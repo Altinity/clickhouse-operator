@@ -113,6 +113,10 @@ func parseSettingScalarValue(untyped any) (string, bool) {
 	return "", false
 }
 
+func (s *Setting) IsEmpty() bool {
+	return s == nil
+}
+
 // IsScalar checks whether setting is a scalar value
 func (s *Setting) IsScalar() bool {
 	return s.Type() == SettingTypeScalar

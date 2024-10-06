@@ -22,7 +22,6 @@ import (
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/altinity/clickhouse-operator/pkg/xml"
 )
 
 const (
@@ -59,33 +58,16 @@ func newGenerator(cr chi.ICustomResource, namer interfaces.INameManager, opts *G
 	}
 }
 
-// generateXMLConfig creates XML using map[string]string definitions
-func (c *Generator) generateXMLConfig(settings *chi.Settings, prefix string) string {
-	if settings.Len() == 0 {
-		return ""
-	}
-
-	b := &bytes.Buffer{}
-	// <yandex>
-	// XML code
-	// </yandex>
-	util.Iline(b, 0, "<"+xmlTagYandex+">")
-	xml.GenerateFromSettings(b, settings, prefix)
-	util.Iline(b, 0, "</"+xmlTagYandex+">")
-
-	return b.String()
-}
-
 // getGlobalSettings creates data for global section of "settings.xml"
 func (c *Generator) getGlobalSettings() string {
 	// No host specified means request to generate common config
-	return c.generateXMLConfig(c.opts.Settings, "")
+	return c.opts.Settings.ClickHouseConfig()
 }
 
 // getHostSettings creates data for host section of "settings.xml"
 func (c *Generator) getHostSettings(host *chi.Host) string {
 	// Generate config for the specified host
-	return c.generateXMLConfig(host.Settings, "")
+	return host.Settings.ClickHouseConfig()
 }
 
 // getSectionFromFiles creates data for custom common config files
@@ -106,17 +88,17 @@ func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnsp
 
 // getUsers creates data for users section. Used as "users.xml"
 func (c *Generator) getUsers() string {
-	return c.generateXMLConfig(c.opts.Users, configUsers)
+	return c.opts.Users.ClickHouseConfig(configUsers)
 }
 
 // getProfiles creates data for profiles section. Used as "profiles.xml"
 func (c *Generator) getProfiles() string {
-	return c.generateXMLConfig(c.opts.Profiles, configProfiles)
+	return c.opts.Profiles.ClickHouseConfig(configProfiles)
 }
 
 // getQuotas creates data for "quotas.xml"
 func (c *Generator) getQuotas() string {
-	return c.generateXMLConfig(c.opts.Quotas, configQuotas)
+	return c.opts.Quotas.ClickHouseConfig(configQuotas)
 }
 
 // getHostZookeeper creates data for "zookeeper.xml"

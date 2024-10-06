@@ -72,10 +72,6 @@ const (
 )
 
 const (
-	xmlTagClickHouse = "clickhouse"
-)
-
-const (
 	configServerId = "server-id"
 	configRaft     = "raft"
 	configSettings = "settings"

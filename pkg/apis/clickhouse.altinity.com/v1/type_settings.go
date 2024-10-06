@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/xml"
 )
 
 // Specify returned errors for being re-used
@@ -156,6 +158,14 @@ func (s *Settings) WalkSafe(f func(name string, setting *Setting)) {
 	})
 }
 
+// WalkNames walks over settings with a function. Function receives name.
+// Storage key is used internally.
+func (s *Settings) WalkNames(f func(name string)) {
+	s.WalkKeys(func(key string, _setting *Setting) {
+		f(s.Key2Name(key))
+	})
+}
+
 // HasKey checks whether key setting exists.
 func (s *Settings) HasKey(key string) bool {
 	if s == nil {
@@ -190,6 +200,12 @@ func (s *Settings) GetKey(key string) *Setting {
 // Get gets named setting.
 // Storage key is used internally.
 func (s *Settings) Get(name string) *Setting {
+	return s.GetKey(s.Name2Key(name))
+}
+
+// GetA gets named setting.
+// Storage key is used internally.
+func (s *Settings) GetA(name string) any {
 	return s.GetKey(s.Name2Key(name))
 }
 
@@ -561,6 +577,30 @@ func (s *Settings) normalizeKeys() {
 	for _, unNormalizedKey := range keysToNormalize {
 		s.DeleteKey(unNormalizedKey)
 	}
+}
+
+const xmlTagClickHouse = "clickhouse"
+
+// ClickHouseConfig produces ClickHouse config
+func (s *Settings) ClickHouseConfig(_prefix ...string) string {
+	if s.Len() == 0 {
+		return ""
+	}
+
+	prefix := ""
+	if len(_prefix) > 0 {
+		prefix = _prefix[0]
+	}
+
+	b := &bytes.Buffer{}
+	// <clickhouse>
+	//   XML code
+	// </clickhouse>
+	util.Iline(b, 0, "<"+xmlTagClickHouse+">")
+	xml.GenerateFromSettings(b, s, prefix)
+	util.Iline(b, 0, "</"+xmlTagClickHouse+">")
+
+	return b.String()
 }
 
 // normalizeKeyAsPath normalizes key which is treated as a path

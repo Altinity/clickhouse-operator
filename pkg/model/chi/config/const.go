@@ -104,6 +104,4 @@ const (
 const (
 	// ZkDefaultPort specifies Zookeeper default port
 	ZkDefaultPort = 2181
-	// ZkDefaultRootTemplate specifies default ZK root - /clickhouse/{namespace}/{chi name}
-	ZkDefaultRootTemplate = "/clickhouse/%s/%s"
 )

@@ -15,12 +15,8 @@
 package config
 
 import (
-	"bytes"
-
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/altinity/clickhouse-operator/pkg/xml"
 )
 
 // Generator generates configuration files content for specified CR
@@ -41,33 +37,16 @@ func newGenerator(cr chi.ICustomResource, namer interfaces.INameManager, opts *G
 	}
 }
 
-// generateXMLConfig creates XML using map[string]string definitions
-func (c *Generator) generateXMLConfig(settings *chi.Settings, prefix string) string {
-	if settings.Len() == 0 {
-		return ""
-	}
-
-	b := &bytes.Buffer{}
-	// <clickhouse>
-	//   XML code
-	// </clickhouse>
-	util.Iline(b, 0, "<"+xmlTagClickHouse+">")
-	xml.GenerateFromSettings(b, settings, prefix)
-	util.Iline(b, 0, "</"+xmlTagClickHouse+">")
-
-	return b.String()
-}
-
 // getGlobalSettings creates data for global section of "settings.xml"
 func (c *Generator) getGlobalSettings() string {
 	// No host specified means request to generate common config
-	return c.generateXMLConfig(c.opts.Settings, "")
+	return c.opts.Settings.ClickHouseConfig()
 }
 
 // getHostSettings creates data for host section of "settings.xml"
 func (c *Generator) getHostSettings(host *chi.Host) string {
 	// Generate config for the specified host
-	return c.generateXMLConfig(host.Settings, "")
+	return host.Settings.ClickHouseConfig()
 }
 
 // getSectionFromFiles creates data for custom common config files
@@ -95,14 +74,14 @@ func (c *Generator) getRaftConfig() string {
 		settings.Set("keeper_server/raft_configuration/server/port", chi.MustNewSettingScalarFromAny(_host.RaftPort.Value()))
 		return nil
 	})
-	return c.generateXMLConfig(settings, "")
+	return settings.ClickHouseConfig()
 }
 
 // getHostServerId builds server id config for the host
 func (c *Generator) getHostServerId(host *chi.Host) string {
 	settings := chi.NewSettings()
 	settings.Set("keeper_server/server_id", chi.MustNewSettingScalarFromAny(getServerId(host)))
-	return c.generateXMLConfig(settings, "")
+	return settings.ClickHouseConfig()
 }
 
 func getServerId(host *chi.Host) int {
