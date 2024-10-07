@@ -15,8 +15,11 @@
 package config
 
 import (
+	"bytes"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+	"strings"
 )
 
 // Generator generates configuration files content for specified CR
@@ -67,14 +70,32 @@ func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnsp
 
 // getRaftConfig builds raft config for the chk
 func (c *Generator) getRaftConfig() string {
-	settings := chi.NewSettings()
-	c.cr.WalkHosts(func(_host *chi.Host) error {
-		settings.Set("keeper_server/raft_configuration/server/id", chi.MustNewSettingScalarFromAny(getServerId(_host)))
-		settings.Set("keeper_server/raft_configuration/server/hostname", chi.NewSettingScalar(c.namer.Name(interfaces.NameInstanceHostname, _host)))
-		settings.Set("keeper_server/raft_configuration/server/port", chi.MustNewSettingScalarFromAny(_host.RaftPort.Value()))
+	// Prepare empty placeholder for RAFT config and will be replaced later in this function:
+	// <raft_configuration>
+	//     <server></server>
+	// </raft_configuration>
+	config := chi.NewSettings().Set("keeper_server/raft_configuration/server", chi.NewSettingScalar("")).ClickHouseConfig()
+
+	// 3-rd level (keeper_server/raft_configuration/server) by 4 spaces
+	raftIndent := 12
+	// Prepare RAFT config for injection into main config
+	raft := &bytes.Buffer{}
+	c.cr.WalkHosts(func(host *chi.Host) error {
+		util.Iline(raft, raftIndent, "<server>")
+		util.Iline(raft, raftIndent, "    <id>%d</id>", getServerId(host))
+		util.Iline(raft, raftIndent, "    <hostname>%s</hostname>", c.namer.Name(interfaces.NameInstanceHostname, host))
+		util.Iline(raft, raftIndent, "    <port>%d</port>", host.RaftPort.Value())
+		util.Iline(raft, raftIndent, "</server>")
 		return nil
 	})
-	return settings.ClickHouseConfig()
+
+	// Inject RAFT config
+	// Replace empty placeholder for RAFT config with actual RAFT config value
+	// <raft_configuration>
+	//     <server></server>
+	// </raft_configuration>
+	// TODO use raftIndent value here instead of spaces
+	return strings.Replace(config, "            <server></server>\n", raft.String(), 1)
 }
 
 // getHostServerId builds server id config for the host
