@@ -14,11 +14,15 @@
 
 package config
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/config"
+)
 
 // FilesGeneratorOptions specifies options for configuration files generator
 type FilesGeneratorOptions struct {
-	host *api.Host
+	host        *api.Host
+	RaftOptions *config.HostSelector
 }
 
 // defaultFilesGeneratorOptions creates new default options for files generator
@@ -43,6 +47,24 @@ func (o *FilesGeneratorOptions) SetHost(host *api.Host) *FilesGeneratorOptions {
 		return nil
 	}
 	o.host = host
+
+	return o
+}
+
+// GetRaftOptions gets RAFT generator options
+func (o *FilesGeneratorOptions) GetRaftOptions() *config.HostSelector {
+	if o == nil {
+		return nil
+	}
+	return o.RaftOptions
+}
+
+// SetRaftOptions sets RAFT generator options
+func (o *FilesGeneratorOptions) SetRaftOptions(opts *config.HostSelector) *FilesGeneratorOptions {
+	if o == nil {
+		return nil
+	}
+	o.RaftOptions = opts
 
 	return o
 }

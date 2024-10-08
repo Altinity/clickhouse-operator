@@ -37,6 +37,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
+	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
@@ -395,12 +396,26 @@ func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 	})
 }
 
-// options build FilesGeneratorOptionsClickHouse
-func (w *worker) options() *config.FilesGeneratorOptions {
-	return config.NewFilesGeneratorOptions()
+// getRaftGeneratorOptions build base set of RaftOptions
+func (w *worker) getRaftGeneratorOptions() *commonConfig.HostSelector {
+	// Raft specifies to exclude:
+	// 1. all newly added hosts
+	// 2. all explicitly excluded hosts
+	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
+		api.NewHostReconcileAttributes().
+			SetAdd().
+			SetExclude(),
+	)
 }
 
-// createCHIFromObjectMeta
+// options build FilesGeneratorOptionsClickHouse
+func (w *worker) options() *config.FilesGeneratorOptions {
+	opts := w.getRaftGeneratorOptions()
+	w.a.Info("RaftOptions: %s", opts)
+	return config.NewFilesGeneratorOptions().SetRaftOptions(opts)
+}
+
+// createCRFromObjectMeta
 func (w *worker) createCRFromObjectMeta(meta meta.Object, isCHI bool, options *commonNormalizer.Options) (*apiChk.ClickHouseKeeperInstallation, error) {
 	w.a.V(3).M(meta).S().P()
 	defer w.a.V(3).M(meta).E().P()

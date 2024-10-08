@@ -71,7 +71,7 @@ func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOpt
 }
 
 func (c *FilesGenerator) createConfigFilesGroupCommonDomain(configSections map[string]string, options *FilesGeneratorOptions) {
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configRaft), c.configGenerator.getRaftConfig())
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configRaft), c.configGenerator.getRaftConfig(options.GetRaftOptions()))
 }
 
 func (c *FilesGenerator) createConfigFilesGroupCommonGeneric(configSections map[string]string, options *FilesGeneratorOptions) {

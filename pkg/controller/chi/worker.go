@@ -40,6 +40,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
+	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
@@ -113,7 +114,6 @@ func configGeneratorOptions(cr *api.ClickHouseInstallation) *config.GeneratorOpt
 	}
 }
 
-// newContext creates new reconcile task
 func (w *worker) newTask(cr *api.ClickHouseInstallation) {
 	w.task = common.NewTask(
 		commonCreator.NewCreator(
@@ -663,12 +663,11 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 }
 
 // getRemoteServersGeneratorOptions build base set of RemoteServersOptions
-// which are applied on each of `remote_servers` reconfiguration during reconcile cycle
-func (w *worker) getRemoteServersGeneratorOptions() *config.RemoteServersOptions {
-	// Base chiModel.RemoteServersOptions specifies to exclude:
+func (w *worker) getRemoteServersGeneratorOptions() *commonConfig.HostSelector {
+	// Base model specifies to exclude:
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
-	return config.NewRemoteServersOptions().ExcludeReconcileAttributes(
+	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
 		api.NewHostReconcileAttributes().
 			SetAdd().
 			SetExclude(),
@@ -682,7 +681,7 @@ func (w *worker) options() *config.FilesGeneratorOptions {
 	return config.NewFilesGeneratorOptions().SetRemoteServersOptions(opts)
 }
 
-// createCHIFromObjectMeta
+// createCRFromObjectMeta
 func (w *worker) createCRFromObjectMeta(meta meta.Object, isCHI bool, options *commonNormalizer.Options) (*api.ClickHouseInstallation, error) {
 	w.a.V(3).M(meta).S().P()
 	defer w.a.V(3).M(meta).E().P()

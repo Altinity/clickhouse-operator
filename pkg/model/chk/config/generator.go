@@ -16,10 +16,14 @@ package config
 
 import (
 	"bytes"
+	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/config"
+	"strings"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"strings"
 )
 
 // Generator generates configuration files content for specified CR
@@ -69,23 +73,29 @@ func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnsp
 }
 
 // getRaftConfig builds raft config for the chk
-func (c *Generator) getRaftConfig() string {
-	// Prepare empty placeholder for RAFT config and will be replaced later in this function:
+func (c *Generator) getRaftConfig(selector *config.HostSelector) string {
+	// Prepare empty placeholder for RAFT config which will be replaced later with real raft config
 	// <raft_configuration>
 	//     <server></server>
 	// </raft_configuration>
 	config := chi.NewSettings().Set("keeper_server/raft_configuration/server", chi.NewSettingScalar("")).ClickHouseConfig()
 
+	// Prepare RAFT config
 	// 3-rd level (keeper_server/raft_configuration/server) by 4 spaces
 	raftIndent := 12
 	// Prepare RAFT config for injection into main config
 	raft := &bytes.Buffer{}
 	c.cr.WalkHosts(func(host *chi.Host) error {
-		util.Iline(raft, raftIndent, "<server>")
-		util.Iline(raft, raftIndent, "    <id>%d</id>", getServerId(host))
-		util.Iline(raft, raftIndent, "    <hostname>%s</hostname>", c.namer.Name(interfaces.NameInstanceHostname, host))
-		util.Iline(raft, raftIndent, "    <port>%d</port>", host.RaftPort.Value())
-		util.Iline(raft, raftIndent, "</server>")
+		msg := fmt.Sprintf("SKIP host from RAFT servers: %s", host.GetName())
+		if selector.Include(host) {
+			util.Iline(raft, raftIndent, "<server>")
+			util.Iline(raft, raftIndent, "    <id>%d</id>", getServerId(host))
+			util.Iline(raft, raftIndent, "    <hostname>%s</hostname>", c.namer.Name(interfaces.NameInstanceHostname, host))
+			util.Iline(raft, raftIndent, "    <port>%d</port>", host.RaftPort.Value())
+			util.Iline(raft, raftIndent, "</server>")
+			msg = fmt.Sprintf("Add host to RAFT servers: %s", host.GetName())
+		}
+		log.V(1).M(host).Info(msg)
 		return nil
 	})
 

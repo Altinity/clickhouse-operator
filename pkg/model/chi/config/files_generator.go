@@ -71,7 +71,6 @@ func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOpt
 }
 
 func (c *FilesGenerator) createConfigFilesGroupCommonDomain(configSections map[string]string, options *FilesGeneratorOptions) {
-	// remote servers
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configRemoteServers), c.configGenerator.getRemoteServers(options.GetRemoteServersOptions()))
 }
 

@@ -15,10 +15,8 @@
 package config
 
 import (
-	"fmt"
-	"strings"
-
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/config"
 )
 
 type GeneratorOptions struct {
@@ -31,105 +29,6 @@ type GeneratorOptions struct {
 	Files    *api.Settings
 }
 
-// RemoteServersOptions specifies options for remote-servers generator
-type RemoteServersOptions struct {
-	exclude struct {
-		attributes *api.HostReconcileAttributes
-		hosts      []*api.Host
-	}
-}
-
-// NewRemoteServersOptions creates new remote-servers generator options
-func NewRemoteServersOptions() *RemoteServersOptions {
-	return &RemoteServersOptions{}
-}
-
-// ExcludeHost specifies to exclude a host
-func (o *RemoteServersOptions) ExcludeHost(host *api.Host) *RemoteServersOptions {
-	if (o == nil) || (host == nil) {
-		return o
-	}
-
-	o.exclude.hosts = append(o.exclude.hosts, host)
-	return o
-}
-
-// ExcludeHosts specifies to exclude list of hosts
-func (o *RemoteServersOptions) ExcludeHosts(hosts ...*api.Host) *RemoteServersOptions {
-	if (o == nil) || (len(hosts) == 0) {
-		return o
-	}
-
-	o.exclude.hosts = append(o.exclude.hosts, hosts...)
-	return o
-}
-
-// ExcludeReconcileAttributes specifies to exclude reconcile attributes
-func (o *RemoteServersOptions) ExcludeReconcileAttributes(attrs *api.HostReconcileAttributes) *RemoteServersOptions {
-	if (o == nil) || (attrs == nil) {
-		return o
-	}
-
-	o.exclude.attributes = attrs
-	return o
-}
-
-// Exclude tells whether to exclude the host
-func (o *RemoteServersOptions) Exclude(host *api.Host) bool {
-	if o == nil {
-		return false
-	}
-
-	if o.exclude.attributes.Any(host.GetReconcileAttributes()) {
-		// Reconcile attributes specify to exclude this host
-		return true
-	}
-
-	for _, val := range o.exclude.hosts {
-		// Host is in the list to be excluded
-		if val == host {
-			return true
-		}
-	}
-
-	return false
-}
-
-// Include tells whether to include the host
-func (o *RemoteServersOptions) Include(host *api.Host) bool {
-	if o == nil {
-		return false
-	}
-
-	if o.exclude.attributes.Any(host.GetReconcileAttributes()) {
-		// Reconcile attributes specify to exclude this host
-		return false
-	}
-
-	for _, val := range o.exclude.hosts {
-		// Host is in the list to be excluded
-		if val == host {
-			return false
-		}
-	}
-
-	return true
-}
-
-// String returns string representation
-func (o *RemoteServersOptions) String() string {
-	if o == nil {
-		return "(nil)"
-	}
-
-	var hostnames []string
-	for _, host := range o.exclude.hosts {
-		hostnames = append(hostnames, host.Name)
-	}
-	return fmt.Sprintf("exclude hosts: %s, attributes: %s", "["+strings.Join(hostnames, ",")+"]", o.exclude.attributes)
-}
-
-// defaultRemoteServersOptions
-func defaultRemoteServersOptions() *RemoteServersOptions {
-	return NewRemoteServersOptions()
+func defaultRemoteServersOptions() *config.HostSelector {
+	return config.NewHostSelector()
 }
