@@ -28,7 +28,7 @@ type versionOptions struct {
 
 func (opts versionOptions) shouldSkip(host *api.Host) (bool, string) {
 	if opts.skipNew {
-		if host.IsNewOne() {
+		if !host.HasAncestor() {
 			return true, "host is a new one, version is not not applicable"
 		}
 	}
