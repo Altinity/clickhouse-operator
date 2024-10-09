@@ -138,7 +138,7 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 		// This host is listed as having tables created already, no need to migrate again
 		return false
 
-	case host.IsNewOne():
+	case host.IsInNewCluster():
 		// CHI is new, all hosts were added
 		return false
 	}

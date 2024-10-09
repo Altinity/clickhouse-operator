@@ -197,27 +197,27 @@ func (w *worker) isGenerationTheSame(old, new *apiChk.ClickHouseKeeperInstallati
 	return old.GetGeneration() == new.GetGeneration()
 }
 
-func (w *worker) markReconcileStart(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation, ap *action_plan.ActionPlan) {
+func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
 	}
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
-	chk.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
-	_ = w.c.updateCRObjectStatus(ctx, chk, types.UpdateStatusOptions{
+	cr.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
+	_ = w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
 		},
 	})
 
 	w.a.V(1).
-		WithEvent(chk, common.EventActionReconcile, common.EventReasonReconcileStarted).
-		WithStatusAction(chk).
-		WithStatusActions(chk).
-		M(chk).F().
-		Info("reconcile started, task id: %s", chk.GetSpecT().GetTaskID())
-	w.a.V(2).M(chk).F().Info("action plan\n%s\n", ap.String())
+		WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileStarted).
+		WithStatusAction(cr).
+		WithStatusActions(cr).
+		M(cr).F().
+		Info("reconcile started, task id: %s", cr.GetSpecT().GetTaskID())
+	w.a.V(2).M(cr).F().Info("action plan\n%s\n", ap.String())
 }
 
 func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chk *apiChk.ClickHouseKeeperInstallation) {
@@ -374,8 +374,13 @@ func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 			return nil
 		default:
 			w.a.V(3).M(chk).Info("Walking over CR hosts. Host: is not clear yet (not detected as added or modified) Host: %s", host.GetName())
-			w.a.V(1).M(chk).Info("Add host as FOUND via host. Host: %s", host.GetName())
-			host.GetReconcileAttributes().SetFound()
+			if host.HasAncestor() {
+				w.a.V(1).M(chk).Info("Add host as FOUND via host. Host: %s", host.GetName())
+				host.GetReconcileAttributes().SetFound()
+			} else {
+				w.a.V(1).M(chk).Info("Add host as ADD via host. Host: %s", host.GetName())
+				host.GetReconcileAttributes().SetAdd()
+			}
 		}
 		return nil
 	})
@@ -402,9 +407,9 @@ func (w *worker) getRaftGeneratorOptions() *commonConfig.HostSelector {
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
-		api.NewHostReconcileAttributes().
-			SetAdd().
-			SetExclude(),
+		api.NewHostReconcileAttributes(),
+		//SetAdd().
+		//SetExclude(),
 	)
 }
 

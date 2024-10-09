@@ -95,7 +95,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		w.a.WithEvent(new, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusError(new).
 			M(new).F().
-			Error("FAILED to reconcile CHI %s, err: %v", util.NamespaceNameString(new), err)
+			Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 		if errors.Is(err, common.ErrCRUDAbort) {
 		}
@@ -281,7 +281,7 @@ func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) err
 }
 
 // reconcileHostStatefulSet reconciles host's StatefulSet
-func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts ...*statefulset.ReconcileOptions) error {
+func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -299,7 +299,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	if w.shouldForceRestartHost(host) {
 		w.a.V(1).M(host).F().Info("Reconcile host: %s. Shutting host down due to force restart", host.GetName())
 		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
-		_ = w.stsReconciler.ReconcileStatefulSet(ctx, host, false)
+		_ = w.stsReconciler.ReconcileStatefulSet(ctx, host, false, opts)
 		metrics.HostReconcilesRestart(ctx, host.GetCR())
 		// At this moment StatefulSet has 0 replicas.
 		// First stage of RollingUpdate completed.
@@ -308,7 +308,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. Reconcile StatefulSet", host.GetName())
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
-	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, true, opts...)
+	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, true, opts)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
 	} else {
@@ -365,7 +365,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.Cluster) 
 	w.a.V(2).M(cluster).S().P()
 	defer w.a.V(2).M(cluster).E().P()
 
-	// Add ChkCluster's Service
+	// Add Cluster Service
 	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster); service != nil {
 		if err := w.reconcileService(ctx, cluster.GetRuntime().GetCR(), service); err == nil {
 			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
@@ -548,6 +548,12 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 // reconcileHostPrepare reconciles specified ClickHouse host
 func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error {
+	w.a.V(1).
+		M(host).F().
+		Info("Include host into cluster. Host/shard/cluster: %d/%d/%s",
+			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+
+	w.includeHostIntoRaftCluster(ctx, host)
 	return nil
 }
 
@@ -556,6 +562,10 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	var (
 		reconcileStatefulSetOpts *statefulset.ReconcileOptions
 	)
+
+	if host.IsFirst() || host.IsLast() {
+		reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetDoNotWait()
+	}
 
 	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
 		w.a.V(1).
@@ -577,7 +587,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		// In case of data loss detection on existing volumes, we need to:
 		// 1. recreate StatefulSet
 		// 2. run tables migration again
-		reconcileStatefulSetOpts = statefulset.NewReconcileStatefulSetOptions(true)
+		reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetForceRecreate()
 		w.a.V(1).
 			M(host).F().
 			Info("Data loss detected for host: %s. Will do force migrate", host.GetName())

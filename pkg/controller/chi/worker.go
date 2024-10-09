@@ -463,27 +463,27 @@ func (w *worker) addCHIToMonitoring(chi *api.ClickHouseInstallation) {
 	w.c.updateWatch(chi)
 }
 
-func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
+func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
 	}
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
-	chi.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
-	_ = w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
+	cr.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
+	_ = w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
 		},
 	})
 
 	w.a.V(1).
-		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileStarted).
-		WithStatusAction(chi).
-		WithStatusActions(chi).
-		M(chi).F().
-		Info("reconcile started, task id: %s", chi.GetSpecT().GetTaskID())
-	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
+		WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileStarted).
+		WithStatusAction(cr).
+		WithStatusActions(cr).
+		M(cr).F().
+		Info("reconcile started, task id: %s", cr.GetSpecT().GetTaskID())
+	w.a.V(2).M(cr).F().Info("action plan\n%s\n", ap.String())
 }
 
 func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *api.ClickHouseInstallation) {

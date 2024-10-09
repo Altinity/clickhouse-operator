@@ -85,13 +85,6 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 		return nil
 	}
 
-	w.a.V(1).
-		M(host).F().
-		Info("Include host into cluster. Host/shard/cluster: %d/%d/%s",
-			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-
-	w.includeHostIntoRaftCluster(ctx, host)
-
 	return nil
 }
 
