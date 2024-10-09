@@ -270,6 +270,10 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
         trigger_event.set()
         join()
 
+    with Then("I recreate shell"):
+        shell = get_shell()
+        self.context.shell = shell
+
     with Then("Check that table is here"):
         tables = clickhouse.query(chi, "SHOW TABLES")
         assert "test_local" in tables
@@ -401,6 +405,10 @@ def test_operator_restart(self, manifest, service, version=None):
     )
     trigger_event.set()
     join()
+
+    with Then("I recreate shell"):
+        shell = get_shell()
+        self.context.shell = shell
 
     with Then("Local tables should have exactly the same number of rows"):
         cnt0 = clickhouse.query(chi, "select count() from test_local", host=f'chi-{chi}-{cluster}-0-0-0')
@@ -548,6 +556,10 @@ def test_008_3(self):
     )
     trigger_event.set()
     join()
+
+    with Then("I recreate shell"):
+        shell = get_shell()
+        self.context.shell = shell
 
     with Finally("I clean up"):
         delete_test_namespace()
