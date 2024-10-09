@@ -4611,7 +4611,7 @@ def test_049(self):
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
     keeper_version_from = "24.3.5.46"
-    keeper_version_to = "24.5"
+    keeper_version_to = "24.8.5.115"
     with Given("CHI with 2 replicas"):
         kubectl.create_and_check(
             manifest=manifest,
