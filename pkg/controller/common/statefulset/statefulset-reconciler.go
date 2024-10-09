@@ -103,22 +103,22 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 	curStatefulSet, err := r.sts.Get(context.TODO(), new)
 	switch {
 	case curStatefulSet != nil:
-		r.a.V(2).M(new).Info("Have StatefulSet available, try to perform label-based comparison for sts: %s", util.NamespaceNameString(new))
+		r.a.V(1).M(new).Info("Have StatefulSet available, try to perform label-based comparison for sts: %s", util.NamespaceNameString(new))
 		return common.GetObjectStatusFromMetas(r.labeler, curStatefulSet, new)
 
 	case apiErrors.IsNotFound(err):
 		// StatefulSet is not found at the moment.
 		// However, it may be just deleted
-		r.a.V(2).M(new).Info("No cur StatefulSet available and the reason is - not found. Either new one or a deleted sts: %s", util.NamespaceNameString(new))
-		if host.IsNewOne() {
-			r.a.V(2).M(new).Info("No cur StatefulSet available and it is not found and is a new one. New one for: %s", util.NamespaceNameString(new))
-			return api.ObjectStatusNew
+		r.a.V(1).M(new).Info("No cur StatefulSet available and the reason is - not found. Either new one or a deleted sts: %s", util.NamespaceNameString(new))
+		if host.HasAncestor() {
+			r.a.V(1).M(new).Warning("No cur StatefulSet available but host has an ancestor. Found deleted StatefulSet. for: %s", util.NamespaceNameString(new))
+			return api.ObjectStatusModified
 		}
-		r.a.V(1).M(new).Warning("No cur StatefulSet available but host has an ancestor. Found deleted StatefulSet. for: %s", util.NamespaceNameString(new))
-		return api.ObjectStatusModified
+		r.a.V(1).M(new).Info("No cur StatefulSet available and it is not found and is a new one. New one for: %s", util.NamespaceNameString(new))
+		return api.ObjectStatusNew
 
 	default:
-		r.a.V(2).M(new).Warning("Have no StatefulSet available, nor it is not found for: %s err: %v", util.NamespaceNameString(new), err)
+		r.a.V(1).M(new).Warning("Have no StatefulSet available, nor it is not found for: %s err: %v", util.NamespaceNameString(new), err)
 		return api.ObjectStatusUnknown
 	}
 }
@@ -128,7 +128,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	ctx context.Context,
 	host *api.Host,
 	register bool,
-	opts ...*ReconcileOptions,
+	opts *ReconcileOptions,
 ) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -162,19 +162,18 @@ func (r *Reconciler) ReconcileStatefulSet(
 		common.DumpStatefulSetDiff(host, host.Runtime.CurStatefulSet, newStatefulSet)
 	}
 
-	opt := NewReconcileOptionsSet(opts...).First()
 	switch {
-	case opt.ForceRecreate():
+	case opts.IsForceRecreate():
 		// Force recreate prevails over all other requests
-		r.recreateStatefulSet(ctx, host, register)
+		r.recreateStatefulSet(ctx, host, register, opts)
 	default:
 		// We have (or had in the past) StatefulSet - try to update|recreate it
-		err = r.updateStatefulSet(ctx, host, register)
+		err = r.updateStatefulSet(ctx, host, register, opts)
 	}
 
 	if apiErrors.IsNotFound(err) {
 		// StatefulSet not found - even during Update process - try to create it
-		err = r.createStatefulSet(ctx, host, register)
+		err = r.createStatefulSet(ctx, host, register, opts)
 	}
 
 	// Host has to know current StatefulSet and Pod
@@ -184,7 +183,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 }
 
 // recreateStatefulSet
-func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, register bool) error {
+func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -195,11 +194,11 @@ func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, re
 
 	_ = r.doDeleteStatefulSet(ctx, host)
 	_ = r.storage.ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
-	return r.createStatefulSet(ctx, host, register)
+	return r.createStatefulSet(ctx, host, register, opts)
 }
 
 // updateStatefulSet
-func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, register bool) error {
+func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -259,7 +258,7 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
 		common.DumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
-		return r.recreateStatefulSet(ctx, host, register)
+		return r.recreateStatefulSet(ctx, host, register, opts)
 	case common.ErrCRUDUnexpectedFlow:
 		r.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
 		return nil
@@ -270,7 +269,7 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 }
 
 // createStatefulSet
-func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, register bool) error {
+func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -287,7 +286,7 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 		M(host).F().
 		Info("Create StatefulSet %s - started", util.NamespaceNameString(statefulSet))
 
-	action := r.doCreateStatefulSet(ctx, host)
+	action := r.doCreateStatefulSet(ctx, host, opts)
 
 	if register {
 		host.GetCR().IEnsureStatus().HostAdded()
@@ -374,7 +373,7 @@ func (r *Reconciler) waitForConfigMapPropagation(ctx context.Context, host *api.
 }
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
-func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host) common.ErrorCRUD {
+func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, opts *ReconcileOptions) common.ErrorCRUD {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -389,13 +388,18 @@ func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host) co
 		return common.ErrCRUDRecreate
 	}
 
-	// StatefulSet created, wait until host is ready
-	if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
-		log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
-		return r.fallback.OnStatefulSetCreateFailed(ctx, host)
+	if opts.IsDoNotWait() {
+		// StatefulSet created, do not wait until host is ready, go by
+		log.V(1).M(host).F().Info("Will NOT wait for StatefulSet to be ready, consider it is created successfully")
+	} else {
+		// StatefulSet created, wait until host is ready
+		if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
+			log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
+			return r.fallback.OnStatefulSetCreateFailed(ctx, host)
+		}
+		log.V(2).M(host).F().Info("Target generation reached, StatefulSet created successfully")
 	}
 
-	log.V(2).M(host).F().Info("Target generation reached, StatefulSet created successfully")
 	return nil
 }
 
