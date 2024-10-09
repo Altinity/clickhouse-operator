@@ -29,6 +29,6 @@ type GeneratorOptions struct {
 	Files    *api.Settings
 }
 
-func defaultRemoteServersOptions() *config.HostSelector {
+func defaultIncludeAllSelector() *config.HostSelector {
 	return config.NewHostSelector()
 }

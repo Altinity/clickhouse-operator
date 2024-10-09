@@ -237,7 +237,7 @@ func (c *Generator) getRemoteServersReplica(host *chi.Host, b *bytes.Buffer) {
 // getRemoteServers creates "remote_servers.xml" content and calculates data generation parameters for other sections
 func (c *Generator) getRemoteServers(selector *config.HostSelector) string {
 	if selector == nil {
-		selector = defaultRemoteServersOptions()
+		selector = defaultIncludeAllSelector()
 	}
 
 	b := &bytes.Buffer{}

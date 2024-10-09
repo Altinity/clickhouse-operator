@@ -74,6 +74,10 @@ func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnsp
 
 // getRaftConfig builds raft config for the chk
 func (c *Generator) getRaftConfig(selector *config.HostSelector) string {
+	if selector == nil {
+		selector = defaultIncludeAllSelector()
+	}
+
 	// Prepare empty placeholder for RAFT config which will be replaced later with real raft config
 	// <raft_configuration>
 	//     <server></server>
