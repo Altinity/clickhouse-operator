@@ -52,7 +52,7 @@ func (c *PVC) UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClai
 	_, err := c.Get(ctx, pvc.Namespace, pvc.Name)
 	if err != nil {
 		if apiErrors.IsNotFound(err) {
-			// This is not an error per se, means PVC is not created (yet)?
+			log.V(1).M(pvc).F().Error("PVC not found, need to create %s", util.NamespacedName(pvc))
 			_, err = c.Create(ctx, pvc)
 			if err != nil {
 				log.V(1).M(pvc).F().Error("unable to Create PVC err: %v", err)

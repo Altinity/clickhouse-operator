@@ -252,8 +252,8 @@ func (w *Reconciler) reconcilePVC(
 		return nil, errNilPVC
 	}
 
-	log.V(2).M(host).S().Info("reconcile PVC (%s/%s)", util.NamespacedName(pvc), host.GetName())
-	defer log.V(2).M(host).E().Info("reconcile PVC (%s/%s)", util.NamespacedName(pvc), host.GetName())
+	log.V(1).M(host).S().Info("reconcile PVC (%s/%s)", util.NamespacedName(pvc), host.GetName())
+	defer log.V(1).M(host).E().Info("reconcile PVC (%s/%s)", util.NamespacedName(pvc), host.GetName())
 
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
