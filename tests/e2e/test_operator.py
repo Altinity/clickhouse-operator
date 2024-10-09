@@ -2239,13 +2239,7 @@ def test_021(self, step=1):
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "simple"
 
-    with Given("Default storage class is expandable"):
-        default_storage_class = kubectl.get_default_storage_class()
-        assert default_storage_class is not None
-        assert len(default_storage_class) > 0
-        allow_volume_expansion = kubectl.get_field("storageclass", default_storage_class, ".allowVolumeExpansion")
-        if allow_volume_expansion != "true":
-            kubectl.launch(f"patch storageclass {default_storage_class} -p '{{\"allowVolumeExpansion\":true}}'")
+    util.require_expandable_storage_class()
 
     kubectl.create_and_check(
         manifest=manifest,
@@ -3770,9 +3764,11 @@ def test_037(self):
     cluster = "default"
     manifest = f"manifests/chi/test-037-1-storagemanagement-switch.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
-    util.require_keeper(keeper_type=self.context.keeper_type)
 
-    with Given("chi exists"):
+    util.require_keeper(keeper_type=self.context.keeper_type)
+    util.require_expandable_storage_class()
+
+    with When("chi exists"):
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -3783,6 +3779,10 @@ def test_037(self):
                 "do_not_delete": 1,
             },
         )
+
+    with And("VolumeClaim is provisioned by StatefulSet"):
+        pvc_templates = kubectl.get_field("sts", f"chi-{chi}-{cluster}-0-0", ".spec.volumeClaimTemplates")
+        assert pvc_templates != None
 
     with And("I time up pod start time"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
@@ -3800,7 +3800,7 @@ def test_037(self):
         clickhouse.query(chi, create_table)
         clickhouse.query(chi, f"INSERT INTO test_local_037 select * from numbers(10000)")
 
-    with When("I switch storageManagement to Operator"):
+    with Then("I switch storageManagement to Operator"):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-037-2-storagemanagement-switch.yaml",
             check={
@@ -3811,6 +3811,10 @@ def test_037(self):
                 "do_not_delete": 1,
             },
         )
+
+    with And("VolumeClaim is provisioned by Operator"):
+        pvc_templates = kubectl.get_field("sts", f"chi-{chi}-{cluster}-0-0", ".spec.volumeClaimTemplates")
+        assert pvc_templates == "<none>"
 
     with And("I check cluster is restarted and time up new pod start time"):
         start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")

@@ -348,3 +348,12 @@ def wait_clickhouse_no_readonly_replicas(chi, retries=20):
                 time.sleep(i * 3)
         if i >= (retries - 1):
             raise RuntimeError(f"FAIL ReadonlyReplica failed, actual={readonly_replicas}, expected={expected_replicas}")
+
+def require_expandable_storage_class():
+    with Given("Default storage class is expandable"):
+        default_storage_class = kubectl.get_default_storage_class()
+        assert default_storage_class is not None
+        assert len(default_storage_class) > 0
+        allow_volume_expansion = kubectl.get_field("storageclass", default_storage_class, ".allowVolumeExpansion")
+        if allow_volume_expansion != "true":
+            kubectl.launch(f"patch storageclass {default_storage_class} -p '{{\"allowVolumeExpansion\":true}}'")
