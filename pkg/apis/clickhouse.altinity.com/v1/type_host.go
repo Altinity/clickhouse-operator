@@ -307,9 +307,9 @@ func (host *Host) IsStopped() bool {
 	return host.GetCR().IsStopped()
 }
 
-// IsNewOne checks whether host is a new one
+// IsInNewCluster checks whether host is in a new cluster
 // TODO unify with model HostIsNewOne
-func (host *Host) IsNewOne() bool {
+func (host *Host) IsInNewCluster() bool {
 	return !host.HasAncestor() && (host.GetCR().IEnsureStatus().GetHostsCount() == host.GetCR().IEnsureStatus().GetHostsAddedCount())
 }
 
@@ -424,6 +424,15 @@ func (host *Host) IsFirst() bool {
 	}
 
 	return host.Runtime.Address.CHIScopeIndex == 0
+}
+
+// IsFirst checks whether the host is the last host of the whole CHI
+func (host *Host) IsLast() bool {
+	if host == nil {
+		return false
+	}
+
+	return host.Runtime.Address.CHIScopeIndex == (host.GetCR().HostsCount() - 1)
 }
 
 // HasCurStatefulSet checks whether host has CurStatefulSet
