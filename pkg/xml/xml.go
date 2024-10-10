@@ -195,7 +195,7 @@ func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string
 		attributes = " remove=\"1\""
 		value = ""
 	}
-	if len(value) < 10 {
+	if len(value) < 32 {
 		// <tag>value</tag>
 		n.writeTagOpen(w, indent, attributes, noEol)
 		n.writeValue(w, value)
@@ -206,6 +206,7 @@ func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string
 		// </tag>
 		n.writeTagOpen(w, indent, attributes, eol)
 		n.writeValue(w, value)
+		n.writeValue(w, eol)
 		n.writeTagClose(w, indent, eol)
 	}
 }
