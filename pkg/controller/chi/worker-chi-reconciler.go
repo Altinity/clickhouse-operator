@@ -576,18 +576,24 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	startTime := time.Now()
 
 	if host.IsFirst() {
-		w.reconcileCRServicePreliminary(ctx, host.GetCR())
+		_ = w.reconcileCRServicePreliminary(ctx, host.GetCR())
 		defer w.reconcileCRServiceFinal(ctx, host.GetCR())
 	}
 
 	// Create artifacts
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
 
-	w.reconcileHostPrepare(ctx, host)
-	w.reconcileHostMain(ctx, host)
+	if err := w.reconcileHostPrepare(ctx, host); err != nil {
+		return err
+	}
+	if err := w.reconcileHostMain(ctx, host); err != nil {
+		return err
+	}
 	// Host is now added and functional
 	host.GetReconcileAttributes().UnsetAdd()
-	w.reconcileHostBootstrap(ctx, host)
+	if err := w.reconcileHostBootstrap(ctx, host); err != nil {
+		return err
+	}
 
 	now := time.Now()
 	hostsCompleted := 0
