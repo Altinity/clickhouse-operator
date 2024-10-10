@@ -20,6 +20,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type xmlNode struct {
@@ -182,6 +184,10 @@ func (n *xmlNode) writeTagNoValue(w io.Writer, attributes string, indent, tabSiz
 // writeTagWithValue prints tag with value. But it must have no children,
 // and children are not printed
 // <tag>value</tag>
+// OR
+// <tag>
+// long value NB - printed w/o indent
+// </tag>
 func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string, indent, tabSize uint8) {
 	// TODO fix this properly
 	// Used in tests
@@ -189,9 +195,19 @@ func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string
 		attributes = " remove=\"1\""
 		value = ""
 	}
-	n.writeTagOpen(w, indent, attributes, noEol)
-	n.writeValue(w, value)
-	n.writeTagClose(w, 0, eol)
+	if len(value) < 10 {
+		// <tag>value</tag>
+		n.writeTagOpen(w, indent, attributes, noEol)
+		n.writeValue(w, value)
+		n.writeTagClose(w, 0, eol)
+	} else {
+		// <tag>
+		// long value NB - printed w/o indent
+		// </tag>
+		n.writeTagOpen(w, indent, attributes, eol)
+		n.writeValue(w, value)
+		n.writeTagClose(w, indent, eol)
+	}
 }
 
 // writeTagOpen prints open XML tag into io.Writer
@@ -217,24 +233,24 @@ func (n *xmlNode) writeTag(w io.Writer, indent uint8, attributes string, openTag
 		if openTag {
 			// pattern would be: %4s<%s%s>%s
 			pattern = fmt.Sprintf("%%%ds<%%s%%s>%%s", indent)
-			_, _ = fmt.Fprintf(w, pattern, " ", n.tag, attributes, eol)
+			util.Fprintf(w, pattern, " ", n.tag, attributes, eol)
 		} else {
 			// pattern would be: %4s</%s>%s
 			pattern = fmt.Sprintf("%%%ds</%%s>%%s", indent)
-			_, _ = fmt.Fprintf(w, pattern, " ", n.tag, eol)
+			util.Fprintf(w, pattern, " ", n.tag, eol)
 		}
 	} else {
 		if openTag {
 			// pattern would be: <%s%s>%s
-			_, _ = fmt.Fprintf(w, "<%s%s>%s", n.tag, attributes, eol)
+			util.Fprintf(w, "<%s%s>%s", n.tag, attributes, eol)
 		} else {
 			// pattern would be: </%s>%s
-			_, _ = fmt.Fprintf(w, "</%s>%s", n.tag, eol)
+			util.Fprintf(w, "</%s>%s", n.tag, eol)
 		}
 	}
 }
 
 // writeValue prints XML value into io.Writer
 func (n *xmlNode) writeValue(w io.Writer, value string) {
-	_, _ = fmt.Fprintf(w, "%s", value)
+	util.Fprintf(w, "%s", value)
 }

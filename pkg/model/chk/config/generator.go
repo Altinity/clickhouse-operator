@@ -17,12 +17,10 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/config"
-	"strings"
-
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -75,48 +73,33 @@ func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnsp
 // getRaftConfig builds raft config for the chk
 func (c *Generator) getRaftConfig(selector *config.HostSelector) string {
 	if selector == nil {
-		selector = defaultIncludeAllSelector()
+		selector = defaultSelectorIncludeAll()
 	}
 
-	// Prepare empty placeholder for RAFT config which will be replaced later with real raft config
-	// <raft_configuration>
-	//     <server></server>
-	// </raft_configuration>
-	config := chi.NewSettings().Set("keeper_server/raft_configuration/server", chi.NewSettingScalar("")).ClickHouseConfig()
-
 	// Prepare RAFT config
-	// 3-rd level (keeper_server/raft_configuration/server) by 4 spaces
-	raftIndent := 12
-	// Prepare RAFT config for injection into main config
+	// Indent is 12 = 3-rd level (clickhouse/keeper_server/raft_configuration) by 4 spaces
+	i := 12
 	raft := &bytes.Buffer{}
 	c.cr.WalkHosts(func(host *chi.Host) error {
 		msg := fmt.Sprintf("SKIP host from RAFT servers: %s", host.GetName())
 		if selector.Include(host) {
-			util.Iline(raft, raftIndent, "<server>")
-			util.Iline(raft, raftIndent, "    <id>%d</id>", getServerId(host))
-			util.Iline(raft, raftIndent, "    <hostname>%s</hostname>", c.namer.Name(interfaces.NameInstanceHostname, host))
-			util.Iline(raft, raftIndent, "    <port>%d</port>", host.RaftPort.Value())
-			util.Iline(raft, raftIndent, "</server>")
+			util.Iline(raft, i, "<server>")
+			util.Iline(raft, i, "    <id>%d</id>", getServerId(host))
+			util.Iline(raft, i, "    <hostname>%s</hostname>", c.namer.Name(interfaces.NameInstanceHostname, host))
+			util.Iline(raft, i, "    <port>%d</port>", host.RaftPort.Value())
+			util.Iline(raft, i, "</server>")
 			msg = fmt.Sprintf("Add host to RAFT servers: %s", host.GetName())
 		}
 		log.V(1).M(host).Info(msg)
 		return nil
 	})
 
-	// Inject RAFT config
-	// Replace empty placeholder for RAFT config with actual RAFT config value
-	// <raft_configuration>
-	//     <server></server>
-	// </raft_configuration>
-	// TODO use raftIndent value here instead of spaces
-	return strings.Replace(config, "            <server></server>\n", raft.String(), 1)
+	return chi.NewSettings().Set("keeper_server/raft_configuration", chi.MustNewSettingScalarFromAny(raft)).ClickHouseConfig()
 }
 
 // getHostServerId builds server id config for the host
 func (c *Generator) getHostServerId(host *chi.Host) string {
-	settings := chi.NewSettings()
-	settings.Set("keeper_server/server_id", chi.MustNewSettingScalarFromAny(getServerId(host)))
-	return settings.ClickHouseConfig()
+	return chi.NewSettings().Set("keeper_server/server_id", chi.MustNewSettingScalarFromAny(getServerId(host))).ClickHouseConfig()
 }
 
 func getServerId(host *chi.Host) int {

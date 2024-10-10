@@ -29,6 +29,6 @@ type GeneratorOptions struct {
 	Files    *api.Settings
 }
 
-func defaultIncludeAllSelector() *config.HostSelector {
+func defaultSelectorIncludeAll() *config.HostSelector {
 	return config.NewHostSelector()
 }
