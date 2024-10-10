@@ -42,6 +42,7 @@ type setting interface {
 	IsVector() bool
 	Attributes() string
 	VectorOfStrings() []string
+	IsEmbed() bool
 }
 
 type settings interface {
@@ -156,13 +157,13 @@ func (n *xmlNode) buildXML(w io.Writer, indent, tabSize uint8) {
 
 	case n.value.IsScalar():
 		// ScalarString node
-		n.writeTagWithValue(w, n.value.String(), n.value.Attributes(), indent, tabSize)
+		n.writeTagWithValue(w, n.value.String(), n.value.Attributes(), indent, n.value.IsEmbed())
 		return
 
 	case n.value.IsVector():
 		// VectorOfStrings node
 		for _, value := range n.value.VectorOfStrings() {
-			n.writeTagWithValue(w, value, n.value.Attributes(), indent, tabSize)
+			n.writeTagWithValue(w, value, n.value.Attributes(), indent, n.value.IsEmbed())
 		}
 	}
 }
@@ -186,19 +187,29 @@ func (n *xmlNode) writeTagNoValue(w io.Writer, attributes string, indent, tabSiz
 // <tag>value</tag>
 // OR
 // <tag>
-// long value NB - printed w/o indent
+// embedded value NB - printed w/o indent
 // </tag>
-func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string, indent, tabSize uint8) {
+func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string, indent uint8, embedded bool) {
 	// TODO fix this properly
 	// Used in tests
 	if value == "_removed_" || value == "_remove_" {
 		attributes = " remove=\"1\""
 		value = ""
 	}
-	// <tag>value</tag>
-	n.writeTagOpen(w, indent, attributes, noEol)
-	n.writeValue(w, value)
-	n.writeTagClose(w, 0, eol)
+
+	if embedded {
+		// <tag>
+		// embedded value NB - printed w/o indent
+		// </tag>
+		n.writeTagOpen(w, indent, attributes, eol)
+		n.writeValue(w, value)
+		n.writeTagClose(w, indent, eol)
+	} else {
+		// <tag>value</tag>
+		n.writeTagOpen(w, indent, attributes, noEol)
+		n.writeValue(w, value)
+		n.writeTagClose(w, 0, eol)
+	}
 }
 
 // writeTagOpen prints open XML tag into io.Writer

@@ -41,6 +41,7 @@ type Setting struct {
 	vector     []string
 	src        *SettingSource
 	attributes map[string]string
+	embed      bool
 }
 
 type SettingType string
@@ -282,4 +283,19 @@ func (s *Setting) parseDataSourceAddress(dataSourceAddress, defaultNamespace str
 	}
 
 	return addr, nil
+}
+
+func (s *Setting) SetEmbed() *Setting {
+	if s == nil {
+		return nil
+	}
+	s.embed = true
+	return s
+}
+
+func (s *Setting) IsEmbed() bool {
+	if s == nil {
+		return false
+	}
+	return s.embed
 }

@@ -94,7 +94,7 @@ func (c *Generator) getRaftConfig(selector *config.HostSelector) string {
 		return nil
 	})
 
-	return chi.NewSettings().Set("keeper_server/raft_configuration", chi.MustNewSettingScalarFromAny(raft)).ClickHouseConfig()
+	return chi.NewSettings().Set("keeper_server/raft_configuration", chi.MustNewSettingScalarFromAny(raft).SetEmbed()).ClickHouseConfig()
 }
 
 // getHostServerId builds server id config for the host
