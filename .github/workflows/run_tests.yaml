@@ -70,7 +70,7 @@ jobs:
         id: run-tests
         continue-on-error: true
         run: |
-          echo "Test run settings:
+          echo "Test run settings:"
           echo "  test mode: ${{ github.event.inputs.test_mode }}"
           echo "  test mask: ${{ github.event.inputs.test_mask }}"
           echo
