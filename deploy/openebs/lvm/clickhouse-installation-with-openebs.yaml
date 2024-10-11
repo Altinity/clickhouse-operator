@@ -1,0 +1,41 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: clickhouse-openebs
+spec:
+  configuration:
+    clusters:
+    - layout:
+        replicasCount: 1
+        shardsCount: 1
+      name: simple
+  defaults:
+    templates:
+      dataVolumeClaimTemplate: openebs
+      podTemplate: clickhouse:24.3
+  templates:
+    podTemplates:
+    - metadata:
+      name: clickhouse:24.3
+      spec:
+        containers:
+        - image: clickhouse/clickhouse-server:24.3
+          name: clickhouse
+          ports:
+          - containerPort: 8123
+            name: http
+          - containerPort: 9000
+            name: client
+          - containerPort: 9009
+            name: interserver
+          - containerPort: 9363
+            name: metrics
+    volumeClaimTemplates:
+    - name: openebs
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: openebs-lvm-test
