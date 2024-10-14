@@ -26,7 +26,16 @@ The biggest problem is volume. In order to remap volume, following steps need to
 
 6. Upgrade operator to 0.24.x
 7. Deploy new CHK with following changes:
-  * Add ‘volumeName’ to volumeClaimTemplate referencing the old volume
+  * Add ‘volumeName’ to CHK volumeClaimTemplate referencing the old volume
+
+```
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          ...
+          volumeName: $PV
+```
+
   * Add settings to mount logs and raft coordination to folders matching old operator:
    
 ```
