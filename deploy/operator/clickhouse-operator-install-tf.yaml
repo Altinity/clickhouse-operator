@@ -11,14 +11,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.24.0
+# OPERATOR_VERSION=0.24.1
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1291,14 +1291,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.24.0
+# OPERATOR_VERSION=0.24.1
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2574,7 +2574,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2989,14 +2989,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.24.0
+# OPERATOR_VERSION=0.24.1
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.24.0
+    clickhouse-keeper.altinity.com/chop: 0.24.1
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -3840,7 +3840,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 ---
 # Template Parameters:
 #
@@ -3866,7 +3866,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 rules:
 
   #
@@ -4085,7 +4085,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -4107,7 +4107,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -4510,7 +4510,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
 ---
@@ -4526,7 +4526,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -4625,7 +4625,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -4725,7 +4725,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -4788,7 +4788,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
 ---
@@ -4804,7 +4804,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -4882,7 +4882,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   readme: |
@@ -4900,7 +4900,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
 ---
@@ -4908,7 +4908,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=${namespace}
 #   COMMENT=
-#   OPERATOR_VERSION=0.24.0
+#   OPERATOR_VERSION=0.24.1
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=${password}
 #
@@ -4918,7 +4918,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -4929,9 +4929,9 @@ stringData:
 #
 # NAMESPACE=${namespace}
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.24.0
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.24.1
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.24.0
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.24.1
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -4942,7 +4942,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -4990,7 +4990,7 @@ spec:
             name: etc-keeper-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.24.0
+          image: altinity/clickhouse-operator:0.24.1
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5066,7 +5066,7 @@ spec:
               name: metrics
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.24.0
+          image: altinity/metrics-exporter:0.24.1
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5157,7 +5157,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 spec:
   ports:
