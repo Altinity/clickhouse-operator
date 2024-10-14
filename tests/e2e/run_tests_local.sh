@@ -32,7 +32,7 @@ function select_test_goal() {
         echo "Having specified explicitly: ${specified_goal}"
         return 0
     else
-        echo "What would you like to start. Possible options:"
+        echo "What would you like to start? Possible options:"
         echo "  1     - test operator"
         echo "  2     - test keeper"
         echo "  3     - test metrics"

@@ -34,7 +34,7 @@ NEW_RELEASE_MINOR=$(increment_version "${CUR_RELEASE}" 1)
 NEW_RELEASE_PATCH=$(increment_version "${CUR_RELEASE}" 2)
 echo "Starting new release."
 echo "Current release: ${CUR_RELEASE}"
-echo "What would you like to start. Possible options:"
+echo "What would you like to start? Possible options:"
 echo "  1     - new MAJOR version: ${NEW_RELEASE_MAJOR}"
 echo "  2     - new MINOR version: ${NEW_RELEASE_MINOR}"
 echo "  3     - new PATCH version: ${NEW_RELEASE_PATCH}"
