@@ -14,24 +14,51 @@
 
 package v1
 
-// ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
-type ChiZookeeperNode struct {
-	Host   string      `json:"host,omitempty" yaml:"host,omitempty"`
-	Port   int32       `json:"port,omitempty" yaml:"port,omitempty"`
-	Secure *StringBool `json:"secure,omitempty" yaml:"secure,omitempty"`
+import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+)
+
+// ZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
+type ZookeeperNode struct {
+	Host   string            `json:"host,omitempty"   yaml:"host,omitempty"`
+	Port   *types.Int32      `json:"port,omitempty"   yaml:"port,omitempty"`
+	Secure *types.StringBool `json:"secure,omitempty" yaml:"secure,omitempty"`
+}
+
+func (zkNode *ZookeeperNode) String() string {
+	if zkNode == nil {
+		return ""
+	}
+	str := zkNode.Host
+	if zkNode.Port.HasValue() {
+		str += ":" + zkNode.Port.String()
+	}
+	return str
 }
 
 // Equal checks whether zookeeper node is equal to another
-func (zkNode *ChiZookeeperNode) Equal(to *ChiZookeeperNode) bool {
+func (zkNode *ZookeeperNode) Equal(to *ZookeeperNode) bool {
 	if to == nil {
 		return false
 	}
 
-	return (zkNode.Host == to.Host) && (zkNode.Port == to.Port) && (zkNode.Secure.Value() == zkNode.Secure.Value())
+	return zkNode.hostEqual(to) && zkNode.portEqual(to) && zkNode.secureEqual(to)
+}
+
+func (zkNode *ZookeeperNode) hostEqual(to *ZookeeperNode) bool {
+	return zkNode.Host == to.Host
+}
+
+func (zkNode *ZookeeperNode) portEqual(to *ZookeeperNode) bool {
+	return zkNode.Port.Equal(to.Port)
+}
+
+func (zkNode *ZookeeperNode) secureEqual(to *ZookeeperNode) bool {
+	return zkNode.Secure.Value() == to.Secure.Value()
 }
 
 // IsSecure checks whether zookeeper node is secure
-func (zkNode *ChiZookeeperNode) IsSecure() bool {
+func (zkNode *ZookeeperNode) IsSecure() bool {
 	if zkNode == nil {
 		return false
 	}

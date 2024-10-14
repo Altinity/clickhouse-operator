@@ -15,9 +15,8 @@
 package k8s
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	core "k8s.io/api/core/v1"
-
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // PodSpecAddContainer adds container to PodSpec
@@ -32,6 +31,19 @@ func ContainerAppendVolumeMounts(container *core.Container, volumeMounts ...core
 	}
 }
 
+// VolumeMountIsValid checks whether VolumeMount is a valid one
+func VolumeMountIsValid(volumeMount core.VolumeMount) bool {
+	if volumeMount.Name == "" {
+		// VolumeMount must have a name
+		return false
+	}
+	if volumeMount.MountPath == "" {
+		// VolumeMount must have a mount path
+		return false
+	}
+	return true
+}
+
 // ContainerAppendVolumeMount appends one VolumeMount to the specified container
 func ContainerAppendVolumeMount(container *core.Container, volumeMount core.VolumeMount) {
 	//
@@ -42,8 +54,8 @@ func ContainerAppendVolumeMount(container *core.Container, volumeMount core.Volu
 		return
 	}
 
-	// VolumeMount has to have reasonable data - Name and MountPath
-	if (volumeMount.Name == "") || (volumeMount.MountPath == "") {
+	// VolumeMount has to be valid
+	if !VolumeMountIsValid(volumeMount) {
 		return
 	}
 
@@ -75,25 +87,27 @@ func ContainerAppendVolumeMount(container *core.Container, volumeMount core.Volu
 
 // ContainerEnsurePortByName
 func ContainerEnsurePortByName(container *core.Container, name string, port int32) {
-	if api.IsPortUnassigned(port) {
+	if types.IsPortUnassigned(port) {
 		return
 	}
 
 	// Find port with specified name
 	for i := range container.Ports {
-		containerPort := &container.Ports[i]
-		if containerPort.Name == name {
+		// Convenience wrapper
+		existingContainerPort := &container.Ports[i]
+		if existingContainerPort.Name == name {
 			// Port with specified name found in the container
-			// Overwrite existing port spec:
-			//   1. No host port
+			// Overwrite existing port spec with the following:
+			//   1. No host port would be specified
 			//   2. Specify new port value
-			containerPort.HostPort = 0
-			containerPort.ContainerPort = port
+			existingContainerPort.HostPort = 0
+			existingContainerPort.ContainerPort = port
 			return
 		}
 	}
 
-	// Port with specified name found NOT in the container. Need to append.
+	// Port with specified name is NOT found in the container.
+	// Need to append it to the container.
 	container.Ports = append(container.Ports, core.ContainerPort{
 		Name:          name,
 		ContainerPort: port,

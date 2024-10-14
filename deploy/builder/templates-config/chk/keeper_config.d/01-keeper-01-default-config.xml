@@ -1,0 +1,36 @@
+<clickhouse>
+    <keeper_server>
+        <coordination_settings>
+            <min_session_timeout_ms>10000</min_session_timeout_ms>
+            <operation_timeout_ms>10000</operation_timeout_ms>
+            <raft_logs_level>information</raft_logs_level>
+            <session_timeout_ms>100000</session_timeout_ms>
+        </coordination_settings>
+        <hostname_checks_enabled>true</hostname_checks_enabled>
+        <log_storage_path>/var/lib/clickhouse-keeper/coordination/logs</log_storage_path>
+        <snapshot_storage_path>/var/lib/clickhouse-keeper/coordination/snapshots</snapshot_storage_path>
+        <storage_path>/var/lib/clickhouse-keeper</storage_path>
+        <tcp_port>2181</tcp_port>
+        <enable_reconfiguration>true</enable_reconfiguration>
+    </keeper_server>
+    <listen_host>::</listen_host>
+    <listen_host>0.0.0.0</listen_host>
+    <listen_try>1</listen_try>
+    <logger>
+        <console>1</console>
+        <level>information</level>
+    </logger>
+    <max_connections>4096</max_connections>
+    <openSSL>
+        <server>
+            <cacheSessions>true</cacheSessions>
+            <certificateFile>/etc/clickhouse-keeper/server.crt</certificateFile>
+            <dhParamsFile>/etc/clickhouse-keeper/dhparam.pem</dhParamsFile>
+            <disableProtocols>sslv2,sslv3</disableProtocols>
+            <loadDefaultCAFile>true</loadDefaultCAFile>
+            <preferServerCiphers>true</preferServerCiphers>
+            <privateKeyFile>/etc/clickhouse-keeper/server.key</privateKeyFile>
+            <verificationMode>none</verificationMode>
+        </server>
+    </openSSL>
+</clickhouse>

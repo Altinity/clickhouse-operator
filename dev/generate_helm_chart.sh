@@ -16,7 +16,12 @@ EOT
 function check_required_tools() {
   for cmd in yq jq helm-docs perl; do
     if ! command -v "${cmd}" &> /dev/null; then
+      echo "======================================"
       usage
+      echo "======================================"
+      echo "The following tool is missing: ${cmd}"
+      echo "Please install it."
+      echo "Abort."
       exit 1
     fi
   done
@@ -58,7 +63,7 @@ function main() {
   for dashboard in "${dashboards_path}"/*.json; do
     local dashboard_name
     dashboard_name=$(basename "${dashboard}")
-    echo "${dashboard_name}"
+    #echo "${dashboard_name}"
     jq '(.templating.list) |= ['"${prom_ds}"'] + .' "${dashboard}" >"${files_dir}/${dashboard_name}"
     perl -pi -e 's/"datasource": "\${DS_PROMETHEUS}"/"datasource": {"type":"prometheus","uid":"\${ds_prometheus}"}/g' "${files_dir}/${dashboard_name}"
     perl -pi -e 's/"datasource": "\$db"/"datasource": {"type":"vertamedia-clickhouse-datasource","uid":"\${db}"}/g' "${files_dir}/${dashboard_name}"
@@ -93,7 +98,7 @@ function process() {
     local templates_dir="${chart_path}/templates/generated"
     processed_file="${templates_dir}/${processed_file}"
   fi
-  echo $(basename "${processed_file}")
+  #echo $(basename "${processed_file}")
   mkdir -p "$(dirname "${processed_file}")"
   mv -f "${file}" "${processed_file}"
 
@@ -190,6 +195,7 @@ function update_deployment_resource() {
   yq e -i '.spec.template.spec.affinity |= "{{ toYaml .Values.affinity | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.tolerations |= "{{ toYaml .Values.tolerations | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.securityContext |= "{{ toYaml .Values.podSecurityContext | nindent 8 }}"' "${file}"
+  yq e -i '.spec.template.spec.topologySpreadConstraints |= "{{ toYaml .Values.topologySpreadConstraints | nindent 8 }}"' "${file}"
 
   for cm in $(yq e '.spec.template.spec.volumes[].configMap.name' "${file}"); do
     local prefix='{{ include \"altinity-clickhouse-operator.fullname\" . }}'

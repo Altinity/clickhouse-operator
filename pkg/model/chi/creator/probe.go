@@ -19,28 +19,35 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-// newDefaultLivenessProbe is a unification wrapper
-func newDefaultLivenessProbe(host *api.ChiHost) *core.Probe {
-	return newDefaultClickHouseLivenessProbe(host)
+type ProbeManager struct {
 }
 
-// newDefaultReadinessProbe is a unification wrapper
-func newDefaultReadinessProbe(host *api.ChiHost) *core.Probe {
-	return newDefaultClickHouseReadinessProbe(host)
+func NewProbeManager() *ProbeManager {
+	return &ProbeManager{}
 }
 
-// newDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
-func newDefaultClickHouseLivenessProbe(host *api.ChiHost) *core.Probe {
+func (m *ProbeManager) CreateProbe(what interfaces.ProbeType, host *api.Host) *core.Probe {
+	switch what {
+	case interfaces.ProbeDefaultLiveness:
+		return m.createDefaultLivenessProbe(host)
+	case interfaces.ProbeDefaultReadiness:
+		return m.createDefaultReadinessProbe(host)
+	}
+	panic("unknown probe type")
+}
+
+// createDefaultLivenessProbe returns default liveness probe
+func (m *ProbeManager) createDefaultLivenessProbe(host *api.Host) *core.Probe {
 	// Introduce http probe in case http port is specified
-	if api.IsPortAssigned(host.HTTPPort) {
+	if host.HTTPPort.HasValue() {
 		return &core.Probe{
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path: "/ping",
-					Port: intstr.Parse(model.ChDefaultHTTPPortName), // What if it is not a default?
+					Port: intstr.Parse(api.ChDefaultHTTPPortName), // What if it is not a default?
 				},
 			},
 			InitialDelaySeconds: 60,
@@ -50,12 +57,12 @@ func newDefaultClickHouseLivenessProbe(host *api.ChiHost) *core.Probe {
 	}
 
 	// Introduce https probe in case https port is specified
-	if api.IsPortAssigned(host.HTTPSPort) {
+	if host.HTTPSPort.HasValue() {
 		return &core.Probe{
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path:   "/ping",
-					Port:   intstr.Parse(model.ChDefaultHTTPSPortName), // What if it is not a default?
+					Port:   intstr.Parse(api.ChDefaultHTTPSPortName), // What if it is not a default?
 					Scheme: core.URISchemeHTTPS,
 				},
 			},
@@ -69,15 +76,15 @@ func newDefaultClickHouseLivenessProbe(host *api.ChiHost) *core.Probe {
 	return nil
 }
 
-// newDefaultClickHouseReadinessProbe returns default ClickHouse readiness probe
-func newDefaultClickHouseReadinessProbe(host *api.ChiHost) *core.Probe {
+// createDefaultReadinessProbe returns default readiness probe
+func (m *ProbeManager) createDefaultReadinessProbe(host *api.Host) *core.Probe {
 	// Introduce http probe in case http port is specified
-	if api.IsPortAssigned(host.HTTPPort) {
+	if host.HTTPPort.HasValue() {
 		return &core.Probe{
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path: "/ping",
-					Port: intstr.Parse(model.ChDefaultHTTPPortName), // What if port name is not a default?
+					Port: intstr.Parse(api.ChDefaultHTTPPortName), // What if port name is not a default?
 				},
 			},
 			InitialDelaySeconds: 10,
@@ -86,12 +93,12 @@ func newDefaultClickHouseReadinessProbe(host *api.ChiHost) *core.Probe {
 	}
 
 	// Introduce https probe in case https port is specified
-	if api.IsPortAssigned(host.HTTPSPort) {
+	if host.HTTPSPort.HasValue() {
 		return &core.Probe{
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path:   "/ping",
-					Port:   intstr.Parse(model.ChDefaultHTTPSPortName), // What if port name is not a default?
+					Port:   intstr.Parse(api.ChDefaultHTTPSPortName), // What if port name is not a default?
 					Scheme: core.URISchemeHTTPS,
 				},
 			},

@@ -19,16 +19,16 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // shouldCreateReplicatedObjects determines whether replicated objects should be created
-func shouldCreateReplicatedObjects(host *api.ChiHost) bool {
-	shard := model.CreateFQDNs(host, api.ChiShard{}, false)
-	cluster := model.CreateFQDNs(host, api.Cluster{}, false)
+func (s *ClusterSchemer) shouldCreateReplicatedObjects(host *api.Host) bool {
+	shard := s.Names(interfaces.NameFQDNs, host, api.ChiShard{}, false)
+	cluster := s.Names(interfaces.NameFQDNs, host, api.Cluster{}, false)
 
-	if host.GetCluster().SchemaPolicy.Shard == model.SchemaPolicyShardAll {
+	if host.GetCluster().GetSchemaPolicy().Shard == SchemaPolicyShardAll {
 		// We have explicit request to create replicated objects on each shard
 		// However, it is reasonable to have at least two instances in a cluster
 		if len(cluster) >= 2 {
@@ -37,7 +37,7 @@ func shouldCreateReplicatedObjects(host *api.ChiHost) bool {
 		}
 	}
 
-	if host.GetCluster().SchemaPolicy.Replica == model.SchemaPolicyReplicaNone {
+	if host.GetCluster().GetSchemaPolicy().Replica == SchemaPolicyReplicaNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Replica says there is no need to replicate objects")
 		return false
 	}
@@ -52,13 +52,13 @@ func shouldCreateReplicatedObjects(host *api.ChiHost) bool {
 }
 
 // getReplicatedObjectsSQLs returns a list of objects that needs to be created on a host in a cluster
-func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil, nil, nil
 	}
 
-	if !shouldCreateReplicatedObjects(host) {
+	if !s.shouldCreateReplicatedObjects(host) {
 		log.V(1).M(host).F().Info("Should not create replicated objects")
 		return nil, nil, nil
 	}
@@ -66,21 +66,21 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.Names(interfaces.NameFQDNs, host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateDatabaseReplicated(host.Runtime.Address.ClusterName),
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
 		s.QueryUnzipAndApplyUUIDs(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.Names(interfaces.NameFQDNs, host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateTableReplicated(host.Runtime.Address.ClusterName),
 		),
 	)
 	functionNames, createFunctionSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.Names(interfaces.NameFQDNs, host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateFunction(host.Runtime.Address.ClusterName),
 		),
 	)

@@ -21,8 +21,8 @@ spec:
     clusters:
       - name: default
         layout:
-          replicasCount: 1
           shardsCount: 2
+          replicasCount: 2
     profiles:
       default/database_atomic_wait_for_drop_and_detach_synchronously: 1
       default/allow_experimental_live_view: 1

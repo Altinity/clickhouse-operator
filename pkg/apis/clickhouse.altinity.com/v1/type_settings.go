@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -23,7 +24,9 @@ import (
 
 	"gopkg.in/d4l3k/messagediff.v1"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/xml"
 )
 
 // Specify returned errors for being re-used
@@ -155,6 +158,14 @@ func (s *Settings) WalkSafe(f func(name string, setting *Setting)) {
 	})
 }
 
+// WalkNames walks over settings with a function. Function receives name.
+// Storage key is used internally.
+func (s *Settings) WalkNames(f func(name string)) {
+	s.WalkKeys(func(key string, _setting *Setting) {
+		f(s.Key2Name(key))
+	})
+}
+
 // HasKey checks whether key setting exists.
 func (s *Settings) HasKey(key string) bool {
 	if s == nil {
@@ -189,6 +200,12 @@ func (s *Settings) GetKey(key string) *Setting {
 // Get gets named setting.
 // Storage key is used internally.
 func (s *Settings) Get(name string) *Setting {
+	return s.GetKey(s.Name2Key(name))
+}
+
+// GetA gets named setting.
+// Storage key is used internally.
+func (s *Settings) GetA(name string) any {
 	return s.GetKey(s.Name2Key(name))
 }
 
@@ -350,43 +367,53 @@ func (s *Settings) MarshalJSON() ([]byte, error) {
 	return json.Marshal(raw)
 }
 
-// fetchPort is the base function to fetch int32 port value
-func (s *Settings) fetchPort(name string) int32 {
-	return int32(s.Get(name).ScalarInt())
+// fetchPort is the base function to fetch *Int32 port value
+func (s *Settings) fetchPort(name string) *types.Int32 {
+	return s.Get(name).ScalarInt32Ptr()
 }
 
 // GetTCPPort gets TCP port from settings
-func (s *Settings) GetTCPPort() int32 {
+func (s *Settings) GetTCPPort() *types.Int32 {
 	return s.fetchPort("tcp_port")
 }
 
 // GetTCPPortSecure gets TCP port secure from settings
-func (s *Settings) GetTCPPortSecure() int32 {
+func (s *Settings) GetTCPPortSecure() *types.Int32 {
 	return s.fetchPort("tcp_port_secure")
 }
 
 // GetHTTPPort gets HTTP port from settings
-func (s *Settings) GetHTTPPort() int32 {
+func (s *Settings) GetHTTPPort() *types.Int32 {
 	return s.fetchPort("http_port")
 }
 
 // GetHTTPSPort gets HTTPS port from settings
-func (s *Settings) GetHTTPSPort() int32 {
+func (s *Settings) GetHTTPSPort() *types.Int32 {
 	return s.fetchPort("https_port")
 }
 
 // GetInterserverHTTPPort gets interserver HTTP port from settings
-func (s *Settings) GetInterserverHTTPPort() int32 {
+func (s *Settings) GetInterserverHTTPPort() *types.Int32 {
 	return s.fetchPort("interserver_http_port")
 }
 
-// MergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
-func (s *Settings) MergeFrom(src *Settings) *Settings {
-	if src.Len() == 0 {
+// GetZKPort gets Zookeeper port from settings
+func (s *Settings) GetZKPort() *types.Int32 {
+	return s.fetchPort("keeper_server/tcp_port")
+}
+
+// GetRaftPort gets Raft port from settings
+func (s *Settings) GetRaftPort() *types.Int32 {
+	return s.fetchPort("keeper_server/raft_configuration/server/port")
+}
+
+// MergeFrom merges into `dst` non-empty new-key-values from `from` in case no such `key` already in `src`
+func (s *Settings) MergeFrom(from *Settings) *Settings {
+	if from.Len() == 0 {
 		return s
 	}
 
-	src.Walk(func(name string, value *Setting) {
+	from.Walk(func(name string, value *Setting) {
 		s = s.Ensure().SetIfNotExists(name, value)
 	})
 
@@ -416,7 +443,7 @@ func (s *Settings) GetSection(section SettingsSection, includeSettingWithNoSecti
 	}
 
 	s.WalkKeys(func(key string, setting *Setting) {
-		_section, err := getSectionFromPath(key)
+		_section, err := GetSectionFromPath(key)
 		switch {
 		case (err == nil) && !_section.Equal(section):
 			// Section is specified in this key.
@@ -467,7 +494,7 @@ func (s *Settings) Filter(
 	}
 
 	s.WalkKeys(func(key string, _ *Setting) {
-		section, err := getSectionFromPath(key)
+		section, err := GetSectionFromPath(key)
 
 		if (err != nil) && (err != errorNoSectionSpecified) {
 			// We have a complex error, skip to the next
@@ -552,6 +579,30 @@ func (s *Settings) normalizeKeys() {
 	}
 }
 
+const xmlTagClickHouse = "clickhouse"
+
+// ClickHouseConfig produces ClickHouse config
+func (s *Settings) ClickHouseConfig(_prefix ...string) string {
+	if s.Len() == 0 {
+		return ""
+	}
+
+	prefix := ""
+	if len(_prefix) > 0 {
+		prefix = _prefix[0]
+	}
+
+	b := &bytes.Buffer{}
+	// <clickhouse>
+	//   XML code
+	// </clickhouse>
+	util.Iline(b, 0, "<"+xmlTagClickHouse+">")
+	xml.GenerateFromSettings(b, s, prefix)
+	util.Iline(b, 0, "</"+xmlTagClickHouse+">")
+
+	return b.String()
+}
+
 // normalizeKeyAsPath normalizes key which is treated as a path
 // Normalized key looks like 'a/b/c'
 // Used in in .spec.configuration.{users, profiles, quotas, settings, files} sections
@@ -602,8 +653,8 @@ func getSuffixFromPath(path string) (string, error) {
 	return suffix, nil
 }
 
-// getSectionFromPath
-func getSectionFromPath(path string) (SettingsSection, error) {
+// GetSectionFromPath
+func GetSectionFromPath(path string) (SettingsSection, error) {
 	// String representation of the section
 	section, err := getPrefixFromPath(path)
 	if err != nil {
@@ -614,11 +665,17 @@ func getSectionFromPath(path string) (SettingsSection, error) {
 	// Check dir names to determine which section path points to
 	configDir := section
 	switch {
-	case strings.EqualFold(configDir, CommonConfigDir):
+	case strings.EqualFold(configDir, CommonConfigDirClickHouse):
 		return SectionCommon, nil
-	case strings.EqualFold(configDir, UsersConfigDir):
+	case strings.EqualFold(configDir, UsersConfigDirClickHouse):
 		return SectionUsers, nil
-	case strings.EqualFold(configDir, HostConfigDir):
+	case strings.EqualFold(configDir, HostConfigDirClickHouse):
+		return SectionHost, nil
+	case strings.EqualFold(configDir, CommonConfigDirKeeper):
+		return SectionCommon, nil
+	case strings.EqualFold(configDir, UsersConfigDirKeeper):
+		return SectionUsers, nil
+	case strings.EqualFold(configDir, HostConfigDirKeeper):
 		return SectionHost, nil
 	}
 

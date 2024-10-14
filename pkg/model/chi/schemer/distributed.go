@@ -19,15 +19,15 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // shouldCreateDistributedObjects determines whether distributed objects should be created
-func shouldCreateDistributedObjects(host *api.ChiHost) bool {
-	hosts := model.CreateFQDNs(host, api.Cluster{}, false)
+func (s *ClusterSchemer) shouldCreateDistributedObjects(host *api.Host) bool {
+	hosts := s.Names(interfaces.NameFQDNs, host, api.Cluster{}, false)
 
-	if host.GetCluster().SchemaPolicy.Shard == model.SchemaPolicyShardNone {
+	if host.GetCluster().GetSchemaPolicy().Shard == SchemaPolicyShardNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")
 		return false
 	}
@@ -42,13 +42,13 @@ func shouldCreateDistributedObjects(host *api.ChiHost) bool {
 
 // getDistributedObjectsSQLs returns a list of objects that needs to be created on a shard in a cluster.
 // That includes all distributed tables, corresponding local tables and databases, if necessary
-func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil, nil, nil
 	}
 
-	if !shouldCreateDistributedObjects(host) {
+	if !s.shouldCreateDistributedObjects(host) {
 		log.V(1).M(host).F().Info("Should not create distributed objects")
 		return nil, nil, nil
 	}
@@ -56,21 +56,21 @@ func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *ap
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.Names(interfaces.NameFQDNs, host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateDatabaseDistributed(host.Runtime.Address.ClusterName),
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
 		s.QueryUnzipAndApplyUUIDs(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.Names(interfaces.NameFQDNs, host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateTableDistributed(host.Runtime.Address.ClusterName),
 		),
 	)
 	functionNames, createFunctionSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.Names(interfaces.NameFQDNs, host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateFunction(host.Runtime.Address.ClusterName),
 		),
 	)

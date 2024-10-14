@@ -2,9 +2,9 @@
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.23.7
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.24.0
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.23.7
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.24.0
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -29,6 +29,10 @@ spec:
         checksum/configd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-configd-files.yaml") . | sha256sum }}
         checksum/templatesd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-templatesd-files.yaml") . | sha256sum }}
         checksum/usersd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-usersd-files.yaml") . | sha256sum }}
+        checksum/etc-keeper-operator-confd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-etc-keeper-operator-confd-files.yaml") . | sha256sum }}
+        checksum/etc-keeper-operator-configd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-etc-keeper-operator-configd-files.yaml") . | sha256sum }}
+        checksum/etc-keeper-operator-templatesd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-etc-keeper-operator-templatesd-files.yaml") . | sha256sum }}
+        checksum/etc-keeper-operator-usersd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-etc-keeper-operator-usersd-files.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ include "altinity-clickhouse-operator.serviceAccountName" . }}
       volumes:
@@ -47,6 +51,18 @@ spec:
         - name: etc-clickhouse-operator-usersd-folder
           configMap:
             name: {{ include "altinity-clickhouse-operator.fullname" . }}-usersd-files
+        - name: etc-keeper-operator-confd-folder
+          configMap:
+            name: etc-keeper-operator-confd-files
+        - name: etc-keeper-operator-configd-folder
+          configMap:
+            name: etc-keeper-operator-configd-files
+        - name: etc-keeper-operator-templatesd-folder
+          configMap:
+            name: etc-keeper-operator-templatesd-files
+        - name: etc-keeper-operator-usersd-folder
+          configMap:
+            name: etc-keeper-operator-usersd-files
       containers:
         - name: {{ .Chart.Name }}
           image: {{ .Values.operator.image.repository }}:{{ include "altinity-clickhouse-operator.operator.tag" . }}
@@ -55,13 +71,21 @@ spec:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
             - name: etc-clickhouse-operator-confd-folder
-              mountPath: /etc/clickhouse-operator/conf.d
+              mountPath: /etc/clickhouse-operator/chi/conf.d
             - name: etc-clickhouse-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/config.d
+              mountPath: /etc/clickhouse-operator/chi/config.d
             - name: etc-clickhouse-operator-templatesd-folder
-              mountPath: /etc/clickhouse-operator/templates.d
+              mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
-              mountPath: /etc/clickhouse-operator/users.d
+              mountPath: /etc/clickhouse-operator/chi/users.d
+            - name: etc-keeper-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/chk/conf.d
+            - name: etc-keeper-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/chk/keeper_config.d
+            - name: etc-keeper-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/chk/templates.d
+            - name: etc-keeper-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/chk/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -125,13 +149,21 @@ spec:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
             - name: etc-clickhouse-operator-confd-folder
-              mountPath: /etc/clickhouse-operator/conf.d
+              mountPath: /etc/clickhouse-operator/chi/conf.d
             - name: etc-clickhouse-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/config.d
+              mountPath: /etc/clickhouse-operator/chi/config.d
             - name: etc-clickhouse-operator-templatesd-folder
-              mountPath: /etc/clickhouse-operator/templates.d
+              mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
-              mountPath: /etc/clickhouse-operator/users.d
+              mountPath: /etc/clickhouse-operator/chi/users.d
+            - name: etc-keeper-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/chk/conf.d
+            - name: etc-keeper-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/chk/keeper_config.d
+            - name: etc-keeper-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/chk/templates.d
+            - name: etc-keeper-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/chk/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -193,3 +225,4 @@ spec:
       affinity: {{ toYaml .Values.affinity | nindent 8 }}
       tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
       securityContext: {{ toYaml .Values.podSecurityContext | nindent 8 }}
+      topologySpreadConstraints: {{ toYaml .Values.topologySpreadConstraints | nindent 8 }}

@@ -1,0 +1,82 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-initdb-schema
+data:
+  init_schema.sql: |
+    CREATE DATABASE IF NOT EXISTS timeseries_db;
+    CREATE TABLE IF NOT EXISTS timeseries_db.timeseires_table ENGINE=TimeSeries;
+---
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: timeseries
+spec:
+  templates:
+    serviceTemplates:
+      - name: timeseries
+        spec:
+          type: ClusterIP
+          ports:
+            - name: http
+              port: 8123
+            - name: tcp
+              port: 9000
+            - name: prometheus
+              port: 9363
+    podTemplates:
+      - name: timeseries
+        spec:
+          volumes:
+            - name: initdb-volume
+              configMap:
+                name: clickhouse-initdb-schema
+                defaultMode: 0555
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:latest
+              env:
+                - name: CLICKHOUSE_ALWAYS_RUN_INITDB_SCRIPTS
+                  value: "true"
+              volumeMounts:
+                - name: initdb-volume
+                  mountPath: /docker-entrypoint-initdb.d
+                  readOnly: true
+  configuration:
+    profiles:
+      default/allow_experimental_time_series_table: 1
+    files:
+      config.d/prometheus_read_and_write.xml: |
+        <clickhouse>
+          <prometheus>
+            <port>9363</port>
+            <handlers>
+              <prometheus_write_rule>
+                <url>/write</url>
+                <handler>
+                  <type>remote_write</type>
+                  <database>timeseries_db</database>
+                  <table>timeseries_table</table>
+                </handler>
+              </prometheus_write_rule>
+              <prometheus_read_rule>
+                  <url>/read</url>
+                  <handler>
+                      <type>remote_read</type>
+                      <database>timeseries_db</database>
+                      <table>timeseries_table</table>
+                  </handler>
+              </prometheus_read_rule>
+            </handlers>
+          </prometheus>
+        </clickhouse>
+    clusters:
+      - name: timeseries
+        layout:
+          replicasCount: 1
+          shardsCount: 1
+  defaults:
+    templates:
+      podTemplate: timeseries
+      serviceTemplate: timeseries

@@ -6,6 +6,5 @@ export OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-"test"}"
 export OPERATOR_INSTALL="${OPERATOR_INSTALL:-"yes"}"
 export IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-"Always"}"
 
-
-
-python3 "$CUR_DIR/../regression.py" --only="/regression/e2e.test_metrics_exporter*" --native
+ONLY="${ONLY:-"*"}"
+python3 "$CUR_DIR/../regression.py" --only="/regression/e2e.test_metrics_exporter/${ONLY}" --native

@@ -15,10 +15,6 @@
 package normalizer
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -26,334 +22,230 @@ import (
 
 	core "k8s.io/api/core/v1"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
-	entitiesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/entities"
-	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
+	crTemplatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates_cr"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
+	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type secretGet func(namespace, name string) (*core.Secret, error)
-
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	secretGet secretGet
-	ctx       *Context
+	secretGet subst.SecretGetter
+	req       *Request
+	namer     interfaces.INameManager
+	macro     interfaces.IMacro
+	labeler   interfaces.ILabeler
 }
 
-// NewNormalizer creates new normalizer
-func NewNormalizer(secretGet secretGet) *Normalizer {
+// New creates new normalizer
+func New(secretGet subst.SecretGetter) *Normalizer {
 	return &Normalizer{
 		secretGet: secretGet,
+		namer:     managers.NewNameManager(managers.NameManagerTypeClickHouse),
+		macro:     commonMacro.New(macro.List),
+		labeler:   labeler.New(nil),
 	}
 }
 
-// CreateTemplatedCHI produces ready-to-use CHI object
-func (n *Normalizer) CreateTemplatedCHI(
-	chi *api.ClickHouseInstallation,
-	options *Options,
-) (*api.ClickHouseInstallation, error) {
-	// New CHI starts with new context
-	n.ctx = NewContext(options)
+// CreateTemplated produces ready-to-use object
+func (n *Normalizer) CreateTemplated(subj *chi.ClickHouseInstallation, options *normalizer.Options) (
+	*chi.ClickHouseInstallation,
+	error,
+) {
+	// Normalization starts with a new request
+	n.buildRequest(options)
+	// Ensure normalization subject presence
+	subj = n.ensureSubject(subj)
+	// Build target from all templates and subject
+	n.buildTargetFromTemplates(subj)
+	// And launch normalization of the whole stack
+	return n.normalizeTarget()
+}
 
-	// Ensure normalization entity present
-	chi = n.ensureNormalizationEntity(chi)
+func (n *Normalizer) buildRequest(options *normalizer.Options) {
+	n.req = NewRequest(options)
+}
 
+func (n *Normalizer) buildTargetFromTemplates(subj *chi.ClickHouseInstallation) {
 	// Create new target that will be populated with data during normalization process
-	n.ctx.SetTarget(n.createTarget())
+	n.req.SetTarget(n.createTarget())
 
-	// At this moment target is either newly created 'empty' CHI or a system-wide template
+	// At this moment we have target available - it is either newly created or a system-wide template
 
-	// Apply templates - both auto and explicitly requested - on top of context target
-	for _, template := range templatesNormalizer.ApplyCHITemplates(n.ctx.GetTarget(), chi) {
-		n.ctx.GetTarget().EnsureStatus().PushUsedTemplate(template)
-	}
+	// Apply CR templates - both auto and explicitly requested - on top of target
+	n.applyCRTemplatesOnTarget(subj)
 
-	// After all templates applied, place provided CHI on top of the whole stack (target)
-	n.ctx.GetTarget().MergeFrom(chi, api.MergeTypeOverrideByNonEmptyValues)
-
-	return n.normalize()
+	// After all CR templates applied, place provided 'subject' on top of the whole stack (target)
+	n.req.GetTarget().MergeFrom(subj, chi.MergeTypeOverrideByNonEmptyValues)
 }
 
-func (n *Normalizer) ensureNormalizationEntity(chi *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	if chi == nil {
-		// No CHI specified - meaning we are building over provided 'empty' CHI with no clusters inside
-		chi = creator.NewCHI()
-		n.ctx.Options().WithDefaultCluster = false
-	} else {
-		// Even in case having CHI provided, we need to insert default cluster in case no clusters specified
-		n.ctx.Options().WithDefaultCluster = true
+func (n *Normalizer) applyCRTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
+	for _, template := range crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), subj) {
+		n.req.GetTarget().EnsureStatus().PushUsedTemplate(template)
 	}
-	return chi
 }
 
-func (n *Normalizer) createTarget() *api.ClickHouseInstallation {
-	// What base should be used to create CHI
-	if chop.Config().Template.CHI.Runtime.Template == nil {
-		// No template specified - start with clear page
-		return creator.NewCHI()
+func (n *Normalizer) newSubject() *chi.ClickHouseInstallation {
+	return managers.CreateCustomResource(managers.CustomResourceCHI).(*chi.ClickHouseInstallation)
+}
+
+func (n *Normalizer) shouldCreateDefaultCluster(subj *chi.ClickHouseInstallation) bool {
+	if subj == nil {
+		// No subject specified - meaning we are normalizing non-existing subject and it should have no clusters inside
+		return false
 	} else {
+		// Subject specified - meaning we are normalizing existing subject and we need to ensure default cluster presence
+		return true
+	}
+}
+
+func (n *Normalizer) ensureSubject(subj *chi.ClickHouseInstallation) *chi.ClickHouseInstallation {
+	n.req.Options().WithDefaultCluster = n.shouldCreateDefaultCluster(subj)
+
+	if subj == nil {
+		// Need to create subject
+		return n.newSubject()
+	} else {
+		// Subject specified
+		return subj
+	}
+}
+
+func (n *Normalizer) getTargetTemplate() *chi.ClickHouseInstallation {
+	return chop.Config().Template.CHI.Runtime.Template
+}
+
+func (n *Normalizer) hasTargetTemplate() bool {
+	return n.getTargetTemplate() != nil
+}
+
+func (n *Normalizer) createTarget() *chi.ClickHouseInstallation {
+	if n.hasTargetTemplate() {
 		// Template specified - start with template
-		return chop.Config().Template.CHI.Runtime.Template.DeepCopy()
+		return n.getTargetTemplate().DeepCopy()
+	} else {
+		// No template specified - start with clear page
+		return n.newSubject()
 	}
 }
 
-// normalize normalizes whole CHI.
-// Returns normalized CHI
-func (n *Normalizer) normalize() (*api.ClickHouseInstallation, error) {
-	// Walk over ChiSpec datatype fields
-	n.ctx.GetTarget().Spec.TaskID = n.normalizeTaskID(n.ctx.GetTarget().Spec.TaskID)
-	n.ctx.GetTarget().Spec.UseTemplates = n.normalizeUseTemplates(n.ctx.GetTarget().Spec.UseTemplates)
-	n.ctx.GetTarget().Spec.Stop = n.normalizeStop(n.ctx.GetTarget().Spec.Stop)
-	n.ctx.GetTarget().Spec.Restart = n.normalizeRestart(n.ctx.GetTarget().Spec.Restart)
-	n.ctx.GetTarget().Spec.Troubleshoot = n.normalizeTroubleshoot(n.ctx.GetTarget().Spec.Troubleshoot)
-	n.ctx.GetTarget().Spec.NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.ctx.GetTarget().Spec.NamespaceDomainPattern)
-	n.ctx.GetTarget().Spec.Templating = n.normalizeTemplating(n.ctx.GetTarget().Spec.Templating)
-	n.ctx.GetTarget().Spec.Reconciling = n.normalizeReconciling(n.ctx.GetTarget().Spec.Reconciling)
-	n.ctx.GetTarget().Spec.Defaults = n.normalizeDefaults(n.ctx.GetTarget().Spec.Defaults)
-	n.ctx.GetTarget().Spec.Configuration = n.normalizeConfiguration(n.ctx.GetTarget().Spec.Configuration)
-	n.ctx.GetTarget().Spec.Templates = n.normalizeTemplates(n.ctx.GetTarget().Spec.Templates)
-	// UseTemplates already done
-
-	n.finalizeCHI()
+// normalizeTarget normalizes target
+func (n *Normalizer) normalizeTarget() (*chi.ClickHouseInstallation, error) {
+	n.normalizeSpec()
+	n.finalize()
 	n.fillStatus()
 
-	return n.ctx.GetTarget(), nil
+	return n.req.GetTarget(), nil
 }
 
-// finalizeCHI performs some finalization tasks, which should be done after CHI is normalized
-func (n *Normalizer) finalizeCHI() {
-	n.ctx.GetTarget().FillSelfCalculatedAddressInfo()
-	n.ctx.GetTarget().FillCHIPointer()
-	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
-		hostTemplate := n.getHostTemplate(host)
-		hostApplyHostTemplate(host, hostTemplate)
+func (n *Normalizer) normalizeSpec() {
+	// Walk over Spec datatype fields
+	n.req.GetTarget().GetSpecT().TaskID = n.normalizeTaskID(n.req.GetTarget().GetSpecT().TaskID)
+	n.req.GetTarget().GetSpecT().UseTemplates = n.normalizeUseTemplates(n.req.GetTarget().GetSpecT().UseTemplates)
+	n.req.GetTarget().GetSpecT().Stop = n.normalizeStop(n.req.GetTarget().GetSpecT().Stop)
+	n.req.GetTarget().GetSpecT().Restart = n.normalizeRestart(n.req.GetTarget().GetSpecT().Restart)
+	n.req.GetTarget().GetSpecT().Troubleshoot = n.normalizeTroubleshoot(n.req.GetTarget().GetSpecT().Troubleshoot)
+	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
+	n.req.GetTarget().GetSpecT().Templating = n.normalizeTemplating(n.req.GetTarget().GetSpecT().Templating)
+	n.req.GetTarget().GetSpecT().Reconciling = n.normalizeReconciling(n.req.GetTarget().GetSpecT().Reconciling)
+	n.req.GetTarget().GetSpecT().Defaults = n.normalizeDefaults(n.req.GetTarget().GetSpecT().Defaults)
+	n.req.GetTarget().GetSpecT().Configuration = n.normalizeConfiguration(n.req.GetTarget().GetSpecT().Configuration)
+	n.req.GetTarget().GetSpecT().Templates = n.normalizeTemplates(n.req.GetTarget().GetSpecT().Templates)
+	// UseTemplates already done
+}
+
+// finalize performs some finalization tasks, which should be done after CHI is normalized
+func (n *Normalizer) finalize() {
+	n.req.GetTarget().Fill()
+	n.req.GetTarget().WalkHosts(func(host *chi.Host) error {
+		n.hostApplyHostTemplateSpecifiedOrDefault(host)
 		return nil
 	})
-	n.fillCHIAddressInfo()
+	n.fillCRAddressInfo()
 }
 
-// fillCHIAddressInfo
-func (n *Normalizer) fillCHIAddressInfo() {
-	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
-		host.Runtime.Address.StatefulSet = model.CreateStatefulSetName(host)
-		host.Runtime.Address.FQDN = model.CreateFQDN(host)
+// fillCRAddressInfo
+func (n *Normalizer) fillCRAddressInfo() {
+	n.req.GetTarget().WalkHosts(func(host *chi.Host) error {
+		host.Runtime.Address.StatefulSet = n.namer.Name(interfaces.NameStatefulSet, host)
+		host.Runtime.Address.FQDN = n.namer.Name(interfaces.NameFQDN, host)
 		return nil
 	})
-}
-
-// getHostTemplate gets Host Template to be used to normalize Host
-func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.HostTemplate {
-	// Which host template would be used - either explicitly defined in or a default one
-	hostTemplate, ok := host.GetHostTemplate()
-	if ok {
-		// Host explicitly references known HostTemplate
-		log.V(2).M(host).F().Info("host: %s uses custom hostTemplate %s", host.Name, hostTemplate.Name)
-		return hostTemplate
-	}
-
-	// Host references UNKNOWN HostTemplate, will use default one
-	// However, with default template there is a nuance - hostNetwork requires different default host template
-
-	// Check hostNetwork case at first
-	if podTemplate, ok := host.GetPodTemplate(); ok {
-		if podTemplate.Spec.HostNetwork {
-			// HostNetwork
-			hostTemplate = creator.NewDefaultHostTemplateForHostNetwork(model.CreateHostTemplateName(host))
-		}
-	}
-
-	// In case hostTemplate still is not picked - use default one
-	if hostTemplate == nil {
-		hostTemplate = creator.NewDefaultHostTemplate(model.CreateHostTemplateName(host))
-	}
-
-	log.V(3).M(host).F().Info("host: %s use default hostTemplate", host.Name)
-
-	return hostTemplate
-}
-
-// hostApplyHostTemplate
-func hostApplyHostTemplate(host *api.ChiHost, template *api.HostTemplate) {
-	if host.GetName() == "" {
-		host.Name = template.Spec.Name
-	}
-
-	host.Insecure = host.Insecure.MergeFrom(template.Spec.Insecure)
-	host.Secure = host.Secure.MergeFrom(template.Spec.Secure)
-
-	for _, portDistribution := range template.PortDistribution {
-		switch portDistribution.Type {
-		case deployment.PortDistributionUnspecified:
-			if api.IsPortUnassigned(host.TCPPort) {
-				host.TCPPort = template.Spec.TCPPort
-			}
-			if api.IsPortUnassigned(host.TLSPort) {
-				host.TLSPort = template.Spec.TLSPort
-			}
-			if api.IsPortUnassigned(host.HTTPPort) {
-				host.HTTPPort = template.Spec.HTTPPort
-			}
-			if api.IsPortUnassigned(host.HTTPSPort) {
-				host.HTTPSPort = template.Spec.HTTPSPort
-			}
-			if api.IsPortUnassigned(host.InterserverHTTPPort) {
-				host.InterserverHTTPPort = template.Spec.InterserverHTTPPort
-			}
-		case deployment.PortDistributionClusterScopeIndex:
-			if api.IsPortUnassigned(host.TCPPort) {
-				base := model.ChDefaultTCPPortNumber
-				if api.IsPortAssigned(template.Spec.TCPPort) {
-					base = template.Spec.TCPPort
-				}
-				host.TCPPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
-			}
-			if api.IsPortUnassigned(host.TLSPort) {
-				base := model.ChDefaultTLSPortNumber
-				if api.IsPortAssigned(template.Spec.TLSPort) {
-					base = template.Spec.TLSPort
-				}
-				host.TLSPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
-			}
-			if api.IsPortUnassigned(host.HTTPPort) {
-				base := model.ChDefaultHTTPPortNumber
-				if api.IsPortAssigned(template.Spec.HTTPPort) {
-					base = template.Spec.HTTPPort
-				}
-				host.HTTPPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
-			}
-			if api.IsPortUnassigned(host.HTTPSPort) {
-				base := model.ChDefaultHTTPSPortNumber
-				if api.IsPortAssigned(template.Spec.HTTPSPort) {
-					base = template.Spec.HTTPSPort
-				}
-				host.HTTPSPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
-			}
-			if api.IsPortUnassigned(host.InterserverHTTPPort) {
-				base := model.ChDefaultInterserverHTTPPortNumber
-				if api.IsPortAssigned(template.Spec.InterserverHTTPPort) {
-					base = template.Spec.InterserverHTTPPort
-				}
-				host.InterserverHTTPPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
-			}
-		}
-	}
-
-	hostApplyPortsFromSettings(host)
-
-	host.InheritTemplatesFrom(nil, nil, template)
-}
-
-// hostApplyPortsFromSettings
-func hostApplyPortsFromSettings(host *api.ChiHost) {
-	// Use host personal settings at first
-	hostEnsurePortValuesFromSettings(host, host.GetSettings(), false)
-	// Fallback to common settings
-	hostEnsurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, true)
-}
-
-// hostEnsurePortValuesFromSettings fetches port spec from settings, if any provided
-func hostEnsurePortValuesFromSettings(host *api.ChiHost, settings *api.Settings, final bool) {
-	//
-	// 1. Setup fallback/default ports
-	//
-	// For intermittent (non-final) setup fallback values should be from "MustBeAssignedLater" family,
-	// because this is not final setup (just intermittent) and all these ports may be overwritten later
-	fallbackTCPPort := api.PortUnassigned()
-	fallbackTLSPort := api.PortUnassigned()
-	fallbackHTTPPort := api.PortUnassigned()
-	fallbackHTTPSPort := api.PortUnassigned()
-	fallbackInterserverHTTPPort := api.PortUnassigned()
-
-	// On the other hand, for final setup we need to assign real numbers to ports
-	if final {
-		if host.IsInsecure() {
-			fallbackTCPPort = model.ChDefaultTCPPortNumber
-			fallbackHTTPPort = model.ChDefaultHTTPPortNumber
-		}
-		if host.IsSecure() {
-			fallbackTLSPort = model.ChDefaultTLSPortNumber
-			fallbackHTTPSPort = model.ChDefaultHTTPSPortNumber
-		}
-		fallbackInterserverHTTPPort = model.ChDefaultInterserverHTTPPortNumber
-	}
-
-	//
-	// 2. Setup ports
-	//
-	host.TCPPort = api.EnsurePortValue(host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
-	host.TLSPort = api.EnsurePortValue(host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
-	host.HTTPPort = api.EnsurePortValue(host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
-	host.HTTPSPort = api.EnsurePortValue(host.HTTPSPort, settings.GetHTTPSPort(), fallbackHTTPSPort)
-	host.InterserverHTTPPort = api.EnsurePortValue(host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
 }
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := model.CreateCHIServiceFQDN(n.ctx.GetTarget())
+	endpoint := n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
-	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
-		pods = append(pods, model.CreatePodName(host))
-		fqdns = append(fqdns, model.CreateFQDN(host))
+	n.req.GetTarget().WalkHosts(func(host *chi.Host) error {
+		pods = append(pods, n.namer.Name(interfaces.NamePod, host))
+		fqdns = append(fqdns, n.namer.Name(interfaces.NameFQDN, host))
 		return nil
 	})
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
-	n.ctx.GetTarget().FillStatus(endpoint, pods, fqdns, ip)
+	n.req.GetTarget().FillStatus(endpoint, pods, fqdns, ip)
 }
 
 // normalizeTaskID normalizes .spec.taskID
-func (n *Normalizer) normalizeTaskID(taskID *string) *string {
-	if taskID != nil {
-		if len(*taskID) > 0 {
-			return taskID
-		}
+func (n *Normalizer) normalizeTaskID(taskID *types.String) *types.String {
+	if len(taskID.Value()) > 0 {
+		return taskID
 	}
 
-	id := uuid.New().String()
-	return &id
+	return types.NewString(uuid.New().String())
 }
 
 // normalizeStop normalizes .spec.stop
-func (n *Normalizer) normalizeStop(stop *api.StringBool) *api.StringBool {
+func (n *Normalizer) normalizeStop(stop *types.StringBool) *types.StringBool {
 	if stop.IsValid() {
 		// It is bool, use as it is
 		return stop
 	}
 
 	// In case it is unknown value - just use set it to false
-	return api.NewStringBool(false)
+	return types.NewStringBool(false)
 }
 
 // normalizeRestart normalizes .spec.restart
-func (n *Normalizer) normalizeRestart(restart string) string {
-	switch strings.ToLower(restart) {
-	case strings.ToLower(api.RestartRollingUpdate):
+func (n *Normalizer) normalizeRestart(restart *types.String) *types.String {
+	switch strings.ToLower(restart.Value()) {
+	case strings.ToLower(chi.RestartRollingUpdate):
 		// Known value, overwrite it to ensure case-ness
-		return api.RestartRollingUpdate
+		return types.NewString(chi.RestartRollingUpdate)
 	}
 
 	// In case it is unknown value - just use empty
-	return ""
+	return nil
 }
 
 // normalizeTroubleshoot normalizes .spec.stop
-func (n *Normalizer) normalizeTroubleshoot(troubleshoot *api.StringBool) *api.StringBool {
+func (n *Normalizer) normalizeTroubleshoot(troubleshoot *types.StringBool) *types.StringBool {
 	if troubleshoot.IsValid() {
 		// It is bool, use as it is
 		return troubleshoot
 	}
 
 	// In case it is unknown value - just use set it to false
-	return api.NewStringBool(false)
+	return types.NewStringBool(false)
 }
 
-func isNamespaceDomainPatternValid(namespaceDomainPattern string) bool {
-	if strings.Count(namespaceDomainPattern, "%s") > 1 {
+func isNamespaceDomainPatternValid(namespaceDomainPattern *types.String) bool {
+	if strings.Count(namespaceDomainPattern.Value(), "%s") > 1 {
 		return false
 	} else {
 		return true
@@ -361,28 +253,28 @@ func isNamespaceDomainPatternValid(namespaceDomainPattern string) bool {
 }
 
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
-func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern string) string {
+func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern *types.String) *types.String {
 	if isNamespaceDomainPatternValid(namespaceDomainPattern) {
 		return namespaceDomainPattern
 	}
 	// In case namespaceDomainPattern is not valid - do not use it
-	return ""
+	return nil
 }
 
 // normalizeDefaults normalizes .spec.defaults
-func (n *Normalizer) normalizeDefaults(defaults *api.ChiDefaults) *api.ChiDefaults {
+func (n *Normalizer) normalizeDefaults(defaults *chi.Defaults) *chi.Defaults {
 	if defaults == nil {
-		defaults = api.NewChiDefaults()
+		defaults = chi.NewDefaults()
 	}
 	// Set defaults for CHI object properties
 	defaults.ReplicasUseFQDN = defaults.ReplicasUseFQDN.Normalize(false)
 	// Ensure field
 	if defaults.DistributedDDL == nil {
-		//defaults.DistributedDDL = api.NewChiDistributedDDL()
+		//defaults.DistributedDDL = api.NewDistributedDDL()
 	}
 	// Ensure field
 	if defaults.StorageManagement == nil {
-		defaults.StorageManagement = api.NewStorageManagement()
+		defaults.StorageManagement = chi.NewStorageManagement()
 	}
 	// Ensure field
 	if defaults.Templates == nil {
@@ -393,9 +285,9 @@ func (n *Normalizer) normalizeDefaults(defaults *api.ChiDefaults) *api.ChiDefaul
 }
 
 // normalizeConfiguration normalizes .spec.configuration
-func (n *Normalizer) normalizeConfiguration(conf *api.Configuration) *api.Configuration {
+func (n *Normalizer) normalizeConfiguration(conf *chi.Configuration) *chi.Configuration {
 	if conf == nil {
-		conf = api.NewConfiguration()
+		conf = chi.NewConfiguration()
 	}
 	conf.Zookeeper = n.normalizeConfigurationZookeeper(conf.Zookeeper)
 	n.normalizeConfigurationAllSettingsBasedSections(conf)
@@ -404,7 +296,7 @@ func (n *Normalizer) normalizeConfiguration(conf *api.Configuration) *api.Config
 }
 
 // normalizeConfigurationAllSettingsBasedSections normalizes Settings-based configuration
-func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *api.Configuration) {
+func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *chi.Configuration) {
 	conf.Users = n.normalizeConfigurationUsers(conf.Users)
 	conf.Profiles = n.normalizeConfigurationProfiles(conf.Profiles)
 	conf.Quotas = n.normalizeConfigurationQuotas(conf.Quotas)
@@ -413,9 +305,8 @@ func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *api.Co
 }
 
 // normalizeTemplates normalizes .spec.templates
-func (n *Normalizer) normalizeTemplates(templates *api.Templates) *api.Templates {
+func (n *Normalizer) normalizeTemplates(templates *chi.Templates) *chi.Templates {
 	if templates == nil {
-		//templates = api.NewChiTemplates()
 		return nil
 	}
 
@@ -427,64 +318,64 @@ func (n *Normalizer) normalizeTemplates(templates *api.Templates) *api.Templates
 }
 
 // normalizeTemplating normalizes .spec.templating
-func (n *Normalizer) normalizeTemplating(templating *api.ChiTemplating) *api.ChiTemplating {
+func (n *Normalizer) normalizeTemplating(templating *chi.ChiTemplating) *chi.ChiTemplating {
 	if templating == nil {
-		templating = api.NewChiTemplating()
+		templating = chi.NewChiTemplating()
 	}
 	switch strings.ToLower(templating.GetPolicy()) {
-	case strings.ToLower(api.TemplatingPolicyAuto):
+	case strings.ToLower(chi.TemplatingPolicyAuto):
 		// Known value, overwrite it to ensure case-ness
-		templating.SetPolicy(api.TemplatingPolicyAuto)
-	case strings.ToLower(api.TemplatingPolicyManual):
+		templating.SetPolicy(chi.TemplatingPolicyAuto)
+	case strings.ToLower(chi.TemplatingPolicyManual):
 		// Known value, overwrite it to ensure case-ness
-		templating.SetPolicy(api.TemplatingPolicyManual)
+		templating.SetPolicy(chi.TemplatingPolicyManual)
 	default:
 		// Unknown value, fallback to default
-		templating.SetPolicy(api.TemplatingPolicyManual)
+		templating.SetPolicy(chi.TemplatingPolicyManual)
 	}
 	return templating
 }
 
 // normalizeReconciling normalizes .spec.reconciling
-func (n *Normalizer) normalizeReconciling(reconciling *api.ChiReconciling) *api.ChiReconciling {
+func (n *Normalizer) normalizeReconciling(reconciling *chi.Reconciling) *chi.Reconciling {
 	if reconciling == nil {
-		reconciling = api.NewChiReconciling().SetDefaults()
+		reconciling = chi.NewReconciling().SetDefaults()
 	}
 	switch strings.ToLower(reconciling.GetPolicy()) {
-	case strings.ToLower(api.ReconcilingPolicyWait):
+	case strings.ToLower(chi.ReconcilingPolicyWait):
 		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(api.ReconcilingPolicyWait)
-	case strings.ToLower(api.ReconcilingPolicyNoWait):
+		reconciling.SetPolicy(chi.ReconcilingPolicyWait)
+	case strings.ToLower(chi.ReconcilingPolicyNoWait):
 		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(api.ReconcilingPolicyNoWait)
+		reconciling.SetPolicy(chi.ReconcilingPolicyNoWait)
 	default:
 		// Unknown value, fallback to default
-		reconciling.SetPolicy(api.ReconcilingPolicyUnspecified)
+		reconciling.SetPolicy(chi.ReconcilingPolicyUnspecified)
 	}
-	reconciling.Cleanup = n.normalizeReconcilingCleanup(reconciling.Cleanup)
+	reconciling.SetCleanup(n.normalizeReconcilingCleanup(reconciling.GetCleanup()))
 	return reconciling
 }
 
-func (n *Normalizer) normalizeReconcilingCleanup(cleanup *api.ChiCleanup) *api.ChiCleanup {
+func (n *Normalizer) normalizeReconcilingCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
 	if cleanup == nil {
-		cleanup = api.NewChiCleanup()
+		cleanup = chi.NewCleanup()
 	}
 
 	if cleanup.UnknownObjects == nil {
 		cleanup.UnknownObjects = cleanup.DefaultUnknownObjects()
 	}
-	n.normalizeCleanup(&cleanup.UnknownObjects.StatefulSet, api.ObjectsCleanupDelete)
-	n.normalizeCleanup(&cleanup.UnknownObjects.PVC, api.ObjectsCleanupDelete)
-	n.normalizeCleanup(&cleanup.UnknownObjects.ConfigMap, api.ObjectsCleanupDelete)
-	n.normalizeCleanup(&cleanup.UnknownObjects.Service, api.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.StatefulSet, chi.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.PVC, chi.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.ConfigMap, chi.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.Service, chi.ObjectsCleanupDelete)
 
 	if cleanup.ReconcileFailedObjects == nil {
 		cleanup.ReconcileFailedObjects = cleanup.DefaultReconcileFailedObjects()
 	}
-	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.StatefulSet, api.ObjectsCleanupRetain)
-	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.PVC, api.ObjectsCleanupRetain)
-	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.ConfigMap, api.ObjectsCleanupRetain)
-	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.Service, api.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.StatefulSet, chi.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.PVC, chi.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.ConfigMap, chi.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.Service, chi.ObjectsCleanupRetain)
 	return cleanup
 }
 
@@ -493,82 +384,82 @@ func (n *Normalizer) normalizeCleanup(str *string, value string) {
 		return
 	}
 	switch strings.ToLower(*str) {
-	case strings.ToLower(api.ObjectsCleanupRetain):
+	case strings.ToLower(chi.ObjectsCleanupRetain):
 		// Known value, overwrite it to ensure case-ness
-		*str = api.ObjectsCleanupRetain
-	case strings.ToLower(api.ObjectsCleanupDelete):
+		*str = chi.ObjectsCleanupRetain
+	case strings.ToLower(chi.ObjectsCleanupDelete):
 		// Known value, overwrite it to ensure case-ness
-		*str = api.ObjectsCleanupDelete
+		*str = chi.ObjectsCleanupDelete
 	default:
 		// Unknown value, fallback to default
 		*str = value
 	}
 }
 
-func (n *Normalizer) normalizeHostTemplates(templates *api.Templates) {
+func (n *Normalizer) normalizeHostTemplates(templates *chi.Templates) {
 	for i := range templates.HostTemplates {
 		n.normalizeHostTemplate(&templates.HostTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizePodTemplates(templates *api.Templates) {
+func (n *Normalizer) normalizePodTemplates(templates *chi.Templates) {
 	for i := range templates.PodTemplates {
 		n.normalizePodTemplate(&templates.PodTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizeVolumeClaimTemplates(templates *api.Templates) {
+func (n *Normalizer) normalizeVolumeClaimTemplates(templates *chi.Templates) {
 	for i := range templates.VolumeClaimTemplates {
 		n.normalizeVolumeClaimTemplate(&templates.VolumeClaimTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizeServiceTemplates(templates *api.Templates) {
+func (n *Normalizer) normalizeServiceTemplates(templates *chi.Templates) {
 	for i := range templates.ServiceTemplates {
 		n.normalizeServiceTemplate(&templates.ServiceTemplates[i])
 	}
 }
 
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
-func (n *Normalizer) normalizeHostTemplate(template *api.HostTemplate) {
-	templatesNormalizer.NormalizeHostTemplate(template)
+func (n *Normalizer) normalizeHostTemplate(template *chi.HostTemplate) {
+	templates.NormalizeHostTemplate(template)
 	// Introduce HostTemplate into Index
-	n.ctx.GetTarget().Spec.Templates.EnsureHostTemplatesIndex().Set(template.Name, template)
+	n.req.GetTarget().GetSpecT().GetTemplates().EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
-func (n *Normalizer) normalizePodTemplate(template *api.PodTemplate) {
+func (n *Normalizer) normalizePodTemplate(template *chi.PodTemplate) {
 	// TODO need to support multi-cluster
 	replicasCount := 1
-	if len(n.ctx.GetTarget().Spec.Configuration.Clusters) > 0 {
-		replicasCount = n.ctx.GetTarget().Spec.Configuration.Clusters[0].Layout.ReplicasCount
+	if len(n.req.GetTarget().GetSpecT().Configuration.Clusters) > 0 {
+		replicasCount = n.req.GetTarget().GetSpecT().Configuration.Clusters[0].Layout.ReplicasCount
 	}
-	templatesNormalizer.NormalizePodTemplate(replicasCount, template)
+	templates.NormalizePodTemplate(n.macro, n.labeler, replicasCount, template)
 	// Introduce PodTemplate into Index
-	n.ctx.GetTarget().Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
+	n.req.GetTarget().GetSpecT().GetTemplates().EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
-func (n *Normalizer) normalizeVolumeClaimTemplate(template *api.VolumeClaimTemplate) {
-	templatesNormalizer.NormalizeVolumeClaimTemplate(template)
+func (n *Normalizer) normalizeVolumeClaimTemplate(template *chi.VolumeClaimTemplate) {
+	templates.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
-	n.ctx.GetTarget().Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
+	n.req.GetTarget().GetSpecT().GetTemplates().EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
-func (n *Normalizer) normalizeServiceTemplate(template *api.ServiceTemplate) {
-	templatesNormalizer.NormalizeServiceTemplate(template)
+func (n *Normalizer) normalizeServiceTemplate(template *chi.ServiceTemplate) {
+	templates.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
-	n.ctx.GetTarget().Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
+	n.req.GetTarget().GetSpecT().GetTemplates().EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeUseTemplates is a wrapper to hold the name of normalized section
-func (n *Normalizer) normalizeUseTemplates(templates []*api.TemplateRef) []*api.TemplateRef {
-	return templatesNormalizer.NormalizeTemplatesList(templates)
+func (n *Normalizer) normalizeUseTemplates(templates []*chi.TemplateRef) []*chi.TemplateRef {
+	return crTemplatesNormalizer.NormalizeTemplatesList(templates)
 }
 
 // normalizeClusters normalizes clusters
-func (n *Normalizer) normalizeClusters(clusters []*api.Cluster) []*api.Cluster {
+func (n *Normalizer) normalizeClusters(clusters []*chi.Cluster) []*chi.Cluster {
 	// We need to have at least one cluster available
 	clusters = n.ensureClusters(clusters)
 	// Normalize all clusters
@@ -579,16 +470,16 @@ func (n *Normalizer) normalizeClusters(clusters []*api.Cluster) []*api.Cluster {
 }
 
 // ensureClusters
-func (n *Normalizer) ensureClusters(clusters []*api.Cluster) []*api.Cluster {
+func (n *Normalizer) ensureClusters(clusters []*chi.Cluster) []*chi.Cluster {
 	// May be we have cluster(s) available
 	if len(clusters) > 0 {
 		return clusters
 	}
 
 	// In case no clusters available, we may want to create a default one
-	if n.ctx.Options().WithDefaultCluster {
-		return []*api.Cluster{
-			creator.NewDefaultCluster(),
+	if n.req.Options().WithDefaultCluster {
+		return []*chi.Cluster{
+			commonCreator.CreateCluster(interfaces.ClusterCHIDefault).(*chi.Cluster),
 		}
 	}
 
@@ -597,7 +488,7 @@ func (n *Normalizer) ensureClusters(clusters []*api.Cluster) []*api.Cluster {
 }
 
 // normalizeConfigurationZookeeper normalizes .spec.configuration.zookeeper
-func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ChiZookeeperConfig) *api.ChiZookeeperConfig {
+func (n *Normalizer) normalizeConfigurationZookeeper(zk *chi.ZookeeperConfig) *chi.ZookeeperConfig {
 	if zk == nil {
 		return nil
 	}
@@ -606,271 +497,52 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ChiZookeeperConfig)
 	for i := range zk.Nodes {
 		// Convenience wrapper
 		node := &zk.Nodes[i]
-		if api.IsPortUnassigned(node.Port) {
-			node.Port = model.ZkDefaultPort
+		if !node.Port.IsValid() {
+			node.Port = types.NewInt32(config.ZkDefaultPort)
 		}
 	}
 
-	// In case no ZK root specified - assign '/clickhouse/{namespace}/{chi name}'
+	// In case no ZK root specified - assign '/clickhouse/{namespace}/{target name}'
 	//if zk.Root == "" {
-	//	zk.Root = fmt.Sprintf(zkDefaultRootTemplate, n.chi.Namespace, n.chi.Name)
+	//	zk.Root = fmt.Sprintf(zkDefaultRootTemplate, n.target.Namespace, n.target.Name)
 	//}
 
 	return zk
 }
 
-type SettingsSubstitution interface {
-	Has(string) bool
-	Get(string) *api.Setting
-	Set(string, *api.Setting) *api.Settings
-	Delete(string)
-	Name2Key(string) string
-}
-
-// substSettingsFieldWithDataFromDataSource substitute settings field with new setting built from the data source
-func (n *Normalizer) substSettingsFieldWithDataFromDataSource(
-	settings SettingsSubstitution,
-	dstField,
-	srcSecretRefField string,
-	parseScalarString bool,
-	newSettingCreator func(api.ObjectAddress) (*api.Setting, error),
-) bool {
-	// Has to have source field specified
-	if !settings.Has(srcSecretRefField) {
-		// No substitution done
-		return false
-	}
-
-	// Fetch data source address from the source setting field
-	setting := settings.Get(srcSecretRefField)
-	secretAddress, err := setting.FetchDataSourceAddress(n.ctx.GetTarget().Namespace, parseScalarString)
-	if err != nil {
-		// This is not necessarily an error, just no address specified, most likely setting is not data source ref
-		// No substitution done
-		return false
-	}
-
-	// Create setting from the secret with a provided function
-	if newSetting, err := newSettingCreator(secretAddress); err == nil {
-		// Set the new setting as dst.
-		// Replacing src in case src name is the same as dst name.
-		settings.Set(dstField, newSetting)
-	}
-
-	// In case we are NOT replacing the same field with its new value, then remove the source field.
-	// Typically non-replaced source field is not expected to be included into the final config,
-	// mainly because very often these source fields are synthetic ones (do not exist in config fields list).
-	if dstField != srcSecretRefField {
-		settings.Delete(srcSecretRefField)
-	}
-
-	// Substitution done
-	return true
-}
-
-// substSettingsFieldWithSecretFieldValue substitute users settings field with the value read from k8s secret
-func (n *Normalizer) substSettingsFieldWithSecretFieldValue(
-	settings SettingsSubstitution,
-	dstField,
-	srcSecretRefField string,
-) bool {
-	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, true,
-		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
-			secretFieldValue, err := n.fetchSecretFieldValue(secretAddress)
-			if err != nil {
-				return nil, err
-			}
-			// Create new setting with the value
-			return api.NewSettingScalar(secretFieldValue), nil
-		})
-}
-
-// substSettingsFieldWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
-func (n *Normalizer) substSettingsFieldWithEnvRefToSecretField(
-	settings SettingsSubstitution,
-	dstField,
-	srcSecretRefField,
-	envVarNamePrefix string,
-	parseScalarString bool,
-) bool {
-	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, parseScalarString,
-		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
-			// ENV VAR name and value
-			// In case not OK env var name will be empty and config will be incorrect. CH may not start
-			envVarName, _ := util.BuildShellEnvVarName(envVarNamePrefix + "_" + settings.Name2Key(dstField))
-			n.appendAdditionalEnvVar(
-				core.EnvVar{
-					Name: envVarName,
-					ValueFrom: &core.EnvVarSource{
-						SecretKeyRef: &core.SecretKeySelector{
-							LocalObjectReference: core.LocalObjectReference{
-								Name: secretAddress.Name,
-							},
-							Key: secretAddress.Key,
-						},
-					},
-				},
-			)
-			// Create new setting w/o value but with attribute to read from ENV var
-			return api.NewSettingScalar("").SetAttribute("from_env", envVarName), nil
-		})
-}
-
-func (n *Normalizer) substSettingsFieldWithMountedFile(settings *api.Settings, srcSecretRefField string) bool {
-	var defaultMode int32 = 0644
-	return n.substSettingsFieldWithDataFromDataSource(settings, "", srcSecretRefField, false,
-		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
-			volumeName, ok1 := util.BuildRFC1035Label(srcSecretRefField)
-			volumeMountName, ok2 := util.BuildRFC1035Label(srcSecretRefField)
-			filenameInSettingsOrFiles := srcSecretRefField
-			filenameInMountedFS := secretAddress.Key
-
-			if !ok1 || !ok2 {
-				return nil, fmt.Errorf("unable to build k8s object name")
-			}
-
-			n.appendAdditionalVolume(core.Volume{
-				Name: volumeName,
-				VolumeSource: core.VolumeSource{
-					Secret: &core.SecretVolumeSource{
-						SecretName: secretAddress.Name,
-						Items: []core.KeyToPath{
-							{
-								Key:  secretAddress.Key,
-								Path: filenameInMountedFS,
-							},
-						},
-						DefaultMode: &defaultMode,
-					},
-				},
-			})
-
-			// TODO setting may have specified mountPath explicitly
-			mountPath := filepath.Join(model.DirPathSecretFilesConfig, filenameInSettingsOrFiles, secretAddress.Name)
-			// TODO setting may have specified subPath explicitly
-			// Mount as file
-			//subPath := filename
-			// Mount as folder
-			subPath := ""
-			n.appendAdditionalVolumeMount(core.VolumeMount{
-				Name:      volumeMountName,
-				ReadOnly:  true,
-				MountPath: mountPath,
-				SubPath:   subPath,
-			})
-
-			// Do not create new setting, but old setting would be deleted
-			return nil, fmt.Errorf("no need to create a new setting")
-		})
-}
-
-func (n *Normalizer) appendClusterSecretEnvVar(cluster *api.Cluster) {
-	switch cluster.Secret.Source() {
-	case api.ClusterSecretSourcePlaintext:
+func (n *Normalizer) appendClusterSecretEnvVar(cluster chi.ICluster) {
+	switch cluster.GetSecret().Source() {
+	case chi.ClusterSecretSourcePlaintext:
 		// Secret has explicit value, it is not passed via ENV vars
 		// Do nothing here
-	case api.ClusterSecretSourceSecretRef:
+		return
+	case chi.ClusterSecretSourceSecretRef:
 		// Secret has explicit SecretKeyRef
-		// Set the password for internode communication using an ENV VAR
-		n.appendAdditionalEnvVar(
+		// Set the password for inter-node communication using an ENV VAR
+		n.req.AppendAdditionalEnvVar(
 			core.EnvVar{
-				Name: model.InternodeClusterSecretEnvName,
+				Name: config.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
-					SecretKeyRef: cluster.Secret.GetSecretKeyRef(),
+					SecretKeyRef: cluster.GetSecret().GetSecretKeyRef(),
 				},
 			},
 		)
-	case api.ClusterSecretSourceAuto:
+	case chi.ClusterSecretSourceAuto:
 		// Secret is auto-generated
-		// Set the password for internode communication using an ENV VAR
-		n.appendAdditionalEnvVar(
+		// Set the password for inter-node communication using an ENV VAR
+		n.req.AppendAdditionalEnvVar(
 			core.EnvVar{
-				Name: model.InternodeClusterSecretEnvName,
+				Name: config.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
-					SecretKeyRef: cluster.Secret.GetAutoSecretKeyRef(model.CreateClusterAutoSecretName(cluster)),
+					SecretKeyRef: cluster.GetSecret().GetAutoSecretKeyRef(n.namer.Name(interfaces.NameClusterAutoSecret, cluster)),
 				},
 			},
 		)
 	}
-}
-
-func (n *Normalizer) appendAdditionalEnvVar(envVar core.EnvVar) {
-	// Sanity check
-	if envVar.Name == "" {
-		return
-	}
-
-	for _, existingEnvVar := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalEnvVars {
-		if existingEnvVar.Name == envVar.Name {
-			// Such a variable already exists
-			return
-		}
-	}
-
-	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalEnvVars = append(n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalEnvVars, envVar)
-}
-
-func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
-	// Sanity check
-	if volume.Name == "" {
-		return
-	}
-
-	for _, existingVolume := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumes {
-		if existingVolume.Name == volume.Name {
-			// Such a variable already exists
-			return
-		}
-	}
-
-	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumes = append(n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumes, volume)
-}
-
-func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
-	// Sanity check
-	if volumeMount.Name == "" {
-		return
-	}
-
-	for _, existingVolumeMount := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumeMounts {
-		if existingVolumeMount.Name == volumeMount.Name {
-			// Such a variable already exists
-			return
-		}
-	}
-
-	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumeMounts = append(n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumeMounts, volumeMount)
-}
-
-var ErrSecretValueNotFound = fmt.Errorf("secret value not found")
-
-// fetchSecretFieldValue fetches the value of the specified field in the specified secret
-// TODO this is the only usage of k8s API in the normalizer. How to remove it?
-func (n *Normalizer) fetchSecretFieldValue(secretAddress api.ObjectAddress) (string, error) {
-
-	// Fetch the secret
-	secret, err := n.secretGet(secretAddress.Namespace, secretAddress.Name)
-	if err != nil {
-		log.V(1).M(secretAddress.Namespace, secretAddress.Name).F().Info("unable to read secret %s %v", secretAddress, err)
-		return "", ErrSecretValueNotFound
-	}
-
-	// Find the field within the secret
-	for key, value := range secret.Data {
-		if secretAddress.Key == key {
-			// The field found!
-			return string(value), nil
-		}
-	}
-
-	log.V(1).M(secretAddress.Namespace, secretAddress.Name).F().
-		Warning("unable to locate secret data by namespace/name/key: %s", secretAddress)
-
-	return "", ErrSecretValueNotFound
 }
 
 // normalizeUsersList extracts usernames from provided 'users' settings and adds some extra usernames
-func (n *Normalizer) normalizeUsersList(users *api.Settings, extraUsernames ...string) (usernames []string) {
+func (n *Normalizer) normalizeUsersList(users *chi.Settings, extraUsernames ...string) (usernames []string) {
 	usernames = append(usernames, users.Groups()...)
 	usernames = append(usernames, extraUsernames...)
 	usernames = util.NonEmpty(util.Unique(usernames))
@@ -883,8 +555,8 @@ const defaultUsername = "default"
 const chopProfile = "clickhouse_operator"
 
 // normalizeConfigurationUsers normalizes .spec.configuration.users
-func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Settings {
-	// Ensure and normalize user settings
+func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings) *chi.Settings {
+	// Ensure and normalizeTarget user settings
 	users = users.Ensure().Normalize()
 
 	// Add special "default" user to the list of users, which is used/required for:
@@ -893,7 +565,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Setti
 	// Add special "chop" user to the list of users, which is used/required for:
 	// 1. Operator to communicate with hosts
 	usernames := n.normalizeUsersList(
-		// user-based settings contains non-explicit users list in it
+		// User-based settings section contains non-explicit users list in it - as part of paths
 		users,
 		// Add default user which always exists
 		defaultUsername,
@@ -903,190 +575,27 @@ func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Setti
 
 	// Normalize each user in the list of users
 	for _, username := range usernames {
-		n.normalizeConfigurationUser(api.NewSettingsUser(users, username))
+		n.normalizeConfigurationUser(chi.NewSettingsUser(users, username))
 	}
 
-	// Remove plain password for the default user
-	n.removePlainPassword(api.NewSettingsUser(users, defaultUsername))
+	// Remove plain password for the "default" user
+	n.removePlainPassword(chi.NewSettingsUser(users, defaultUsername))
 
 	return users
 }
 
-func (n *Normalizer) removePlainPassword(user *api.SettingsUser) {
+func (n *Normalizer) removePlainPassword(user *chi.SettingsUser) {
 	// If user has any of encrypted password(s) specified, we need to delete existing plaintext password.
-	// Set `remove` flag for user's plaintext `password`, which is specified as empty in stock ClickHouse users.xml,
+	// Set 'remove' flag for user's plaintext 'password' setting, which is specified as empty in stock ClickHouse users.xml,
 	// thus we need to overwrite it.
 	if user.Has("password_double_sha1_hex") || user.Has("password_sha256_hex") {
-		user.Set("password", api.NewSettingScalar("").SetAttribute("remove", "1"))
+		user.Set("password", chi.NewSettingScalar("").SetAttribute("remove", "1"))
 	}
-}
-
-const (
-	envVarNamePrefixConfigurationUsers    = "CONFIGURATION_USERS"
-	envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS"
-)
-
-func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
-	n.normalizeConfigurationUserSecretRef(user)
-	n.normalizeConfigurationUserPassword(user)
-	n.normalizeConfigurationUserEnsureMandatoryFields(user)
-}
-
-func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser) {
-	user.WalkSafe(func(name string, _ *api.Setting) {
-		if strings.HasPrefix(name, "k8s_secret_") {
-			// TODO remove as obsoleted
-			// Skip this user field, it will be processed later
-		} else {
-			n.substSettingsFieldWithEnvRefToSecretField(user, name, name, envVarNamePrefixConfigurationUsers, false)
-		}
-	})
-}
-
-func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.SettingsUser) {
-	//
-	// Ensure each user has mandatory fields:
-	//
-	// 1. user/profile
-	// 2. user/quota
-	// 3. user/networks/ip
-	// 4. user/networks/host_regexp
-	profile := chop.Config().ClickHouse.Config.User.Default.Profile
-	quota := chop.Config().ClickHouse.Config.User.Default.Quota
-	ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
-	hostRegexp := model.CreatePodHostnameRegexp(n.ctx.GetTarget(), chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
-
-	// Some users may have special options for mandatory fields
-	switch user.Username() {
-	case defaultUsername:
-		// "default" user
-		ips = append(ips, n.ctx.Options().DefaultUserAdditionalIPs...)
-		if !n.ctx.Options().DefaultUserInsertHostRegex {
-			hostRegexp = ""
-		}
-	case chop.Config().ClickHouse.Access.Username:
-		// User used by CHOp to access ClickHouse instances.
-		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
-
-		profile = chopProfile
-		quota = ""
-		ips = []string{ip}
-		hostRegexp = ""
-	}
-
-	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
-	n.setMandatoryUserFields(user, &userFields{
-		profile:    profile,
-		quota:      quota,
-		ips:        ips,
-		hostRegexp: hostRegexp,
-	})
-}
-
-type userFields struct {
-	profile    string
-	quota      string
-	ips        []string
-	hostRegexp string
-}
-
-// setMandatoryUserFields sets user fields
-func (n *Normalizer) setMandatoryUserFields(user *api.SettingsUser, fields *userFields) {
-	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
-	if fields.profile != "" {
-		user.SetIfNotExists("profile", api.NewSettingScalar(fields.profile))
-	}
-	if fields.quota != "" {
-		user.SetIfNotExists("quota", api.NewSettingScalar(fields.quota))
-	}
-	if len(fields.ips) > 0 {
-		user.Set("networks/ip", api.NewSettingVector(fields.ips).MergeFrom(user.Get("networks/ip")))
-	}
-	if fields.hostRegexp != "" {
-		user.SetIfNotExists("networks/host_regexp", api.NewSettingScalar(fields.hostRegexp))
-	}
-}
-
-// normalizeConfigurationUserPassword deals with user passwords
-func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
-	// Values from the secret have higher priority
-	n.substSettingsFieldWithSecretFieldValue(user, "password", "k8s_secret_password")
-	n.substSettingsFieldWithSecretFieldValue(user, "password_sha256_hex", "k8s_secret_password_sha256_hex")
-	n.substSettingsFieldWithSecretFieldValue(user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
-
-	// Values from the secret passed via ENV have even higher priority
-	n.substSettingsFieldWithEnvRefToSecretField(user, "password", "k8s_secret_env_password", envVarNamePrefixConfigurationUsers, true)
-	n.substSettingsFieldWithEnvRefToSecretField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex", envVarNamePrefixConfigurationUsers, true)
-	n.substSettingsFieldWithEnvRefToSecretField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex", envVarNamePrefixConfigurationUsers, true)
-
-	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
-	if user.Has("password_double_sha1_hex") {
-		user.Delete("password_sha256_hex")
-		user.Delete("password")
-		// This is all for this user
-		return
-	}
-
-	// Than goes password_sha256_hex, thus keep it only
-	if user.Has("password_sha256_hex") {
-		user.Delete("password_double_sha1_hex")
-		user.Delete("password")
-		// This is all for this user
-		return
-	}
-
-	// From now on we either have a plaintext password specified (explicitly or via ENV), or no password at all
-
-	if user.Get("password").HasAttributes() {
-		// Have plaintext password with attributes - means we have plaintext password explicitly specified via ENV var
-		// This is fine
-		// This is all for this user
-		return
-	}
-
-	// From now on we either have plaintext password specified as an explicit string, or no password at all
-
-	passwordPlaintext := user.Get("password").String()
-
-	// Apply default password for password-less non-default users
-	// 1. NB "default" user keeps empty password in here.
-	// 2. ClickHouse user gets password from his section of CHOp configuration
-	// 3. All the rest users get default password
-	if passwordPlaintext == "" {
-		switch user.Username() {
-		case defaultUsername:
-			// NB "default" user keeps empty password in here.
-		case chop.Config().ClickHouse.Access.Username:
-			// User used by CHOp to access ClickHouse instances.
-			// Gets ClickHouse access password from "ClickHouse.Access.Password"
-			passwordPlaintext = chop.Config().ClickHouse.Access.Password
-		default:
-			// All the rest users get default password from "ClickHouse.Config.User.Default.Password"
-			passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
-		}
-	}
-
-	// It may come that plaintext password is still empty.
-	// For example, user `default` quite often has empty password.
-	if passwordPlaintext == "" {
-		// This is fine
-		// This is all for this user
-		return
-	}
-
-	// Have plaintext password specified.
-	// Replace plaintext password with encrypted one
-	passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-	user.Set("password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
-	// And keep only one password specification - delete all the rest (if any exists)
-	user.Delete("password_double_sha1_hex")
-	user.Delete("password")
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
-func (n *Normalizer) normalizeConfigurationProfiles(profiles *api.Settings) *api.Settings {
+func (n *Normalizer) normalizeConfigurationProfiles(profiles *chi.Settings) *chi.Settings {
 	if profiles == nil {
-		//profiles = api.NewSettings()
 		return nil
 	}
 	profiles.Normalize()
@@ -1094,88 +603,97 @@ func (n *Normalizer) normalizeConfigurationProfiles(profiles *api.Settings) *api
 }
 
 // normalizeConfigurationQuotas normalizes .spec.configuration.quotas
-func (n *Normalizer) normalizeConfigurationQuotas(quotas *api.Settings) *api.Settings {
+func (n *Normalizer) normalizeConfigurationQuotas(quotas *chi.Settings) *chi.Settings {
 	if quotas == nil {
-		//quotas = api.NewSettings()
 		return nil
 	}
 	quotas.Normalize()
 	return quotas
 }
 
+const envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS"
+
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
-func (n *Normalizer) normalizeConfigurationSettings(settings *api.Settings) *api.Settings {
+func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings) *chi.Settings {
 	if settings == nil {
-		//settings = api.NewSettings()
 		return nil
 	}
 	settings.Normalize()
 
-	settings.WalkSafe(func(name string, setting *api.Setting) {
-		n.substSettingsFieldWithEnvRefToSecretField(settings, name, name, envVarNamePrefixConfigurationSettings, false)
+	settings.WalkSafe(func(name string, setting *chi.Setting) {
+		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings, false)
 	})
 	return settings
 }
 
 // normalizeConfigurationFiles normalizes .spec.configuration.files
-func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Settings {
+func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings) *chi.Settings {
 	if files == nil {
-		//files = api.NewSettings()
 		return nil
 	}
 	files.Normalize()
 
-	files.WalkSafe(func(key string, setting *api.Setting) {
-		n.substSettingsFieldWithMountedFile(files, key)
+	files.WalkSafe(func(key string, setting *chi.Setting) {
+		subst.ReplaceSettingsFieldWithMountedFile(n.req, files, key)
 	})
 
 	return files
 }
 
-// normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
-func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
+func ensureCluster(cluster *chi.Cluster) *chi.Cluster {
 	if cluster == nil {
-		cluster = creator.NewDefaultCluster()
+		return commonCreator.CreateCluster(interfaces.ClusterCHIDefault).(*chi.Cluster)
+	} else {
+		return cluster
 	}
+}
 
-	cluster.Runtime.CHI = n.ctx.GetTarget()
+// normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
+func (n *Normalizer) normalizeCluster(cluster *chi.Cluster) *chi.Cluster {
+	cluster = ensureCluster(cluster)
 
+	// Runtime has to be prepared first
+	cluster.GetRuntime().SetCR(n.req.GetTarget())
+
+	// Then we need to inherit values from the parent
 	// Inherit from .spec.configuration.zookeeper
-	cluster.InheritZookeeperFrom(n.ctx.GetTarget())
+	cluster.InheritZookeeperFrom(n.req.GetTarget())
 	// Inherit from .spec.configuration.files
-	cluster.InheritFilesFrom(n.ctx.GetTarget())
+	cluster.InheritFilesFrom(n.req.GetTarget())
 	// Inherit from .spec.defaults
-	cluster.InheritTemplatesFrom(n.ctx.GetTarget())
+	cluster.InheritTemplatesFrom(n.req.GetTarget())
 
 	cluster.Zookeeper = n.normalizeConfigurationZookeeper(cluster.Zookeeper)
 	cluster.Settings = n.normalizeConfigurationSettings(cluster.Settings)
 	cluster.Files = n.normalizeConfigurationFiles(cluster.Files)
 
 	cluster.SchemaPolicy = n.normalizeClusterSchemaPolicy(cluster.SchemaPolicy)
+	cluster.PDBMaxUnavailable = n.normalizePDBMaxUnavailable(cluster.PDBMaxUnavailable)
 
+	// Ensure layout
 	if cluster.Layout == nil {
-		cluster.Layout = api.NewChiClusterLayout()
+		cluster.Layout = chi.NewChiClusterLayout()
 	}
 	cluster.FillShardReplicaSpecified()
 	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
 	n.ensureClusterLayoutShards(cluster.Layout)
 	n.ensureClusterLayoutReplicas(cluster.Layout)
 
-	n.createHostsField(cluster)
+	createHostsField(cluster)
 	n.appendClusterSecretEnvVar(cluster)
 
 	// Loop over all shards and replicas inside shards and fill structure
-	cluster.WalkShards(func(index int, shard *api.ChiShard) error {
-		n.normalizeShard(shard, cluster, index)
+	cluster.WalkShards(func(index int, shard chi.IShard) error {
+		n.normalizeShard(shard.(*chi.ChiShard), cluster, index)
 		return nil
 	})
 
-	cluster.WalkReplicas(func(index int, replica *api.ChiReplica) error {
+	cluster.WalkReplicas(func(index int, replica *chi.ChiReplica) error {
 		n.normalizeReplica(replica, cluster, index)
 		return nil
 	})
 
-	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *api.ChiHost) error {
+	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *chi.Host) error {
 		n.normalizeHost(host, cluster.GetShard(shard), cluster.GetReplica(replica), cluster, shard, replica)
 		return nil
 	})
@@ -1183,69 +701,57 @@ func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 	return cluster
 }
 
-// createHostsField
-func (n *Normalizer) createHostsField(cluster *api.Cluster) {
-	cluster.Layout.HostsField = api.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
-
-	// Need to migrate hosts from Shards and Replicas into HostsField
-	hostMergeFunc := func(shard, replica int, host *api.ChiHost) error {
-		if curHost := cluster.Layout.HostsField.Get(shard, replica); curHost == nil {
-			cluster.Layout.HostsField.Set(shard, replica, host)
-		} else {
-			curHost.MergeFrom(host)
-		}
-		return nil
-	}
-
-	cluster.WalkHostsByShards(hostMergeFunc)
-	cluster.WalkHostsByReplicas(hostMergeFunc)
-}
-
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
-func (n *Normalizer) normalizeClusterSchemaPolicy(policy *api.SchemaPolicy) *api.SchemaPolicy {
+func (n *Normalizer) normalizeClusterSchemaPolicy(policy *chi.SchemaPolicy) *chi.SchemaPolicy {
 	if policy == nil {
-		policy = api.NewClusterSchemaPolicy()
+		policy = chi.NewClusterSchemaPolicy()
 	}
 
 	switch strings.ToLower(policy.Replica) {
-	case strings.ToLower(model.SchemaPolicyReplicaNone):
+	case strings.ToLower(schemer.SchemaPolicyReplicaNone):
 		// Known value, overwrite it to ensure case-ness
-		policy.Replica = model.SchemaPolicyReplicaNone
-	case strings.ToLower(model.SchemaPolicyReplicaAll):
+		policy.Replica = schemer.SchemaPolicyReplicaNone
+	case strings.ToLower(schemer.SchemaPolicyReplicaAll):
 		// Known value, overwrite it to ensure case-ness
-		policy.Replica = model.SchemaPolicyReplicaAll
+		policy.Replica = schemer.SchemaPolicyReplicaAll
 	default:
 		// Unknown value, fallback to default
-		policy.Replica = model.SchemaPolicyReplicaAll
+		policy.Replica = schemer.SchemaPolicyReplicaAll
 	}
 
 	switch strings.ToLower(policy.Shard) {
-	case strings.ToLower(model.SchemaPolicyShardNone):
+	case strings.ToLower(schemer.SchemaPolicyShardNone):
 		// Known value, overwrite it to ensure case-ness
-		policy.Shard = model.SchemaPolicyShardNone
-	case strings.ToLower(model.SchemaPolicyShardAll):
+		policy.Shard = schemer.SchemaPolicyShardNone
+	case strings.ToLower(schemer.SchemaPolicyShardAll):
 		// Known value, overwrite it to ensure case-ness
-		policy.Shard = model.SchemaPolicyShardAll
-	case strings.ToLower(model.SchemaPolicyShardDistributedTablesOnly):
+		policy.Shard = schemer.SchemaPolicyShardAll
+	case strings.ToLower(schemer.SchemaPolicyShardDistributedTablesOnly):
 		// Known value, overwrite it to ensure case-ness
-		policy.Shard = model.SchemaPolicyShardDistributedTablesOnly
+		policy.Shard = schemer.SchemaPolicyShardDistributedTablesOnly
 	default:
 		// unknown value, fallback to default
-		policy.Shard = model.SchemaPolicyShardAll
+		policy.Shard = schemer.SchemaPolicyShardAll
 	}
 
 	return policy
 }
 
+// normalizePDBMaxUnavailable normalizes PDBMaxUnavailable
+func (n *Normalizer) normalizePDBMaxUnavailable(value *types.Int32) *types.Int32 {
+	return value.Normalize(1)
+}
+
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
-func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLayout *api.ChiClusterLayout) *api.ChiClusterLayout {
+func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLayout *chi.ChiClusterLayout) *chi.ChiClusterLayout {
+	// Ensure layout
 	if clusterLayout == nil {
-		clusterLayout = api.NewChiClusterLayout()
+		clusterLayout = chi.NewChiClusterLayout()
 	}
 
-	// ChiClusterLayout.ShardsCount
+	// clusterLayout.ShardsCount
 	// and
-	// ChiClusterLayout.ReplicasCount
+	// clusterLayout.ReplicasCount
 	// must represent max number of shards and replicas requested respectively
 
 	// Deal with unspecified ShardsCount
@@ -1264,16 +770,18 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 
 	// Let's look for explicitly specified Shards in Layout.Replicas
 	for i := range clusterLayout.Replicas {
-		replica := &clusterLayout.Replicas[i]
+		replica := clusterLayout.Replicas[i]
 
 		if replica.ShardsCount > clusterLayout.ShardsCount {
-			// We have Shards number specified explicitly in this replica
+			// We have Shards number specified explicitly in this replica,
+			// and this replica has more shards than specified in cluster.
+			// Well, enlarge cluster shards count
 			clusterLayout.ShardsCount = replica.ShardsCount
 		}
 
 		if len(replica.Hosts) > clusterLayout.ShardsCount {
 			// We have more explicitly specified shards than count specified.
-			// Need to adjust.
+			// Well, enlarge cluster shards count
 			clusterLayout.ShardsCount = len(replica.Hosts)
 		}
 	}
@@ -1288,22 +796,23 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 
 	if len(clusterLayout.Replicas) > clusterLayout.ReplicasCount {
 		// We have more explicitly specified replicas than count specified.
-		// Need to adjust.
+		// Well, enlarge cluster replicas count
 		clusterLayout.ReplicasCount = len(clusterLayout.Replicas)
 	}
 
 	// Let's look for explicitly specified Replicas in Layout.Shards
 	for i := range clusterLayout.Shards {
-		shard := &clusterLayout.Shards[i]
+		shard := clusterLayout.Shards[i]
 
 		if shard.ReplicasCount > clusterLayout.ReplicasCount {
 			// We have Replicas number specified explicitly in this shard
+			// Well, enlarge cluster replicas count
 			clusterLayout.ReplicasCount = shard.ReplicasCount
 		}
 
 		if len(shard.Hosts) > clusterLayout.ReplicasCount {
-			// We have more explicitly specified replcas than count specified.
-			// Need to adjust.
+			// We have more explicitly specified replicas than count specified.
+			// Well, enlarge cluster replicas count
 			clusterLayout.ReplicasCount = len(shard.Hosts)
 		}
 	}
@@ -1312,31 +821,31 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 }
 
 // ensureClusterLayoutShards ensures slice layout.Shards is in place
-func (n *Normalizer) ensureClusterLayoutShards(layout *api.ChiClusterLayout) {
+func (n *Normalizer) ensureClusterLayoutShards(layout *chi.ChiClusterLayout) {
 	// Disposition of shards in slice would be
 	// [explicitly specified shards 0..N, N+1..layout.ShardsCount-1 empty slots for to-be-filled shards]
 
-	// Some (may be all) shards specified, need to append space for unspecified shards
+	// Some (may be all) shards specified, need to append assumed (unspecified, but expected to exist) shards
 	// TODO may be there is better way to append N slots to a slice
 	for len(layout.Shards) < layout.ShardsCount {
-		layout.Shards = append(layout.Shards, api.ChiShard{})
+		layout.Shards = append(layout.Shards, &chi.ChiShard{})
 	}
 }
 
 // ensureClusterLayoutReplicas ensures slice layout.Replicas is in place
-func (n *Normalizer) ensureClusterLayoutReplicas(layout *api.ChiClusterLayout) {
+func (n *Normalizer) ensureClusterLayoutReplicas(layout *chi.ChiClusterLayout) {
 	// Disposition of replicas in slice would be
 	// [explicitly specified replicas 0..N, N+1..layout.ReplicasCount-1 empty slots for to-be-filled replicas]
 
-	// Some (may be all) replicas specified, need to append space for unspecified replicas
+	// Some (may be all) replicas specified, need to append assumed (unspecified, but expected to exist) replicas
 	// TODO may be there is better way to append N slots to a slice
 	for len(layout.Replicas) < layout.ReplicasCount {
-		layout.Replicas = append(layout.Replicas, api.ChiReplica{})
+		layout.Replicas = append(layout.Replicas, &chi.ChiReplica{})
 	}
 }
 
 // normalizeShard normalizes a shard - walks over all fields
-func (n *Normalizer) normalizeShard(shard *api.ChiShard, cluster *api.Cluster, shardIndex int) {
+func (n *Normalizer) normalizeShard(shard *chi.ChiShard, cluster *chi.Cluster, shardIndex int) {
 	n.normalizeShardName(shard, shardIndex)
 	n.normalizeShardWeight(shard)
 	// For each shard of this normalized cluster inherit from cluster
@@ -1353,7 +862,7 @@ func (n *Normalizer) normalizeShard(shard *api.ChiShard, cluster *api.Cluster, s
 }
 
 // normalizeReplica normalizes a replica - walks over all fields
-func (n *Normalizer) normalizeReplica(replica *api.ChiReplica, cluster *api.Cluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplica(replica *chi.ChiReplica, cluster *chi.Cluster, replicaIndex int) {
 	n.normalizeReplicaName(replica, replicaIndex)
 	// For each replica of this normalized cluster inherit from cluster
 	replica.InheritSettingsFrom(cluster)
@@ -1367,7 +876,7 @@ func (n *Normalizer) normalizeReplica(replica *api.ChiReplica, cluster *api.Clus
 }
 
 // normalizeShardReplicasCount ensures shard.ReplicasCount filled properly
-func (n *Normalizer) normalizeShardReplicasCount(shard *api.ChiShard, layoutReplicasCount int) {
+func (n *Normalizer) normalizeShardReplicasCount(shard *chi.ChiShard, layoutReplicasCount int) {
 	if shard.ReplicasCount > 0 {
 		// Shard has explicitly specified number of replicas
 		return
@@ -1391,7 +900,7 @@ func (n *Normalizer) normalizeShardReplicasCount(shard *api.ChiShard, layoutRepl
 }
 
 // normalizeReplicaShardsCount ensures replica.ShardsCount filled properly
-func (n *Normalizer) normalizeReplicaShardsCount(replica *api.ChiReplica, layoutShardsCount int) {
+func (n *Normalizer) normalizeReplicaShardsCount(replica *chi.ChiReplica, layoutShardsCount int) {
 	if replica.ShardsCount > 0 {
 		// Replica has explicitly specified number of shards
 		return
@@ -1414,31 +923,31 @@ func (n *Normalizer) normalizeReplicaShardsCount(replica *api.ChiReplica, layout
 }
 
 // normalizeShardName normalizes shard name
-func (n *Normalizer) normalizeShardName(shard *api.ChiShard, index int) {
-	if (len(shard.Name) > 0) && !model.IsAutoGeneratedShardName(shard.Name, shard, index) {
+func (n *Normalizer) normalizeShardName(shard *chi.ChiShard, index int) {
+	if (len(shard.GetName()) > 0) && !commonNamer.IsAutoGeneratedShardName(shard.GetName(), shard, index) {
 		// Has explicitly specified name already
 		return
 	}
 
-	shard.Name = model.CreateShardName(shard, index)
+	shard.Name = n.namer.Name(interfaces.NameShard, shard, index)
 }
 
 // normalizeReplicaName normalizes replica name
-func (n *Normalizer) normalizeReplicaName(replica *api.ChiReplica, index int) {
-	if (len(replica.Name) > 0) && !model.IsAutoGeneratedReplicaName(replica.Name, replica, index) {
+func (n *Normalizer) normalizeReplicaName(replica *chi.ChiReplica, index int) {
+	if (len(replica.Name) > 0) && !commonNamer.IsAutoGeneratedReplicaName(replica.Name, replica, index) {
 		// Has explicitly specified name already
 		return
 	}
 
-	replica.Name = model.CreateReplicaName(replica, index)
+	replica.Name = n.namer.Name(interfaces.NameReplica, replica, index)
 }
 
 // normalizeShardName normalizes shard weight
-func (n *Normalizer) normalizeShardWeight(shard *api.ChiShard) {
+func (n *Normalizer) normalizeShardWeight(shard *chi.ChiShard) {
 }
 
 // normalizeShardHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeShardHosts(shard *api.ChiShard, cluster *api.Cluster, shardIndex int) {
+func (n *Normalizer) normalizeShardHosts(shard *chi.ChiShard, cluster *chi.Cluster, shardIndex int) {
 	// Use hosts from HostsField
 	shard.Hosts = nil
 	for len(shard.Hosts) < shard.ReplicasCount {
@@ -1451,7 +960,7 @@ func (n *Normalizer) normalizeShardHosts(shard *api.ChiShard, cluster *api.Clust
 }
 
 // normalizeReplicaHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeReplicaHosts(replica *api.ChiReplica, cluster *api.Cluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplicaHosts(replica *chi.ChiReplica, cluster *chi.Cluster, replicaIndex int) {
 	// Use hosts from HostsField
 	replica.Hosts = nil
 	for len(replica.Hosts) < replica.ShardsCount {
@@ -1463,52 +972,9 @@ func (n *Normalizer) normalizeReplicaHosts(replica *api.ChiReplica, cluster *api
 	}
 }
 
-// normalizeHost normalizes a host/replica
-func (n *Normalizer) normalizeHost(
-	host *api.ChiHost,
-	shard *api.ChiShard,
-	replica *api.ChiReplica,
-	cluster *api.Cluster,
-	shardIndex int,
-	replicaIndex int,
-) {
-
-	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
-	entitiesNormalizer.NormalizeHostPorts(host)
-	// Inherit from either Shard or Replica
-	var s *api.ChiShard
-	var r *api.ChiReplica
-	if cluster.IsShardSpecified() {
-		s = shard
-	} else {
-		r = replica
-	}
-	host.InheritSettingsFrom(s, r)
-	host.Settings = n.normalizeConfigurationSettings(host.Settings)
-	host.InheritFilesFrom(s, r)
-	host.Files = n.normalizeConfigurationFiles(host.Files)
-	host.InheritTemplatesFrom(s, r, nil)
-}
-
-// normalizeHostName normalizes host's name
-func (n *Normalizer) normalizeHostName(
-	host *api.ChiHost,
-	shard *api.ChiShard,
-	shardIndex int,
-	replica *api.ChiReplica,
-	replicaIndex int,
-) {
-	if (len(host.GetName()) > 0) && !model.IsAutoGeneratedHostName(host.GetName(), host, shard, shardIndex, replica, replicaIndex) {
-		// Has explicitly specified name already
-		return
-	}
-
-	host.Name = model.CreateHostName(host, shard, shardIndex, replica, replicaIndex)
-}
-
 // normalizeShardInternalReplication ensures reasonable values in
 // .spec.configuration.clusters.layout.shards.internalReplication
-func (n *Normalizer) normalizeShardInternalReplication(shard *api.ChiShard) {
+func (n *Normalizer) normalizeShardInternalReplication(shard *chi.ChiShard) {
 	// Shards with replicas are expected to have internal replication on by default
 	defaultInternalReplication := false
 	if shard.ReplicasCount > 1 {
