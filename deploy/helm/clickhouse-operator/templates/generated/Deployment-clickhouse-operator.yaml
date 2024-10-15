@@ -29,10 +29,10 @@ spec:
         checksum/configd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-configd-files.yaml") . | sha256sum }}
         checksum/templatesd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-templatesd-files.yaml") . | sha256sum }}
         checksum/usersd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-usersd-files.yaml") . | sha256sum }}
-        checksum/etc-keeper-operator-confd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-etc-keeper-operator-confd-files.yaml") . | sha256sum }}
-        checksum/etc-keeper-operator-configd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-etc-keeper-operator-configd-files.yaml") . | sha256sum }}
-        checksum/etc-keeper-operator-templatesd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-etc-keeper-operator-templatesd-files.yaml") . | sha256sum }}
-        checksum/etc-keeper-operator-usersd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-etc-keeper-operator-usersd-files.yaml") . | sha256sum }}
+        checksum/keeper-confd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-confd-files.yaml") . | sha256sum }}
+        checksum/keeper-configd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-configd-files.yaml") . | sha256sum }}
+        checksum/keeper-templatesd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-templatesd-files.yaml") . | sha256sum }}
+        checksum/keeper-usersd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-usersd-files.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ include "altinity-clickhouse-operator.serviceAccountName" . }}
       volumes:
@@ -53,16 +53,16 @@ spec:
             name: {{ include "altinity-clickhouse-operator.fullname" . }}-usersd-files
         - name: etc-keeper-operator-confd-folder
           configMap:
-            name: etc-keeper-operator-confd-files
+            name: {{ include "altinity-clickhouse-operator.fullname" . }}-keeper-confd-files
         - name: etc-keeper-operator-configd-folder
           configMap:
-            name: etc-keeper-operator-configd-files
+            name: {{ include "altinity-clickhouse-operator.fullname" . }}-keeper-configd-files
         - name: etc-keeper-operator-templatesd-folder
           configMap:
-            name: etc-keeper-operator-templatesd-files
+            name: {{ include "altinity-clickhouse-operator.fullname" . }}-keeper-templatesd-files
         - name: etc-keeper-operator-usersd-folder
           configMap:
-            name: etc-keeper-operator-usersd-files
+            name: {{ include "altinity-clickhouse-operator.fullname" . }}-keeper-usersd-files
       containers:
         - name: {{ .Chart.Name }}
           image: {{ .Values.operator.image.repository }}:{{ include "altinity-clickhouse-operator.operator.tag" . }}

@@ -7,7 +7,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ printf "%s-etc-keeper-operator-confd-files" (include "altinity-clickhouse-operator.fullname" .) }}
+  name: {{ printf "%s-keeper-confd-files" (include "altinity-clickhouse-operator.fullname" .) }}
   namespace: {{ .Release.Namespace }}
   labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
-data: {{ include "altinity-clickhouse-operator.configmap-data" (list . .Values.configs.etcKeeperOperatorConfdFiles) | nindent 2 }}
+data: {{ include "altinity-clickhouse-operator.configmap-data" (list . .Values.configs.keeperConfdFiles) | nindent 2 }}
