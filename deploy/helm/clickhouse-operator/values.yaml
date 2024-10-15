@@ -697,8 +697,8 @@ configs:
           </default>
         </profiles>
       </yandex>
-  etcKeeperOperatorConfdFiles: null
-  etcKeeperOperatorConfigdFiles:
+  keeperConfdFiles: null
+  keeperConfigdFiles:
     01-keeper-01-default-config.xml: |
       <!-- IMPORTANT -->
       <!-- This file is auto-generated -->
@@ -759,10 +759,10 @@ configs:
               </http_control>
           </keeper_server>
       </clickhouse>
-  etcKeeperOperatorTemplatesdFiles:
+  keeperTemplatesdFiles:
     readme: |-
       Templates in this folder are packaged with an operator and available via 'useTemplate'
-  etcKeeperOperatorUsersdFiles: null
+  keeperUsersdFiles: null
 # additionalResources -- list of additional resources to create (are processed via `tpl` function), useful for create ClickHouse clusters together with clickhouse-operator, look `kubectl explain chi` for details
 
 additionalResources: []

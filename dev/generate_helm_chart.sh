@@ -200,9 +200,11 @@ function update_deployment_resource() {
   for cm in $(yq e '.spec.template.spec.volumes[].configMap.name' "${file}"); do
     local prefix='{{ include \"altinity-clickhouse-operator.fullname\" . }}'
     local newCm="${cm/etc-clickhouse-operator/$prefix}"
+    newCm="${newCm/etc-keeper-operator/${prefix}-keeper}"
     yq e -i '(.spec.template.spec.volumes[].configMap.name | select(. == "'"${cm}"'") | .) |= "'"${newCm}"'"' "${file}"
     local cmName="${cm/etc-clickhouse-operator-/}"
-    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include (print $.Template.BasePath \"/generated/ConfigMap-etc-clickhouse-operator-'"${cmName}"'.yaml\") . | sha256sum }}"}' "${file}"
+    cmName="${cmName/etc-keeper-operator-/keeper-}"
+    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include (print $.Template.BasePath \"/generated/ConfigMap-'"${cm}"'.yaml\") . | sha256sum }}"}' "${file}"
   done
 
   yq e -i '.spec.template.spec.containers[0].name |= "{{ .Chart.Name }}"' "${file}"
@@ -245,18 +247,19 @@ function update_configmap_resource() {
   fi
 
   local name_suffix="${name/etc-clickhouse-operator-/}"
-  local cameled_name
-  cameled_name=$(to_camel_case "${name_suffix}")
+  local name_suffix="${name_suffix/etc-keeper-operator-/keeper-}"
+  local camel_cased_name
+  camel_cased_name=$(to_camel_case "${name_suffix}")
 
   yq e -i '.metadata.name |= "{{ printf \"%s-'"${name_suffix}"'\" (include \"altinity-clickhouse-operator.fullname\" .) }}"' "${file}"
   yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
-  yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${cameled_name}"') | nindent 2 }}"' "${file}"
+  yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${camel_cased_name}"') | nindent 2 }}"' "${file}"
 
   if [ -z "${data}" ]; then
-    yq e -i '.configs.'"${cameled_name}"' |= null' "${values_yaml}"
+    yq e -i '.configs.'"${camel_cased_name}"' |= null' "${values_yaml}"
   else
-    data_arg="${data}" yq e -i '.configs.'"${cameled_name}"' |= env(data_arg)' "${values_yaml}"
+    data_arg="${data}" yq e -i '.configs.'"${camel_cased_name}"' |= env(data_arg)' "${values_yaml}"
   fi
 
   perl -pi -e "s/'//g" "${file}"
