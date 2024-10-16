@@ -8,8 +8,9 @@ on:
       - '*'
 
 jobs:
-  test_helm:
+  check_helm:
     name: Test Helm Chart
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
