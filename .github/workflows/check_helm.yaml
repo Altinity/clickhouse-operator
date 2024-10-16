@@ -28,6 +28,7 @@ jobs:
       - name: Local Helm Test
         run: |
           set -xe
+          minikube kubectl create ns test
           helm install -n test test-operator ./deploy/helm/clickhouse-operator/
           sleep 10
           workflow_count=$(kubectl get all --all-namespaces | grep -c "test-operator")
