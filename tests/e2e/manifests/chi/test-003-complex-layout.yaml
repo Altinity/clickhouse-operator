@@ -8,6 +8,7 @@ spec:
   configuration:
     clusters:
       - name: cluster1
+        pdbMaxUnavailable: 0
         layout:
           shards:
             - name: shard0
@@ -21,5 +22,4 @@ spec:
             - name: shard1
               replicas:
                 - name: replica1-0
-                - name: replica1-1
       - name: cluster2

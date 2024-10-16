@@ -19,6 +19,8 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // NewSettingScalar makes new scalar Setting
@@ -38,15 +40,21 @@ func NewSettingScalarFromAny(untyped any) (*Setting, bool) {
 	return nil, false
 }
 
+// MustNewSettingScalarFromAny makes new scalar Setting from untyped
+func MustNewSettingScalarFromAny(untyped any) *Setting {
+	if scalar, ok := parseSettingScalarValue(untyped); ok {
+		return NewSettingScalar(scalar)
+	}
+
+	return nil
+}
+
 const (
 	// Float with fractional part less than ignoreThreshold is considered to be int and is casted to int
 	ignoreThreshold = 0.001
 )
 
 func parseSettingScalarValue(untyped any) (string, bool) {
-	var scalarValue string
-	var isKnownType bool
-
 	typeOf := reflect.TypeOf(untyped)
 	if typeOf == nil {
 		// Unable to determine type of the value
@@ -54,6 +62,9 @@ func parseSettingScalarValue(untyped any) (string, bool) {
 	}
 
 	switch untyped.(type) {
+	case fmt.Stringer:
+		stringer := untyped.(fmt.Stringer)
+		return fmt.Sprintf("%s", stringer), true
 	case // scalar
 		int, uint,
 		int8, uint8,
@@ -62,8 +73,7 @@ func parseSettingScalarValue(untyped any) (string, bool) {
 		int64, uint64,
 		bool,
 		string:
-		scalarValue = fmt.Sprintf("%v", untyped)
-		isKnownType = true
+		return fmt.Sprintf("%v", untyped), true
 	case // scalar
 		float32:
 		floatVal := untyped.(float32)
@@ -72,13 +82,12 @@ func parseSettingScalarValue(untyped any) (string, bool) {
 		_, frac := math.Modf(float64(floatVal))
 		if frac > ignoreThreshold {
 			// Consider it float
-			scalarValue = fmt.Sprintf("%f", untyped)
+			return fmt.Sprintf("%f", untyped), true
 		} else {
 			// Consider it int
 			intVal := int64(floatVal)
-			scalarValue = fmt.Sprintf("%v", intVal)
+			return fmt.Sprintf("%v", intVal), true
 		}
-		isKnownType = true
 	case // scalar
 		float64:
 		floatVal := untyped.(float64)
@@ -87,19 +96,19 @@ func parseSettingScalarValue(untyped any) (string, bool) {
 		_, frac := math.Modf(floatVal)
 		if frac > ignoreThreshold {
 			// Consider it float
-			scalarValue = fmt.Sprintf("%f", untyped)
+			return fmt.Sprintf("%f", untyped), true
 		} else {
 			// Consider it int
 			intVal := int64(floatVal)
-			scalarValue = fmt.Sprintf("%v", intVal)
+			return fmt.Sprintf("%v", intVal), true
 		}
-		isKnownType = true
 	}
 
-	if isKnownType {
-		return scalarValue, true
-	}
 	return "", false
+}
+
+func (s *Setting) IsEmpty() bool {
+	return s == nil
 }
 
 // IsScalar checks whether setting is a scalar value
@@ -125,6 +134,18 @@ func (s *Setting) ScalarInt() int {
 	}
 
 	return 0
+}
+
+// ScalarInt gets int scalar value of a setting
+func (s *Setting) ScalarInt32Ptr() *types.Int32 {
+	if s == nil {
+		return nil
+	}
+	if value, err := strconv.Atoi(s.scalar); err == nil {
+		return types.NewInt32(int32(value))
+	}
+
+	return nil
 }
 
 // scalarAsAny gets scalar value of a setting as any

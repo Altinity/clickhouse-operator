@@ -1,0 +1,26 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-050
+  labels:
+    exclude_this_label: test-050
+    include_this_label: test-050
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  defaults:
+    templates:
+      dataVolumeClaimTemplate: default
+  configuration:
+    clusters:
+      - name: default
+  templates:
+    volumeClaimTemplates:
+      - name: default
+        reclaimPolicy: Retain
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Mi

@@ -54,7 +54,15 @@ else
     fi
 fi
 
-if [[ "0" == $(docker buildx ls | grep -E 'linux/arm.+\*' | grep -E 'running|inactive') ]]; then
+if docker buildx > /dev/null; then
+    echo "docker buildx available, continue"
+else
+    echo "No docker buildx available. Abort."
+    exit 1
+fi
+
+DOCKER_BUILDX_NUM=$(docker buildx ls | grep -E 'linux/arm.+\*' | grep -E 'running|inactive' | wc -l)
+if [[ "${DOCKER_BUILDX_NUM}" == "0" ]]; then
     echo "Looks like there is no appropriate buildx instance available."
     echo "Create a new buildx instance."
     docker buildx create --use --name multi-platform --platform=linux/amd64,linux/arm64
@@ -71,15 +79,15 @@ DOCKER_CMD="docker buildx build --progress plain"
 
 # Append arch
 if [[ "${DOCKER_IMAGE}" =~ ":dev" || "${MINIKUBE}" == "yes" ]]; then
-    echo "Building dev images for amd64 only, skip arm arch."
-    DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64 --output type=image,name=${DOCKER_IMAGE}"
+    echo "Build image (dev) for amd64 only, skip arm arch."
+    DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64 --output type=docker --output type=image,name=${DOCKER_IMAGE}"
 else
-    echo "Going to build for both amd64 and arm64."
+    echo "Build image for both amd64 and arm64."
     DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64,linux/arm64"
 fi
 
 # Append VERSION and RELEASE
-DOCKER_CMD="${DOCKER_CMD} --build-arg VERSION=${VERSION:-dev} --build-arg RELEASE=${RELEASE:-1}"
+DOCKER_CMD="${DOCKER_CMD} --build-arg VERSION=${VERSION:-dev}"
 
 # Append GC flags if present
 if [[ ! -z "${GCFLAGS}" ]]; then

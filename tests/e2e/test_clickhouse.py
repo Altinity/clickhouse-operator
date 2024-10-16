@@ -31,7 +31,7 @@ def test_ch_001(self):
         },
     )
 
-    chi = yaml_manifest.get_chi_name(util.get_full_path("manifests/chi/test-ch-001-insert-quorum.yaml"))
+    chi = yaml_manifest.get_name(util.get_full_path("manifests/chi/test-ch-001-insert-quorum.yaml"))
     chi_data = kubectl.get("chi", ns=settings.test_namespace, name=chi)
     util.wait_clickhouse_cluster_ready(chi_data)
 
@@ -41,7 +41,7 @@ def test_ch_001(self):
     create_table = """
     create table t1 on cluster default (a Int8, d Date default today())
     Engine = ReplicatedMergeTree('/clickhouse/tables/{table}', '{replica}')
-    partition by d order by a 
+    partition by d order by a
     TTL d + interval 5 second
     SETTINGS merge_with_ttl_timeout=5""".replace(
         "\r", ""

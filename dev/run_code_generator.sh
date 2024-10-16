@@ -11,9 +11,11 @@ set -o pipefail
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
+# Possible options for code generator location
 CODE_GENERATOR_DIR_INSIDE_MODULES="${SRC_ROOT}/vendor/k8s.io/code-generator"
 CODE_GENERATOR_DIR_INSIDE_GOPATH="${GOPATH}/src/k8s.io/code-generator"
 
+# Detect code generator location
 CODE_GENERATOR_DIR=$( \
     realpath "${CODE_GENERATOR_DIR:-$( \
         cd "${SRC_ROOT}"; \

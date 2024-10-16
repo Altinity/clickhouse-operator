@@ -21,13 +21,13 @@ import (
 	"sort"
 	"strings"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type xmlNode struct {
 	children []*xmlNode
 	tag      string
-	value    *api.Setting
+	value    setting
 }
 
 const (
@@ -35,8 +35,24 @@ const (
 	noEol = ""
 )
 
+type setting interface {
+	fmt.Stringer
+	IsEmpty() bool
+	IsScalar() bool
+	IsVector() bool
+	Attributes() string
+	VectorOfStrings() []string
+	IsEmbed() bool
+}
+
+type settings interface {
+	Len() int
+	WalkNames(func(name string))
+	GetA(string) any
+}
+
 // GenerateFromSettings creates XML representation from the provided settings
-func GenerateFromSettings(w io.Writer, settings *api.Settings, prefix string) {
+func GenerateFromSettings(w io.Writer, settings settings, prefix string) {
 	if settings.Len() == 0 {
 		return
 	}
@@ -49,7 +65,7 @@ func GenerateFromSettings(w io.Writer, settings *api.Settings, prefix string) {
 	// 2. all map keys listed in 'excludes' are excluded
 	data := make(map[string]string)
 	// Skip excluded paths
-	settings.Walk(func(name string, setting *api.Setting) {
+	settings.WalkNames(func(name string) {
 		// 'name' may be non-normalized, and may have starting or trailing '/'
 		// 'path' is normalized path without starting and trailing '/', ex.: 'test/quotas'
 		path := normalizePath(prefix, name)
@@ -73,7 +89,7 @@ func GenerateFromSettings(w io.Writer, settings *api.Settings, prefix string) {
 			continue
 		}
 		name := data[path]
-		xmlTreeRoot.addBranch(tags, settings.Get(name))
+		xmlTreeRoot.addBranch(tags, settings.GetA(name).(setting))
 	}
 
 	// build XML into writer
@@ -96,7 +112,7 @@ func normalizePath(prefix, path string) string {
 }
 
 // addBranch ensures branch exists and assign value to the last tagged node
-func (n *xmlNode) addBranch(tags []string, setting *api.Setting) {
+func (n *xmlNode) addBranch(tags []string, setting setting) {
 	node := n
 	for _, tag := range tags {
 		node = node.addChild(tag)
@@ -127,24 +143,27 @@ func (n *xmlNode) addChild(tag string) *xmlNode {
 	return node
 }
 
-// buildXML generates XML from xmlNode type linked list
-func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
-	if n.value == nil {
-		// No value node, may have nested tags
-		n.writeTagNoValue(w, "", indent, tabsize)
-		return
-	}
+func (n *xmlNode) NoValue() bool {
+	return (n.value == nil) || n.value.IsEmpty()
+}
 
+// buildXML generates XML from xmlNode type linked list
+func (n *xmlNode) buildXML(w io.Writer, indent, tabSize uint8) {
 	switch {
+	case n.NoValue():
+		// No value node, may have nested tags
+		n.writeTagNoValue(w, "", indent, tabSize)
+		return
+
 	case n.value.IsScalar():
 		// ScalarString node
-		n.writeTagWithValue(w, n.value.String(), n.value.Attributes(), indent, tabsize)
+		n.writeTagWithValue(w, n.value.String(), n.value.Attributes(), indent, n.value.IsEmbed())
 		return
-	// VectorOfStrings node
 
 	case n.value.IsVector():
+		// VectorOfStrings node
 		for _, value := range n.value.VectorOfStrings() {
-			n.writeTagWithValue(w, value, n.value.Attributes(), indent, tabsize)
+			n.writeTagWithValue(w, value, n.value.Attributes(), indent, n.value.IsEmbed())
 		}
 	}
 }
@@ -155,10 +174,10 @@ func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
 //	<b>...</b>
 //
 // </a>
-func (n *xmlNode) writeTagNoValue(w io.Writer, attributes string, indent, tabsize uint8) {
+func (n *xmlNode) writeTagNoValue(w io.Writer, attributes string, indent, tabSize uint8) {
 	n.writeTagOpen(w, indent, attributes, eol)
 	for i := range n.children {
-		n.children[i].buildXML(w, indent+tabsize, tabsize)
+		n.children[i].buildXML(w, indent+tabSize, tabSize)
 	}
 	n.writeTagClose(w, indent, eol)
 }
@@ -166,16 +185,31 @@ func (n *xmlNode) writeTagNoValue(w io.Writer, attributes string, indent, tabsiz
 // writeTagWithValue prints tag with value. But it must have no children,
 // and children are not printed
 // <tag>value</tag>
-func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string, indent, tabsize uint8) {
+// OR
+// <tag>
+// embedded value NB - printed w/o indent
+// </tag>
+func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string, indent uint8, embedded bool) {
 	// TODO fix this properly
 	// Used in tests
-	if value == "_removed_" {
+	if value == "_removed_" || value == "_remove_" {
 		attributes = " remove=\"1\""
 		value = ""
 	}
-	n.writeTagOpen(w, indent, attributes, noEol)
-	n.writeValue(w, value)
-	n.writeTagClose(w, 0, eol)
+
+	if embedded {
+		// <tag>
+		// embedded value NB - printed w/o indent
+		// </tag>
+		n.writeTagOpen(w, indent, attributes, eol)
+		n.writeValue(w, value)
+		n.writeTagClose(w, indent, eol)
+	} else {
+		// <tag>value</tag>
+		n.writeTagOpen(w, indent, attributes, noEol)
+		n.writeValue(w, value)
+		n.writeTagClose(w, 0, eol)
+	}
 }
 
 // writeTagOpen prints open XML tag into io.Writer
@@ -201,24 +235,24 @@ func (n *xmlNode) writeTag(w io.Writer, indent uint8, attributes string, openTag
 		if openTag {
 			// pattern would be: %4s<%s%s>%s
 			pattern = fmt.Sprintf("%%%ds<%%s%%s>%%s", indent)
-			_, _ = fmt.Fprintf(w, pattern, " ", n.tag, attributes, eol)
+			util.Fprintf(w, pattern, " ", n.tag, attributes, eol)
 		} else {
 			// pattern would be: %4s</%s>%s
 			pattern = fmt.Sprintf("%%%ds</%%s>%%s", indent)
-			_, _ = fmt.Fprintf(w, pattern, " ", n.tag, eol)
+			util.Fprintf(w, pattern, " ", n.tag, eol)
 		}
 	} else {
 		if openTag {
 			// pattern would be: <%s%s>%s
-			_, _ = fmt.Fprintf(w, "<%s%s>%s", n.tag, attributes, eol)
+			util.Fprintf(w, "<%s%s>%s", n.tag, attributes, eol)
 		} else {
 			// pattern would be: </%s>%s
-			_, _ = fmt.Fprintf(w, "</%s>%s", n.tag, eol)
+			util.Fprintf(w, "</%s>%s", n.tag, eol)
 		}
 	}
 }
 
 // writeValue prints XML value into io.Writer
 func (n *xmlNode) writeValue(w io.Writer, value string) {
-	_, _ = fmt.Fprintf(w, "%s", value)
+	util.Fprintf(w, "%s", value)
 }

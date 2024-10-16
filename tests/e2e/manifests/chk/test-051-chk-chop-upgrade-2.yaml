@@ -1,0 +1,42 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-051-chk
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+      volumeClaimTemplate: default
+      serviceTemplate: backwards-compatible
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: IfNotPresent
+              image: "clickhouse/clickhouse-keeper:24.3.5.46"
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+    serviceTemplates:
+      - name: backwards-compatible # operator 0.24 default service name is keeper-test-051-chk
+        generateName: "test-051-chk"
+        spec:
+          ports:
+            - name: zk
+              port: 2181
+          type: ClusterIP
+          clusterIP: None
+  configuration:
+    clusters:
+      - name: single
+    settings:
+      # can be skipped, this is default
+      logger/console: "true"
+      keeper_server/tcp_port: "2181"

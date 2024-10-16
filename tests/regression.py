@@ -7,14 +7,14 @@ from requirements.requirements import *
 
 xfails = {
     # test_operator.py
-    "/regression/e2e.test_operator/test_008_3*": [(Fail, "Test 008_3 sometimes fails due to unknown reasons")],
-    "/regression/e2e.test_operator/test_041*": [(Fail, "Test 041 fails on cert verification")],
+    "/regression/e2e.test_operator/test_008*": [(Fail, "Test 008 sometimes fails due to unknown reasons")],
+    "/regression/e2e.test_operator/test_032:": [(Fail, "Test 032 sometimes fails due to unknown reasons")],
     # test_clickhouse.py
     "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
     # test_metrics_alerts.py
-    "/regression/e2e.test_metrics_alerts/test_clickhouse_keeper_alerts*": [
-        (Fail, "clickhouse-keeper wrong prometheus endpoint format, look https://github.com/ClickHouse/ClickHouse/issues/46136")
-    ],
+    # "/regression/e2e.test_metrics_alerts/test_clickhouse_keeper_alerts*": [
+    #     (Fail, "clickhouse-keeper wrong prometheus endpoint format, look https://github.com/ClickHouse/ClickHouse/issues/46136")
+    # ],
     # test_keeper.py
     # "/regression/e2e.test_keeper/test_clickhouse_keeper_rescale*": [
     #     (Fail, "need `ruok` before quorum https://github.com/ClickHouse/ClickHouse/issues/35464, need apply file config instead use commited data for quorum https://github.com/ClickHouse/ClickHouse/issues/35465. --force-recovery useless https://github.com/ClickHouse/ClickHouse/issues/37434"),

@@ -10,6 +10,7 @@ from e2e.steps import *
 
 from requirements.requirements import *
 
+
 def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries_number=10):
     svc_name = "zookeeper-client" if keeper_type == "zookeeper-operator" else "zookeeper"
     expected_containers = "1/1"
@@ -105,7 +106,8 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
             "zookeeper": "2",
             "zookeeper-operator": "3",
             "clickhouse-keeper": "2",
-            "clickhouse-keeper_with_CHKI": "2",
+            "clickhouse-keeper_with_chk": "2",
+            "CHK": "2",
         }
         if expected_out[keeper_type] != out.strip(" \t\r\n") and i + 1 < retry_count:
             with Then(f"{keeper_type} system.zookeeper not ready, wait {(i + 1) * 3} sec"):
@@ -131,7 +133,7 @@ def rescale_zk_and_clickhouse(
     _, chi = util.install_clickhouse_and_keeper(
         chi_file=f"manifests/chi/test-cluster-for-{keeper_type}-{ch_node_count}.yaml",
         #
-        chi_template_file="manifests/chit/tpl-clickhouse-stable.yaml",
+        chi_template_file="manifests/chit/tpl-clickhouse-latest.yaml",
         chi_name="test-cluster-for-zk",
         keeper_manifest=keeper_manifest,
         keeper_type=keeper_type,
@@ -352,11 +354,11 @@ def test_clickhouse_keeper_rescale(self):
 
 
 @TestScenario
-@Name("test_clickhouse_keeper_rescale_CHKI using ClickHouseKeeperInstallation. Check KEEPER scale-up / scale-down cases")
+@Name("test_clickhouse_keeper_rescale_chk. Using ClickHouseKeeperInstallation. Check KEEPER scale-up / scale-down cases")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
-def test_clickhouse_keeper_rescale_CHKI(self):
+def test_clickhouse_keeper_rescale_chk(self):
     test_keeper_rescale_outline(
-        keeper_type="clickhouse-keeper_with_CHKI",
+        keeper_type="clickhouse-keeper_with_chk",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node="clickhouse-keeper-1-node-for-test-only.yaml",
         keeper_manifest_3_node="clickhouse-keeper-3-node-for-test-only.yaml",
@@ -524,9 +526,9 @@ def test_clickhouse_keeper_probes_workload(self):
     "under workload in multi-datacenter installation"
 )
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
-def test_clickhouse_keeper_probes_workload_with_CHKI(self):
+def test_clickhouse_keeper_probes_workload_with_chk(self):
     test_keeper_probes_outline(
-        keeper_type="clickhouse-keeper_with_CHKI",
+        keeper_type="clickhouse-chk",
         keeper_manifest_1_node="clickhouse-keeper-1-node-for-test-only.yaml",
         keeper_manifest_3_node="clickhouse-keeper-3-node-for-test-only.yaml",
     )
@@ -546,7 +548,7 @@ def test(self):
     all_tests = [
         test_zookeeper_operator_rescale,
         test_clickhouse_keeper_rescale,
-        test_clickhouse_keeper_rescale_CHKI,
+        test_clickhouse_keeper_rescale_chk,
         test_zookeeper_pvc_scaleout_rescale,
         test_zookeeper_rescale,
 
@@ -554,7 +556,7 @@ def test(self):
         test_zookeeper_pvc_probes_workload,
         test_zookeeper_operator_probes_workload,
         test_clickhouse_keeper_probes_workload,
-        test_clickhouse_keeper_probes_workload_with_CHKI,
+        test_clickhouse_keeper_probes_workload_with_chk,
     ]
 
     util.clean_namespace(delete_chi=True, delete_keeper=True)

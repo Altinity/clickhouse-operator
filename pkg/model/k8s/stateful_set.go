@@ -20,22 +20,30 @@ import (
 )
 
 // StatefulSetContainerGet gets container from the StatefulSet either by name or by index
-func StatefulSetContainerGet(statefulSet *apps.StatefulSet, name string, index int) (*core.Container, bool) {
-	// Find by name
-	if len(name) > 0 {
-		for i := range statefulSet.Spec.Template.Spec.Containers {
-			// Convenience wrapper
-			container := &statefulSet.Spec.Template.Spec.Containers[i]
-			if container.Name == name {
-				return container, true
+func StatefulSetContainerGet(statefulSet *apps.StatefulSet, namesOrIndexes ...any) (*core.Container, bool) {
+	for _, nameOrIndex := range namesOrIndexes {
+		switch typed := nameOrIndex.(type) {
+		// Find by name
+		case string:
+			name := typed
+			if len(name) > 0 {
+				for i := range statefulSet.Spec.Template.Spec.Containers {
+					// Convenience wrapper
+					container := &statefulSet.Spec.Template.Spec.Containers[i]
+					if container.Name == name {
+						return container, true
+					}
+				}
 			}
-		}
-	}
-
-	// Find by index
-	if index >= 0 {
-		if len(statefulSet.Spec.Template.Spec.Containers) > index {
-			return &statefulSet.Spec.Template.Spec.Containers[index], true
+		// Find by index
+		case int:
+			index := typed
+			if index >= 0 {
+				if len(statefulSet.Spec.Template.Spec.Containers) > index {
+					// Existing index, get container
+					return &statefulSet.Spec.Template.Spec.Containers[index], true
+				}
+			}
 		}
 	}
 
@@ -117,7 +125,14 @@ func StatefulSetAppendVolumes(statefulSet *apps.StatefulSet, volumes ...core.Vol
 	)
 }
 
-func StatefulSetAppendVolumeMounts(statefulSet *apps.StatefulSet, volumeMounts ...core.VolumeMount) {
+func StatefulSetAppendPersistentVolumeClaims(statefulSet *apps.StatefulSet, pvcs ...core.PersistentVolumeClaim) {
+	statefulSet.Spec.VolumeClaimTemplates = append(
+		statefulSet.Spec.VolumeClaimTemplates,
+		pvcs...,
+	)
+}
+
+func StatefulSetAppendVolumeMountsInAllContainers(statefulSet *apps.StatefulSet, volumeMounts ...core.VolumeMount) {
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have VolumeMounts mounted as Volumes
 	for i := range statefulSet.Spec.Template.Spec.Containers {
@@ -128,4 +143,22 @@ func StatefulSetAppendVolumeMounts(statefulSet *apps.StatefulSet, volumeMounts .
 			volumeMounts...,
 		)
 	}
+}
+
+func StatefulSetWalkContainers(statefulSet *apps.StatefulSet, f func(*core.Container)) {
+	for i := range statefulSet.Spec.Template.Spec.Containers {
+		// Convenience wrapper
+		container := &statefulSet.Spec.Template.Spec.Containers[i]
+		f(container)
+	}
+}
+
+func StatefulSetWalkVolumeMounts(statefulSet *apps.StatefulSet, f func(*core.VolumeMount)) {
+	StatefulSetWalkContainers(statefulSet, func(container *core.Container) {
+		for j := range container.VolumeMounts {
+			// Convenience wrapper
+			volumeMount := &container.VolumeMounts[j]
+			f(volumeMount)
+		}
+	})
 }

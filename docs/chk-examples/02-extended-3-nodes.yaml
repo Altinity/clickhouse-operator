@@ -1,28 +1,31 @@
 apiVersion: "clickhouse-keeper.altinity.com/v1"
 kind: "ClickHouseKeeperInstallation"
 metadata:
-  name: chk-3-nodes
+  name: extended-3
 spec:
   configuration:
     clusters:
-      - name: "simple-3"
+      - name: "cluster1"
         layout:
           replicasCount: 3
     settings:
       logger/level: "trace"
       logger/console: "true"
       listen_host: "0.0.0.0"
-      keeper_server/storage_path: /var/lib/clickhouse-keeper
-      keeper_server/tcp_port: "2181"
       keeper_server/four_letter_word_white_list: "*"
       keeper_server/coordination_settings/raft_logs_level: "information"
-      keeper_server/raft_configuration/server/port: "9444"
       prometheus/endpoint: "/metrics"
       prometheus/port: "7000"
       prometheus/metrics: "true"
       prometheus/events: "true"
       prometheus/asynchronous_metrics: "true"
       prometheus/status_info: "false"
+
+  defaults:
+    templates:
+      # Templates are specified as default for all clusters
+      podTemplate: default
+
   templates:
     podTemplates:
       - name: default
@@ -41,7 +44,7 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:head-alpine"
+              image: "clickhouse/clickhouse-keeper:24.3.5.46"
               resources:
                 requests:
                   memory: "256M"
@@ -49,15 +52,11 @@ spec:
                 limits:
                   memory: "4Gi"
                   cpu: "2"
+          securityContext:
+            fsGroup: 101
+
     volumeClaimTemplates:
       - name: default
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 10Gi
-      - name: snapshot-storage-path
         spec:
           accessModes:
             - ReadWriteOnce

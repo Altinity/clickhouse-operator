@@ -1,0 +1,44 @@
+name: check_helm
+on:
+  pull_request:
+    branches:
+      - '*'
+  push:
+    branches:
+      - '*'
+
+jobs:
+  check_helm:
+    name: Test Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: medyagh/setup-minikube@master
+        with:
+          driver: docker
+          container-runtime: containerd
+          kubernetes-version: v1.31.0
+          cpus: max
+          memory: max
+
+      - name: Local Helm Test
+        run: |
+          set -xe
+          minikube kubectl create ns test
+          helm install -n test test-operator ./deploy/helm/clickhouse-operator/
+          sleep 10
+          workflow_count=$(kubectl get all --all-namespaces | grep -c "test-operator")
+          configmap_count=$(kubectl get cm --all-namespaces | grep -c "test-operator")
+          if [ "$workflow_count" -lt 4 ]; then
+            echo "Error: Workload count is less than 4. Current count: $workflow_count"
+            exit 1
+          fi
+
+          if [ "$configmap_count" -lt 9 ]; then
+            echo "Error: ConfigMap count is less than 9. Current count: $configmap_count"
+            exit 1
+          fi

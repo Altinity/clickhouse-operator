@@ -68,6 +68,10 @@ data:
                 <!-- <raft_logs_level>trace</raft_logs_level> -->
                 <raft_logs_level>information</raft_logs_level>
             </coordination_settings>
+            <http_control>
+                <port>9182</port>
+                <readiness><endpoint>/ready</endpoint></readiness>
+            </http_control>
         </keeper_server>
         <prometheus>
             <endpoint>/metrics</endpoint>
@@ -138,7 +142,7 @@ data:
     mkdir -p /tmp/clickhouse-keeper/config.d/
     if [[ "true" == "${ACTIVE_ENSEMBLE}" ]]; then
       # get current config from clickhouse-keeper
-      CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h ${CLIENT_HOST} -p ${CLIENT_PORT} -q "get /keeper/config" || true) 
+      CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h ${CLIENT_HOST} -p ${CLIENT_PORT} -q "get '/keeper/config'" || true) 
       # generate dynamic config, add current server to xml
       {
         echo "<yandex><keeper_server>"
@@ -198,7 +202,7 @@ data:
     fi
     export MY_ID=$((ORD+1))
 
-    CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h localhost -p ${CLIENT_PORT} -q "get /keeper/config")
+    CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h localhost -p ${CLIENT_PORT} -q "get '/keeper/config'")
     CLUSTER_SIZE=$(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E '^server\.[0-9]+=') 
     echo "CLUSTER_SIZE=$CLUSTER_SIZE, MyId=$MY_ID"
     # If CLUSTER_SIZE > 1, this server is being permanently removed from raft_configuration.
@@ -208,7 +212,7 @@ data:
 
     # Wait to remove $MY_ID from quorum
     # for (( i = 0; i < 6; i++ )); do
-    #    CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h localhost -p ${CLIENT_PORT} -q "get /keeper/config")
+    #    CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h localhost -p ${CLIENT_PORT} -q "get '/keeper/config'")
     #    if [[ "0" == $(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E "^server.${MY_ID}=$HOST.+participant;[0-1]$") ]]; then
     #      echo "$MY_ID removed from quorum"
     #      break
@@ -278,9 +282,18 @@ data:
         echo "Failed to parse name and ordinal of Pod"
         exit 1
       fi
+      set +e
+      HTTP_READY_STATUS=$(wget -qO- http://127.0.0.1:9182/ready)
+      if [[ "0" == "$?" ]]; then
+        if [[ "0" != $(echo $HTTP_READY_STATUS | grep -c '"status":"ok"') ]]; then
+          echo $HTTP_READY_STATUS
+          exit 0
+        fi
+      fi
+      set -e
       MY_ID=$((ORD+1))
       
-      CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h ${CLIENT_HOST} -p ${CLIENT_PORT} -q "get /keeper/config" || exit 0)
+      CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h ${CLIENT_HOST} -p ${CLIENT_PORT} -q "get '/keeper/config'" || exit 0)
       # Check to see if clickhouse-keeper for this node is a participant in raft cluster
       if [[ "1" == $(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E "^server.${MY_ID}=${HOST}.+participant;1$") ]]; then
         echo "clickhouse-keeper instance is available and an active participant"
@@ -345,7 +358,7 @@ spec:
             defaultMode: 0755
       containers:
         - name: clickhouse-keeper
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           image: "clickhouse/clickhouse-keeper:latest-alpine"
           resources:
             requests:
@@ -372,7 +385,7 @@ spec:
             exec:
               command:
                 - /conf/keeperLive.sh
-            failureThreshold: 3
+            failureThreshold: 6
             initialDelaySeconds: 60
             periodSeconds: 10
             successThreshold: 1
@@ -385,7 +398,7 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
-            timeoutSeconds: 20
+            timeoutSeconds: 30
           ports:
             - containerPort: 2181
               name: client

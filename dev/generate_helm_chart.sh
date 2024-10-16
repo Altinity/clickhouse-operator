@@ -16,7 +16,12 @@ EOT
 function check_required_tools() {
   for cmd in yq jq helm-docs perl; do
     if ! command -v "${cmd}" &> /dev/null; then
+      echo "======================================"
       usage
+      echo "======================================"
+      echo "The following tool is missing: ${cmd}"
+      echo "Please install it."
+      echo "Abort."
       exit 1
     fi
   done
@@ -58,7 +63,7 @@ function main() {
   for dashboard in "${dashboards_path}"/*.json; do
     local dashboard_name
     dashboard_name=$(basename "${dashboard}")
-    echo "${dashboard_name}"
+    #echo "${dashboard_name}"
     jq '(.templating.list) |= ['"${prom_ds}"'] + .' "${dashboard}" >"${files_dir}/${dashboard_name}"
     perl -pi -e 's/"datasource": "\${DS_PROMETHEUS}"/"datasource": {"type":"prometheus","uid":"\${ds_prometheus}"}/g' "${files_dir}/${dashboard_name}"
     perl -pi -e 's/"datasource": "\$db"/"datasource": {"type":"vertamedia-clickhouse-datasource","uid":"\${db}"}/g' "${files_dir}/${dashboard_name}"
@@ -93,7 +98,7 @@ function process() {
     local templates_dir="${chart_path}/templates/generated"
     processed_file="${templates_dir}/${processed_file}"
   fi
-  echo $(basename "${processed_file}")
+  #echo $(basename "${processed_file}")
   mkdir -p "$(dirname "${processed_file}")"
   mv -f "${file}" "${processed_file}"
 
@@ -190,13 +195,16 @@ function update_deployment_resource() {
   yq e -i '.spec.template.spec.affinity |= "{{ toYaml .Values.affinity | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.tolerations |= "{{ toYaml .Values.tolerations | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.securityContext |= "{{ toYaml .Values.podSecurityContext | nindent 8 }}"' "${file}"
+  yq e -i '.spec.template.spec.topologySpreadConstraints |= "{{ toYaml .Values.topologySpreadConstraints | nindent 8 }}"' "${file}"
 
   for cm in $(yq e '.spec.template.spec.volumes[].configMap.name' "${file}"); do
     local prefix='{{ include \"altinity-clickhouse-operator.fullname\" . }}'
     local newCm="${cm/etc-clickhouse-operator/$prefix}"
+    newCm="${newCm/etc-keeper-operator/${prefix}-keeper}"
     yq e -i '(.spec.template.spec.volumes[].configMap.name | select(. == "'"${cm}"'") | .) |= "'"${newCm}"'"' "${file}"
     local cmName="${cm/etc-clickhouse-operator-/}"
-    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include (print $.Template.BasePath \"/generated/ConfigMap-etc-clickhouse-operator-'"${cmName}"'.yaml\") . | sha256sum }}"}' "${file}"
+    cmName="${cmName/etc-keeper-operator-/keeper-}"
+    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include (print $.Template.BasePath \"/generated/ConfigMap-'"${cm}"'.yaml\") . | sha256sum }}"}' "${file}"
   done
 
   yq e -i '.spec.template.spec.containers[0].name |= "{{ .Chart.Name }}"' "${file}"
@@ -239,18 +247,19 @@ function update_configmap_resource() {
   fi
 
   local name_suffix="${name/etc-clickhouse-operator-/}"
-  local cameled_name
-  cameled_name=$(to_camel_case "${name_suffix}")
+  local name_suffix="${name_suffix/etc-keeper-operator-/keeper-}"
+  local camel_cased_name
+  camel_cased_name=$(to_camel_case "${name_suffix}")
 
   yq e -i '.metadata.name |= "{{ printf \"%s-'"${name_suffix}"'\" (include \"altinity-clickhouse-operator.fullname\" .) }}"' "${file}"
   yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
-  yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${cameled_name}"') | nindent 2 }}"' "${file}"
+  yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${camel_cased_name}"') | nindent 2 }}"' "${file}"
 
   if [ -z "${data}" ]; then
-    yq e -i '.configs.'"${cameled_name}"' |= null' "${values_yaml}"
+    yq e -i '.configs.'"${camel_cased_name}"' |= null' "${values_yaml}"
   else
-    data_arg="${data}" yq e -i '.configs.'"${cameled_name}"' |= env(data_arg)' "${values_yaml}"
+    data_arg="${data}" yq e -i '.configs.'"${camel_cased_name}"' |= env(data_arg)' "${values_yaml}"
   fi
 
   perl -pi -e "s/'//g" "${file}"

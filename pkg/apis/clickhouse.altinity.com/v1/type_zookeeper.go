@@ -14,26 +14,51 @@
 
 package v1
 
-import "gopkg.in/d4l3k/messagediff.v1"
+import (
+	"gopkg.in/d4l3k/messagediff.v1"
+	"strings"
+)
 
-// ChiZookeeperConfig defines zookeeper section of .spec.configuration
+// ZookeeperConfig defines zookeeper section of .spec.configuration
 // Refers to
 // https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper
-type ChiZookeeperConfig struct {
-	Nodes              []ChiZookeeperNode `json:"nodes,omitempty"                yaml:"nodes,omitempty"`
-	SessionTimeoutMs   int                `json:"session_timeout_ms,omitempty"   yaml:"session_timeout_ms,omitempty"`
-	OperationTimeoutMs int                `json:"operation_timeout_ms,omitempty" yaml:"operation_timeout_ms,omitempty"`
-	Root               string             `json:"root,omitempty"                 yaml:"root,omitempty"`
-	Identity           string             `json:"identity,omitempty"             yaml:"identity,omitempty"`
+type ZookeeperConfig struct {
+	Nodes              ZookeeperNodes `json:"nodes,omitempty"                yaml:"nodes,omitempty"`
+	SessionTimeoutMs   int            `json:"session_timeout_ms,omitempty"   yaml:"session_timeout_ms,omitempty"`
+	OperationTimeoutMs int            `json:"operation_timeout_ms,omitempty" yaml:"operation_timeout_ms,omitempty"`
+	Root               string         `json:"root,omitempty"                 yaml:"root,omitempty"`
+	Identity           string         `json:"identity,omitempty"             yaml:"identity,omitempty"`
 }
 
-// NewChiZookeeperConfig creates new ChiZookeeperConfig object
-func NewChiZookeeperConfig() *ChiZookeeperConfig {
-	return new(ChiZookeeperConfig)
+type ZookeeperNodes []ZookeeperNode
+
+func (n ZookeeperNodes) Len() int {
+	return len(n)
+}
+
+func (n ZookeeperNodes) First() ZookeeperNode {
+	return n[0]
+}
+
+func (n ZookeeperNodes) Servers() []string {
+	var servers []string
+	for _, node := range n {
+		servers = append(servers, node.String())
+	}
+	return servers
+}
+
+func (n ZookeeperNodes) String() string {
+	return strings.Join(n.Servers(), ",")
+}
+
+// NewZookeeperConfig creates new ZookeeperConfig object
+func NewZookeeperConfig() *ZookeeperConfig {
+	return new(ZookeeperConfig)
 }
 
 // IsEmpty checks whether config is empty
-func (zkc *ChiZookeeperConfig) IsEmpty() bool {
+func (zkc *ZookeeperConfig) IsEmpty() bool {
 	if zkc == nil {
 		return true
 	}
@@ -42,19 +67,19 @@ func (zkc *ChiZookeeperConfig) IsEmpty() bool {
 }
 
 // MergeFrom merges from provided object
-func (zkc *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeType) *ChiZookeeperConfig {
+func (zkc *ZookeeperConfig) MergeFrom(from *ZookeeperConfig, _type MergeType) *ZookeeperConfig {
 	if from == nil {
 		return zkc
 	}
 
 	if zkc == nil {
-		zkc = NewChiZookeeperConfig()
+		zkc = NewZookeeperConfig()
 	}
 
 	if !from.IsEmpty() {
 		// Append Nodes from `from`
 		if zkc.Nodes == nil {
-			zkc.Nodes = make([]ChiZookeeperNode, 0)
+			zkc.Nodes = make([]ZookeeperNode, 0)
 		}
 		for fromIndex := range from.Nodes {
 			fromNode := &from.Nodes[fromIndex]
@@ -94,7 +119,7 @@ func (zkc *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeTy
 }
 
 // Equals checks whether config is equal to another one
-func (zkc *ChiZookeeperConfig) Equals(b *ChiZookeeperConfig) bool {
+func (zkc *ZookeeperConfig) Equals(b *ZookeeperConfig) bool {
 	_, equals := messagediff.DeepDiff(zkc, b)
 	return equals
 }

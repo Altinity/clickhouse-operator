@@ -18,6 +18,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,7 +26,6 @@ import (
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 
-	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
@@ -96,7 +96,7 @@ func Run() {
 	chop.New(kubeClient, chopClient, chopConfigFile)
 	log.Info(chop.Config().String(true))
 
-	exporter := metrics.StartMetricsREST(
+	exporter := clickhouse.StartMetricsREST(
 		metricsEP,
 		metricsPath,
 		chop.Config().ClickHouse.Metrics.Timeouts.Collect,

@@ -2,7 +2,7 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallationTemplate"
 
 metadata:
-  name: clickhouse-version
+  name: clickhouse-latest-version
 spec:
   defaults:
     templates:

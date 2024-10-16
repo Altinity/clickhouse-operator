@@ -18,12 +18,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/version"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 // CLI parameter variables
@@ -69,23 +70,40 @@ func Run() {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	// Setup notification signals with cancel
-	setupNotification(cancelFunc)
-
-	initClickHouse(ctx)
-	initClickHouseReconcilerMetricsExporter(ctx)
-	keeperErr := initKeeper(ctx)
+	setupSignalsNotification(cancelFunc)
 
 	var wg sync.WaitGroup
-	wg.Add(3)
 
+	launchClickHouse(ctx, &wg)
+	launchClickHouseReconcilerMetricsExporter(ctx, &wg)
+	launchKeeper(ctx, &wg)
+
+	// Wait for completion
+	<-ctx.Done()
+	wg.Wait()
+}
+
+func launchClickHouse(ctx context.Context, wg *sync.WaitGroup) {
+	initClickHouse(ctx)
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		runClickHouse(ctx)
 	}()
+}
+
+func launchClickHouseReconcilerMetricsExporter(ctx context.Context, wg *sync.WaitGroup) {
+	initClickHouseReconcilerMetricsExporter(ctx)
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		runClickHouseReconcilerMetricsExporter(ctx)
 	}()
+}
+
+func launchKeeper(ctx context.Context, wg *sync.WaitGroup) {
+	keeperErr := initKeeper(ctx)
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		if keeperErr == nil {
@@ -100,14 +118,10 @@ func Run() {
 			log.Warning("Starting keeper skipped due to failed initialization with err: %v", keeperErr)
 		}
 	}()
-
-	// Wait for completion
-	<-ctx.Done()
-	wg.Wait()
 }
 
-// setupNotification sets up OS signals
-func setupNotification(cancel context.CancelFunc) {
+// setupSignalsNotification sets up OS signals
+func setupSignalsNotification(cancel context.CancelFunc) {
 	stopChan := make(chan os.Signal, 2)
 	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
 	go func() {

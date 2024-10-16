@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.23.7
+# OPERATOR_VERSION=0.24.0
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -51,7 +51,7 @@ spec:
           jsonPath: .status.taskID
         - name: status
           type: string
-          description: CHI status
+          description: Resource status
           jsonPath: .status.status
         - name: hosts-unchanged
           type: integer
@@ -96,39 +96,42 @@ spec:
         status: {}
       schema:
         openAPIV3Schema:
-          description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more ClickHouse clusters"
+          description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more clusters"
           type: object
           required:
             - spec
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation
+              description: |
+                APIVersion defines the versioned schema of this representation
                 of an object. Servers should convert recognized schemas to the latest
-                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this
+              description: |
+                Kind is a string value representing the REST resource this
                 object represents. Servers may infer this from the endpoint the client
-                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             metadata:
               type: object
             status:
               type: object
-              description: "Current ClickHouseInstallation manifest status, contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other"
+              description: |
+                Status contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other
               properties:
                 chop-version:
                   type: string
-                  description: "ClickHouse operator version"
+                  description: "Operator version"
                 chop-commit:
                   type: string
-                  description: "ClickHouse operator git commit SHA"
+                  description: "Operator git commit SHA"
                 chop-date:
                   type: string
-                  description: "ClickHouse operator build date"
+                  description: "Operator build date"
                 chop-ip:
                   type: string
-                  description: "IP address of the operator's pod which managed this CHI"
+                  description: "IP address of the operator's pod which managed this resource"
                 clusters:
                   type: integer
                   minimum: 0
@@ -232,11 +235,11 @@ spec:
                   description: "Generation"
                 normalized:
                   type: object
-                  description: "Normalized CHI requested"
+                  description: "Normalized resource requested"
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
-                  description: "Normalized CHI completed"
+                  description: "Normalized resource completed"
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
@@ -490,7 +493,7 @@ spec:
                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                         volumeClaimTemplate:
                           type: string
-                          description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
+                          description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                 configuration:
                   type: object
                   description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
@@ -544,6 +547,21 @@ spec:
                         you can configure password hashed, authorization restrictions, database level security row filters etc.
                         More details: https://clickhouse.tech/docs/en/operations/settings/settings-users/
                         Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers
+
+                        any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
+                        secret value will pass in `pod.spec.containers.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/users.d/chop-generated-users.xml
+                        it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
+
+                        look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+
+                        any key with prefix `k8s_secret_` shall has value with format namespace/secret/key or secret/key
+                        in this case value from secret will write directly into XML tag during render *-usersd ConfigMap
+
+                        any key with prefix `k8s_secret_env` shall has value with format namespace/secret/key or secret/key
+                        in this case value from secret will write into environment variable and write to XML tag via from_env=XXX
+
+                        look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
                     profiles:
@@ -570,6 +588,13 @@ spec:
                         allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
                         More details: https://clickhouse.tech/docs/en/operations/settings/settings/
                         Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationsettings
+
+                        any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
+                        look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+
+                        secret value will pass in `pod.spec.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
+                        it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
+
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
                     files: &TypeFiles
@@ -581,12 +606,19 @@ spec:
                         you can use `!!binary |` and base64 for binary files, see details here https://yaml.org/type/binary.html
                         each key could contains prefix like USERS, COMMON, HOST or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
                         More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
+
+                        any key could contains `valueFrom` with `secretKeyRef` which allow pass values from kubernetes secrets
+                        secrets will mounted into pod as separate volume in /etc/clickhouse-server/secrets.d/
+                        and will automatically update when update secret
+                        it useful for pass SSL certificates from cert-manager or similar tool
+                        look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
                     clusters:
                       type: array
                       description: |
-                        describes ClickHouse clusters layout and allows change settings on cluster-level, shard-level and replica-level
+                        describes clusters layout and allows change settings on cluster-level, shard-level and replica-level
                         every cluster is a set of StatefulSet, one StatefulSet contains only one Pod with `clickhouse-server`
                         all Pods will rendered in <remote_server> part of ClickHouse configs, mounted from ConfigMap as `/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml`
                         Clusters will use for Distributed table engine, more details: https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/
@@ -599,7 +631,7 @@ spec:
                         properties:
                           name:
                             type: string
-                            description: "cluster name, used to identify set of ClickHouse servers and wide used during generate names of related Kubernetes resources"
+                            description: "cluster name, used to identify set of servers and wide used during generate names of related Kubernetes resources"
                             minLength: 1
                             # See namePartClusterMaxLen const
                             maxLength: 15
@@ -687,6 +719,14 @@ spec:
                                     required:
                                       - name
                                       - key
+                          pdbMaxUnavailable:
+                            type: integer
+                            description: |
+                              Pod eviction is allowed if at most "pdbMaxUnavailable" pods are unavailable after the eviction,
+                              i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions
+                              by specifying 0. This is a mutually exclusive setting with "minAvailable".
+                            minimum: 0
+                            maximum: 65535
                           layout:
                             type: object
                             description: |
@@ -694,18 +734,24 @@ spec:
                               allows override settings on each shard and replica separatelly
                             # nullable: true
                             properties:
-                              type:
-                                type: string
-                                description: "DEPRECATED - to be removed soon"
                               shardsCount:
                                 type: integer
-                                description: "how much shards for current ClickHouse cluster will run in Kubernetes, each shard contains shared-nothing part of data and contains set of replicas, cluster contains 1 shard by default"
+                                description: |
+                                  how much shards for current ClickHouse cluster will run in Kubernetes,
+                                  each shard contains shared-nothing part of data and contains set of replicas,
+                                  cluster contains 1 shard by default"
                               replicasCount:
                                 type: integer
-                                description: "how much replicas in each shards for current ClickHouse cluster will run in Kubernetes, each replica is a separate `StatefulSet` which contains only one `Pod` with `clickhouse-server` instance, every shard contains 1 replica by default"
+                                description: |
+                                  how much replicas in each shards for current cluster will run in Kubernetes,
+                                  each replica is a separate `StatefulSet` which contains only one `Pod` with `clickhouse-server` instance,
+                                  every shard contains 1 replica by default"
                               shards:
                                 type: array
-                                description: "optional, allows override top-level `chi.spec.configuration`, cluster-level `chi.spec.configuration.clusters` settings for each shard separately, use it only if you fully understand what you do"
+                                description: |
+                                  optional, allows override top-level `chi.spec.configuration`, cluster-level
+                                  `chi.spec.configuration.clusters` settings for each shard separately,
+                                  use it only if you fully understand what you do"
                                 # nullable: true
                                 items:
                                   type: object
@@ -1113,7 +1159,9 @@ spec:
                                   maximum: 65535
                                 topologyKey:
                                   type: string
-                                  description: "use for inter-pod affinity look to `pod.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution.podAffinityTerm.topologyKey`, More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity"
+                                  description: |
+                                    use for inter-pod affinity look to `pod.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution.podAffinityTerm.topologyKey`,
+                                    more info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity"
                           metadata:
                             type: object
                             description: |
@@ -1130,7 +1178,8 @@ spec:
 
                     volumeClaimTemplates:
                       type: array
-                      description: "allows define template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mount clickhouse `data`, clickhouse `logs` or something else"
+                      description: |
+                        allows define template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mount clickhouse `data`, clickhouse `logs` or something else
                       # nullable: true
                       items:
                         type: object
@@ -1183,14 +1232,17 @@ spec:
                               replica-level `chi.spec.configuration.clusters.layout.replicas.templates.replicaServiceTemplate` or `chi.spec.configuration.clusters.layout.shards.replicas.replicaServiceTemplate`
                           generateName:
                             type: string
-                            description: "allows define format for generated `Service` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about aviailable template variables"
+                            description: |
+                              allows define format for generated `Service` name,
+                              look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates
+                              for details about aviailable template variables"
                           metadata:
                             # TODO specify ObjectMeta
                             type: object
                             description: |
                               allows pass standard object's metadata from template to Service
                               Could be use for define specificly for Cloud Provider metadata which impact to behavior of service
-                              More info: https://kubernetes.io/docs/concepts/services-networking/service/
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
                             # nullable: true
                             x-kubernetes-preserve-unknown-fields: true
                           spec:
@@ -1203,7 +1255,9 @@ spec:
                             x-kubernetes-preserve-unknown-fields: true
                 useTemplates:
                   type: array
-                  description: "list of `ClickHouseInstallationTemplate` (chit) resource names which will merge with current `Chi` manifest during render Kubernetes resources to create related ClickHouse clusters"
+                  description: |
+                    list of `ClickHouseInstallationTemplate` (chit) resource names which will merge with current `CHI`
+                    manifest during render Kubernetes resources to create related ClickHouse clusters"
                   # nullable: true
                   items:
                     type: object
@@ -1230,14 +1284,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.23.7
+# OPERATOR_VERSION=0.24.0
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1277,7 +1331,7 @@ spec:
           jsonPath: .status.taskID
         - name: status
           type: string
-          description: CHI status
+          description: Resource status
           jsonPath: .status.status
         - name: hosts-unchanged
           type: integer
@@ -1322,39 +1376,42 @@ spec:
         status: {}
       schema:
         openAPIV3Schema:
-          description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more ClickHouse clusters"
+          description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more clusters"
           type: object
           required:
             - spec
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation
+              description: |
+                APIVersion defines the versioned schema of this representation
                 of an object. Servers should convert recognized schemas to the latest
-                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this
+              description: |
+                Kind is a string value representing the REST resource this
                 object represents. Servers may infer this from the endpoint the client
-                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             metadata:
               type: object
             status:
               type: object
-              description: "Current ClickHouseInstallation manifest status, contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other"
+              description: |
+                Status contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other
               properties:
                 chop-version:
                   type: string
-                  description: "ClickHouse operator version"
+                  description: "Operator version"
                 chop-commit:
                   type: string
-                  description: "ClickHouse operator git commit SHA"
+                  description: "Operator git commit SHA"
                 chop-date:
                   type: string
-                  description: "ClickHouse operator build date"
+                  description: "Operator build date"
                 chop-ip:
                   type: string
-                  description: "IP address of the operator's pod which managed this CHI"
+                  description: "IP address of the operator's pod which managed this resource"
                 clusters:
                   type: integer
                   minimum: 0
@@ -1458,11 +1515,11 @@ spec:
                   description: "Generation"
                 normalized:
                   type: object
-                  description: "Normalized CHI requested"
+                  description: "Normalized resource requested"
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
-                  description: "Normalized CHI completed"
+                  description: "Normalized resource completed"
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
@@ -1716,7 +1773,7 @@ spec:
                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                         volumeClaimTemplate:
                           type: string
-                          description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
+                          description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                 configuration:
                   type: object
                   description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
@@ -1770,6 +1827,21 @@ spec:
                         you can configure password hashed, authorization restrictions, database level security row filters etc.
                         More details: https://clickhouse.tech/docs/en/operations/settings/settings-users/
                         Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers
+
+                        any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
+                        secret value will pass in `pod.spec.containers.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/users.d/chop-generated-users.xml
+                        it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
+
+                        look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+
+                        any key with prefix `k8s_secret_` shall has value with format namespace/secret/key or secret/key
+                        in this case value from secret will write directly into XML tag during render *-usersd ConfigMap
+
+                        any key with prefix `k8s_secret_env` shall has value with format namespace/secret/key or secret/key
+                        in this case value from secret will write into environment variable and write to XML tag via from_env=XXX
+
+                        look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
                     profiles:
@@ -1796,6 +1868,13 @@ spec:
                         allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
                         More details: https://clickhouse.tech/docs/en/operations/settings/settings/
                         Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationsettings
+
+                        any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
+                        look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+
+                        secret value will pass in `pod.spec.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
+                        it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
+
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
                     files: &TypeFiles
@@ -1807,12 +1886,19 @@ spec:
                         you can use `!!binary |` and base64 for binary files, see details here https://yaml.org/type/binary.html
                         each key could contains prefix like USERS, COMMON, HOST or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
                         More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
+
+                        any key could contains `valueFrom` with `secretKeyRef` which allow pass values from kubernetes secrets
+                        secrets will mounted into pod as separate volume in /etc/clickhouse-server/secrets.d/
+                        and will automatically update when update secret
+                        it useful for pass SSL certificates from cert-manager or similar tool
+                        look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
                     clusters:
                       type: array
                       description: |
-                        describes ClickHouse clusters layout and allows change settings on cluster-level, shard-level and replica-level
+                        describes clusters layout and allows change settings on cluster-level, shard-level and replica-level
                         every cluster is a set of StatefulSet, one StatefulSet contains only one Pod with `clickhouse-server`
                         all Pods will rendered in <remote_server> part of ClickHouse configs, mounted from ConfigMap as `/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml`
                         Clusters will use for Distributed table engine, more details: https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/
@@ -1825,7 +1911,7 @@ spec:
                         properties:
                           name:
                             type: string
-                            description: "cluster name, used to identify set of ClickHouse servers and wide used during generate names of related Kubernetes resources"
+                            description: "cluster name, used to identify set of servers and wide used during generate names of related Kubernetes resources"
                             minLength: 1
                             # See namePartClusterMaxLen const
                             maxLength: 15
@@ -1913,6 +1999,14 @@ spec:
                                     required:
                                       - name
                                       - key
+                          pdbMaxUnavailable:
+                            type: integer
+                            description: |
+                              Pod eviction is allowed if at most "pdbMaxUnavailable" pods are unavailable after the eviction,
+                              i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions
+                              by specifying 0. This is a mutually exclusive setting with "minAvailable".
+                            minimum: 0
+                            maximum: 65535
                           layout:
                             type: object
                             description: |
@@ -1920,18 +2014,24 @@ spec:
                               allows override settings on each shard and replica separatelly
                             # nullable: true
                             properties:
-                              type:
-                                type: string
-                                description: "DEPRECATED - to be removed soon"
                               shardsCount:
                                 type: integer
-                                description: "how much shards for current ClickHouse cluster will run in Kubernetes, each shard contains shared-nothing part of data and contains set of replicas, cluster contains 1 shard by default"
+                                description: |
+                                  how much shards for current ClickHouse cluster will run in Kubernetes,
+                                  each shard contains shared-nothing part of data and contains set of replicas,
+                                  cluster contains 1 shard by default"
                               replicasCount:
                                 type: integer
-                                description: "how much replicas in each shards for current ClickHouse cluster will run in Kubernetes, each replica is a separate `StatefulSet` which contains only one `Pod` with `clickhouse-server` instance, every shard contains 1 replica by default"
+                                description: |
+                                  how much replicas in each shards for current cluster will run in Kubernetes,
+                                  each replica is a separate `StatefulSet` which contains only one `Pod` with `clickhouse-server` instance,
+                                  every shard contains 1 replica by default"
                               shards:
                                 type: array
-                                description: "optional, allows override top-level `chi.spec.configuration`, cluster-level `chi.spec.configuration.clusters` settings for each shard separately, use it only if you fully understand what you do"
+                                description: |
+                                  optional, allows override top-level `chi.spec.configuration`, cluster-level
+                                  `chi.spec.configuration.clusters` settings for each shard separately,
+                                  use it only if you fully understand what you do"
                                 # nullable: true
                                 items:
                                   type: object
@@ -2339,7 +2439,9 @@ spec:
                                   maximum: 65535
                                 topologyKey:
                                   type: string
-                                  description: "use for inter-pod affinity look to `pod.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution.podAffinityTerm.topologyKey`, More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity"
+                                  description: |
+                                    use for inter-pod affinity look to `pod.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution.podAffinityTerm.topologyKey`,
+                                    more info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity"
                           metadata:
                             type: object
                             description: |
@@ -2356,7 +2458,8 @@ spec:
 
                     volumeClaimTemplates:
                       type: array
-                      description: "allows define template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mount clickhouse `data`, clickhouse `logs` or something else"
+                      description: |
+                        allows define template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mount clickhouse `data`, clickhouse `logs` or something else
                       # nullable: true
                       items:
                         type: object
@@ -2409,14 +2512,17 @@ spec:
                               replica-level `chi.spec.configuration.clusters.layout.replicas.templates.replicaServiceTemplate` or `chi.spec.configuration.clusters.layout.shards.replicas.replicaServiceTemplate`
                           generateName:
                             type: string
-                            description: "allows define format for generated `Service` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about aviailable template variables"
+                            description: |
+                              allows define format for generated `Service` name,
+                              look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates
+                              for details about aviailable template variables"
                           metadata:
                             # TODO specify ObjectMeta
                             type: object
                             description: |
                               allows pass standard object's metadata from template to Service
                               Could be use for define specificly for Cloud Provider metadata which impact to behavior of service
-                              More info: https://kubernetes.io/docs/concepts/services-networking/service/
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
                             # nullable: true
                             x-kubernetes-preserve-unknown-fields: true
                           spec:
@@ -2429,7 +2535,9 @@ spec:
                             x-kubernetes-preserve-unknown-fields: true
                 useTemplates:
                   type: array
-                  description: "list of `ClickHouseInstallationTemplate` (chit) resource names which will merge with current `Chi` manifest during render Kubernetes resources to create related ClickHouse clusters"
+                  description: |
+                    list of `ClickHouseInstallationTemplate` (chit) resource names which will merge with current `CHI`
+                    manifest during render Kubernetes resources to create related ClickHouse clusters"
                   # nullable: true
                   items:
                     type: object
@@ -2459,7 +2567,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2874,14 +2982,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.23.7
+# OPERATOR_VERSION=0.24.0
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.23.7
+    clickhouse-keeper.altinity.com/chop: 0.24.0
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -2896,15 +3004,67 @@ spec:
       served: true
       storage: true
       additionalPrinterColumns:
+        - name: version
+          type: string
+          description: Operator version
+          priority: 1 # show in wide view
+          jsonPath: .status.chop-version
+        - name: clusters
+          type: integer
+          description: Clusters count
+          jsonPath: .status.clusters
+        - name: shards
+          type: integer
+          description: Shards count
+          priority: 1 # show in wide view
+          jsonPath: .status.shards
+        - name: hosts
+          type: integer
+          description: Hosts count
+          jsonPath: .status.hosts
+        - name: taskID
+          type: string
+          description: TaskID
+          priority: 1 # show in wide view
+          jsonPath: .status.taskID
         - name: status
           type: string
-          description: CHK status
+          description: Resource status
           jsonPath: .status.status
-        - name: replicas
+        - name: hosts-unchanged
           type: integer
-          description: Replica count
+          description: Unchanged hosts count
           priority: 1 # show in wide view
-          jsonPath: .status.replicas
+          jsonPath: .status.hostsUnchanged
+        - name: hosts-updated
+          type: integer
+          description: Updated hosts count
+          priority: 1 # show in wide view
+          jsonPath: .status.hostsUpdated
+        - name: hosts-added
+          type: integer
+          description: Added hosts count
+          priority: 1 # show in wide view
+          jsonPath: .status.hostsAdded
+        - name: hosts-completed
+          type: integer
+          description: Completed hosts count
+          jsonPath: .status.hostsCompleted
+        - name: hosts-deleted
+          type: integer
+          description: Hosts deleted count
+          priority: 1 # show in wide view
+          jsonPath: .status.hostsDeleted
+        - name: hosts-delete
+          type: integer
+          description: Hosts to be deleted count
+          priority: 1 # show in wide view
+          jsonPath: .status.hostsDelete
+        - name: endpoint
+          type: string
+          description: Client access endpoint
+          priority: 1 # show in wide view
+          jsonPath: .status.endpoint
         - name: age
           type: date
           description: Age of the resource
@@ -2914,105 +3074,388 @@ spec:
         status: {}
       schema:
         openAPIV3Schema:
+          description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more clusters"
           type: object
           required:
             - spec
-          description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one ClickHouse Keeper cluster"
           properties:
             apiVersion:
-              type: string
               description: |
                 APIVersion defines the versioned schema of this representation
                 of an object. Servers should convert recognized schemas to the latest
                 internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-            kind:
               type: string
+            kind:
               description: |
                 Kind is a string value representing the REST resource this
                 object represents. Servers may infer this from the endpoint the client
                 submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
             metadata:
               type: object
             status:
               type: object
               description: |
-                Current ClickHouseKeeperInstallation status, contains many fields like overall status, desired replicas and ready replica list with their endpoints
+                Status contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other
               properties:
                 chop-version:
                   type: string
-                  description: "ClickHouse operator version"
+                  description: "Operator version"
                 chop-commit:
                   type: string
-                  description: "ClickHouse operator git commit SHA"
+                  description: "Operator git commit SHA"
                 chop-date:
                   type: string
-                  description: "ClickHouse operator build date"
+                  description: "Operator build date"
                 chop-ip:
                   type: string
-                  description: "IP address of the operator's pod which managed this CHI"
+                  description: "IP address of the operator's pod which managed this resource"
+                clusters:
+                  type: integer
+                  minimum: 0
+                  description: "Clusters count"
+                shards:
+                  type: integer
+                  minimum: 0
+                  description: "Shards count"
+                replicas:
+                  type: integer
+                  minimum: 0
+                  description: "Replicas count"
+                hosts:
+                  type: integer
+                  minimum: 0
+                  description: "Hosts count"
                 status:
                   type: string
                   description: "Status"
-                replicas:
-                  type: integer
-                  format: int32
-                  description: Replicas is the number of number of desired replicas in the cluster
-                readyReplicas:
+                taskID:
+                  type: string
+                  description: "Current task id"
+                taskIDsStarted:
                   type: array
-                  description: ReadyReplicas is the array of endpoints of those ready replicas in the cluster
+                  description: "Started task ids"
+                  nullable: true
                   items:
-                    type: object
-                    properties:
-                      host:
-                        type: string
-                        description: dns name or ip address for Keeper node
-                      port:
-                        type: integer
-                        minimum: 0
-                        maximum: 65535
-                        description: TCP port which used to connect to Keeper node
-                      secure:
-                        type: string
-                        description: if a secure connection to Keeper is required
+                    type: string
+                taskIDsCompleted:
+                  type: array
+                  description: "Completed task ids"
+                  nullable: true
+                  items:
+                    type: string
+                action:
+                  type: string
+                  description: "Action"
+                actions:
+                  type: array
+                  description: "Actions"
+                  nullable: true
+                  items:
+                    type: string
+                error:
+                  type: string
+                  description: "Last error"
+                errors:
+                  type: array
+                  description: "Errors"
+                  nullable: true
+                  items:
+                    type: string
+                hostsUnchanged:
+                  type: integer
+                  minimum: 0
+                  description: "Unchanged Hosts count"
+                hostsUpdated:
+                  type: integer
+                  minimum: 0
+                  description: "Updated Hosts count"
+                hostsAdded:
+                  type: integer
+                  minimum: 0
+                  description: "Added Hosts count"
+                hostsCompleted:
+                  type: integer
+                  minimum: 0
+                  description: "Completed Hosts count"
+                hostsDeleted:
+                  type: integer
+                  minimum: 0
+                  description: "Deleted Hosts count"
+                hostsDelete:
+                  type: integer
+                  minimum: 0
+                  description: "About to delete Hosts count"
+                pods:
+                  type: array
+                  description: "Pods"
+                  nullable: true
+                  items:
+                    type: string
+                pod-ips:
+                  type: array
+                  description: "Pod IPs"
+                  nullable: true
+                  items:
+                    type: string
+                fqdns:
+                  type: array
+                  description: "Pods FQDNs"
+                  nullable: true
+                  items:
+                    type: string
+                endpoint:
+                  type: string
+                  description: "Endpoint"
+                generation:
+                  type: integer
+                  minimum: 0
+                  description: "Generation"
                 normalized:
                   type: object
-                  description: "Normalized CHK requested"
+                  description: "Normalized resource requested"
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
-                  description: "Normalized CHK completed"
+                  description: "Normalized resource completed"
                   x-kubernetes-preserve-unknown-fields: true
+                hostsWithTablesCreated:
+                  type: array
+                  description: "List of hosts with tables created by the operator"
+                  nullable: true
+                  items:
+                    type: string
+                usedTemplates:
+                  type: array
+                  description: "List of templates used to build this CHI"
+                  nullable: true
+                  x-kubernetes-preserve-unknown-fields: true
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
-              description: KeeperSpec defines the desired state of a Keeper cluster
+              # x-kubernetes-preserve-unknown-fields: true
+              description: |
+                Specification of the desired behavior of one or more ClickHouse clusters
+                More info: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md
               properties:
+                taskID:
+                  type: string
+                  description: |
+                    Allows to define custom taskID for CHI update and watch status of this update execution.
+                    Displayed in all .status.taskID* fields.
+                    By default (if not filled) every update of CHI manifest will generate random taskID
+                stop: &TypeStringBool
+                  type: string
+                  description: |
+                    Allows to stop all ClickHouse clusters defined in a CHI.
+                    Works as the following:
+                     - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
+                     - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
+                  enum:
+                    # List StringBoolXXX constants from model
+                    - ""
+                    - "0"
+                    - "1"
+                    - "False"
+                    - "false"
+                    - "True"
+                    - "true"
+                    - "No"
+                    - "no"
+                    - "Yes"
+                    - "yes"
+                    - "Off"
+                    - "off"
+                    - "On"
+                    - "on"
+                    - "Disable"
+                    - "disable"
+                    - "Enable"
+                    - "enable"
+                    - "Disabled"
+                    - "disabled"
+                    - "Enabled"
+                    - "enabled"
                 namespaceDomainPattern:
                   type: string
                   description: |
                     Custom domain pattern which will be used for DNS names of `Service` or `Pod`.
                     Typical use scenario - custom cluster domain in Kubernetes cluster
                     Example: %s.svc.my.test
-                replicas:
-                  type: integer
-                  format: int32
+                reconciling:
+                  type: object
+                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+                  # nullable: true
+                  properties:
+                    policy:
+                      type: string
+                      description: |
+                        DISCUSSED TO BE DEPRECATED
+                        Syntax sugar
+                        Overrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config
+                        Possible values:
+                         - wait - should wait to exclude host, complete queries and include host back into the cluster
+                         - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                      enum:
+                        - ""
+                        - "wait"
+                        - "nowait"
+                    configMapPropagationTimeout:
+                      type: integer
+                      description: |
+                        Timeout in seconds for `clickhouse-operator` to wait for modified `ConfigMap` to propagate into the `Pod`
+                        More details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
+                      minimum: 0
+                      maximum: 3600
+                    cleanup:
+                      type: object
+                      description: "Optional, defines behavior for cleanup Kubernetes resources during reconcile cycle"
+                      # nullable: true
+                      properties:
+                        unknownObjects:
+                          type: object
+                          description: |
+                            Describes what clickhouse-operator should do with found Kubernetes resources which should be managed by clickhouse-operator,
+                            but do not have `ownerReference` to any currently managed `ClickHouseInstallation` resource.
+                            Default behavior is `Delete`"
+                          # nullable: true
+                          properties:
+                            statefulSet: &TypeObjectsCleanup
+                              type: string
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
+                              enum:
+                                # List ObjectsCleanupXXX constants from model
+                                - ""
+                                - "Retain"
+                                - "Delete"
+                            pvc:
+                              type: string
+                              <<: *TypeObjectsCleanup
+                              description: "Behavior policy for unknown PVC, `Delete` by default"
+                            configMap:
+                              <<: *TypeObjectsCleanup
+                              description: "Behavior policy for unknown ConfigMap, `Delete` by default"
+                            service:
+                              <<: *TypeObjectsCleanup
+                              description: "Behavior policy for unknown Service, `Delete` by default"
+                        reconcileFailedObjects:
+                          type: object
+                          description: |
+                            Describes what clickhouse-operator should do with Kubernetes resources which are failed during reconcile.
+                            Default behavior is `Retain`"
+                          # nullable: true
+                          properties:
+                            statefulSet:
+                              <<: *TypeObjectsCleanup
+                              description: "Behavior policy for failed StatefulSet, `Retain` by default"
+                            pvc:
+                              <<: *TypeObjectsCleanup
+                              description: "Behavior policy for failed PVC, `Retain` by default"
+                            configMap:
+                              <<: *TypeObjectsCleanup
+                              description: "Behavior policy for failed ConfigMap, `Retain` by default"
+                            service:
+                              <<: *TypeObjectsCleanup
+                              description: "Behavior policy for failed Service, `Retain` by default"
+                defaults:
+                  type: object
                   description: |
-                    Replicas is the expected size of the keeper cluster.
-                    The valid range of size is from 1 to 7.
-                  minimum: 1
-                  maximum: 7
+                    define default behavior for whole ClickHouseInstallation, some behavior can be re-define on cluster, shard and replica level
+                    More info: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specdefaults
+                  # nullable: true
+                  properties:
+                    replicasUseFQDN:
+                      <<: *TypeStringBool
+                      description: |
+                        define should replicas be specified by FQDN in `<host></host>`.
+                        In case of "no" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup
+                        "yes" by default
+                    distributedDDL:
+                      type: object
+                      description: |
+                        allows change `<yandex><distributed_ddl></distributed_ddl></yandex>` settings
+                        More info: https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-distributed_ddl
+                      # nullable: true
+                      properties:
+                        profile:
+                          type: string
+                          description: "Settings from this profile will be used to execute DDL queries"
+                    storageManagement:
+                      type: object
+                      description: default storage management options
+                      properties:
+                        provisioner: &TypePVCProvisioner
+                          type: string
+                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator"
+                          enum:
+                            - ""
+                            - "StatefulSet"
+                            - "Operator"
+                        reclaimPolicy: &TypePVCReclaimPolicy
+                          type: string
+                          description: |
+                            defines behavior of `PVC` deletion.
+                            `Delete` by default, if `Retain` specified then `PVC` will be kept when deleting StatefulSet
+                          enum:
+                            - ""
+                            - "Retain"
+                            - "Delete"
+                    templates: &TypeTemplateNames
+                      type: object
+                      description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
+                      # nullable: true
+                      properties:
+                        hostTemplate:
+                          type: string
+                          description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure every `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod`"
+                        podTemplate:
+                          type: string
+                          description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
+                        dataVolumeClaimTemplate:
+                          type: string
+                          description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
+                        logVolumeClaimTemplate:
+                          type: string
+                          description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
+                        serviceTemplate:
+                          type: string
+                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                        clusterServiceTemplate:
+                          type: string
+                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
+                        shardServiceTemplate:
+                          type: string
+                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each shard inside clickhouse cluster described in `chi.spec.configuration.clusters`"
+                        replicaServiceTemplate:
+                          type: string
+                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
+                        volumeClaimTemplate:
+                          type: string
+                          description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                 configuration:
                   type: object
                   description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
                   # nullable: true
                   properties:
-                    settings:
+                    settings: &TypeSettings
                       type: object
-                      description: "allows configure multiple aspects and behavior for `clickhouse-keeper` instance"
+                      description: |
+                        allows configure multiple aspects and behavior for `clickhouse-keeper` instance
+                      # nullable: true
+                      x-kubernetes-preserve-unknown-fields: true
+                    files: &TypeFiles
+                      type: object
+                      description: |
+                        allows define content of any setting
+
+                      # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
                     clusters:
                       type: array
                       description: |
-                        describes ClickHouseKeeper clusters layout and allows change settings on cluster-level and replica-level
+                        describes clusters layout and allows change settings on cluster-level and replica-level
                       # nullable: true
                       items:
                         type: object
@@ -3021,25 +3464,179 @@ spec:
                         properties:
                           name:
                             type: string
-                            description: "cluster name, used to identify set of ClickHouseKeeper servers and wide used during generate names of related Kubernetes resources"
+                            description: "cluster name, used to identify set of servers and wide used during generate names of related Kubernetes resources"
                             minLength: 1
                             # See namePartClusterMaxLen const
                             maxLength: 15
                             pattern: "^[a-zA-Z0-9-]{0,15}$"
+                          settings:
+                            <<: *TypeSettings
+                            description: |
+                              optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` only in one cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
+                              override top-level `chi.spec.configuration.settings`
+                              More details: https://clickhouse.tech/docs/en/operations/settings/settings/
+                          files:
+                            <<: *TypeFiles
+                            description: |
+                              optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
+                              override top-level `chi.spec.configuration.files`
+                          templates:
+                            <<: *TypeTemplateNames
+                            description: |
+                              optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
+                              override top-level `chi.spec.configuration.templates`
                           layout:
                             type: object
                             description: |
-                              describe current cluster layout, how many replicas
+                              describe current cluster layout, how much shards in cluster, how much replica in shard
+                              allows override settings on each shard and replica separatelly
                             # nullable: true
                             properties:
                               replicasCount:
                                 type: integer
-                                description: "how many replicas in ClickHouseKeeper cluster"
+                                description: |
+                                  how much replicas in each shards for current cluster will run in Kubernetes,
+                                  each replica is a separate `StatefulSet` which contains only one `Pod` with `clickhouse-server` instance,
+                                  every shard contains 1 replica by default"
+                              replicas:
+                                type: array
+                                description: "optional, allows override top-level `chi.spec.configuration` and cluster-level `chi.spec.configuration.clusters` configuration for each replica and each shard relates to selected replica, use it only if you fully understand what you do"
+                                # nullable: true
+                                items:
+                                  type: object
+                                  properties:
+                                    name:
+                                      type: string
+                                      description: "optional, by default replica name is generated, but you can override it and setup custom name"
+                                      minLength: 1
+                                      # See namePartShardMaxLen const
+                                      maxLength: 15
+                                      pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                    settings:
+                                      <<: *TypeSettings
+                                      description: |
+                                        optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
+                                        override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and will ignore if shard-level `chi.spec.configuration.clusters.layout.shards` present
+                                        More details: https://clickhouse.tech/docs/en/operations/settings/settings/
+                                    files:
+                                      <<: *TypeFiles
+                                      description: |
+                                        optional, allows define content of any setting file inside each `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
+                                        override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents
+                                    templates:
+                                      <<: *TypeTemplateNames
+                                      description: |
+                                        optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
+                                        override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`
+                                    shardsCount:
+                                      type: integer
+                                      description: "optional, count of shards related to current replica, you can override each shard behavior on low-level `chi.spec.configuration.clusters.layout.replicas.shards`"
+                                      minimum: 1
+                                    shards:
+                                      type: array
+                                      description: "optional, list of shards related to current replica, will ignore if `chi.spec.configuration.clusters.layout.shards` presents"
+                                      # nullable: true
+                                      items:
+                                        # Host
+                                        type: object
+                                        properties:
+                                          name:
+                                            type: string
+                                            description: "optional, by default shard name is generated, but you can override it and setup custom name"
+                                            minLength: 1
+                                            # See namePartReplicaMaxLen const
+                                            maxLength: 15
+                                            pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                          zkPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
+                                          raftPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
+                                          settings:
+                                            <<: *TypeSettings
+                                            description: |
+                                              optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
+                                              override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and replica-level `chi.spec.configuration.clusters.layout.replicas.settings`
+                                              More details: https://clickhouse.tech/docs/en/operations/settings/settings/
+                                          files:
+                                            <<: *TypeFiles
+                                            description: |
+                                              optional, allows define content of any setting file inside each `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
+                                              override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents
+                                          templates:
+                                            <<: *TypeTemplateNames
+                                            description: |
+                                              optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
+                                              override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
                 templates:
                   type: object
                   description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
                   # nullable: true
                   properties:
+                    hostTemplates:
+                      type: array
+                      description: "hostTemplate will use during apply to generate `clickhose-server` config files"
+                      # nullable: true
+                      items:
+                        type: object
+                        #required:
+                        #  - name
+                        properties:
+                          name:
+                            description: "template name, could use to link inside top-level `chi.spec.defaults.templates.hostTemplate`, cluster-level `chi.spec.configuration.clusters.templates.hostTemplate`, shard-level `chi.spec.configuration.clusters.layout.shards.temlates.hostTemplate`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates.hostTemplate`"
+                            type: string
+                          portDistribution:
+                            type: array
+                            description: "define how will distribute numeric values of named ports in `Pod.spec.containers.ports` and clickhouse-server configs"
+                            # nullable: true
+                            items:
+                              type: object
+                              #required:
+                              #  - type
+                              properties:
+                                type:
+                                  type: string
+                                  description: "type of distribution, when `Unspecified` (default value) then all listen ports on clickhouse-server configuration in all Pods will have the same value, when `ClusterScopeIndex` then ports will increment to offset from base value depends on shard and replica index inside cluster with combination of `chi.spec.templates.podTemlates.spec.HostNetwork` it allows setup ClickHouse cluster inside Kubernetes and provide access via external network bypass Kubernetes internal network"
+                                  enum:
+                                    # List PortDistributionXXX constants
+                                    - ""
+                                    - "Unspecified"
+                                    - "ClusterScopeIndex"
+                          spec:
+                            # Host
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                                description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
+                                minLength: 1
+                                # See namePartReplicaMaxLen const
+                                maxLength: 15
+                                pattern: "^[a-zA-Z0-9-]{0,15}$"
+                              zkPort:
+                                type: integer
+                                minimum: 1
+                                maximum: 65535
+                              raftPort:
+                                type: integer
+                                minimum: 1
+                                maximum: 65535
+                              settings:
+                                <<: *TypeSettings
+                                description: |
+                                  optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
+                                  More details: https://clickhouse.tech/docs/en/operations/settings/settings/
+                              files:
+                                <<: *TypeFiles
+                                description: |
+                                  optional, allows define content of any setting file inside each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
+                              templates:
+                                <<: *TypeTemplateNames
+                                description: "be careful, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
+
                     podTemplates:
                       type: array
                       description: |
@@ -3054,6 +3651,83 @@ spec:
                           name:
                             type: string
                             description: "template name, could use to link inside top-level `chi.spec.defaults.templates.podTemplate`, cluster-level `chi.spec.configuration.clusters.templates.podTemplate`, shard-level `chi.spec.configuration.clusters.layout.shards.temlates.podTemplate`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates.podTemplate`"
+                          generateName:
+                            type: string
+                            description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about aviailable template variables"
+                          zone:
+                            type: object
+                            description: "allows define custom zone name and will separate ClickHouse `Pods` between nodes, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
+                            #required:
+                            #  - values
+                            properties:
+                              key:
+                                type: string
+                                description: "optional, if defined, allows select kubernetes nodes by label with `name` equal `key`"
+                              values:
+                                type: array
+                                description: "optional, if defined, allows select kubernetes nodes by label with `value` in `values`"
+                                # nullable: true
+                                items:
+                                  type: string
+                          distribution:
+                            type: string
+                            description: "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
+                            enum:
+                              - ""
+                              - "Unspecified"
+                              - "OnePerHost"
+                          podDistribution:
+                            type: array
+                            description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
+                            # nullable: true
+                            items:
+                              type: object
+                              #required:
+                              #  - type
+                              properties:
+                                type:
+                                  type: string
+                                  description: "you can define multiple affinity policy types"
+                                  enum:
+                                    # List PodDistributionXXX constants
+                                    - ""
+                                    - "Unspecified"
+                                    - "ClickHouseAntiAffinity"
+                                    - "ShardAntiAffinity"
+                                    - "ReplicaAntiAffinity"
+                                    - "AnotherNamespaceAntiAffinity"
+                                    - "AnotherClickHouseInstallationAntiAffinity"
+                                    - "AnotherClusterAntiAffinity"
+                                    - "MaxNumberPerNode"
+                                    - "NamespaceAffinity"
+                                    - "ClickHouseInstallationAffinity"
+                                    - "ClusterAffinity"
+                                    - "ShardAffinity"
+                                    - "ReplicaAffinity"
+                                    - "PreviousTailAffinity"
+                                    - "CircularReplication"
+                                scope:
+                                  type: string
+                                  description: "scope for apply each podDistribution"
+                                  enum:
+                                    # list PodDistributionScopeXXX constants
+                                    - ""
+                                    - "Unspecified"
+                                    - "Shard"
+                                    - "Replica"
+                                    - "Cluster"
+                                    - "ClickHouseInstallation"
+                                    - "Namespace"
+                                number:
+                                  type: integer
+                                  description: "define, how much ClickHouse Pods could be inside selected scope with selected distribution type"
+                                  minimum: 0
+                                  maximum: 65535
+                                topologyKey:
+                                  type: string
+                                  description: |
+                                    use for inter-pod affinity look to `pod.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution.podAffinityTerm.topologyKey`,
+                                    more info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity"
                           metadata:
                             type: object
                             description: |
@@ -3070,7 +3744,8 @@ spec:
 
                     volumeClaimTemplates:
                       type: array
-                      description: "allows define template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mount clickhouse `data`, clickhouse `logs` or something else"
+                      description: |
+                        allows define template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mount clickhouse `data`, clickhouse `logs` or something else
                       # nullable: true
                       items:
                         type: object
@@ -3086,6 +3761,8 @@ spec:
                               cluster-level `chi.spec.configuration.clusters.templates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.templates.logVolumeClaimTemplate`,
                               shard-level `chi.spec.configuration.clusters.layout.shards.temlates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.layout.shards.temlates.logVolumeClaimTemplate`
                               replica-level `chi.spec.configuration.clusters.layout.replicas.templates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.layout.replicas.templates.logVolumeClaimTemplate`
+                          provisioner: *TypePVCProvisioner
+                          reclaimPolicy: *TypePVCReclaimPolicy
                           metadata:
                             type: object
                             description: |
@@ -3119,6 +3796,12 @@ spec:
                               cluster-level `chi.spec.configuration.clusters.templates.clusterServiceTemplate`
                               shard-level `chi.spec.configuration.clusters.layout.shards.temlates.shardServiceTemplate`
                               replica-level `chi.spec.configuration.clusters.layout.replicas.templates.replicaServiceTemplate` or `chi.spec.configuration.clusters.layout.shards.replicas.replicaServiceTemplate`
+                          generateName:
+                            type: string
+                            description: |
+                              allows define format for generated `Service` name,
+                              look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates
+                              for details about aviailable template variables"
                           metadata:
                             # TODO specify ObjectMeta
                             type: object
@@ -3150,7 +3833,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
 ---
 # Template Parameters:
 #
@@ -3176,7 +3859,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
 rules:
 
   #
@@ -3395,7 +4078,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -3417,7 +4100,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -3462,12 +4145,12 @@ data:
           # In case path is relative - it is relative to the folder where configuration file you are reading right now is located.
           path:
             # Path to the folder where ClickHouse configuration files common for all instances within a CHI are located.
-            common: config.d
+            common: chi/config.d
             # Path to the folder where ClickHouse configuration files unique for each instance (host) within a CHI are located.
-            host: conf.d
+            host: chi/conf.d
             # Path to the folder where ClickHouse configuration files with users' settings are located.
             # Files are common for all instances within a CHI.
-            user: users.d
+            user: chi/users.d
         ################################################
         ##
         ## Configuration users section
@@ -3615,6 +4298,26 @@ data:
           # All collected metrics are returned.
           collect: 9
     
+    keeper:
+      configuration:
+        ################################################
+        ##
+        ## Configuration files section
+        ##
+        ################################################
+        file:
+          # Each 'path' can be either absolute or relative.
+          # In case path is absolute - it is used as is
+          # In case path is relative - it is relative to the folder where configuration file you are reading right now is located.
+          path:
+            # Path to the folder where Keeper configuration files common for all instances within a CHK are located.
+            common: chk/keeper_config.d
+            # Path to the folder where Keeper configuration files unique for each instance (host) within a CHK are located.
+            host: chk/conf.d
+            # Path to the folder where Keeper configuration files with users' settings are located.
+            # Files are common for all instances within a CHI.
+            user: chk/users.d
+    
     ################################################
     ##
     ## Template(s) management section
@@ -3631,7 +4334,18 @@ data:
         # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
         # Templates are added to the list of all templates and used when CHI is reconciled.
         # Templates are applied in sorted alpha-numeric order.
-        path: templates.d
+        path: chi/templates.d
+      chk:
+        # CHK template updates handling policy
+        # Possible policy values:
+        #   - ReadOnStart. Accept CHIT updates on the operators start only.
+        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+        policy: ApplyOnNextReconcile
+    
+        # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
+        # Templates are added to the list of all templates and used when CHI is reconciled.
+        # Templates are applied in sorted alpha-numeric order.
+        path: chk/templates.d
     
     ################################################
     ##
@@ -3789,7 +4503,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
     app: clickhouse-operator
 data:
 ---
@@ -3805,7 +4519,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3904,7 +4618,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -4004,7 +4718,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -4055,11 +4769,139 @@ data:
       </profiles>
     </yandex>
 ---
+# Template Parameters:
+#
+# NAME=etc-keeper-operator-confd-files
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-keeper-operator-confd-files
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.24.0
+    app: clickhouse-operator
+data:
+---
+# Template Parameters:
+#
+# NAME=etc-keeper-operator-configd-files
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-keeper-operator-configd-files
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.24.0
+    app: clickhouse-operator
+data:
+  01-keeper-01-default-config.xml: |
+    <!-- IMPORTANT -->
+    <!-- This file is auto-generated -->
+    <!-- Do not edit this file - all changes would be lost -->
+    <!-- Edit appropriate template in the following folder: -->
+    <!-- deploy/builder/templates-config -->
+    <!-- IMPORTANT -->
+    <clickhouse>
+        <keeper_server>
+            <coordination_settings>
+                <min_session_timeout_ms>10000</min_session_timeout_ms>
+                <operation_timeout_ms>10000</operation_timeout_ms>
+                <raft_logs_level>information</raft_logs_level>
+                <session_timeout_ms>100000</session_timeout_ms>
+            </coordination_settings>
+            <hostname_checks_enabled>true</hostname_checks_enabled>
+            <log_storage_path>/var/lib/clickhouse-keeper/coordination/logs</log_storage_path>
+            <snapshot_storage_path>/var/lib/clickhouse-keeper/coordination/snapshots</snapshot_storage_path>
+            <storage_path>/var/lib/clickhouse-keeper</storage_path>
+            <tcp_port>2181</tcp_port>
+            <enable_reconfiguration>true</enable_reconfiguration>
+        </keeper_server>
+        <listen_host>::</listen_host>
+        <listen_host>0.0.0.0</listen_host>
+        <listen_try>1</listen_try>
+        <logger>
+            <console>1</console>
+            <level>information</level>
+        </logger>
+        <max_connections>4096</max_connections>
+        <openSSL>
+            <server>
+                <cacheSessions>true</cacheSessions>
+                <certificateFile>/etc/clickhouse-keeper/server.crt</certificateFile>
+                <dhParamsFile>/etc/clickhouse-keeper/dhparam.pem</dhParamsFile>
+                <disableProtocols>sslv2,sslv3</disableProtocols>
+                <loadDefaultCAFile>true</loadDefaultCAFile>
+                <preferServerCiphers>true</preferServerCiphers>
+                <privateKeyFile>/etc/clickhouse-keeper/server.key</privateKeyFile>
+                <verificationMode>none</verificationMode>
+            </server>
+        </openSSL>
+    </clickhouse>
+
+  01-keeper-02-readiness.xml: |
+    <!-- IMPORTANT -->
+    <!-- This file is auto-generated -->
+    <!-- Do not edit this file - all changes would be lost -->
+    <!-- Edit appropriate template in the following folder: -->
+    <!-- deploy/builder/templates-config -->
+    <!-- IMPORTANT -->
+    <clickhouse>
+        <keeper_server>
+            <http_control>
+                <port>9182</port>
+                <readiness>
+                    <endpoint>/ready</endpoint>
+                </readiness>
+            </http_control>
+        </keeper_server>
+    </clickhouse>
+
+---
+# Template Parameters:
+#
+# NAME=etc-keeper-operator-templatesd-files
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-keeper-operator-templatesd-files
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.24.0
+    app: clickhouse-operator
+data:
+  readme: |
+    Templates in this folder are packaged with an operator and available via 'useTemplate'
+---
+# Template Parameters:
+#
+# NAME=etc-keeper-operator-usersd-files
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-keeper-operator-usersd-files
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.24.0
+    app: clickhouse-operator
+data:
+---
 #
 # Template parameters available:
 #   NAMESPACE=${OPERATOR_NAMESPACE}
 #   COMMENT=
-#   OPERATOR_VERSION=0.23.7
+#   OPERATOR_VERSION=0.24.0
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -4069,7 +4911,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -4093,7 +4935,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -4127,6 +4969,18 @@ spec:
         - name: etc-clickhouse-operator-usersd-folder
           configMap:
             name: etc-clickhouse-operator-usersd-files
+        - name: etc-keeper-operator-confd-folder
+          configMap:
+            name: etc-keeper-operator-confd-files
+        - name: etc-keeper-operator-configd-folder
+          configMap:
+            name: etc-keeper-operator-configd-files
+        - name: etc-keeper-operator-templatesd-folder
+          configMap:
+            name: etc-keeper-operator-templatesd-files
+        - name: etc-keeper-operator-usersd-folder
+          configMap:
+            name: etc-keeper-operator-usersd-files
       containers:
         - name: clickhouse-operator
           image: ${OPERATOR_IMAGE}
@@ -4135,13 +4989,21 @@ spec:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
             - name: etc-clickhouse-operator-confd-folder
-              mountPath: /etc/clickhouse-operator/conf.d
+              mountPath: /etc/clickhouse-operator/chi/conf.d
             - name: etc-clickhouse-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/config.d
+              mountPath: /etc/clickhouse-operator/chi/config.d
             - name: etc-clickhouse-operator-templatesd-folder
-              mountPath: /etc/clickhouse-operator/templates.d
+              mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
-              mountPath: /etc/clickhouse-operator/users.d
+              mountPath: /etc/clickhouse-operator/chi/users.d
+            - name: etc-keeper-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/chk/conf.d
+            - name: etc-keeper-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/chk/keeper_config.d
+            - name: etc-keeper-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/chk/templates.d
+            - name: etc-keeper-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/chk/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -4203,13 +5065,21 @@ spec:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
             - name: etc-clickhouse-operator-confd-folder
-              mountPath: /etc/clickhouse-operator/conf.d
+              mountPath: /etc/clickhouse-operator/chi/conf.d
             - name: etc-clickhouse-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/config.d
+              mountPath: /etc/clickhouse-operator/chi/config.d
             - name: etc-clickhouse-operator-templatesd-folder
-              mountPath: /etc/clickhouse-operator/templates.d
+              mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
-              mountPath: /etc/clickhouse-operator/users.d
+              mountPath: /etc/clickhouse-operator/chi/users.d
+            - name: etc-keeper-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/chk/conf.d
+            - name: etc-keeper-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/chk/keeper_config.d
+            - name: etc-keeper-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/chk/templates.d
+            - name: etc-keeper-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/chk/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -4280,7 +5150,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.7
+    clickhouse.altinity.com/chop: 0.24.0
     app: clickhouse-operator
 spec:
   ports:

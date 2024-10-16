@@ -16,6 +16,7 @@ package runtime
 
 import (
 	"path"
+	"reflect"
 	"runtime"
 	"strings"
 )
@@ -45,4 +46,9 @@ func Caller(skip string) (string, int, string) {
 		}
 	}
 	return "", 0, ""
+}
+
+// FunctionName returns name of thee calling function
+func FunctionName(fn interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
 }

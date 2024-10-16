@@ -4,9 +4,14 @@ metadata:
   name: clickhouse-credentials
 type: Opaque
 stringData:
-  password_plain: password
-  password_sha256_hex: 65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5
-  password_double_sha1_hex: c5bf7884d77d2294924d6dedcb60222f2730ff04
+  password_plain: "password"
+  password_sha256_hex: "65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5"
+  password_double_sha1_hex: "c5bf7884d77d2294924d6dedcb60222f2730ff04"
+  disable_internal_dns_cache: "1"
+  quota: "test_quota"
+  example.xml: |
+    <yandex> <!-- just example --> </yandex>
+
 ---
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
@@ -24,7 +29,15 @@ spec:
         - "127.0.0.1/32"
         - "192.168.74.1/24"
       test/profile: test_profile
-      test/quota: test_quota
+
+      # will pass via pod.spec.containers.env and render in XML with from_env attribute
+      # no regeneration if secret updated
+      test/quota:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: quota
+
       test/allow_databases/database:
         - "dbname1"
         - "dbname2"
@@ -37,12 +50,16 @@ spec:
       admin/quota: default
 
       # User 'user_secret_ref_password_plain' has plain password specified as reference to the secret's field
+      # will pass via pod.spec.containers.env and render in XML with from_env attribute
+      # no regeneration if secret updated
       user_secret_ref_password_plain/password:
         valueFrom:
           secretKeyRef:
             name: clickhouse-credentials
             key: password_plain
       # User 'user_secret_ref_password_sha256_hex' has sha256 hex password specified as reference to the secret's field
+      # will pass via pod.spec.containers.env and render in XML with from_env attribute
+      # no regeneration if secret updated
       user_secret_ref_password_sha256_hex/password_sha256_hex:
         valueFrom:
           secretKeyRef:
@@ -50,6 +67,8 @@ spec:
             key: password_sha256_hex
 
       # User 'user_secret_ref_password_double_sha1_hex' has double sha1 hex password specified as reference to the secret's field
+      # will pass via pod.spec.containers.env and render in XML with from_env attibute
+      # no regeneration if secret updated
       user_secret_ref_password_double_sha1_hex/password_double_sha1_hex:
         valueFrom:
           secretKeyRef:
@@ -61,15 +80,15 @@ spec:
       readonly/profile: readonly
       readonly/quota: default
 
-      # reference to namespace/name/field in the secret with plain password
+      # reference to namespace/secret/key in the secret with plain password, will render in XML as is from secret, no updates when secret updated
       testpwduser1/k8s_secret_password: dev/clickhouse-credentials/password_plain
-      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password
+      # reference to the same namespace as operator is running in secret/key format with hashed password, will render in XML as is from secret, no updates when secret updated
       testpwduser2/k8s_secret_password_sha256_hex: clickhouse-credentials/password_sha256_hex
       testpwduser3/k8s_secret_password_double_sha1_hex: clickhouse-credentials/password_double_sha1_hex
 
-      # reference to namespace/name/field in the secret with plain password
+      # reference to namespace/secret/key in the secret with plain password, will render in XML with from_env attribute
       testenvpwduser1/k8s_secret_env_password: dev/clickhouse-credentials/password_plain
-      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password
+      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password, will render in XML with from_env attribute
       testenvpwduser2/k8s_secret_env_password_sha256_hex: clickhouse-credentials/password_sha256_hex
       testenvpwduser3/k8s_secret_env_password_double_sha1_hex: clickhouse-credentials/password_double_sha1_hex
 
@@ -81,8 +100,22 @@ spec:
       test_quota/interval/duration: 3600
     settings:
       compression/case/method: zstd
-      disable_internal_dns_cache: 1
+      # will pass in `pod.spec.evn`, and generate with from_env=XXX in XML, no updates when updates `secret`
+      disable_internal_dns_cache:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: disable_internal_dns_cache
+
     files:
+      # will mount as separate volume inside /etc/clickhouse-server/secrets.d/example/clickhouse-credentials/example.xml
+      # and will regenerate when secret updates, useful for SSL certificates
+      example:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: example.xml
+
       dict1.xml: |
         <yandex>
             <!-- ref to file /etc/clickhouse-data/config.d/source1.csv -->

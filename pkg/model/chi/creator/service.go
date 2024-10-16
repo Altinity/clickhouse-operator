@@ -15,31 +15,90 @@
 package creator
 
 import (
-	"fmt"
-
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
-	"github.com/altinity/clickhouse-operator/pkg/util"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 )
 
-// CreateServiceCHI creates new core.Service for specified CHI
-func (c *Creator) CreateServiceCHI() *core.Service {
-	if template, ok := c.chi.GetCHIServiceTemplate(); ok {
+const (
+	// Default value for ClusterIP service
+	TemplateDefaultsServiceClusterIP = "None"
+)
+
+type ServiceManager struct {
+	cr      chi.ICustomResource
+	or      interfaces.IOwnerReferencesManager
+	tagger  interfaces.ITagger
+	macro   interfaces.IMacro
+	namer   interfaces.INameManager
+	labeler interfaces.ILabeler
+}
+
+func NewServiceManager() *ServiceManager {
+	return &ServiceManager{
+		or:      NewOwnerReferencer(),
+		macro:   commonMacro.New(macro.List),
+		namer:   namer.New(),
+		labeler: nil,
+	}
+}
+
+func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
+	switch what {
+	case interfaces.ServiceCR:
+		return m.createServiceCR()
+	case interfaces.ServiceCluster:
+		var cluster chi.ICluster
+		if len(params) > 0 {
+			cluster = params[0].(chi.ICluster)
+			return m.createServiceCluster(cluster)
+		}
+	case interfaces.ServiceShard:
+		var shard chi.IShard
+		if len(params) > 0 {
+			shard = params[0].(chi.IShard)
+			return m.createServiceShard(shard)
+		}
+	case interfaces.ServiceHost:
+		var host *chi.Host
+		if len(params) > 0 {
+			host = params[0].(*chi.Host)
+			return m.createServiceHost(host)
+		}
+	}
+	panic("unknown service type")
+}
+
+func (m *ServiceManager) SetCR(cr chi.ICustomResource) {
+	m.cr = cr
+	m.labeler = labeler.New(cr)
+}
+func (m *ServiceManager) SetTagger(tagger interfaces.ITagger) {
+	m.tagger = tagger
+}
+
+// createServiceCR creates new core.Service for specified CR
+func (m *ServiceManager) createServiceCR() *core.Service {
+	if template, ok := m.cr.GetRootServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return c.createServiceFromTemplate(
+		return creator.CreateServiceFromTemplate(
 			template,
-			c.chi.Namespace,
-			model.CreateCHIServiceName(c.chi),
-			c.labels.GetServiceCHI(c.chi),
-			c.annotations.GetServiceCHI(c.chi),
-			c.labels.GetSelectorCHIScopeReady(),
-			getOwnerReferences(c.chi),
-			model.Macro(c.chi),
+			m.cr.GetNamespace(),
+			m.namer.Name(interfaces.NameCRService, m.cr),
+			m.tagger.Label(interfaces.LabelServiceCR, m.cr),
+			m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr),
+			m.tagger.Selector(interfaces.SelectorCRScopeReady),
+			m.or.CreateOwnerReferences(m.cr),
+			m.macro.Scope(m.cr),
+			m.labeler,
 		)
 	}
 
@@ -47,92 +106,94 @@ func (c *Creator) CreateServiceCHI() *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            model.CreateCHIServiceName(c.chi),
-			Namespace:       c.chi.Namespace,
-			Labels:          model.Macro(c.chi).Map(c.labels.GetServiceCHI(c.chi)),
-			Annotations:     model.Macro(c.chi).Map(c.annotations.GetServiceCHI(c.chi)),
-			OwnerReferences: getOwnerReferences(c.chi),
+			Name:            m.namer.Name(interfaces.NameCRService, m.cr),
+			Namespace:       m.cr.GetNamespace(),
+			Labels:          m.macro.Scope(m.cr).Map(m.tagger.Label(interfaces.LabelServiceCR, m.cr)),
+			Annotations:     m.macro.Scope(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr)),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
-			ClusterIP: model.TemplateDefaultsServiceClusterIP,
+			ClusterIP: TemplateDefaultsServiceClusterIP,
 			Ports: []core.ServicePort{
 				{
-					Name:       model.ChDefaultHTTPPortName,
+					Name:       chi.ChDefaultHTTPPortName,
 					Protocol:   core.ProtocolTCP,
-					Port:       model.ChDefaultHTTPPortNumber,
-					TargetPort: intstr.FromString(model.ChDefaultHTTPPortName),
+					Port:       chi.ChDefaultHTTPPortNumber,
+					TargetPort: intstr.FromString(chi.ChDefaultHTTPPortName),
 				},
 				{
-					Name:       model.ChDefaultTCPPortName,
+					Name:       chi.ChDefaultTCPPortName,
 					Protocol:   core.ProtocolTCP,
-					Port:       model.ChDefaultTCPPortNumber,
-					TargetPort: intstr.FromString(model.ChDefaultTCPPortName),
+					Port:       chi.ChDefaultTCPPortNumber,
+					TargetPort: intstr.FromString(chi.ChDefaultTCPPortName),
 				},
 			},
-			Selector: c.labels.GetSelectorCHIScopeReady(),
+			Selector: m.tagger.Selector(interfaces.SelectorCRScopeReady),
 			Type:     core.ServiceTypeClusterIP,
 			// ExternalTrafficPolicy: core.ServiceExternalTrafficPolicyTypeLocal, // For core.ServiceTypeLoadBalancer only
 		},
 	}
-	model.MakeObjectVersion(&svc.ObjectMeta, svc)
+	m.labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }
 
-// CreateServiceCluster creates new core.Service for specified Cluster
-func (c *Creator) CreateServiceCluster(cluster *api.Cluster) *core.Service {
-	serviceName := model.CreateClusterServiceName(cluster)
-	ownerReferences := getOwnerReferences(c.chi)
+// createServiceCluster creates new core.Service for specified Cluster
+func (m *ServiceManager) createServiceCluster(cluster chi.ICluster) *core.Service {
+	serviceName := m.namer.Name(interfaces.NameClusterService, cluster)
+	ownerReferences := m.or.CreateOwnerReferences(m.cr)
 
-	c.a.V(1).F().Info("%s/%s", cluster.Runtime.Address.Namespace, serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return c.createServiceFromTemplate(
+		return creator.CreateServiceFromTemplate(
 			template,
-			cluster.Runtime.Address.Namespace,
+			cluster.GetRuntime().GetAddress().GetNamespace(),
 			serviceName,
-			c.labels.GetServiceCluster(cluster),
-			c.annotations.GetServiceCluster(cluster),
-			model.GetSelectorClusterScopeReady(cluster),
+			m.tagger.Label(interfaces.LabelServiceCluster, cluster),
+			m.tagger.Annotate(interfaces.AnnotateServiceCluster, cluster),
+			m.tagger.Selector(interfaces.SelectorClusterScopeReady, cluster),
 			ownerReferences,
-			model.Macro(cluster),
+			m.macro.Scope(cluster),
+			m.labeler,
 		)
 	}
 	// No template specified, no need to create service
 	return nil
 }
 
-// CreateServiceShard creates new core.Service for specified Shard
-func (c *Creator) CreateServiceShard(shard *api.ChiShard) *core.Service {
+// createServiceShard creates new core.Service for specified Shard
+func (m *ServiceManager) createServiceShard(shard chi.IShard) *core.Service {
 	if template, ok := shard.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return c.createServiceFromTemplate(
+		return creator.CreateServiceFromTemplate(
 			template,
-			shard.Runtime.Address.Namespace,
-			model.CreateShardServiceName(shard),
-			c.labels.GetServiceShard(shard),
-			c.annotations.GetServiceShard(shard),
-			model.GetSelectorShardScopeReady(shard),
-			getOwnerReferences(c.chi),
-			model.Macro(shard),
+			shard.GetRuntime().GetAddress().GetNamespace(),
+			m.namer.Name(interfaces.NameShardService, shard),
+			m.tagger.Label(interfaces.LabelServiceShard, shard),
+			m.tagger.Annotate(interfaces.AnnotateServiceShard, shard),
+			m.tagger.Selector(interfaces.SelectorShardScopeReady, shard),
+			m.or.CreateOwnerReferences(m.cr),
+			m.macro.Scope(shard),
+			m.labeler,
 		)
 	}
 	// No template specified, no need to create service
 	return nil
 }
 
-// CreateServiceHost creates new core.Service for specified host
-func (c *Creator) CreateServiceHost(host *api.ChiHost) *core.Service {
+// createServiceHost creates new core.Service for specified host
+func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return c.createServiceFromTemplate(
+		return creator.CreateServiceFromTemplate(
 			template,
-			host.Runtime.Address.Namespace,
-			model.CreateStatefulSetServiceName(host),
-			c.labels.GetServiceHost(host),
-			c.annotations.GetServiceHost(host),
-			model.GetSelectorHostScope(host),
-			getOwnerReferences(c.chi),
-			model.Macro(host),
+			host.GetRuntime().GetAddress().GetNamespace(),
+			m.namer.Name(interfaces.NameStatefulSetService, host),
+			m.tagger.Label(interfaces.LabelServiceHost, host),
+			m.tagger.Annotate(interfaces.AnnotateServiceHost, host),
+			m.tagger.Selector(interfaces.SelectorHostScope, host),
+			m.or.CreateOwnerReferences(m.cr),
+			m.macro.Scope(host),
+			m.labeler,
 		)
 	}
 
@@ -140,82 +201,20 @@ func (c *Creator) CreateServiceHost(host *api.ChiHost) *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            model.CreateStatefulSetServiceName(host),
-			Namespace:       host.Runtime.Address.Namespace,
-			Labels:          model.Macro(host).Map(c.labels.GetServiceHost(host)),
-			Annotations:     model.Macro(host).Map(c.annotations.GetServiceHost(host)),
-			OwnerReferences: getOwnerReferences(c.chi),
+			Name:            m.namer.Name(interfaces.NameStatefulSetService, host),
+			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
+			Labels:          m.macro.Scope(host).Map(m.tagger.Label(interfaces.LabelServiceHost, host)),
+			Annotations:     m.macro.Scope(host).Map(m.tagger.Annotate(interfaces.AnnotateServiceHost, host)),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
-			Selector:                 model.GetSelectorHostScope(host),
-			ClusterIP:                model.TemplateDefaultsServiceClusterIP,
+			Selector:                 m.tagger.Selector(interfaces.SelectorHostScope, host),
+			ClusterIP:                TemplateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
 			PublishNotReadyAddresses: true,
 		},
 	}
-	appendServicePorts(svc, host)
-	model.MakeObjectVersion(&svc.ObjectMeta, svc)
+	creator.SvcAppendSpecifiedPorts(svc, host)
+	m.labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
-}
-
-func appendServicePorts(service *core.Service, host *api.ChiHost) {
-	// Walk over all assigned ports of the host and append each port to the list of service's ports
-	model.HostWalkAssignedPorts(
-		host,
-		func(name string, port *int32, protocol core.Protocol) bool {
-			// Append assigned port to the list of service's ports
-			service.Spec.Ports = append(service.Spec.Ports,
-				core.ServicePort{
-					Name:       name,
-					Protocol:   protocol,
-					Port:       *port,
-					TargetPort: intstr.FromInt(int(*port)),
-				},
-			)
-			// Do not abort, continue iterating
-			return false
-		},
-	)
-}
-
-// createServiceFromTemplate create Service from ServiceTemplate and additional info
-func (c *Creator) createServiceFromTemplate(
-	template *api.ServiceTemplate,
-	namespace string,
-	name string,
-	labels map[string]string,
-	annotations map[string]string,
-	selector map[string]string,
-	ownerReferences []meta.OwnerReference,
-	macro *model.MacrosEngine,
-) *core.Service {
-
-	// Verify Ports
-	if err := k8s.ServiceSpecVerifyPorts(&template.Spec); err != nil {
-		c.a.V(1).F().Warning(fmt.Sprintf("template: %s err: %s", template.Name, err))
-		return nil
-	}
-
-	// Create Service
-	service := &core.Service{
-		ObjectMeta: *template.ObjectMeta.DeepCopy(),
-		Spec:       *template.Spec.DeepCopy(),
-	}
-
-	// Overwrite .name and .namespace - they are not allowed to be specified in template
-	service.Name = name
-	service.Namespace = namespace
-	service.OwnerReferences = ownerReferences
-
-	// Combine labels and annotations
-	service.Labels = macro.Map(util.MergeStringMapsOverwrite(service.Labels, labels))
-	service.Annotations = macro.Map(util.MergeStringMapsOverwrite(service.Annotations, annotations))
-
-	// Append provided Selector to already specified Selector in template
-	service.Spec.Selector = util.MergeStringMapsOverwrite(service.Spec.Selector, selector)
-
-	// And after the object is ready we can put version label
-	model.MakeObjectVersion(&service.ObjectMeta, service)
-
-	return service
 }

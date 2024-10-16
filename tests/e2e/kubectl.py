@@ -12,7 +12,7 @@ import e2e.yaml_manifest as yaml_manifest
 import e2e.util as util
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-max_retries = 35
+max_retries = 20
 
 
 def launch(command, ok_to_fail=False, ns=None, timeout=600, shell=None):
@@ -61,16 +61,19 @@ def run_shell(cmd, timeout=600, ok_to_fail=False, shell=None):
     return res_cmd.output if (code == 0) or ok_to_fail else ""
 
 
-def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
-    with When(f"Delete chi {chi}"):
+def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None):
+    with When(f"Delete {kind} {name}"):
         launch(
-            f"delete chi {chi} -v 5 --now --timeout=600s",
+            f"delete {kind} {name} -v 5 --now --timeout=600s",
             ns=ns,
             timeout=600,
             ok_to_fail=ok_to_fail,
             shell=shell
         )
-        if wait:
+
+def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
+    delete_kind("chi", chi, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
+    if wait:
             wait_objects(
                 chi,
                 {
@@ -83,20 +86,26 @@ def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
             )
 
 
-def delete_all_chi(ns=None):
-    crds = launch("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
-    if "clickhouseinstallations.clickhouse.altinity.com" in crds:
-        try:
-            chis = get("chi", "", ns=ns, ok_to_fail=True)
-        except Exception:
-            chis = {}
-        if "items" in chis:
-            for chi in chis["items"]:
-                # kubectl(f"patch chi {chi} --type=merge -p '\{\"metadata\":\{\"finalizers\": [null]\}\}'", ns = ns)
-                delete_chi(chi["metadata"]["name"], ns, wait = False)
-            for chi in chis["items"]:
-                wait_object("chi", chi["metadata"]["name"], ns=ns, count=0)
+def delete_chk(chk, ns=None, wait=True, ok_to_fail=False, shell=None):
+    delete_kind("chk", chk, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
 
+def delete_all_chi(ns=None):
+    delete_all("chi", ns=ns)
+
+def delete_all_chk(ns=None):
+    delete_all("chk", ns=ns)
+
+def delete_all(kind, ns=None):
+    crds = launch("get crds -o=custom-columns=name:.spec.names.shortNames[0]", ns=ns).splitlines()
+    if kind in crds:
+        try:
+            to_delete = get(kind, "", ns=ns, ok_to_fail=True)
+        except Exception:
+            to_delete = {}
+        if "items" in to_delete:
+            for i in to_delete["items"]:
+                delete_kind(kind, i["metadata"]["name"], ns=ns)
+                wait_object(kind, i["metadata"]["name"], ns=ns, count=0)
 
 
 def delete_all_keeper(ns=None):
@@ -122,10 +131,14 @@ def delete_all_keeper(ns=None):
 
 
 def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1800):
-    chi_name = yaml_manifest.get_chi_name(util.get_full_path(f"{manifest}"))
+    chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
 
-    # state_field = ".status.taskID"
-    # prev_state = get_field("chi", chi_name, state_field, ns)
+    if kind == "chi":
+        label = f"-l clickhouse.altinity.com/chi={chi_name}"
+    elif kind == "chk":
+        label = f"-l clickhouse-keeper.altinity.com/chk={chi_name}"
+    else:
+        assert False, error(f"Unknown kind {kind}")
 
     if "apply_templates" in check:
         debug("Need to apply additional templates")
@@ -138,6 +151,8 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
 
     if "chi_status" in check:
         wait_chi_status(chi_name, check["chi_status"], ns=ns, shell=shell)
+    elif "chk_status" in check:
+        wait_chk_status(chi_name, check["chk_status"], ns=ns, shell=shell)
     else:
         # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
         # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
@@ -153,7 +168,7 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
         wait_object(
             "pod",
             "",
-            label=f"-l clickhouse.altinity.com/chi={chi_name}",
+            label=label,
             count=check["pod_count"],
             ns=ns,
             shell=shell
@@ -199,10 +214,11 @@ def create_ns(ns):
 
 
 def delete_ns(ns = None, delete_chi=False, ok_to_fail=False, timeout=1000):
-    if ns == None:
+    if ns is None:
         ns = current().context.test_namespace
     if delete_chi:
         delete_all_chi(ns)
+        delete_all_chk(ns)
     launch(
         f"delete ns {ns} -v 5 --now --timeout={timeout}s",
         ns=None,
@@ -219,7 +235,7 @@ def get_count(kind, name="", label="", chi="", ns=None, shell=None):
     if chi != "" and label == "":
         label = f"-l clickhouse.altinity.com/chi={chi}"
 
-    if ns == None:
+    if ns is None:
         ns = current().context.test_namespace
 
     if kind == "pv":
@@ -265,7 +281,7 @@ def apply(manifest, ns=None, validate=True, timeout=600, shell=None):
 def apply_chi(manifest, ns=None, validate=True, timeout=600, shell=None):
     if ns is None:
         ns = current().context.test_namespace
-    chi_name = yaml_manifest.get_chi_name(manifest)
+    chi_name = yaml_manifest.get_name(manifest)
     with When(f"CHI {chi_name} is applied"):
         if current().context.kubectl_mode == "replace":
             if get_count("chi", chi_name, ns=ns) == 0:
@@ -322,7 +338,7 @@ def wait_objects(chi, object_counts, ns=None, shell=None, retries=max_retries):
         assert cur_object_counts == object_counts, error()
 
 
-def wait_object(kind, name, label="", count=1, ns=None, retries=max_retries, backoff=5, shell=None):
+def wait_object(kind, name, names=[], label="", count=1, ns=None, retries=max_retries, backoff=5, shell=None):
     with Then(f"{count} {kind}(s) {name} should be created"):
         for i in range(1, retries):
             cur_count = get_count(kind, ns=ns, name=name, label=label, shell=shell)
@@ -346,6 +362,10 @@ def wait_command(command, result, count=1, ns=None, retries=max_retries):
 
 def wait_chi_status(chi, status, ns=None, retries=max_retries, throw_error=True, shell=None):
     wait_field("chi", chi, ".status.status", status, ns, retries, throw_error=throw_error, shell=shell)
+
+
+def wait_chk_status(chk, status, ns=None, retries=max_retries, throw_error=True, shell=None):
+    wait_field("chk", chk, ".status.status", status, ns, retries, throw_error=throw_error, shell=shell)
 
 
 def get_chi_status(chi, ns=None):
@@ -413,9 +433,7 @@ def wait_jsonpath(kind, name, field, value, ns=None, retries=max_retries):
 
 
 def get_field(kind, name, field, ns=None, shell=None):
-    out = ""
-    if get_count(kind, name=name, ns=ns, shell=shell) > 0:
-        out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns, shell=shell).splitlines()
+    out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns, ok_to_fail=True, shell=shell).splitlines()
     if len(out) > 1:
         return out[1]
     else:
@@ -599,7 +617,7 @@ def check_configmap(cfg_name, values, ns=None, shell=None):
 
 
 def check_pdb(chi, clusters, ns=None, shell=None):
-    for c in clusters:
+    for c in clusters.keys():
         with Then(f"PDB is configured for cluster {c}"):
             pdb = get("pdb", chi + "-" + c, shell=shell)
             labels = pdb["spec"]["selector"]["matchLabels"]
@@ -607,4 +625,4 @@ def check_pdb(chi, clusters, ns=None, shell=None):
             assert labels["clickhouse.altinity.com/chi"] == chi
             assert labels["clickhouse.altinity.com/cluster"] == c
             assert labels["clickhouse.altinity.com/namespace"] == current().context.test_namespace
-            assert pdb["spec"]["maxUnavailable"] == 1
+            assert pdb["spec"]["maxUnavailable"] == clusters[c]

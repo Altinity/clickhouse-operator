@@ -47,7 +47,7 @@ jobs:
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.30.0
+          kubernetes-version: v1.31.0
           cpus: max
           memory: max
 
@@ -70,6 +70,11 @@ jobs:
         id: run-tests
         continue-on-error: true
         run: |
+          echo "Test run settings:"
+          echo "  test mode: ${{ github.event.inputs.test_mode }}"
+          echo "  test mask: ${{ github.event.inputs.test_mask }}"
+          echo
+        
           source ~/venv/qa/bin/activate
           set -x
           set +e # disable the "exit on failure"
