@@ -18,7 +18,7 @@ end
 
 
 Vagrant.configure(2) do |config|
-  config.vm.box = "generic/ubuntu2004"
+  config.vm.box = "generic/ubuntu2404"
   config.vm.box_check_update = false
 
   if get_provider == "hyperv"
@@ -111,7 +111,7 @@ Vagrant.configure(2) do |config|
     apt-get install --no-install-recommends -y clickhouse-client
 
     # golang
-    export GOLANG_VERSION=1.19
+    export GOLANG_VERSION=1.23
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F6BC817356A3D45E
     add-apt-repository ppa:longsleep/golang-backports
     apt-get install --no-install-recommends -y golang-${GOLANG_VERSION}-go
@@ -148,7 +148,8 @@ Vagrant.configure(2) do |config|
     # MINIKUBE_VERSION=1.19.0
     # MINIKUBE_VERSION=1.20.0
     # MINIKUBE_VERSION=1.23.2
-    MINIKUBE_VERSION=1.28.0
+    # MINIKUBE_VERSION=1.28.0
+    MINIKUBE_VERSION=1.34.0
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -168,7 +169,8 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.22.5}
 #    K8S_VERSION=${K8S_VERSION:-1.23.1}
 #    K8S_VERSION=${K8S_VERSION:-1.24.8}
-    K8S_VERSION=${K8S_VERSION:-1.25.4}
+#    K8S_VERSION=${K8S_VERSION:-1.25.4}
+    K8S_VERSION=${K8S_VERSION:-1.31.1}
     export VALIDATE_YAML=true
 
     killall kubectl || true
