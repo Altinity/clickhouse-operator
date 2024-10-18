@@ -78,8 +78,8 @@ func RemoveFromArray(needle string, haystack []string) []string {
 
 // Unzip makes two 1-value columns (slices) out of one 2-value column (slice)
 func Unzip(slice [][]string) ([]string, []string) {
-	col1 := make([]string, len(slice))
-	col2 := make([]string, len(slice))
+	col1 := make([]string, 0, len(slice))
+	col2 := make([]string, 0, len(slice))
 	for i := 0; i < len(slice); i++ {
 		col1 = append(col1, slice[i][0])
 		if len(slice[i]) > 1 {
