@@ -210,6 +210,24 @@ type OperatorConfigFileRuntime struct {
 	UsersConfigFiles  map[string]string `json:"-" yaml:"-"`
 }
 
+type IOperatorConfigFilesPathsGetter interface {
+	GetCommonConfigFiles() map[string]string
+	GetHostConfigFiles() map[string]string
+	GetUsersConfigFiles() map[string]string
+}
+
+func (r OperatorConfigFileRuntime) GetCommonConfigFiles() map[string]string {
+	return r.CommonConfigFiles
+}
+
+func (r OperatorConfigFileRuntime) GetHostConfigFiles() map[string]string {
+	return r.HostConfigFiles
+}
+
+func (r OperatorConfigFileRuntime) GetUsersConfigFiles() map[string]string {
+	return r.UsersConfigFiles
+}
+
 // OperatorConfigUser specifies User section
 type OperatorConfigUser struct {
 	Default OperatorConfigDefault `json:"default" yaml:"default"`
