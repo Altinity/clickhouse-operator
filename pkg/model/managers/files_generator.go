@@ -16,6 +16,7 @@ package managers
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	chiConfig "github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
@@ -31,9 +32,9 @@ const (
 func NewConfigFilesGenerator(what FilesGeneratorType, cr api.ICustomResource, opts any) interfaces.IConfigFilesGenerator {
 	switch what {
 	case FilesGeneratorTypeClickHouse:
-		return chiConfig.NewFilesGenerator(cr, NewNameManager(NameManagerTypeClickHouse), opts.(*chiConfig.GeneratorOptions))
+		return chiConfig.NewFilesGenerator(cr, NewNameManager(NameManagerTypeClickHouse), chop.Config().ClickHouse.Config.File.Runtime, opts.(*chiConfig.GeneratorOptions))
 	case FilesGeneratorTypeKeeper:
-		return chkConfig.NewFilesGenerator(cr, NewNameManager(NameManagerTypeKeeper), opts.(*chkConfig.GeneratorOptions))
+		return chkConfig.NewFilesGenerator(cr, NewNameManager(NameManagerTypeKeeper), chop.Config().Keeper.Config.File.Runtime, opts.(*chkConfig.GeneratorOptions))
 	}
 	panic("unknown config files generator type")
 }
