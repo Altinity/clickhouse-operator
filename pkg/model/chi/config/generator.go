@@ -17,11 +17,11 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/config"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -50,8 +50,8 @@ type Generator struct {
 	opts  *GeneratorOptions
 }
 
-// newGenerator returns new Generator struct
-func newGenerator(cr chi.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *Generator {
+// NewGenerator returns new Generator struct
+func NewGenerator(cr chi.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *Generator {
 	return &Generator{
 		cr:    cr,
 		namer: namer,
@@ -59,20 +59,20 @@ func newGenerator(cr chi.ICustomResource, namer interfaces.INameManager, opts *G
 	}
 }
 
-// getGlobalSettings creates data for global section of "settings.xml"
-func (c *Generator) getGlobalSettings() string {
+// GetGlobalSettings creates data for global section of "settings.xml"
+func (c *Generator) GetGlobalSettings() string {
 	// No host specified means request to generate common config
 	return c.opts.Settings.ClickHouseConfig()
 }
 
-// getHostSettings creates data for host section of "settings.xml"
-func (c *Generator) getHostSettings(host *chi.Host) string {
+// GetHostSettings creates data for host section of "settings.xml"
+func (c *Generator) GetHostSettings(host *chi.Host) string {
 	// Generate config for the specified host
 	return host.Settings.ClickHouseConfig()
 }
 
-// getSectionFromFiles creates data for custom common config files
-func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnspecified bool, host *chi.Host) map[string]string {
+// GetSectionFromFiles creates data for custom common config files
+func (c *Generator) GetSectionFromFiles(section chi.SettingsSection, includeUnspecified bool, host *chi.Host) map[string]string {
 	var files *chi.Settings
 	if host == nil {
 		// We are looking into Common files

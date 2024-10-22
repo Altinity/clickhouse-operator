@@ -22,20 +22,35 @@ import (
 
 // FilesGenerator specifies configuration generator object
 type FilesGenerator struct {
-	configGenerator *Generator
+	configGeneratorGeneric IConfigGeneratorGeneric
 	// paths to additional config files
 	pathsGetter chi.IOperatorConfigFilesPathsGetter
-	// domain files generator
-	domain *FilesGeneratorDomain
+	// configFilesGeneratorDomain files generator
+	configFilesGeneratorDomain IFilesGeneratorDomain
+}
+
+type IConfigGeneratorGeneric interface {
+	GetGlobalSettings() string
+	GetSectionFromFiles(section chi.SettingsSection, includeUnspecified bool, host *chi.Host) map[string]string
+	GetHostSettings(host *chi.Host) string
+}
+
+type IFilesGeneratorDomain interface {
+	CreateConfigFilesGroupCommon(configSections map[string]string, options *FilesGeneratorOptions)
+	CreateConfigFilesGroupUsers(configSections map[string]string)
+	CreateConfigFilesGroupHost(configSections map[string]string, options *FilesGeneratorOptions)
 }
 
 // NewFilesGenerator creates new configuration files generator object
-func NewFilesGenerator(cr chi.ICustomResource, namer interfaces.INameManager, pathsGetter chi.IOperatorConfigFilesPathsGetter, opts *GeneratorOptions) *FilesGenerator {
-	g := newGenerator(cr, namer, opts)
+func NewFilesGenerator(
+	configGeneratorGeneric IConfigGeneratorGeneric,
+	pathsGetter chi.IOperatorConfigFilesPathsGetter,
+	configFilesGeneratorDomain IFilesGeneratorDomain,
+) *FilesGenerator {
 	return &FilesGenerator{
-		configGenerator: g,
-		pathsGetter:     pathsGetter,
-		domain:          NewFilesGeneratorDomain(g),
+		configGeneratorGeneric:     configGeneratorGeneric,
+		pathsGetter:                pathsGetter,
+		configFilesGeneratorDomain: configFilesGeneratorDomain,
 	}
 }
 
@@ -74,14 +89,14 @@ func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOpt
 }
 
 func (c *FilesGenerator) createConfigFilesGroupCommonDomain(configSections map[string]string, options *FilesGeneratorOptions) {
-	c.domain.CreateConfigFilesGroupCommon(configSections, options)
+	c.configFilesGeneratorDomain.CreateConfigFilesGroupCommon(configSections, options)
 }
 
 func (c *FilesGenerator) createConfigFilesGroupCommonGeneric(configSections map[string]string, options *FilesGeneratorOptions) {
 	// common settings
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getGlobalSettings())
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGeneratorGeneric.GetGlobalSettings())
 	// common files
-	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionCommon, true, nil))
+	util.MergeStringMapsOverwrite(configSections, c.configGeneratorGeneric.GetSectionFromFiles(chi.SectionCommon, true, nil))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(configSections, c.pathsGetter.GetCommonConfigFiles())
 }
@@ -98,12 +113,12 @@ func (c *FilesGenerator) createConfigFilesGroupUsers() map[string]string {
 }
 
 func (c *FilesGenerator) createConfigFilesGroupUsersDomain(configSections map[string]string) {
-	c.domain.CreateConfigFilesGroupUsers(configSections)
+	c.configFilesGeneratorDomain.CreateConfigFilesGroupUsers(configSections)
 }
 
 func (c *FilesGenerator) createConfigFilesGroupUsersGeneric(configSections map[string]string) {
 	// user files
-	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionUsers, false, nil))
+	util.MergeStringMapsOverwrite(configSections, c.configGeneratorGeneric.GetSectionFromFiles(chi.SectionUsers, false, nil))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(configSections, c.pathsGetter.GetUsersConfigFiles())
 }
@@ -120,12 +135,12 @@ func (c *FilesGenerator) createConfigFilesGroupHost(options *FilesGeneratorOptio
 }
 
 func (c *FilesGenerator) createConfigFilesGroupHostDomain(configSections map[string]string, options *FilesGeneratorOptions) {
-	c.domain.CreateConfigFilesGroupHost(configSections, options)
+	c.configFilesGeneratorDomain.CreateConfigFilesGroupHost(configSections, options)
 }
 
 func (c *FilesGenerator) createConfigFilesGroupHostGeneric(configSections map[string]string, options *FilesGeneratorOptions) {
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getHostSettings(options.GetHost()))
-	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionHost, true, options.GetHost()))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGeneratorGeneric.GetHostSettings(options.GetHost()))
+	util.MergeStringMapsOverwrite(configSections, c.configGeneratorGeneric.GetSectionFromFiles(chi.SectionHost, true, options.GetHost()))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(configSections, c.pathsGetter.GetHostConfigFiles())
 }
