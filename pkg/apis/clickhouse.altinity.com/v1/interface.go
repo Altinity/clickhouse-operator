@@ -68,6 +68,7 @@ type ICRSpec interface {
 }
 
 type IConfiguration interface {
+	GetUsers() *Settings
 	GetProfiles() *Settings
 	GetQuotas() *Settings
 	GetSettings() *Settings

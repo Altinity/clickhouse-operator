@@ -558,10 +558,10 @@ func (host *Host) SetHasData(hasData bool) {
 	host.Runtime.hasData = hasData
 }
 
-func (host *Host)IsZero() bool {
+func (host *Host) IsZero() bool {
 	return host == nil
 }
 
-func (host *Host)IsNonZero() bool {
+func (host *Host) IsNonZero() bool {
 	return host != nil
 }
