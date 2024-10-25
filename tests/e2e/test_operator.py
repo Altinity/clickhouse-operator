@@ -2584,27 +2584,45 @@ def test_024(self):
         },
     )
 
-    def checkAnnotations(annotation, value):
+    def check_annotations(annotation, value, allow_to_fail_for_pvc=False):
 
         with Then(f"Pod annotation {annotation}={value} should populated from a podTemplate"):
-            assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", f".metadata.annotations.podtemplate/{annotation}") == value
+            have = kubectl.get_field("pod", "chi-test-024-default-0-0-0", f".metadata.annotations.podtemplate/{annotation}")
+            print(f"pod annotation have: {have}")
+            print(f"pod annotation need: {value}")
+            assert have == value
 
         with And(f"Service annotation {annotation}={value} should be populated from a serviceTemplate"):
-            assert kubectl.get_field("service", "clickhouse-test-024", f".metadata.annotations.servicetemplate/{annotation}") == value
+            have = kubectl.get_field("service", "clickhouse-test-024", f".metadata.annotations.servicetemplate/{annotation}")
+            print(f"service annotation have: {have}")
+            print(f"service annotation need: {value}")
+            assert have == value
 
         with And(f"PVC annotation {annotation}={value} should be populated from a volumeTemplate"):
-            assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", f".metadata.annotations.pvc/{annotation}") == value
+            have = kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", f".metadata.annotations.pvc/{annotation}")
+            print(f"pvc annotation have: {have}")
+            print(f"pvc annotation need: {value}")
+            assert allow_to_fail_for_pvc or (have == value)
 
         with And(f"Pod annotation {annotation}={value} should populated from a CHI"):
-            assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", f".metadata.annotations.chi/{annotation}") == value
+            have = kubectl.get_field("pod", "chi-test-024-default-0-0-0", f".metadata.annotations.chi/{annotation}")
+            print(f"pod annotation have: {have}")
+            print(f"pod annotation need: {value}")
+            assert have == value
 
         with And(f"Service annotation {annotation}={value} should be populated from a CHI"):
-            assert kubectl.get_field("service", "clickhouse-test-024", f".metadata.annotations.chi/{annotation}") == value
+            have = kubectl.get_field("service", "clickhouse-test-024", f".metadata.annotations.chi/{annotation}")
+            print(f"service annotation have: {have}")
+            print(f"service annotation need: {value}")
+            assert have == value
 
         with And(f"PVC annotation {annotation}={value} should be populated from a CHI"):
-            assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", f".metadata.annotations.chi/{annotation}") == value
+            have = kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", f".metadata.annotations.chi/{annotation}")
+            print(f"pvc annotation have: {have}")
+            print(f"pvc annotation need: {value}")
+            assert allow_to_fail_for_pvc or (have == value)
 
-    checkAnnotations("test", "test")
+    check_annotations("test", "test")
 
     with And("Service annotation macros should be resolved"):
         assert (
@@ -2632,8 +2650,8 @@ def test_024(self):
                 "do_not_delete": 1,
             },
         )
-        checkAnnotations("test", "test-2")
-        checkAnnotations("test-2", "test-2")
+        check_annotations("test", "test-2")
+        check_annotations("test-2", "test-2")
 
     with When("Revert template annotations to original values"):
         kubectl.create_and_check(
@@ -2643,10 +2661,9 @@ def test_024(self):
                 "do_not_delete": 1,
             },
         )
-        checkAnnotations("test", "test")
-        # with Then("Annotation test-2 should be removed"):
-        #    TODO. Does not work for services yet
-        #    checkAnnotations("test-2", "<none>")
+        check_annotations("test", "test")
+        with Then("Annotation test-2 should be removed"):
+            check_annotations("test-2", "<none>", allow_to_fail_for_pvc=True)
 
     with Finally("I clean up"):
         delete_test_namespace()
