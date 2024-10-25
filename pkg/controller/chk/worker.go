@@ -82,12 +82,15 @@ func (c *Controller) newWorker() *worker {
 
 func configGeneratorOptions(cr *apiChk.ClickHouseKeeperInstallation) *config.GeneratorOptions {
 	return &config.GeneratorOptions{
-		Settings: cr.GetSpecT().Configuration.Settings,
-		Files:    cr.GetSpecT().Configuration.Files,
+		Settings: cr.GetSpecT().GetConfiguration().GetSettings(),
+		Files:    cr.GetSpecT().GetConfiguration().GetFiles(),
 	}
 }
 
-func (w *worker) buildCreartor(cr *apiChk.ClickHouseKeeperInstallation) *commonCreator.Creator {
+func (w *worker) buildCreator(cr *apiChk.ClickHouseKeeperInstallation) *commonCreator.Creator {
+	if cr == nil {
+		cr = &apiChk.ClickHouseKeeperInstallation{}
+	}
 	return commonCreator.NewCreator(
 		cr,
 		managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeKeeper, cr, configGeneratorOptions(cr)),
@@ -106,7 +109,7 @@ func (w *worker) buildCreartor(cr *apiChk.ClickHouseKeeperInstallation) *commonC
 }
 
 func (w *worker) newTask(new, old *apiChk.ClickHouseKeeperInstallation) {
-	w.task = common.NewTask(w.buildCreartor(new), w.buildCreartor(old))
+	w.task = common.NewTask(w.buildCreator(new), w.buildCreator(old))
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
