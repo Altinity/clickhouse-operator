@@ -96,7 +96,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		return nil
 	}
 
-	w.newTask(new)
+	w.newTask(new, old)
 	w.markReconcileStart(ctx, new, actionPlan)
 	w.excludeStoppedCHIFromMonitoring(new)
 	w.walkHosts(ctx, new, actionPlan)
@@ -206,7 +206,8 @@ func (w *worker) reconcileCRServiceFinal(ctx context.Context, cr api.ICustomReso
 
 	// Create entry point for the whole CHI
 	if service := w.task.Creator().CreateService(interfaces.ServiceCR); service != nil {
-		if err := w.reconcileService(ctx, cr, service); err != nil {
+		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCR)
+		if err := w.reconcileService(ctx, cr, service, prevService); err != nil {
 			// Service not reconciled
 			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
 			return err
@@ -369,7 +370,8 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 		// This is not a problem, service may be omitted
 		return nil
 	}
-	err := w.reconcileService(ctx, host.GetCR(), service)
+	prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceHost, host.GetAncestor())
+	err := w.reconcileService(ctx, host.GetCR(), service, prevService)
 	if err == nil {
 		w.a.V(1).M(host).F().Info("DONE Reconcile service of the host: %s", host.GetName())
 		w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
@@ -392,7 +394,8 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 
 	// Add Cluster Service
 	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster); service != nil {
-		if err := w.reconcileService(ctx, cluster.GetRuntime().GetCR(), service); err == nil {
+		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCluster, cluster.GetAncestor())
+		if err := w.reconcileService(ctx, cluster.GetRuntime().GetCR(), service, prevService); err == nil {
 			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
 		} else {
 			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
@@ -553,7 +556,8 @@ func (w *worker) reconcileShardService(ctx context.Context, shard api.IShard) er
 		// This is not a problem, ServiceShard may be omitted
 		return nil
 	}
-	err := w.reconcileService(ctx, shard.GetRuntime().GetCR(), service)
+	prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceShard, shard.GetAncestor())
+	err := w.reconcileService(ctx, shard.GetRuntime().GetCR(), service, prevService)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
 	} else {

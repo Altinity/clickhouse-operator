@@ -114,31 +114,33 @@ func configGeneratorOptions(cr *api.ClickHouseInstallation) *config.GeneratorOpt
 	}
 }
 
-func (w *worker) newTask(cr *api.ClickHouseInstallation) {
-	w.task = common.NewTask(
-		commonCreator.NewCreator(
-			cr,
-			managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeClickHouse, cr, configGeneratorOptions(cr)),
-			managers.NewContainerManager(managers.ContainerManagerTypeClickHouse),
-			managers.NewTagManager(managers.TagManagerTypeClickHouse, cr),
-			managers.NewProbeManager(managers.ProbeManagerTypeClickHouse),
-			managers.NewServiceManager(managers.ServiceManagerTypeClickHouse),
-			managers.NewVolumeManager(managers.VolumeManagerTypeClickHouse),
-			managers.NewConfigMapManager(managers.ConfigMapManagerTypeClickHouse),
-			managers.NewNameManager(managers.NameManagerTypeClickHouse),
-			managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeClickHouse),
-			namer.New(),
-			commonMacro.New(macro.List),
-			labeler.New(cr),
-		),
-	)
+func (w *worker) buildCreartor(cr *api.ClickHouseInstallation) *commonCreator.Creator{
+return 		commonCreator.NewCreator(
+	cr,
+	managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeClickHouse, cr, configGeneratorOptions(cr)),
+	managers.NewContainerManager(managers.ContainerManagerTypeClickHouse),
+	managers.NewTagManager(managers.TagManagerTypeClickHouse, cr),
+	managers.NewProbeManager(managers.ProbeManagerTypeClickHouse),
+	managers.NewServiceManager(managers.ServiceManagerTypeClickHouse),
+	managers.NewVolumeManager(managers.VolumeManagerTypeClickHouse),
+	managers.NewConfigMapManager(managers.ConfigMapManagerTypeClickHouse),
+	managers.NewNameManager(managers.NameManagerTypeClickHouse),
+	managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeClickHouse),
+	namer.New(),
+	commonMacro.New(macro.List),
+	labeler.New(cr),
+)
 
+}
+
+func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
+	w.task = common.NewTask(w.buildCreartor(new), w.buildCreartor(old))
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
 		domain.NewHostStatefulSetPoller(domain.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.ctrlLabeler),
 		w.c.namer,
-		labeler.New(cr),
+		labeler.New(new),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
 		w.c.kube,
 		w.c,
@@ -267,7 +269,7 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 			w.a.V(1).M(chi).Info("Update users IPS-1")
 
 			// TODO unify with finalize reconcile
-			w.newTask(chi)
+			w.newTask(chi, chi.GetAncestorT())
 			w.reconcileConfigMapCommonUsers(ctx, chi)
 			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 				TolerateAbsence: true,
@@ -507,7 +509,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 			chi.SetTarget(nil)
 			chi.EnsureStatus().ReconcileComplete()
 			// TODO unify with update endpoints
-			w.newTask(chi)
+			w.newTask(chi, chi.GetAncestorT())
 			w.reconcileConfigMapCommonUsers(ctx, chi)
 			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{

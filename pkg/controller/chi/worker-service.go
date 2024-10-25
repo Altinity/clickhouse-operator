@@ -28,7 +28,7 @@ import (
 )
 
 // reconcileService reconciles core.Service
-func (w *worker) reconcileService(ctx context.Context, cr api.ICustomResource, service *core.Service) error {
+func (w *worker) reconcileService(ctx context.Context, cr api.ICustomResource, service, prevService *core.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -43,7 +43,7 @@ func (w *worker) reconcileService(ctx context.Context, cr api.ICustomResource, s
 	if curService != nil {
 		// We have the Service - try to update it
 		w.a.V(1).M(cr).F().Info("Service found: %s. Will try to update", util.NamespaceNameString(service))
-		err = w.updateService(ctx, cr, curService, service)
+		err = w.updateService(ctx, cr, curService, service, prevService)
 	}
 
 	if err != nil {
@@ -82,6 +82,7 @@ func (w *worker) updateService(
 	cr api.ICustomResource,
 	curService *core.Service,
 	targetService *core.Service,
+	prevService *core.Service,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
