@@ -25,6 +25,7 @@ spec:
     templates:
       # Templates are specified as default for all clusters
       podTemplate: default
+      dataVolumeClaimTemplate: default
 
   templates:
     podTemplates:
@@ -44,7 +45,7 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:24.3.5.46"
+              image: "clickhouse/clickhouse-keeper:latest"
               resources:
                 requests:
                   memory: "256M"
