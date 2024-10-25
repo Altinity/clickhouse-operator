@@ -167,9 +167,9 @@ func (w *worker) updateService(
 	//
 	// Migrate labels, annotations and finalizers to the new service
 	//
-	newService.GetObjectMeta().SetLabels(util.MergeStringMapsPreserve(newService.GetObjectMeta().GetLabels(), curService.GetObjectMeta().GetLabels()))
-	newService.GetObjectMeta().SetAnnotations(util.MergeStringMapsPreserve(newService.GetObjectMeta().GetAnnotations(), curService.GetObjectMeta().GetAnnotations()))
-	newService.GetObjectMeta().SetFinalizers(util.MergeStringArrays(newService.GetObjectMeta().GetFinalizers(), curService.GetObjectMeta().GetFinalizers()))
+	newService.SetLabels(w.prepareLabels(curService, newService, prevService))
+	newService.SetAnnotations(w.prepareAnnotations(curService, newService, prevService))
+	newService.SetFinalizers(w.prepareFinalizers(curService, newService, prevService))
 
 	//
 	// And only now we are ready to actually update the service with new version of the service
@@ -187,6 +187,18 @@ func (w *worker) updateService(
 	}
 
 	return err
+}
+
+func (w *worker) prepareLabels(curService, newService, oldService *core.Service) map[string]string {
+	return util.MapMigrate(curService.GetLabels(), newService.GetLabels(), oldService.GetLabels())
+}
+
+func (w *worker) prepareAnnotations(curService, newService, oldService *core.Service) map[string]string {
+	return util.MapMigrate(curService.GetAnnotations(), newService.GetAnnotations(), oldService.GetAnnotations())
+}
+
+func (w *worker) prepareFinalizers(curService, newService, oldService *core.Service) []string {
+	return util.MergeStringArrays(newService.GetFinalizers(), curService.GetFinalizers())
 }
 
 // createService

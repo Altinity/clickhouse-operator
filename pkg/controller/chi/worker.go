@@ -105,36 +105,38 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 
 func configGeneratorOptions(cr *api.ClickHouseInstallation) *config.GeneratorOptions {
 	return &config.GeneratorOptions{
-		Users:          cr.GetSpecT().Configuration.Users,
-		Profiles:       cr.GetSpecT().Configuration.Profiles,
-		Quotas:         cr.GetSpecT().Configuration.Quotas,
-		Settings:       cr.GetSpecT().Configuration.Settings,
-		Files:          cr.GetSpecT().Configuration.Files,
-		DistributedDDL: cr.GetSpecT().Defaults.DistributedDDL,
+		Users:          cr.GetSpecT().GetConfiguration().GetUsers(),
+		Profiles:       cr.GetSpecT().GetConfiguration().GetProfiles(),
+		Quotas:         cr.GetSpecT().GetConfiguration().GetQuotas(),
+		Settings:       cr.GetSpecT().GetConfiguration().GetSettings(),
+		Files:          cr.GetSpecT().GetConfiguration().GetFiles(),
+		DistributedDDL: cr.GetSpecT().GetDefaults().GetDistributedDDL(),
 	}
 }
 
-func (w *worker) buildCreartor(cr *api.ClickHouseInstallation) *commonCreator.Creator{
-return 		commonCreator.NewCreator(
-	cr,
-	managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeClickHouse, cr, configGeneratorOptions(cr)),
-	managers.NewContainerManager(managers.ContainerManagerTypeClickHouse),
-	managers.NewTagManager(managers.TagManagerTypeClickHouse, cr),
-	managers.NewProbeManager(managers.ProbeManagerTypeClickHouse),
-	managers.NewServiceManager(managers.ServiceManagerTypeClickHouse),
-	managers.NewVolumeManager(managers.VolumeManagerTypeClickHouse),
-	managers.NewConfigMapManager(managers.ConfigMapManagerTypeClickHouse),
-	managers.NewNameManager(managers.NameManagerTypeClickHouse),
-	managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeClickHouse),
-	namer.New(),
-	commonMacro.New(macro.List),
-	labeler.New(cr),
-)
-
+func (w *worker) buildCreator(cr *api.ClickHouseInstallation) *commonCreator.Creator {
+	if cr == nil {
+		cr = &api.ClickHouseInstallation{}
+	}
+	return commonCreator.NewCreator(
+		cr,
+		managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeClickHouse, cr, configGeneratorOptions(cr)),
+		managers.NewContainerManager(managers.ContainerManagerTypeClickHouse),
+		managers.NewTagManager(managers.TagManagerTypeClickHouse, cr),
+		managers.NewProbeManager(managers.ProbeManagerTypeClickHouse),
+		managers.NewServiceManager(managers.ServiceManagerTypeClickHouse),
+		managers.NewVolumeManager(managers.VolumeManagerTypeClickHouse),
+		managers.NewConfigMapManager(managers.ConfigMapManagerTypeClickHouse),
+		managers.NewNameManager(managers.NameManagerTypeClickHouse),
+		managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeClickHouse),
+		namer.New(),
+		commonMacro.New(macro.List),
+		labeler.New(cr),
+	)
 }
 
 func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
-	w.task = common.NewTask(w.buildCreartor(new), w.buildCreartor(old))
+	w.task = common.NewTask(w.buildCreator(new), w.buildCreator(old))
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
