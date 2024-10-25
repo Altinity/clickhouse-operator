@@ -264,3 +264,8 @@ func MapGetSortedKeysAndValues(m map[string]string) (keys []string, values []str
 	}
 	return keys, values
 }
+
+func MapMigrate(cur, new, old map[string]string)map[string]string {
+	removed := MapGetSortedKeys(SubtractStringMaps(CopyMap(old), new))
+	return MapDeleteKeys(MergeStringMapsPreserve(new, cur), removed...)
+}
