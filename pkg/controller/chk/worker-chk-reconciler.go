@@ -86,7 +86,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		return nil
 	}
 
-	w.newTask(new)
+	w.newTask(new, old)
 	w.markReconcileStart(ctx, new, actionPlan)
 	w.walkHosts(ctx, new, actionPlan)
 

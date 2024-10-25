@@ -87,32 +87,33 @@ func configGeneratorOptions(cr *apiChk.ClickHouseKeeperInstallation) *config.Gen
 	}
 }
 
-func (w *worker) newTask(cr *apiChk.ClickHouseKeeperInstallation) {
-	w.task = common.NewTask(
-		commonCreator.NewCreator(
-			cr,
-			managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeKeeper, cr, configGeneratorOptions(cr)),
-			managers.NewContainerManager(managers.ContainerManagerTypeKeeper),
-			managers.NewTagManager(managers.TagManagerTypeKeeper, cr),
-			managers.NewProbeManager(managers.ProbeManagerTypeKeeper),
-			managers.NewServiceManager(managers.ServiceManagerTypeKeeper),
-			managers.NewVolumeManager(managers.VolumeManagerTypeKeeper),
-			managers.NewConfigMapManager(managers.ConfigMapManagerTypeKeeper),
-			managers.NewNameManager(managers.NameManagerTypeKeeper),
-			managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeKeeper),
-			namer.New(),
-			commonMacro.New(macro.List),
-			labeler.New(cr),
-		),
+func (w *worker) buildCreartor(cr *apiChk.ClickHouseKeeperInstallation) *commonCreator.Creator {
+	return commonCreator.NewCreator(
+		cr,
+		managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeKeeper, cr, configGeneratorOptions(cr)),
+		managers.NewContainerManager(managers.ContainerManagerTypeKeeper),
+		managers.NewTagManager(managers.TagManagerTypeKeeper, cr),
+		managers.NewProbeManager(managers.ProbeManagerTypeKeeper),
+		managers.NewServiceManager(managers.ServiceManagerTypeKeeper),
+		managers.NewVolumeManager(managers.VolumeManagerTypeKeeper),
+		managers.NewConfigMapManager(managers.ConfigMapManagerTypeKeeper),
+		managers.NewNameManager(managers.NameManagerTypeKeeper),
+		managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeKeeper),
+		namer.New(),
+		commonMacro.New(macro.List),
+		labeler.New(cr),
 	)
+}
 
+func (w *worker) newTask(new, old *apiChk.ClickHouseKeeperInstallation) {
+	w.task = common.NewTask(w.buildCreartor(new), w.buildCreartor(old))
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
 		//poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.labeler),
 		domain.NewHostStatefulSetPoller(domain.NewStatefulSetPoller(w.c.kube), w.c.kube, nil),
 		w.c.namer,
-		labeler.New(cr),
+		labeler.New(new),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
 		w.c.kube,
 		statefulset.NewDefaultFallback(),
@@ -241,7 +242,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chk *ap
 			chi.SetTarget(nil)
 			chi.EnsureStatus().ReconcileComplete()
 			// TODO unify with update endpoints
-			w.newTask(chi)
+			w.newTask(chi, chi.GetAncestorT())
 			//w.reconcileConfigMapCommonUsers(ctx, chi)
 			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{
