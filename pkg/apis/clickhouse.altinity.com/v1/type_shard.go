@@ -174,6 +174,10 @@ func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
 	return shard.Runtime.CHI
 }
 
+func (shard *ChiShard) GetAncestor() IShard {
+	return shard.GetCHI().GetAncestor().FindShard(shard.GetCluster().GetName(), shard.GetName())
+}
+
 // GetCluster gets cluster of the shard
 func (shard *ChiShard) GetCluster() *Cluster {
 	return shard.Runtime.CHI.GetSpecT().Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
@@ -236,6 +240,14 @@ func (shard *ChiShard) GetTemplates() *TemplatesList {
 		return nil
 	}
 	return shard.Templates
+}
+
+func (shard *ChiShard) IsZero() bool {
+	return shard == nil
+}
+
+func (shard *ChiShard) IsNonZero() bool {
+	return shard != nil
 }
 
 // ChiShardAddress defines address of a shard within ClickHouseInstallation

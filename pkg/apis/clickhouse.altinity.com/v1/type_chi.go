@@ -26,10 +26,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (cr *ClickHouseInstallation) IsNonZero() bool {
-	return cr != nil
-}
-
 func (cr *ClickHouseInstallation) GetSpec() ICRSpec {
 	return &cr.Spec
 }
@@ -680,4 +676,12 @@ func (cr *ClickHouseInstallation) WalkTillError(
 	}
 
 	return nil
+}
+
+func (cr *ClickHouseInstallation) IsZero() bool {
+	return cr == nil
+}
+
+func (cr *ClickHouseInstallation) IsNonZero() bool {
+	return cr != nil
 }

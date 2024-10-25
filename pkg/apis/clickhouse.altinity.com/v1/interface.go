@@ -23,6 +23,7 @@ type ICustomResource interface {
 	meta.Object
 
 	IsNonZero() bool
+	IsZero() bool
 
 	GetSpecA() any
 	GetSpec() ICRSpec
@@ -100,6 +101,9 @@ type IStatus interface {
 }
 
 type ICluster interface {
+	IsNonZero() bool
+	IsZero() bool
+
 	GetName() string
 	GetZookeeper() *ZookeeperConfig
 	GetSchemaPolicy() *SchemaPolicy
@@ -120,6 +124,7 @@ type ICluster interface {
 
 	GetRuntime() IClusterRuntime
 	GetServiceTemplate() (*ServiceTemplate, bool)
+	GetAncestor() ICluster
 }
 
 type IClusterRuntime interface {
@@ -143,6 +148,9 @@ type IClusterAddress interface {
 }
 
 type IShard interface {
+	IsNonZero() bool
+	IsZero() bool
+
 	GetName() string
 	GetRuntime() IShardRuntime
 	GetServiceTemplate() (*ServiceTemplate, bool)
@@ -163,6 +171,7 @@ type IShard interface {
 	FirstHost() *Host
 
 	HostsCount() int
+	GetAncestor() IShard
 }
 
 type IShardRuntime interface {
