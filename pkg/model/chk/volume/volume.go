@@ -82,7 +82,7 @@ func (m *Manager) stsSetupVolumesUserDataWithFixedPaths(statefulSet *apps.Statef
 	// Mount all named (data and log so far) VolumeClaimTemplates into all containers
 	k8s.StatefulSetAppendVolumeMountsInAllContainers(
 		statefulSet,
-		k8s.CreateVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), config.DirPathDataStorage),
-		k8s.CreateVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), config.DirPathLogStorage),
+		k8s.CreateVolumeMount(host.GetTemplates().GetDataVolumeClaimTemplate(), config.DirPathDataStorage),
+		k8s.CreateVolumeMount(host.GetTemplates().GetLogVolumeClaimTemplate(), config.DirPathLogStorage),
 	)
 }

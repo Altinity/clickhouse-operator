@@ -61,6 +61,12 @@ func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...an
 			cluster = params[0].(chi.ICluster)
 			return m.createServiceCluster(cluster)
 		}
+	case interfaces.ServiceShard:
+		var shard chi.IShard
+		if len(params) > 0 {
+			shard = params[0].(chi.IShard)
+			return m.createServiceShard(shard)
+		}
 	case interfaces.ServiceHost:
 		var host *chi.Host
 		if len(params) > 0 {
@@ -81,6 +87,9 @@ func (m *ServiceManager) SetTagger(tagger interfaces.ITagger) {
 
 // createServiceCR creates new core.Service for specified CR
 func (m *ServiceManager) createServiceCR() *core.Service {
+	if m.cr.IsZero() {
+		return nil
+	}
 	if template, ok := m.cr.GetRootServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return creator.CreateServiceFromTemplate(
@@ -133,6 +142,10 @@ func (m *ServiceManager) createServiceCR() *core.Service {
 
 // createServiceCluster creates new core.Service for specified Cluster
 func (m *ServiceManager) createServiceCluster(cluster chi.ICluster) *core.Service {
+	if cluster.IsZero() {
+		return nil
+	}
+
 	serviceName := m.namer.Name(interfaces.NameClusterService, cluster)
 	ownerReferences := m.or.CreateOwnerReferences(m.cr)
 
@@ -154,8 +167,34 @@ func (m *ServiceManager) createServiceCluster(cluster chi.ICluster) *core.Servic
 	return nil
 }
 
+// createServiceShard creates new core.Service for specified Shard
+func (m *ServiceManager) createServiceShard(shard chi.IShard) *core.Service {
+	if shard.IsZero() {
+		return nil
+	}
+	if template, ok := shard.GetServiceTemplate(); ok {
+		// .templates.ServiceTemplate specified
+		return creator.CreateServiceFromTemplate(
+			template,
+			shard.GetRuntime().GetAddress().GetNamespace(),
+			m.namer.Name(interfaces.NameShardService, shard),
+			m.tagger.Label(interfaces.LabelServiceShard, shard),
+			m.tagger.Annotate(interfaces.AnnotateServiceShard, shard),
+			m.tagger.Selector(interfaces.SelectorShardScopeReady, shard),
+			m.or.CreateOwnerReferences(m.cr),
+			m.macro.Scope(shard),
+			m.labeler,
+		)
+	}
+	// No template specified, no need to create service
+	return nil
+}
+
 // createServiceHost creates new core.Service for specified host
 func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
+	if host.IsZero() {
+		return nil
+	}
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return creator.CreateServiceFromTemplate(
