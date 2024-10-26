@@ -22,13 +22,13 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // reconcileService reconciles core.Service
-func (w *worker) reconcileService(ctx context.Context, cr api.ICustomResource, service, prevService *core.Service) error {
+func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, service, prevService *core.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -79,7 +79,7 @@ func (w *worker) reconcileService(ctx context.Context, cr api.ICustomResource, s
 // updateService
 func (w *worker) updateService(
 	ctx context.Context,
-	cr api.ICustomResource,
+	cr chi.ICustomResource,
 	curService *core.Service,
 	targetService *core.Service,
 	prevService *core.Service,
@@ -167,9 +167,9 @@ func (w *worker) updateService(
 	//
 	// Migrate labels, annotations and finalizers to the new service
 	//
-	newService.SetLabels(w.prepareLabels(curService, newService, prevService))
-	newService.SetAnnotations(w.prepareAnnotations(curService, newService, prevService))
-	newService.SetFinalizers(w.prepareFinalizers(curService, newService, prevService))
+	newService.SetLabels(w.prepareLabels(curService, newService, ensureService(prevService)))
+	newService.SetAnnotations(w.prepareAnnotations(curService, newService, ensureService(prevService)))
+	newService.SetFinalizers(w.prepareFinalizers(curService, newService, ensureService(prevService)))
 
 	//
 	// And only now we are ready to actually update the service with new version of the service
@@ -189,6 +189,13 @@ func (w *worker) updateService(
 	return err
 }
 
+func ensureService( svc *core.Service) *core.Service {
+	if svc == nil {
+		return &core.Service{}
+	}
+	return svc
+}
+
 func (w *worker) prepareLabels(curService, newService, oldService *core.Service) map[string]string {
 	return util.MapMigrate(curService.GetLabels(), newService.GetLabels(), oldService.GetLabels())
 }
@@ -202,7 +209,7 @@ func (w *worker) prepareFinalizers(curService, newService, oldService *core.Serv
 }
 
 // createService
-func (w *worker) createService(ctx context.Context, cr api.ICustomResource, service *core.Service) error {
+func (w *worker) createService(ctx context.Context, cr chi.ICustomResource, service *core.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
