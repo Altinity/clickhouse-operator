@@ -74,19 +74,45 @@ type HostRuntime struct {
 }
 
 func (r *HostRuntime) GetAddress() IHostAddress {
+	if r == nil {
+		return (*HostAddress)(nil)
+	}
 	return &r.Address
 }
 
 func (r *HostRuntime) SetCR(cr ICustomResource) {
+	if r == nil {
+		return
+	}
 	r.cr = cr
 }
 
 func (r *HostRuntime) GetCR() ICustomResource {
-	return r.cr.(ICustomResource)
+	if r == nil {
+		return nil
+	}
+	return r.cr
 }
 
 func (host *Host) GetRuntime() IHostRuntime {
+	if host == nil {
+		return (*HostRuntime)(nil)
+	}
 	return &host.Runtime
+}
+
+func (host *Host) GetTemplates() *TemplatesList {
+	if host == nil {
+		return nil
+	}
+	return host.Templates
+}
+
+func (host *Host) SetTemplates(tl *TemplatesList) {
+	if host == nil {
+		return
+	}
+	host.Templates = tl
 }
 
 // GetReconcileAttributes is an ensurer getter
@@ -102,6 +128,9 @@ func (host *Host) GetReconcileAttributes() *HostReconcileAttributes {
 
 // InheritSettingsFrom inherits settings from specified shard and replica
 func (host *Host) InheritSettingsFrom(shard IShard, replica IReplica) {
+	if host == nil {
+		return
+	}
 	if (shard != nil) && shard.HasSettings() {
 		host.Settings = host.Settings.MergeFrom(shard.GetSettings())
 	}
@@ -113,6 +142,9 @@ func (host *Host) InheritSettingsFrom(shard IShard, replica IReplica) {
 
 // InheritFilesFrom inherits files from specified shard and replica
 func (host *Host) InheritFilesFrom(shard IShard, replica IReplica) {
+	if host == nil {
+		return
+	}
 	if (shard != nil) && shard.HasFiles() {
 		host.Files = host.Files.MergeFrom(shard.GetFiles())
 	}
@@ -124,27 +156,30 @@ func (host *Host) InheritFilesFrom(shard IShard, replica IReplica) {
 
 // InheritTemplatesFrom inherits templates from specified shard, replica or template
 func (host *Host) InheritTemplatesFrom(sources ...any) {
+	if host == nil {
+		return
+	}
 	for _, source := range sources {
 		switch typed := source.(type) {
 		case IShard:
 			shard := typed
 			if shard.HasTemplates() {
-				host.Templates = host.Templates.MergeFrom(shard.GetTemplates(), MergeTypeFillEmptyValues)
+				host.SetTemplates(host.GetTemplates().MergeFrom(shard.GetTemplates(), MergeTypeFillEmptyValues))
 			}
 		case IReplica:
 			replica := typed
 			if replica.HasTemplates() {
-				host.Templates = host.Templates.MergeFrom(replica.GetTemplates(), MergeTypeFillEmptyValues)
+				host.SetTemplates(host.GetTemplates().MergeFrom(replica.GetTemplates(), MergeTypeFillEmptyValues))
 			}
 		case *HostTemplate:
 			template := typed
 			if template != nil {
-				host.Templates = host.Templates.MergeFrom(template.Spec.Templates, MergeTypeFillEmptyValues)
+				host.SetTemplates(host.GetTemplates().MergeFrom(template.Spec.GetTemplates(), MergeTypeFillEmptyValues))
 			}
 		}
 	}
 
-	host.Templates.HandleDeprecatedFields()
+	host.GetTemplates().HandleDeprecatedFields()
 }
 
 // MergeFrom merges from specified host
@@ -178,34 +213,34 @@ func (host *Host) MergeFrom(from *Host) {
 		host.RaftPort.MergeFrom(from.RaftPort)
 	}
 
-	host.Templates = host.Templates.MergeFrom(from.Templates, MergeTypeFillEmptyValues)
-	host.Templates.HandleDeprecatedFields()
+	host.SetTemplates(host.GetTemplates().MergeFrom(from.GetTemplates(), MergeTypeFillEmptyValues))
+	host.GetTemplates().HandleDeprecatedFields()
 }
 
 // GetHostTemplate gets host template
 func (host *Host) GetHostTemplate() (*HostTemplate, bool) {
-	if !host.Templates.HasHostTemplate() {
+	if !host.GetTemplates().HasHostTemplate() {
 		return nil, false
 	}
-	name := host.Templates.GetHostTemplate()
+	name := host.GetTemplates().GetHostTemplate()
 	return host.GetCR().GetHostTemplate(name)
 }
 
 // GetPodTemplate gets pod template
 func (host *Host) GetPodTemplate() (*PodTemplate, bool) {
-	if !host.Templates.HasPodTemplate() {
+	if !host.GetTemplates().HasPodTemplate() {
 		return nil, false
 	}
-	name := host.Templates.GetPodTemplate()
+	name := host.GetTemplates().GetPodTemplate()
 	return host.GetCR().GetPodTemplate(name)
 }
 
 // GetServiceTemplate gets service template
 func (host *Host) GetServiceTemplate() (*ServiceTemplate, bool) {
-	if !host.Templates.HasReplicaServiceTemplate() {
+	if !host.GetTemplates().HasReplicaServiceTemplate() {
 		return nil, false
 	}
-	name := host.Templates.GetReplicaServiceTemplate()
+	name := host.GetTemplates().GetReplicaServiceTemplate()
 	return host.GetCR().GetServiceTemplate(name)
 }
 
@@ -227,6 +262,9 @@ func (host *Host) GetStatefulSetReplicasNum(shutdown bool) *int32 {
 
 // GetSettings gets settings
 func (host *Host) GetSettings() *Settings {
+	if host == nil {
+		return nil
+	}
 	return host.Settings
 }
 
