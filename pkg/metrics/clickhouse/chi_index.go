@@ -16,17 +16,17 @@ package clickhouse
 
 import "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 
-type chInstallationsIndex map[string]*metrics.WatchedCHI
+type chInstallationsIndex map[string]*metrics.WatchedCR
 
-func (i chInstallationsIndex) slice() []*metrics.WatchedCHI {
-	res := make([]*metrics.WatchedCHI, 0)
+func (i chInstallationsIndex) slice() []*metrics.WatchedCR {
+	res := make([]*metrics.WatchedCR, 0)
 	for _, chi := range i {
 		res = append(res, chi)
 	}
 	return res
 }
 
-func (i chInstallationsIndex) get(key string) (*metrics.WatchedCHI, bool) {
+func (i chInstallationsIndex) get(key string) (*metrics.WatchedCR, bool) {
 	if i == nil {
 		return nil, false
 	}
@@ -36,7 +36,7 @@ func (i chInstallationsIndex) get(key string) (*metrics.WatchedCHI, bool) {
 	return nil, false
 }
 
-func (i chInstallationsIndex) set(key string, value *metrics.WatchedCHI) {
+func (i chInstallationsIndex) set(key string, value *metrics.WatchedCR) {
 	if i == nil {
 		return
 	}
@@ -52,7 +52,7 @@ func (i chInstallationsIndex) remove(key string) {
 	}
 }
 
-func (i chInstallationsIndex) walk(f func(*metrics.WatchedCHI, *metrics.WatchedCluster, *metrics.WatchedHost)) {
+func (i chInstallationsIndex) walk(f func(*metrics.WatchedCR, *metrics.WatchedCluster, *metrics.WatchedHost)) {
 	// Loop over ClickHouseInstallations
 	for _, chi := range i {
 		chi.WalkHosts(f)
