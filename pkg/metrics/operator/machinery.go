@@ -32,6 +32,22 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
+func GetMandatoryLabelsAndValues(cr BaseInfoGetter) (labels []string, values []string) {
+	labelsFromNames, valuesFromNames := getLabelsFromName(cr)
+	labels = append(labels, labelsFromNames...)
+	values = append(values, valuesFromNames...)
+
+	labelsFromLabels, valuesFromLabels := getLabelsFromLabels(cr)
+	labels = append(labels, labelsFromLabels...)
+	values = append(values, valuesFromLabels...)
+
+	labelsFromAnnotations, valuesFromAnnotations := getLabelsFromAnnotations(cr)
+	labels = append(labels, labelsFromAnnotations...)
+	values = append(values, valuesFromAnnotations...)
+
+	return labels, values
+}
+
 func newOTELResource() (*otelResource.Resource, error) {
 	pod, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAME)
 	namespace, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
@@ -130,20 +146,4 @@ func getLabelsFromAnnotations(chi BaseInfoGetter) (labels []string, values []str
 			util.ListSkippedAnnotations(),
 		),
 	)
-}
-
-func GetMandatoryLabelsAndValues(cr BaseInfoGetter) (labels []string, values []string) {
-	labelsFromNames, valuesFromNames := getLabelsFromName(cr)
-	labels = append(labels, labelsFromNames...)
-	values = append(values, valuesFromNames...)
-
-	labelsFromLabels, valuesFromLabels := getLabelsFromLabels(cr)
-	labels = append(labels, labelsFromLabels...)
-	values = append(values, valuesFromLabels...)
-
-	labelsFromAnnotations, valuesFromAnnotations := getLabelsFromAnnotations(cr)
-	labels = append(labels, labelsFromAnnotations...)
-	values = append(values, valuesFromAnnotations...)
-
-	return labels, values
 }

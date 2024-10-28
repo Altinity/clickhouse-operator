@@ -31,7 +31,7 @@ func NewConfiguration() *Configuration {
 }
 
 func (c *Configuration) GetUsers() *apiChi.Settings {
-		return nil
+	return nil
 }
 
 func (c *Configuration) GetProfiles() *apiChi.Settings {

@@ -20,8 +20,8 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-// WatchedCHI specifies watched ClickHouseInstallation
-type WatchedCHI struct {
+// WatchedCR specifies watched ClickHouseInstallation
+type WatchedCR struct {
 	Namespace   string            `json:"namespace"`
 	Name        string            `json:"name"`
 	Labels      map[string]string `json:"labels"`
@@ -46,13 +46,13 @@ type WatchedHost struct {
 }
 
 // NewWatchedCHI creates new watched CHI
-func NewWatchedCHI(cr api.ICustomResource) *WatchedCHI {
-	chi := &WatchedCHI{}
+func NewWatchedCHI(cr api.ICustomResource) *WatchedCR {
+	chi := &WatchedCR{}
 	chi.readFrom(cr)
 	return chi
 }
 
-func (chi *WatchedCHI) readFrom(cr api.ICustomResource) {
+func (chi *WatchedCR) readFrom(cr api.ICustomResource) {
 	if chi == nil {
 		return
 	}
@@ -69,19 +69,19 @@ func (chi *WatchedCHI) readFrom(cr api.ICustomResource) {
 	})
 }
 
-func (chi *WatchedCHI) IsValid() bool {
+func (chi *WatchedCR) IsValid() bool {
 	return !chi.empty()
 }
 
-func (chi *WatchedCHI) empty() bool {
+func (chi *WatchedCR) empty() bool {
 	return (len(chi.Namespace) == 0) && (len(chi.Name) == 0) && (len(chi.Clusters) == 0)
 }
 
-func (chi *WatchedCHI) IndexKey() string {
+func (chi *WatchedCR) IndexKey() string {
 	return chi.Namespace + ":" + chi.Name
 }
 
-func (chi *WatchedCHI) WalkHosts(f func(*WatchedCHI, *WatchedCluster, *WatchedHost)) {
+func (chi *WatchedCR) WalkHosts(f func(*WatchedCR, *WatchedCluster, *WatchedHost)) {
 	if chi == nil {
 		return
 	}
@@ -92,28 +92,28 @@ func (chi *WatchedCHI) WalkHosts(f func(*WatchedCHI, *WatchedCluster, *WatchedHo
 	}
 }
 
-func (chi *WatchedCHI) GetName() string {
+func (chi *WatchedCR) GetName() string {
 	if chi == nil {
 		return ""
 	}
 	return chi.Name
 }
 
-func (chi *WatchedCHI) GetNamespace() string {
+func (chi *WatchedCR) GetNamespace() string {
 	if chi == nil {
 		return ""
 	}
 	return chi.Namespace
 }
 
-func (chi *WatchedCHI) GetLabels() map[string]string {
+func (chi *WatchedCR) GetLabels() map[string]string {
 	if chi == nil {
 		return nil
 	}
 	return chi.Labels
 }
 
-func (chi *WatchedCHI) GetAnnotations() map[string]string {
+func (chi *WatchedCR) GetAnnotations() map[string]string {
 	if chi == nil {
 		return nil
 	}
@@ -121,7 +121,7 @@ func (chi *WatchedCHI) GetAnnotations() map[string]string {
 }
 
 // String is a stringifier
-func (chi *WatchedCHI) String() string {
+func (chi *WatchedCR) String() string {
 	if chi == nil {
 		return "nil"
 	}
