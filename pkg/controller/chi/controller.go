@@ -617,12 +617,12 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 
 // updateWatch
 func (c *Controller) updateWatch(chi *api.ClickHouseInstallation) {
-	watched := metrics.NewWatchedCHI(chi)
+	watched := metrics.NewWatchedCR(chi)
 	go c.updateWatchAsync(watched)
 }
 
 // updateWatchAsync
-func (c *Controller) updateWatchAsync(chi *metrics.WatchedCHI) {
+func (c *Controller) updateWatchAsync(chi *metrics.WatchedCR) {
 	if err := clickhouse.InformMetricsExporterAboutWatchedCHI(chi); err != nil {
 		log.V(1).F().Info("FAIL update watch (%s/%s): %q", chi.Namespace, chi.Name, err)
 	} else {
@@ -632,12 +632,12 @@ func (c *Controller) updateWatchAsync(chi *metrics.WatchedCHI) {
 
 // deleteWatch
 func (c *Controller) deleteWatch(chi *api.ClickHouseInstallation) {
-	watched := metrics.NewWatchedCHI(chi)
+	watched := metrics.NewWatchedCR(chi)
 	go c.deleteWatchAsync(watched)
 }
 
 // deleteWatchAsync
-func (c *Controller) deleteWatchAsync(chi *metrics.WatchedCHI) {
+func (c *Controller) deleteWatchAsync(chi *metrics.WatchedCR) {
 	if err := clickhouse.InformMetricsExporterToDeleteWatchedCHI(chi); err != nil {
 		log.V(1).F().Info("FAIL delete watch (%s/%s): %q", chi.Namespace, chi.Name, err)
 	} else {
