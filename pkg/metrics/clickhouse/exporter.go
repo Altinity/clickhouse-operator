@@ -56,13 +56,13 @@ var _ prometheus.Collector = &Exporter{}
 // NewExporter returns a new instance of Exporter type
 func NewExporter(collectorTimeout time.Duration) *Exporter {
 	return &Exporter{
-		chInstallations:  make(map[string]*metrics.WatchedCHI),
+		chInstallations:  make(map[string]*metrics.WatchedCR),
 		collectorTimeout: collectorTimeout,
 	}
 }
 
 // getWatchedCHIs
-func (e *Exporter) getWatchedCHIs() []*metrics.WatchedCHI {
+func (e *Exporter) getWatchedCHIs() []*metrics.WatchedCR {
 	return e.chInstallations.slice()
 }
 
@@ -94,9 +94,9 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	log.V(1).Infof("Launching host collectors [%s]", time.Now().Sub(start))
 
 	var wg = sync.WaitGroup{}
-	e.chInstallations.walk(func(chi *metrics.WatchedCHI, _ *metrics.WatchedCluster, host *metrics.WatchedHost) {
+	e.chInstallations.walk(func(chi *metrics.WatchedCR, _ *metrics.WatchedCluster, host *metrics.WatchedHost) {
 		wg.Add(1)
-		go func(ctx context.Context, chi *metrics.WatchedCHI, host *metrics.WatchedHost, ch chan<- prometheus.Metric) {
+		go func(ctx context.Context, chi *metrics.WatchedCR, host *metrics.WatchedHost, ch chan<- prometheus.Metric) {
 			defer wg.Done()
 			e.collectHostMetrics(ctx, chi, host, ch)
 		}(ctx, chi, host, ch)
@@ -110,7 +110,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // enqueueToRemoveFromWatched
-func (e *Exporter) enqueueToRemoveFromWatched(chi *metrics.WatchedCHI) {
+func (e *Exporter) enqueueToRemoveFromWatched(chi *metrics.WatchedCR) {
 	e.toRemoveFromWatched.Store(chi, struct{}{})
 }
 
@@ -120,10 +120,10 @@ func (e *Exporter) cleanup() {
 	log.V(2).Info("Starting cleanup")
 	e.toRemoveFromWatched.Range(func(key, value interface{}) bool {
 		switch key.(type) {
-		case *metrics.WatchedCHI:
+		case *metrics.WatchedCR:
 			e.toRemoveFromWatched.Delete(key)
-			e.removeFromWatched(key.(*metrics.WatchedCHI))
-			log.V(1).Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*metrics.WatchedCHI).Name, key.(*metrics.WatchedCHI).Namespace)
+			e.removeFromWatched(key.(*metrics.WatchedCR))
+			log.V(1).Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*metrics.WatchedCR).Name, key.(*metrics.WatchedCR).Namespace)
 		}
 		return true
 	})
@@ -131,7 +131,7 @@ func (e *Exporter) cleanup() {
 }
 
 // removeFromWatched deletes record from Exporter.chInstallation map identified by chiName key
-func (e *Exporter) removeFromWatched(chi *metrics.WatchedCHI) {
+func (e *Exporter) removeFromWatched(chi *metrics.WatchedCR) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 	log.V(1).Infof("Remove ClickHouseInstallation (%s/%s)", chi.Namespace, chi.Name)
@@ -139,7 +139,7 @@ func (e *Exporter) removeFromWatched(chi *metrics.WatchedCHI) {
 }
 
 // updateWatched updates Exporter.chInstallation map with values from chInstances slice
-func (e *Exporter) updateWatched(chi *metrics.WatchedCHI) {
+func (e *Exporter) updateWatched(chi *metrics.WatchedCR) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 	log.V(1).Infof("Update ClickHouseInstallation (%s/%s): %s", chi.Namespace, chi.Name, chi)
@@ -171,7 +171,7 @@ func (e *Exporter) newHostFetcher(host *metrics.WatchedHost) *ClickHouseMetricsF
 }
 
 // collectHostMetrics collects metrics from one host and writes them into chan
-func (e *Exporter) collectHostMetrics(ctx context.Context, chi *metrics.WatchedCHI, host *metrics.WatchedHost, c chan<- prometheus.Metric) {
+func (e *Exporter) collectHostMetrics(ctx context.Context, chi *metrics.WatchedCR, host *metrics.WatchedHost, c chan<- prometheus.Metric) {
 	fetcher := e.newHostFetcher(host)
 	writer := NewCHIPrometheusWriter(c, chi, host)
 
@@ -340,8 +340,8 @@ func (e *Exporter) getWatchedCHI(w http.ResponseWriter, r *http.Request) {
 }
 
 // fetchCHI decodes chi from the request
-func (e *Exporter) fetchCHI(r *http.Request) (*metrics.WatchedCHI, error) {
-	chi := &metrics.WatchedCHI{}
+func (e *Exporter) fetchCHI(r *http.Request) (*metrics.WatchedCR, error) {
+	chi := &metrics.WatchedCR{}
 	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
 		if chi.IsValid() {
 			return chi, nil
@@ -405,7 +405,7 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 		})
 		normalized, _ := normalizer.CreateTemplated(chi, normalizerCommon.NewOptions())
 
-		watchedCHI := metrics.NewWatchedCHI(normalized)
+		watchedCHI := metrics.NewWatchedCR(normalized)
 		e.updateWatched(watchedCHI)
 	}
 }
