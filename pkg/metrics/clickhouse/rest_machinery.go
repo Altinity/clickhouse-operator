@@ -23,7 +23,7 @@ import (
 	"net/http"
 )
 
-func makeRESTCall(chi *metrics.WatchedCHI, method string) error {
+func makeRESTCall(chi *metrics.WatchedCR, method string) error {
 	url := "http://127.0.0.1:8888/chi"
 
 	json, err := json.Marshal(chi)
