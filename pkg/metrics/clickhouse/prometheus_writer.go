@@ -41,14 +41,14 @@ const (
 // CHIPrometheusWriter specifies writer to prometheus
 type CHIPrometheusWriter struct {
 	out  chan<- prometheus.Metric
-	chi  *metrics.WatchedCHI
+	chi  *metrics.WatchedCR
 	host *metrics.WatchedHost
 }
 
 // NewCHIPrometheusWriter creates new CHI prometheus writer
 func NewCHIPrometheusWriter(
 	out chan<- prometheus.Metric,
-	chi *metrics.WatchedCHI,
+	chi *metrics.WatchedCR,
 	host *metrics.WatchedHost,
 ) *CHIPrometheusWriter {
 	return &CHIPrometheusWriter{
@@ -226,9 +226,9 @@ func (w *CHIPrometheusWriter) appendHostLabel(labels, values []string) ([]string
 	return append(labels, "hostname"), append(values, w.host.Hostname)
 }
 
-func (w *CHIPrometheusWriter) getMandatoryLabelsAndValues() (labelNames []string, labelValues []string) {
-	// Prepare mandatory set of labels
-	labelNames, labelValues = operator.GetMandatoryLabelsAndValues(w.chi)
+func (w *CHIPrometheusWriter) getBaseSetLabelsAndValues() (labelNames []string, labelValues []string) {
+	// Prepare set of labels from watched CR
+	labelNames, labelValues = operator.GetLabelsFromSource(w.chi)
 	// Append current host label
 	labelNames, labelValues = w.appendHostLabel(labelNames, labelValues)
 
@@ -240,16 +240,14 @@ func (w *CHIPrometheusWriter) writeSingleMetricToPrometheus(
 	desc string,
 	metricType prometheus.ValueType,
 	value string,
-	optionalLabels []string,
-	optionalLabelValues []string,
+	metricLabelNames []string,
+	metricLabelValues []string,
 ) {
-	// Prepare mandatory set of labels
-	labelNames, labelValues := w.getMandatoryLabelsAndValues()
-	// Append optional labels
-	labelNames = append(labelNames, optionalLabels...)
-	labelValues = append(labelValues, optionalLabelValues...)
-
+	// Prepare metrics labels
+	labelNames, labelValues := w.prepareLabels(metricLabelNames, metricLabelValues)
+	// Prepare metrics value
 	floatValue, _ := strconv.ParseFloat(value, 64)
+	// Prepare metric from value and labels
 	metric, err := prometheus.NewConstMetric(
 		newMetricDescriptor(name, desc, labelNames),
 		metricType,
@@ -266,6 +264,17 @@ func (w *CHIPrometheusWriter) writeSingleMetricToPrometheus(
 	case <-time.After(writeMetricWaitTimeout):
 		log.Warningf("Error sending metric to the channel: %s", name)
 	}
+}
+
+func (w *CHIPrometheusWriter) prepareLabels(extraLabelNames, extraLabelValues []string) (labelNames []string, labelValues []string) {
+	// Prepare base set of labels
+	labelNames, labelValues = w.getBaseSetLabelsAndValues()
+	// Append particular metric labels
+	labelNames = append(labelNames, extraLabelNames...)
+	labelValues = append(labelValues, extraLabelValues...)
+	// Filter out metrics to be skipped
+	// TODO
+	return
 }
 
 // newMetricDescriptor creates a new prometheus.Desc object
