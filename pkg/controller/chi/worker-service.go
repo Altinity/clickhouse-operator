@@ -189,7 +189,7 @@ func (w *worker) updateService(
 	return err
 }
 
-func ensureService( svc *core.Service) *core.Service {
+func ensureService(svc *core.Service) *core.Service {
 	if svc == nil {
 		return &core.Service{}
 	}
