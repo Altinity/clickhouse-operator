@@ -45,87 +45,87 @@ type WatchedHost struct {
 	HTTPSPort int32  `json:"httpsPort,omitempty" yaml:"httpsPort,omitempty"`
 }
 
-// NewWatchedCHI creates new watched CHI
-func NewWatchedCHI(cr api.ICustomResource) *WatchedCR {
-	chi := &WatchedCR{}
-	chi.readFrom(cr)
-	return chi
+// NewWatchedCR creates new watched CR
+func NewWatchedCR(src api.ICustomResource) *WatchedCR {
+	cr := &WatchedCR{}
+	cr.readFrom(src)
+	return cr
 }
 
-func (chi *WatchedCR) readFrom(cr api.ICustomResource) {
-	if chi == nil {
+func (cr *WatchedCR) readFrom(src api.ICustomResource) {
+	if cr == nil {
 		return
 	}
-	chi.Namespace = cr.GetNamespace()
-	chi.Name = cr.GetName()
-	chi.Labels = cr.GetLabels()
-	chi.Annotations = cr.GetAnnotations()
+	cr.Namespace = src.GetNamespace()
+	cr.Name = src.GetName()
+	cr.Labels = src.GetLabels()
+	cr.Annotations = src.GetAnnotations()
 
-	cr.WalkClusters(func(cl api.ICluster) error {
+	src.WalkClusters(func(cl api.ICluster) error {
 		cluster := &WatchedCluster{}
 		cluster.readFrom(cl)
-		chi.Clusters = append(chi.Clusters, cluster)
+		cr.Clusters = append(cr.Clusters, cluster)
 		return nil
 	})
 }
 
-func (chi *WatchedCR) IsValid() bool {
-	return !chi.empty()
+func (cr *WatchedCR) IsValid() bool {
+	return !cr.empty()
 }
 
-func (chi *WatchedCR) empty() bool {
-	return (len(chi.Namespace) == 0) && (len(chi.Name) == 0) && (len(chi.Clusters) == 0)
+func (cr *WatchedCR) empty() bool {
+	return (len(cr.Namespace) == 0) && (len(cr.Name) == 0) && (len(cr.Clusters) == 0)
 }
 
-func (chi *WatchedCR) IndexKey() string {
-	return chi.Namespace + ":" + chi.Name
+func (cr *WatchedCR) IndexKey() string {
+	return cr.Namespace + ":" + cr.Name
 }
 
-func (chi *WatchedCR) WalkHosts(f func(*WatchedCR, *WatchedCluster, *WatchedHost)) {
-	if chi == nil {
+func (cr *WatchedCR) WalkHosts(f func(*WatchedCR, *WatchedCluster, *WatchedHost)) {
+	if cr == nil {
 		return
 	}
-	for _, cluster := range chi.Clusters {
+	for _, cluster := range cr.Clusters {
 		for _, host := range cluster.Hosts {
-			f(chi, cluster, host)
+			f(cr, cluster, host)
 		}
 	}
 }
 
-func (chi *WatchedCR) GetName() string {
-	if chi == nil {
+func (cr *WatchedCR) GetName() string {
+	if cr == nil {
 		return ""
 	}
-	return chi.Name
+	return cr.Name
 }
 
-func (chi *WatchedCR) GetNamespace() string {
-	if chi == nil {
+func (cr *WatchedCR) GetNamespace() string {
+	if cr == nil {
 		return ""
 	}
-	return chi.Namespace
+	return cr.Namespace
 }
 
-func (chi *WatchedCR) GetLabels() map[string]string {
-	if chi == nil {
+func (cr *WatchedCR) GetLabels() map[string]string {
+	if cr == nil {
 		return nil
 	}
-	return chi.Labels
+	return cr.Labels
 }
 
-func (chi *WatchedCR) GetAnnotations() map[string]string {
-	if chi == nil {
+func (cr *WatchedCR) GetAnnotations() map[string]string {
+	if cr == nil {
 		return nil
 	}
-	return chi.Annotations
+	return cr.Annotations
 }
 
 // String is a stringifier
-func (chi *WatchedCR) String() string {
-	if chi == nil {
+func (cr *WatchedCR) String() string {
+	if cr == nil {
 		return "nil"
 	}
-	bytes, _ := json.Marshal(chi)
+	bytes, _ := json.Marshal(cr)
 	return string(bytes)
 }
 
