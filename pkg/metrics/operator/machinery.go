@@ -28,25 +28,8 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
-
-func GetMandatoryLabelsAndValues(cr BaseInfoGetter) (labels []string, values []string) {
-	labelsFromNames, valuesFromNames := getLabelsFromName(cr)
-	labels = append(labels, labelsFromNames...)
-	values = append(values, valuesFromNames...)
-
-	labelsFromLabels, valuesFromLabels := getLabelsFromLabels(cr)
-	labels = append(labels, labelsFromLabels...)
-	values = append(values, valuesFromLabels...)
-
-	labelsFromAnnotations, valuesFromAnnotations := getLabelsFromAnnotations(cr)
-	labels = append(labels, labelsFromAnnotations...)
-	values = append(values, valuesFromAnnotations...)
-
-	return labels, values
-}
 
 func newOTELResource() (*otelResource.Resource, error) {
 	pod, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAME)
@@ -120,30 +103,4 @@ func serveMetrics(addr, path string) {
 		fmt.Printf("error serving http: %v", err)
 	}
 	fmt.Printf("end serving metrics at: %s%s\n", addr, path)
-}
-
-type BaseInfoGetter interface {
-	GetName() string
-	GetNamespace() string
-	GetLabels() map[string]string
-	GetAnnotations() map[string]string
-}
-
-func getLabelsFromName(chi BaseInfoGetter) (labels []string, values []string) {
-	return []string{"chi", "namespace"}, []string{chi.GetName(), chi.GetNamespace()}
-}
-
-func getLabelsFromLabels(chi BaseInfoGetter) (labels []string, values []string) {
-	return util.MapGetSortedKeysAndValues(chi.GetLabels())
-}
-
-func getLabelsFromAnnotations(chi BaseInfoGetter) (labels []string, values []string) {
-	return util.MapGetSortedKeysAndValues(
-		// Exclude skipped annotations
-		util.CopyMapFilter(
-			chi.GetAnnotations(),
-			nil,
-			util.ListSkippedAnnotations(),
-		),
-	)
 }
