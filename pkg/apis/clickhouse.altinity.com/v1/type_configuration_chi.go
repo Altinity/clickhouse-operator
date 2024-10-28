@@ -50,7 +50,7 @@ type Configuration struct {
 	Quotas    *Settings        `json:"quotas,omitempty"    yaml:"quotas,omitempty"`
 	Settings  *Settings        `json:"settings,omitempty"  yaml:"settings,omitempty"`
 	Files     *Settings        `json:"files,omitempty"     yaml:"files,omitempty"`
-	Clusters []*Cluster `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
+	Clusters  []*Cluster       `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
 }
 
 // NewConfiguration creates new Configuration objects
