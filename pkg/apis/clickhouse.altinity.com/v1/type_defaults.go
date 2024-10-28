@@ -29,7 +29,7 @@ func NewDefaults() *Defaults {
 	return new(Defaults)
 }
 
-func (d *Defaults) GetDistributedDDL() * DistributedDDL {
+func (d *Defaults) GetDistributedDDL() *DistributedDDL {
 	if d == nil {
 		return nil
 	}
