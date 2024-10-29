@@ -4258,6 +4258,20 @@ spec:
                         - "LabelClusterScopeCycleSize"
                         - "LabelClusterScopeCycleIndex"
                         - "LabelClusterScopeCycleOffset"
+                metrics:
+                  type: object
+                  description: "defines metrics exporter options"
+                  properties:
+                    labels:
+                      type: object
+                      description: "defines metric labels options"
+                      properties:
+                        exclude:
+                          type: array
+                          description: |
+                            When adding labels to a metric exclude labels with names from the following list
+                          items:
+                            type: string
                 statefulSet:
                   type: object
                   description: "define StatefulSet-specific parameters"
