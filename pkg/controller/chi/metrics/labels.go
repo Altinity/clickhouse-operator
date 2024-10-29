@@ -18,38 +18,35 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/operator"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func labels(src labelsSource) metric.MeasurementOption {
 	return metric.WithAttributes(prepareLabels(src)...)
 }
 
-type labelsSource interface {
-	GetName() string
-	GetNamespace() string
-	GetLabels() map[string]string
-	GetAnnotations() map[string]string
-}
-
 func prepareLabels(cr labelsSource) []attribute.KeyValue {
 	// Prepare base set of labels
-	labels, values := getBaseSetLabelsAndValues(cr)
+	labels := getBaseLabels(cr)
 	// Append particular metric labels
 	// not yet...
 	// Filter out metrics to be skipped
-	// TODO
-	return convert(labels, values)
+	labels = util.CopyMapFilter(
+		labels,
+		nil,
+		chop.Config().Metrics.Labels.Exclude,
+	)
+	return convert(labels)
 }
 
-func getBaseSetLabelsAndValues(cr labelsSource) (labelNames []string, labelValues []string) {
+func getBaseLabels(cr labelsSource) map[string]string {
 	return operator.GetLabelsFromSource(cr)
 }
 
-func convert(labelNames []string, labelValues []string) (attributes []attribute.KeyValue) {
-	for i := range labelNames {
-		name := labelNames[i]
-		value := labelValues[i]
+func convert(labels map[string]string) (attributes []attribute.KeyValue) {
+	for name, value := range labels {
 		attributes = append(attributes, attribute.String(name, value))
 	}
 	return attributes
