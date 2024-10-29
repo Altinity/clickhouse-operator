@@ -18,44 +18,32 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func GetLabelsFromSource(src labelsSource) (labels []string, values []string) {
-	labelsFromNames, valuesFromNames := getLabelsFromName(src)
-	labels = append(labels, labelsFromNames...)
-	values = append(values, valuesFromNames...)
-
-	labelsFromLabels, valuesFromLabels := getLabelsFromLabels(src)
-	labels = append(labels, labelsFromLabels...)
-	values = append(values, valuesFromLabels...)
-
-	labelsFromAnnotations, valuesFromAnnotations := getLabelsFromAnnotations(src)
-	labels = append(labels, labelsFromAnnotations...)
-	values = append(values, valuesFromAnnotations...)
-
-	return labels, values
-}
-
-type labelsSource interface {
-	GetName() string
-	GetNamespace() string
-	GetLabels() map[string]string
-	GetAnnotations() map[string]string
-}
-
-func getLabelsFromName(chi labelsSource) (labels []string, values []string) {
-	return []string{"chi", "namespace"}, []string{chi.GetName(), chi.GetNamespace()}
-}
-
-func getLabelsFromLabels(chi labelsSource) (labels []string, values []string) {
-	return util.MapGetSortedKeysAndValues(chi.GetLabels())
-}
-
-func getLabelsFromAnnotations(chi labelsSource) (labels []string, values []string) {
-	return util.MapGetSortedKeysAndValues(
-		// Exclude skipped annotations
-		util.CopyMapFilter(
-			chi.GetAnnotations(),
-			nil,
-			util.ListSkippedAnnotations(),
+func GetLabelsFromSource(src labelsSource) (labels map[string]string) {
+	return util.MergeStringMapsOverwrite(
+		util.MergeStringMapsOverwrite(
+			util.MergeStringMapsOverwrite(labels, getLabelsFromName(src)),
+			getLabelsFromLabels(src),
 		),
+		getLabelsFromAnnotations(src),
+	)
+}
+
+func getLabelsFromName(chi labelsSource) map[string]string {
+	return map[string]string{
+		"chi":       chi.GetName(),
+		"namespace": chi.GetNamespace(),
+	}
+}
+
+func getLabelsFromLabels(chi labelsSource) map[string]string {
+	return chi.GetLabels()
+}
+
+func getLabelsFromAnnotations(chi labelsSource) map[string]string {
+	// Exclude skipped annotations
+	return util.CopyMapFilter(
+		chi.GetAnnotations(),
+		nil,
+		util.ListSkippedAnnotations(),
 	)
 }
