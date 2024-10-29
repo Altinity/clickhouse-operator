@@ -414,6 +414,12 @@ type OperatorConfigLabel struct {
 	} `json:"runtime" yaml:"runtime"`
 }
 
+type OperatorConfigMetrics struct {
+	Labels struct {
+		Exclude []string `json:"exclude" yaml:"exclude"`
+	} `json:"labels" yaml:"labels"`
+}
+
 type ConfigCRSource struct {
 	Namespace string
 	Name      string
@@ -429,6 +435,7 @@ type OperatorConfig struct {
 	Reconcile   OperatorConfigReconcile  `json:"reconcile"  yaml:"reconcile"`
 	Annotation  OperatorConfigAnnotation `json:"annotation" yaml:"annotation"`
 	Label       OperatorConfigLabel      `json:"label"      yaml:"label"`
+	Metrics     OperatorConfigMetrics    `json:"metrics"    yaml:"metrics"`
 	StatefulSet struct {
 		// Revision history limit
 		RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`
