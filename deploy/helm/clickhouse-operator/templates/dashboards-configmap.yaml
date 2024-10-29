@@ -15,6 +15,7 @@ metadata:
 {{- end }}
 data:
 {{- range $path, $_ := .Files.Glob "files/*.json" }}
-  {{ $path | trimPrefix "files/" }}: {{ $.Files.Get $path | b64enc -}}
+  {{ $path | trimPrefix "files/" }}: |-
+{{ $.Files.Get $path | indent 4 -}}
 {{ end }}
 {{- end }}
