@@ -148,7 +148,7 @@ func (w *worker) reconcile(ctx context.Context, cr *api.ClickHouseInstallation) 
 	})
 
 	if counters.AddOnly() {
-		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CHI: %s", util.NamespaceNameString(cr))
+		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CR: %s", util.NamespaceNameString(cr))
 		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
 			FullFanOut: true,
 		})
@@ -230,7 +230,7 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 
 	// CR ConfigMaps with update
 	cr.GetRuntime().LockCommonConfig()
-	err = w.reconcileConfigMapCommon(ctx, cr, nil)
+	err = w.reconcileConfigMapCommon(ctx, cr)
 	cr.GetRuntime().UnlockCommonConfig()
 	return err
 }
@@ -239,17 +239,22 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 func (w *worker) reconcileConfigMapCommon(
 	ctx context.Context,
 	cr api.ICustomResource,
-	options *config.FilesGeneratorOptions,
+	options ...*config.FilesGeneratorOptions,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	// ConfigMap common for all resources in CHI
+	var opts *config.FilesGeneratorOptions
+	if len(options) > 0 {
+		opts = options[0]
+	}
+
+	// ConfigMap common for all resources in CR
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommon, options)
+	configMapCommon := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommon, opts)
 	err := w.reconcileConfigMap(ctx, cr, configMapCommon)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
