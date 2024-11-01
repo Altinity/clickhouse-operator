@@ -1461,6 +1461,35 @@ def test_014_0(self):
                 )
                 assert out == "1"
 
+        with And("Replicated database should have correct uuid, so new tables are automatically created"):
+            import time
+
+            new_table = "test_replicated_014_" + str(int(time.time()))
+            new_table_ddl = f"CREATE TABLE test_replicated_014.{new_table} (a Int8) Engine = ReplicatedMergeTree ORDER BY tuple()"
+            with Then(f"Create {new_table} on one node only"):
+                clickhouse.query(chi_name, new_table_ddl)
+
+            # Give some time for replication to catch up
+            time.sleep(10)
+
+            for replica in replicas:
+                for shard in shards:
+                    host=f"chi-{chi_name}-{cluster}-{shard}-{replica}"
+                    out = clickhouse.query(
+                        chi_name,
+                        f"SELECT uuid FROM system.databases where name = 'test_replicated_014'",
+                        host=host,
+                    )
+                    print(f"{host} database uuid: {out}")
+                    print(f"Checking {new_table}")
+                    out = clickhouse.query(
+                        chi_name,
+                        f"SELECT count() FROM system.tables WHERE name = '{new_table}'",
+                        host=host,
+                    )
+                    assert out == "1"
+
+
         with And("Replicated table should have the data"):
             for replica in replicas:
                 for shard in shards:
@@ -1472,6 +1501,7 @@ def test_014_0(self):
                             host=f"chi-{chi_name}-{cluster}-{shard}-{replica}",
                         )
                         assert out == f"{shard}"
+
 
     # replicas = [1]
     replicas = [1, 2]
@@ -4643,8 +4673,8 @@ def test_049(self):
     manifest = f"manifests/chi/test-049-clickhouse-keeper-upgrade.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
-    keeper_version_from = "24.3.5.46"
-    keeper_version_to = "24.8.5.115"
+    keeper_version_from = "24.8"
+    keeper_version_to = "24.9"
     with Given("CHI with 2 replicas"):
         kubectl.create_and_check(
             manifest=manifest,
@@ -4689,12 +4719,9 @@ def test_049(self):
         kubectl.wait_chk_status('clickhouse-keeper', 'Completed')
 
     with When(f"I check clickhouse-keeper version is changed to {keeper_version_to}"):
-        assert keeper_version_to in \
-               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image'), error()
-        assert keeper_version_to in \
-               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-1-0', '.spec.containers[0].image'), error()
-        assert keeper_version_to in \
-               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-2-0', '.spec.containers[0].image'), error()
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-only-0-1-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-only-0-2-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
 
     with And("I insert data in the replicated table after clickhouse-keeper upgrade"):
         clickhouse.query(chi, f"INSERT INTO test_local_049 select 2", timeout=600)
