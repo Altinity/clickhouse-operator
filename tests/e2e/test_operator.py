@@ -5000,6 +5000,102 @@ def test_051_1(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+@TestScenario
+@Name("test_052. Clickhouse-keeper scale-up/scale-down")
+def test_052(self):
+    """Check that clickhouse-operator support scale-up/scale-down without service interruption"""
+
+    create_shell_namespace_clickhouse_template()
+
+    chi_manifest = "manifests/chi/test-052-keeper-rescale.yaml"
+    chk_manifest_1 = "manifests/chk/test-052-chk-rescale-1.yaml"
+    chk_manifest_3 = "manifests/chk/test-052-chk-rescale-3.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest_1))
+
+    cluster = "default"
+
+    with Given("Install CHK"):
+        kubectl.create_and_check(
+            manifest=chk_manifest_1, kind="chk",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Given("CHI with 2 replicas"):
+        kubectl.create_and_check(
+            manifest=chi_manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with When("I create replicated table"):
+        create_table = """
+            CREATE TABLE test_local_052 ON CLUSTER 'default' (a UInt32)
+            Engine = ReplicatedMergeTree
+            PARTITION BY tuple()
+            ORDER BY a
+            """.replace(
+            "\r", ""
+        ).replace(
+            "\n", ""
+        )
+        clickhouse.query(chi, create_table)
+
+    with And("I insert data in the replicated table"):
+        clickhouse.query(chi, f"INSERT INTO test_local_052 select 1")
+
+    with Then("Check replicated table has data on both nodes"):
+        for replica in {0,1}:
+            out = clickhouse.query(chi, "SELECT count(*) from test_local_052", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+            assert out == "1", error()
+
+    with Given("Rescale CHK to 3 replicas"):
+        kubectl.create_and_check(
+            manifest=chk_manifest_3, kind="chk",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I insert data in the replicated table after clickhouse-keeper rescale"):
+        clickhouse.query(chi, f"INSERT INTO test_local_052 select 2", timeout=300)
+
+    with Then("Check replicated table has data on both nodes"):
+        for replica in {0,1}:
+            out = clickhouse.query(chi, "SELECT count(*) from test_local_052", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+            assert out == "2", error()
+
+    with Then("Kill first pod to switch the leader"):
+        kubectl.launch(f"delete pod chk-test-052-chk-keeper-0-0-0")
+        time.sleep(10)
+
+    with Given("Rescale CHK back to 1 replica"):
+        kubectl.create_and_check(
+            manifest=chk_manifest_1, kind="chk",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I insert data in the replicated table after clickhouse-keeper rescale"):
+        clickhouse.query(chi, f"INSERT INTO test_local_052 select 3", timeout=300)
+
+    with Then("Check replicated table has data on both nodes"):
+        for replica in {0,1}:
+            out = clickhouse.query(chi, "SELECT count(*) from test_local_052", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+            assert out == "3", error()
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"),
