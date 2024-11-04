@@ -4059,7 +4059,6 @@ def test_040(self):
             "pod_volumes": {
                 "/var/lib/clickhouse",
             },
-            "pod_image": current().context.clickhouse_version,
             "do_not_delete": 1,
             "chi_status": "InProgress",
         },
