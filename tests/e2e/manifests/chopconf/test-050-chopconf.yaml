@@ -3,6 +3,14 @@ kind: "ClickHouseOperatorConfiguration"
 metadata:
   name: "test-050-chopconf"
 spec:
+  metrics:
+    labels:
+      exclude:
+      - exclude_this_label
+      - exclude_this_annotation
   label:
     exclude:
       - exclude_this_label
+  annotation:
+    exclude:
+      - exclude_this_annotation

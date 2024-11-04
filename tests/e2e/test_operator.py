@@ -4758,20 +4758,39 @@ def test_050(self):
             },
         )
 
-    def test_labels(chi, label, value):
+    def test_labels(chi, type, key, value):
 
-        with Then(f"Pod label {label}={value} should populated from CHI"):
-            assert kubectl.get_field("pod", f"-l clickhouse.altinity.com/chi={chi}", f".metadata.labels.{label}") == value
+        with Then(f"Pod {type} {key}={value} should populated from CHI"):
+            assert kubectl.get_field("pod", f"-l clickhouse.altinity.com/chi={chi}", f".metadata.{type}s.{key}") == value
 
-        with And(f"Service label {label}={value} should populated from CHI"):
-            assert kubectl.get_field("service", f"-l clickhouse.altinity.com/chi={chi}", f".metadata.labels.{label}") == value
+        with And(f"Service {type} {key}={value} should populated from CHI"):
+            assert kubectl.get_field("service", f"-l clickhouse.altinity.com/chi={chi}", f".metadata.{type}s.{key}") == value
 
-        with And(f"PVC label {label}={value} should populated from CHI"):
-            assert kubectl.get_field("pvc", f"-l clickhouse.altinity.com/chi={chi}", f".metadata.labels.{label}") == value
+        with And(f"PVC {type} {key}={value} should populated from CHI"):
+            assert kubectl.get_field("pvc", f"-l clickhouse.altinity.com/chi={chi}", f".metadata.{type}s.{key}") == value
 
-    test_labels(chi, "include_this_label", "test-050")
+    test_labels(chi, "label", "include_this_label", "test-050-label")
 
-    test_labels(chi, "exclude_this_label", "<none>")
+    test_labels(chi, "label", "exclude_this_label", "<none>")
+
+    test_labels(chi, "annotation", "include_this_annotation", "test-050-annotation")
+
+    test_labels(chi, "annotation", "exclude_this_annotation", "<none>")
+
+
+    with Then("Check that exposed metrics do not have labels and annotations that are excluded"):
+        operator_namespace=current().context.operator_namespace
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=operator_namespace).splitlines()[1]
+        operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
+
+        # chi_clickhouse_metric_VersionInteger{chi="test-050",exclude_this_annotation="test-050-annotation",hostname="chi-test-050-default-0-0.test-050-e1884706-9a94-11ef-a786-367ddacfe5fd.svc.cluster.local",include_this_annotation="test-050-annotation",include_this_label="test-050-label",namespace="test-050-e1884706-9a94-11ef-a786-367ddacfe5fd"}
+        expect_labels = f"chi=\"test-050\",hostname=\"chi-test-050-default-0-0.{operator_namespace}.svc.cluster.local\",include_this_annotation=\"test-050-annotation\",include_this_label=\"test-050-label\""
+        check_metrics_monitoring(
+            operator_namespace = operator_namespace,
+            operator_pod=operator_pod,
+            expect_metric="chi_clickhouse_metric_VersionInteger",
+            expect_labels=expect_labels
+            )
 
     with Finally("I clean up"):
         delete_test_namespace()
