@@ -577,7 +577,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		reconcileStatefulSetOpts *statefulset.ReconcileOptions
 	)
 
-	if host.IsFirst() || host.IsLast() {
+	if !host.IsLast() {
 		reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetDoNotWait()
 	}
 
