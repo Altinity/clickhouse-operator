@@ -334,7 +334,7 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 func (r *Reconciler) waitForConfigMapPropagation(ctx context.Context, host *api.Host) bool {
 	// No need to wait for ConfigMap propagation on stopped host
 	if host.IsStopped() {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - on stopped host")
+		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - host is stopped")
 		return false
 	}
 
@@ -347,7 +347,7 @@ func (r *Reconciler) waitForConfigMapPropagation(ctx context.Context, host *api.
 	// What timeout is expected to be enough for ConfigMap propagation?
 	// In case timeout is not specified, no need to wait
 	if !host.GetCR().GetReconciling().HasConfigMapPropagationTimeout() {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable")
+		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable due to missing timeout value")
 		return false
 	}
 
@@ -357,13 +357,13 @@ func (r *Reconciler) waitForConfigMapPropagation(ctx context.Context, host *api.
 	// May be there is no need to wait already
 	elapsed := time.Now().Sub(r.task.CmUpdate())
 	if elapsed >= timeout {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)
+		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. [elapsed/timeout: %s/%s]", elapsed, timeout)
 		return false
 	}
 
 	// Looks like we need to wait for Configmap propagation, after all
 	wait := timeout - elapsed
-	r.a.V(1).M(host).F().Info("Wait for ConfigMap propagation for %s %s/%s", wait, elapsed, timeout)
+	r.a.V(1).M(host).F().Info("Going to wait for ConfigMap propagation for: %s [elapsed/timeout: %s/%s]", wait, elapsed, timeout)
 	if util.WaitContextDoneOrTimeout(ctx, wait) {
 		log.V(2).Info("task is done")
 		return true
