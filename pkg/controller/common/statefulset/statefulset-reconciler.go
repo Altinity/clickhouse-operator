@@ -369,6 +369,7 @@ func (r *Reconciler) waitForConfigMapPropagation(ctx context.Context, host *api.
 		return true
 	}
 
+	r.a.V(1).M(host).F().Info("Wait completed for: %s  of timeout: %s]", wait, timeout)
 	return false
 }
 

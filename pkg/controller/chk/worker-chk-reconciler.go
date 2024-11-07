@@ -168,6 +168,21 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *apiCh
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
 	}
 
+	return w.reconcileCRAuxObjectsPreliminaryDomain(ctx, cr)
+}
+
+func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
+	switch {
+	case cr.HostsCount() < cr.GetAncestor().HostsCount():
+		// Downscale
+		time.Sleep(120*time.Second)
+	case cr.HostsCount() > cr.GetAncestor().HostsCount():
+		// Upscale
+		time.Sleep(30*time.Second)
+	default:
+		// Same size
+		time.Sleep(10*time.Second)
+	}
 	return nil
 }
 
@@ -577,9 +592,9 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		reconcileStatefulSetOpts *statefulset.ReconcileOptions
 	)
 
-	if !host.IsLast() {
-		reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetDoNotWait()
-	}
+	//if !host.IsLast() {
+	//	reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetDoNotWait()
+	//}
 
 	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
 		w.a.V(1).
@@ -607,6 +622,8 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Info("Data loss detected for host: %s. Will do force migrate", host.GetName())
 	}
 
+	_ = w.reconcileHostService(ctx, host)
+
 	if err := w.reconcileHostStatefulSet(ctx, host, reconcileStatefulSetOpts); err != nil {
 		w.a.V(1).
 			M(host).F().
@@ -620,8 +637,23 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		storage.NewStoragePVC(kube.NewPVC(w.c.Client)),
 	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 
-	_ = w.reconcileHostService(ctx, host)
+	// _ = w.reconcileHostService(ctx, host)
 
+	return w.reconcileHostMainDomain(ctx, host)
+}
+
+func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host) error {
+	// Should we wait for host to startup
+	wait := false
+
+	if host.GetReconcileAttributes().IsAdd() {
+		wait = true
+	}
+
+	// Wait for host to startup
+	if wait {
+		time.Sleep(7*time.Second)
+	}
 	return nil
 }
 
