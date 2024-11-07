@@ -4632,29 +4632,7 @@ def test_048(self):
                 "do_not_delete": 1,
                 },
             )
-    with When("I create replicated table"):
-        create_table = """
-            CREATE TABLE test_local_048 ON CLUSTER 'default' (a UInt32)
-            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-            PARTITION BY tuple()
-            ORDER BY a
-            """.replace(
-            "\r", ""
-        ).replace(
-            "\n", ""
-        )
-        clickhouse.query(chi, create_table)
-
-    numbers = 100
-    with And("I insert data in the replicated table"):
-        clickhouse.query(chi, f"INSERT INTO test_local_048 select * from numbers({numbers})")
-
-    with Then("Check replicated table on host 0 has all rows"):
-        out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-0-0-0")
-        assert out == f"{numbers}", error()
-    with Then("Check replicated table on host 1 has all rows"):
-        out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-0-1-0")
-        assert out == f"{numbers}", error()
+    check_replication(chi, {0,1}, 1)
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -4683,26 +4661,7 @@ def test_049(self):
             },
         )
 
-    with When("I create replicated table"):
-        create_table = """
-            CREATE TABLE test_local_049 ON CLUSTER 'default' (a UInt32)
-            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-            PARTITION BY tuple()
-            ORDER BY a
-            """.replace(
-            "\r", ""
-        ).replace(
-            "\n", ""
-        )
-        clickhouse.query(chi, create_table)
-
-    with And("I insert data in the replicated table"):
-        clickhouse.query(chi, f"INSERT INTO test_local_049 select 1")
-
-    with Then("Check replicated table has data on both nodes"):
-        for replica in {0,1}:
-            out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-{replica}-0")
-            assert out == "1", error()
+    check_replication(chi, {0,1}, 1)
 
     with When(f"I check clickhouse-keeper version is {keeper_version_from}"):
         assert keeper_version_from in \
@@ -4722,13 +4681,7 @@ def test_049(self):
         kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-only-0-1-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
         kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-only-0-2-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
 
-    with And("I insert data in the replicated table after clickhouse-keeper upgrade"):
-        clickhouse.query(chi, f"INSERT INTO test_local_049 select 2", timeout=600)
-
-    with Then("Check replicated table has data on both nodes"):
-        for replica in {0,1}:
-            out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-{replica}-0")
-            assert out == "2", error()
+    check_replication(chi, {0,1}, 2)
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -4831,17 +4784,7 @@ def test_051(self):
             },
         )
 
-    with When("I create replicated table"):
-        create_table = "CREATE TABLE test_local_051 ON CLUSTER 'default' (a UInt32) Engine = ReplicatedMergeTree ORDER BY a"
-        clickhouse.query(chi, create_table)
-
-    with And("I insert data in the replicated table"):
-        clickhouse.query(chi, f"INSERT INTO test_local_051 select 1")
-
-    with Then("Check replicated table has data on both nodes"):
-        for replica in {0,1}:
-            out = clickhouse.query(chi, "SELECT count(*) from test_local_051", host=f"chi-{chi}-{cluster}-0-{replica}-0")
-            assert out == "1", error()
+    check_replication(chi, {0,1}, 1, "test_local_051")
 
     with When(f"upgrade operator to {version_to}"):
         util.install_operator_version(version_to)
@@ -4886,13 +4829,7 @@ def test_051(self):
                         out = clickhouse.query(chi, host=host, sql="SELECT count(*) from system.replicas where is_readonly")
                         assert out == "0", error()
 
-    with And("I insert data in the replicated table"):
-        clickhouse.query(chi, f"INSERT INTO test_local_051 select 2")
-
-    with Then("Check replicated table has data on both nodes"):
-        for replica in {0,1}:
-            out = clickhouse.query(chi, "SELECT count(*) from test_local_051", host=f"chi-{chi}-{cluster}-0-{replica}-0")
-            assert out == "2", error()
+    check_replication(chi, {0,1}, 2, "test_local_051")
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -4931,17 +4868,7 @@ def test_051_1(self):
             },
         )
 
-    with When("I create replicated table"):
-        create_table = "CREATE TABLE test_local_051 ON CLUSTER 'default' (a UInt32) Engine = ReplicatedMergeTree ORDER BY a"
-        clickhouse.query(chi, create_table)
-
-    with And("I insert data in the replicated table"):
-        clickhouse.query(chi, f"INSERT INTO test_local_051 select 1")
-
-    with Then("Check replicated table has data on both nodes"):
-        for replica in {0,1}:
-            out = clickhouse.query(chi, "SELECT count(*) from test_local_051", host=f"chi-{chi}-{cluster}-0-{replica}-0")
-            assert out == "1", error()
+    check_replication(chi, {0,1}, 1)
 
     old_pvc = "both-paths-test-051-chk-0"
     pv = kubectl.get_pv_name(old_pvc)
@@ -4988,13 +4915,7 @@ def test_051_1(self):
                 time.sleep(10)
         assert out == "1", error()
 
-    with And("I insert data in the replicated table"):
-        clickhouse.query(chi, f"INSERT INTO test_local_051 select 2")
-
-    with Then("Check replicated table has data on both nodes"):
-        for replica in {0,1}:
-            out = clickhouse.query(chi, "SELECT count(*) from test_local_051", host=f"chi-{chi}-{cluster}-0-{replica}-0")
-            assert out == "2", error()
+    check_replication(chi, {0,1}, 2)
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -5032,26 +4953,7 @@ def test_052(self):
             },
         )
 
-    with When("I create replicated table"):
-        create_table = """
-            CREATE TABLE test_local_052 ON CLUSTER 'default' (a UInt32)
-            Engine = ReplicatedMergeTree
-            PARTITION BY tuple()
-            ORDER BY a
-            """.replace(
-            "\r", ""
-        ).replace(
-            "\n", ""
-        )
-        clickhouse.query(chi, create_table)
-
-    with And("I insert data in the replicated table"):
-        clickhouse.query(chi, f"INSERT INTO test_local_052 select 1")
-
-    with Then("Check replicated table has data on both nodes"):
-        for replica in {0,1}:
-            out = clickhouse.query(chi, "SELECT count(*) from test_local_052", host=f"chi-{chi}-{cluster}-0-{replica}-0")
-            assert out == "1", error()
+    check_replication(chi, {0,1}, 1)
 
     with Given("Rescale CHK to 3 replicas"):
         kubectl.create_and_check(
@@ -5062,37 +4964,65 @@ def test_052(self):
             },
         )
 
-    with And("I insert data in the replicated table after clickhouse-keeper rescale"):
-        clickhouse.query(chi, f"INSERT INTO test_local_052 select 2", timeout=300)
-
-    with Then("Check replicated table has data on both nodes"):
-        for replica in {0,1}:
-            out = clickhouse.query(chi, "SELECT count(*) from test_local_052", host=f"chi-{chi}-{cluster}-0-{replica}-0")
-            assert out == "2", error()
+    check_replication(chi, {0,1}, 2)
 
     with Then("Kill first pod to switch the leader"):
         kubectl.launch(f"delete pod chk-test-052-chk-keeper-0-0-0")
         time.sleep(10)
 
-    with Given("Rescale CHK back to 1 replica"):
+    # with Then("Force leader to be on the first node only"):
+    #    kubectl.create_and_check(
+    #        manifest="manifests/chk/test-052-chk-rescale-1.1.yaml", kind="chk",
+    #        check={
+    #            "pod_count": 3,
+    #            "do_not_delete": 1,
+    #        },
+    #    )
+
+    # check_replication(chi, {0,1}, 3)
+
+
+    # with Then("Remove other nodes from the raft configuration"):
+    #    kubectl.create_and_check(
+    #        manifest="manifests/chk/test-052-chk-rescale-1.2.yaml", kind="chk",
+    #        check={
+    #            "do_not_delete": 1,
+    #        },
+    #    )
+
+    # check_replication(chi, {0,1}, 4)
+
+
+    with Then("Rescale CHK back to 1 replica"):
         kubectl.create_and_check(
-            manifest=chk_manifest_1, kind="chk",
+            manifest="manifests/chk/test-052-chk-rescale-1.yaml", kind="chk",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
             },
         )
 
-    with And("I insert data in the replicated table after clickhouse-keeper rescale"):
-        clickhouse.query(chi, f"INSERT INTO test_local_052 select 3", timeout=300)
-
-    with Then("Check replicated table has data on both nodes"):
-        for replica in {0,1}:
-            out = clickhouse.query(chi, "SELECT count(*) from test_local_052", host=f"chi-{chi}-{cluster}-0-{replica}-0")
-            assert out == "3", error()
+    check_replication(chi, {0,1}, 5)
 
     with Finally("I clean up"):
         delete_test_namespace()
+
+
+def check_replication(chi, replicas, token, table = ''):
+        cluster = clickhouse.query(chi, "select substitution from system.macros where macro = 'cluster'")
+        if table == '':
+            table = chi.replace('-','_')
+
+        with When("Create a replicated table if not exists"):
+            clickhouse.query(chi, f"CREATE TABLE IF NOT EXISTS {table} ON CLUSTER '{cluster}' (a UInt32) Engine = ReplicatedMergeTree ORDER BY a")
+
+        with And("I insert data in the replicated table"):
+            clickhouse.query(chi, f"INSERT INTO {table} select {token}", timeout=300)
+
+        with Then("Check replicated table has data on both nodes"):
+            for replica in replicas:
+                out = clickhouse.query(chi, f"SELECT a from {table} where a={token}", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+                assert out == f"{token}", error()
 
 
 @TestModule
