@@ -4,9 +4,9 @@ function usage() {
   cat << EOT
  Script splits clickhouse-operator-install-bundle.yaml to separate files and adjusts them to conform the helm standards
  NOTE script requires some pre-installed tools:
- - yq ( https://mikefarah.gitbook.io/yq/ ) > v4.14.x. Do not use brew install yq in MacOS，Version is lower than it.
+ - yq ( https://mikefarah.gitbook.io/yq/ ) > v4.14.x
  - jq ( https://github.com/stedolan/jq )
- - helm-docs ( https://github.com/norwoodj/helm-docs )
+ - helm-docs ( https://github.com/norwoodj/helm-docs ) > v1.14.x
  - perl ( https://learn.perl.org/installing/ )
 
  Usage: ./generate_helm_chart.sh
@@ -70,7 +70,7 @@ function main() {
   done
 
   if [[ $(command -v helm-docs) ]]; then
-    helm-docs --chart-search-root="${chart_path}" --log-level=warning
+    helm-docs --skip-version-footer --chart-search-root="${chart_path}" --log-level=warning
   else
     echo "WARNING"
     echo "helm-docs is not available, skip docs generation"
