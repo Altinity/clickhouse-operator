@@ -104,17 +104,19 @@ jobs:
           
           for test_file in ./tests/test_*.py; do
             name=$(basename "$test_file" .py | sed 's/^test_//')
+            run_cmd="~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e?test_${name}/\${ONLY} \$test_mode --trim-results on -o short --native --log ./tests/raw_${name}.log && "
+            run_cmd+="~/venv/qa/bin/tfs --no-colors transform compact ./tests/raw_${name}.log ./tests/compact_${name}.log && "
+            run_cmd+="~/venv/qa/bin/tfs --no-colors transform nice ./tests/raw_${name}.log ./tests/nice_${name}.log.txt && "
+            run_cmd+="~/venv/qa/bin/tfs --no-colors transform short ./tests/raw_${name}.log ./tests/short_${name}.log.txt && "
+            run_cmd+="bash -xec '~/venv/qa/bin/tfs --no-colors report results -a '${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/' ./tests/raw_${name}.log - --confidential --copyright 'Altinity Inc.' --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report_${name}.html'"
+          
             run_tests+=(
-              "~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e?test_${name}/\${ONLY} \$test_mode --trim-results on -o short --native --log ./tests/raw_${name}.log"
+              "${run_cmd}"
             )
           done          
-          printf "%s\n" "${run_tests[@]}" | xargs -P 10 -I {} bash -xc '{}'
+          printf "%s\n" "${run_tests[@]}" | xargs -P 10 -I {} bash -xec '{}'
           
           test_result=$?
-          ~/venv/qa/bin/tfs --no-colors transform compact ./tests/raw.log ./tests/compact.log
-          ~/venv/qa/bin/tfs --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
-          ~/venv/qa/bin/tfs --no-colors transform short ./tests/raw.log ./tests/short.log.txt
-          ~/venv/qa/bin/tfs --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity Inc." --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report.html
 
           echo "test_result=$test_result" >> $GITHUB_OUTPUT
           exit "$test_result"
