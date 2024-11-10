@@ -16,8 +16,8 @@ on:
         type: string
         required: false
 jobs:
-  run_operator_tests:
-    name: Run Operator Tests
+  run_tests:
+    name: Run Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
 
       - name: Deploy minio
         run: |
-          NO_WAIT=1 ./deploy/prometheus/create-minio.sh
+          NO_WAIT=1 ./deploy/minio/create-minio.sh
 
       - name: Run Tests
         id: run-tests
@@ -101,8 +101,15 @@ jobs:
           then
             test_mode="--test-to-end"
           fi
-
-          ~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e?test_operator/${ONLY} $test_mode --trim-results on -o short --native --log ./tests/raw.log
+          
+          for test_file in ./tests/test_*.py; do
+            name=$(basename "$test_file" .py | sed 's/^test_//')
+            run_tests+=(
+              "~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e?test_${name}/\${ONLY} \$test_mode --trim-results on -o short --native --log ./tests/raw_${name}.log"
+            )
+          done          
+          printf "%s\n" "${run_tests[@]}" | xargs -P 10 -I {} bash -c '{}'
+          
           test_result=$?
           ~/venv/qa/bin/tfs --no-colors transform compact ./tests/raw.log ./tests/compact.log
           ~/venv/qa/bin/tfs --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
