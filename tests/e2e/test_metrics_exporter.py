@@ -16,7 +16,7 @@ import e2e.util as util
 @Name("test_metrics_exporter_setup: Check metrics server setup and version")
 def test_metrics_exporter_setup(self):
     with Given("clickhouse-operator is installed"):
-        assert kubectl.get_count("pod", ns="--all-namespaces", label=util.operator_label) > 0, error()
+        assert kubectl.get_count("pod", ns=self.context.operator_namespace, label=util.operator_label) > 0, error()
         with Then(f"Set metrics-exporter version {settings.operator_version}"):
             util.set_metrics_exporter_version(settings.operator_version)
 
@@ -75,7 +75,7 @@ def test_metrics_exporter_chi(self):
             "true,true",
             ns=self.context.operator_namespace,
         )
-        assert kubectl.get_count("pod", ns="--all-namespaces", label=util.operator_label) > 0, error()
+        assert kubectl.get_count("pod", ns=self.context.operator_namespace, label=util.operator_label) > 0, error()
 
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=self.context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
@@ -96,7 +96,7 @@ def test_metrics_exporter_chi(self):
             )
             expected_chi = [
                 {
-                    "namespace": "test",
+                    "namespace": self.context.test_namespace,
                     "name": "test-017-multi-version",
                     "labels": {"clickhouse.altinity.com/chi": "test-017-multi-version"},
                     "annotations": {"clickhouse.altinity.com/email": "myname@mydomain.com, yourname@yourdoman.com"},
@@ -106,13 +106,13 @@ def test_metrics_exporter_chi(self):
                             "hosts": [
                                 {
                                     "name": "0-0",
-                                    "hostname": "chi-test-017-multi-version-default-0-0.test.svc.cluster.local",
+                                    "hostname": f"chi-test-017-multi-version-default-0-0.{self.context.test_namespace}.svc.cluster.local",
                                     "tcpPort": 9000,
                                     "httpPort": 8123
                                 },
                                 {
                                     "name": "1-0",
-                                    "hostname": "chi-test-017-multi-version-default-1-0.test.svc.cluster.local",
+                                    "hostname": f"chi-test-017-multi-version-default-1-0.{self.context.test_namespace}.svc.cluster.local",
                                     "tcpPort": 9000,
                                     "httpPort": 8123
                                 }
