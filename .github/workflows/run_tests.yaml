@@ -69,11 +69,11 @@ jobs:
       - name: Deploy prometheus
         run: |
           cp ./deploy/prometheus/prometheus-sensitive-data.example.sh ./deploy/prometheus/prometheus-sensitive-data.sh
-          NO_WAIT=1 ./deploy/prometheus/create-prometheus.sh
+          NO_WAIT=1 bash ./deploy/prometheus/create-prometheus.sh
 
       - name: Deploy minio
         run: |
-          NO_WAIT=1 ./deploy/minio/create-minio.sh
+          NO_WAIT=1 bash ./deploy/minio/create-minio.sh
 
       - name: Run Tests
         id: run-tests
