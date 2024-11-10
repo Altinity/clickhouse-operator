@@ -68,7 +68,7 @@ jobs:
 
       - name: Deploy prometheus
         run: |
-          cp ./deploy/prometheus/create-prometheus.sh
+          cp ./deploy/prometheus/prometheus-sensitive-data.example.sh ./deploy/prometheus/prometheus-sensitive-data.sh
           NO_WAIT=1 ./deploy/prometheus/create-prometheus.sh
 
       - name: Deploy minio
