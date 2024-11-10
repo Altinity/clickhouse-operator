@@ -102,7 +102,7 @@ jobs:
             test_mode="--test-to-end"
           fi
           
-          for test_file in ./tests/test_*.py; do
+          for test_file in "./tests/test_*.py"; do
             name=$(basename "$test_file" .py | sed 's/^test_//')
             run_cmd="~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e?test_${name}/\${ONLY} \$test_mode --trim-results on -o short --native --log ./tests/raw_${name}.log && "
             run_cmd+="~/venv/qa/bin/tfs --no-colors transform compact ./tests/raw_${name}.log ./tests/compact_${name}.log && "
