@@ -14,7 +14,7 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:24.8"
+              image: "clickhouse/clickhouse-keeper:24.10"
     volumeClaimTemplates:
       - name: default
         spec:
@@ -28,6 +28,3 @@ spec:
       - name: keeper
         layout:
           replicasCount: 3
-    settings:
-      keeper_server/enable_reconfiguration: "false"
-

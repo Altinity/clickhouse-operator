@@ -351,7 +351,7 @@ func (a Announcer) tryToFindNamespaceNameEverywhere(m interface{}) (string, bool
 	return "", false
 }
 
-// findInObjectMeta
+// findNamespaceName
 func (a Announcer) findNamespaceName(m interface{}) (string, bool) {
 	if m == nil {
 		return "", false
