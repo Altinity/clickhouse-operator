@@ -32,7 +32,7 @@ def create_test_namespace(self, force=False):
     """Create unique test namespace for test."""
 
     if (self.cflags & PARALLEL) and not force:
-        self.context.test_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
+        self.context.test_namespace = self.name[self.name.find('test_0'):self.name.find('# ')].replace("_", "-") + "-" + str(uuid.uuid1())
         self.context.operator_namespace = self.context.test_namespace
         util.create_namespace(self.context.test_namespace)
         util.install_operator_if_not_exist()
@@ -77,7 +77,7 @@ def set_settings(self):
     self.context.kubectl_cmd = (
         "kubectl"
         if current().context.native
-        else f"docker-compose -f {get_docker_compose_path()[0]} exec -T runner kubectl"
+        else f"docker compose -f {get_docker_compose_path()[0]} exec -T runner kubectl"
     )
 
     self.context.kubectl_cmd = define("kubectl_cmd", os.getenv("KUBECTL_CMD") if "KUBECTL_CMD" in os.environ else self.context.kubectl_cmd)

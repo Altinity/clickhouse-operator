@@ -25,7 +25,7 @@ kubectl_mode = os.getenv("KUBECTL_MODE") if "KUBECTL_MODE" in os.environ else "a
 kubectl_cmd = (
     "kubectl"
     if current().context.native else
-    f"docker-compose -f {get_docker_compose_path()[0]} exec -T runner kubectl"
+    f"docker compose -f {get_docker_compose_path()[0]} exec -T runner kubectl"
 )
 
 kubectl_cmd = os.getenv("KUBECTL_CMD") if "KUBECTL_CMD" in os.environ else kubectl_cmd
@@ -75,8 +75,8 @@ clickhouse_version_old = get_ch_version(clickhouse_template_old)
 keeper_type = os.getenv("KEEPER_TYPE") if "KEEPER_TYPE" in os.environ else "zookeeper" # zookeeper | clickhouse_keeper
 
 prometheus_namespace = "prometheus"
-prometheus_operator_version = "0.68"
-prometheus_scrape_interval = 10
+prometheus_operator_version = "0.78.1"
+prometheus_scrape_interval = 5
 
 minio_version = "latest"
 

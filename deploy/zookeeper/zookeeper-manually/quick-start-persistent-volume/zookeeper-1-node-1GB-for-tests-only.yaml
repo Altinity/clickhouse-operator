@@ -82,7 +82,7 @@ spec:
       containers:
         - name: kubernetes-zookeeper
           imagePullPolicy: IfNotPresent
-          image: "docker.io/zookeeper:3.8.4"
+          image: "docker.io/zookeeper:latest"
           ports:
             - containerPort: 2181
               name: client

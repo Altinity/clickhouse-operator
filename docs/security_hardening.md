@@ -257,7 +257,7 @@ spec:
         spec:
           containers:
           - name: clickhouse
-            image: altinity/clickhouse-server:23.3.8.22.altinitystable
+            image: clickhouse/clickhouse-server:24.8
             env:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
@@ -512,7 +512,7 @@ spec:
     - name: default
       containers:
       - name: clickhouse-pod
-        image: clickhouse/clickhouse-server:23.8
+        image: clickhouse/clickhouse-server:24.8
         ports:
         - name: http
           containerPort: 8123

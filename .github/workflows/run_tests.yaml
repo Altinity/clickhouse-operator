@@ -16,8 +16,8 @@ on:
         type: string
         required: false
 jobs:
-  run_tests:
-    name: Run Tests
+  run_operator_tests:
+    name: Run Operator Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.31.0
+          kubernetes-version: v1.31.2
           cpus: max
           memory: max
 
@@ -65,6 +65,15 @@ jobs:
 
           minikube image load operator.tar
           minikube image load metrics-exporter.tar
+
+      - name: Deploy prometheus
+        run: |
+          cp ./deploy/prometheus/create-prometheus.sh
+          NO_WAIT=1 ./deploy/prometheus/create-prometheus.sh
+
+      - name: Deploy minio
+        run: |
+          NO_WAIT=1 ./deploy/prometheus/create-minio.sh
 
       - name: Run Tests
         id: run-tests
@@ -93,7 +102,7 @@ jobs:
             test_mode="--test-to-end"
           fi
 
-          ~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e.test_operator/${ONLY} $test_mode --trim-results on -o short --native --log ./tests/raw.log
+          ~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e?test_operator/${ONLY} $test_mode --trim-results on -o short --native --log ./tests/raw.log
           test_result=$?
           ~/venv/qa/bin/tfs --no-colors transform compact ./tests/raw.log ./tests/compact.log
           ~/venv/qa/bin/tfs --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt

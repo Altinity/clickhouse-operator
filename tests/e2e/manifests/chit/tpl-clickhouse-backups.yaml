@@ -25,14 +25,15 @@ spec:
             fsGroup: 101
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:latest
+              imagePullPolicy: Always
               command:
                 - clickhouse-server
                 - --config-file=/etc/clickhouse-server/config.xml
 
             - name: clickhouse-backup
-              image: altinity/clickhouse-backup:2.4.15
-              imagePullPolicy: IfNotPresent
+              image: altinity/clickhouse-backup:latest
+              imagePullPolicy: Always
               command:
                 - bash
                 - -xc
@@ -49,7 +50,7 @@ spec:
                 - name: BACKUPS_TO_KEEP_REMOTE
                   value: "3"
                 - name: S3_ENDPOINT
-                  value: https://minio.minio
+                  value: http://minio.minio
                 - name: S3_BUCKET
                   value: clickhouse-backup
                 - name: S3_PATH

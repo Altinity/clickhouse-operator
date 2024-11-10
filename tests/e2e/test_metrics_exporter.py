@@ -1,5 +1,6 @@
-import time
-import re
+import json
+import os
+os.environ["TEST_NAMESPACE"]="test-metrics-exporter"
 import json
 
 from e2e.steps import *
@@ -12,7 +13,7 @@ import e2e.util as util
 
 
 @TestScenario
-@Name("Check metrics server setup and version")
+@Name("test_metrics_exporter_setup: Check metrics server setup and version")
 def test_metrics_exporter_setup(self):
     with Given("clickhouse-operator is installed"):
         assert kubectl.get_count("pod", ns="--all-namespaces", label=util.operator_label) > 0, error()
@@ -21,7 +22,7 @@ def test_metrics_exporter_setup(self):
 
 
 @TestScenario
-@Name("Test basic metrics exporter functionality")
+@Name("test_metrics_exporter_chi: Test basic metrics exporter functionality")
 def test_metrics_exporter_chi(self):
     def check_monitoring_chi(operator_namespace, operator_pod, expect_result, max_retries=10):
         with Then(f"metrics-exporter /chi endpoint result should return {expect_result}"):
@@ -170,8 +171,8 @@ def test_metrics_exporter_chi(self):
 def test(self):
     with Given("set settings"):
         set_settings()
-        self.context.test_namespace = "test"
-        self.context.operator_namespace = "test"
+        self.context.test_namespace = "test-metrics-exporter"
+        self.context.operator_namespace = "test-metrics-exporter"
     with Given("I create shell"):
         shell = get_shell()
         self.context.shell = shell
