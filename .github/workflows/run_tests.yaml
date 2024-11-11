@@ -101,7 +101,7 @@ jobs:
           then
             test_mode="--test-to-end"
           fi
-          
+
           for test_file in ./tests/e2e/test_*.py; do
             name=$(basename "$test_file" .py | sed 's/^test_//')
             run_cmd="~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e?test_${name}/${ONLY} $test_mode --trim-results on -o short --native --log ./tests/raw_${name}.log && "
@@ -114,7 +114,7 @@ jobs:
               "${run_cmd}"
             )
           done          
-          printf "%s\n" "${run_tests[@]}" | xargs -P 10 -I {} bash -xec '{}'
+          printf "%s\n" "${run_tests[@]}" | xargs -P 2 -I {} bash -xec '{}'
           
           test_result=$?
 
