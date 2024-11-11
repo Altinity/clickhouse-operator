@@ -41,6 +41,8 @@ venv
 
 # Tests cached files
 tests/image/cache
+tests/*.log.txt
+tests/*.html
 
 # Skip tmp folder
 /tmp/

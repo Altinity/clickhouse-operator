@@ -19,7 +19,7 @@ for test_file in ${CUR_DIR}/test_*.py; do
     "${run_cmd}"
   )
 done
-printf "%s\n" "${run_tests[@]}" | xargs -P 10 -I {} bash -xec '{}'
+printf "%s\n" "${run_tests[@]}" | xargs -P 2 -I {} bash -xec '{}'
 test_result=$?
 
 date
