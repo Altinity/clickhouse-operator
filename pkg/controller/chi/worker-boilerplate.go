@@ -23,7 +23,6 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
-	normalizerCommon "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -150,16 +149,6 @@ func (w *worker) processReconcilePod(ctx context.Context, cmd *cmd_queue.Reconci
 	return nil
 }
 
-func (w *worker) processDropDns(ctx context.Context, cmd *cmd_queue.DropDns) error {
-	if chi, err := w.createCRFromObjectMeta(cmd.Initiator, false, normalizerCommon.NewOptions()); err == nil {
-		w.a.V(2).M(cmd.Initiator).Info("flushing DNS for CHI %s", chi.Name)
-		_ = w.ensureClusterSchemer(chi.FirstHost()).CHIDropDnsCache(ctx, chi)
-	} else {
-		w.a.M(cmd.Initiator).F().Error("unable to find CHI by %v err: %v", cmd.Initiator.GetLabels(), err)
-	}
-	return nil
-}
-
 // processItem processes one work item according to its type
 func (w *worker) processItem(ctx context.Context, item interface{}) error {
 	if util.IsContextDone(ctx) {
@@ -181,8 +170,6 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 		return w.processReconcileEndpoints(ctx, cmd)
 	case *cmd_queue.ReconcilePod:
 		return w.processReconcilePod(ctx, cmd)
-	case *cmd_queue.DropDns:
-		return w.processDropDns(ctx, cmd)
 	}
 
 	// Unknown item type, don't know what to do with it

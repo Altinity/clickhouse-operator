@@ -25,7 +25,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/model"
@@ -56,7 +55,6 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	objs.Subtract(need)
 	w.a.V(1).M(cr).F().Info("Non-reconciled objects:\n%s", objs)
 	if w.purge(ctx, cr, objs, w.task.RegistryFailed()) > 0 {
-		w.c.enqueueObject(cmd_queue.NewDropDns(cr))
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
 

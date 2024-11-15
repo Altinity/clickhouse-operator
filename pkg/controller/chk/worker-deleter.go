@@ -49,7 +49,6 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	objs.Subtract(need)
 	w.a.V(1).M(cr).F().Info("Non-reconciled objects:\n%s", objs)
 	if w.purge(ctx, cr, objs, w.task.RegistryFailed()) > 0 {
-		//w.c.enqueueObject(cmd_queue.NewDropDns(chk))
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
 

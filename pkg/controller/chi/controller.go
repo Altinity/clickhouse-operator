@@ -358,7 +358,6 @@ func (c *Controller) addEventHandlersEndpoint(
 			log.V(3).M(newEndpoints).Info("endpointsInformer.UpdateFunc")
 			if updated(oldEndpoints, newEndpoints) {
 				c.enqueueObject(cmd_queue.NewReconcileEndpoints(cmd_queue.ReconcileUpdate, oldEndpoints, newEndpoints))
-				c.enqueueObject(cmd_queue.NewDropDns(&newEndpoints.ObjectMeta))
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -603,8 +602,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		*cmd_queue.ReconcileCHIT,
 		*cmd_queue.ReconcileChopConfig,
 		*cmd_queue.ReconcileEndpoints,
-		*cmd_queue.ReconcilePod,
-		*cmd_queue.DropDns:
+		*cmd_queue.ReconcilePod:
 		variants := api.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)
 		enqueue = true

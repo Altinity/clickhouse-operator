@@ -15,10 +15,8 @@
 package cmd_queue
 
 import (
-	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/altinity/queue"
+	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
@@ -44,7 +42,6 @@ const (
 	priorityReconcileCHIT       int = 5
 	priorityReconcileChopConfig int = 3
 	priorityReconcileEndpoints  int = 15
-	priorityDropDNS             int = 7
 )
 
 // ReconcileCHI specifies reconcile request queue item
@@ -194,32 +191,6 @@ func NewReconcileEndpoints(cmd string, old, new *core.Endpoints) *ReconcileEndpo
 		Cmd: cmd,
 		Old: old,
 		New: new,
-	}
-}
-
-// DropDns specifies drop dns queue item
-type DropDns struct {
-	PriorityQueueItem
-	Initiator meta.Object
-}
-
-var _ queue.PriorityQueueItem = &DropDns{}
-
-// Handle returns handle of the queue item
-func (r DropDns) Handle() queue.T {
-	if r.Initiator != nil {
-		return "DropDNS" + ":" + r.Initiator.GetNamespace() + "/" + r.Initiator.GetName()
-	}
-	return ""
-}
-
-// NewDropDns creates new drop dns queue item
-func NewDropDns(initiator meta.Object) *DropDns {
-	return &DropDns{
-		PriorityQueueItem: PriorityQueueItem{
-			priority: priorityDropDNS,
-		},
-		Initiator: initiator,
 	}
 }
 

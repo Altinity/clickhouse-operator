@@ -143,14 +143,6 @@ func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *api.Host) bo
 	return inside
 }
 
-// CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
-func (s *ClusterSchemer) CHIDropDnsCache(ctx context.Context, chi *api.ClickHouseInstallation) error {
-	chi.WalkHosts(func(host *api.Host) error {
-		return s.ExecHost(ctx, host, []string{s.sqlDropDNSCache()})
-	})
-	return nil
-}
-
 // HostActiveQueriesNum returns how many active queries are on the host
 func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *api.Host) (int, error) {
 	return s.QueryHostInt(ctx, host, s.sqlActiveQueriesNum())
