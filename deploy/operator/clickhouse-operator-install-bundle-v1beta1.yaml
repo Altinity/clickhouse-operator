@@ -4223,7 +4223,6 @@ data:
         # These credentials are used for:
         #   1. Metrics requests
         #   2. Schema maintenance
-        #   3. DROP DNS CACHE
         # User with these credentials can be specified in additional ClickHouse .xml config files,
         # located in 'clickhouse.configuration.file.path.user' folder
         username: ""

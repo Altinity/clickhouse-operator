@@ -63,3 +63,4 @@ For upgrade please install CRDs separately:
 | serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) |
 | tolerations | list | `[]` | tolerations for scheduler pod assignment, check `kubectl explain pod.spec.tolerations` for details |
 | topologySpreadConstraints | list | `[]` |  |
+
