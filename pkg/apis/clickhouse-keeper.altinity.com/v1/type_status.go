@@ -18,7 +18,7 @@ import (
 	"sort"
 	"sync"
 
-	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/version"
@@ -75,7 +75,7 @@ type Status struct {
 	NormalizedCR           *ClickHouseKeeperInstallation `json:"normalized,omitempty"             yaml:"normalized,omitempty"`
 	NormalizedCRCompleted  *ClickHouseKeeperInstallation `json:"normalizedCompleted,omitempty"    yaml:"normalizedCompleted,omitempty"`
 	HostsWithTablesCreated []string                      `json:"hostsWithTablesCreated,omitempty" yaml:"hostsWithTablesCreated,omitempty"`
-	UsedTemplates          []*apiChi.TemplateRef         `json:"usedTemplates,omitempty"          yaml:"usedTemplates,omitempty"`
+	UsedTemplates          []*chi.TemplateRef         `json:"usedTemplates,omitempty"          yaml:"usedTemplates,omitempty"`
 
 	mu sync.RWMutex `json:"-" yaml:"-"`
 }
@@ -135,6 +135,16 @@ func (s *Status) SetError(err string) {
 	})
 }
 
+// PushError sets and pushes error into status
+func (s *Status) PushError(error string) {
+	doWithWriteLock(s, func(s *Status) {
+		s.Errors = append([]string{error}, s.Errors...)
+		if len(s.Errors) > maxErrors {
+			s.Errors = s.Errors[:maxErrors]
+		}
+	})
+}
+
 // SetAndPushError sets and pushes error into status
 func (s *Status) SetAndPushError(err string) {
 	doWithWriteLock(s, func(s *Status) {
@@ -167,7 +177,7 @@ func (s *Status) SyncHostTablesCreated() {
 }
 
 // PushUsedTemplate pushes used template to the list of used templates
-func (s *Status) PushUsedTemplate(templateRef *apiChi.TemplateRef) {
+func (s *Status) PushUsedTemplate(templateRef *chi.TemplateRef) {
 	doWithWriteLock(s, func(s *Status) {
 		s.UsedTemplates = append(s.UsedTemplates, templateRef)
 	})
@@ -187,16 +197,6 @@ func (s *Status) SetAction(action string) {
 	})
 }
 
-// HasNormalizedCRCompleted is a checker
-func (s *Status) HasNormalizedCRCompleted() bool {
-	return s.GetNormalizedCRCompleted() != nil
-}
-
-// HasNormalizedCR is a checker
-func (s *Status) HasNormalizedCR() bool {
-	return s.GetNormalizedCR() != nil
-}
-
 // PushAction pushes action into status
 func (s *Status) PushAction(action string) {
 	doWithWriteLock(s, func(s *Status) {
@@ -205,14 +205,14 @@ func (s *Status) PushAction(action string) {
 	})
 }
 
-// PushError sets and pushes error into status
-func (s *Status) PushError(error string) {
-	doWithWriteLock(s, func(s *Status) {
-		s.Errors = append([]string{error}, s.Errors...)
-		if len(s.Errors) > maxErrors {
-			s.Errors = s.Errors[:maxErrors]
-		}
-	})
+// HasNormalizedCRCompleted is a checker
+func (s *Status) HasNormalizedCRCompleted() bool {
+	return s.GetNormalizedCRCompleted() != nil
+}
+
+// HasNormalizedCR is a checker
+func (s *Status) HasNormalizedCR() bool {
+	return s.GetNormalizedCR() != nil
 }
 
 // SetPodIPs sets pod IPs
@@ -322,6 +322,95 @@ func (s *Status) DeleteStart() {
 	})
 }
 
+func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
+	if opts.FieldGroupInheritable {
+		opts.Copy.TaskIDsStarted = true
+		opts.Copy.TaskIDsCompleted = true
+		opts.Copy.Actions = true
+		opts.Copy.Errors = true
+		opts.Copy.HostsWithTablesCreated = true
+	}
+
+	if opts.FieldGroupActions {
+		opts.Copy.Action = true
+		opts.Merge.Actions = true
+		opts.Copy.HostsWithTablesCreated = true
+		opts.Copy.UsedTemplates = true
+	}
+
+	if opts.FieldGroupErrors {
+		opts.Copy.Error = true
+		opts.Merge.Errors = true
+	}
+
+	if opts.FieldGroupMain {
+		opts.Copy.CHOpVersion = true
+		opts.Copy.CHOpCommit = true
+		opts.Copy.CHOpDate = true
+		opts.Copy.CHOpIP = true
+		opts.Copy.ClustersCount = true
+		opts.Copy.ShardsCount = true
+		opts.Copy.ReplicasCount = true
+		opts.Copy.HostsCount = true
+		opts.Copy.Status = true
+		opts.Copy.TaskID = true
+		opts.Copy.TaskIDsStarted = true
+		opts.Copy.TaskIDsCompleted = true
+		opts.Copy.Action = true
+		opts.Merge.Actions = true
+		opts.Copy.Error = true
+		opts.Copy.Errors = true
+		opts.Copy.HostsUpdatedCount = true
+		opts.Copy.HostsAddedCount = true
+		opts.Copy.HostsUnchangedCount = true
+		opts.Copy.HostsCompletedCount = true
+		opts.Copy.HostsDeletedCount = true
+		opts.Copy.HostsDeleteCount = true
+		opts.Copy.Pods = true
+		opts.Copy.PodIPs = true
+		opts.Copy.FQDNs = true
+		opts.Copy.Endpoint = true
+		opts.Copy.NormalizedCR = true
+	}
+
+	if opts.FieldGroupNormalized {
+		opts.Copy.NormalizedCR = true
+	}
+
+	if opts.FieldGroupWholeStatus {
+		opts.Copy.CHOpVersion = true
+		opts.Copy.CHOpCommit = true
+		opts.Copy.CHOpDate = true
+		opts.Copy.CHOpIP = true
+		opts.Copy.ClustersCount = true
+		opts.Copy.ShardsCount = true
+		opts.Copy.ReplicasCount = true
+		opts.Copy.HostsCount = true
+		opts.Copy.Status = true
+		opts.Copy.TaskID = true
+		opts.Copy.TaskIDsStarted = true
+		opts.Copy.TaskIDsCompleted = true
+		opts.Copy.Action = true
+		opts.Merge.Actions = true
+		opts.Copy.Error = true
+		opts.Copy.Errors = true
+		opts.Copy.HostsUpdatedCount = true
+		opts.Copy.HostsAddedCount = true
+		opts.Copy.HostsUnchangedCount = true
+		opts.Copy.HostsCompletedCount = true
+		opts.Copy.HostsDeletedCount = true
+		opts.Copy.HostsDeleteCount = true
+		opts.Copy.Pods = true
+		opts.Copy.PodIPs = true
+		opts.Copy.FQDNs = true
+		opts.Copy.Endpoint = true
+		opts.Copy.NormalizedCR = true
+		opts.Copy.NormalizedCRCompleted = true
+	}
+
+	return opts
+}
+
 // CopyFrom copies the state of a given Status f into the receiver Status of the call.
 func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 	doWithWriteLock(s, func(s *Status) {
@@ -330,96 +419,108 @@ func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 				return
 			}
 
-			if opts.InheritableFields {
-				s.TaskIDsStarted = from.TaskIDsStarted
-				s.TaskIDsCompleted = from.TaskIDsCompleted
-				s.Actions = from.Actions
-				s.Errors = from.Errors
-				s.HostsWithTablesCreated = from.HostsWithTablesCreated
-			}
+			opts = prepareOptions(opts)
 
-			if opts.Actions {
+			// Copy fields
+			if opts.Copy.CHOpVersion {
+				s.CHOpVersion = from.CHOpVersion
+			}
+			if opts.Copy.CHOpCommit {
+				s.CHOpCommit = from.CHOpCommit
+			}
+			if opts.Copy.CHOpDate {
+				s.CHOpDate = from.CHOpDate
+			}
+			if opts.Copy.CHOpIP {
+				s.CHOpIP = from.CHOpIP
+			}
+			if opts.Copy.ClustersCount {
+				s.ClustersCount = from.ClustersCount
+			}
+			if opts.Copy.ShardsCount {
+				s.ShardsCount = from.ShardsCount
+			}
+			if opts.Copy.ReplicasCount {
+				s.ReplicasCount = from.ReplicasCount
+			}
+			if opts.Copy.HostsCount {
+				s.HostsCount = from.HostsCount
+			}
+			if opts.Copy.Status {
+				s.Status = from.Status
+			}
+			if opts.Copy.TaskID {
+				s.TaskID = from.TaskID
+			}
+			if opts.Copy.TaskIDsStarted {
+				s.TaskIDsStarted = from.TaskIDsStarted
+			}
+			if opts.Copy.TaskIDsCompleted {
+				s.TaskIDsCompleted = from.TaskIDsCompleted
+			}
+			if opts.Copy.Action {
 				s.Action = from.Action
+			}
+			if opts.Merge.Actions {
 				mergeActionsNoSync(s, from)
+			}
+			if opts.Copy.Error {
+				s.Error = from.Error
+			}
+			if opts.Copy.Errors {
+				s.Errors = from.Errors
+			}
+			if opts.Merge.Errors {
+				s.Errors = util.MergeStringArrays(s.Errors, from.Errors)
+				sort.Sort(sort.Reverse(sort.StringSlice(s.Errors)))
+			}
+			if opts.Copy.HostsUpdatedCount {
+				s.HostsUpdatedCount = from.HostsUpdatedCount
+			}
+			if opts.Copy.HostsAddedCount {
+				s.HostsAddedCount = from.HostsAddedCount
+			}
+			if opts.Copy.HostsUnchangedCount {
+				s.HostsUnchangedCount = from.HostsUnchangedCount
+			}
+			if opts.Copy.HostsCompletedCount {
+				s.HostsCompletedCount = from.HostsCompletedCount
+			}
+			if opts.Copy.HostsDeletedCount {
+				s.HostsDeletedCount = from.HostsDeletedCount
+			}
+			if opts.Copy.HostsDeleteCount {
+				s.HostsDeleteCount = from.HostsDeleteCount
+			}
+			if opts.Copy.Pods {
+				s.Pods = from.Pods
+			}
+			if opts.Copy.PodIPs {
+				s.PodIPs = from.PodIPs
+			}
+			if opts.Copy.FQDNs {
+				s.FQDNs = from.FQDNs
+			}
+			if opts.Copy.Endpoint {
+				s.Endpoint = from.Endpoint
+			}
+			if opts.Copy.NormalizedCR {
+				s.NormalizedCR = from.NormalizedCR
+			}
+			if opts.Copy.NormalizedCRCompleted {
+				s.NormalizedCRCompleted = from.NormalizedCRCompleted
+			}
+			if opts.Copy.HostsWithTablesCreated {
 				s.HostsWithTablesCreated = nil
 				if len(from.HostsWithTablesCreated) > 0 {
 					s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, from.HostsWithTablesCreated...)
 				}
+			}
+			if opts.Copy.UsedTemplates {
 				s.UsedTemplates = nil
 				if len(from.UsedTemplates) > 0 {
 					s.UsedTemplates = append(s.UsedTemplates, from.UsedTemplates...)
 				}
-			}
-
-			if opts.Errors {
-				s.Error = from.Error
-				s.Errors = util.MergeStringArrays(s.Errors, from.Errors)
-				sort.Sort(sort.Reverse(sort.StringSlice(s.Errors)))
-			}
-
-			if opts.MainFields {
-				s.CHOpVersion = from.CHOpVersion
-				s.CHOpCommit = from.CHOpCommit
-				s.CHOpDate = from.CHOpDate
-				s.CHOpIP = from.CHOpIP
-				s.ClustersCount = from.ClustersCount
-				s.ShardsCount = from.ShardsCount
-				s.ReplicasCount = from.ReplicasCount
-				s.HostsCount = from.HostsCount
-				s.Status = from.Status
-				s.TaskID = from.TaskID
-				s.TaskIDsStarted = from.TaskIDsStarted
-				s.TaskIDsCompleted = from.TaskIDsCompleted
-				s.Action = from.Action
-				mergeActionsNoSync(s, from)
-				s.Error = from.Error
-				s.Errors = from.Errors
-				s.HostsUpdatedCount = from.HostsUpdatedCount
-				s.HostsAddedCount = from.HostsAddedCount
-				s.HostsUnchangedCount = from.HostsUnchangedCount
-				s.HostsCompletedCount = from.HostsCompletedCount
-				s.HostsDeletedCount = from.HostsDeletedCount
-				s.HostsDeleteCount = from.HostsDeleteCount
-				s.Pods = from.Pods
-				s.PodIPs = from.PodIPs
-				s.FQDNs = from.FQDNs
-				s.Endpoint = from.Endpoint
-				s.NormalizedCR = from.NormalizedCR
-			}
-
-			if opts.Normalized {
-				s.NormalizedCR = from.NormalizedCR
-			}
-
-			if opts.WholeStatus {
-				s.CHOpVersion = from.CHOpVersion
-				s.CHOpCommit = from.CHOpCommit
-				s.CHOpDate = from.CHOpDate
-				s.CHOpIP = from.CHOpIP
-				s.ClustersCount = from.ClustersCount
-				s.ShardsCount = from.ShardsCount
-				s.ReplicasCount = from.ReplicasCount
-				s.HostsCount = from.HostsCount
-				s.Status = from.Status
-				s.TaskID = from.TaskID
-				s.TaskIDsStarted = from.TaskIDsStarted
-				s.TaskIDsCompleted = from.TaskIDsCompleted
-				s.Action = from.Action
-				mergeActionsNoSync(s, from)
-				s.Error = from.Error
-				s.Errors = from.Errors
-				s.HostsUpdatedCount = from.HostsUpdatedCount
-				s.HostsAddedCount = from.HostsAddedCount
-				s.HostsUnchangedCount = from.HostsUnchangedCount
-				s.HostsCompletedCount = from.HostsCompletedCount
-				s.HostsDeletedCount = from.HostsDeletedCount
-				s.HostsDeleteCount = from.HostsDeleteCount
-				s.Pods = from.Pods
-				s.PodIPs = from.PodIPs
-				s.FQDNs = from.FQDNs
-				s.Endpoint = from.Endpoint
-				s.NormalizedCR = from.NormalizedCR
-				s.NormalizedCRCompleted = from.NormalizedCRCompleted
 			}
 		})
 	})

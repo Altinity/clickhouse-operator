@@ -308,8 +308,10 @@ func (a Announcer) writeStatus(format string, args ...interface{}) {
 		_ = a.statusUpdater.StatusUpdate(context.Background(), a.cr, types.UpdateStatusOptions{
 			TolerateAbsence: true,
 			CopyStatusOptions: types.CopyStatusOptions{
-				Actions: true,
-				Errors:  true,
+				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+					FieldGroupActions: true,
+					FieldGroupErrors:  true,
+				},
 			},
 		})
 	}

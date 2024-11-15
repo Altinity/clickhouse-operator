@@ -276,7 +276,9 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 				TolerateAbsence: true,
 				CopyStatusOptions: types.CopyStatusOptions{
-					Normalized: true,
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupNormalized: true,
+					},
 				},
 			})
 		} else {
@@ -477,7 +479,9 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInsta
 	cr.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
 	_ = w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	})
 
@@ -515,7 +519,9 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 			w.reconcileConfigMapCommonUsers(ctx, chi)
 			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{
-					WholeStatus: true,
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupWholeStatus: true,
+					},
 				},
 			})
 		} else {
@@ -547,7 +553,9 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 	}
 	w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	})
 

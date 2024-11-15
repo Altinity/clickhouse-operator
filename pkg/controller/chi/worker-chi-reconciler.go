@@ -620,7 +620,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 	_ = w.c.updateCRObjectStatus(ctx, host.GetCR(), types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	})
 

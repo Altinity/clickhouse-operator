@@ -211,7 +211,9 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKe
 	cr.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
 	_ = w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	})
 
@@ -249,7 +251,9 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chk *ap
 			//w.reconcileConfigMapCommonUsers(ctx, chi)
 			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{
-					WholeStatus: true,
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupWholeStatus: true,
+					},
 				},
 			})
 		} else {
@@ -281,7 +285,9 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chk *
 	}
 	w.c.updateCRObjectStatus(ctx, chk, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	})
 

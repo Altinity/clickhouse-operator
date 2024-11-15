@@ -290,7 +290,9 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	if err := w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 		TolerateAbsence: true,
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	}); err != nil {
 		w.a.V(1).M(chi).F().Error("UNABLE to write normalized CHI. err: %q", err)
@@ -496,7 +498,9 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 	_ = w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 		TolerateAbsence: true,
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	})
 

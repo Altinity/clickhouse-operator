@@ -175,13 +175,13 @@ func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr 
 	switch {
 	case cr.HostsCount() < cr.GetAncestor().HostsCount():
 		// Downscale
-		time.Sleep(120*time.Second)
+		time.Sleep(120 * time.Second)
 	case cr.HostsCount() > cr.GetAncestor().HostsCount():
 		// Upscale
-		time.Sleep(30*time.Second)
+		time.Sleep(30 * time.Second)
 	default:
 		// Same size
-		time.Sleep(10*time.Second)
+		time.Sleep(10 * time.Second)
 	}
 	return nil
 }
@@ -569,7 +569,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 	_ = w.c.updateCRObjectStatus(ctx, host.GetCR(), types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	})
 	return nil
@@ -652,7 +654,7 @@ func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host) er
 
 	// Wait for host to startup
 	if wait {
-		time.Sleep(7*time.Second)
+		time.Sleep(7 * time.Second)
 	}
 	return nil
 }

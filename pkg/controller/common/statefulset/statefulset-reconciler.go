@@ -146,7 +146,9 @@ func (r *Reconciler) ReconcileStatefulSet(
 			host.GetCR().IEnsureStatus().HostUnchanged()
 			_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{
-					MainFields: true,
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupMain: true,
+					},
 				},
 			})
 		}
@@ -236,7 +238,9 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 			host.GetCR().IEnsureStatus().HostUpdated()
 			_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{
-					MainFields: true,
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupMain: true,
+					},
 				},
 			})
 		}
@@ -292,7 +296,9 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 		host.GetCR().IEnsureStatus().HostAdded()
 		_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
 			CopyStatusOptions: types.CopyStatusOptions{
-				MainFields: true,
+				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+					FieldGroupMain: true,
+				},
 			},
 		})
 	}
