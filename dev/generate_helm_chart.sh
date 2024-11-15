@@ -70,7 +70,7 @@ function main() {
   done
 
   if [[ $(command -v helm-docs) ]]; then
-    helm-docs --skip-version-footer --chart-search-root="${chart_path}" --log-level=warning
+    helm-docs --chart-search-root="${chart_path}" --log-level=warning
   else
     echo "WARNING"
     echo "helm-docs is not available, skip docs generation"
