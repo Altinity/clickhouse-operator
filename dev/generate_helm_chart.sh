@@ -6,7 +6,7 @@ function usage() {
  NOTE script requires some pre-installed tools:
  - yq ( https://mikefarah.gitbook.io/yq/ ) > v4.14.x
  - jq ( https://github.com/stedolan/jq )
- - helm-docs ( https://github.com/norwoodj/helm-docs ) > v1.14.x
+ - helm-docs ( https://github.com/norwoodj/helm-docs )
  - perl ( https://learn.perl.org/installing/ )
 
  Usage: ./generate_helm_chart.sh
