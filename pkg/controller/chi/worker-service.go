@@ -17,13 +17,13 @@ package chi
 import (
 	"context"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -52,7 +52,7 @@ func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, s
 			w.a.V(1).M(cr).F().Info("Service: %s not found. err: %v", util.NamespaceNameString(service), err)
 		} else {
 			// The Service is either not found or not updated. Try to recreate it
-			w.a.WithEvent(cr, announcer.EventActionUpdate, announcer.EventReasonUpdateFailed).
+			w.a.WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateFailed).
 				WithAction(cr).
 				WithError(cr).
 				M(cr).F().
@@ -66,7 +66,7 @@ func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, s
 	if err == nil {
 		w.a.V(1).M(cr).F().Info("Service reconcile successful: %s", util.NamespaceNameString(service))
 	} else {
-		w.a.WithEvent(cr, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+		w.a.WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithAction(cr).
 			WithError(cr).
 			M(cr).F().
@@ -178,7 +178,7 @@ func (w *worker) updateService(
 	err := w.c.updateService(ctx, newService)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, announcer.EventActionUpdate, announcer.EventReasonUpdateCompleted).
+			WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateCompleted).
 			WithAction(cr).
 			M(cr).F().
 			Info("Update Service success: %s", util.NamespaceNameString(newService))
@@ -218,12 +218,12 @@ func (w *worker) createService(ctx context.Context, cr chi.ICustomResource, serv
 	err := w.c.createService(ctx, service)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, announcer.EventActionCreate, announcer.EventReasonCreateCompleted).
+			WithEvent(cr, a.EventActionCreate, a.EventReasonCreateCompleted).
 			WithAction(cr).
 			M(cr).F().
 			Info("OK Create Service: %s", util.NamespaceNameString(service))
 	} else {
-		w.a.WithEvent(cr, announcer.EventActionCreate, announcer.EventReasonCreateFailed).
+		w.a.WithEvent(cr, a.EventActionCreate, a.EventReasonCreateFailed).
 			WithAction(cr).
 			WithError(cr).
 			M(cr).F().
