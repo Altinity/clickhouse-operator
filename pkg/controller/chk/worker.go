@@ -49,7 +49,7 @@ import (
 // worker represents worker thread which runs reconcile tasks
 type worker struct {
 	c *Controller
-	a announcer.Announcer
+	a a.Announcer
 
 	normalizer    *normalizer.Normalizer
 	task          *common.Task
@@ -65,7 +65,7 @@ func (c *Controller) newWorker() *worker {
 	//generateName := "chop-chk-"
 	//component := componentName
 
-	announcer := announcer.NewAnnouncer(
+	announcer := a.NewAnnouncer(
 		//common.NewEventEmitter(c.kube.Event(), kind, generateName, component),
 		nil,
 		c.kube.CR(),
