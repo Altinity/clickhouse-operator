@@ -4272,6 +4272,126 @@ spec:
                             When adding labels to a metric exclude labels with names from the following list
                           items:
                             type: string
+                status:
+                  type: object
+                  description: "defines status options"
+                  properties:
+                    fields:
+                      type: object
+                      description: "defines status fields options"
+                      properties:
+                        action:
+                          type: string
+                          enum:
+                            # List StringBoolXXX constants from model
+                            - ""
+                            - "0"
+                            - "1"
+                            - "False"
+                            - "false"
+                            - "True"
+                            - "true"
+                            - "No"
+                            - "no"
+                            - "Yes"
+                            - "yes"
+                            - "Off"
+                            - "off"
+                            - "On"
+                            - "on"
+                            - "Disable"
+                            - "disable"
+                            - "Enable"
+                            - "enable"
+                            - "Disabled"
+                            - "disabled"
+                            - "Enabled"
+                            - "enabled"
+                          description: "Whether the operator should fill status field 'action'"
+                        actions:
+                          type: string
+                          enum:
+                            # List StringBoolXXX constants from model
+                            - ""
+                            - "0"
+                            - "1"
+                            - "False"
+                            - "false"
+                            - "True"
+                            - "true"
+                            - "No"
+                            - "no"
+                            - "Yes"
+                            - "yes"
+                            - "Off"
+                            - "off"
+                            - "On"
+                            - "on"
+                            - "Disable"
+                            - "disable"
+                            - "Enable"
+                            - "enable"
+                            - "Disabled"
+                            - "disabled"
+                            - "Enabled"
+                            - "enabled"
+                          description: "Whether the operator should fill status field 'actions'"
+                        error:
+                          type: string
+                          enum:
+                            # List StringBoolXXX constants from model
+                            - ""
+                            - "0"
+                            - "1"
+                            - "False"
+                            - "false"
+                            - "True"
+                            - "true"
+                            - "No"
+                            - "no"
+                            - "Yes"
+                            - "yes"
+                            - "Off"
+                            - "off"
+                            - "On"
+                            - "on"
+                            - "Disable"
+                            - "disable"
+                            - "Enable"
+                            - "enable"
+                            - "Disabled"
+                            - "disabled"
+                            - "Enabled"
+                            - "enabled"
+                          description: "Whether the operator should fill status field 'error'"
+                        errors:
+                          type: string
+                          enum:
+                            # List StringBoolXXX constants from model
+                            - ""
+                            - "0"
+                            - "1"
+                            - "False"
+                            - "false"
+                            - "True"
+                            - "true"
+                            - "No"
+                            - "no"
+                            - "Yes"
+                            - "yes"
+                            - "Off"
+                            - "off"
+                            - "On"
+                            - "on"
+                            - "Disable"
+                            - "disable"
+                            - "Enable"
+                            - "enable"
+                            - "Disabled"
+                            - "disabled"
+                            - "Enabled"
+                            - "enabled"
+                          description: "Whether the operator should fill status field 'errors'"
                 statefulSet:
                   type: object
                   description: "define StatefulSet-specific parameters"

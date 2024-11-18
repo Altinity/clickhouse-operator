@@ -2955,6 +2955,26 @@ spec:
                             When adding labels to a metric exclude labels with names from the following list
                           items:
                             type: string
+                status:
+                  type: object
+                  description: "defines status options"
+                  properties:
+                    fields:
+                      type: object
+                      description: "defines status fields options"
+                      properties:
+                        action:
+                          <<: *TypeStringBool
+                          description: "Whether the operator should fill status field 'action'"
+                        actions:
+                          <<: *TypeStringBool
+                          description: "Whether the operator should fill status field 'actions'"
+                        error:
+                          <<: *TypeStringBool
+                          description: "Whether the operator should fill status field 'error'"
+                        errors:
+                          <<: *TypeStringBool
+                          description: "Whether the operator should fill status field 'errors'"
                 statefulSet:
                   type: object
                   description: "define StatefulSet-specific parameters"
@@ -4485,6 +4505,18 @@ data:
     metrics:
       labels:
         exclude: []
+    
+    ################################################
+    ##
+    ## Status management section
+    ##
+    ################################################
+    status:
+      fields:
+        action: false
+        actions: false
+        error: false
+        errors: false
     
     ################################################
     ##
