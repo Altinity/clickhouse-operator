@@ -75,7 +75,7 @@ type Status struct {
 	NormalizedCR           *ClickHouseKeeperInstallation `json:"normalized,omitempty"             yaml:"normalized,omitempty"`
 	NormalizedCRCompleted  *ClickHouseKeeperInstallation `json:"normalizedCompleted,omitempty"    yaml:"normalizedCompleted,omitempty"`
 	HostsWithTablesCreated []string                      `json:"hostsWithTablesCreated,omitempty" yaml:"hostsWithTablesCreated,omitempty"`
-	UsedTemplates          []*chi.TemplateRef         `json:"usedTemplates,omitempty"          yaml:"usedTemplates,omitempty"`
+	UsedTemplates          []*chi.TemplateRef            `json:"usedTemplates,omitempty"          yaml:"usedTemplates,omitempty"`
 
 	mu sync.RWMutex `json:"-" yaml:"-"`
 }
