@@ -17,13 +17,13 @@ package chi
 import (
 	"context"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -52,9 +52,9 @@ func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, s
 			w.a.V(1).M(cr).F().Info("Service: %s not found. err: %v", util.NamespaceNameString(service), err)
 		} else {
 			// The Service is either not found or not updated. Try to recreate it
-			w.a.WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateFailed).
-				WithStatusAction(cr).
-				WithStatusError(cr).
+			w.a.WithEvent(cr, announcer.EventActionUpdate, announcer.EventReasonUpdateFailed).
+				WithAction(cr).
+				WithError(cr).
 				M(cr).F().
 				Error("Update Service: %s failed with error: %v", util.NamespaceNameString(service), err)
 		}
@@ -66,9 +66,9 @@ func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, s
 	if err == nil {
 		w.a.V(1).M(cr).F().Info("Service reconcile successful: %s", util.NamespaceNameString(service))
 	} else {
-		w.a.WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusAction(cr).
-			WithStatusError(cr).
+		w.a.WithEvent(cr, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+			WithAction(cr).
+			WithError(cr).
 			M(cr).F().
 			Error("FAILED to reconcile Service: %s CHI: %s ", util.NamespaceNameString(service), cr.GetName())
 	}
@@ -178,8 +178,8 @@ func (w *worker) updateService(
 	err := w.c.updateService(ctx, newService)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateCompleted).
-			WithStatusAction(cr).
+			WithEvent(cr, announcer.EventActionUpdate, announcer.EventReasonUpdateCompleted).
+			WithAction(cr).
 			M(cr).F().
 			Info("Update Service success: %s", util.NamespaceNameString(newService))
 	} else {
@@ -218,14 +218,14 @@ func (w *worker) createService(ctx context.Context, cr chi.ICustomResource, serv
 	err := w.c.createService(ctx, service)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, common.EventActionCreate, common.EventReasonCreateCompleted).
-			WithStatusAction(cr).
+			WithEvent(cr, announcer.EventActionCreate, announcer.EventReasonCreateCompleted).
+			WithAction(cr).
 			M(cr).F().
 			Info("OK Create Service: %s", util.NamespaceNameString(service))
 	} else {
-		w.a.WithEvent(cr, common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(cr).
-			WithStatusError(cr).
+		w.a.WithEvent(cr, announcer.EventActionCreate, announcer.EventReasonCreateFailed).
+			WithAction(cr).
+			WithError(cr).
 			M(cr).F().
 			Error("FAILED Create Service: %s err: %v", util.NamespaceNameString(service), err)
 	}

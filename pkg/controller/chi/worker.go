@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"errors"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -55,7 +56,7 @@ const FinalizerName = "finalizer.clickhouseinstallation.altinity.com"
 // worker represents worker thread which runs reconcile tasks
 type worker struct {
 	c *Controller
-	a common.Announcer
+	a announcer.Announcer
 
 	//queue workqueue.RateLimitingInterface
 	queue   queue.PriorityQueue
@@ -78,8 +79,8 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	generateName := "chop-chi-"
 	component := componentName
 
-	announcer := common.NewAnnouncer(
-		common.NewEventEmitter(c.kube.Event(), kind, generateName, component),
+	announcer := announcer.NewAnnouncer(
+		announcer.NewEventEmitter(c.kube.Event(), kind, generateName, component),
 		c.kube.CR(),
 	)
 
@@ -207,8 +208,8 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 	chi, err := w.normalizer.CreateTemplated(c, commonNormalizer.NewOptions())
 	if err != nil {
-		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusError(chi).
+		w.a.WithEvent(chi, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+			WithError(chi).
 			M(chi).F().
 			Error("FAILED to normalize CR 1: %v", err)
 	}
@@ -220,8 +221,8 @@ func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstall
 
 	chi, err = w.normalizer.CreateTemplated(c, opts)
 	if err != nil {
-		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusError(chi).
+		w.a.WithEvent(chi, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+			WithError(chi).
 			M(chi).F().
 			Error("FAILED to normalize CHI 2: %v", err)
 	}
@@ -447,8 +448,8 @@ func (w *worker) excludeStoppedCHIFromMonitoring(chi *api.ClickHouseInstallation
 	}
 
 	w.a.V(1).
-		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileInProgress).
-		WithStatusAction(chi).
+		WithEvent(chi, announcer.EventActionReconcile, announcer.EventReasonReconcileInProgress).
+		WithAction(chi).
 		M(chi).F().
 		Info("exclude CHI from monitoring")
 	w.c.deleteWatch(chi)
@@ -462,8 +463,8 @@ func (w *worker) addCHIToMonitoring(chi *api.ClickHouseInstallation) {
 	}
 
 	w.a.V(1).
-		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileInProgress).
-		WithStatusAction(chi).
+		WithEvent(chi, announcer.EventActionReconcile, announcer.EventReasonReconcileInProgress).
+		WithAction(chi).
 		M(chi).F().
 		Info("add CHI to monitoring")
 	w.c.updateWatch(chi)
@@ -486,9 +487,9 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInsta
 	})
 
 	w.a.V(1).
-		WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileStarted).
-		WithStatusAction(cr).
-		WithStatusActions(cr).
+		WithEvent(cr, announcer.EventActionReconcile, announcer.EventReasonReconcileStarted).
+		WithAction(cr).
+		WithActions(cr).
 		M(cr).F().
 		Info("reconcile started, task id: %s", cr.GetSpecT().GetTaskID())
 	w.a.V(2).M(cr).F().Info("action plan\n%s\n", ap.String())
@@ -532,9 +533,9 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 	}
 
 	w.a.V(1).
-		WithEvent(_chi, common.EventActionReconcile, common.EventReasonReconcileCompleted).
-		WithStatusAction(_chi).
-		WithStatusActions(_chi).
+		WithEvent(_chi, announcer.EventActionReconcile, announcer.EventReasonReconcileCompleted).
+		WithAction(_chi).
+		WithActions(_chi).
 		M(_chi).F().
 		Info("reconcile completed successfully, task id: %s", _chi.GetSpecT().GetTaskID())
 }
@@ -560,9 +561,9 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 	})
 
 	w.a.V(1).
-		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
-		WithStatusAction(chi).
-		WithStatusActions(chi).
+		WithEvent(chi, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+		WithAction(chi).
+		WithActions(chi).
 		M(chi).F().
 		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chi.GetSpecT().GetTaskID())
 }

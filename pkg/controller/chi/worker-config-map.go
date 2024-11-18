@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -23,7 +24,6 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -55,9 +55,9 @@ func (w *worker) reconcileConfigMap(
 	}
 
 	if err != nil {
-		w.a.WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusAction(cr).
-			WithStatusError(cr).
+		w.a.WithEvent(cr, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+			WithAction(cr).
+			WithError(cr).
 			M(cr).F().
 			Error("FAILED to reconcile ConfigMap: %s CHI: %s ", configMap.GetName(), cr.GetName())
 	}
@@ -75,17 +75,17 @@ func (w *worker) updateConfigMap(ctx context.Context, cr api.ICustomResource, co
 	updatedConfigMap, err := w.c.updateConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateCompleted).
-			WithStatusAction(cr).
+			WithEvent(cr, announcer.EventActionUpdate, announcer.EventReasonUpdateCompleted).
+			WithAction(cr).
 			M(cr).F().
 			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		if updatedConfigMap.ResourceVersion != configMap.ResourceVersion {
 			w.task.SetCmUpdate(time.Now())
 		}
 	} else {
-		w.a.WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateFailed).
-			WithStatusAction(cr).
-			WithStatusError(cr).
+		w.a.WithEvent(cr, announcer.EventActionUpdate, announcer.EventReasonUpdateFailed).
+			WithAction(cr).
+			WithError(cr).
 			M(cr).F().
 			Error("Update ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
 	}
@@ -103,14 +103,14 @@ func (w *worker) createConfigMap(ctx context.Context, cr api.ICustomResource, co
 	err := w.c.createConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, common.EventActionCreate, common.EventReasonCreateCompleted).
-			WithStatusAction(cr).
+			WithEvent(cr, announcer.EventActionCreate, announcer.EventReasonCreateCompleted).
+			WithAction(cr).
 			M(cr).F().
 			Info("Create ConfigMap %s", util.NamespaceNameString(configMap))
 	} else {
-		w.a.WithEvent(cr, common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(cr).
-			WithStatusError(cr).
+		w.a.WithEvent(cr, announcer.EventActionCreate, announcer.EventReasonCreateFailed).
+			WithAction(cr).
+			WithError(cr).
 			M(cr).F().
 			Error("Create ConfigMap %s failed with error %v", util.NamespaceNameString(configMap), err)
 	}
