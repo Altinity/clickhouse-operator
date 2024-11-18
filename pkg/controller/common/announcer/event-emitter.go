@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package announcer
 
 import (
 	"time"
@@ -80,6 +80,17 @@ func NewEventEmitter(
 		kind:         kind,
 		generateName: generateName,
 		component:    component,
+	}
+}
+
+func (c *EventEmitter) Event(level string, obj meta.Object, action string, reason string, message string) {
+	switch level {
+	case "info":
+		c.EventInfo(obj, action, reason, message)
+	case "warning":
+		c.EventWarning(obj, action, reason, message)
+	case "error":
+		c.EventError(obj, action, reason, message)
 	}
 }
 
