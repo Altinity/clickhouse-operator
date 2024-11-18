@@ -16,7 +16,6 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -24,6 +23,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -55,7 +55,7 @@ func (w *worker) reconcileConfigMap(
 	}
 
 	if err != nil {
-		w.a.WithEvent(cr, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+		w.a.WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithAction(cr).
 			WithError(cr).
 			M(cr).F().
@@ -75,7 +75,7 @@ func (w *worker) updateConfigMap(ctx context.Context, cr api.ICustomResource, co
 	updatedConfigMap, err := w.c.updateConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, announcer.EventActionUpdate, announcer.EventReasonUpdateCompleted).
+			WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateCompleted).
 			WithAction(cr).
 			M(cr).F().
 			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
@@ -83,7 +83,7 @@ func (w *worker) updateConfigMap(ctx context.Context, cr api.ICustomResource, co
 			w.task.SetCmUpdate(time.Now())
 		}
 	} else {
-		w.a.WithEvent(cr, announcer.EventActionUpdate, announcer.EventReasonUpdateFailed).
+		w.a.WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateFailed).
 			WithAction(cr).
 			WithError(cr).
 			M(cr).F().
@@ -103,12 +103,12 @@ func (w *worker) createConfigMap(ctx context.Context, cr api.ICustomResource, co
 	err := w.c.createConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, announcer.EventActionCreate, announcer.EventReasonCreateCompleted).
+			WithEvent(cr, a.EventActionCreate, a.EventReasonCreateCompleted).
 			WithAction(cr).
 			M(cr).F().
 			Info("Create ConfigMap %s", util.NamespaceNameString(configMap))
 	} else {
-		w.a.WithEvent(cr, announcer.EventActionCreate, announcer.EventReasonCreateFailed).
+		w.a.WithEvent(cr, a.EventActionCreate, a.EventReasonCreateFailed).
 			WithAction(cr).
 			WithError(cr).
 			M(cr).F().
