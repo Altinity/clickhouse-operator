@@ -16,13 +16,13 @@ package chk
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"time"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -35,8 +35,8 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	}
 
 	w.a.V(1).
-		WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileInProgress).
-		WithStatusAction(cr).
+		WithEvent(cr, announcer.EventActionReconcile, announcer.EventReasonReconcileInProgress).
+		WithAction(cr).
 		M(cr).F().
 		Info("remove items scheduled for deletion")
 
