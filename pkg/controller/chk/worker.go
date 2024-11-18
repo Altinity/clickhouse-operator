@@ -17,7 +17,6 @@ package chk
 import (
 	"context"
 	"errors"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"time"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +26,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
@@ -174,7 +174,7 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 func (w *worker) normalize(c *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
 	chk, err := normalizer.New().CreateTemplated(c, commonNormalizer.NewOptions())
 	if err != nil {
-		w.a.WithEvent(chk, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+		w.a.WithEvent(chk, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithError(chk).
 			M(chk).F().
 			Error("FAILED to normalize CR 1: %v", err)
@@ -219,7 +219,7 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKe
 	})
 
 	w.a.V(1).
-		WithEvent(cr, announcer.EventActionReconcile, announcer.EventReasonReconcileStarted).
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileStarted).
 		WithAction(cr).
 		WithActions(cr).
 		M(cr).F().
@@ -265,7 +265,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chk *ap
 	}
 
 	w.a.V(1).
-		WithEvent(_chk, announcer.EventActionReconcile, announcer.EventReasonReconcileCompleted).
+		WithEvent(_chk, a.EventActionReconcile, a.EventReasonReconcileCompleted).
 		WithAction(_chk).
 		WithActions(_chk).
 		M(_chk).F().
@@ -293,7 +293,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chk *
 	})
 
 	w.a.V(1).
-		WithEvent(chk, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+		WithEvent(chk, a.EventActionReconcile, a.EventReasonReconcileFailed).
 		WithAction(chk).
 		WithActions(chk).
 		M(chk).F().
