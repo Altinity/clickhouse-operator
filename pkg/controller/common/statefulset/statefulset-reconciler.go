@@ -16,7 +16,6 @@ package statefulset
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -26,6 +25,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
@@ -33,7 +33,7 @@ import (
 )
 
 type Reconciler struct {
-	a    announcer.Announcer
+	a    a.Announcer
 	task *common.Task
 
 	hostSTSPoller IHostStatefulSetPoller
@@ -48,7 +48,7 @@ type Reconciler struct {
 }
 
 func NewReconciler(
-	a announcer.Announcer,
+	a a.Announcer,
 	task *common.Task,
 	hostSTSPoller IHostStatefulSetPoller,
 	namer interfaces.INameManager,
@@ -218,7 +218,7 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 	name := newStatefulSet.Name
 
 	r.a.V(1).
-		WithEvent(host.GetCR(), announcer.EventActionCreate, announcer.EventReasonCreateStarted).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
 		WithAction(host.GetCR()).
 		M(host).F().
 		Info("Update StatefulSet(%s) - started", util.NamespaceNameString(newStatefulSet))
@@ -246,7 +246,7 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 			})
 		}
 		r.a.V(1).
-			WithEvent(host.GetCR(), announcer.EventActionUpdate, announcer.EventReasonUpdateCompleted).
+			WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateCompleted).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
@@ -258,7 +258,7 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 		r.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got ignore. Ignore", namespace, name)
 		return nil
 	case common.ErrCRUDRecreate:
-		r.a.WithEvent(host.GetCR(), announcer.EventActionUpdate, announcer.EventReasonUpdateInProgress).
+		r.a.WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateInProgress).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
@@ -286,7 +286,7 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
 
 	r.a.V(1).
-		WithEvent(host.GetCR(), announcer.EventActionCreate, announcer.EventReasonCreateStarted).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
 		WithAction(host.GetCR()).
 		M(host).F().
 		Info("Create StatefulSet %s - started", util.NamespaceNameString(statefulSet))
@@ -307,20 +307,20 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 	switch action {
 	case nil:
 		r.a.V(1).
-			WithEvent(host.GetCR(), announcer.EventActionCreate, announcer.EventReasonCreateCompleted).
+			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Create StatefulSet: %s - completed", util.NamespaceNameString(statefulSet))
 		return nil
 	case common.ErrCRUDAbort:
-		r.a.WithEvent(host.GetCR(), announcer.EventActionCreate, announcer.EventReasonCreateFailed).
+		r.a.WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
 			WithAction(host.GetCR()).
 			WithError(host.GetCR()).
 			M(host).F().
 			Error("Create StatefulSet: %s - failed with error: %v", util.NamespaceNameString(statefulSet), action)
 		return action
 	case common.ErrCRUDIgnore:
-		r.a.WithEvent(host.GetCR(), announcer.EventActionCreate, announcer.EventReasonCreateFailed).
+		r.a.WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Warning("Create StatefulSet: %s - error ignored", util.NamespaceNameString(statefulSet))
