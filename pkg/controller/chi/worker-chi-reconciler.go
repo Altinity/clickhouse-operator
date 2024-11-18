@@ -17,7 +17,6 @@ package chi
 import (
 	"context"
 	"errors"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"math"
 	"sync"
 	"time"
@@ -28,6 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -104,7 +104,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 
 	if err := w.reconcile(ctx, new); err != nil {
 		// Something went wrong
-		w.a.WithEvent(new, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+		w.a.WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithError(new).
 			M(new).F().
 			Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
@@ -343,7 +343,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 		}
 
 		host.GetCR().IEnsureStatus().HostFailed()
-		w.a.WithEvent(host.GetCR(), announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+		w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithAction(host.GetCR()).
 			WithError(host.GetCR()).
 			M(host).F().
@@ -614,10 +614,10 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		hostsCount = host.GetCR().GetStatus().GetHostsCount()
 	}
 	w.a.V(1).
-		WithEvent(host.GetCR(), announcer.EventActionProgress, announcer.EventReasonProgressHostsCompleted).
+		WithEvent(host.GetCR(), a.EventActionProgress, a.EventReasonProgressHostsCompleted).
 		WithAction(host.GetCR()).
 		M(host).F().
-		Info("[now: %s] %s: %d of %d", now, announcer.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+		Info("[now: %s] %s: %d of %d", now, a.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
 
 	_ = w.c.updateCRObjectStatus(ctx, host.GetCR(), types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
@@ -638,13 +638,13 @@ func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error
 	// Check whether ClickHouse is running and accessible and what version is available
 	if version, err := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true}); err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCR(), announcer.EventActionReconcile, announcer.EventReasonReconcileStarted).
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCR(), announcer.EventActionReconcile, announcer.EventReasonReconcileStarted).
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Warning("Reconcile Host start. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
@@ -747,13 +747,13 @@ func (w *worker) reconcileHostBootstrap(ctx context.Context, host *api.Host) err
 	// Sometimes service needs some time to start after creation|modification before being accessible for usage
 	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCR(), announcer.EventActionReconcile, announcer.EventReasonReconcileCompleted).
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCR(), announcer.EventActionReconcile, announcer.EventReasonReconcileCompleted).
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
