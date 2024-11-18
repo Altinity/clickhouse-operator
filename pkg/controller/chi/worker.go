@@ -17,7 +17,6 @@ package chi
 import (
 	"context"
 	"errors"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -29,6 +28,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
@@ -56,7 +56,7 @@ const FinalizerName = "finalizer.clickhouseinstallation.altinity.com"
 // worker represents worker thread which runs reconcile tasks
 type worker struct {
 	c *Controller
-	a announcer.Announcer
+	a a.Announcer
 
 	//queue workqueue.RateLimitingInterface
 	queue   queue.PriorityQueue
@@ -79,8 +79,8 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	generateName := "chop-chi-"
 	component := componentName
 
-	announcer := announcer.NewAnnouncer(
-		announcer.NewEventEmitter(c.kube.Event(), kind, generateName, component),
+	announcer := a.NewAnnouncer(
+		a.NewEventEmitter(c.kube.Event(), kind, generateName, component),
 		c.kube.CR(),
 	)
 
@@ -208,7 +208,7 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 	chi, err := w.normalizer.CreateTemplated(c, commonNormalizer.NewOptions())
 	if err != nil {
-		w.a.WithEvent(chi, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+		w.a.WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithError(chi).
 			M(chi).F().
 			Error("FAILED to normalize CR 1: %v", err)
@@ -221,7 +221,7 @@ func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstall
 
 	chi, err = w.normalizer.CreateTemplated(c, opts)
 	if err != nil {
-		w.a.WithEvent(chi, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+		w.a.WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithError(chi).
 			M(chi).F().
 			Error("FAILED to normalize CHI 2: %v", err)
@@ -448,7 +448,7 @@ func (w *worker) excludeStoppedCHIFromMonitoring(chi *api.ClickHouseInstallation
 	}
 
 	w.a.V(1).
-		WithEvent(chi, announcer.EventActionReconcile, announcer.EventReasonReconcileInProgress).
+		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileInProgress).
 		WithAction(chi).
 		M(chi).F().
 		Info("exclude CHI from monitoring")
@@ -463,7 +463,7 @@ func (w *worker) addCHIToMonitoring(chi *api.ClickHouseInstallation) {
 	}
 
 	w.a.V(1).
-		WithEvent(chi, announcer.EventActionReconcile, announcer.EventReasonReconcileInProgress).
+		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileInProgress).
 		WithAction(chi).
 		M(chi).F().
 		Info("add CHI to monitoring")
@@ -487,7 +487,7 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInsta
 	})
 
 	w.a.V(1).
-		WithEvent(cr, announcer.EventActionReconcile, announcer.EventReasonReconcileStarted).
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileStarted).
 		WithAction(cr).
 		WithActions(cr).
 		M(cr).F().
@@ -533,7 +533,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 	}
 
 	w.a.V(1).
-		WithEvent(_chi, announcer.EventActionReconcile, announcer.EventReasonReconcileCompleted).
+		WithEvent(_chi, a.EventActionReconcile, a.EventReasonReconcileCompleted).
 		WithAction(_chi).
 		WithActions(_chi).
 		M(_chi).F().
@@ -561,7 +561,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 	})
 
 	w.a.V(1).
-		WithEvent(chi, announcer.EventActionReconcile, announcer.EventReasonReconcileFailed).
+		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
 		WithAction(chi).
 		WithActions(chi).
 		M(chi).F().
