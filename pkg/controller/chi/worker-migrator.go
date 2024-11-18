@@ -16,11 +16,11 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
@@ -89,7 +89,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 	}
 
 	w.a.V(1).
-		WithEvent(host.GetCR(), announcer.EventActionCreate, announcer.EventReasonCreateStarted).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
 		WithAction(host.GetCR()).
 		M(host).F().
 		Info(
@@ -99,7 +99,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 	err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCR(), announcer.EventActionCreate, announcer.EventReasonCreateCompleted).
+			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Tables added successfully on shard/host:%d/%d cluster:%s",
@@ -107,7 +107,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 		host.GetCR().IEnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCR(), announcer.EventActionCreate, announcer.EventReasonCreateFailed).
+			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Error("ERROR add tables added successfully on shard/host:%d/%d cluster:%s err:%v",
