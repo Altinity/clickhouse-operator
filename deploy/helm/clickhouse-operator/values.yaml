@@ -512,6 +512,17 @@ configs:
           exclude: []
       ################################################
       ##
+      ## Status management section
+      ##
+      ################################################
+      status:
+        fields:
+          action: false
+          actions: false
+          error: false
+          errors: false
+      ################################################
+      ##
       ## StatefulSet management section
       ##
       ################################################
