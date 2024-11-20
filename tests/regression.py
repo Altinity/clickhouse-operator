@@ -9,6 +9,7 @@ xfails = {
     # test_operator.py
     "/regression/e2e.test_operator/test_008*": [(Fail, "Test 008 sometimes fails due to unknown reasons")],
     "/regression/e2e.test_operator/test_032:": [(Fail, "Test 032 sometimes fails due to unknown reasons")],
+    "/regression/e2e.test_operator/test_051_1:": [(Fail, "Test 51 may fail in dev env due to incorrect github path")],
     # test_clickhouse.py
     "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
     # test_metrics_alerts.py
