@@ -175,11 +175,13 @@ func (s *Status) SyncHostTablesCreated() {
 	})
 }
 
-// PushUsedTemplate pushes used template to the list of used templates
-func (s *Status) PushUsedTemplate(templateRef *TemplateRef) {
-	doWithWriteLock(s, func(s *Status) {
-		s.UsedTemplates = append(s.UsedTemplates, templateRef)
-	})
+// PushUsedTemplate pushes used templates to the list of used templates
+func (s *Status) PushUsedTemplate(templateRefs ...*TemplateRef) {
+	if len(templateRefs) > 0 {
+		doWithWriteLock(s, func(s *Status) {
+			s.UsedTemplates = append(s.UsedTemplates, templateRefs...)
+		})
+	}
 }
 
 // GetUsedTemplatesCount gets used templates count
@@ -328,6 +330,7 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.Actions = true
 		opts.Copy.Errors = true
 		opts.Copy.HostsWithTablesCreated = true
+		opts.Copy.UsedTemplates = true
 	}
 
 	if opts.FieldGroupActions {
@@ -370,6 +373,7 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.FQDNs = true
 		opts.Copy.Endpoint = true
 		opts.Copy.NormalizedCR = true
+		opts.Copy.UsedTemplates = true
 	}
 
 	if opts.FieldGroupNormalized {
@@ -405,6 +409,7 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.Endpoint = true
 		opts.Copy.NormalizedCR = true
 		opts.Copy.NormalizedCRCompleted = true
+		opts.Copy.UsedTemplates = true
 	}
 
 	return opts
@@ -516,8 +521,8 @@ func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 				}
 			}
 			if opts.Copy.UsedTemplates {
-				s.UsedTemplates = nil
-				if len(from.UsedTemplates) > 0 {
+				if len(from.UsedTemplates) > len(s.UsedTemplates) {
+					s.UsedTemplates = nil
 					s.UsedTemplates = append(s.UsedTemplates, from.UsedTemplates...)
 				}
 			}
