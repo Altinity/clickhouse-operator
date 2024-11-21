@@ -19,6 +19,7 @@
 # Skip logs and caches
 log
 *.log
+*.log.txt
 __pycache__
 
 # Skip dev runtime-produced
