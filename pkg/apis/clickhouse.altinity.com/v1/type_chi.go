@@ -222,7 +222,9 @@ func (cr *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type 
 	cr.ensureRuntime().attributes = from.ensureRuntime().attributes
 
 	cr.EnsureStatus().CopyFrom(from.Status, types.CopyStatusOptions{
-		InheritableFields: true,
+		CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+			FieldGroupInheritable: true,
+		},
 	})
 }
 

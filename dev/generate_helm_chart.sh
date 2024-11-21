@@ -6,7 +6,7 @@ function usage() {
  NOTE script requires some pre-installed tools:
  - yq ( https://mikefarah.gitbook.io/yq/ ) > v4.14.x
  - jq ( https://github.com/stedolan/jq )
- - helm-docs ( https://github.com/norwoodj/helm-docs ) > v1.14.x
+ - helm-docs ( https://github.com/norwoodj/helm-docs )
  - perl ( https://learn.perl.org/installing/ )
 
  Usage: ./generate_helm_chart.sh
@@ -70,7 +70,7 @@ function main() {
   done
 
   if [[ $(command -v helm-docs) ]]; then
-    helm-docs --skip-version-footer --chart-search-root="${chart_path}" --log-level=warning
+    helm-docs --chart-search-root="${chart_path}" --log-level=warning
   else
     echo "WARNING"
     echo "helm-docs is not available, skip docs generation"

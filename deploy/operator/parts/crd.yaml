@@ -1699,7 +1699,7 @@ spec:
                             description: "template name, could use to link inside top-level `chi.spec.defaults.templates.podTemplate`, cluster-level `chi.spec.configuration.clusters.templates.podTemplate`, shard-level `chi.spec.configuration.clusters.layout.shards.temlates.podTemplate`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates.podTemplate`"
                           generateName:
                             type: string
-                            description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about aviailable template variables"
+                            description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about available template variables"
                           zone:
                             type: object
                             description: "allows define custom zone name and will separate ClickHouse `Pods` between nodes, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
@@ -1860,7 +1860,7 @@ spec:
                             description: |
                               allows define format for generated `Service` name,
                               look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates
-                              for details about aviailable template variables"
+                              for details about available template variables"
                           metadata:
                             # TODO specify ObjectMeta
                             type: object
@@ -3604,7 +3604,7 @@ spec:
                             description: "template name, could use to link inside top-level `chi.spec.defaults.templates.podTemplate`, cluster-level `chi.spec.configuration.clusters.templates.podTemplate`, shard-level `chi.spec.configuration.clusters.layout.shards.temlates.podTemplate`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates.podTemplate`"
                           generateName:
                             type: string
-                            description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about aviailable template variables"
+                            description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about available template variables"
                           zone:
                             type: object
                             description: "allows define custom zone name and will separate ClickHouse `Pods` between nodes, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
@@ -3765,7 +3765,7 @@ spec:
                             description: |
                               allows define format for generated `Service` name,
                               look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates
-                              for details about aviailable template variables"
+                              for details about available template variables"
                           metadata:
                             # TODO specify ObjectMeta
                             type: object
@@ -4272,6 +4272,126 @@ spec:
                             When adding labels to a metric exclude labels with names from the following list
                           items:
                             type: string
+                status:
+                  type: object
+                  description: "defines status options"
+                  properties:
+                    fields:
+                      type: object
+                      description: "defines status fields options"
+                      properties:
+                        action:
+                          type: string
+                          enum:
+                            # List StringBoolXXX constants from model
+                            - ""
+                            - "0"
+                            - "1"
+                            - "False"
+                            - "false"
+                            - "True"
+                            - "true"
+                            - "No"
+                            - "no"
+                            - "Yes"
+                            - "yes"
+                            - "Off"
+                            - "off"
+                            - "On"
+                            - "on"
+                            - "Disable"
+                            - "disable"
+                            - "Enable"
+                            - "enable"
+                            - "Disabled"
+                            - "disabled"
+                            - "Enabled"
+                            - "enabled"
+                          description: "Whether the operator should fill status field 'action'"
+                        actions:
+                          type: string
+                          enum:
+                            # List StringBoolXXX constants from model
+                            - ""
+                            - "0"
+                            - "1"
+                            - "False"
+                            - "false"
+                            - "True"
+                            - "true"
+                            - "No"
+                            - "no"
+                            - "Yes"
+                            - "yes"
+                            - "Off"
+                            - "off"
+                            - "On"
+                            - "on"
+                            - "Disable"
+                            - "disable"
+                            - "Enable"
+                            - "enable"
+                            - "Disabled"
+                            - "disabled"
+                            - "Enabled"
+                            - "enabled"
+                          description: "Whether the operator should fill status field 'actions'"
+                        error:
+                          type: string
+                          enum:
+                            # List StringBoolXXX constants from model
+                            - ""
+                            - "0"
+                            - "1"
+                            - "False"
+                            - "false"
+                            - "True"
+                            - "true"
+                            - "No"
+                            - "no"
+                            - "Yes"
+                            - "yes"
+                            - "Off"
+                            - "off"
+                            - "On"
+                            - "on"
+                            - "Disable"
+                            - "disable"
+                            - "Enable"
+                            - "enable"
+                            - "Disabled"
+                            - "disabled"
+                            - "Enabled"
+                            - "enabled"
+                          description: "Whether the operator should fill status field 'error'"
+                        errors:
+                          type: string
+                          enum:
+                            # List StringBoolXXX constants from model
+                            - ""
+                            - "0"
+                            - "1"
+                            - "False"
+                            - "false"
+                            - "True"
+                            - "true"
+                            - "No"
+                            - "no"
+                            - "Yes"
+                            - "yes"
+                            - "Off"
+                            - "off"
+                            - "On"
+                            - "on"
+                            - "Disable"
+                            - "disable"
+                            - "Enable"
+                            - "enable"
+                            - "Disabled"
+                            - "disabled"
+                            - "Enabled"
+                            - "enabled"
+                          description: "Whether the operator should fill status field 'errors'"
                 statefulSet:
                   type: object
                   description: "define StatefulSet-specific parameters"
@@ -5175,7 +5295,7 @@ spec:
                             description: "template name, could use to link inside top-level `chi.spec.defaults.templates.podTemplate`, cluster-level `chi.spec.configuration.clusters.templates.podTemplate`, shard-level `chi.spec.configuration.clusters.layout.shards.temlates.podTemplate`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates.podTemplate`"
                           generateName:
                             type: string
-                            description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about aviailable template variables"
+                            description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about available template variables"
                           zone:
                             type: object
                             description: "allows define custom zone name and will separate ClickHouse `Pods` between nodes, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
@@ -5336,7 +5456,7 @@ spec:
                             description: |
                               allows define format for generated `Service` name,
                               look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates
-                              for details about aviailable template variables"
+                              for details about available template variables"
                           metadata:
                             # TODO specify ObjectMeta
                             type: object

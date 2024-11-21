@@ -28,6 +28,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
@@ -55,7 +56,7 @@ const FinalizerName = "finalizer.clickhouseinstallation.altinity.com"
 // worker represents worker thread which runs reconcile tasks
 type worker struct {
 	c *Controller
-	a common.Announcer
+	a a.Announcer
 
 	//queue workqueue.RateLimitingInterface
 	queue   queue.PriorityQueue
@@ -78,8 +79,8 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	generateName := "chop-chi-"
 	component := componentName
 
-	announcer := common.NewAnnouncer(
-		common.NewEventEmitter(c.kube.Event(), kind, generateName, component),
+	announcer := a.NewAnnouncer(
+		a.NewEventEmitter(c.kube.Event(), kind, generateName, component),
 		c.kube.CR(),
 	)
 
@@ -207,8 +208,8 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 	chi, err := w.normalizer.CreateTemplated(c, commonNormalizer.NewOptions())
 	if err != nil {
-		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusError(chi).
+		w.a.WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithError(chi).
 			M(chi).F().
 			Error("FAILED to normalize CR 1: %v", err)
 	}
@@ -220,8 +221,8 @@ func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstall
 
 	chi, err = w.normalizer.CreateTemplated(c, opts)
 	if err != nil {
-		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusError(chi).
+		w.a.WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithError(chi).
 			M(chi).F().
 			Error("FAILED to normalize CHI 2: %v", err)
 	}
@@ -276,7 +277,9 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 				TolerateAbsence: true,
 				CopyStatusOptions: types.CopyStatusOptions{
-					Normalized: true,
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupNormalized: true,
+					},
 				},
 			})
 		} else {
@@ -445,8 +448,8 @@ func (w *worker) excludeStoppedCHIFromMonitoring(chi *api.ClickHouseInstallation
 	}
 
 	w.a.V(1).
-		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileInProgress).
-		WithStatusAction(chi).
+		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileInProgress).
+		WithAction(chi).
 		M(chi).F().
 		Info("exclude CHI from monitoring")
 	w.c.deleteWatch(chi)
@@ -460,8 +463,8 @@ func (w *worker) addCHIToMonitoring(chi *api.ClickHouseInstallation) {
 	}
 
 	w.a.V(1).
-		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileInProgress).
-		WithStatusAction(chi).
+		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileInProgress).
+		WithAction(chi).
 		M(chi).F().
 		Info("add CHI to monitoring")
 	w.c.updateWatch(chi)
@@ -477,14 +480,16 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInsta
 	cr.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
 	_ = w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	})
 
 	w.a.V(1).
-		WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileStarted).
-		WithStatusAction(cr).
-		WithStatusActions(cr).
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileStarted).
+		WithAction(cr).
+		WithActions(cr).
 		M(cr).F().
 		Info("reconcile started, task id: %s", cr.GetSpecT().GetTaskID())
 	w.a.V(2).M(cr).F().Info("action plan\n%s\n", ap.String())
@@ -515,7 +520,9 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 			w.reconcileConfigMapCommonUsers(ctx, chi)
 			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{
-					WholeStatus: true,
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupWholeStatus: true,
+					},
 				},
 			})
 		} else {
@@ -526,9 +533,9 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 	}
 
 	w.a.V(1).
-		WithEvent(_chi, common.EventActionReconcile, common.EventReasonReconcileCompleted).
-		WithStatusAction(_chi).
-		WithStatusActions(_chi).
+		WithEvent(_chi, a.EventActionReconcile, a.EventReasonReconcileCompleted).
+		WithAction(_chi).
+		WithActions(_chi).
 		M(_chi).F().
 		Info("reconcile completed successfully, task id: %s", _chi.GetSpecT().GetTaskID())
 }
@@ -547,14 +554,16 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 	}
 	w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	})
 
 	w.a.V(1).
-		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
-		WithStatusAction(chi).
-		WithStatusActions(chi).
+		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
+		WithAction(chi).
+		WithActions(chi).
 		M(chi).F().
 		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chi.GetSpecT().GetTaskID())
 }

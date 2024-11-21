@@ -106,6 +106,7 @@ type ICreator interface {
 }
 
 type IEventEmitter interface {
+	Event(level string, obj meta.Object, action string, reason string, message string)
 	EventInfo(obj meta.Object, action string, reason string, message string)
 	EventWarning(obj meta.Object, action string, reason string, message string)
 	EventError(obj meta.Object, action string, reason string, message string)
