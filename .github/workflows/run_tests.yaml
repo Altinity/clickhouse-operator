@@ -101,7 +101,7 @@ jobs:
           then
             test_mode="--test-to-end"
           fi
-
+          ONLY="test_001*"
           for test_file in ./tests/e2e/test_operator*.py; do
             name=$(basename "$test_file" .py | sed 's/^test_//')
             run_cmd="~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e?test_${name}/${ONLY} $test_mode --trim-results on -o short --native --log ./tests/raw_${name}.log && "
@@ -116,6 +116,7 @@ jobs:
           done          
           printf "%s\n" "${run_tests[@]}" | xargs -P 2 -I {} bash -xec '{}'
           
+          ls -la ./tests/*.html
           test_result=$?
 
           echo "test_result=$test_result" >> $GITHUB_OUTPUT
@@ -134,7 +135,7 @@ jobs:
         with:
           name: testflows-report
           path: |
-            tests/*_report.html
+            tests/*.html
           if-no-files-found: error
           retention-days: 90
 
