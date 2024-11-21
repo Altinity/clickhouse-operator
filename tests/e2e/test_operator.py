@@ -1747,7 +1747,7 @@ def test_015(self):
             "test-015-host-network",
             host="chi-test-015-host-network-default-0-0",
             port="10000",
-            sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10",
+            sql="SELECT count() FROM cluster('all-sharded', system.one) SETTINGS receive_timeout=10",
         )
         note(f"cluster out:\n{out}")
         print(f"out: {out}")
@@ -3005,14 +3005,16 @@ def test_028(self):
                         sql,
                         pod="chi-test-028-replication-default-0-0-0",
                         host="chi-test-028-replication-default-0-0",
-                        advanced_params="--connect_timeout=1 --send_timeout=10 --receive_timeout=10",
+                        timeout=10,
+                        advanced_params="--connect_timeout=1 --send_timeout=10",
                     )
                     ch2 = clickhouse.query_with_error(
                         chi,
                         sql,
                         pod="chi-test-028-replication-default-1-0-0",
                         host="chi-test-028-replication-default-1-0",
-                        advanced_params="--connect_timeout=1 --send_timeout=10 --receive_timeout=10",
+                        timeout=10,
+                        advanced_params="--connect_timeout=1 --send_timeout=10",
                     )
 
                     if "error" in ch1 or "Exception" in ch1 or ch2.endswith("1"):
