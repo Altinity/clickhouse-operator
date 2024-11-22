@@ -506,7 +506,7 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiS
 	return nil
 }
 
-func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShardIndex int, shards[]*api.ChiShard ) error {
+func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShardIndex int, shards []*api.ChiShard) error {
 	if len(shards) == 0 {
 		return nil
 	}
@@ -527,7 +527,7 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 		for i, shard := range shards {
 			ch <- &shardReconcile{
 				shard,
-				startShardIndex+i,
+				startShardIndex + i,
 			}
 		}
 	}()
@@ -556,7 +556,7 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 	return err
 }
 
-func (w *worker) runConcurrentlyInBatches(ctx context.Context, workersNum int, start int, shards[]*api.ChiShard ) error {
+func (w *worker) runConcurrentlyInBatches(ctx context.Context, workersNum int, start int, shards []*api.ChiShard) error {
 	for startShardIndex := 0; startShardIndex < len(shards); startShardIndex += workersNum {
 		endShardIndex := util.IncTopped(startShardIndex, workersNum, len(shards))
 		concurrentlyProcessedShards := shards[startShardIndex:endShardIndex]
@@ -645,6 +645,17 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
 
+	//si := host.GetRuntime().GetAddress().GetShardIndex()
+	//ri := host.GetRuntime().GetAddress().GetReplicaIndex()
+	////sleep := util.DecBottomed(si, 1, 0)*(si % 3)*20
+	//sleep := (2 - si)*90
+	//if ri > 0 {
+	//	sleep = 0
+	//}
+	//w.a.V(1).Info("Host [%d/%d]. Going to sleep %d sec", si, ri, sleep)
+	//time.Sleep((time.Duration)(sleep)*time.Second)
+	//w.a.V(1).Info("Host [%d/%d]. Done to sleep %d sec", si, ri)
+
 	metrics.HostReconcilesStarted(ctx, host.GetCR())
 	startTime := time.Now()
 
@@ -692,16 +703,6 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 	metrics.HostReconcilesCompleted(ctx, host.GetCR())
 	metrics.HostReconcilesTimings(ctx, host.GetCR(), time.Now().Sub(startTime).Seconds())
-
-	//si := host.GetRuntime().GetAddress().GetShardIndex()
-	//ri := host.GetRuntime().GetAddress().GetReplicaIndex()
-	//sleep := util.DecBottomed(si, 1, 0)*(si % 3)*20
-	//if ri > 0 {
-	//	sleep = 0
-	//}
-	//w.a.V(1).Info("Host [%d/%d]. Going to sleep %d sec", si, ri, sleep)
-	//time.Sleep((time.Duration)(sleep)*time.Second)
-	//w.a.V(1).Info("Host [%d/%d]. Done to sleep %d sec", si, ri)
 
 	return nil
 }
