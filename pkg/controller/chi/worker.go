@@ -646,15 +646,19 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 		w.a.V(3).M(chi).Info("Walking over CR hosts. Host: %s", host.GetName())
 		switch {
 		case host.GetReconcileAttributes().IsAdd():
-			w.a.V(3).M(chi).Info("Walking over CR hosts. Host: is already added Host: %s", host.GetName())
+			w.a.V(3).M(chi).Info("Walking over CR hosts. Host: is already listed as ADD. Host: %s", host.GetName())
 			return nil
 		case host.GetReconcileAttributes().IsModify():
-			w.a.V(3).M(chi).Info("Walking over CR hosts. Host: is already modified Host: %s", host.GetName())
+			w.a.V(3).M(chi).Info("Walking over CR hosts. Host: is already listed as MODIFIED. Host: %s", host.GetName())
 			return nil
 		default:
-			w.a.V(3).M(chi).Info("Walking over CR hosts. Host: is not clear yet (not detected as added or modified) Host: %s", host.GetName())
-			w.a.V(1).M(chi).Info("Add host as FOUND via host. Host: %s", host.GetName())
-			host.GetReconcileAttributes().SetFound()
+			if host.HasAncestor() {
+				w.a.V(1).M(chi).Info("Add host as FOUND via host. Host: %s", host.GetName())
+				host.GetReconcileAttributes().SetFound()
+			} else {
+				w.a.V(1).M(chi).Info("Add host as ADD via host. Host: %s", host.GetName())
+				host.GetReconcileAttributes().SetAdd()
+			}
 		}
 		return nil
 	})
