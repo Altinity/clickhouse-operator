@@ -310,3 +310,7 @@ func (s *HostReconcileAttributesCounters) GetExclude() int {
 func (s *HostReconcileAttributesCounters) AddOnly() bool {
 	return s.GetAdd() > 0 && s.GetFound() == 0 && s.GetModify() == 0 && s.GetRemove() == 0
 }
+
+func (s *HostReconcileAttributesCounters) String() string {
+	return fmt.Sprintf("a: %d f: %d m: %d r: %d", s.GetAdd(), s.GetFound(), s.GetModify(), s.GetRemove())
+}
