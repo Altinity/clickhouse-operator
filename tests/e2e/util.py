@@ -129,6 +129,10 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
                 kubectl.wait_pod_status(pod_name, "Running")
                 kubectl.wait_container_status(pod_name, "true")
 
+            if keeper_type == "CHK" or keeper_type == "clickhouse-keeper_with_chk" :
+                kubectl.wait_chk_status("clickhouse-keeper", 'Completed')
+
+
 
 def wait_clickhouse_cluster_ready(chi):
     with Given("All expected pods present in system.clusters"):

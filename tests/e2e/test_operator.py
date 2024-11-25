@@ -4870,6 +4870,21 @@ def test_051_1(self):
 
     check_replication(chi, {0,1}, 1)
 
+    with Then("Unattach old CHK resources"):
+        kubectl.launch(f"patch sts {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"patch cm  {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"patch service {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"patch service {chk}-headless -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"label pod -lapp={chk} app-")
+        kubectl.launch(f"label sts -lapp={chk} app-")
+
+    with Then("Confirm that statefulset and pod are still running if we delete chk"):
+        kubectl.delete_kind("chk", chk)
+        assert kubectl.get_field("pod", "test-051-chk-0", ".status.phase") == "Running"
+        assert kubectl.get_count("sts", "test-051-chk") == 1
+        assert kubectl.get_count("cm",  "test-051-chk") == 1
+        assert kubectl.get_count("service", "test-051-chk") == 1
+
     old_pvc = "both-paths-test-051-chk-0"
     pv = kubectl.get_pv_name(old_pvc)
     new_pvc = "default-chk-test-051-chk-single-0-0-0"
@@ -4878,7 +4893,8 @@ def test_051_1(self):
         kubectl.launch(f"patch pv {pv}" + """ -p \'{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}\'""")
 
     with Then("Delete old Keeper resources"):
-        kubectl.delete_kind("chk", chk)
+        kubectl.delete_kind("sts", "test-051-chk")
+        kubectl.delete_kind("pod", "test-051-chk-0")
         kubectl.delete_kind("pvc", old_pvc)
 
     with Then("Unmount PV from old PVC"):
