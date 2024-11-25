@@ -3339,19 +3339,8 @@ def test_032(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
-    create_table = """
-    CREATE TABLE test_local_032 ON CLUSTER 'default' (a UInt32)
-    Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-    PARTITION BY tuple()
-    ORDER BY a
-    """.replace(
-        "\r", ""
-    ).replace(
-        "\n", ""
-    )
-
+    
     manifest = "manifests/chi/test-032-rescaling.yaml"
-
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     kubectl.create_and_check(
@@ -3379,7 +3368,10 @@ def test_032(self):
     time.sleep(60)
 
     with Given("Create replicated and distributed tables"):
-        clickhouse.query(chi, create_table)
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_local_032 ON CLUSTER 'default' (a UInt32) Engine = ReplicatedMergeTree() PARTITION BY tuple() ORDER BY a",
+        )
         clickhouse.query(
             chi,
             "CREATE TABLE test_distr_032 ON CLUSTER 'default' AS test_local_032 Engine = Distributed('default', default, test_local_032, a%2)",
@@ -3402,7 +3394,6 @@ def test_032(self):
     with When("I create new shells"):
         shell_1 = get_shell()
         shell_2 = get_shell()
-        shell_3 = get_shell()
 
     Check("run query until receive stop event", test=run_select_query, parallel=True)(
         host="clickhouse-test-032-rescaling",
@@ -3427,10 +3418,6 @@ def test_032(self):
         kubectl.create_and_check(
             manifest="manifests/chi/test-032-rescaling-2.yaml",
             check={
-                "apply_templates": {
-                    self.context.clickhouse_template,
-                    "manifests/chit/tpl-persistent-volume-100Mi.yaml",
-                },
                 "object_counts": {
                     "statefulset": 4,
                     "pod": 4,
@@ -3438,8 +3425,7 @@ def test_032(self):
                 },
                 "do_not_delete": 1,
             },
-            timeout=int(1000),
-            shell=shell_3
+            timeout=900,
         )
 
     trigger_event.set()
