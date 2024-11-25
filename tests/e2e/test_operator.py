@@ -200,103 +200,6 @@ def test_007(self):
         delete_test_namespace()
 
 
-@TestCheck
-def test_operator_upgrade(self, manifest, service, version_from, version_to=None, shell=None):
-    if version_to is None:
-        version_to = current().context.operator_version
-    with Given(f"clickhouse-operator from {version_from}"):
-        util.install_operator_version(version_from)
-        time.sleep(15)
-
-        chi = yaml_manifest.get_name(util.get_full_path(manifest, True))
-        cluster = chi
-
-        kubectl.create_and_check(
-            manifest=manifest,
-            check={
-                "object_counts": {
-                    "statefulset": 2,
-                    "pod": 2,
-                    "service": 3,
-                },
-                "do_not_delete": 1,
-            },
-        )
-        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-
-        with Then("Create tables"):
-            for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
-                clickhouse.query(
-                    chi,
-                    "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log",
-                    host=h,
-                )
-                clickhouse.query(chi, "INSERT INTO test_local SELECT 1", host=h)
-
-    trigger_event = threading.Event()
-
-    with When("I create new shells"):
-        shell_1 = get_shell()
-        shell_2 = get_shell()
-        shell_3 = get_shell()
-
-    Check("run query until receive stop event", test=run_select_query, parallel=True)(
-        host=service,
-        user="test_009",
-        password="test_009",
-        query="select count() from cluster('{cluster}', system.one)",
-        res1="2",
-        res2="1",
-        trigger_event=trigger_event,
-        shell=shell_1
-    )
-
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
-        chi=chi,
-        shards=2,
-        trigger_event=trigger_event,
-        shell=shell_2
-    )
-
-    try:
-        with When(f"upgrade operator to {version_to}"):
-            util.install_operator_version(version_to, shell=shell_3)
-            time.sleep(15)
-
-            kubectl.wait_chi_status(chi, "Completed", shell=shell_3)
-            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3}, shell=shell_3)
-
-    finally:
-        trigger_event.set()
-        join()
-
-    with Then("I recreate shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    with Then("Check that table is here"):
-        tables = clickhouse.query(chi, "SHOW TABLES")
-        assert "test_local" in tables
-        out = clickhouse.query(chi, "SELECT count() FROM test_local")
-        assert out == "1"
-
-    with Then("ClickHouse pods should not be restarted during upgrade"):
-        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-        if start_time != new_start_time:
-            kubectl.launch(f"describe chi -n {self.context.test_namespace} {chi}")
-            kubectl.launch(
-                # In my env "pod/: prefix is already returned by $(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator)
-                # f"logs -n {current().context.operator_namespace} pod/$(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
-                f"logs -n {current().context.operator_namespace} $(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
-            )
-            assert start_time == new_start_time, error(
-                f"{start_time} != {new_start_time}, pod restarted after operator upgrade"
-            )
-
-    with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-
 
 def wait_operator_restart(chi, wait_objects, shell=None):
     with When("Restart operator"):
@@ -565,6 +468,101 @@ def test_008_3(self):
         delete_test_namespace()
 
 
+@TestCheck
+def test_operator_upgrade(self, manifest, service, version_from, version_to=None, shell=None):
+    if version_to is None:
+        version_to = current().context.operator_version
+    with Given(f"clickhouse-operator from {version_from}"):
+        current().context.operator_version = version_from
+        create_shell_namespace_clickhouse_template()
+
+        chi = yaml_manifest.get_name(util.get_full_path(manifest, True))
+        cluster = chi
+
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
+                "do_not_delete": 1,
+            },
+        )
+        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+
+        with Then("Create tables"):
+            for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
+                clickhouse.query(
+                    chi,
+                    "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log",
+                    host=h,
+                )
+                clickhouse.query(chi, "INSERT INTO test_local SELECT 1", host=h)
+
+    trigger_event = threading.Event()
+
+    with When("I create new shells"):
+        shell_1 = get_shell()
+        shell_2 = get_shell()
+        shell_3 = get_shell()
+
+    Check("run query until receive stop event", test=run_select_query, parallel=True)(
+        host=service,
+        user="test_009",
+        password="test_009",
+        query="select count() from cluster('{cluster}', system.one)",
+        res1="2",
+        res2="1",
+        trigger_event=trigger_event,
+        shell=shell_1
+    )
+
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
+        chi=chi,
+        shards=2,
+        trigger_event=trigger_event,
+        shell=shell_2
+    )
+
+    with When(f"upgrade operator to {version_to}"):
+        util.install_operator_version(version_to)
+        time.sleep(15)
+
+        kubectl.wait_chi_status(chi, "Completed")
+        kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+
+    trigger_event.set()
+    join()
+
+    with Then("I recreate shell"):
+        shell = get_shell()
+        self.context.shell = shell
+
+    with Then("Check that table is here"):
+        tables = clickhouse.query(chi, "SHOW TABLES")
+        assert "test_local" in tables
+        out = clickhouse.query(chi, "SELECT count() FROM test_local")
+        assert out == "1"
+
+    with Then("ClickHouse pods should not be restarted during upgrade"):
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        if start_time != new_start_time:
+            kubectl.launch(f"describe chi -n {self.context.test_namespace} {chi}")
+            kubectl.launch(
+                # In my env "pod/: prefix is already returned by $(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator)
+                # f"logs -n {current().context.operator_namespace} pod/$(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+                f"logs -n {current().context.operator_namespace} $(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+            )
+            assert start_time == new_start_time, error(
+                f"{start_time} != {new_start_time}, pod restarted after operator upgrade"
+            )
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
 @TestScenario
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
@@ -572,8 +570,6 @@ def test_008_3(self):
 def test_009_1(self, version_from="0.23.7", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
-
-    create_shell_namespace_clickhouse_template()
 
     with Check("Test simple chi for operator upgrade"):
         test_operator_upgrade(
@@ -583,9 +579,6 @@ def test_009_1(self, version_from="0.23.7", version_to=None):
             version_to=version_to,
         )
 
-    with Finally("I clean up"):
-        delete_test_namespace()
-
 
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
@@ -594,8 +587,6 @@ def test_009_2(self, version_from="0.23.7", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
-    create_shell_namespace_clickhouse_template()
-
     with Check("Test advanced chi for operator upgrade"):
         test_operator_upgrade(
             manifest="manifests/chi/test-009-operator-upgrade-2.yaml",
@@ -603,9 +594,6 @@ def test_009_2(self, version_from="0.23.7", version_to=None):
             version_from=version_from,
             version_to=version_to,
         )
-
-    with Finally("I clean up"):
-        delete_test_namespace()
 
 
 @TestScenario
