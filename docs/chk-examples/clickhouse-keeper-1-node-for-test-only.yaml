@@ -1,46 +1,28 @@
----
-# Fake Service to drop-in replacement in tests
-apiVersion: v1
-kind: Service
-metadata:
-  # DNS would be like zookeeper.namespace.svc
-  name: zookeeper
-  labels:
-    app: zookeeper
-spec:
-  ports:
-    - port: 2181
-      name: client
-    - port: 7000
-      name: prometheus
-  selector:
-    clickhouse-keeper.altinity.com/chk: clickhouse-keeper
-    clickhouse-keeper.altinity.com/ready: "yes"
----
 apiVersion: "clickhouse-keeper.altinity.com/v1"
 kind: "ClickHouseKeeperInstallation"
 metadata:
   name: clickhouse-keeper
-  labels:
-    app: clickhouse-keeper
 spec:
   defaults:
     templates:
+      podTemplate: clickhouse-keeper
       volumeClaimTemplate: data-volume
-      podTemplate: latest-with-volume-mounts
+      clusterServiceTemplate: zookeeper
   configuration:
     clusters:
-      - name: "test-only"
+      - name: test
         layout:
           replicasCount: 1
+    settings:
+        keeper_server/tcp_port: "2181"
   templates:
     podTemplates:
-      - name: latest-with-volume-mounts
+      - name: clickhouse-keeper
         spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: Always
-              image: "clickhouse/clickhouse-keeper:latest-alpine"
+              image: "clickhouse/clickhouse-keeper:24.8"
     volumeClaimTemplates:
       - name: data-volume
         spec:
@@ -48,4 +30,15 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 1Gi
+              storage: 100Mi
+    serviceTemplates: # Service drop-in replacement in tests
+      - name: zookeeper
+        generateName: zookeeper
+        spec:
+          ports:
+            - port: 2181
+              name: client
+            - port: 7000
+              name: prometheus
+          type: ClusterIP
+          clusterIP: None

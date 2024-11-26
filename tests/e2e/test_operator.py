@@ -247,6 +247,8 @@ def test_operator_restart(self, manifest, service, version=None):
             },
         )
 
+    wait_for_cluster(chi, cluster, 2)
+
     with Then("Create tables"):
         for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
             clickhouse.query(
@@ -259,7 +261,6 @@ def test_operator_restart(self, manifest, service, version=None):
                 "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a)",
                 host=h,
             )
-    wait_for_cluster(chi, cluster, 2)
 
     trigger_event = threading.Event()
 
@@ -1382,7 +1383,7 @@ def test_014_0(self):
             "CREATE TABLE test_replicated_014.test_replicated_014 (a Int8) Engine = ReplicatedMergeTree ORDER BY tuple()",
         ]
 
-    wait_for_cluster(chi_name, cluster, n_shards)
+    wait_for_cluster(chi_name, cluster, n_shards, 2)
 
     with Then("Create schema objects"):
         for q in create_ddls:
@@ -3339,7 +3340,7 @@ def test_032(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
-    
+
     manifest = "manifests/chi/test-032-rescaling.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
@@ -3365,7 +3366,6 @@ def test_032(self):
     # remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
     # print(remote_servers)
     wait_for_cluster(chi, 'default', 2, 2)
-    time.sleep(60)
 
     with Given("Create replicated and distributed tables"):
         clickhouse.query(
@@ -4593,8 +4593,8 @@ def test_048(self):
     """Check clickhouse-operator support ClickHouseKeeperInstallation with PVC in keeper manifest."""
 
     create_shell_namespace_clickhouse_template()
-    util.require_keeper(keeper_type="CHK",
-                        keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-24.yaml")
+    util.require_keeper(keeper_type="chk",
+                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
     manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
@@ -4619,8 +4619,8 @@ def test_049(self):
      when clickhouse-keeper defined with ClickHouseKeeperInstallation."""
 
     create_shell_namespace_clickhouse_template()
-    util.require_keeper(keeper_type="CHK",
-                        keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-24.yaml")
+    util.require_keeper(keeper_type="chk",
+                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
     manifest = f"manifests/chi/test-049-clickhouse-keeper-upgrade.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
@@ -4639,7 +4639,7 @@ def test_049(self):
 
     with When(f"I check clickhouse-keeper version is {keeper_version_from}"):
         assert keeper_version_from in \
-               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image'), error()
+               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-0-0-0', '.spec.containers[0].image'), error()
 
     with Then(f"I change keeper version to {keeper_version_to}"):
         cmd = f"""patch chk clickhouse-keeper --type='json' --patch='[{{"op":"replace","path":"/spec/templates/podTemplates/0/spec/containers/0/image","value":"clickhouse/clickhouse-keeper:{keeper_version_to}"}}]'"""
@@ -4651,9 +4651,9 @@ def test_049(self):
         kubectl.wait_chk_status('clickhouse-keeper', 'Completed')
 
     with When(f"I check clickhouse-keeper version is changed to {keeper_version_to}"):
-        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
-        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-only-0-1-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
-        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-only-0-2-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-0-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-1-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-2-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
 
     check_replication(chi, {0,1}, 2)
 
@@ -5002,6 +5002,8 @@ def check_replication(chi, replicas, token, table = ''):
         cluster = clickhouse.query(chi, "select substitution from system.macros where macro = 'cluster'")
         if table == '':
             table = chi.replace('-','_')
+
+        wait_for_cluster(chi, cluster, 1, len(replicas))
 
         with When("Create a replicated table if not exists"):
             clickhouse.query(chi, f"CREATE TABLE IF NOT EXISTS {table} ON CLUSTER '{cluster}' (a UInt32) Engine = ReplicatedMergeTree ORDER BY a")
