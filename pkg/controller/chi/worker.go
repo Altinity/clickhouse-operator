@@ -183,24 +183,26 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 		return true
 	}
 
-	podIsCrushed := false
-	// pod.Status.ContainerStatuses[0].State.Waiting.Reason
-	if pod, err := w.c.kube.Pod().Get(host); err == nil {
-		if len(pod.Status.ContainerStatuses) > 0 {
-			if pod.Status.ContainerStatuses[0].State.Waiting != nil {
-				if pod.Status.ContainerStatuses[0].State.Waiting.Reason == "CrashLoopBackOff" {
-					podIsCrushed = true
-				}
-			}
-		}
-	}
-
-	if host.Runtime.Version.IsUnknown() && podIsCrushed {
+	if host.Runtime.Version.IsUnknown() && w.isPodCrushed(host) {
 		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
 		return true
 	}
 
 	w.a.V(1).M(host).F().Info("Host restart is not required. Host: %s", host.GetName())
+	return false
+}
+
+func (w *worker) isPodCrushed(host *api.Host) bool {
+	// pod.Status.ContainerStatuses[0].State.Waiting.Reason
+	if pod, err := w.c.kube.Pod().Get(host); err == nil {
+		if len(pod.Status.ContainerStatuses) > 0 {
+			if pod.Status.ContainerStatuses[0].State.Waiting != nil {
+				if pod.Status.ContainerStatuses[0].State.Waiting.Reason == "CrashLoopBackOff" {
+					return true
+				}
+			}
+		}
+	}
 	return false
 }
 
@@ -644,6 +646,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 
 	chi.WalkHosts(func(host *api.Host) error {
 		w.a.V(3).M(chi).Info("Walking over CR hosts. Host: %s", host.GetName())
+		_, err := w.c.kube.STS().Get(ctx, host)
 		switch {
 		case host.GetReconcileAttributes().IsAdd():
 			w.a.V(3).M(chi).Info("Walking over CR hosts. Host: is already listed as ADD. Host: %s", host.GetName())
@@ -651,16 +654,19 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 		case host.GetReconcileAttributes().IsModify():
 			w.a.V(3).M(chi).Info("Walking over CR hosts. Host: is already listed as MODIFIED. Host: %s", host.GetName())
 			return nil
+		case host.HasAncestor():
+			w.a.V(1).M(chi).Info("Add host as FOUND via host because host has ancestor. Host: %s", host.GetName())
+			host.GetReconcileAttributes().SetFound()
+			return nil
+		case err == nil:
+			w.a.V(1).M(chi).Info("Add host as FOUND via host because has found sts. Host: %s", host.GetName())
+			host.GetReconcileAttributes().SetFound()
+			return nil
 		default:
-			if host.HasAncestor() {
-				w.a.V(1).M(chi).Info("Add host as FOUND via host. Host: %s", host.GetName())
-				host.GetReconcileAttributes().SetFound()
-			} else {
-				w.a.V(1).M(chi).Info("Add host as ADD via host. Host: %s", host.GetName())
-				host.GetReconcileAttributes().SetAdd()
-			}
+			w.a.V(1).M(chi).Info("Add host as ADD via host. Host: %s", host.GetName())
+			host.GetReconcileAttributes().SetAdd()
+			return nil
 		}
-		return nil
 	})
 
 	// Log hosts statuses
