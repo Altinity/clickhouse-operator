@@ -200,103 +200,6 @@ def test_007(self):
         delete_test_namespace()
 
 
-@TestCheck
-def test_operator_upgrade(self, manifest, service, version_from, version_to=None, shell=None):
-    if version_to is None:
-        version_to = current().context.operator_version
-    with Given(f"clickhouse-operator from {version_from}"):
-        util.install_operator_version(version_from)
-        time.sleep(15)
-
-        chi = yaml_manifest.get_name(util.get_full_path(manifest, True))
-        cluster = chi
-
-        kubectl.create_and_check(
-            manifest=manifest,
-            check={
-                "object_counts": {
-                    "statefulset": 2,
-                    "pod": 2,
-                    "service": 3,
-                },
-                "do_not_delete": 1,
-            },
-        )
-        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-
-        with Then("Create tables"):
-            for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
-                clickhouse.query(
-                    chi,
-                    "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log",
-                    host=h,
-                )
-                clickhouse.query(chi, "INSERT INTO test_local SELECT 1", host=h)
-
-    trigger_event = threading.Event()
-
-    with When("I create new shells"):
-        shell_1 = get_shell()
-        shell_2 = get_shell()
-        shell_3 = get_shell()
-
-    Check("run query until receive stop event", test=run_select_query, parallel=True)(
-        host=service,
-        user="test_009",
-        password="test_009",
-        query="select count() from cluster('{cluster}', system.one)",
-        res1="2",
-        res2="1",
-        trigger_event=trigger_event,
-        shell=shell_1
-    )
-
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
-        chi=chi,
-        shards=2,
-        trigger_event=trigger_event,
-        shell=shell_2
-    )
-
-    try:
-        with When(f"upgrade operator to {version_to}"):
-            util.install_operator_version(version_to, shell=shell_3)
-            time.sleep(15)
-
-            kubectl.wait_chi_status(chi, "Completed", shell=shell_3)
-            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3}, shell=shell_3)
-
-    finally:
-        trigger_event.set()
-        join()
-
-    with Then("I recreate shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    with Then("Check that table is here"):
-        tables = clickhouse.query(chi, "SHOW TABLES")
-        assert "test_local" in tables
-        out = clickhouse.query(chi, "SELECT count() FROM test_local")
-        assert out == "1"
-
-    with Then("ClickHouse pods should not be restarted during upgrade"):
-        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-        if start_time != new_start_time:
-            kubectl.launch(f"describe chi -n {self.context.test_namespace} {chi}")
-            kubectl.launch(
-                # In my env "pod/: prefix is already returned by $(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator)
-                # f"logs -n {current().context.operator_namespace} pod/$(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
-                f"logs -n {current().context.operator_namespace} $(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
-            )
-            assert start_time == new_start_time, error(
-                f"{start_time} != {new_start_time}, pod restarted after operator upgrade"
-            )
-
-    with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-
 
 def wait_operator_restart(chi, wait_objects, shell=None):
     with When("Restart operator"):
@@ -344,6 +247,8 @@ def test_operator_restart(self, manifest, service, version=None):
             },
         )
 
+    wait_for_cluster(chi, cluster, 2)
+
     with Then("Create tables"):
         for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
             clickhouse.query(
@@ -356,7 +261,6 @@ def test_operator_restart(self, manifest, service, version=None):
                 "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a)",
                 host=h,
             )
-    wait_for_cluster(chi, cluster, 2)
 
     trigger_event = threading.Event()
 
@@ -565,6 +469,101 @@ def test_008_3(self):
         delete_test_namespace()
 
 
+@TestCheck
+def test_operator_upgrade(self, manifest, service, version_from, version_to=None, shell=None):
+    if version_to is None:
+        version_to = current().context.operator_version
+    with Given(f"clickhouse-operator from {version_from}"):
+        current().context.operator_version = version_from
+        create_shell_namespace_clickhouse_template()
+
+        chi = yaml_manifest.get_name(util.get_full_path(manifest, True))
+        cluster = chi
+
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
+                "do_not_delete": 1,
+            },
+        )
+        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+
+        with Then("Create tables"):
+            for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
+                clickhouse.query(
+                    chi,
+                    "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log",
+                    host=h,
+                )
+                clickhouse.query(chi, "INSERT INTO test_local SELECT 1", host=h)
+
+    trigger_event = threading.Event()
+
+    with When("I create new shells"):
+        shell_1 = get_shell()
+        shell_2 = get_shell()
+        shell_3 = get_shell()
+
+    Check("run query until receive stop event", test=run_select_query, parallel=True)(
+        host=service,
+        user="test_009",
+        password="test_009",
+        query="select count() from cluster('{cluster}', system.one)",
+        res1="2",
+        res2="1",
+        trigger_event=trigger_event,
+        shell=shell_1
+    )
+
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
+        chi=chi,
+        shards=2,
+        trigger_event=trigger_event,
+        shell=shell_2
+    )
+
+    with When(f"upgrade operator to {version_to}"):
+        util.install_operator_version(version_to)
+        time.sleep(15)
+
+        kubectl.wait_chi_status(chi, "Completed")
+        kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+
+    trigger_event.set()
+    join()
+
+    with Then("I recreate shell"):
+        shell = get_shell()
+        self.context.shell = shell
+
+    with Then("Check that table is here"):
+        tables = clickhouse.query(chi, "SHOW TABLES")
+        assert "test_local" in tables
+        out = clickhouse.query(chi, "SELECT count() FROM test_local")
+        assert out == "1"
+
+    with Then("ClickHouse pods should not be restarted during upgrade"):
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        if start_time != new_start_time:
+            kubectl.launch(f"describe chi -n {self.context.test_namespace} {chi}")
+            kubectl.launch(
+                # In my env "pod/: prefix is already returned by $(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator)
+                # f"logs -n {current().context.operator_namespace} pod/$(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+                f"logs -n {current().context.operator_namespace} $(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+            )
+            assert start_time == new_start_time, error(
+                f"{start_time} != {new_start_time}, pod restarted after operator upgrade"
+            )
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
 @TestScenario
 @Name("test_009_1# Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
@@ -572,8 +571,6 @@ def test_008_3(self):
 def test_009_1(self, version_from="0.23.7", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
-
-    create_shell_namespace_clickhouse_template()
 
     with Check("Test simple chi for operator upgrade"):
         test_operator_upgrade(
@@ -583,9 +580,6 @@ def test_009_1(self, version_from="0.23.7", version_to=None):
             version_to=version_to,
         )
 
-    with Finally("I clean up"):
-        delete_test_namespace()
-
 
 @TestScenario
 @Name("test_009_2# Test operator upgrade")
@@ -594,8 +588,6 @@ def test_009_2(self, version_from="0.23.7", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
-    create_shell_namespace_clickhouse_template()
-
     with Check("Test advanced chi for operator upgrade"):
         test_operator_upgrade(
             manifest="manifests/chi/test-009-operator-upgrade-2.yaml",
@@ -603,9 +595,6 @@ def test_009_2(self, version_from="0.23.7", version_to=None):
             version_from=version_from,
             version_to=version_to,
         )
-
-    with Finally("I clean up"):
-        delete_test_namespace()
 
 
 @TestScenario
@@ -1394,7 +1383,7 @@ def test_014_0(self):
             "CREATE TABLE test_replicated_014.test_replicated_014 (a Int8) Engine = ReplicatedMergeTree ORDER BY tuple()",
         ]
 
-    wait_for_cluster(chi_name, cluster, n_shards)
+    wait_for_cluster(chi_name, cluster, n_shards, 2)
 
     with Then("Create schema objects"):
         for q in create_ddls:
@@ -3353,19 +3342,8 @@ def test_032(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
-    create_table = """
-    CREATE TABLE test_local_032 ON CLUSTER 'default' (a UInt32)
-    Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-    PARTITION BY tuple()
-    ORDER BY a
-    """.replace(
-        "\r", ""
-    ).replace(
-        "\n", ""
-    )
 
     manifest = "manifests/chi/test-032-rescaling.yaml"
-
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     kubectl.create_and_check(
@@ -3390,10 +3368,12 @@ def test_032(self):
     # remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
     # print(remote_servers)
     wait_for_cluster(chi, 'default', 2, 2)
-    time.sleep(60)
 
     with Given("Create replicated and distributed tables"):
-        clickhouse.query(chi, create_table)
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_local_032 ON CLUSTER 'default' (a UInt32) Engine = ReplicatedMergeTree() PARTITION BY tuple() ORDER BY a",
+        )
         clickhouse.query(
             chi,
             "CREATE TABLE test_distr_032 ON CLUSTER 'default' AS test_local_032 Engine = Distributed('default', default, test_local_032, a%2)",
@@ -3416,7 +3396,6 @@ def test_032(self):
     with When("I create new shells"):
         shell_1 = get_shell()
         shell_2 = get_shell()
-        shell_3 = get_shell()
 
     Check("run query until receive stop event", test=run_select_query, parallel=True)(
         host="clickhouse-test-032-rescaling",
@@ -3441,10 +3420,6 @@ def test_032(self):
         kubectl.create_and_check(
             manifest="manifests/chi/test-032-rescaling-2.yaml",
             check={
-                "apply_templates": {
-                    self.context.clickhouse_template,
-                    "manifests/chit/tpl-persistent-volume-100Mi.yaml",
-                },
                 "object_counts": {
                     "statefulset": 4,
                     "pod": 4,
@@ -3452,8 +3427,7 @@ def test_032(self):
                 },
                 "do_not_delete": 1,
             },
-            timeout=int(1000),
-            shell=shell_3
+            timeout=900,
         )
 
     trigger_event.set()
@@ -4621,8 +4595,8 @@ def test_048(self):
     """Check clickhouse-operator support ClickHouseKeeperInstallation with PVC in keeper manifest."""
 
     create_shell_namespace_clickhouse_template()
-    util.require_keeper(keeper_type="CHK",
-                        keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-24.yaml")
+    util.require_keeper(keeper_type="chk",
+                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
     manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
@@ -4647,8 +4621,8 @@ def test_049(self):
      when clickhouse-keeper defined with ClickHouseKeeperInstallation."""
 
     create_shell_namespace_clickhouse_template()
-    util.require_keeper(keeper_type="CHK",
-                        keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-24.yaml")
+    util.require_keeper(keeper_type="chk",
+                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
     manifest = f"manifests/chi/test-049-clickhouse-keeper-upgrade.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
@@ -4667,7 +4641,7 @@ def test_049(self):
 
     with When(f"I check clickhouse-keeper version is {keeper_version_from}"):
         assert keeper_version_from in \
-               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image'), error()
+               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-0-0-0', '.spec.containers[0].image'), error()
 
     with Then(f"I change keeper version to {keeper_version_to}"):
         cmd = f"""patch chk clickhouse-keeper --type='json' --patch='[{{"op":"replace","path":"/spec/templates/podTemplates/0/spec/containers/0/image","value":"clickhouse/clickhouse-keeper:{keeper_version_to}"}}]'"""
@@ -4679,9 +4653,9 @@ def test_049(self):
         kubectl.wait_chk_status('clickhouse-keeper', 'Completed')
 
     with When(f"I check clickhouse-keeper version is changed to {keeper_version_to}"):
-        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
-        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-only-0-1-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
-        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-only-0-2-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-0-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-1-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-2-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
 
     check_replication(chi, {0,1}, 2)
 
@@ -4872,6 +4846,21 @@ def test_051_1(self):
 
     check_replication(chi, {0,1}, 1)
 
+    with Then("Unattach old CHK resources"):
+        kubectl.launch(f"patch sts {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"patch cm  {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"patch service {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"patch service {chk}-headless -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"label pod -lapp={chk} app-")
+        kubectl.launch(f"label sts -lapp={chk} app-")
+
+    with Then("Confirm that statefulset and pod are still running if we delete chk"):
+        kubectl.delete_kind("chk", chk)
+        assert kubectl.get_field("pod", "test-051-chk-0", ".status.phase") == "Running"
+        assert kubectl.get_count("sts", "test-051-chk") == 1
+        assert kubectl.get_count("cm",  "test-051-chk") == 1
+        assert kubectl.get_count("service", "test-051-chk") == 1
+
     old_pvc = "both-paths-test-051-chk-0"
     pv = kubectl.get_pv_name(old_pvc)
     new_pvc = "default-chk-test-051-chk-single-0-0-0"
@@ -4880,7 +4869,8 @@ def test_051_1(self):
         kubectl.launch(f"patch pv {pv}" + """ -p \'{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}\'""")
 
     with Then("Delete old Keeper resources"):
-        kubectl.delete_kind("chk", chk)
+        kubectl.delete_kind("sts", "test-051-chk")
+        kubectl.delete_kind("pod", "test-051-chk-0")
         kubectl.delete_kind("pvc", old_pvc)
 
     with Then("Unmount PV from old PVC"):
@@ -5014,6 +5004,8 @@ def check_replication(chi, replicas, token, table = ''):
         cluster = clickhouse.query(chi, "select substitution from system.macros where macro = 'cluster'")
         if table == '':
             table = chi.replace('-','_')
+
+        wait_for_cluster(chi, cluster, 1, len(replicas))
 
         with When("Create a replicated table if not exists"):
             clickhouse.query(chi, f"CREATE TABLE IF NOT EXISTS {table} ON CLUSTER '{cluster}' (a UInt32) Engine = ReplicatedMergeTree ORDER BY a")

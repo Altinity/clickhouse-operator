@@ -153,6 +153,8 @@ func (w *worker) reconcile(ctx context.Context, cr *api.ClickHouseInstallation) 
 		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
 			FullFanOut: true,
 		})
+	} else {
+		w.a.V(1).M(cr).Info("Unable to use full fan-out mode. Counters: %s. CR: %s", counters, util.NamespaceNameString(cr))
 	}
 
 	return cr.WalkTillError(
@@ -488,20 +490,77 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiS
 			return err
 		}
 
-		// Since shard with 0 index is already done, we'll proceed with the 1-st
+		// Since shard with 0 index is already done, we'll proceed concurrently starting with the 1-st
 		startShard = 1
 	}
 
 	// Process shards using specified concurrency level while maintaining specified max concurrency percentage.
 	// Loop over shards.
 	workersNum := w.getReconcileShardsWorkersNum(shards, opts)
-	w.a.V(1).Info("Starting rest of shards on workers: %d", workersNum)
-	for startShardIndex := startShard; startShardIndex < len(shards); startShardIndex += workersNum {
-		endShardIndex := startShardIndex + workersNum
-		if endShardIndex > len(shards) {
-			endShardIndex = len(shards)
+	w.a.V(1).Info("Starting rest of shards on workers. Workers num: %d", workersNum)
+	if err := w.runConcurrently(ctx, workersNum, startShard, shards[startShard:]); err != nil {
+		w.a.V(1).Info("Finished with ERROR rest of shards on workers: %d, err: %v", workersNum, err)
+		return err
+	}
+	w.a.V(1).Info("Finished successfully rest of shards on workers: %d", workersNum)
+	return nil
+}
+
+func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShardIndex int, shards []*api.ChiShard) error {
+	if len(shards) == 0 {
+		return nil
+	}
+
+	type shardReconcile struct {
+		shard *api.ChiShard
+		index int
+	}
+
+	ch := make(chan *shardReconcile)
+	wg := sync.WaitGroup{}
+
+	// Launch tasks feeder
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(ch)
+		for i, shard := range shards {
+			ch <- &shardReconcile{
+				shard,
+				startShardIndex + i,
+			}
 		}
+	}()
+
+	// Launch workers
+	var err error
+	var errLock sync.Mutex
+	for i := 0; i < workersNum; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for rq := range ch {
+				w.a.V(1).Info("Starting shard index: %d on worker", rq.index)
+				if e := w.reconcileShardWithHosts(ctx, rq.shard); e != nil {
+					errLock.Lock()
+					err = e
+					errLock.Unlock()
+				}
+			}
+		}()
+	}
+
+	w.a.V(1).Info("Starting to wait shards from index: %d on workers.", startShardIndex)
+	wg.Wait()
+	w.a.V(1).Info("Finished to wait shards from index: %d on workers.", startShardIndex)
+	return err
+}
+
+func (w *worker) runConcurrentlyInBatches(ctx context.Context, workersNum int, start int, shards []*api.ChiShard) error {
+	for startShardIndex := 0; startShardIndex < len(shards); startShardIndex += workersNum {
+		endShardIndex := util.IncTopped(startShardIndex, workersNum, len(shards))
 		concurrentlyProcessedShards := shards[startShardIndex:endShardIndex]
+		w.a.V(1).Info("Starting shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
 
 		// Processing error protected with mutex
 		var err error
@@ -512,17 +571,21 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiS
 		// Launch shard concurrent processing
 		for j := range concurrentlyProcessedShards {
 			shard := concurrentlyProcessedShards[j]
+			w.a.V(1).Info("Starting shard on worker. Shard index: %d", start+startShardIndex+j)
 			go func() {
 				defer wg.Done()
+				w.a.V(1).Info("Starting shard on goroutine. Shard index: %d", start+startShardIndex+j)
 				if e := w.reconcileShardWithHosts(ctx, shard); e != nil {
 					errLock.Lock()
 					err = e
 					errLock.Unlock()
-					return
 				}
+				w.a.V(1).Info("Finished shard on goroutine. Shard index: %d", start+startShardIndex+j)
 			}()
 		}
+		w.a.V(1).Info("Starting to wait shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
 		wg.Wait()
+		w.a.V(1).Info("Finished to wait shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
 		if err != nil {
 			w.a.V(1).Warning("Skipping rest of shards due to an error: %v", err)
 			return err
@@ -581,6 +644,17 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
+
+	//si := host.GetRuntime().GetAddress().GetShardIndex()
+	//ri := host.GetRuntime().GetAddress().GetReplicaIndex()
+	////sleep := util.DecBottomed(si, 1, 0)*(si % 3)*20
+	//sleep := (2 - si)*90
+	//if ri > 0 {
+	//	sleep = 0
+	//}
+	//w.a.V(1).Info("Host [%d/%d]. Going to sleep %d sec", si, ri, sleep)
+	//time.Sleep((time.Duration)(sleep)*time.Second)
+	//w.a.V(1).Info("Host [%d/%d]. Done to sleep %d sec", si, ri)
 
 	metrics.HostReconcilesStarted(ctx, host.GetCR())
 	startTime := time.Now()
