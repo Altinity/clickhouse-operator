@@ -1,7 +1,7 @@
 apiVersion: "clickhouse-keeper.altinity.com/v1"
 kind: "ClickHouseKeeperInstallation"
 metadata:
-  name: extended-1
+  name: extended
 spec:
   configuration:
     clusters:
@@ -30,7 +30,21 @@ spec:
   templates:
     podTemplates:
       - name: default
+        metadata:
+          labels:
+            app: clickhouse-keeper
         spec:
+          # affinity, remove it to allow use in single node test environment
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: "app"
+                        operator: In
+                        values:
+                          - clickhouse-keeper
+                  topologyKey: "kubernetes.io/hostname"
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
