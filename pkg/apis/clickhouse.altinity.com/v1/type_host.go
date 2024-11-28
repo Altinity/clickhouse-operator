@@ -603,3 +603,14 @@ func (host *Host) IsZero() bool {
 func (host *Host) IsNonZero() bool {
 	return host != nil
 }
+
+func (host *Host) ShouldIncludeIntoCluster() bool {
+	switch {
+	case host.IsStopped():
+		return false
+	case host.GetCluster().HostsCount() < 2:
+		return false
+	default:
+		return true
+	}
+}

@@ -298,7 +298,7 @@ def install_operator_if_not_exist(
 
 
 def install_operator_version(version, shell=None):
-    if version == current().context.operator_version:
+    if version == current().context.operator_version or version == "dev":
         manifest = get_full_path(current().context.clickhouse_operator_install_manifest)
         manifest = f"cat {manifest}"
     else:

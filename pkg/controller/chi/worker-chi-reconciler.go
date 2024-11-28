@@ -235,6 +235,15 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 	cr.GetRuntime().LockCommonConfig()
 	err = w.reconcileConfigMapCommon(ctx, cr)
 	cr.GetRuntime().UnlockCommonConfig()
+
+	// Wait for all hosts to be included into cluster
+	cr.WalkHosts(func(host *api.Host) error {
+		if host.ShouldIncludeIntoCluster() {
+			_ = w.waitHostInCluster(ctx, host)
+		}
+		return nil
+	})
+
 	return err
 }
 
