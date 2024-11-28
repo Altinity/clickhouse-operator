@@ -3377,7 +3377,7 @@ def test_032(self):
             "CREATE TABLE test_distr_032 ON CLUSTER 'default' AS test_local_032 Engine = Distributed('default', default, test_local_032, a%2)",
         )
         clickhouse.query(chi, f"INSERT INTO test_distr_032 select * from numbers({numbers})")
-        time.sleep(60)
+        time.sleep(10)
 
         with Then("Distributed table is created on all nodes"):
             cnt = clickhouse.query(chi_name=chi, sql="select count() from cluster('all-sharded', system.tables) where name='test_distr_032'")
