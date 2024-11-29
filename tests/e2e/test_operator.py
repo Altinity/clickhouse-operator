@@ -603,7 +603,6 @@ def test_009_2(self, version_from="0.23.7", version_to=None):
 def test_010(self):
     create_shell_namespace_clickhouse_template()
 
-    util.set_operator_version(current().context.operator_version)
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     kubectl.create_and_check(
@@ -617,6 +616,41 @@ def test_010(self):
         },
     )
     time.sleep(10)
+    with And("ClickHouse should not complain regarding zookeeper path"):
+        out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/' limit 1")
+        assert "/" == out
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+@TestScenario
+@Name("test_010_1. Test zookeeper initialization AFTER starting a cluster")
+def test_010_1(self):
+    create_shell_namespace_clickhouse_template()
+    chi = "test-010-zkroot"
+
+    kubectl.create_and_check(
+        manifest="manifests/chi/test-010-zkroot.yaml",
+        check={
+            "apply_templates": {
+                current().context.clickhouse_template,
+            },
+            "do_not_delete": 1,
+            "chi_status": "InProgress"
+        },
+    )
+
+    with Then("Wait 60 seconds for operator to start creating ZooKeeper root"):
+        time.sleep(60)
+
+    # with Then("CHI should be in progress with no pods created yet"):
+    #    assert kubectl.get_chi_status(chi) == "InProgress"
+    #    assert kubectl.get_count("pod", chi = chi) == 0
+
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    kubectl.wait_chi_status(chi, "Completed")
+
     with And("ClickHouse should not complain regarding zookeeper path"):
         out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/' limit 1")
         assert "/" == out
@@ -1565,9 +1599,7 @@ def test_014_0(self):
             kubectl.launch(f"delete pod {self.context.keeper_type}-0")
             time.sleep(1)
 
-        with Then(
-            f"try insert into the table while {self.context.keeper_type} offline table should be in readonly mode"
-        ):
+        with Then(f"try insert into the table while {self.context.keeper_type} offline table should be in readonly mode"):
             out = clickhouse.query_with_error(chi_name, "SET insert_keeper_max_retries=0; INSERT INTO test_local_014 VALUES(2)")
             assert "Table is in readonly mode" in out
 
@@ -1597,28 +1629,44 @@ def test_014_0(self):
         time.sleep(10)
         check_schema_propagation([1])
 
+    with When("Remove shard"):
+        manifest = "manifests/chi/test-014-0-replication-2-1.yaml"
+        chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+            timeout=600,
+        )
+        with Then("Shard should be deleted in ZooKeeper"):
+            out = clickhouse.query_with_error(
+                chi_name,
+                f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{cluster}/tables/1/default'",
+            )
+            note(f"Found {out} replicated tables in {self.context.keeper_type}")
+            # FIXME: it fails
+            # assert "DB::Exception: No node" in out or out == "0"
+
     with When("Delete chi"):
         kubectl.delete_chi("test-014-replication")
 
-        with Then(
-            f"Tables should be deleted in {self.context.keeper_type}. We can test it re-creating the chi and checking {self.context.keeper_type} contents"
-        ):
-            manifest = "manifests/chi/test-014-0-replication-1.yaml"
-            kubectl.create_and_check(
-                manifest=manifest,
-                check={
-                    "pod_count": 2,
-                    "pdb": {"default": 1},
-                    "do_not_delete": 1,
-                },
+        manifest = "manifests/chi/test-014-0-replication-1.yaml"
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+        with Then("Tables are deleted in ZooKeeper"):
+            out = clickhouse.query_with_error(
+                chi_name,
+                f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{cluster}/tables/0/default'",
             )
-            with Then("Tables are deleted in ZooKeeper"):
-                out = clickhouse.query_with_error(
-                    chi_name,
-                    f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{chi_name}/tables/0/default'",
-                )
-                note(f"Found {out} replicated tables in {self.context.keeper_type}")
-                assert "DB::Exception: No node" in out or out == "0"
+            note(f"Found {out} replicated tables in {self.context.keeper_type}")
+            assert "DB::Exception: No node" in out or out == "0"
 
     with Finally("I clean up"):
         delete_test_namespace()

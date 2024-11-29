@@ -85,7 +85,7 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
             keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
         if keeper_type == "chk":
             keeper_manifest = (
-                "clickhouse-keeper-1-node-for-test.yaml" if keeper_manifest == "" else keeper_manifest
+                "clickhouse-keeper-1-node-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             )
             keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-with-CHK-resource/{keeper_manifest}"
         if keeper_type == "zookeeper-operator":
@@ -102,7 +102,7 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
         expected_docs = {
             "zookeeper": 5 if "scaleout-pvc" in keeper_manifest else 4,
             "clickhouse-keeper": 7,
-            "chk": 1,
+            "chk": 2,
             "zookeeper-operator": 3 if "probes" in keeper_manifest else 1,
         }
         expected_pod_prefix = {
