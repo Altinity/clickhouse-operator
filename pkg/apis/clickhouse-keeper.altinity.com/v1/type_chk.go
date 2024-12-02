@@ -27,10 +27,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (cr *ClickHouseKeeperInstallation) IsNonZero() bool {
-	return cr != nil
-}
-
 func (cr *ClickHouseKeeperInstallation) GetSpec() apiChi.ICRSpec {
 	return &cr.Spec
 }
@@ -227,7 +223,9 @@ func (cr *ClickHouseKeeperInstallation) MergeFrom(from *ClickHouseKeeperInstalla
 	//cr.ensureRuntime().attributes = from.ensureRuntime().attributes
 
 	cr.EnsureStatus().CopyFrom(from.Status, types.CopyStatusOptions{
-		InheritableFields: true,
+		CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+			FieldGroupInheritable: true,
+		},
 	})
 }
 
@@ -652,4 +650,12 @@ func (cr *ClickHouseKeeperInstallation) WalkTillError(
 	}
 
 	return nil
+}
+
+func (cr *ClickHouseKeeperInstallation) IsZero() bool {
+	return cr == nil
+}
+
+func (cr *ClickHouseKeeperInstallation) IsNonZero() bool {
+	return cr != nil
 }

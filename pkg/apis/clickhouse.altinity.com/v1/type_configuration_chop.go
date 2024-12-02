@@ -210,6 +210,24 @@ type OperatorConfigFileRuntime struct {
 	UsersConfigFiles  map[string]string `json:"-" yaml:"-"`
 }
 
+type IOperatorConfigFilesPathsGetter interface {
+	GetCommonConfigFiles() map[string]string
+	GetHostConfigFiles() map[string]string
+	GetUsersConfigFiles() map[string]string
+}
+
+func (r OperatorConfigFileRuntime) GetCommonConfigFiles() map[string]string {
+	return r.CommonConfigFiles
+}
+
+func (r OperatorConfigFileRuntime) GetHostConfigFiles() map[string]string {
+	return r.HostConfigFiles
+}
+
+func (r OperatorConfigFileRuntime) GetUsersConfigFiles() map[string]string {
+	return r.UsersConfigFiles
+}
+
 // OperatorConfigUser specifies User section
 type OperatorConfigUser struct {
 	Default OperatorConfigDefault `json:"default" yaml:"default"`
@@ -396,6 +414,21 @@ type OperatorConfigLabel struct {
 	} `json:"runtime" yaml:"runtime"`
 }
 
+type OperatorConfigMetrics struct {
+	Labels struct {
+		Exclude []string `json:"exclude" yaml:"exclude"`
+	} `json:"labels" yaml:"labels"`
+}
+
+type OperatorConfigStatus struct {
+	Fields struct {
+		Action  *types.StringBool `json:"action,omitempty"  yaml:"action,omitempty"`
+		Actions *types.StringBool `json:"actions,omitempty" yaml:"actions,omitempty"`
+		Error   *types.StringBool `json:"error,omitempty"   yaml:"error,omitempty"`
+		Errors  *types.StringBool `json:"errors,omitempty"  yaml:"errors,omitempty"`
+	} `json:"fields" yaml:"fields"`
+}
+
 type ConfigCRSource struct {
 	Namespace string
 	Name      string
@@ -411,6 +444,8 @@ type OperatorConfig struct {
 	Reconcile   OperatorConfigReconcile  `json:"reconcile"  yaml:"reconcile"`
 	Annotation  OperatorConfigAnnotation `json:"annotation" yaml:"annotation"`
 	Label       OperatorConfigLabel      `json:"label"      yaml:"label"`
+	Metrics     OperatorConfigMetrics    `json:"metrics"    yaml:"metrics"`
+	Status      OperatorConfigStatus     `json:"status"    yaml:"status"`
 	StatefulSet struct {
 		// Revision history limit
 		RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`

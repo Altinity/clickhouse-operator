@@ -50,8 +50,7 @@ type Configuration struct {
 	Quotas    *Settings        `json:"quotas,omitempty"    yaml:"quotas,omitempty"`
 	Settings  *Settings        `json:"settings,omitempty"  yaml:"settings,omitempty"`
 	Files     *Settings        `json:"files,omitempty"     yaml:"files,omitempty"`
-	// TODO refactor into map[string]ChiCluster
-	Clusters []*Cluster `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
+	Clusters  []*Cluster       `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
 }
 
 // NewConfiguration creates new Configuration objects
@@ -59,19 +58,38 @@ func NewConfiguration() *Configuration {
 	return new(Configuration)
 }
 
+func (c *Configuration) GetUsers() *Settings {
+	if c == nil {
+		return nil
+	}
+	return c.Users
+}
+
 func (c *Configuration) GetProfiles() *Settings {
+	if c == nil {
+		return nil
+	}
 	return c.Profiles
 }
 
 func (c *Configuration) GetQuotas() *Settings {
+	if c == nil {
+		return nil
+	}
 	return c.Quotas
 }
 
 func (c *Configuration) GetSettings() *Settings {
+	if c == nil {
+		return nil
+	}
 	return c.Settings
 }
 
 func (c *Configuration) GetFiles() *Settings {
+	if c == nil {
+		return nil
+	}
 	return c.Files
 }
 

@@ -106,8 +106,7 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
             "zookeeper": "2",
             "zookeeper-operator": "3",
             "clickhouse-keeper": "2",
-            "clickhouse-keeper_with_chk": "2",
-            "CHK": "2",
+            "chk": "1",
         }
         if expected_out[keeper_type] != out.strip(" \t\r\n") and i + 1 < retry_count:
             with Then(f"{keeper_type} system.zookeeper not ready, wait {(i + 1) * 3} sec"):
@@ -358,10 +357,10 @@ def test_clickhouse_keeper_rescale(self):
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
 def test_clickhouse_keeper_rescale_chk(self):
     test_keeper_rescale_outline(
-        keeper_type="clickhouse-keeper_with_chk",
+        keeper_type="chk",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
-        keeper_manifest_1_node="clickhouse-keeper-1-node-for-test-only.yaml",
-        keeper_manifest_3_node="clickhouse-keeper-3-node-for-test-only.yaml",
+        keeper_manifest_1_node="clickhouse-keeper-1-node-for-test.yaml",
+        keeper_manifest_3_node="clickhouse-keeper-3-node-for-test.yaml",
     )
 
 
@@ -428,7 +427,7 @@ def test_keeper_probes_outline(
                 min_bytes_for_compact_part=10485760,
                 parts_to_delay_insert=1000000,
                 parts_to_throw_insert=1000000,
-                max_parts_in_total=1000000;        
+                max_parts_in_total=1000000;
         """,
         )
     with Then("Insert data to keeper_bench for make zookeeper workload"):

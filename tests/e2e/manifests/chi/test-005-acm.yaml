@@ -13,7 +13,7 @@ spec:
           fsGroup: 101
         containers:
         - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:24.3
+          image: clickhouse/clickhouse-server:24.8.5.115
           ports:
           - name: http
             containerPort: 8123
@@ -39,7 +39,7 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/clickhouse
               name: default
-        - image: altinity/clickhouse-backup:2.2.7
+        - image: altinity/clickhouse-backup:stable
           name: clickhouse-backup
           command:
           - /bin/bash

@@ -44,14 +44,6 @@ type Announcer struct {
 	meta string
 }
 
-// announcer which would be used in top-level functions, can be called as a 'default announcer'
-var announcer Announcer
-
-// init creates default announcer
-func init() {
-	announcer = New()
-}
-
 // skip specifies file name which to be skipped from address
 const skip = "announcer.go"
 
@@ -69,21 +61,11 @@ func (a Announcer) Silence() Announcer {
 	return b
 }
 
-// Silence produces silent announcer
-func Silence() Announcer {
-	return announcer.Silence()
-}
-
 // V is inspired by log.V()
 func (a Announcer) V(level log.Level) Announcer {
 	b := a
 	b.v = level
 	return b
-}
-
-// V is inspired by log.V()
-func V(level log.Level) Announcer {
-	return announcer.V(level)
 }
 
 // F adds function name
@@ -93,21 +75,11 @@ func (a Announcer) F() Announcer {
 	return b
 }
 
-// F adds function name
-func F() Announcer {
-	return announcer.F()
-}
-
 // L adds line number
 func (a Announcer) L() Announcer {
 	b := a
 	_, b.line, _ = runtime.Caller(skip)
 	return b
-}
-
-// L adds line number
-func L() Announcer {
-	return announcer.L()
 }
 
 // FL adds filename
@@ -117,21 +89,11 @@ func (a Announcer) FL() Announcer {
 	return b
 }
 
-// FL adds filename
-func FL() Announcer {
-	return announcer.FL()
-}
-
 // A adds full code address as 'file:line:function'
 func (a Announcer) A() Announcer {
 	b := a
 	b.file, b.line, b.function = runtime.Caller(skip)
 	return b
-}
-
-// A adds full code address as 'file:line:function'
-func A() Announcer {
-	return announcer.A()
 }
 
 // S adds 'start of the function' tag, which includes:
@@ -143,12 +105,6 @@ func (a Announcer) S() Announcer {
 	return b
 }
 
-// S adds 'start of the function' tag, which includes:
-// file, line, function and start prefix
-func S() Announcer {
-	return announcer.S()
-}
-
 // E adds 'end of the function' tag, which includes:
 // file, line, function and start prefix
 func (a Announcer) E() Announcer {
@@ -156,12 +112,6 @@ func (a Announcer) E() Announcer {
 	b.prefix = "end"
 	b.file, b.line, b.function = runtime.Caller(skip)
 	return b
-}
-
-// E adds 'end of the function' tag, which includes:
-// file, line, function and start prefix
-func E() Announcer {
-	return announcer.E()
 }
 
 // M adds object meta as 'namespace/name'
@@ -199,19 +149,9 @@ func (a Announcer) M(m ...interface{}) Announcer {
 	return b
 }
 
-// M adds object meta as 'namespace/name'
-func M(m ...interface{}) Announcer {
-	return announcer.M(m...)
-}
-
 // P triggers log to print line
 func (a Announcer) P() {
 	a.Info("")
-}
-
-// P triggers log to print line
-func P() {
-	announcer.P()
 }
 
 // Info is inspired by log.Infof()
@@ -237,11 +177,6 @@ func (a Announcer) Info(format string, args ...interface{}) {
 	}
 }
 
-// Info is inspired by log.Infof()
-func Info(format string, args ...interface{}) {
-	announcer.Info(format, args...)
-}
-
 // Warning is inspired by log.Warningf()
 func (a Announcer) Warning(format string, args ...interface{}) {
 	// Produce classic log line
@@ -255,11 +190,6 @@ func (a Announcer) Warning(format string, args ...interface{}) {
 	} else {
 		log.Warning(format)
 	}
-}
-
-// Warning is inspired by log.Warningf()
-func Warning(format string, args ...interface{}) {
-	announcer.Warning(format, args...)
 }
 
 // Error is inspired by log.Errorf()
@@ -277,11 +207,6 @@ func (a Announcer) Error(format string, args ...interface{}) {
 	}
 }
 
-// Error is inspired by log.Errorf()
-func Error(format string, args ...interface{}) {
-	announcer.Error(format, args...)
-}
-
 // Fatal is inspired by log.Fatalf()
 func (a Announcer) Fatal(format string, args ...interface{}) {
 	format = a.prependFormat(format)
@@ -291,11 +216,6 @@ func (a Announcer) Fatal(format string, args ...interface{}) {
 	} else {
 		log.Fatal(format)
 	}
-}
-
-// Fatal is inspired by log.Fatalf()
-func Fatal(format string, args ...interface{}) {
-	announcer.Fatal(format, args...)
 }
 
 // prependFormat
@@ -351,7 +271,7 @@ func (a Announcer) tryToFindNamespaceNameEverywhere(m interface{}) (string, bool
 	return "", false
 }
 
-// findInObjectMeta
+// findNamespaceName
 func (a Announcer) findNamespaceName(m interface{}) (string, bool) {
 	if m == nil {
 		return "", false

@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.24.0
+# OPERATOR_VERSION=0.24.1
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1079,7 +1079,7 @@ spec:
                         description: "template name, could use to link inside top-level `chi.spec.defaults.templates.podTemplate`, cluster-level `chi.spec.configuration.clusters.templates.podTemplate`, shard-level `chi.spec.configuration.clusters.layout.shards.temlates.podTemplate`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates.podTemplate`"
                       generateName:
                         type: string
-                        description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about aviailable template variables"
+                        description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about available template variables"
                       zone:
                         type: object
                         description: "allows define custom zone name and will separate ClickHouse `Pods` between nodes, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
@@ -1226,7 +1226,7 @@ spec:
                         description: |
                           allows define format for generated `Service` name,
                           look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates
-                          for details about aviailable template variables"
+                          for details about available template variables"
                       metadata:
                         # TODO specify ObjectMeta
                         type: object
@@ -1275,14 +1275,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.24.0
+# OPERATOR_VERSION=0.24.1
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2348,7 +2348,7 @@ spec:
                         description: "template name, could use to link inside top-level `chi.spec.defaults.templates.podTemplate`, cluster-level `chi.spec.configuration.clusters.templates.podTemplate`, shard-level `chi.spec.configuration.clusters.layout.shards.temlates.podTemplate`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates.podTemplate`"
                       generateName:
                         type: string
-                        description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about aviailable template variables"
+                        description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about available template variables"
                       zone:
                         type: object
                         description: "allows define custom zone name and will separate ClickHouse `Pods` between nodes, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
@@ -2495,7 +2495,7 @@ spec:
                         description: |
                           allows define format for generated `Service` name,
                           look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates
-                          for details about aviailable template variables"
+                          for details about available template variables"
                       metadata:
                         # TODO specify ObjectMeta
                         type: object
@@ -2547,7 +2547,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2909,6 +2909,40 @@ spec:
                     - "LabelClusterScopeCycleSize"
                     - "LabelClusterScopeCycleIndex"
                     - "LabelClusterScopeCycleOffset"
+            metrics:
+              type: object
+              description: "defines metrics exporter options"
+              properties:
+                labels:
+                  type: object
+                  description: "defines metric labels options"
+                  properties:
+                    exclude:
+                      type: array
+                      description: |
+                        When adding labels to a metric exclude labels with names from the following list
+                      items:
+                        type: string
+            status:
+              type: object
+              description: "defines status options"
+              properties:
+                fields:
+                  type: object
+                  description: "defines status fields options"
+                  properties:
+                    action:
+                      !!merge <<: *TypeStringBool
+                      description: "Whether the operator should fill status field 'action'"
+                    actions:
+                      !!merge <<: *TypeStringBool
+                      description: "Whether the operator should fill status field 'actions'"
+                    error:
+                      !!merge <<: *TypeStringBool
+                      description: "Whether the operator should fill status field 'error'"
+                    errors:
+                      !!merge <<: *TypeStringBool
+                      description: "Whether the operator should fill status field 'errors'"
             statefulSet:
               type: object
               description: "define StatefulSet-specific parameters"
@@ -2952,14 +2986,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.24.0
+# OPERATOR_VERSION=0.24.1
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.24.0
+    clickhouse-keeper.altinity.com/chop: 0.24.1
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -3621,7 +3655,7 @@ spec:
                             description: "template name, could use to link inside top-level `chi.spec.defaults.templates.podTemplate`, cluster-level `chi.spec.configuration.clusters.templates.podTemplate`, shard-level `chi.spec.configuration.clusters.layout.shards.temlates.podTemplate`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates.podTemplate`"
                           generateName:
                             type: string
-                            description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about aviailable template variables"
+                            description: "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about available template variables"
                           zone:
                             type: object
                             description: "allows define custom zone name and will separate ClickHouse `Pods` between nodes, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
@@ -3768,7 +3802,7 @@ spec:
                             description: |
                               allows define format for generated `Service` name,
                               look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates
-                              for details about aviailable template variables"
+                              for details about available template variables"
                           metadata:
                             # TODO specify ObjectMeta
                             type: object
@@ -3800,7 +3834,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 
 # Template Parameters:
 #
@@ -3825,7 +3859,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 rules:
   #
   # Core API group
@@ -4034,7 +4068,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -4056,7 +4090,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -4209,7 +4243,6 @@ data:
         # These credentials are used for:
         #   1. Metrics requests
         #   2. Schema maintenance
-        #   3. DROP DNS CACHE
         # User with these credentials can be specified in additional ClickHouse .xml config files,
         # located in 'clickhouse.configuration.file.path.user' folder
         username: ""
@@ -4415,6 +4448,27 @@ data:
 
     ################################################
     ##
+    ## Metrics management section
+    ##
+    ################################################
+    metrics:
+      labels:
+        exclude: []
+
+    ################################################
+    ##
+    ## Status management section
+    ##
+    ################################################
+    status:
+      fields:
+        action: false
+        actions: false
+        error: false
+        errors: false
+
+    ################################################
+    ##
     ## StatefulSet management section
     ##
     ################################################
@@ -4458,7 +4512,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
 ---
@@ -4474,7 +4528,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -4568,7 +4622,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -4666,7 +4720,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -4728,7 +4782,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
 ---
@@ -4744,7 +4798,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -4767,7 +4821,6 @@ data:
             <snapshot_storage_path>/var/lib/clickhouse-keeper/coordination/snapshots</snapshot_storage_path>
             <storage_path>/var/lib/clickhouse-keeper</storage_path>
             <tcp_port>2181</tcp_port>
-            <enable_reconfiguration>true</enable_reconfiguration>
         </keeper_server>
         <listen_host>::</listen_host>
         <listen_host>0.0.0.0</listen_host>
@@ -4807,6 +4860,18 @@ data:
             </http_control>
         </keeper_server>
     </clickhouse>
+  01-keeper-03-enable-reconfig.xml: |
+    <!-- IMPORTANT -->
+    <!-- This file is auto-generated -->
+    <!-- Do not edit this file - all changes would be lost -->
+    <!-- Edit appropriate template in the following folder: -->
+    <!-- deploy/builder/templates-config -->
+    <!-- IMPORTANT -->
+    <clickhouse>
+        <keeper_server>
+            <enable_reconfiguration>false</enable_reconfiguration>
+        </keeper_server>
+    </clickhouse>
 ---
 # Template Parameters:
 #
@@ -4820,7 +4885,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
   readme: |
@@ -4838,7 +4903,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 data:
 ---
@@ -4846,7 +4911,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=kube-system
 #   COMMENT=
-#   OPERATOR_VERSION=0.24.0
+#   OPERATOR_VERSION=0.24.1
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -4856,7 +4921,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -4867,9 +4932,9 @@ stringData:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.24.0
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.24.1
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.24.0
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.24.1
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -4880,7 +4945,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -4928,7 +4993,7 @@ spec:
             name: etc-keeper-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.24.0
+          image: altinity/clickhouse-operator:0.24.1
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5002,7 +5067,7 @@ spec:
             - containerPort: 9999
               name: metrics
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.24.0
+          image: altinity/metrics-exporter:0.24.1
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5092,7 +5157,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.0
+    clickhouse.altinity.com/chop: 0.24.1
     app: clickhouse-operator
 spec:
   ports:

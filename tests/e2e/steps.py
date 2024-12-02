@@ -152,31 +152,42 @@ def check_metrics_monitoring(
         self,
         operator_namespace,
         operator_pod,
-        expect_pattern,
+        expect_pattern = "",
+        expect_metric = "",
+        expect_labels = "",
         container="metrics-exporter",
         port="8888",
         max_retries=7
 ):
-    with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"):
+    with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern} {expect_metric} {expect_labels}"):
         for i in range(1, max_retries):
             url_cmd = util.make_http_get_request("127.0.0.1", port, "/metrics")
             out = kubectl.launch(
                 f"exec {operator_pod} -c {container} -- {url_cmd}",
                 ns=operator_namespace,
             )
-            # print(out)
-
-            rx = re.compile(expect_pattern, re.MULTILINE)
-            matches = rx.findall(out)
-            expected_pattern_found = False
-
-            if matches:
-                expected_pattern_found = True
-
-            if expected_pattern_found:
+            if expect_metric != "":
+                lines = [m for m in out.splitlines() if m.startswith(expect_metric)]
+                if len(lines) > 0:
+                    metric = lines[0]
+                    print(metric)
+                    expected_pattern_found = expect_labels in metric
+                else:
+                    expected_pattern_found = False
                 break
 
-            with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
-                time.sleep(i * 5)
+            if expect_pattern != "":
+                rx = re.compile(expect_pattern, re.MULTILINE)
+                matches = rx.findall(out)
+                expected_pattern_found = False
+
+                if matches:
+                    expected_pattern_found = True
+
+                if expected_pattern_found:
+                    break
+
+                with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
+                    time.sleep(i * 5)
 
         assert expected_pattern_found, error()

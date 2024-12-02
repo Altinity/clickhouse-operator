@@ -224,6 +224,10 @@ func (cluster *Cluster) GetCHI() *ClickHouseInstallation {
 	return cluster.Runtime.CHI
 }
 
+func (cluster *Cluster) GetAncestor() ICluster {
+	return cluster.GetCHI().GetAncestor().FindCluster(cluster.GetName())
+}
+
 // GetShard gets shard with specified index
 func (cluster *Cluster) GetShard(shard int) *ChiShard {
 	return cluster.Layout.Shards[shard]
@@ -363,6 +367,14 @@ func (cluster *Cluster) HostsCount() int {
 		return nil
 	})
 	return count
+}
+
+func (cluster *Cluster) IsZero() bool {
+	return cluster == nil
+}
+
+func (cluster *Cluster) IsNonZero() bool {
+	return cluster != nil
 }
 
 // ChiClusterLayout defines layout section of .spec.configuration.clusters

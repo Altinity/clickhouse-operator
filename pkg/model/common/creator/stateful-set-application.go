@@ -156,7 +156,7 @@ func (c *Creator) stsAppContainerSetupTroubleshootingMode(statefulSet *apps.Stat
 // stsSetupLogContainer
 func (c *Creator) stsSetupLogContainer(statefulSet *apps.StatefulSet, host *api.Host) {
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
-	if host.Templates.HasLogVolumeClaimTemplate() {
+	if host.GetTemplates().HasLogVolumeClaimTemplate() {
 		c.stsEnsureLogContainerSpecified(statefulSet)
 		c.a.V(1).F().Info("add log container for host: %s", host.Runtime.Address.HostName)
 	}

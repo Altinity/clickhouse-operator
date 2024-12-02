@@ -25,6 +25,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
@@ -32,7 +33,7 @@ import (
 )
 
 type Reconciler struct {
-	a    common.Announcer
+	a    a.Announcer
 	task *common.Task
 
 	hostSTSPoller IHostStatefulSetPoller
@@ -47,7 +48,7 @@ type Reconciler struct {
 }
 
 func NewReconciler(
-	a common.Announcer,
+	a a.Announcer,
 	task *common.Task,
 	hostSTSPoller IHostStatefulSetPoller,
 	namer interfaces.INameManager,
@@ -100,25 +101,25 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 		host.GetCR().IEnsureStatus().GetHostsAddedCount(),
 	)
 
-	curStatefulSet, err := r.sts.Get(context.TODO(), new)
+	cur, err := r.sts.Get(context.TODO(), new)
 	switch {
-	case curStatefulSet != nil:
+	case cur != nil:
 		r.a.V(1).M(new).Info("Have StatefulSet available, try to perform label-based comparison for sts: %s", util.NamespaceNameString(new))
-		return common.GetObjectStatusFromMetas(r.labeler, curStatefulSet, new)
+		return common.GetObjectStatusFromMetas(r.labeler, cur, new)
 
 	case apiErrors.IsNotFound(err):
 		// StatefulSet is not found at the moment.
 		// However, it may be just deleted
 		r.a.V(1).M(new).Info("No cur StatefulSet available and the reason is - not found. Either new one or a deleted sts: %s", util.NamespaceNameString(new))
 		if host.HasAncestor() {
-			r.a.V(1).M(new).Warning("No cur StatefulSet available but host has an ancestor. Found deleted StatefulSet. for: %s", util.NamespaceNameString(new))
+			r.a.V(1).M(new).Warning("No cur StatefulSet available but host has an ancestor. Found deleted sts. for: %s", util.NamespaceNameString(new))
 			return api.ObjectStatusModified
 		}
-		r.a.V(1).M(new).Info("No cur StatefulSet available and it is not found and is a new one. New one for: %s", util.NamespaceNameString(new))
+		r.a.V(1).M(new).Info("No cur StatefulSet available and it is not found and is a new one. New sts: %s", util.NamespaceNameString(new))
 		return api.ObjectStatusNew
 
 	default:
-		r.a.V(1).M(new).Warning("Have no StatefulSet available, nor it is not found for: %s err: %v", util.NamespaceNameString(new), err)
+		r.a.V(1).M(new).Warning("Have no StatefulSet available, nor it is not found. sts: %s err: %v", util.NamespaceNameString(new), err)
 		return api.ObjectStatusUnknown
 	}
 }
@@ -146,7 +147,9 @@ func (r *Reconciler) ReconcileStatefulSet(
 			host.GetCR().IEnsureStatus().HostUnchanged()
 			_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{
-					MainFields: true,
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupMain: true,
+					},
 				},
 			})
 		}
@@ -215,8 +218,8 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 	name := newStatefulSet.Name
 
 	r.a.V(1).
-		WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateStarted).
-		WithStatusAction(host.GetCR()).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
+		WithAction(host.GetCR()).
 		M(host).F().
 		Info("Update StatefulSet(%s) - started", util.NamespaceNameString(newStatefulSet))
 
@@ -236,13 +239,15 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 			host.GetCR().IEnsureStatus().HostUpdated()
 			_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{
-					MainFields: true,
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupMain: true,
+					},
 				},
 			})
 		}
 		r.a.V(1).
-			WithEvent(host.GetCR(), common.EventActionUpdate, common.EventReasonUpdateCompleted).
-			WithStatusAction(host.GetCR()).
+			WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateCompleted).
+			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
 		return nil
@@ -253,8 +258,8 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 		r.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got ignore. Ignore", namespace, name)
 		return nil
 	case common.ErrCRUDRecreate:
-		r.a.WithEvent(host.GetCR(), common.EventActionUpdate, common.EventReasonUpdateInProgress).
-			WithStatusAction(host.GetCR()).
+		r.a.WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateInProgress).
+			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
 		common.DumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
@@ -281,8 +286,8 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
 
 	r.a.V(1).
-		WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateStarted).
-		WithStatusAction(host.GetCR()).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
+		WithAction(host.GetCR()).
 		M(host).F().
 		Info("Create StatefulSet %s - started", util.NamespaceNameString(statefulSet))
 
@@ -292,7 +297,9 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 		host.GetCR().IEnsureStatus().HostAdded()
 		_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
 			CopyStatusOptions: types.CopyStatusOptions{
-				MainFields: true,
+				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+					FieldGroupMain: true,
+				},
 			},
 		})
 	}
@@ -300,21 +307,21 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 	switch action {
 	case nil:
 		r.a.V(1).
-			WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateCompleted).
-			WithStatusAction(host.GetCR()).
+			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
+			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Create StatefulSet: %s - completed", util.NamespaceNameString(statefulSet))
 		return nil
 	case common.ErrCRUDAbort:
-		r.a.WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(host.GetCR()).
-			WithStatusError(host.GetCR()).
+		r.a.WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(host.GetCR()).
+			WithError(host.GetCR()).
 			M(host).F().
 			Error("Create StatefulSet: %s - failed with error: %v", util.NamespaceNameString(statefulSet), action)
 		return action
 	case common.ErrCRUDIgnore:
-		r.a.WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(host.GetCR()).
+		r.a.WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(host.GetCR()).
 			M(host).F().
 			Warning("Create StatefulSet: %s - error ignored", util.NamespaceNameString(statefulSet))
 		return nil
@@ -334,7 +341,7 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 func (r *Reconciler) waitForConfigMapPropagation(ctx context.Context, host *api.Host) bool {
 	// No need to wait for ConfigMap propagation on stopped host
 	if host.IsStopped() {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - on stopped host")
+		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - host is stopped")
 		return false
 	}
 
@@ -347,7 +354,7 @@ func (r *Reconciler) waitForConfigMapPropagation(ctx context.Context, host *api.
 	// What timeout is expected to be enough for ConfigMap propagation?
 	// In case timeout is not specified, no need to wait
 	if !host.GetCR().GetReconciling().HasConfigMapPropagationTimeout() {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable")
+		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable due to missing timeout value")
 		return false
 	}
 
@@ -357,18 +364,19 @@ func (r *Reconciler) waitForConfigMapPropagation(ctx context.Context, host *api.
 	// May be there is no need to wait already
 	elapsed := time.Now().Sub(r.task.CmUpdate())
 	if elapsed >= timeout {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)
+		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. [elapsed/timeout: %s/%s]", elapsed, timeout)
 		return false
 	}
 
 	// Looks like we need to wait for Configmap propagation, after all
 	wait := timeout - elapsed
-	r.a.V(1).M(host).F().Info("Wait for ConfigMap propagation for %s %s/%s", wait, elapsed, timeout)
+	r.a.V(1).M(host).F().Info("Going to wait for ConfigMap propagation for: %s [elapsed/timeout: %s/%s]", wait, elapsed, timeout)
 	if util.WaitContextDoneOrTimeout(ctx, wait) {
 		log.V(2).Info("task is done")
 		return true
 	}
 
+	r.a.V(1).M(host).F().Info("Wait completed for: %s  of timeout: %s]", wait, timeout)
 	return false
 }
 

@@ -29,6 +29,13 @@ func NewDefaults() *Defaults {
 	return new(Defaults)
 }
 
+func (d *Defaults) GetDistributedDDL() *DistributedDDL {
+	if d == nil {
+		return nil
+	}
+	return d.DistributedDDL
+}
+
 // MergeFrom merges from specified object
 func (defaults *Defaults) MergeFrom(from *Defaults, _type MergeType) *Defaults {
 	if from == nil {

@@ -94,9 +94,8 @@ func (n *Normalizer) buildTargetFromTemplates(subj *chi.ClickHouseInstallation) 
 }
 
 func (n *Normalizer) applyCRTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
-	for _, template := range crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), subj) {
-		n.req.GetTarget().EnsureStatus().PushUsedTemplate(template)
-	}
+	usedTemplates := crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), subj)
+	n.req.GetTarget().EnsureStatus().PushUsedTemplate(usedTemplates...)
 }
 
 func (n *Normalizer) newSubject() *chi.ClickHouseInstallation {

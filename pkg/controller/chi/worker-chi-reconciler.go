@@ -27,6 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -96,15 +97,15 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		return nil
 	}
 
-	w.newTask(new)
+	w.newTask(new, old)
 	w.markReconcileStart(ctx, new, actionPlan)
 	w.excludeStoppedCHIFromMonitoring(new)
 	w.walkHosts(ctx, new, actionPlan)
 
 	if err := w.reconcile(ctx, new); err != nil {
 		// Something went wrong
-		w.a.WithEvent(new, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusError(new).
+		w.a.WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithError(new).
 			M(new).F().
 			Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
@@ -148,10 +149,12 @@ func (w *worker) reconcile(ctx context.Context, cr *api.ClickHouseInstallation) 
 	})
 
 	if counters.AddOnly() {
-		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CHI: %s", util.NamespaceNameString(cr))
+		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CR: %s", util.NamespaceNameString(cr))
 		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
 			FullFanOut: true,
 		})
+	} else {
+		w.a.V(1).M(cr).Info("Unable to use full fan-out mode. Counters: %s. CR: %s", counters, util.NamespaceNameString(cr))
 	}
 
 	return cr.WalkTillError(
@@ -206,7 +209,8 @@ func (w *worker) reconcileCRServiceFinal(ctx context.Context, cr api.ICustomReso
 
 	// Create entry point for the whole CHI
 	if service := w.task.Creator().CreateService(interfaces.ServiceCR); service != nil {
-		if err := w.reconcileService(ctx, cr, service); err != nil {
+		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCR)
+		if err := w.reconcileService(ctx, cr, service, prevService); err != nil {
 			// Service not reconciled
 			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
 			return err
@@ -229,8 +233,17 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 
 	// CR ConfigMaps with update
 	cr.GetRuntime().LockCommonConfig()
-	err = w.reconcileConfigMapCommon(ctx, cr, nil)
+	err = w.reconcileConfigMapCommon(ctx, cr)
 	cr.GetRuntime().UnlockCommonConfig()
+
+	// Wait for all hosts to be included into cluster
+	cr.WalkHosts(func(host *api.Host) error {
+		if host.ShouldIncludeIntoCluster() {
+			_ = w.waitHostInCluster(ctx, host)
+		}
+		return nil
+	})
+
 	return err
 }
 
@@ -238,17 +251,22 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 func (w *worker) reconcileConfigMapCommon(
 	ctx context.Context,
 	cr api.ICustomResource,
-	options *config.FilesGeneratorOptions,
+	options ...*config.FilesGeneratorOptions,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	// ConfigMap common for all resources in CHI
+	var opts *config.FilesGeneratorOptions
+	if len(options) > 0 {
+		opts = options[0]
+	}
+
+	// ConfigMap common for all resources in CR
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommon, options)
+	configMapCommon := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommon, opts)
 	err := w.reconcileConfigMap(ctx, cr, configMapCommon)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
@@ -336,9 +354,9 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 		}
 
 		host.GetCR().IEnsureStatus().HostFailed()
-		w.a.WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusAction(host.GetCR()).
-			WithStatusError(host.GetCR()).
+		w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(host.GetCR()).
+			WithError(host.GetCR()).
 			M(host).F().
 			Error("FAILED to reconcile StatefulSet for host: %s", host.GetName())
 	}
@@ -369,7 +387,8 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 		// This is not a problem, service may be omitted
 		return nil
 	}
-	err := w.reconcileService(ctx, host.GetCR(), service)
+	prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceHost, host.GetAncestor())
+	err := w.reconcileService(ctx, host.GetCR(), service, prevService)
 	if err == nil {
 		w.a.V(1).M(host).F().Info("DONE Reconcile service of the host: %s", host.GetName())
 		w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
@@ -392,7 +411,8 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 
 	// Add Cluster Service
 	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster); service != nil {
-		if err := w.reconcileService(ctx, cluster.GetRuntime().GetCR(), service); err == nil {
+		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCluster, cluster.GetAncestor())
+		if err := w.reconcileService(ctx, cluster.GetRuntime().GetCR(), service, prevService); err == nil {
 			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
 		} else {
 			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
@@ -479,20 +499,77 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiS
 			return err
 		}
 
-		// Since shard with 0 index is already done, we'll proceed with the 1-st
+		// Since shard with 0 index is already done, we'll proceed concurrently starting with the 1-st
 		startShard = 1
 	}
 
 	// Process shards using specified concurrency level while maintaining specified max concurrency percentage.
 	// Loop over shards.
 	workersNum := w.getReconcileShardsWorkersNum(shards, opts)
-	w.a.V(1).Info("Starting rest of shards on workers: %d", workersNum)
-	for startShardIndex := startShard; startShardIndex < len(shards); startShardIndex += workersNum {
-		endShardIndex := startShardIndex + workersNum
-		if endShardIndex > len(shards) {
-			endShardIndex = len(shards)
+	w.a.V(1).Info("Starting rest of shards on workers. Workers num: %d", workersNum)
+	if err := w.runConcurrently(ctx, workersNum, startShard, shards[startShard:]); err != nil {
+		w.a.V(1).Info("Finished with ERROR rest of shards on workers: %d, err: %v", workersNum, err)
+		return err
+	}
+	w.a.V(1).Info("Finished successfully rest of shards on workers: %d", workersNum)
+	return nil
+}
+
+func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShardIndex int, shards []*api.ChiShard) error {
+	if len(shards) == 0 {
+		return nil
+	}
+
+	type shardReconcile struct {
+		shard *api.ChiShard
+		index int
+	}
+
+	ch := make(chan *shardReconcile)
+	wg := sync.WaitGroup{}
+
+	// Launch tasks feeder
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(ch)
+		for i, shard := range shards {
+			ch <- &shardReconcile{
+				shard,
+				startShardIndex + i,
+			}
 		}
+	}()
+
+	// Launch workers
+	var err error
+	var errLock sync.Mutex
+	for i := 0; i < workersNum; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for rq := range ch {
+				w.a.V(1).Info("Starting shard index: %d on worker", rq.index)
+				if e := w.reconcileShardWithHosts(ctx, rq.shard); e != nil {
+					errLock.Lock()
+					err = e
+					errLock.Unlock()
+				}
+			}
+		}()
+	}
+
+	w.a.V(1).Info("Starting to wait shards from index: %d on workers.", startShardIndex)
+	wg.Wait()
+	w.a.V(1).Info("Finished to wait shards from index: %d on workers.", startShardIndex)
+	return err
+}
+
+func (w *worker) runConcurrentlyInBatches(ctx context.Context, workersNum int, start int, shards []*api.ChiShard) error {
+	for startShardIndex := 0; startShardIndex < len(shards); startShardIndex += workersNum {
+		endShardIndex := util.IncTopped(startShardIndex, workersNum, len(shards))
 		concurrentlyProcessedShards := shards[startShardIndex:endShardIndex]
+		w.a.V(1).Info("Starting shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
 
 		// Processing error protected with mutex
 		var err error
@@ -503,17 +580,21 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiS
 		// Launch shard concurrent processing
 		for j := range concurrentlyProcessedShards {
 			shard := concurrentlyProcessedShards[j]
+			w.a.V(1).Info("Starting shard on worker. Shard index: %d", start+startShardIndex+j)
 			go func() {
 				defer wg.Done()
+				w.a.V(1).Info("Starting shard on goroutine. Shard index: %d", start+startShardIndex+j)
 				if e := w.reconcileShardWithHosts(ctx, shard); e != nil {
 					errLock.Lock()
 					err = e
 					errLock.Unlock()
-					return
 				}
+				w.a.V(1).Info("Finished shard on goroutine. Shard index: %d", start+startShardIndex+j)
 			}()
 		}
+		w.a.V(1).Info("Starting to wait shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
 		wg.Wait()
+		w.a.V(1).Info("Finished to wait shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
 		if err != nil {
 			w.a.V(1).Warning("Skipping rest of shards due to an error: %v", err)
 			return err
@@ -553,7 +634,8 @@ func (w *worker) reconcileShardService(ctx context.Context, shard api.IShard) er
 		// This is not a problem, ServiceShard may be omitted
 		return nil
 	}
-	err := w.reconcileService(ctx, shard.GetRuntime().GetCR(), service)
+	prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceShard, shard.GetAncestor())
+	err := w.reconcileService(ctx, shard.GetRuntime().GetCR(), service, prevService)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
 	} else {
@@ -571,6 +653,17 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
+
+	//si := host.GetRuntime().GetAddress().GetShardIndex()
+	//ri := host.GetRuntime().GetAddress().GetReplicaIndex()
+	////sleep := util.DecBottomed(si, 1, 0)*(si % 3)*20
+	//sleep := (2 - si)*90
+	//if ri > 0 {
+	//	sleep = 0
+	//}
+	//w.a.V(1).Info("Host [%d/%d]. Going to sleep %d sec", si, ri, sleep)
+	//time.Sleep((time.Duration)(sleep)*time.Second)
+	//w.a.V(1).Info("Host [%d/%d]. Done to sleep %d sec", si, ri)
 
 	metrics.HostReconcilesStarted(ctx, host.GetCR())
 	startTime := time.Now()
@@ -604,14 +697,16 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		hostsCount = host.GetCR().GetStatus().GetHostsCount()
 	}
 	w.a.V(1).
-		WithEvent(host.GetCR(), common.EventActionProgress, common.EventReasonProgressHostsCompleted).
-		WithStatusAction(host.GetCR()).
+		WithEvent(host.GetCR(), a.EventActionProgress, a.EventReasonProgressHostsCompleted).
+		WithAction(host.GetCR()).
 		M(host).F().
-		Info("[now: %s] %s: %d of %d", now, common.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+		Info("[now: %s] %s: %d of %d", now, a.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
 
 	_ = w.c.updateCRObjectStatus(ctx, host.GetCR(), types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	})
 
@@ -626,14 +721,14 @@ func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error
 	// Check whether ClickHouse is running and accessible and what version is available
 	if version, err := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true}); err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileStarted).
-			WithStatusAction(host.GetCR()).
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
+			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileStarted).
-			WithStatusAction(host.GetCR()).
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
+			WithAction(host.GetCR()).
 			M(host).F().
 			Warning("Reconcile Host start. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
 	}
@@ -735,14 +830,14 @@ func (w *worker) reconcileHostBootstrap(ctx context.Context, host *api.Host) err
 	// Sometimes service needs some time to start after creation|modification before being accessible for usage
 	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileCompleted).
-			WithStatusAction(host.GetCR()).
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
+			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileCompleted).
-			WithStatusAction(host.GetCR()).
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
+			WithAction(host.GetCR()).
 			M(host).F().
 			Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
 	}

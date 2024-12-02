@@ -27,6 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -86,14 +87,14 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		return nil
 	}
 
-	w.newTask(new)
+	w.newTask(new, old)
 	w.markReconcileStart(ctx, new, actionPlan)
 	w.walkHosts(ctx, new, actionPlan)
 
 	if err := w.reconcile(ctx, new); err != nil {
 		// Something went wrong
-		w.a.WithEvent(new, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusError(new).
+		w.a.WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithError(new).
 			M(new).F().
 			Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
@@ -131,7 +132,7 @@ func (w *worker) reconcile(ctx context.Context, cr *apiChk.ClickHouseKeeperInsta
 	})
 
 	if counters.AddOnly() {
-		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CHI: %s", util.NamespaceNameString(cr))
+		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CR: %s", util.NamespaceNameString(cr))
 		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
 			FullFanOut: true,
 		})
@@ -168,6 +169,21 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *apiCh
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
 	}
 
+	return w.reconcileCRAuxObjectsPreliminaryDomain(ctx, cr)
+}
+
+func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
+	switch {
+	case cr.HostsCount() < cr.GetAncestor().HostsCount():
+		// Downscale
+		time.Sleep(120 * time.Second)
+	case cr.HostsCount() > cr.GetAncestor().HostsCount():
+		// Upscale
+		time.Sleep(30 * time.Second)
+	default:
+		// Same size
+		time.Sleep(10 * time.Second)
+	}
 	return nil
 }
 
@@ -189,7 +205,8 @@ func (w *worker) reconcileCRServiceFinal(ctx context.Context, cr api.ICustomReso
 
 	// Create entry point for the whole CHI
 	if service := w.task.Creator().CreateService(interfaces.ServiceCR); service != nil {
-		if err := w.reconcileService(ctx, cr, service); err != nil {
+		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCR)
+		if err := w.reconcileService(ctx, cr, service, prevService); err != nil {
 			// Service not reconciled
 			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
 			return err
@@ -212,7 +229,7 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *apiChk.Clic
 
 	// CR ConfigMaps with update
 	cr.GetRuntime().LockCommonConfig()
-	err = w.reconcileConfigMapCommon(ctx, cr, nil)
+	err = w.reconcileConfigMapCommon(ctx, cr)
 	cr.GetRuntime().UnlockCommonConfig()
 	return err
 }
@@ -221,17 +238,22 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *apiChk.Clic
 func (w *worker) reconcileConfigMapCommon(
 	ctx context.Context,
 	cr api.ICustomResource,
-	options *config.FilesGeneratorOptions,
+	options ...*config.FilesGeneratorOptions,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	// ConfigMap common for all resources in CHI
+	var opts *config.FilesGeneratorOptions
+	if len(options) > 0 {
+		opts = options[0]
+	}
+
+	// ConfigMap common for all resources in CR
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommon, options)
+	configMapCommon := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommon, opts)
 	err := w.reconcileConfigMap(ctx, cr, configMapCommon)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
@@ -319,9 +341,9 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 		}
 
 		host.GetCR().IEnsureStatus().HostFailed()
-		w.a.WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusAction(host.GetCR()).
-			WithStatusError(host.GetCR()).
+		w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(host.GetCR()).
+			WithError(host.GetCR()).
 			M(host).F().
 			Error("FAILED to reconcile StatefulSet for host: %s", host.GetName())
 	}
@@ -344,7 +366,8 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 		// This is not a problem, service may be omitted
 		return nil
 	}
-	err := w.reconcileService(ctx, host.GetCR(), service)
+	prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceHost, host.GetAncestor())
+	err := w.reconcileService(ctx, host.GetCR(), service, prevService)
 	if err == nil {
 		w.a.V(1).M(host).F().Info("DONE Reconcile service of the host: %s", host.GetName())
 		w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
@@ -367,7 +390,8 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.Cluster) 
 
 	// Add Cluster Service
 	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster); service != nil {
-		if err := w.reconcileService(ctx, cluster.GetRuntime().GetCR(), service); err == nil {
+		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCluster, cluster.GetAncestor())
+		if err := w.reconcileService(ctx, cluster.GetRuntime().GetCR(), service, prevService); err == nil {
 			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
 		} else {
 			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
@@ -539,14 +563,16 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		hostsCount = host.GetCR().GetStatus().GetHostsCount()
 	}
 	w.a.V(1).
-		WithEvent(host.GetCR(), common.EventActionProgress, common.EventReasonProgressHostsCompleted).
-		WithStatusAction(host.GetCR()).
+		WithEvent(host.GetCR(), a.EventActionProgress, a.EventReasonProgressHostsCompleted).
+		WithAction(host.GetCR()).
 		M(host).F().
-		Info("[now: %s] %s: %d of %d", now, common.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+		Info("[now: %s] %s: %d of %d", now, a.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
 
 	_ = w.c.updateCRObjectStatus(ctx, host.GetCR(), types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
 		},
 	})
 	return nil
@@ -569,9 +595,9 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		reconcileStatefulSetOpts *statefulset.ReconcileOptions
 	)
 
-	if host.IsFirst() || host.IsLast() {
-		reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetDoNotWait()
-	}
+	//if !host.IsLast() {
+	//	reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetDoNotWait()
+	//}
 
 	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
 		w.a.V(1).
@@ -599,6 +625,8 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Info("Data loss detected for host: %s. Will do force migrate", host.GetName())
 	}
 
+	_ = w.reconcileHostService(ctx, host)
+
 	if err := w.reconcileHostStatefulSet(ctx, host, reconcileStatefulSetOpts); err != nil {
 		w.a.V(1).
 			M(host).F().
@@ -612,8 +640,23 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		storage.NewStoragePVC(kube.NewPVC(w.c.Client)),
 	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 
-	_ = w.reconcileHostService(ctx, host)
+	// _ = w.reconcileHostService(ctx, host)
 
+	return w.reconcileHostMainDomain(ctx, host)
+}
+
+func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host) error {
+	// Should we wait for host to startup
+	wait := false
+
+	if host.GetReconcileAttributes().IsAdd() {
+		wait = true
+	}
+
+	// Wait for host to startup
+	if wait {
+		time.Sleep(7 * time.Second)
+	}
 	return nil
 }
 

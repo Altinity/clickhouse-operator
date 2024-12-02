@@ -22,13 +22,13 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // reconcileService reconciles core.Service
-func (w *worker) reconcileService(ctx context.Context, cr api.ICustomResource, service *core.Service) error {
+func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, service, prevService *core.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -43,7 +43,7 @@ func (w *worker) reconcileService(ctx context.Context, cr api.ICustomResource, s
 	if curService != nil {
 		// We have the Service - try to update it
 		w.a.V(1).M(cr).F().Info("Service found: %s. Will try to update", util.NamespaceNameString(service))
-		err = w.updateService(ctx, cr, curService, service)
+		err = w.updateService(ctx, cr, curService, service, prevService)
 	}
 
 	if err != nil {
@@ -52,9 +52,9 @@ func (w *worker) reconcileService(ctx context.Context, cr api.ICustomResource, s
 			w.a.V(1).M(cr).F().Info("Service: %s not found. err: %v", util.NamespaceNameString(service), err)
 		} else {
 			// The Service is either not found or not updated. Try to recreate it
-			w.a.WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateFailed).
-				WithStatusAction(cr).
-				WithStatusError(cr).
+			w.a.WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateFailed).
+				WithAction(cr).
+				WithError(cr).
 				M(cr).F().
 				Error("Update Service: %s failed with error: %v", util.NamespaceNameString(service), err)
 		}
@@ -66,9 +66,9 @@ func (w *worker) reconcileService(ctx context.Context, cr api.ICustomResource, s
 	if err == nil {
 		w.a.V(1).M(cr).F().Info("Service reconcile successful: %s", util.NamespaceNameString(service))
 	} else {
-		w.a.WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusAction(cr).
-			WithStatusError(cr).
+		w.a.WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(cr).
+			WithError(cr).
 			M(cr).F().
 			Error("FAILED to reconcile Service: %s CHI: %s ", util.NamespaceNameString(service), cr.GetName())
 	}
@@ -79,9 +79,10 @@ func (w *worker) reconcileService(ctx context.Context, cr api.ICustomResource, s
 // updateService
 func (w *worker) updateService(
 	ctx context.Context,
-	cr api.ICustomResource,
+	cr chi.ICustomResource,
 	curService *core.Service,
 	targetService *core.Service,
+	prevService *core.Service,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -166,9 +167,9 @@ func (w *worker) updateService(
 	//
 	// Migrate labels, annotations and finalizers to the new service
 	//
-	newService.GetObjectMeta().SetLabels(util.MergeStringMapsPreserve(newService.GetObjectMeta().GetLabels(), curService.GetObjectMeta().GetLabels()))
-	newService.GetObjectMeta().SetAnnotations(util.MergeStringMapsPreserve(newService.GetObjectMeta().GetAnnotations(), curService.GetObjectMeta().GetAnnotations()))
-	newService.GetObjectMeta().SetFinalizers(util.MergeStringArrays(newService.GetObjectMeta().GetFinalizers(), curService.GetObjectMeta().GetFinalizers()))
+	newService.SetLabels(w.prepareLabels(curService, newService, ensureService(prevService)))
+	newService.SetAnnotations(w.prepareAnnotations(curService, newService, ensureService(prevService)))
+	newService.SetFinalizers(w.prepareFinalizers(curService, newService, ensureService(prevService)))
 
 	//
 	// And only now we are ready to actually update the service with new version of the service
@@ -177,8 +178,8 @@ func (w *worker) updateService(
 	err := w.c.updateService(ctx, newService)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateCompleted).
-			WithStatusAction(cr).
+			WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateCompleted).
+			WithAction(cr).
 			M(cr).F().
 			Info("Update Service success: %s", util.NamespaceNameString(newService))
 	} else {
@@ -188,8 +189,27 @@ func (w *worker) updateService(
 	return err
 }
 
+func ensureService(svc *core.Service) *core.Service {
+	if svc == nil {
+		return &core.Service{}
+	}
+	return svc
+}
+
+func (w *worker) prepareLabels(curService, newService, oldService *core.Service) map[string]string {
+	return util.MapMigrate(curService.GetLabels(), newService.GetLabels(), oldService.GetLabels())
+}
+
+func (w *worker) prepareAnnotations(curService, newService, oldService *core.Service) map[string]string {
+	return util.MapMigrate(curService.GetAnnotations(), newService.GetAnnotations(), oldService.GetAnnotations())
+}
+
+func (w *worker) prepareFinalizers(curService, newService, oldService *core.Service) []string {
+	return util.MergeStringArrays(newService.GetFinalizers(), curService.GetFinalizers())
+}
+
 // createService
-func (w *worker) createService(ctx context.Context, cr api.ICustomResource, service *core.Service) error {
+func (w *worker) createService(ctx context.Context, cr chi.ICustomResource, service *core.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -198,14 +218,14 @@ func (w *worker) createService(ctx context.Context, cr api.ICustomResource, serv
 	err := w.c.createService(ctx, service)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, common.EventActionCreate, common.EventReasonCreateCompleted).
-			WithStatusAction(cr).
+			WithEvent(cr, a.EventActionCreate, a.EventReasonCreateCompleted).
+			WithAction(cr).
 			M(cr).F().
 			Info("OK Create Service: %s", util.NamespaceNameString(service))
 	} else {
-		w.a.WithEvent(cr, common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(cr).
-			WithStatusError(cr).
+		w.a.WithEvent(cr, a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(cr).
+			WithError(cr).
 			M(cr).F().
 			Error("FAILED Create Service: %s err: %v", util.NamespaceNameString(service), err)
 	}

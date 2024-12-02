@@ -30,6 +30,10 @@ func NewConfiguration() *Configuration {
 	return new(Configuration)
 }
 
+func (c *Configuration) GetUsers() *apiChi.Settings {
+	return nil
+}
+
 func (c *Configuration) GetProfiles() *apiChi.Settings {
 	return nil
 }
@@ -42,31 +46,14 @@ func (c *Configuration) GetSettings() *apiChi.Settings {
 	if c == nil {
 		return nil
 	}
-
 	return c.Settings
 }
 
 func (c *Configuration) GetFiles() *apiChi.Settings {
-	return c.Files
-}
-
-func (c *Configuration) GetClusters() []*Cluster {
 	if c == nil {
 		return nil
 	}
-
-	return c.Clusters
-}
-
-func (c *Configuration) GetCluster(i int) *Cluster {
-	clusters := c.GetClusters()
-	if clusters == nil {
-		return nil
-	}
-	if i >= len(clusters) {
-		return nil
-	}
-	return clusters[i]
+	return c.Files
 }
 
 // MergeFrom merges from specified source

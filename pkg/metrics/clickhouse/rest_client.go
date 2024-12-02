@@ -17,11 +17,11 @@ package clickhouse
 import "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 
 // InformMetricsExporterAboutWatchedCHI informs exporter about new watched CHI
-func InformMetricsExporterAboutWatchedCHI(chi *metrics.WatchedCHI) error {
+func InformMetricsExporterAboutWatchedCHI(chi *metrics.WatchedCR) error {
 	return makeRESTCall(chi, "POST")
 }
 
 // InformMetricsExporterToDeleteWatchedCHI informs exporter to delete/forget watched CHI
-func InformMetricsExporterToDeleteWatchedCHI(chi *metrics.WatchedCHI) error {
+func InformMetricsExporterToDeleteWatchedCHI(chi *metrics.WatchedCR) error {
 	return makeRESTCall(chi, "DELETE")
 }

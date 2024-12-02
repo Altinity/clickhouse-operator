@@ -22,7 +22,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -35,8 +35,8 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	}
 
 	w.a.V(1).
-		WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileInProgress).
-		WithStatusAction(cr).
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileInProgress).
+		WithAction(cr).
 		M(cr).F().
 		Info("remove items scheduled for deletion")
 
@@ -49,7 +49,6 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	objs.Subtract(need)
 	w.a.V(1).M(cr).F().Info("Non-reconciled objects:\n%s", objs)
 	if w.purge(ctx, cr, objs, w.task.RegistryFailed()) > 0 {
-		//w.c.enqueueObject(cmd_queue.NewDropDns(chk))
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
 

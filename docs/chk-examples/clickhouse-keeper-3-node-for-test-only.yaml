@@ -1,12 +1,44 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: clickhouse-keeper
+spec:
+  defaults:
+    templates:
+      podTemplate: clickhouse-keeper
+      volumeClaimTemplate: data-volume
+  configuration:
+    clusters:
+      - name: test
+        layout:
+          replicasCount: 3
+    settings:
+        keeper_server/tcp_port: "2181"
+  templates:
+    podTemplates:
+      - name: clickhouse-keeper
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: Always
+              image: "clickhouse/clickhouse-keeper:24.8"
+    volumeClaimTemplates:
+      - name: data-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Mi
 ---
 # Fake Service to drop-in replacement in tests
 apiVersion: v1
 kind: Service
 metadata:
-  # DNS would be like zookeeper.namespace.svc
   name: zookeeper
   labels:
-    app: zookeeper
+    clickhouse-keeper.altinity.com/app: chop
+    clickhouse-keeper.altinity.com/chk: clickhouse-keeper
 spec:
   ports:
     - port: 2181
@@ -16,36 +48,3 @@ spec:
   selector:
     clickhouse-keeper.altinity.com/chk: clickhouse-keeper
     clickhouse-keeper.altinity.com/ready: "yes"
----
-apiVersion: "clickhouse-keeper.altinity.com/v1"
-kind: "ClickHouseKeeperInstallation"
-metadata:
-  name: clickhouse-keeper
-  labels:
-    app: clickhouse-keeper
-spec:
-  defaults:
-    templates:
-      volumeClaimTemplate: data-volume
-      podTemplate: latest-with-volume-mounts
-  configuration:
-    clusters:
-      - name: "test-only"
-        layout:
-          replicasCount: 3
-  templates:
-    podTemplates:
-      - name: latest-with-volume-mounts
-        spec:
-          containers:
-            - name: clickhouse-keeper
-              imagePullPolicy: Always
-              image: "clickhouse/clickhouse-keeper:latest-alpine"
-    volumeClaimTemplates:
-      - name: data-volume
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi

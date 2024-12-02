@@ -248,21 +248,11 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQueryDetachedParts(ctx context.C
 	)
 }
 
-// ScanFunction defines function to scan rows
-type ScanFunction func(rows *sql.Rows, data *Table) error
-
-// Table defines tables of strings
-type Table [][]string
-
-func newTable() Table {
-	return make(Table, 0)
-}
-
 // clickHouseQueryScanRows scan all rows by external scan function
 func (f *ClickHouseMetricsFetcher) clickHouseQueryScanRows(
 	ctx context.Context,
 	sql string,
-	scan ScanFunction,
+	scanner ScanFunction,
 ) (Table, error) {
 	if util.IsContextDone(ctx) {
 		return nil, ctx.Err()
@@ -277,7 +267,7 @@ func (f *ClickHouseMetricsFetcher) clickHouseQueryScanRows(
 		if util.IsContextDone(ctx) {
 			return nil, ctx.Err()
 		}
-		_ = scan(query.Rows, &data)
+		_ = scanner(query.Rows, &data)
 	}
 	return data, nil
 }

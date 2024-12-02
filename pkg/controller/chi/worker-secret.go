@@ -21,7 +21,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -45,9 +45,9 @@ func (w *worker) reconcileSecret(ctx context.Context, cr api.ICustomResource, se
 	_ = w.c.deleteSecretIfExists(ctx, secret.Namespace, secret.Name)
 	err := w.createSecret(ctx, cr, secret)
 	if err != nil {
-		w.a.WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusAction(cr).
-			WithStatusError(cr).
+		w.a.WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(cr).
+			WithError(cr).
 			M(cr).F().
 			Error("FAILED to reconcile Secret: %s CHI: %s ", secret.Name, cr.GetName())
 	}
@@ -65,14 +65,14 @@ func (w *worker) createSecret(ctx context.Context, cr api.ICustomResource, secre
 	err := w.c.createSecret(ctx, secret)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, common.EventActionCreate, common.EventReasonCreateCompleted).
-			WithStatusAction(cr).
+			WithEvent(cr, a.EventActionCreate, a.EventReasonCreateCompleted).
+			WithAction(cr).
 			M(cr).F().
 			Info("Create Secret %s/%s", secret.Namespace, secret.Name)
 	} else {
-		w.a.WithEvent(cr, common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(cr).
-			WithStatusError(cr).
+		w.a.WithEvent(cr, a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(cr).
+			WithError(cr).
 			M(cr).F().
 			Error("Create Secret %s/%s failed with error %v", secret.Namespace, secret.Name, err)
 	}

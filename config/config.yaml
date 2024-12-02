@@ -147,7 +147,6 @@ clickhouse:
     # These credentials are used for:
     #   1. Metrics requests
     #   2. Schema maintenance
-    #   3. DROP DNS CACHE
     # User with these credentials can be specified in additional ClickHouse .xml config files,
     # located in 'clickhouse.configuration.file.path.user' folder
     username: ""
@@ -350,6 +349,27 @@ label:
   #  LabelClusterScopeCycleIndex
   #  LabelClusterScopeCycleOffset
   appendScope: "no"
+
+################################################
+##
+## Metrics management section
+##
+################################################
+metrics:
+  labels:
+    exclude: []
+
+################################################
+##
+## Status management section
+##
+################################################
+status:
+  fields:
+    action: false
+    actions: false
+    error: false
+    errors: false
 
 ################################################
 ##

@@ -20,54 +20,15 @@ import (
 
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (w *worker) reconcileClientService(chk *apiChk.ClickHouseKeeperInstallation) error {
-	return w.c.reconcile(
-		chk,
-		&core.Service{},
-		w.task.Creator().CreateService(interfaces.ServiceCR, chk),
-		"Client Service",
-		reconcileUpdaterService,
-	)
-}
-
-func (w *worker) reconcileHeadlessService(chk *apiChk.ClickHouseKeeperInstallation) error {
-	return w.c.reconcile(
-		chk,
-		&core.Service{},
-		w.task.Creator().CreateService(interfaces.ServiceHost, chk),
-		"Headless Service",
-		reconcileUpdaterService,
-	)
-}
-
-func reconcileUpdaterService(_cur, _new client.Object) error {
-	cur, ok1 := _cur.(*core.Service)
-	new, ok2 := _new.(*core.Service)
-	if !ok1 || !ok2 {
-		return fmt.Errorf("unable to cast")
-	}
-	return updateService(cur, new)
-}
-
-func updateService(cur, new *core.Service) error {
-	cur.Spec.Ports = new.Spec.Ports
-	cur.Spec.Type = new.Spec.Type
-	cur.SetAnnotations(new.GetAnnotations())
-	return nil
-}
-
 // reconcileService reconciles core.Service
-func (w *worker) reconcileService(ctx context.Context, cr apiChi.ICustomResource, service *core.Service) error {
+func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, service, prevService *core.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -82,7 +43,7 @@ func (w *worker) reconcileService(ctx context.Context, cr apiChi.ICustomResource
 	if curService != nil {
 		// We have the Service - try to update it
 		w.a.V(1).M(cr).F().Info("Service found: %s. Will try to update", util.NamespaceNameString(service))
-		err = w.updateService(ctx, cr, curService, service)
+		err = w.updateService(ctx, cr, curService, service, prevService)
 	}
 
 	if err != nil {
@@ -91,9 +52,9 @@ func (w *worker) reconcileService(ctx context.Context, cr apiChi.ICustomResource
 			w.a.V(1).M(cr).F().Info("Service: %s not found. err: %v", util.NamespaceNameString(service), err)
 		} else {
 			// The Service is either not found or not updated. Try to recreate it
-			w.a.WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateFailed).
-				WithStatusAction(cr).
-				WithStatusError(cr).
+			w.a.WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateFailed).
+				WithAction(cr).
+				WithError(cr).
 				M(cr).F().
 				Error("Update Service: %s failed with error: %v", util.NamespaceNameString(service), err)
 		}
@@ -105,9 +66,9 @@ func (w *worker) reconcileService(ctx context.Context, cr apiChi.ICustomResource
 	if err == nil {
 		w.a.V(1).M(cr).F().Info("Service reconcile successful: %s", util.NamespaceNameString(service))
 	} else {
-		w.a.WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusAction(cr).
-			WithStatusError(cr).
+		w.a.WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(cr).
+			WithError(cr).
 			M(cr).F().
 			Error("FAILED to reconcile Service: %s CHI: %s ", util.NamespaceNameString(service), cr.GetName())
 	}
@@ -118,9 +79,10 @@ func (w *worker) reconcileService(ctx context.Context, cr apiChi.ICustomResource
 // updateService
 func (w *worker) updateService(
 	ctx context.Context,
-	cr apiChi.ICustomResource,
+	cr chi.ICustomResource,
 	curService *core.Service,
 	targetService *core.Service,
+	prevService *core.Service,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -205,9 +167,9 @@ func (w *worker) updateService(
 	//
 	// Migrate labels, annotations and finalizers to the new service
 	//
-	newService.GetObjectMeta().SetLabels(util.MergeStringMapsPreserve(newService.GetObjectMeta().GetLabels(), curService.GetObjectMeta().GetLabels()))
-	newService.GetObjectMeta().SetAnnotations(util.MergeStringMapsPreserve(newService.GetObjectMeta().GetAnnotations(), curService.GetObjectMeta().GetAnnotations()))
-	newService.GetObjectMeta().SetFinalizers(util.MergeStringArrays(newService.GetObjectMeta().GetFinalizers(), curService.GetObjectMeta().GetFinalizers()))
+	newService.SetLabels(w.prepareLabels(curService, newService, ensureService(prevService)))
+	newService.SetAnnotations(w.prepareAnnotations(curService, newService, ensureService(prevService)))
+	newService.SetFinalizers(w.prepareFinalizers(curService, newService, ensureService(prevService)))
 
 	//
 	// And only now we are ready to actually update the service with new version of the service
@@ -216,8 +178,8 @@ func (w *worker) updateService(
 	err := w.c.updateService(ctx, newService)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateCompleted).
-			WithStatusAction(cr).
+			WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateCompleted).
+			WithAction(cr).
 			M(cr).F().
 			Info("Update Service success: %s", util.NamespaceNameString(newService))
 	} else {
@@ -227,8 +189,27 @@ func (w *worker) updateService(
 	return err
 }
 
+func ensureService(svc *core.Service) *core.Service {
+	if svc == nil {
+		return &core.Service{}
+	}
+	return svc
+}
+
+func (w *worker) prepareLabels(curService, newService, oldService *core.Service) map[string]string {
+	return util.MapMigrate(curService.GetLabels(), newService.GetLabels(), oldService.GetLabels())
+}
+
+func (w *worker) prepareAnnotations(curService, newService, oldService *core.Service) map[string]string {
+	return util.MapMigrate(curService.GetAnnotations(), newService.GetAnnotations(), oldService.GetAnnotations())
+}
+
+func (w *worker) prepareFinalizers(curService, newService, oldService *core.Service) []string {
+	return util.MergeStringArrays(newService.GetFinalizers(), curService.GetFinalizers())
+}
+
 // createService
-func (w *worker) createService(ctx context.Context, cr apiChi.ICustomResource, service *core.Service) error {
+func (w *worker) createService(ctx context.Context, cr chi.ICustomResource, service *core.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -237,14 +218,14 @@ func (w *worker) createService(ctx context.Context, cr apiChi.ICustomResource, s
 	err := w.c.createService(ctx, service)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(cr, common.EventActionCreate, common.EventReasonCreateCompleted).
-			WithStatusAction(cr).
+			WithEvent(cr, a.EventActionCreate, a.EventReasonCreateCompleted).
+			WithAction(cr).
 			M(cr).F().
 			Info("OK Create Service: %s", util.NamespaceNameString(service))
 	} else {
-		w.a.WithEvent(cr, common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(cr).
-			WithStatusError(cr).
+		w.a.WithEvent(cr, a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(cr).
+			WithError(cr).
 			M(cr).F().
 			Error("FAILED Create Service: %s err: %v", util.NamespaceNameString(service), err)
 	}

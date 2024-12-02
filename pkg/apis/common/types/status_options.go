@@ -16,16 +16,60 @@ package types
 
 // CopyStatusOptions specifies what parts to copy in status
 type CopyStatusOptions struct {
-	Actions           bool
-	Errors            bool
-	Normalized        bool
-	MainFields        bool
-	WholeStatus       bool
-	InheritableFields bool
+	CopyStatusFieldGroup
+	CopyStatusField
+}
+
+type CopyStatusFieldGroup struct {
+	FieldGroupActions     bool
+	FieldGroupErrors      bool
+	FieldGroupNormalized  bool
+	FieldGroupMain        bool
+	FieldGroupWholeStatus bool
+	FieldGroupInheritable bool
+}
+
+type CopyStatusField struct {
+	Copy  Status
+	Merge Status
 }
 
 // UpdateStatusOptions defines how to update CHI status
 type UpdateStatusOptions struct {
 	CopyStatusOptions
 	TolerateAbsence bool
+}
+
+type Status struct {
+	CHOpVersion            bool
+	CHOpCommit             bool
+	CHOpDate               bool
+	CHOpIP                 bool
+	ClustersCount          bool
+	ShardsCount            bool
+	ReplicasCount          bool
+	HostsCount             bool
+	Status                 bool
+	TaskID                 bool
+	TaskIDsStarted         bool
+	TaskIDsCompleted       bool
+	Action                 bool
+	Actions                bool
+	Error                  bool
+	Errors                 bool
+	HostsUpdatedCount      bool
+	HostsAddedCount        bool
+	HostsUnchangedCount    bool
+	HostsFailedCount       bool
+	HostsCompletedCount    bool
+	HostsDeletedCount      bool
+	HostsDeleteCount       bool
+	Pods                   bool
+	PodIPs                 bool
+	FQDNs                  bool
+	Endpoint               bool
+	NormalizedCR           bool
+	NormalizedCRCompleted  bool
+	HostsWithTablesCreated bool
+	UsedTemplates          bool
 }

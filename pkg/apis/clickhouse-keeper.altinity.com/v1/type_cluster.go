@@ -189,6 +189,10 @@ func (cluster *Cluster) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
 	return nil, false
 }
 
+func (cluster *Cluster) GetAncestor() apiChi.ICluster {
+	return (*Cluster)(nil)
+}
+
 // GetShard gets shard with specified index
 func (cluster *Cluster) GetShard(shard int) *ChkShard {
 	return cluster.Layout.Shards[shard]
@@ -328,6 +332,14 @@ func (cluster *Cluster) HostsCount() int {
 		return nil
 	})
 	return count
+}
+
+func (cluster *Cluster) IsZero() bool {
+	return cluster == nil
+}
+
+func (cluster *Cluster) IsNonZero() bool {
+	return cluster != nil
 }
 
 // ChkClusterLayout defines layout section of .spec.configuration.clusters

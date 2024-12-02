@@ -20,7 +20,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
@@ -89,8 +89,8 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 	}
 
 	w.a.V(1).
-		WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateStarted).
-		WithStatusAction(host.GetCR()).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
+		WithAction(host.GetCR()).
 		M(host).F().
 		Info(
 			"Adding tables on shard/host:%d/%d cluster:%s",
@@ -99,16 +99,16 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 	err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateCompleted).
-			WithStatusAction(host.GetCR()).
+			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
+			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Tables added successfully on shard/host:%d/%d cluster:%s",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
 		host.GetCR().IEnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(host.GetCR()).
+			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(host.GetCR()).
 			M(host).F().
 			Error("ERROR add tables added successfully on shard/host:%d/%d cluster:%s err:%v",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName, err)

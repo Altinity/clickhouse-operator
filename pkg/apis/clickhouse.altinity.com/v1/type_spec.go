@@ -35,43 +35,73 @@ type ChiSpec struct {
 
 // HasTaskID checks whether task id is specified
 func (spec *ChiSpec) HasTaskID() bool {
+	if spec == nil {
+		return false
+	}
 	return len(spec.TaskID.Value()) > 0
 }
 
 // GetTaskID gets task id as a string
 func (spec *ChiSpec) GetTaskID() string {
+	if spec == nil {
+		return ""
+	}
 	return spec.TaskID.Value()
 }
 
 func (spec *ChiSpec) GetStop() *types.StringBool {
+	if spec == nil {
+		return (*types.StringBool)(nil)
+	}
 	return spec.Stop
 }
 
 func (spec *ChiSpec) GetRestart() *types.String {
+	if spec == nil {
+		return (*types.String)(nil)
+	}
 	return spec.Restart
 }
 
 func (spec *ChiSpec) GetTroubleshoot() *types.StringBool {
+	if spec == nil {
+		return (*types.StringBool)(nil)
+	}
 	return spec.Troubleshoot
 }
 
 func (spec *ChiSpec) GetNamespaceDomainPattern() *types.String {
+	if spec == nil {
+		return (*types.String)(nil)
+	}
 	return spec.NamespaceDomainPattern
 }
 
 func (spec *ChiSpec) GetTemplating() *ChiTemplating {
+	if spec == nil {
+		return (*ChiTemplating)(nil)
+	}
 	return spec.Templating
 }
 
 func (spec *ChiSpec) GetDefaults() *Defaults {
+	if spec == nil {
+		return (*Defaults)(nil)
+	}
 	return spec.Defaults
 }
 
 func (spec *ChiSpec) GetConfiguration() IConfiguration {
+	if spec == nil {
+		return (*Configuration)(nil)
+	}
 	return spec.Configuration
 }
 
 func (spec *ChiSpec) GetTemplates() *Templates {
+	if spec == nil {
+		return (*Templates)(nil)
+	}
 	return spec.Templates
 }
 
@@ -79,6 +109,10 @@ func (spec *ChiSpec) GetTemplates() *Templates {
 func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	if from == nil {
 		return
+	}
+
+	if spec == nil {
+		spec = &ChiSpec{}
 	}
 
 	switch _type {

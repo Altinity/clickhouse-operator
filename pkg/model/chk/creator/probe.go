@@ -36,7 +36,8 @@ func (m *ProbeManager) CreateProbe(what interfaces.ProbeType, host *api.Host) *c
 	case interfaces.ProbeDefaultLiveness:
 		return m.createDefaultLivenessProbe(host)
 	case interfaces.ProbeDefaultReadiness:
-		return m.createDefaultReadinessProbe(host)
+		return nil
+		//return m.createDefaultReadinessProbe(host)
 	}
 	panic("unknown probe type")
 }
@@ -53,9 +54,9 @@ func (m *ProbeManager) createDefaultLivenessProbe(host *api.Host) *core.Probe {
 				},
 			},
 		},
-		InitialDelaySeconds: 60,
-		PeriodSeconds:       3,
-		FailureThreshold:    10,
+		InitialDelaySeconds: 5,
+		PeriodSeconds:       5,
+		FailureThreshold:    12,
 	}
 }
 
@@ -77,7 +78,8 @@ func (m *ProbeManager) createDefaultReadinessProbe(host *api.Host) *core.Probe {
 				Port: intstr.Parse("9182"),
 			},
 		},
-		InitialDelaySeconds: 10,
-		PeriodSeconds:       3,
+		InitialDelaySeconds: 5,
+		PeriodSeconds:       5,
+		FailureThreshold:    12,
 	}
 }

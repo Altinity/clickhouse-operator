@@ -238,10 +238,6 @@ func (s *ClusterSchemer) sqlDropReplica(shard int, replica string) []string {
 	}
 }
 
-func (s *ClusterSchemer) sqlDropDNSCache() string {
-	return `SYSTEM DROP DNS CACHE`
-}
-
 func (s *ClusterSchemer) sqlActiveQueriesNum() string {
 	return `SELECT count() FROM system.processes`
 }

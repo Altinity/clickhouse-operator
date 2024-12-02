@@ -31,27 +31,45 @@ type ChkSpec struct {
 
 // HasTaskID checks whether task id is specified
 func (spec *ChkSpec) HasTaskID() bool {
+	if spec == nil {
+		return false
+	}
 	return len(spec.TaskID.Value()) > 0
 }
 
 // GetTaskID gets task id as a string
 func (spec *ChkSpec) GetTaskID() string {
+	if spec == nil {
+		return ""
+	}
 	return spec.TaskID.Value()
 }
 
 func (spec *ChkSpec) GetNamespaceDomainPattern() *types.String {
+	if spec == nil {
+		return (*types.String)(nil)
+	}
 	return spec.NamespaceDomainPattern
 }
 
 func (spec *ChkSpec) GetDefaults() *apiChi.Defaults {
+	if spec == nil {
+		return (*apiChi.Defaults)(nil)
+	}
 	return spec.Defaults
 }
 
 func (spec *ChkSpec) GetConfiguration() apiChi.IConfiguration {
+	if spec == nil {
+		return (*Configuration)(nil)
+	}
 	return spec.Configuration
 }
 
 func (spec *ChkSpec) GetTemplates() *apiChi.Templates {
+	if spec == nil {
+		return (*apiChi.Templates)(nil)
+	}
 	return spec.Templates
 }
 
@@ -59,6 +77,10 @@ func (spec *ChkSpec) GetTemplates() *apiChi.Templates {
 func (spec *ChkSpec) MergeFrom(from *ChkSpec, _type apiChi.MergeType) {
 	if from == nil {
 		return
+	}
+
+	if spec == nil {
+		spec = &ChkSpec{}
 	}
 
 	switch _type {

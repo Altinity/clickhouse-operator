@@ -1,0 +1,123 @@
+## OpenEBS - LocalPV-LVM CSI Driver with ClickHouse
+LocalPV-LVM CSI Driver became GA in August 2021 (with the release v0.8.0). It is now a very mature product and a core component of the OpenEBS storage platform.
+Due to the major adoption of LocalPV-LVM (+50,000 users), this Data-Engine is now being unified and integrated into the core OpenEBS Storage platform; instead of being maintained as an external Data-Engine within our project.
+
+## Setup
+
+Find the disk which you want to use for the LocalPV-LVM. Note: For testing you can use the loopback device.
+
+```
+truncate -s 1024G /tmp/disk.img
+sudo losetup -f /tmp/disk.img --show
+```
+
+> [!NOTE]
+> - This is the old maual config process <BR>
+> - LocalPV-LVM will num dynamically provision the VG fro you <BR>
+> - The PV, VG and LV names will be dynamically provisioned by OpenEBS LocalPV-LVM as K8s unique entities (for safety, you cannot provide your own PV, VG or LV names)
+
+Create the Volume group on all the nodes, which will be used by the LVM2 Driver for provisioning the volumes
+
+```
+sudo pvcreate /dev/loop0
+sudo vgcreate vg-test /dev/loop0       ## here lvmvg is the volume group name to be created
+```
+
+Display the Volume Group
+
+```
+vgdisplay
+```
+
+## Installation
+
+Install the latest release of OpenEBS LVM2 LocalPV-LVM driver by running the following command. Note: All nodes must be running the same version of LocalPV-LVM, LMV2, device-mapper & dm-snapshot.
+
+Create a variable containing the K8s namesapce
+
+```bash
+OPENEBS_NAMESPACE=openebs
+```
+
+Install the OpenEBS component without the distributed component (MayaStor) and ZFS
+
+```bash
+helm repo add openebs https://openebs.github.io/openebs
+helm repo update
+helm install openebs --namespace ${OPENEBS_NAMESPACE} openebs/openebs --set engines.replicated.mayastor.enabled=false --set engines.local.zfs.enabled=false --create-namespace --version 4.1.1
+```
+
+List the OpenEBS chart and check that it's deployed
+
+```bash
+helm list -n ${OPENEBS_NAMESPACE}
+NAME   	NAMESPACE	REVISION	UPDATED                              	STATUS  	CHART        	APP VERSION
+openebs	openebs  	1       	2024-06-01 12:28:49.358189 +0200 CEST	deployed	openebs-4.0.1	4.0.1
+```
+
+You can uninstall the OpenEBS componenent if there is any issues or for testing different version
+
+```bash
+helm uninstall openebs --namespace ${OPENEBS_NAMESPACE}
+```
+
+Create a new Storage Class using the test volume group (!! for testing only !!)
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+allowVolumeExpansion: true
+metadata:
+  name: openebs-lvm-test
+parameters:
+  fsType: xfs
+  storage: lvm
+  vgpattern: vg-test
+provisioner: local.csi.openebs.io
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+```
+
+Install a test installation of Clickhouse with a ``volumeClaimTemplates``
+```bash
+kubecl apply -f clickhouse-installation-with-openebs.yaml -n ch-test
+```
+
+Connect to the the Clickhouse pod and check the mounted volume name
+```bash
+# df -k
+Filesystem                                                         1K-blocks     Used Available Use% Mounted on
+overlay                                                             73334784 10300660  63034124  15% /
+tmpfs                                                                  65536        0     65536   0% /dev
+/dev/mapper/rhel_vg-root                                            73334784 10300660  63034124  15% /etc/hosts
+shm                                                                    65536        0     65536   0% /dev/shm
+/dev/mapper/vg--test-pvc--d2c6219b--755d--4540--8382--a8959c5f1eb5    983040    41684    941356   5% /var/lib/clickhouse
+tmpfs                                                               15804764       12  15804752   1% /run/secrets/kubernetes.io/serviceaccount
+tmpfs                                                                7902380        0   7902380   0% /proc/asound
+tmpfs                                                                7902380        0   7902380   0% /proc/acpi
+tmpfs                                                                7902380        0   7902380   0% /proc/scsi
+tmpfs                                                                7902380        0   7902380   0% /sys/firmware
+tmpfs                                                                7902380        0   7902380   0% /sys/devices/virtual/powercap
+```
+
+You can find it on the host with the following LVM command
+```bash
+# lvdisplay
+
+  --- Logical volume ---
+  LV Path                /dev/vg-test/pvc-d2c6219b-755d-4540-8382-a8959c5f1eb5
+  LV Name                pvc-d2c6219b-755d-4540-8382-a8959c5f1eb5
+  VG Name                vg-test
+  LV UUID                KqDQ6f-70gM-fbyN-gePw-iROE-XL5E-6zTn5d
+  LV Write Access        read/write
+  LV Creation host, time openebs-lvm-localpv-node-zfg4x, 2024-10-11 08:52:06 +0200
+  LV Status              available
+  # open                 1
+  LV Size                1.00 GiB
+  Current LE             256
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     8192
+  Block device           253:4
+```
+

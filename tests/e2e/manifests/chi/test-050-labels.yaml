@@ -3,8 +3,11 @@ kind: "ClickHouseInstallation"
 metadata:
   name: test-050
   labels:
-    exclude_this_label: test-050
-    include_this_label: test-050
+    exclude_this_label: test-050-label
+    include_this_label: test-050-label
+  annotations:
+    exclude_this_annotation: test-050-annotation
+    include_this_annotation: test-050-annotation
 spec:
   useTemplates:
     - name: clickhouse-version

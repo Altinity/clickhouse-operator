@@ -1,0 +1,5 @@
+<clickhouse>
+    <keeper_server>
+        <enable_reconfiguration>false</enable_reconfiguration>
+    </keeper_server>
+</clickhouse>

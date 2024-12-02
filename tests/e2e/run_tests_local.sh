@@ -32,7 +32,7 @@ function select_test_goal() {
         echo "Having specified explicitly: ${specified_goal}"
         return 0
     else
-        echo "What would you like to start. Possible options:"
+        echo "What would you like to start? Possible options:"
         echo "  1     - test operator"
         echo "  2     - test keeper"
         echo "  3     - test metrics"
@@ -132,7 +132,7 @@ if [[ ! -z "${MINIKUBE_PRELOAD_IMAGES}" ]]; then
     clickhouse/clickhouse-server:23.8
     clickhouse/clickhouse-server:latest
     altinity/clickhouse-server:22.8.15.25.altinitystable
-    docker.io/zookeeper:3.8.3
+    docker.io/zookeeper:3.8.4
     "
     for image in ${IMAGES}; do
         docker pull -q ${image} && \
