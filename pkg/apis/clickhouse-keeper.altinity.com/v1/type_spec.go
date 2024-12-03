@@ -23,6 +23,7 @@ import (
 type ChkSpec struct {
 	TaskID                 *types.String       `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
 	NamespaceDomainPattern *types.String       `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
+	Suspend                *types.StringBool   `json:"suspend,omitempty"                yaml:"suspend,omitempty"`
 	Reconciling            *apiChi.Reconciling `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
 	Defaults               *apiChi.Defaults    `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
 	Configuration          *Configuration      `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
@@ -91,12 +92,18 @@ func (spec *ChkSpec) MergeFrom(from *ChkSpec, _type apiChi.MergeType) {
 		if !spec.NamespaceDomainPattern.HasValue() {
 			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
 		}
+		if !spec.Suspend.HasValue() {
+			spec.Suspend = spec.Suspend.MergeFrom(from.Suspend)
+		}
 	case apiChi.MergeTypeOverrideByNonEmptyValues:
 		if from.HasTaskID() {
 			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
 		}
 		if from.NamespaceDomainPattern.HasValue() {
 			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
+		}
+		if spec.Suspend.HasValue() {
+			spec.Suspend = spec.Suspend.MergeFrom(from.Suspend)
 		}
 	}
 

@@ -88,6 +88,11 @@ spec:
           description: Age of the resource
           # Displayed in all priorities
           jsonPath: .metadata.creationTimestamp
+        - name: suspend
+          type: string
+          description: Suspend reconciliation
+          # Displayed in all priorities
+          jsonPath: .spec.suspend
       subresources:
         status: {}
       schema:
@@ -271,6 +276,38 @@ spec:
                     Works as the following:
                      - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
                      - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
+                  enum:
+                    # List StringBoolXXX constants from model
+                    - ""
+                    - "0"
+                    - "1"
+                    - "False"
+                    - "false"
+                    - "True"
+                    - "true"
+                    - "No"
+                    - "no"
+                    - "Yes"
+                    - "yes"
+                    - "Off"
+                    - "off"
+                    - "On"
+                    - "on"
+                    - "Disable"
+                    - "disable"
+                    - "Enable"
+                    - "enable"
+                    - "Disabled"
+                    - "disabled"
+                    - "Enabled"
+                    - "enabled"
+                suspend: &TypeStringBool
+                  type: string
+                  description: |
+                    Suspend reconciliation of resources managed by a ClickHouse Keeper.
+                    Works as the following:
+                     - When `suspend` is `true` operator stops reconciling all keeper resources.
+                     - When `suspend` is `false` or not set, operator reconciles all keeper resources.
                   enum:
                     # List StringBoolXXX constants from model
                     - ""
