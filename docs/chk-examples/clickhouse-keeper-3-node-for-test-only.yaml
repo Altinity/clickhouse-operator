@@ -7,7 +7,6 @@ spec:
     templates:
       podTemplate: clickhouse-keeper
       volumeClaimTemplate: data-volume
-      clusterServiceTemplate: zookeeper
   configuration:
     clusters:
       - name: test
@@ -31,14 +30,21 @@ spec:
           resources:
             requests:
               storage: 100Mi
-    serviceTemplates: # Service drop-in replacement in tests
-      - name: zookeeper
-        generateName: zookeeper
-        spec:
-          ports:
-            - port: 2181
-              name: client
-            - port: 7000
-              name: prometheus
-          type: ClusterIP
-          clusterIP: None
+---
+# Fake Service to drop-in replacement in tests
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  labels:
+    clickhouse-keeper.altinity.com/app: chop
+    clickhouse-keeper.altinity.com/chk: clickhouse-keeper
+spec:
+  ports:
+    - port: 2181
+      name: client
+    - port: 7000
+      name: prometheus
+  selector:
+    clickhouse-keeper.altinity.com/chk: clickhouse-keeper
+    clickhouse-keeper.altinity.com/ready: "yes"

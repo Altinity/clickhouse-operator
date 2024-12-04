@@ -1,0 +1,30 @@
+apiVersion: "clickhouse.altinity.com/v1"
+
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-014-replication
+
+spec:
+  # reconciling:
+  #  policy: wait
+  useTemplates:
+    - name: clickhouse-version
+    - name: persistent-volume
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+      session_timeout_ms: 5000
+      operation_timeout_ms: 5000
+      root: /test/root/path
+    clusters:
+      - name: default
+        layout:
+          replicasCount: 2
+          shardsCount: 1
+    profiles:
+      default/database_atomic_wait_for_drop_and_detach_synchronously: 1
+      default/allow_experimental_live_view: 1
+      default/allow_experimental_database_replicated: 1

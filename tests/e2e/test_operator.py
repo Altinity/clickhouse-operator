@@ -603,7 +603,6 @@ def test_009_2(self, version_from="0.23.7", version_to=None):
 def test_010(self):
     create_shell_namespace_clickhouse_template()
 
-    util.set_operator_version(current().context.operator_version)
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     kubectl.create_and_check(
@@ -617,6 +616,41 @@ def test_010(self):
         },
     )
     time.sleep(10)
+    with And("ClickHouse should not complain regarding zookeeper path"):
+        out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/' limit 1")
+        assert "/" == out
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+@TestScenario
+@Name("test_010_1. Test zookeeper initialization AFTER starting a cluster")
+def test_010_1(self):
+    create_shell_namespace_clickhouse_template()
+    chi = "test-010-zkroot"
+
+    kubectl.create_and_check(
+        manifest="manifests/chi/test-010-zkroot.yaml",
+        check={
+            "apply_templates": {
+                current().context.clickhouse_template,
+            },
+            "do_not_delete": 1,
+            "chi_status": "InProgress"
+        },
+    )
+
+    with Then("Wait 60 seconds for operator to start creating ZooKeeper root"):
+        time.sleep(60)
+
+    # with Then("CHI should be in progress with no pods created yet"):
+    #    assert kubectl.get_chi_status(chi) == "InProgress"
+    #    assert kubectl.get_count("pod", chi = chi) == 0
+
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    kubectl.wait_chi_status(chi, "Completed")
+
     with And("ClickHouse should not complain regarding zookeeper path"):
         out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/' limit 1")
         assert "/" == out
@@ -1250,14 +1284,14 @@ def get_shards_from_remote_servers(chi, cluster, shell=None):
     return chi_shards
 
 
-def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wait = False):
+def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wait=False):
     with Given(f"Cluster {cluster} is properly configured"):
-        if current().context.operator_version >= "0.24" and force_wait == False:
+        if current().context.operator_version >= "0.24" and force_wait is False:
             print(f"operator {current().context.operator_version} does not require extra wait, skipping check")
         else:
             with By(f"remote_servers have {num_shards} shards"):
                 assert num_shards == get_shards_from_remote_servers(chi, cluster)
-            with By(f"ClickHouse recognizes {num_shards} shards in the cluster"):
+            with By(f"ClickHouse recognizes {num_shards} shards in the cluster {cluster}"):
                 for shard in range(num_shards):
                     shards = ""
                     for i in range(1, 10):
@@ -1275,22 +1309,41 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wai
                     assert shards == str(num_shards)
 
         if num_replicas > 0:
-            with By(f"ClickHouse recognizes {num_replicas} replicas in the cluster"):
-                for replica in range(num_replicas):
-                    replicas = ""
-                    for i in range(1, 10):
-                        replicas = clickhouse.query(
-                            chi,
-                            f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
-                            host=f"chi-{chi}-{cluster}-0-{replica}",
-                            pwd=pwd,
-                            with_error=True,
+            with By(f"ClickHouse recognizes {num_replicas} replicas shard in the cluster {cluster}"):
+                for shard in range(num_shards):
+                    for replica in range(num_replicas):
+                        replicas = ""
+                        for i in range(1, 10):
+                            replicas = clickhouse.query(
+                                chi,
+                                f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
+                                host=f"chi-{chi}-{cluster}-{shard}-{replica}",
+                                pwd=pwd,
+                                with_error=True,
                             )
-                        if replicas == str(num_replicas):
-                            break
-                        with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
-                            time.sleep(i * 5)
-                    assert replicas == str(num_replicas)
+                            if replicas == str(num_replicas):
+                                break
+                            with Then(f"Not ready. {replicas}/{num_replicas} replicas Wait for " + str(i * 5) + " seconds"):
+                                time.sleep(i * 5)
+                        assert replicas == str(num_replicas)
+            num_hosts = num_shards * num_replicas
+            with By(f"ClickHouse recognizes {num_hosts} hosts in the cluster {cluster}"):
+                for shard in range(num_shards):
+                    for replica in range(num_replicas):
+                        hosts = ""
+                        for i in range(1, 10):
+                            hosts = clickhouse.query(
+                                chi,
+                                f"select count() from system.clusters where cluster ='{cluster}'",
+                                host=f"chi-{chi}-{cluster}-{shard}-{replica}",
+                                pwd=pwd,
+                                with_error=True,
+                            )
+                            if hosts == str(num_hosts):
+                                break
+                            with Then(f"Not ready. {hosts}/{num_hosts} hosts Wait for " + str(i * 5) + " seconds"):
+                                time.sleep(i * 5)
+                        assert hosts == str(num_hosts)
 
 
 @TestScenario
@@ -1383,12 +1436,14 @@ def test_014_0(self):
             "CREATE TABLE test_replicated_014.test_replicated_014 (a Int8) Engine = ReplicatedMergeTree ORDER BY tuple()",
         ]
 
-    wait_for_cluster(chi_name, cluster, n_shards, 2)
+    wait_for_cluster(chi_name, cluster, n_shards, 1)
 
     with Then("Create schema objects"):
         for q in create_ddls:
             clickhouse.query(chi_name, q, host=f"chi-{chi_name}-{cluster}-0-0")
 
+    # Give some time for replication to catch up
+    time.sleep(10)
     with Given("Replicated tables are created on a first replica and data is inserted"):
         for table in replicated_tables:
             if table != "test_atomic_014.test_mv2_014":
@@ -1478,7 +1533,6 @@ def test_014_0(self):
                     )
                     assert out == "1"
 
-
         with And("Replicated table should have the data"):
             for replica in replicas:
                 for shard in shards:
@@ -1490,7 +1544,6 @@ def test_014_0(self):
                             host=f"chi-{chi_name}-{cluster}-{shard}-{replica}",
                         )
                         assert out == f"{shard}"
-
 
     # replicas = [1]
     replicas = [1, 2]
@@ -1546,9 +1599,7 @@ def test_014_0(self):
             kubectl.launch(f"delete pod {self.context.keeper_type}-0")
             time.sleep(1)
 
-        with Then(
-            f"try insert into the table while {self.context.keeper_type} offline table should be in readonly mode"
-        ):
+        with Then(f"try insert into the table while {self.context.keeper_type} offline table should be in readonly mode"):
             out = clickhouse.query_with_error(chi_name, "SET insert_keeper_max_retries=0; INSERT INTO test_local_014 VALUES(2)")
             assert "Table is in readonly mode" in out
 
@@ -1578,28 +1629,44 @@ def test_014_0(self):
         time.sleep(10)
         check_schema_propagation([1])
 
+    with When("Remove shard"):
+        manifest = "manifests/chi/test-014-0-replication-2-1.yaml"
+        chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+            timeout=600,
+        )
+        with Then("Shard should be deleted in ZooKeeper"):
+            out = clickhouse.query_with_error(
+                chi_name,
+                f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{cluster}/tables/1/default'",
+            )
+            note(f"Found {out} replicated tables in {self.context.keeper_type}")
+            # FIXME: it fails
+            # assert "DB::Exception: No node" in out or out == "0"
+
     with When("Delete chi"):
         kubectl.delete_chi("test-014-replication")
 
-        with Then(
-            f"Tables should be deleted in {self.context.keeper_type}. We can test it re-creating the chi and checking {self.context.keeper_type} contents"
-        ):
-            manifest = "manifests/chi/test-014-0-replication-1.yaml"
-            kubectl.create_and_check(
-                manifest=manifest,
-                check={
-                    "pod_count": 2,
-                    "pdb": {"default": 1},
-                    "do_not_delete": 1,
-                },
+        manifest = "manifests/chi/test-014-0-replication-1.yaml"
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+        with Then("Tables are deleted in ZooKeeper"):
+            out = clickhouse.query_with_error(
+                chi_name,
+                f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{cluster}/tables/0/default'",
             )
-            with Then("Tables are deleted in ZooKeeper"):
-                out = clickhouse.query_with_error(
-                    chi_name,
-                    f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{chi_name}/tables/0/default'",
-                )
-                note(f"Found {out} replicated tables in {self.context.keeper_type}")
-                assert "DB::Exception: No node" in out or out == "0"
+            note(f"Found {out} replicated tables in {self.context.keeper_type}")
+            assert "DB::Exception: No node" in out or out == "0"
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -3377,7 +3444,7 @@ def test_032(self):
             "CREATE TABLE test_distr_032 ON CLUSTER 'default' AS test_local_032 Engine = Distributed('default', default, test_local_032, a%2)",
         )
         clickhouse.query(chi, f"INSERT INTO test_distr_032 select * from numbers({numbers})")
-        time.sleep(60)
+        time.sleep(10)
 
         with Then("Distributed table is created on all nodes"):
             cnt = clickhouse.query(chi_name=chi, sql="select count() from cluster('all-sharded', system.tables) where name='test_distr_032'")

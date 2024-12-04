@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.24.2
+# OPERATOR_VERSION=0.24.1
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced

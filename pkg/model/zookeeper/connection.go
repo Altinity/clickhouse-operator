@@ -117,7 +117,8 @@ func (c *Connection) retry(ctx context.Context, fn func(*zk.Conn) error) error {
 
 	for i := 0; i < c.MaxRetriesNum; i++ {
 		if i > 0 {
-			time.Sleep(1*time.Second + time.Duration(rand.Int63n(int64(1*time.Second))))
+			// Progressive delay before each retry
+			time.Sleep(time.Duration(i)*time.Second + time.Duration(rand.Int63n(int64(1*time.Second))))
 		}
 
 		connection, err := c.ensureConnection(ctx)

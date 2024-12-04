@@ -17,11 +17,11 @@ package zookeeper
 import "time"
 
 const (
-	maxRetriesNum               = 3
-	maxConcurrentRequests int64 = 32
+	defaultMaxRetriesNum               = 25
+	defaultMaxConcurrentRequests int64 = 32
 
-	timeoutConnect   = 30 * time.Second
-	timeoutKeepAlive = 30 * time.Second
+	defaultTimeoutConnect   = 30 * time.Second
+	defaultTimeoutKeepAlive = 30 * time.Second
 )
 
 type ConnectionParams struct {
@@ -42,16 +42,16 @@ func (p *ConnectionParams) Normalize() *ConnectionParams {
 		p = &ConnectionParams{}
 	}
 	if p.MaxRetriesNum == 0 {
-		p.MaxRetriesNum = maxRetriesNum
+		p.MaxRetriesNum = defaultMaxRetriesNum
 	}
 	if p.MaxConcurrentRequests == 0 {
-		p.MaxConcurrentRequests = maxConcurrentRequests
+		p.MaxConcurrentRequests = defaultMaxConcurrentRequests
 	}
 	if p.TimeoutConnect == 0 {
-		p.TimeoutConnect = timeoutConnect
+		p.TimeoutConnect = defaultTimeoutConnect
 	}
 	if p.TimeoutKeepAlive == 0 {
-		p.TimeoutKeepAlive = timeoutKeepAlive
+		p.TimeoutKeepAlive = defaultTimeoutKeepAlive
 	}
 	return p
 }
