@@ -3835,6 +3835,7 @@ metadata:
   namespace: kube-system
   labels:
     clickhouse.altinity.com/chop: 0.24.2
+
 # Template Parameters:
 #
 # NAMESPACE=kube-system
