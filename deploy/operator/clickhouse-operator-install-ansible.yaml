@@ -4890,18 +4890,6 @@ data:
             <level>information</level>
         </logger>
         <max_connections>4096</max_connections>
-        <openSSL>
-            <server>
-                <cacheSessions>true</cacheSessions>
-                <certificateFile>/etc/clickhouse-keeper/server.crt</certificateFile>
-                <dhParamsFile>/etc/clickhouse-keeper/dhparam.pem</dhParamsFile>
-                <disableProtocols>sslv2,sslv3</disableProtocols>
-                <loadDefaultCAFile>true</loadDefaultCAFile>
-                <preferServerCiphers>true</preferServerCiphers>
-                <privateKeyFile>/etc/clickhouse-keeper/server.key</privateKeyFile>
-                <verificationMode>none</verificationMode>
-            </server>
-        </openSSL>
     </clickhouse>
 
   01-keeper-02-readiness.xml: |

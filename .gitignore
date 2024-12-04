@@ -20,6 +20,7 @@
 log
 *.log
 *.log.txt
+tests/report_*.html
 __pycache__
 
 # Skip dev runtime-produced

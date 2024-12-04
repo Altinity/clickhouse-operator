@@ -1,7 +1,7 @@
 apiVersion: "clickhouse-keeper.altinity.com/v1"
 kind: "ClickHouseKeeperInstallation"
 metadata:
-  name: extended-3
+  name: extended
 spec:
   configuration:
     clusters:
@@ -30,8 +30,11 @@ spec:
   templates:
     podTemplates:
       - name: default
+        metadata:
+          labels:
+            app: clickhouse-keeper
         spec:
-          # affinity removed to allow use in single node test environment
+          # affinity, remove it to allow use in single node test environment
           affinity:
             podAntiAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
