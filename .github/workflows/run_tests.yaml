@@ -83,7 +83,7 @@ jobs:
           echo "  test mode: ${{ github.event.inputs.test_mode }}"
           echo "  test mask: ${{ github.event.inputs.test_mask }}"
           echo
-        
+
           source ~/venv/qa/bin/activate
           set -x
           set +e # disable the "exit on failure"
@@ -140,7 +140,7 @@ jobs:
           retention-days: 90
 
       - name: Test Failed
-        if: ${{ steps.vars.outputs.test_result != '0' }}
+        if: ${{ failure() }}
         uses: actions/github-script@v3
         with:
           script: |

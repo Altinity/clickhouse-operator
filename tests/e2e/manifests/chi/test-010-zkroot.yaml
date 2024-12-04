@@ -8,13 +8,13 @@ spec:
   useTemplates:
     - name: clickhouse-version
   defaults:
-    templates: 
+    templates:
       logVolumeClaimTemplate: default
   configuration:
     zookeeper: # Add Zookeeper
       nodes:
         - host: zookeeper
-          # port: 2181
+          port: 2181
       root: "/clickhouse/test-010-zkroot"
       session_timeout_ms: 30000
       operation_timeout_ms: 10000
