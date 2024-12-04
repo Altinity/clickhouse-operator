@@ -15,7 +15,8 @@
 package statefulset
 
 import (
-	"context"
+	"context"	
+	"strings"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -200,6 +201,27 @@ func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, re
 	return r.createStatefulSet(ctx, host, register, opts)
 }
 
+// copyKubectlAnnotationsBeforeUpdate copies kubectl annotations from old to new statefulset as they are set by external kubectl
+// operations and should be preserved during statefulset update
+func (r *Reconciler) copyKubectlAnnotationsBeforeUpdate(old, new *apps.StatefulSet) {
+	if old == nil || new == nil {
+		return
+	}
+
+	oldMeta := old.Spec.Template.ObjectMeta
+	newMeta := new.Spec.Template.ObjectMeta
+
+	for k, v := range oldMeta.Annotations {
+		if strings.HasPrefix(k, "kubectl.kubernetes.io/") {
+			if newMeta.Annotations == nil {
+				newMeta.Annotations = make(map[string]string)
+			}
+
+			newMeta.Annotations[k] = v
+		}
+	}
+}
+
 // updateStatefulSet
 func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
@@ -208,8 +230,10 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 	}
 
 	// Helpers
-	newStatefulSet := host.Runtime.DesiredStatefulSet
+	newStatefulSet := host.Runtime.DesiredStatefulSet.DeepCopy()
 	curStatefulSet := host.Runtime.CurStatefulSet
+
+	r.copyKubectlAnnotationsBeforeUpdate(curStatefulSet, newStatefulSet)
 
 	r.a.V(2).M(host).S().Info(newStatefulSet.Name)
 	defer r.a.V(2).M(host).E().Info(newStatefulSet.Name)
