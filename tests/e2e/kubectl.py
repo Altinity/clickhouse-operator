@@ -433,7 +433,7 @@ def wait_jsonpath(kind, name, field, value, ns=None, retries=max_retries):
 
 
 def get_field(kind, name, field, ns=None, shell=None):
-    out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns, ok_to_fail=True, shell=shell).splitlines()
+    out = launch(f"get {kind} {name} -o=custom-columns=field:\"{field}\"", ns=ns, ok_to_fail=True, shell=shell).splitlines()
     if len(out) > 1:
         return out[1]
     else:
