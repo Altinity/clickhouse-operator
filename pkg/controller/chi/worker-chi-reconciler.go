@@ -142,13 +142,7 @@ func (w *worker) reconcile(ctx context.Context, cr *api.ClickHouseInstallation) 
 	w.a.V(2).M(cr).S().P()
 	defer w.a.V(2).M(cr).E().P()
 
-	counters := api.NewHostReconcileAttributesCounters()
-	cr.WalkHosts(func(host *api.Host) error {
-		counters.Add(host.GetReconcileAttributes())
-		return nil
-	})
-
-	if counters.AddOnly() {
+	if counters := api.NewHostReconcileAttributesCounters().Count(cr); counters.AddOnly() {
 		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CR: %s", util.NamespaceNameString(cr))
 		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
 			FullFanOut: true,
@@ -464,6 +458,17 @@ func (w *worker) getReconcileShardsWorkersNum(shards []*api.ChiShard, opts *comm
 	return int(math.Min(availableWorkers, maxAllowedWorkers))
 }
 
+func (w *worker) reconcileShardsAndHostsFetchOpts(ctx context.Context) *common.ReconcileShardsAndHostsOptions {
+	// Try to fetch options
+	if opts, ok := ctx.Value(common.ReconcileShardsAndHostsOptionsCtxKey).(*common.ReconcileShardsAndHostsOptions); ok {
+		w.a.V(1).Info("found ReconcileShardsAndHostsOptionsCtxKey")
+		return opts
+	} else {
+		w.a.V(1).Info("not found ReconcileShardsAndHostsOptionsCtxKey, use empty opts")
+		return &common.ReconcileShardsAndHostsOptions{}
+	}
+}
+
 // reconcileShardsAndHosts reconciles shards and hosts of each shard
 func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiShard) error {
 	// Sanity check - has to have shard(s)
@@ -474,14 +479,7 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiS
 	log.V(1).F().S().Info("reconcileShardsAndHosts start")
 	defer log.V(1).F().E().Info("reconcileShardsAndHosts end")
 
-	// Try to fetch options
-	opts, ok := ctx.Value(common.ReconcileShardsAndHostsOptionsCtxKey).(*common.ReconcileShardsAndHostsOptions)
-	if ok {
-		w.a.V(1).Info("found ReconcileShardsAndHostsOptionsCtxKey")
-	} else {
-		w.a.V(1).Info("not found ReconcileShardsAndHostsOptionsCtxKey, use empty opts")
-		opts = &common.ReconcileShardsAndHostsOptions{}
-	}
+	opts := w.reconcileShardsAndHostsFetchOpts(ctx)
 
 	// Which shard to start concurrent processing with
 	var startShard int

@@ -2831,7 +2831,7 @@ def test_025(self):
         kubectl.wait_field(
             "pod",
             "chi-test-025-rescaling-default-0-1-0",
-            '.metadata.labels."clickhouse\\.altinity\\.com/ready"',
+            ".metadata.labels.clickhouse\.altinity\.com/ready",
             "yes",
             backoff=1,
         )
@@ -5082,6 +5082,78 @@ def check_replication(chi, replicas, token, table = ''):
             for replica in replicas:
                 out = clickhouse.query(chi, f"SELECT a from {table} where a={token}", host=f"chi-{chi}-{cluster}-0-{replica}-0")
                 assert out == f"{token}", error()
+
+@TestScenario
+@Name("test_053. Check that stadnard Kubernetes annotations are ignored if set to statefulset externally")
+@Tags("NO_PARALLEL")
+def test_053(self):
+    version_from = "0.23.7"
+    version_to = current().context.operator_version
+    with Given(f"clickhouse-operator from {version_from}"):
+        current().context.operator_version = version_from
+        create_shell_namespace_clickhouse_template()
+
+    manifest="manifests/chi/test-001.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    sts = f"chi-{chi}-single-0-0"
+    pod = f"{sts}-0"
+
+    kubectl.create_and_check(
+        manifest=manifest,
+        check={
+            "object_counts": {
+                "statefulset": 1,
+                "pod": 1,
+                "service": 2,
+            },
+            "do_not_delete": 1
+        },
+    )
+
+    with When("Run rollout restart"):
+        kubectl.launch(f"rollout restart statefulset {sts}")
+        time.sleep(10)
+
+        with Then("Pod annotation kubectl.kubernetes.io/restartedAt should be populated"):
+            assert kubectl.get_field("pod", pod, ".metadata.annotations.kubectl\.kubernetes\.io/restartedAt") != "<none>"
+        with And("PodTemplate annotation kubectl.kubernetes.io/restartedAt should be populated"):
+            assert kubectl.get_field("statefulset", sts, ".spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt") != "<none>"
+
+        start_time = kubectl.get_field("pod", pod, ".status.startTime")
+        def check_restart():
+            with Then("ClickHouse pods should not be restarted during operator's restart"):
+                new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
+                # print(f"pod start_time old: {start_time}")
+                # print(f"pod start_time new: {new_start_time}")
+                assert start_time == new_start_time
+
+        with Then("Trigger reconcile"):
+            start_time = kubectl.get_field("pod", pod, ".status.startTime")
+
+            cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"Reconcile"}}]\''
+            kubectl.launch(cmd)
+            kubectl.wait_chi_status(chi, "InProgress")
+            kubectl.wait_chi_status(chi, "Completed")
+
+            check_restart()
+
+        with When("Restart operator"):
+            util.restart_operator()
+            kubectl.wait_chi_status(chi, "InProgress")
+            kubectl.wait_chi_status(chi, "Completed")
+
+            check_restart()
+
+        with When(f"upgrade operator to {version_to}"):
+            util.install_operator_version(version_to)
+            kubectl.wait_chi_status(chi, "InProgress")
+            kubectl.wait_chi_status(chi, "Completed")
+
+            check_restart()
+
+
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 
 @TestModule
