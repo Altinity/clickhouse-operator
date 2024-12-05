@@ -28,6 +28,7 @@ Altinity Kubernetes Operator for ClickHouse creates, configures and manages Clic
 ## Requirements
 
  * Kubernetes 1.19+
+ * ClickHouse 21.11. For older ClickHouse versions use operator 0.23.7 or earlier.
  
 ## Documentation
 
