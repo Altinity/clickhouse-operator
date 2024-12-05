@@ -2831,7 +2831,7 @@ def test_025(self):
         kubectl.wait_field(
             "pod",
             "chi-test-025-rescaling-default-0-1-0",
-            '.metadata.labels."clickhouse\\.altinity\\.com/ready"',
+            ".metadata.labels.clickhouse\.altinity\.com/ready",
             "yes",
             backoff=1,
         )
