@@ -2,7 +2,9 @@ name: release_chart
 
 on:
   release:
-    types: [ published ]
+    types:
+    - published
+    - edited
 
 jobs:
   release_chart:
