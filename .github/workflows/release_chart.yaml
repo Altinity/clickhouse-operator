@@ -2,7 +2,9 @@ name: release_chart
 
 on:
   release:
-    types: [ published ]
+    types:
+    - published
+    - edited
 
 jobs:
   release_chart:
@@ -36,7 +38,7 @@ jobs:
           jq -r ".[] | select(.name == \"$ASSET_NAME\") | .id")
           
           echo "Asset ID is $ASSET_ID"
-          echo "::set-output name=asset_id::$ASSET_ID"
+          echo "asset_id=$ASSET_ID" >> $GITHUB_OUTPUT
 
       - name: Delete Existing Release Artifacts
         if: steps.get_assets.outputs.asset_id != ''
