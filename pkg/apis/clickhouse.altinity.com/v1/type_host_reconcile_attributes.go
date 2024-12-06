@@ -49,168 +49,168 @@ func NewHostReconcileAttributes() *HostReconcileAttributes {
 }
 
 // Equal checks whether reconcile attributes are equal
-func (s *HostReconcileAttributes) Equal(to HostReconcileAttributes) bool {
-	if s == nil {
+func (a *HostReconcileAttributes) Equal(to HostReconcileAttributes) bool {
+	if a == nil {
 		return false
 	}
 	return true &&
-		(s.add == to.add) &&
-		(s.remove == to.remove) &&
-		(s.modify == to.modify) &&
-		(s.found == to.found) &&
-		(s.exclude == to.exclude)
+		(a.add == to.add) &&
+		(a.remove == to.remove) &&
+		(a.modify == to.modify) &&
+		(a.found == to.found) &&
+		(a.exclude == to.exclude)
 }
 
 // Any checks whether any of the attributes is set
-func (s *HostReconcileAttributes) Any(of *HostReconcileAttributes) bool {
-	if s == nil {
+func (a *HostReconcileAttributes) Any(of *HostReconcileAttributes) bool {
+	if a == nil {
 		return false
 	}
 	if of == nil {
 		return false
 	}
 	return false ||
-		(s.add && of.add) ||
-		(s.remove && of.remove) ||
-		(s.modify && of.modify) ||
-		(s.found && of.found) ||
-		(s.exclude && of.exclude)
+		(a.add && of.add) ||
+		(a.remove && of.remove) ||
+		(a.modify && of.modify) ||
+		(a.found && of.found) ||
+		(a.exclude && of.exclude)
 }
 
 // SetStatus sets status
-func (s *HostReconcileAttributes) SetStatus(status ObjectStatus) *HostReconcileAttributes {
-	if s == nil {
-		return s
+func (a *HostReconcileAttributes) SetStatus(status ObjectStatus) *HostReconcileAttributes {
+	if a == nil {
+		return a
 	}
-	s.status = status
-	return s
+	a.status = status
+	return a
 }
 
 // GetStatus gets status
-func (s *HostReconcileAttributes) GetStatus() ObjectStatus {
-	if s == nil {
+func (a *HostReconcileAttributes) GetStatus() ObjectStatus {
+	if a == nil {
 		return ObjectStatus("")
 	}
-	return s.status
+	return a.status
 }
 
 // SetAdd sets 'add' attribute
-func (s *HostReconcileAttributes) SetAdd() *HostReconcileAttributes {
-	if s == nil {
-		return s
+func (a *HostReconcileAttributes) SetAdd() *HostReconcileAttributes {
+	if a == nil {
+		return a
 	}
-	s.add = true
-	return s
+	a.add = true
+	return a
 }
 
 // UnsetAdd unsets 'add' attribute
-func (s *HostReconcileAttributes) UnsetAdd() *HostReconcileAttributes {
-	if s == nil {
-		return s
+func (a *HostReconcileAttributes) UnsetAdd() *HostReconcileAttributes {
+	if a == nil {
+		return a
 	}
-	s.add = false
-	return s
+	a.add = false
+	return a
 }
 
 // IsAdd checks whether 'add' attribute is set
-func (s *HostReconcileAttributes) IsAdd() bool {
-	if s == nil {
+func (a *HostReconcileAttributes) IsAdd() bool {
+	if a == nil {
 		return false
 	}
-	return s.add
+	return a.add
 }
 
 // SetRemove sets 'remove' attribute
-func (s *HostReconcileAttributes) SetRemove() *HostReconcileAttributes {
-	if s == nil {
-		return s
+func (a *HostReconcileAttributes) SetRemove() *HostReconcileAttributes {
+	if a == nil {
+		return a
 	}
-	s.remove = true
-	return s
+	a.remove = true
+	return a
 }
 
 // IsRemove checks whether 'remove' attribute is set
-func (s *HostReconcileAttributes) IsRemove() bool {
-	if s == nil {
+func (a *HostReconcileAttributes) IsRemove() bool {
+	if a == nil {
 		return false
 	}
-	return s.remove
+	return a.remove
 }
 
 // SetModify sets 'modify' attribute
-func (s *HostReconcileAttributes) SetModify() *HostReconcileAttributes {
-	if s == nil {
-		return s
+func (a *HostReconcileAttributes) SetModify() *HostReconcileAttributes {
+	if a == nil {
+		return a
 	}
-	s.modify = true
-	return s
+	a.modify = true
+	return a
 }
 
 // IsModify checks whether 'modify' attribute is set
-func (s *HostReconcileAttributes) IsModify() bool {
-	if s == nil {
+func (a *HostReconcileAttributes) IsModify() bool {
+	if a == nil {
 		return false
 	}
-	return s.modify
+	return a.modify
 }
 
 // SetFound sets 'found' attribute
-func (s *HostReconcileAttributes) SetFound() *HostReconcileAttributes {
-	if s == nil {
-		return s
+func (a *HostReconcileAttributes) SetFound() *HostReconcileAttributes {
+	if a == nil {
+		return a
 	}
-	s.found = true
-	return s
+	a.found = true
+	return a
 }
 
 // IsFound checks whether 'found' attribute is set
-func (s *HostReconcileAttributes) IsFound() bool {
-	if s == nil {
+func (a *HostReconcileAttributes) IsFound() bool {
+	if a == nil {
 		return false
 	}
-	return s.found
+	return a.found
 }
 
 // SetExclude sets 'exclude' attribute
-func (s *HostReconcileAttributes) SetExclude() *HostReconcileAttributes {
-	if s == nil {
-		return s
+func (a *HostReconcileAttributes) SetExclude() *HostReconcileAttributes {
+	if a == nil {
+		return a
 	}
-	s.exclude = true
-	return s
+	a.exclude = true
+	return a
 }
 
 // UnsetExclude unsets 'exclude' attribute
-func (s *HostReconcileAttributes) UnsetExclude() *HostReconcileAttributes {
-	if s == nil {
-		return s
+func (a *HostReconcileAttributes) UnsetExclude() *HostReconcileAttributes {
+	if a == nil {
+		return a
 	}
-	s.exclude = false
-	return s
+	a.exclude = false
+	return a
 }
 
 // IsExclude checks whether 'exclude' attribute is set
-func (s *HostReconcileAttributes) IsExclude() bool {
-	if s == nil {
+func (a *HostReconcileAttributes) IsExclude() bool {
+	if a == nil {
 		return false
 	}
-	return s.exclude
+	return a.exclude
 }
 
 // String returns string form
-func (s *HostReconcileAttributes) String() string {
-	if s == nil {
+func (a *HostReconcileAttributes) String() string {
+	if a == nil {
 		return "(nil)"
 	}
 
 	return fmt.Sprintf(
 		"status: %s, add: %t, remove: %t, modify: %t, found: %t, exclude: %t",
-		s.status,
-		s.add,
-		s.remove,
-		s.modify,
-		s.found,
-		s.exclude,
+		a.status,
+		a.add,
+		a.remove,
+		a.modify,
+		a.found,
+		a.exclude,
 	)
 }
 
@@ -236,81 +236,93 @@ func NewHostReconcileAttributesCounters() *HostReconcileAttributesCounters {
 }
 
 // Add adds to counters provided HostReconcileAttributes
-func (s *HostReconcileAttributesCounters) Add(a *HostReconcileAttributes) {
-	if s == nil {
+func (c *HostReconcileAttributesCounters) Add(a *HostReconcileAttributes) {
+	if c == nil {
 		return
 	}
 
-	value, ok := s.status[a.GetStatus()]
+	value, ok := c.status[a.GetStatus()]
 	if ok {
 		value = value + 1
 	} else {
 		value = 1
 	}
-	s.status[a.GetStatus()] = value
+	c.status[a.GetStatus()] = value
 
 	if a.IsAdd() {
-		s.add++
+		c.add++
 	}
 	if a.IsRemove() {
-		s.remove++
+		c.remove++
 	}
 	if a.IsModify() {
-		s.modify++
+		c.modify++
 	}
 	if a.IsFound() {
-		s.found++
+		c.found++
 	}
 	if a.IsExclude() {
-		s.exclude++
+		c.exclude++
 	}
 }
 
 // GetAdd gets added
-func (s *HostReconcileAttributesCounters) GetAdd() int {
-	if s == nil {
+func (c *HostReconcileAttributesCounters) GetAdd() int {
+	if c == nil {
 		return 0
 	}
-	return s.add
+	return c.add
 }
 
 // GetRemove gets removed
-func (s *HostReconcileAttributesCounters) GetRemove() int {
-	if s == nil {
+func (c *HostReconcileAttributesCounters) GetRemove() int {
+	if c == nil {
 		return 0
 	}
-	return s.remove
+	return c.remove
 }
 
 // GetModify gets modified
-func (s *HostReconcileAttributesCounters) GetModify() int {
-	if s == nil {
+func (c *HostReconcileAttributesCounters) GetModify() int {
+	if c == nil {
 		return 0
 	}
-	return s.modify
+	return c.modify
 }
 
 // GetFound gets found
-func (s *HostReconcileAttributesCounters) GetFound() int {
-	if s == nil {
+func (c *HostReconcileAttributesCounters) GetFound() int {
+	if c == nil {
 		return 0
 	}
-	return s.found
+	return c.found
 }
 
 // GetExclude gets exclude
-func (s *HostReconcileAttributesCounters) GetExclude() int {
-	if s == nil {
+func (c *HostReconcileAttributesCounters) GetExclude() int {
+	if c == nil {
 		return 0
 	}
-	return s.exclude
+	return c.exclude
 }
 
 // AddOnly checks whether counters have Add() only items
-func (s *HostReconcileAttributesCounters) AddOnly() bool {
-	return s.GetAdd() > 0 && s.GetFound() == 0 && s.GetModify() == 0 && s.GetRemove() == 0
+func (c *HostReconcileAttributesCounters) AddOnly() bool {
+	return c.GetAdd() > 0 && c.GetFound() == 0 && c.GetModify() == 0 && c.GetRemove() == 0
 }
 
-func (s *HostReconcileAttributesCounters) String() string {
-	return fmt.Sprintf("a: %d f: %d m: %d r: %d", s.GetAdd(), s.GetFound(), s.GetModify(), s.GetRemove())
+func (c *HostReconcileAttributesCounters) String() string {
+	return fmt.Sprintf("a: %d f: %d m: %d r: %d", c.GetAdd(), c.GetFound(), c.GetModify(), c.GetRemove())
+}
+
+type iWalkHosts interface {
+	WalkHosts(func(host *Host) error) []error
+}
+
+func (c *HostReconcileAttributesCounters) Count(src iWalkHosts) *HostReconcileAttributesCounters {
+	src.WalkHosts(func(host *Host) error {
+		c.Add(host.GetReconcileAttributes())
+		return nil
+	})
+	return c
 }

@@ -62,10 +62,10 @@ func (c *PVC) UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClai
 		// In case of any non-NotFound API error - unable to proceed
 		log.V(1).M(pvc).F().Error("ERROR unable to get PVC(%s) err: %v", util.NamespacedName(pvc), err)
 		return nil, err
-	}    
+	}
 
-	oldStorageRequest := oldPvc.Spec.Resources.Requests[core.ResourceStorage]	
-	newStorageRequest  := pvc.Spec.Resources.Requests[core.ResourceStorage]
+	oldStorageRequest := oldPvc.Spec.Resources.Requests[core.ResourceStorage]
+	newStorageRequest := pvc.Spec.Resources.Requests[core.ResourceStorage]
 
 	if oldStorageRequest.Cmp(newStorageRequest) == 1 {
 		log.V(1).M(pvc).F().Info("PVC storage was increased externally to greater value and value cannot be decreased, using greater value")
