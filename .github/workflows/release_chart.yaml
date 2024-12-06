@@ -27,6 +27,7 @@ jobs:
         run: cr package deploy/helm/clickhouse-operator
 
       - name: Get Release Assets
+        id: get_assets
         run: |
           CHART_PATH=$(ls .cr-release-packages/altinity-clickhouse-operator-*.tgz)
           ASSET_NAME=$(basename ${CHART_PATH})
@@ -41,7 +42,7 @@ jobs:
         if: steps.get_assets.outputs.asset_id != ''
         run: |
           curl -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          "https://api.github.com/repos/${{ github.repository
+          "https://api.github.com/repos/${{ github.repository }}
 
       - name: Upload Release Artifacts
         run: |
