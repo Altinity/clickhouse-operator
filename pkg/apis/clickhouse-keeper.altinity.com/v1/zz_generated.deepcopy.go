@@ -293,6 +293,11 @@ func (in *ChkSpec) DeepCopyInto(out *ChkSpec) {
 		*out = new(types.String)
 		**out = **in
 	}
+	if in.Suspend != nil {
+		in, out := &in.Suspend, &out.Suspend
+		*out = new(types.StringBool)
+		**out = **in
+	}
 	if in.Reconciling != nil {
 		in, out := &in.Reconciling, &out.Reconciling
 		*out = new(clickhousealtinitycomv1.Reconciling)

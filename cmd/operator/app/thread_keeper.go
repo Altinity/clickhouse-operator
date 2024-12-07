@@ -10,8 +10,11 @@ import (
 	clientGoScheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlRuntime "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	//	ctrl "sigs.k8s.io/controller-runtime/pkg/controller"
 
@@ -56,7 +59,7 @@ func initKeeper(ctx context.Context) error {
 
 	err = ctrlRuntime.
 		NewControllerManagedBy(manager).
-		For(&api.ClickHouseKeeperInstallation{}).
+		For(&api.ClickHouseKeeperInstallation{}, builder.WithPredicates(keeperPredicate())).
 		Owns(&apps.StatefulSet{}).
 		Complete(
 			&controller.Controller{
@@ -80,4 +83,37 @@ func runKeeper(ctx context.Context) error {
 	}
 	// Run successful
 	return nil
+}
+
+func keeperPredicate() predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			obj, ok := e.Object.(*api.ClickHouseKeeperInstallation)
+			if !ok {
+				return false
+			}
+
+			if obj.Spec.Suspend.Value() {
+				return false
+			}
+			return true
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return true
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			obj, ok := e.ObjectNew.(*api.ClickHouseKeeperInstallation)
+			if !ok {
+				return false
+			}
+
+			if obj.Spec.Suspend.Value() {
+				return false
+			}
+			return true
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return true
+		},
+	}
 }
