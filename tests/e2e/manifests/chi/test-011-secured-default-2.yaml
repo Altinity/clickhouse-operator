@@ -6,6 +6,8 @@ spec:
   useTemplates:
     - name: clickhouse-version
   configuration:
+    profiles:
+      readonly/receive_timeout: 60
     users:
       default/profile: readonly
     clusters:

@@ -12,19 +12,19 @@ function ensure_namespace() {
 
 
 echo "External value for \$OPENEBS_NAMESPACE=$OPENEBS_NAMESPACE"
-echo "External value for \$OPENEBS_OPERATOR_VERSION=$OPENEBS_OPERATOR_VERSION"
+echo "External value for \$OPENEBS_HELM_VERSION=$OPENEBS_HELM_VERSION"
 echo "External value for \$VALIDATE_YAML=$VALIDATE_YAML"
 echo "External value for \$CLICKHOUSE_NAMESPACE=$CLICKHOUSE_NAMESPACE"
 
 OPENEBS_NAMESPACE="${OPENEBS_NAMESPACE:-openebs}"
-OPENEBS_OPERATOR_VERSION="${OPENEBS_OPERATOR_VERSION:-v4.1.3}"
+OPENEBS_HELM_VERSION="${OPENEBS_HELM_VERSION:-4.1.1}"
 VALIDATE_YAML="${VALIDATE_YAML:-"true"}"
 CLICKHOUSE_NAMESPACE="${CLICKHOUSE_NAMESPACE:-ch-test}"
 
 echo "Setup OpenEBS"
 echo "OPTIONS"
 echo "\$OPENEBS_NAMESPACE=${OPENEBS_NAMESPACE}"
-echo "\$OPENEBS_OPERATOR_VERSION=${OPENEBS_OPERATOR_VERSION}"
+echo "\$OPENEBS_HELM_VERSION=${OPENEBS_HELM_VERSION}"
 echo "\$VALIDATE_YAML=${VALIDATE_YAML}"
 echo "\$CLICKHOUSE_NAMESPACE=${CLICKHOUSE_NAMESPACE}"
 echo ""
@@ -73,7 +73,7 @@ trap 'clean_dir ${TMP_DIR}' SIGHUP SIGINT SIGQUIT SIGFPE SIGALRM SIGTERM
 helm repo add openebs https://openebs.github.io/openebs
 helm repo update
 
-echo "Setup OpenEBS operator ${OPENEBS_OPERATOR_VERSION} into ${OPENEBS_NAMESPACE} namespace"
+echo "Setup OpenEBS operator ${OPENEBS_HELM_VERSION} into ${OPENEBS_NAMESPACE} namespace"
 
 # Let's setup all OpenEBS-related stuff into dedicated namespace
 ## TODO: need to refactor after next OPENEBS-operator release
@@ -82,7 +82,7 @@ kubectl delete crd volumesnapshotcontents.snapshot.storage.k8s.io
 kubectl delete crd volumesnapshots.snapshot.storage.k8s.io
 
 # Setup OPENEBS-operator into dedicated namespace via kustomize
-helm install openebs --namespace ${OPENEBS_NAMESPACE} openebs/openebs --set engines.replicated.mayastor.enabled=false --set engines.local.zfs.enabled=false --create-namespace --version 4.1.1
+helm install openebs --namespace "${OPENEBS_NAMESPACE}" openebs/openebs --set engines.replicated.mayastor.enabled=false --set engines.local.zfs.enabled=false --create-namespace --version "${OPENEBS_HELM_VERSION}"
 
 echo -n "Waiting '${OPENEBS_NAMESPACE}/openebs-lvm-localpv-controller' deployment to start"
 # Check grafana deployment have all pods ready
@@ -93,7 +93,7 @@ done
 echo "...DONE"
 
 # Install the test storage class
-kubectl apply -f openebs-lvm-storageclass.yaml -n ${OPENEBS_NAMESPACE}
+kubectl apply -f openebs-lvm-storageclass.yaml -n "${OPENEBS_NAMESPACE}"
 
 # Install a simple Clickhouse instance using openebs
 echo "Setup simple Clickhouse into ${OPENEBS_NAMESPACE} namespace using OpenEBS"

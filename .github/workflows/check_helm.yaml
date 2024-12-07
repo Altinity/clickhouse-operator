@@ -21,7 +21,7 @@ jobs:
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.31.0
+          kubernetes-version: v1.31.2
           cpus: max
           memory: max
 

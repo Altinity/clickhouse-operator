@@ -9,7 +9,7 @@ spec:
       spec:
         containers:
           - name: clickhouse
-            image: clickhouse/clickhouse-server:24.3
+            image: clickhouse/clickhouse-server:24.8
     volumeClaimTemplates:
       - name: log-volume-template
         spec:

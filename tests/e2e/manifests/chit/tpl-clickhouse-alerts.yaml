@@ -17,5 +17,5 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:24.3
+              image: clickhouse/clickhouse-server:latest
               imagePullPolicy: Always

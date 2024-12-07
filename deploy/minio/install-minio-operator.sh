@@ -4,7 +4,7 @@ echo "External value for \$MINIO_NAMESPACE=$MINIO_NAMESPACE"
 echo "External value for \$MINIO_OPERATOR_VERSION=$MINIO_OPERATOR_VERSION"
 
 MINIO_NAMESPACE="${MINIO_NAMESPACE:-minio}"
-MINIO_OPERATOR_VERSION="${MINIO_OPERATOR_VERSION:-v4.1.3}"
+MINIO_OPERATOR_VERSION="${MINIO_OPERATOR_VERSION:-v6.0.4}"
 
 echo "Setup minio.io"
 echo "OPTIONS"
@@ -63,7 +63,9 @@ echo "Setup minio.io operator ${MINIO_OPERATOR_VERSION} into ${MINIO_NAMESPACE} 
 ## TODO: need to refactor after next minio-operator release
 
 MINIO_KUSTOMIZE_DIR="${MINIO_OPERATOR_DIR}/resources"
+sed -i -e "s/replicas: 2/replicas: 1/" $MINIO_KUSTOMIZE_DIR/base/deployment.yaml
 sed -i -e "s/name: minio-operator/name: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/base/namespace.yaml
+sed -i -e "s/: restricted/: baseline/" $MINIO_KUSTOMIZE_DIR/base/namespace.yaml
 sed -i -e "s/namespace: default/namespace: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/base/*.yaml
 sed -i -e "s/namespace: minio-operator/namespace: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/base/*.yaml
 sed -i -e "s/namespace: minio-operator/namespace: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/kustomization.yaml
