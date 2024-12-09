@@ -92,6 +92,11 @@ spec:
           description: Age of the resource
           # Displayed in all priorities
           jsonPath: .metadata.creationTimestamp
+        - name: suspend
+          type: string
+          description: Suspend reconciliation
+          # Displayed in all priorities
+          jsonPath: .spec.suspend
       subresources:
         status: {}
       schema:
@@ -308,6 +313,38 @@ spec:
                   enum:
                     - ""
                     - "RollingUpdate"
+                suspend: &TypeStringBool
+                  type: string
+                  description: |
+                    Suspend reconciliation of resources managed by a ClickHouse Installation.
+                    Works as the following:
+                     - When `suspend` is `true` operator stops reconciling all resources.
+                     - When `suspend` is `false` or not set, operator reconciles all resources.
+                  enum:
+                    # List StringBoolXXX constants from model
+                    - ""
+                    - "0"
+                    - "1"
+                    - "False"
+                    - "false"
+                    - "True"
+                    - "true"
+                    - "No"
+                    - "no"
+                    - "Yes"
+                    - "yes"
+                    - "Off"
+                    - "off"
+                    - "On"
+                    - "on"
+                    - "Disable"
+                    - "disable"
+                    - "Enable"
+                    - "enable"
+                    - "Disabled"
+                    - "disabled"
+                    - "Enabled"
+                    - "enabled"
                 troubleshoot:
                   !!merge <<: *TypeStringBool
                   description: |
