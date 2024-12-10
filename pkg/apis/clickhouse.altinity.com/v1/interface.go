@@ -22,6 +22,8 @@ import (
 type ICustomResource interface {
 	meta.Object
 
+	NamespaceName() (string, string)
+
 	IsNonZero() bool
 	IsZero() bool
 
