@@ -47,7 +47,28 @@ func NewCR(chopClient chopClientSet.Interface, kubeClient kube.Interface) *CR {
 }
 
 func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResource, error) {
+	chi, err := c.getCR(ctx, namespace, name)
+	if err != nil {
+		return nil, err
+	}
+
+	cm, _ := c.getCM(ctx, chi)
+
+	chi = c.buildCR(chi, cm)
+
+	return chi, nil
+}
+
+func (c *CR) getCR(ctx context.Context, namespace, name string) (*api.ClickHouseInstallation, error) {
 	return c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
+}
+
+func (c *CR) getCM(ctx context.Context, chi api.ICustomResource) (*core.ConfigMap, error) {
+	return NewConfigMap(c.kubeClient).Get(ctx, c.buildCMNamespace(chi), c.buildCMName(chi))
+}
+
+func (c *CR) buildCR(chi *api.ClickHouseInstallation, cm *core.ConfigMap) *api.ClickHouseInstallation {
+	return chi
 }
 
 // StatusUpdate updates CR object's Status
@@ -146,7 +167,7 @@ func (c *CR) statusUpdate(ctx context.Context, chi *api.ClickHouseInstallation) 
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -160,12 +181,12 @@ func (c *CR) buildResources(chi *api.ClickHouseInstallation) (*api.ClickHouseIns
 	}
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: chi.GetNamespace(),
-			Name:      chi.GetName(),
+			Namespace: c.buildCMNamespace(chi),
+			Name:      c.buildCMName(chi),
 		},
 		Data: map[string]string{
-			"status-normalized":          string(normalized),
-			"status-normalizedCompleted": string(normalizedCompleted),
+			statusNormalized:          string(normalized),
+			statusNormalizedCompleted: string(normalizedCompleted),
 		},
 	}
 	chi.Status.NormalizedCR = nil
@@ -189,3 +210,16 @@ func (c *CR) statusUpdateCM(ctx context.Context, cm *core.ConfigMap) error {
 	}
 	return err
 }
+
+func (c *CR) buildCMNamespace(obj meta.Object) string {
+	return obj.GetNamespace()
+}
+
+func (c *CR) buildCMName(obj meta.Object) string {
+	return obj.GetName()
+}
+
+const (
+statusNormalized = "status-normalized"
+statusNormalizedCompleted = "status-normalizedCompleted"
+)
