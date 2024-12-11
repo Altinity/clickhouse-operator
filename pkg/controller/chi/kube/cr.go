@@ -68,6 +68,26 @@ func (c *CR) getCM(ctx context.Context, chi api.ICustomResource) (*core.ConfigMa
 }
 
 func (c *CR) buildCR(chi *api.ClickHouseInstallation, cm *core.ConfigMap) *api.ClickHouseInstallation {
+	if cm == nil {
+		return chi
+	}
+
+	if len(cm.Data[statusNormalized]) > 0 {
+		normalized := &api.ClickHouseInstallation{}
+		if yaml.Unmarshal([]byte(cm.Data[statusNormalized]), normalized) != nil {
+			return chi
+		}
+			chi.EnsureStatus().NormalizedCR = normalized
+	}
+	
+	if len( cm.Data[statusNormalizedCompleted])>0 {
+		normalizedCompleted := &api.ClickHouseInstallation{}
+		if yaml.Unmarshal([]byte(cm.Data[statusNormalizedCompleted]), normalizedCompleted) != nil {
+			return chi
+		}
+		chi.EnsureStatus().NormalizedCRCompleted = normalizedCompleted
+	}
+
 	return chi
 }
 
