@@ -99,6 +99,11 @@ spec:
           description: Age of the resource
           # Displayed in all priorities
           jsonPath: .metadata.creationTimestamp
+        - name: suspend
+          type: string
+          description: Suspend reconciliation
+          # Displayed in all priorities
+          jsonPath: .spec.suspend
       subresources:
         status: {}
       schema:
@@ -315,6 +320,13 @@ spec:
                   enum:
                     - ""
                     - "RollingUpdate"
+                suspend:
+                  <<: *TypeStringBool
+                  description: |
+                    Suspend reconciliation of resources managed by a ClickHouse Installation.
+                    Works as the following:
+                     - When `suspend` is `true` operator stops reconciling all resources.
+                     - When `suspend` is `false` or not set, operator reconciles all resources.
                 troubleshoot:
                   <<: *TypeStringBool
                   description: |
@@ -1379,6 +1391,11 @@ spec:
           description: Age of the resource
           # Displayed in all priorities
           jsonPath: .metadata.creationTimestamp
+        - name: suspend
+          type: string
+          description: Suspend reconciliation
+          # Displayed in all priorities
+          jsonPath: .spec.suspend
       subresources:
         status: {}
       schema:
@@ -1595,6 +1612,13 @@ spec:
                   enum:
                     - ""
                     - "RollingUpdate"
+                suspend:
+                  <<: *TypeStringBool
+                  description: |
+                    Suspend reconciliation of resources managed by a ClickHouse Installation.
+                    Works as the following:
+                     - When `suspend` is `true` operator stops reconciling all resources.
+                     - When `suspend` is `false` or not set, operator reconciles all resources.
                 troubleshoot:
                   <<: *TypeStringBool
                   description: |
@@ -3111,6 +3135,11 @@ spec:
           description: Age of the resource
           # Displayed in all priorities
           jsonPath: .metadata.creationTimestamp
+        - name: suspend
+          type: string
+          description: Suspend reconciliation
+          # Displayed in all priorities
+          jsonPath: .spec.suspend
       subresources:
         status: {}
       schema:
@@ -3319,6 +3348,13 @@ spec:
                     - "disabled"
                     - "Enabled"
                     - "enabled"
+                suspend:
+                  <<: *TypeStringBool
+                  description: |
+                    Suspend reconciliation of resources managed by a ClickHouse Keeper.
+                    Works as the following:
+                     - When `suspend` is `true` operator stops reconciling all keeper resources.
+                     - When `suspend` is `false` or not set, operator reconciles all keeper resources.
                 namespaceDomainPattern:
                   type: string
                   description: |
