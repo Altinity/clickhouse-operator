@@ -377,6 +377,11 @@ func (cluster *Cluster) IsNonZero() bool {
 	return cluster != nil
 }
 
+// IsStopped checks whether host is stopped
+func (cluster *Cluster) IsStopped() bool {
+	return cluster.GetCHI().IsStopped()
+}
+
 // ChiClusterLayout defines layout section of .spec.configuration.clusters
 type ChiClusterLayout struct {
 	ShardsCount   int `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
