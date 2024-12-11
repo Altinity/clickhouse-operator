@@ -79,7 +79,7 @@ func (c *CR) buildCR(chi *api.ClickHouseInstallation, cm *core.ConfigMap) *api.C
 		}
 			chi.EnsureStatus().NormalizedCR = normalized
 	}
-	
+
 	if len( cm.Data[statusNormalizedCompleted])>0 {
 		normalizedCompleted := &api.ClickHouseInstallation{}
 		if yaml.Unmarshal([]byte(cm.Data[statusNormalizedCompleted]), normalizedCompleted) != nil {
@@ -236,7 +236,7 @@ func (c *CR) buildCMNamespace(obj meta.Object) string {
 }
 
 func (c *CR) buildCMName(obj meta.Object) string {
-	return obj.GetName()
+	return "chi-storage-" + obj.GetName()
 }
 
 const (
