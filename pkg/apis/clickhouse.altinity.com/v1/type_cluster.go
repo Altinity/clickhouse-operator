@@ -219,13 +219,13 @@ func (cluster *Cluster) GetServiceTemplate() (*ServiceTemplate, bool) {
 	return cluster.Runtime.CHI.GetServiceTemplate(name)
 }
 
-// GetCHI gets parent CHI
-func (cluster *Cluster) GetCHI() *ClickHouseInstallation {
+// GetCR gets parent CR
+func (cluster *Cluster) GetCR() *ClickHouseInstallation {
 	return cluster.Runtime.CHI
 }
 
 func (cluster *Cluster) GetAncestor() ICluster {
-	return cluster.GetCHI().GetAncestor().FindCluster(cluster.GetName())
+	return cluster.GetCR().GetAncestor().FindCluster(cluster.GetName())
 }
 
 // GetShard gets shard with specified index
@@ -379,7 +379,7 @@ func (cluster *Cluster) IsNonZero() bool {
 
 // IsStopped checks whether host is stopped
 func (cluster *Cluster) IsStopped() bool {
-	return cluster.GetCHI().IsStopped()
+	return cluster.GetCR().IsStopped()
 }
 
 // ChiClusterLayout defines layout section of .spec.configuration.clusters
