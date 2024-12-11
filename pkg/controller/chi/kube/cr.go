@@ -77,10 +77,10 @@ func (c *CR) buildCR(chi *api.ClickHouseInstallation, cm *core.ConfigMap) *api.C
 		if yaml.Unmarshal([]byte(cm.Data[statusNormalized]), normalized) != nil {
 			return chi
 		}
-			chi.EnsureStatus().NormalizedCR = normalized
+		chi.EnsureStatus().NormalizedCR = normalized
 	}
 
-	if len( cm.Data[statusNormalizedCompleted])>0 {
+	if len(cm.Data[statusNormalizedCompleted]) > 0 {
 		normalizedCompleted := &api.ClickHouseInstallation{}
 		if yaml.Unmarshal([]byte(cm.Data[statusNormalizedCompleted]), normalizedCompleted) != nil {
 			return chi
@@ -240,6 +240,6 @@ func (c *CR) buildCMName(obj meta.Object) string {
 }
 
 const (
-statusNormalized = "status-normalized"
-statusNormalizedCompleted = "status-normalizedCompleted"
+	statusNormalized          = "status-normalized"
+	statusNormalizedCompleted = "status-normalizedCompleted"
 )
