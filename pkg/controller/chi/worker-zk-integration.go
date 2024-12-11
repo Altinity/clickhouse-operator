@@ -20,7 +20,7 @@ import (
 )
 
 func reconcileZookeeperRootPath(cluster *api.Cluster) {
-	if cluster.Zookeeper.IsEmpty() {
+	if !shouldReconcileZookeeperPath(cluster) {
 		// Nothing to reconcile
 		return
 	}
@@ -28,4 +28,17 @@ func reconcileZookeeperRootPath(cluster *api.Cluster) {
 	path := zookeeper.NewPathManager(conn)
 	path.Ensure(cluster.Zookeeper.Root)
 	path.Close()
+}
+
+func shouldReconcileZookeeperPath(cluster *api.Cluster) bool {
+	if cluster.IsStopped() {
+		// Nothing to reconcile
+		return false
+	}
+	if cluster.Zookeeper.IsEmpty() {
+		// Nothing to reconcile
+		return false
+	}
+
+	return true
 }
