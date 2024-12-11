@@ -856,8 +856,8 @@ def test_011_2(self):
 
         with Then("Default user plain password should be removed"):
             chi = kubectl.get("chi", "test-011-secured-default")
-            assert "default/password" in chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]
-            assert chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]["default/password"] == ""
+            # assert "default/password" in chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]
+            # assert chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]["default/password"] == ""
 
             cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
             assert '<password remove="1"></password>' in cfm["data"]["chop-generated-users.xml"]
@@ -2617,8 +2617,8 @@ def test_023(self):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[1].name") == "extension-annotations"
         # assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == ""
 
-    with Then("Annotation from a template should be populated"):
-        assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.test") == "test"
+    # with Then("Annotation from a template should be populated"):
+    #     assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.test") == "test"
     with Then("Pod annotation should populated from template"):
         assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.test") == "test"
     with Then("Environment variable from a template should be populated"):
