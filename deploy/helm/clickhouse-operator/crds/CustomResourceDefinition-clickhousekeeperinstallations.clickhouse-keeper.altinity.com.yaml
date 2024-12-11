@@ -301,38 +301,13 @@ spec:
                     - "disabled"
                     - "Enabled"
                     - "enabled"
-                suspend: &TypeStringBool
-                  type: string
+                suspend:
+                  !!merge <<: *TypeStringBool
                   description: |
                     Suspend reconciliation of resources managed by a ClickHouse Keeper.
                     Works as the following:
                      - When `suspend` is `true` operator stops reconciling all keeper resources.
                      - When `suspend` is `false` or not set, operator reconciles all keeper resources.
-                  enum:
-                    # List StringBoolXXX constants from model
-                    - ""
-                    - "0"
-                    - "1"
-                    - "False"
-                    - "false"
-                    - "True"
-                    - "true"
-                    - "No"
-                    - "no"
-                    - "Yes"
-                    - "yes"
-                    - "Off"
-                    - "off"
-                    - "On"
-                    - "on"
-                    - "Disable"
-                    - "disable"
-                    - "Enable"
-                    - "enable"
-                    - "Disabled"
-                    - "disabled"
-                    - "Enabled"
-                    - "enabled"
                 namespaceDomainPattern:
                   type: string
                   description: |
