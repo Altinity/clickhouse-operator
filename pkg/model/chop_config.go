@@ -19,8 +19,8 @@ import (
 
 	"gopkg.in/d4l3k/messagediff.v1"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 

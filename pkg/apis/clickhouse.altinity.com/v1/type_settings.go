@@ -375,7 +375,7 @@ func (s *Settings) unmarshal(data []byte, unmarshaller func(data []byte, v any) 
 }
 
 // marshal
-func (s *Settings) marshal(marshaller func (v any) ([]byte, error)) ([]byte, error) {
+func (s *Settings) marshal(marshaller func(v any) ([]byte, error)) ([]byte, error) {
 	if s == nil {
 		return marshaller(nil)
 	}
