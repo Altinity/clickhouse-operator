@@ -1893,6 +1893,7 @@ def test_016(self):
         with And("ClickHouse SHOULD NOT be restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time == new_start_time
+            assert start_time == new_start_time
 
     # test-016-settings-03.yaml
     with When("Update macro and dictionary settings"):
