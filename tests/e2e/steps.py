@@ -31,18 +31,16 @@ def get_shell(self, timeout=600):
 def create_test_namespace(self, force=False):
     """Create unique test namespace for test."""
 
-    if (self.cflags & PARALLEL) and not force:
-        self.context.test_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
-        self.context.operator_namespace = self.context.test_namespace
-        util.create_namespace(self.context.test_namespace)
-        util.install_operator_if_not_exist()
-        return self.context.test_namespace
-    else:
-        self.context.operator_namespace = self.context.test_namespace
-        util.create_namespace(self.context.test_namespace)
-        util.install_operator_if_not_exist()
-        return self.context.test_namespace
+    random_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
 
+    if not force: # (self.cflags & PARALLEL) and not force:
+        self.context.test_namespace = random_namespace
+
+    self.context.operator_namespace = self.context.test_namespace
+    util.create_namespace(self.context.test_namespace)
+    util.install_operator_if_not_exist()
+
+    return self.context.test_namespace
 
 @TestStep(Finally)
 def delete_test_namespace(self):
