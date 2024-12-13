@@ -152,9 +152,9 @@ def check_metrics_monitoring(
         self,
         operator_namespace,
         operator_pod,
-        expect_pattern = "",
-        expect_metric = "",
-        expect_labels = "",
+        expect_pattern="",
+        expect_metric="",
+        expect_labels="",
         container="metrics-exporter",
         port="8888",
         max_retries=7
