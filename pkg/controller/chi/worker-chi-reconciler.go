@@ -53,6 +53,14 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		return nil
 	}
 
+	if new != nil {
+		n, err := w.c.kube.CR().Get(ctx, new.GetNamespace(), new.GetName())
+		if err != nil {
+			return err
+		}
+		new = n.(*api.ClickHouseInstallation)
+	}
+
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
