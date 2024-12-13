@@ -16,10 +16,9 @@ package kube
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
-
-	"gopkg.in/yaml.v3"
 
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -74,7 +73,7 @@ func (c *CR) buildCR(chi *api.ClickHouseInstallation, cm *core.ConfigMap) *api.C
 
 	if len(cm.Data[statusNormalized]) > 0 {
 		normalized := &api.ClickHouseInstallation{}
-		if yaml.Unmarshal([]byte(cm.Data[statusNormalized]), normalized) != nil {
+		if json.Unmarshal([]byte(cm.Data[statusNormalized]), normalized) != nil {
 			return chi
 		}
 		chi.EnsureStatus().NormalizedCR = normalized
@@ -82,7 +81,7 @@ func (c *CR) buildCR(chi *api.ClickHouseInstallation, cm *core.ConfigMap) *api.C
 
 	if len(cm.Data[statusNormalizedCompleted]) > 0 {
 		normalizedCompleted := &api.ClickHouseInstallation{}
-		if yaml.Unmarshal([]byte(cm.Data[statusNormalizedCompleted]), normalizedCompleted) != nil {
+		if json.Unmarshal([]byte(cm.Data[statusNormalizedCompleted]), normalizedCompleted) != nil {
 			return chi
 		}
 		chi.EnsureStatus().NormalizedCRCompleted = normalizedCompleted
@@ -194,10 +193,10 @@ func (c *CR) statusUpdate(ctx context.Context, chi *api.ClickHouseInstallation) 
 func (c *CR) buildResources(chi *api.ClickHouseInstallation) (*api.ClickHouseInstallation, *core.ConfigMap) {
 	var normalized, normalizedCompleted []byte
 	if chi.Status.NormalizedCR != nil {
-		normalized, _ = yaml.Marshal(chi.Status.NormalizedCR)
+		normalized, _ = json.Marshal(chi.Status.NormalizedCR)
 	}
 	if chi.Status.NormalizedCRCompleted != nil {
-		normalizedCompleted, _ = yaml.Marshal(chi.Status.NormalizedCRCompleted)
+		normalizedCompleted, _ = json.Marshal(chi.Status.NormalizedCRCompleted)
 	}
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
