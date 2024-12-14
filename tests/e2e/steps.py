@@ -31,7 +31,7 @@ def get_shell(self, timeout=600):
 def create_test_namespace(self, force=False):
     """Create unique test namespace for test."""
 
-    random_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
+    random_namespace = self.name[self.name.find('test_0'):self.name.find('# ')].replace("_", "-") + "-" + str(uuid.uuid1())
 
     if not force: # (self.cflags & PARALLEL) and not force:
         self.context.test_namespace = random_namespace
