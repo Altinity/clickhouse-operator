@@ -18,7 +18,7 @@ class Shell(ShellBase):
         # to terminate any open shell commands.
         # This is needed for example
         # to solve a problem with
-        # 'docker-compose exec {name} bash --noediting'
+        # 'docker compose exec {name} bash --noediting'
         # that does not clean up open bash processes
         # if not exited normally
         for i in range(10):
@@ -32,13 +32,13 @@ class Shell(ShellBase):
 
 
 class Cluster(object):
-    """Simple object around docker-compose cluster."""
+    """Simple object around docker compose cluster."""
 
     def __init__(self, configs_dir=None):
 
         self.environ = {}
         self.configs_dir = configs_dir
-        self.docker_compose = "docker-compose"
+        self.docker_compose = "docker compose"
         self.shell = Shell()
 
         frame = inspect.currentframe().f_back
@@ -62,7 +62,7 @@ class Cluster(object):
         )
 
     def __enter__(self):
-        with Given("docker-compose cluster"):
+        with Given("docker compose cluster"):
             self.up()
         return self
 
@@ -71,11 +71,11 @@ class Cluster(object):
             self.down()
 
     def down(self, timeout=3600):
-        """Bring cluster down by executing docker-compose down."""
+        """Bring cluster down by executing docker compose down."""
         return self.shell(f"{self.docker_compose} down --timeout {timeout}  -v --remove-orphans")
 
     def up(self, timeout=3600):
-        with Given("docker-compose"):
+        with Given("docker compose"):
             max_attempts = 5
             max_up_attempts = 1
 
@@ -84,7 +84,7 @@ class Cluster(object):
                     with By("checking if any containers are already running"):
                         self.shell(f"set -o pipefail && {self.docker_compose} ps | tee")
 
-                    with And("executing docker-compose down just in case it is up"):
+                    with And("executing docker compose down just in case it is up"):
                         cmd = self.shell(
                             f"set -o pipefail && {self.docker_compose} down --timeout={timeout} -v --remove-orphans 2>&1 | tee"
                         )
@@ -94,7 +94,7 @@ class Cluster(object):
                     with And("checking if any containers are still left running"):
                         self.shell(f"set -o pipefail && {self.docker_compose} ps | tee")
 
-                    with And("executing docker-compose up"):
+                    with And("executing docker compose up"):
                         for up_attempt in range(max_up_attempts):
                             with By(f"attempt {up_attempt}/{max_up_attempts}"):
                                 cmd = self.shell(
@@ -113,4 +113,4 @@ class Cluster(object):
                         break
 
             if cmd.exitcode != 0 or "is unhealthy" in cmd.output or "Exit" in ps_cmd.output:
-                fail("could not bring up docker-compose cluster")
+                fail("could not bring up docker compose cluster")

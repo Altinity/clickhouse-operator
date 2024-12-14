@@ -19,6 +19,7 @@ import (
 
 	"gopkg.in/d4l3k/messagediff.v1"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
@@ -157,6 +158,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 		}
 		new = host.GetZookeeper()
 		if isZookeeperChangeRequiresReboot(host, old, new) {
+			log.Info("ChangeRequiresReboot isZookeeperChangeRequiresReboot: true")
 			return true
 		}
 	}
@@ -170,6 +172,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 			new = host.GetCR().GetSpec().GetConfiguration().GetProfiles()
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionProfiles, old, new) {
+			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(profiles global): true")
 			return true
 		}
 	}
@@ -183,6 +186,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 			new = host.GetCR().GetSpec().GetConfiguration().GetQuotas()
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionQuotas, old, new) {
+			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(quotas global): true")
 			return true
 		}
 	}
@@ -196,6 +200,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 			new = host.GetCR().GetSpec().GetConfiguration().GetSettings()
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionSettings, old, new) {
+			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(settings global): true")
 			return true
 		}
 	}
@@ -207,6 +212,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 		}
 		new = host.Settings
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionSettings, old, new) {
+			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(settings local): true")
 			return true
 		}
 	}
@@ -228,6 +234,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 			)
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionFiles, old, new) {
+			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(files global): true")
 			return true
 		}
 	}
@@ -247,6 +254,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 			true,
 		)
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionFiles, old, new) {
+			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(files local): true")
 			return true
 		}
 	}

@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"gopkg.in/d4l3k/messagediff.v1"
+	"gopkg.in/yaml.v3"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -310,6 +311,26 @@ func (s *Settings) Groups() []string {
 
 // UnmarshalJSON unmarshal JSON
 func (s *Settings) UnmarshalJSON(data []byte) error {
+	return s.unmarshal(data, json.Unmarshal)
+}
+
+// MarshalJSON marshals JSON
+func (s *Settings) MarshalJSON() ([]byte, error) {
+	return s.marshal(json.Marshal)
+}
+
+// UnmarshalYAML unmarshal YAML
+func (s *Settings) UnmarshalYAML(data []byte) error {
+	return s.unmarshal(data, yaml.Unmarshal)
+}
+
+// MarshalYAML marshals YAML
+func (s *Settings) MarshalYAML() ([]byte, error) {
+	return s.marshal(yaml.Marshal)
+}
+
+// unmarshal
+func (s *Settings) unmarshal(data []byte, unmarshaller func(data []byte, v any) error) error {
 	if s == nil {
 		return fmt.Errorf("unable to unmashal with nil")
 	}
@@ -319,7 +340,7 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 	var untypedMap untypedMapType
 
 	// Provided binary data is expected to unmarshal into untyped map, because settings are map-like struct
-	if err := json.Unmarshal(data, &untypedMap); err != nil {
+	if err := unmarshaller(data, &untypedMap); err != nil {
 		return err
 	}
 
@@ -353,10 +374,10 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON marshals JSON
-func (s *Settings) MarshalJSON() ([]byte, error) {
+// marshal
+func (s *Settings) marshal(marshaller func(v any) ([]byte, error)) ([]byte, error) {
 	if s == nil {
-		return json.Marshal(nil)
+		return marshaller(nil)
 	}
 
 	raw := make(map[string]interface{})
@@ -364,7 +385,7 @@ func (s *Settings) MarshalJSON() ([]byte, error) {
 		raw[key] = setting.AsAny()
 	})
 
-	return json.Marshal(raw)
+	return marshaller(raw)
 }
 
 // fetchPort is the base function to fetch *Int32 port value

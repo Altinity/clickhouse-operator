@@ -24,6 +24,7 @@ type ChiSpec struct {
 	Stop                   *types.StringBool `json:"stop,omitempty"                   yaml:"stop,omitempty"`
 	Restart                *types.String     `json:"restart,omitempty"                yaml:"restart,omitempty"`
 	Troubleshoot           *types.StringBool `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
+	Suspend                *types.StringBool `json:"suspend,omitempty"                yaml:"suspend,omitempty"`
 	NamespaceDomainPattern *types.String     `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating    `json:"templating,omitempty"             yaml:"templating,omitempty"`
 	Reconciling            *Reconciling      `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
@@ -132,6 +133,9 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		if !spec.NamespaceDomainPattern.HasValue() {
 			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
 		}
+		if !spec.Suspend.HasValue() {
+			spec.Suspend = spec.Suspend.MergeFrom(from.Suspend)
+		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.HasTaskID() {
 			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
@@ -150,6 +154,10 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		}
 		if from.NamespaceDomainPattern.HasValue() {
 			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
+		}
+		if from.Suspend.HasValue() {
+			// Override by non-empty values only
+			spec.Suspend = from.Suspend
 		}
 	}
 

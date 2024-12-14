@@ -1,3 +1,6 @@
+import os
+os.environ["TEST_NAMESPACE"]="test-backup-alerts"
+
 import json
 import random
 import time
@@ -25,7 +28,7 @@ def get_minio_spec():
 def exec_on_backup_container(
     backup_pod,
     cmd,
-    ns=settings.test_namespace,
+    ns,
     ok_to_fail=False,
     timeout=60,
     container="clickhouse-backup",
@@ -60,12 +63,13 @@ def is_expected_backup_status(command_name, command_is_done, st, expected_status
     return False, command_is_done
 
 
-def wait_backup_command_status(backup_pod, command_name, expected_status="success", err_status="error"):
+def wait_backup_command_status(backup_pod, command_name, ns, expected_status="success", err_status="error"):
     command_is_done = False
     with Then(f'wait "{command_name}" with status "{expected_status}"'):
         while command_is_done is False:
             status_lines = exec_on_backup_container(
-                backup_pod, f'curl -sL "http://127.0.0.1:7171/backup/status"'
+                backup_pod, f'curl -sL "http://127.0.0.1:7171/backup/status"',
+                ns=ns
             ).splitlines()
             for line in status_lines:
                 st = json.loads(line)
@@ -161,7 +165,7 @@ def test_minio_setup(self, chi, minio_spec):
 
 
 @TestScenario
-@Name("test_backup_is_success. Basic backup scenario")
+@Name("test_backup_is_success# Basic backup scenario")
 def test_backup_is_success(self, chi, minio_spec):
     _, _, backup_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
     backup_name = prepare_table_for_backup(backup_pod, chi)
@@ -173,21 +177,26 @@ def test_backup_is_success(self, chi, minio_spec):
             "clickhouse_backup_successful_backups|clickhouse_backup_successful_creates",
             ns=self.context.test_namespace
         )
-        list_before = exec_on_backup_container(backup_pod, "curl -sL http://127.0.0.1:7171/backup/list")
+        list_before = exec_on_backup_container(backup_pod, "curl -sL http://127.0.0.1:7171/backup/list", self.context.test_namespace)
         exec_on_backup_container(
             backup_pod,
             f'curl -X POST -sL "http://127.0.0.1:7171/backup/create?name={backup_name}"',
+            ns=self.context.test_namespace
         )
-        wait_backup_command_status(backup_pod, f"create {backup_name}", expected_status="success")
+        wait_backup_command_status(backup_pod, f"create {backup_name}", expected_status="success", ns=self.context.test_namespace,)
 
         exec_on_backup_container(
             backup_pod,
             f'curl -X POST -sL "http://127.0.0.1:7171/backup/upload/{backup_name}"',
+            ns=self.context.test_namespace
         )
-        wait_backup_command_status(backup_pod, f"upload {backup_name}", expected_status="success")
+        wait_backup_command_status(backup_pod, f"upload {backup_name}", expected_status="success", ns=self.context.test_namespace)
 
     with Then("list of backups shall changed"):
-        list_after = exec_on_backup_container(backup_pod, "curl -sL http://127.0.0.1:7171/backup/list")
+        list_after = exec_on_backup_container(
+            backup_pod, "curl -sL http://127.0.0.1:7171/backup/list",
+            ns=self.context.test_namespace
+        )
         assert list_before != list_after, error("backup is not created")
 
     with Then("successful backup count shall increased"):
@@ -202,13 +211,13 @@ def test_backup_is_success(self, chi, minio_spec):
 
 
 @TestScenario
-@Name("test_backup_is_down. ClickHouseBackupDown and ClickHouseBackupRecentlyRestart alerts")
+@Name("test_backup_is_down# ClickHouseBackupDown and ClickHouseBackupRecentlyRestart alerts")
 def test_backup_is_down(self, chi, minio_spec):
     reboot_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
     def reboot_backup_container():
         kubectl.launch(
-            f"exec -n {settings.test_namespace} {reboot_pod} -c clickhouse-backup -- kill 1",
+            f"exec -n {self.context.test_namespace} {reboot_pod} -c clickhouse-backup -- kill 1",
             ok_to_fail=True,
         )
 
@@ -257,7 +266,7 @@ def test_backup_is_down(self, chi, minio_spec):
 
 
 @TestScenario
-@Name("test_backup_failed. Check ClickHouseBackupFailed alerts")
+@Name("test_backup_failed# Check ClickHouseBackupFailed alerts")
 def test_backup_failed(self, chi, minio_spec):
     backup_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
     backup_prefix = prepare_table_for_backup(backup_pod, chi)
@@ -268,20 +277,20 @@ def test_backup_failed(self, chi, minio_spec):
         backup_name = backup_prefix + "-" + str(random.randint(1, 4096))
         backup_dir = f"/var/lib/clickhouse/backup/{backup_name}/shadow/default/test_backup"
         kubectl.launch(
-            f"exec -n {settings.test_namespace} {backup_pod} -c clickhouse-backup -- bash -c 'mkdir -v -m 0400 -p {backup_dir}'",
+            f"exec -n {self.context.test_namespace} {backup_pod} -c clickhouse-backup -- bash -c 'mkdir -v -m 0400 -p {backup_dir}'",
         )
 
         kubectl.launch(
-            f"exec -n {settings.test_namespace} {backup_pod} -c clickhouse-backup -- curl -X POST -sL http://127.0.0.1:7171/backup/create?name={backup_name}",
+            f"exec -n {self.context.test_namespace} {backup_pod} -c clickhouse-backup -- curl -X POST -sL http://127.0.0.1:7171/backup/create?name={backup_name}",
         )
-        wait_backup_command_status(backup_pod, command_name=f"create {backup_name}", expected_status="error")
+        wait_backup_command_status(backup_pod, command_name=f"create {backup_name}", expected_status="error", ns=self.context.test_namespace)
 
     def create_success_backup():
         backup_name = backup_prefix + "-" + str(random.randint(1, 4096))
         kubectl.launch(
-            f"exec -n {settings.test_namespace} {backup_pod} -c clickhouse-backup -- curl -X POST -sL http://127.0.0.1:7171/backup/create?name={backup_name}",
+            f"exec -n {self.context.test_namespace} {backup_pod} -c clickhouse-backup -- curl -X POST -sL http://127.0.0.1:7171/backup/create?name={backup_name}",
         )
-        wait_backup_command_status(backup_pod, command_name=f"create {backup_name}", expected_status="success")
+        wait_backup_command_status(backup_pod, command_name=f"create {backup_name}", expected_status="success", ns=self.context.test_namespace)
 
     with When("clickhouse-backup create failed"):
         fired = alerts.wait_alert_state(
@@ -307,7 +316,7 @@ def test_backup_failed(self, chi, minio_spec):
 
 
 @TestScenario
-@Name("test_backup_duration. Check ClickHouseBackupTooShort and ClickHouseBackupTooLong alerts")
+@Name("test_backup_duration# Check ClickHouseBackupTooShort and ClickHouseBackupTooLong alerts")
 def test_backup_duration(self, chi, minio_spec):
     short_pod, _, long_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
     apply_fake_backup("prepare fake backup duration metric")
@@ -374,7 +383,7 @@ def test_backup_duration(self, chi, minio_spec):
 
 
 @TestScenario
-@Name("test_backup_size. Check ClickHouseBackupSizeChanged alerts")
+@Name("test_backup_size# Check ClickHouseBackupSizeChanged alerts")
 def test_backup_size(self, chi, minio_spec):
     decrease_pod, _, increase_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
 
@@ -395,8 +404,9 @@ def test_backup_size(self, chi, minio_spec):
             exec_on_backup_container(
                 backup_pod,
                 f'curl -X POST -sL "http://127.0.0.1:7171/backup/create?name={backup_name}"',
+                ns=self.context.test_namespace
             )
-            wait_backup_command_status(backup_pod, f"create {backup_name}", expected_status="success")
+            wait_backup_command_status(backup_pod, f"create {backup_name}", expected_status="success", ns=self.context.test_namespace)
             if decrease:
                 clickhouse.query(
                     chi["metadata"]["name"],
@@ -425,7 +435,7 @@ def test_backup_size(self, chi, minio_spec):
 
 
 @TestScenario
-@Name("test_backup_not_run. Check ClickhouseBackupDoesntRunTooLong alert")
+@Name("test_backup_not_run# Check ClickhouseBackupDoesntRunTooLong alert")
 def test_backup_not_run(self, chi, minio_spec):
     not_run_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
     apply_fake_backup("prepare fake backup for time metric")
@@ -462,14 +472,16 @@ def test_backup_not_run(self, chi, minio_spec):
         exec_on_backup_container(
             not_run_pod,
             f'curl -X POST -sL "http://127.0.0.1:7171/backup/create?name={backup_name}"',
+            ns=self.context.test_namespace
         )
-        wait_backup_command_status(not_run_pod, f"create {backup_name}", expected_status="success")
+        wait_backup_command_status(not_run_pod, f"create {backup_name}", expected_status="success", ns=self.context.test_namespace)
 
         exec_on_backup_container(
             not_run_pod,
             f'curl -X POST -sL "http://127.0.0.1:7171/backup/upload/{backup_name}"',
+            ns=self.context.test_namespace
         )
-        wait_backup_command_status(not_run_pod, f"upload {backup_name}", expected_status="success")
+        wait_backup_command_status(not_run_pod, f"upload {backup_name}", expected_status="success", ns=self.context.test_namespace)
 
     with Then("check ClickhouseBackupDoesntRunTooLong gone away"):
         resolved = alerts.wait_alert_state(
@@ -502,7 +514,7 @@ def test(self):
     minio_spec = get_minio_spec()
 
     with Module("backup_alerts"):
-        test_cases = [
+        all_tests = [
             test_backup_is_success,
             test_backup_is_down,
             test_backup_failed,
@@ -510,5 +522,7 @@ def test(self):
             test_backup_size,
             test_backup_not_run,
         ]
-        for t in test_cases:
+        for t in all_tests:
             Scenario(test=t)(chi=chi, minio_spec=minio_spec)
+
+    util.clean_namespace(delete_chi=True, delete_keeper=True, namespace=self.context.test_namespace)

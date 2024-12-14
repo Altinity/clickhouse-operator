@@ -1,3 +1,7 @@
+import json
+import os
+os.environ["TEST_NAMESPACE"]="test-keeper"
+
 import re
 import time
 import random
@@ -15,13 +19,13 @@ import e2e.steps as steps
 
 
 @TestScenario
-@Name("test_prometheus_setup. Check clickhouse-operator/prometheus/alertmanager setup")
+@Name("test_prometheus_setup# Check clickhouse-operator/prometheus/alertmanager setup")
 def test_prometheus_setup(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     with Given("clickhouse-operator is installed"):
         assert (
             kubectl.get_count(
                 "pod",
-                ns=settings.operator_namespace,
+                ns=self.context.operator_namespace,
                 label="-l app=clickhouse-operator",
             )
             > 0
@@ -64,12 +68,12 @@ def test_prometheus_setup(self, prometheus_operator_spec, clickhouse_operator_sp
 
 
 @TestScenario
-@Name("test_metrics_exporter_down. Check ClickHouseMetricsExporterDown")
+@Name("test_metrics_exporter_down# Check ClickHouseMetricsExporterDown")
 def test_metrics_exporter_down(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     def reboot_metrics_exporter():
         clickhouse_operator_pod = clickhouse_operator_spec["items"][0]["metadata"]["name"]
         kubectl.launch(
-            f"exec -n {settings.operator_namespace} {clickhouse_operator_pod} -c metrics-exporter -- sh -c 'kill 1'",
+            f"exec -n {self.context.operator_namespace} {clickhouse_operator_pod} -c metrics-exporter -- sh -c 'kill 1'",
             ok_to_fail=True,
         )
 
@@ -89,7 +93,7 @@ def test_metrics_exporter_down(self, prometheus_operator_spec, clickhouse_operat
 
 
 @TestScenario
-@Name("test_clickhouse_server_reboot. Check ClickHouseServerDown, ClickHouseServerRestartRecently")
+@Name("test_clickhouse_server_reboot# Check ClickHouseServerDown, ClickHouseServerRestartRecently")
 def test_clickhouse_server_reboot(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     random_idx = random.randint(0, 1)
     clickhouse_pod = chi["status"]["pods"][random_idx]
@@ -149,7 +153,7 @@ def test_clickhouse_server_reboot(self, prometheus_operator_spec, clickhouse_ope
 
 
 @TestScenario
-@Name("test_clickhouse_dns_errors. Check ClickHouseDNSErrors")
+@Name("test_clickhouse_dns_errors# Check ClickHouseDNSErrors")
 def test_clickhouse_dns_errors(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     random_idx = random.randint(0, 1)
     clickhouse_pod = chi["status"]["pods"][random_idx]
@@ -196,7 +200,7 @@ def test_clickhouse_dns_errors(self, prometheus_operator_spec, clickhouse_operat
 
 
 @TestScenario
-@Name("test_distributed_files_to_insert. Check ClickHouseDistributedFilesToInsertHigh")
+@Name("test_distributed_files_to_insert# Check ClickHouseDistributedFilesToInsertHigh")
 def test_distributed_files_to_insert(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         delayed_pod,
@@ -276,7 +280,7 @@ def test_distributed_files_to_insert(self, prometheus_operator_spec, clickhouse_
 
 
 @TestScenario
-@Name("test_distributed_connection_exceptions. Check ClickHouseDistributedConnectionExceptions")
+@Name("test_distributed_connection_exceptions# Check ClickHouseDistributedConnectionExceptions")
 def test_distributed_connection_exceptions(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         delayed_pod,
@@ -340,12 +344,14 @@ def test_distributed_connection_exceptions(self, prometheus_operator_spec, click
         "true",
         ns=self.context.test_namespace,
     )
+    # why connection refused if /ping return ok ? ;(
+    time.sleep(5)
     clickhouse.drop_distributed_table_on_cluster(chi)
 
 
 @TestScenario
 @Name(
-    "test_insert_related_alerts. Check ClickHouseRejectedInsert, ClickHouseDelayedInsertThrottling, ClickHouseMaxPartCountForPartition, ClickHouseLowInsertedRowsPerQuery"
+    "test_insert_related_alerts# Check ClickHouseRejectedInsert, ClickHouseDelayedInsertThrottling, ClickHouseMaxPartCountForPartition, ClickHouseLowInsertedRowsPerQuery"
 )
 def test_insert_related_alerts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     clickhouse.create_table_on_cluster(chi)
@@ -357,10 +363,16 @@ def test_insert_related_alerts(self, prometheus_operator_spec, clickhouse_operat
     ) = alerts.random_pod_choice_for_callbacks(chi)
 
     prometheus_scrape_interval = settings.prometheus_scrape_interval
+    chi_name = chi["metadata"]["name"]
     # default values in system.merge_tree_settings
+    settings_json = json.loads(clickhouse.query(chi_name, "SELECT name, value FROM system.merge_tree_settings WHERE name IN ('parts_to_delay_insert','parts_to_throw_insert') FORMAT JSONCompact"))
     parts_to_throw_insert = 300
     parts_to_delay_insert = 150
-    chi_name = chi["metadata"]["name"]
+    for row in settings_json["data"]:
+        if row[0] == "parts_to_throw_insert":
+            parts_to_throw_insert = row[1]
+        if row[0] == "parts_to_delay_insert":
+            parts_to_delay_insert = row[1]
 
     parts_limits = parts_to_delay_insert
     selected_svc = delayed_svc
@@ -375,13 +387,13 @@ def test_insert_related_alerts(self, prometheus_operator_spec, clickhouse_operat
                 + min_block
                 + f"INSERT INTO default.test(event_time, test) SELECT now(),number FROM system.numbers LIMIT {r};"
             )
-            clickhouse.query(chi_name, sql, host=selected_svc, ns=self.context.test_namespace)
+            clickhouse.query(chi_name, sql, host=selected_svc, ns=self.context.test_namespace, timeout=600)
 
             sql = (
                 min_block
                 + "INSERT INTO default.test(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1;"
             )
-            clickhouse.query_with_error(chi_name, sql, host=selected_svc, ns=self.context.test_namespace)
+            clickhouse.query_with_error(chi_name, sql, host=selected_svc, ns=self.context.test_namespace, timeout=300)
             with Then(f"wait prometheus_scrape_interval={prometheus_scrape_interval}*2 sec"):
                 time.sleep(prometheus_scrape_interval * 2)
 
@@ -454,6 +466,13 @@ def test_insert_related_alerts(self, prometheus_operator_spec, clickhouse_operat
         )
         assert resolved, error("can't check ClickHouseLowInsertedRowsPerQuery alert is gone away")
 
+    clickhouse.query(
+        chi_name,
+        "OPTIMIZE TABLE default.test FINAL;SELECT count() FROM system.parts WHERE active AND database='default' AND table='test'",
+        host=selected_svc,
+        ns=self.context.test_namespace,
+    )
+
     parts_limits = parts_to_throw_insert
     selected_svc = rejected_svc
     insert_many_parts_to_clickhouse()
@@ -487,7 +506,7 @@ def test_insert_related_alerts(self, prometheus_operator_spec, clickhouse_operat
 
 
 @TestScenario
-@Name("test_longest_running_query. Check ClickHouseLongestRunningQuery")
+@Name("test_longest_running_query# Check ClickHouseLongestRunningQuery")
 def test_longest_running_query(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     long_running_pod, long_running_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
     # 600s trigger + 2*30s - double prometheus scraping interval
@@ -517,7 +536,7 @@ def test_longest_running_query(self, prometheus_operator_spec, clickhouse_operat
 
 
 @TestScenario
-@Name("test_query_preempted. Check ClickHouseQueryPreempted")
+@Name("test_query_preempted# Check ClickHouseQueryPreempted")
 def test_query_preempted(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     priority_pod, priority_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
@@ -555,7 +574,7 @@ def test_query_preempted(self, prometheus_operator_spec, clickhouse_operator_spe
 
 
 @TestScenario
-@Name("test_read_only_replica. Check ClickHouseReadonlyReplica")
+@Name("test_read_only_replica# Check ClickHouseReadonlyReplica")
 def test_read_only_replica(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         read_only_pod,
@@ -573,8 +592,9 @@ def test_read_only_replica(self, prometheus_operator_spec, clickhouse_operator_s
     )
 
     def restart_keeper():
+        kill_cmd = "ps -ef | grep keeper | grep -v grep | awk -F'[ \\t]+' '{print \$2}' | xargs kill"
         kubectl.launch(
-            f'exec -n {self.context.test_namespace} {self.context.keeper_type}-0 -- sh -c "kill 1"',
+            f'exec -n {self.context.test_namespace} {self.context.keeper_type}-0 -- sh -c "{kill_cmd}"',
             ok_to_fail=True,
         )
         clickhouse.query_with_error(
@@ -641,7 +661,7 @@ def test_read_only_replica(self, prometheus_operator_spec, clickhouse_operator_s
 
 
 @TestScenario
-@Name("test_replicas_max_absolute_delay. Check ClickHouseReplicasMaxAbsoluteDelay")
+@Name("test_replicas_max_absolute_delay# Check ClickHouseReplicasMaxAbsoluteDelay")
 def test_replicas_max_absolute_delay(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         stop_replica_pod,
@@ -702,7 +722,7 @@ def test_replicas_max_absolute_delay(self, prometheus_operator_spec, clickhouse_
 
 
 @TestScenario
-@Name("test_too_many_connections. Check ClickHouseTooManyConnections")
+@Name("test_too_many_connections# Check ClickHouseTooManyConnections")
 def test_too_many_connections(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         too_many_connection_pod,
@@ -724,12 +744,12 @@ def test_too_many_connections(self, prometheus_operator_spec, clickhouse_operato
                 # HTTPConnection metric increase after full parsing of HTTP Request, we can't provide pause between CONNECT and QUERY running
                 # long_cmd += f"nc -vv 127.0.0.1 {port} <( printf \"POST / HTTP/1.1\\r\\nHost: 127.0.0.1:8123\\r\\nContent-Length: 34\\r\\n\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\");"
                 long_cmd += (
-                    'wget -qO- "http://127.0.0.1:8123?query=SELECT sleepEachRow(1),number,now() FROM numbers(30) SETTINGS function_sleep_max_microseconds_per_block=0";'
+                    'wget -qO- "http://127.0.0.1:8123?query=SELECT sleepEachRow(1),number,now() FROM numbers(30) SETTINGS function_sleep_max_microseconds_per_block=0, max_threads=1";'
                 )
             elif port == "9000":
-                long_cmd += 'clickhouse-client --send_logs_level trace --idle_connection_timeout 70 --receive_timeout 70 -q "SELECT sleepEachRow(1),number,now() FROM numbers(30) SETTINGS function_sleep_max_microseconds_per_block=0";'
+                long_cmd += 'clickhouse-client --send_logs_level trace --idle_connection_timeout 70 --receive_timeout 70 -q "SELECT sleepEachRow(1),number,now() FROM numbers(30) SETTINGS function_sleep_max_microseconds_per_block=0,max_threads=1";'
             # elif port == "3306":
-            #     long_cmd += 'mysql -u default -h 127.0.0.1 -e "SELECT sleepEachRow(1),number, now() FROM numbers(30) SETTINGS function_sleep_max_microseconds_per_block=0";'
+            #     long_cmd += 'mysql -u default -h 127.0.0.1 -e "SELECT sleepEachRow(1),number, now() FROM numbers(30) SETTINGS function_sleep_max_microseconds_per_block=0,max_threads=1";'
             else:
                 long_cmd += f'printf "1\\n1" | nc -q 5 -i 30 -vv 127.0.0.1 {port};'
 
@@ -766,7 +786,7 @@ def test_too_many_connections(self, prometheus_operator_spec, clickhouse_operato
 
 
 @TestScenario
-@Name("test_too_much_running_queries. Check ClickHouseTooManyRunningQueries")
+@Name("test_too_much_running_queries# Check ClickHouseTooManyRunningQueries")
 def test_too_much_running_queries(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         _,
@@ -828,7 +848,7 @@ def test_too_much_running_queries(self, prometheus_operator_spec, clickhouse_ope
 
 
 @TestScenario
-@Name("test_system_settings_changed. Check ClickHouseSystemSettingsChanged")
+@Name("test_system_settings_changed# Check ClickHouseSystemSettingsChanged")
 def test_system_settings_changed(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     changed_pod, changed_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
@@ -889,7 +909,7 @@ def test_system_settings_changed(self, prometheus_operator_spec, clickhouse_oper
 
 
 @TestScenario
-@Name("test_version_changed. Check ClickHouseVersionChanged")
+@Name("test_version_changed# Check ClickHouseVersionChanged")
 def test_version_changed(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     changed_pod, changed_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
@@ -954,14 +974,15 @@ def test_version_changed(self, prometheus_operator_spec, clickhouse_operator_spe
 
 
 @TestScenario
-@Name("test_zookeeper_hardware_exceptions. Check ClickHouseZooKeeperHardwareExceptions")
+@Name("test_zookeeper_hardware_exceptions# Check ClickHouseZooKeeperHardwareExceptions")
 def test_zookeeper_hardware_exceptions(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     pod1, svc1, pod2, svc2 = alerts.random_pod_choice_for_callbacks(chi)
     chi_name = chi["metadata"]["name"]
 
     def restart_keeper():
+        kill_cmd = "ps -ef | grep keeper | grep -v grep | awk -F'[ \\t]+' '{print \$2}' | xargs kill"
         kubectl.launch(
-            f'exec -n {self.context.test_namespace} {self.context.keeper_type}-0 -- sh -c "kill 1"',
+            f'exec -n {self.context.test_namespace} {self.context.keeper_type}-0 -- sh -c "{kill_cmd}"',
             ok_to_fail=True,
         )
         clickhouse.query_with_error(
@@ -1009,7 +1030,7 @@ def test_zookeeper_hardware_exceptions(self, prometheus_operator_spec, clickhous
 
 
 @TestScenario
-@Name("test_distributed_sync_insertion_timeout. Check ClickHouseDistributedSyncInsertionTimeoutExceeded")
+@Name("test_distributed_sync_insertion_timeout# Check ClickHouseDistributedSyncInsertionTimeoutExceeded")
 def test_distributed_sync_insertion_timeout(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         sync_pod,
@@ -1059,7 +1080,7 @@ def test_distributed_sync_insertion_timeout(self, prometheus_operator_spec, clic
 
 
 @TestScenario
-@Name("test_detached_parts. Check ClickHouseDetachedParts")
+@Name("test_detached_parts# Check ClickHouseDetachedParts")
 def test_detached_parts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     clickhouse.create_table_on_cluster(chi)
     detached_pod, detached_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
@@ -1118,14 +1139,27 @@ def test_detached_parts(self, prometheus_operator_spec, clickhouse_operator_spec
 
 
 @TestScenario
-@Name("test_clickhouse_keeper_alerts. Check ClickHouseKeeperDown")
-def test_clickhouse_keeper_alerts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
+@Name("test_clickhouse_keeper_alerts# Check ClickHouseKeeperDown")
+def test_clickhouse_keeper_alerts(self):
+    alerts.initialize(
+        chi_file="manifests/chi/test-cluster-for-alerts.yaml",
+        chi_template_file="manifests/chit/tpl-clickhouse-alerts.yaml",
+        chi_name="test-cluster-for-alerts",
+        keeper_type="clickhouse-keeper",
+    )
     test_keeper_alerts_outline(keeper_type="clickhouse-keeper")
 
 
 @TestScenario
-@Name("test_zookeeper_alerts. Check ZookeeperDown, ZookeeperRestartRecently")
-def test_zookeeper_alerts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
+@Name("test_zookeeper_alerts# Check ZookeeperDown, ZookeeperRestartRecently")
+def test_zookeeper_alerts(self):
+    alerts.initialize(
+        chi_file="manifests/chi/test-cluster-for-alerts.yaml",
+        chi_template_file="manifests/chit/tpl-clickhouse-alerts.yaml",
+        chi_name="test-cluster-for-alerts",
+        keeper_type="zookeeper",
+    )
+
     test_keeper_alerts_outline(keeper_type="zookeeper")
 
 
@@ -1145,8 +1179,9 @@ def test_keeper_alerts_outline(self, keeper_type):
     }
 
     def restart_keeper():
+        kill_cmd = "ps -ef | grep keeper | grep -v grep | awk -F'[ \\t]+' '{print \$2}' | xargs kill"
         kubectl.launch(
-            f'exec -n {self.context.test_namespace} {keeper_spec} -- sh -c "kill 1"',
+            f'exec -n {self.context.test_namespace} {keeper_spec} -- sh -c "{kill_cmd}"',
             ok_to_fail=True,
         )
 
@@ -1167,7 +1202,7 @@ def test_keeper_alerts_outline(self, keeper_type):
                 "firing",
                 True,
                 labels={"pod_name": keeper_spec},
-                time_range="1m",
+                time_range="3m",
                 sleep_time=settings.prometheus_scrape_interval,
                 callback=restart_keeper,
             )
@@ -1194,7 +1229,7 @@ def test_keeper_alerts_outline(self, keeper_type):
                 "firing",
                 True,
                 labels={"pod_name": keeper_spec},
-                time_range="30s",
+                time_range="3m",
             )
             assert fired, error(f"can't get {expected_alerts[keeper_type]['restart']} alert in firing state")
 
@@ -1217,35 +1252,16 @@ def test_keeper_alerts_outline(self, keeper_type):
 def test(self):
     with Given("I setup settings"):
         steps.set_settings()
+        self.context.test_namespace = "test-metrics-alerts"
+        self.context.operator_namespace = "test-metrics-alerts"
     with Given("I create shell"):
         shell = steps.get_shell()
         self.context.shell = shell
     util.clean_namespace(delete_chi=True)
     util.install_operator_if_not_exist()
 
-    (prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi,) = alerts.initialize(
-        chi_file="manifests/chi/test-cluster-for-alerts.yaml",
-        chi_template_file="manifests/chit/tpl-clickhouse-alerts.yaml",
-        chi_name="test-cluster-for-alerts",
-        keeper_type="clickhouse-keeper",
-    )
-    Scenario(test=test_clickhouse_keeper_alerts)(
-        prometheus_operator_spec=prometheus_operator_spec,
-        clickhouse_operator_spec=clickhouse_operator_spec,
-        chi=chi,
-    )
-
-    (prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi,) = alerts.initialize(
-        chi_file="manifests/chi/test-cluster-for-alerts.yaml",
-        chi_template_file="manifests/chit/tpl-clickhouse-alerts.yaml",
-        chi_name="test-cluster-for-alerts",
-        keeper_type="zookeeper",
-    )
-    Scenario(test=test_zookeeper_alerts)(
-        prometheus_operator_spec=prometheus_operator_spec,
-        clickhouse_operator_spec=clickhouse_operator_spec,
-        chi=chi,
-    )
+    Scenario(test=test_zookeeper_alerts)
+    Scenario(test=test_clickhouse_keeper_alerts)
 
     (prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi,) = alerts.initialize(
         chi_file="manifests/chi/test-cluster-for-alerts.yaml",
@@ -1254,14 +1270,13 @@ def test(self):
         keeper_type=self.context.keeper_type,
     )
 
-    test_cases = [
+    all_tests = [
         test_prometheus_setup,
+        test_insert_related_alerts,
+        test_distributed_connection_exceptions,
         test_read_only_replica,
-        test_replicas_max_absolute_delay,
         test_metrics_exporter_down,
         test_clickhouse_dns_errors,
-        test_distributed_connection_exceptions,
-        test_insert_related_alerts,
         test_too_many_connections,
         test_too_much_running_queries,
         test_longest_running_query,
@@ -1272,10 +1287,13 @@ def test(self):
         test_distributed_files_to_insert,
         test_detached_parts,
         test_clickhouse_server_reboot,
+        test_replicas_max_absolute_delay,
     ]
-    for t in test_cases:
+    for t in all_tests:
         Scenario(test=t)(
             prometheus_operator_spec=prometheus_operator_spec,
             clickhouse_operator_spec=clickhouse_operator_spec,
             chi=chi,
         )
+
+    util.clean_namespace(delete_chi=True, delete_keeper=True)

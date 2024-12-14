@@ -20,13 +20,13 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	commonTypes "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type CR struct {
@@ -52,19 +52,23 @@ func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResour
 	}
 }
 
-// updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *CR) StatusUpdate(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) (err error) {
+// StatusUpdate updates CR object's Status
+func (c *CR) StatusUpdate(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
+	return c.statusUpdateRetry(ctx, cr, opts)
+}
+
+func (c *CR) statusUpdateRetry(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) (err error) {
 	for retry, attempt := true, 1; retry; attempt++ {
 		if attempt > 60 {
 			retry = false
 		}
 
-		err = c.doUpdateCRStatus(ctx, cr, opts)
+		err = c.statusUpdateProcess(ctx, cr, opts)
 		if err == nil {
 			return nil
 		}
@@ -79,16 +83,16 @@ func (c *CR) StatusUpdate(ctx context.Context, cr api.ICustomResource, opts comm
 	return
 }
 
-// doUpdateCRStatus updates ClickHouseInstallation object's Status
-func (c *CR) doUpdateCRStatus(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
+// statusUpdateProcess updates CR object's Status
+func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	chk := cr.(*apiChk.ClickHouseKeeperInstallation)
-	namespace, name := util.NamespaceName(chk)
-	log.V(3).M(chk).F().Info("Update CHK status")
+	cr := icr.(*apiChk.ClickHouseKeeperInstallation)
+	namespace, name := cr.NamespaceName()
+	log.V(3).M(cr).F().Info("Update CR status")
 
 	_cur, err := c.Get(ctx, namespace, name)
 	cur := _cur.(*apiChk.ClickHouseKeeperInstallation)
@@ -96,24 +100,24 @@ func (c *CR) doUpdateCRStatus(ctx context.Context, cr api.ICustomResource, opts 
 		if opts.TolerateAbsence {
 			return nil
 		}
-		log.V(1).M(chk).F().Error("%q", err)
+		log.V(1).M(cr).F().Error("%q", err)
 		return err
 	}
 	if cur == nil {
 		if opts.TolerateAbsence {
 			return nil
 		}
-		log.V(1).M(chk).F().Error("NULL returned")
+		log.V(1).M(cr).F().Error("NULL returned")
 		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", namespace, name)
 	}
 
 	// Update status of a real object.
-	cur.EnsureStatus().CopyFrom(chk.Status, opts.CopyStatusOptions)
+	cur.EnsureStatus().CopyFrom(cr.Status, opts.CopyStatusOptions)
 
-	err = c.kubeClient.Status().Update(ctx, cur)
+	err = c.statusUpdate(ctx, cur)
 	if err != nil {
 		// Error update
-		log.V(2).M(chk).F().Info("Got error upon update, may retry. err: %q", err)
+		log.V(2).M(cr).F().Info("Got error upon update, may retry. err: %q", err)
 		return err
 	}
 
@@ -121,13 +125,18 @@ func (c *CR) doUpdateCRStatus(ctx context.Context, cr api.ICustomResource, opts 
 	cur = _cur.(*apiChk.ClickHouseKeeperInstallation)
 
 	// Propagate updated ResourceVersion into chi
-	if chk.GetResourceVersion() != cur.GetResourceVersion() {
-		log.V(3).M(chk).F().Info("ResourceVersion change: %s to %s", chk.GetResourceVersion(), cur.GetResourceVersion())
-		chk.SetResourceVersion(cur.GetResourceVersion())
+	if cr.GetResourceVersion() != cur.GetResourceVersion() {
+		log.V(3).M(cr).F().Info("ResourceVersion change: %s to %s", cr.GetResourceVersion(), cur.GetResourceVersion())
+		cr.SetResourceVersion(cur.GetResourceVersion())
 		return nil
 	}
 
 	// ResourceVersion not changed - no update performed?
 
 	return nil
+}
+
+func (c *CR) statusUpdate(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) error {
+	err := c.kubeClient.Status().Update(ctx, chk)
+	return err
 }

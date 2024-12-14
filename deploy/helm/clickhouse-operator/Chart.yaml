@@ -13,8 +13,8 @@ description: |-
     kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousekeeperinstallations.clickhouse-keeper.altinity.com.yaml
   ```
 type: application
-version: 0.24.2
-appVersion: 0.24.2
+version: 0.24.3
+appVersion: 0.24.3
 home: https://github.com/Altinity/clickhouse-operator
 icon: https://logosandtypes.com/wp-content/uploads/2020/12/altinity.svg
 maintainers:
