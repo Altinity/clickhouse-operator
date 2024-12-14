@@ -736,14 +736,14 @@ func (s *Status) GetEndpoint() string {
 
 // GetNormalizedCR gets target CR
 func (s *Status) GetNormalizedCR() *ClickHouseKeeperInstallation {
-	return getInstallationWithReadLock(s, func(s *Status) *ClickHouseKeeperInstallation {
+	return getCRWithReadLock(s, func(s *Status) *ClickHouseKeeperInstallation {
 		return s.NormalizedCR
 	})
 }
 
 // GetNormalizedCRCompleted gets completed CR
 func (s *Status) GetNormalizedCRCompleted() *ClickHouseKeeperInstallation {
-	return getInstallationWithReadLock(s, func(s *Status) *ClickHouseKeeperInstallation {
+	return getCRWithReadLock(s, func(s *Status) *ClickHouseKeeperInstallation {
 		return s.NormalizedCRCompleted
 	})
 }
@@ -757,7 +757,7 @@ func (s *Status) GetHostsWithTablesCreated() []string {
 
 // Begin helpers
 
-func doWithWriteLock(s *Status, f func(s *Status)) {
+func doWithWriteLock(s *Status, f func(*Status)) {
 	if s == nil {
 		return
 	}
@@ -767,7 +767,7 @@ func doWithWriteLock(s *Status, f func(s *Status)) {
 	f(s)
 }
 
-func doWithReadLock(s *Status, f func(s *Status)) {
+func doWithReadLock(s *Status, f func(*Status)) {
 	if s == nil {
 		return
 	}
@@ -777,7 +777,7 @@ func doWithReadLock(s *Status, f func(s *Status)) {
 	f(s)
 }
 
-func getIntWithReadLock(s *Status, f func(s *Status) int) int {
+func getIntWithReadLock(s *Status, f func(*Status) int) int {
 	var zeroVal int
 	if s == nil {
 		return zeroVal
@@ -788,7 +788,7 @@ func getIntWithReadLock(s *Status, f func(s *Status) int) int {
 	return f(s)
 }
 
-func getStringWithReadLock(s *Status, f func(s *Status) string) string {
+func getStringWithReadLock(s *Status, f func(*Status) string) string {
 	var zeroVal string
 	if s == nil {
 		return zeroVal
@@ -799,7 +799,7 @@ func getStringWithReadLock(s *Status, f func(s *Status) string) string {
 	return f(s)
 }
 
-func getInstallationWithReadLock(s *Status, f func(s *Status) *ClickHouseKeeperInstallation) *ClickHouseKeeperInstallation {
+func getCRWithReadLock(s *Status, f func(*Status) *ClickHouseKeeperInstallation) *ClickHouseKeeperInstallation {
 	var zeroVal *ClickHouseKeeperInstallation
 	if s == nil {
 		return zeroVal
@@ -810,7 +810,7 @@ func getInstallationWithReadLock(s *Status, f func(s *Status) *ClickHouseKeeperI
 	return f(s)
 }
 
-func getStringArrWithReadLock(s *Status, f func(s *Status) []string) []string {
+func getStringArrWithReadLock(s *Status, f func(*Status) []string) []string {
 	emptyArr := make([]string, 0, 0)
 	if s == nil {
 		return emptyArr

@@ -687,3 +687,7 @@ func (cr *ClickHouseInstallation) IsZero() bool {
 func (cr *ClickHouseInstallation) IsNonZero() bool {
 	return cr != nil
 }
+
+func (cr *ClickHouseInstallation) NamespaceName() (string, string) {
+	return util.NamespaceName(cr)
+}

@@ -1,26 +1,26 @@
 # Template Parameters:
 #
-# KIND=ClickHouseInstallation
-# SINGULAR=clickhouseinstallation
-# PLURAL=clickhouseinstallations
-# SHORT=chi
-# OPERATOR_VERSION=0.24.3
+# KIND=ClickHouseInstallationTemplate
+# SINGULAR=clickhouseinstallationtemplate
+# PLURAL=clickhouseinstallationtemplates
+# SHORT=chit
+# OPERATOR_VERSION=0.24.2
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: clickhouseinstallations.clickhouse.altinity.com
+  name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.3
+    clickhouse.altinity.com/chop: 0.24.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
   names:
-    kind: ClickHouseInstallation
-    singular: clickhouseinstallation
-    plural: clickhouseinstallations
+    kind: ClickHouseInstallationTemplate
+    singular: clickhouseinstallationtemplate
+    plural: clickhouseinstallationtemplates
     shortNames:
-      - chi
+      - chit
   versions:
     - name: v1
       served: true
@@ -92,11 +92,6 @@ spec:
           description: Age of the resource
           # Displayed in all priorities
           jsonPath: .metadata.creationTimestamp
-        - name: suspend
-          type: string
-          description: Suspend reconciliation
-          # Displayed in all priorities
-          jsonPath: .spec.suspend
       subresources:
         status: {}
       schema:
@@ -313,13 +308,6 @@ spec:
                   enum:
                     - ""
                     - "RollingUpdate"
-                suspend:
-                  !!merge <<: *TypeStringBool
-                  description: |
-                    Suspend reconciliation of resources managed by a ClickHouse Installation.
-                    Works as the following:
-                     - When `suspend` is `true` operator stops reconciling all resources.
-                     - When `suspend` is `false` or not set, operator reconciles all resources.
                 troubleshoot:
                   !!merge <<: *TypeStringBool
                   description: |

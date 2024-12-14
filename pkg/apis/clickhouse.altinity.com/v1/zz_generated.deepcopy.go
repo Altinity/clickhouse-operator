@@ -305,6 +305,11 @@ func (in *ChiSpec) DeepCopyInto(out *ChiSpec) {
 		*out = new(types.StringBool)
 		**out = **in
 	}
+	if in.Suspend != nil {
+		in, out := &in.Suspend, &out.Suspend
+		*out = new(types.StringBool)
+		**out = **in
+	}
 	if in.NamespaceDomainPattern != nil {
 		in, out := &in.NamespaceDomainPattern, &out.NamespaceDomainPattern
 		*out = new(types.String)

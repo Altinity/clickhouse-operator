@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.24.2
+# OPERATOR_VERSION=0.24.3
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -92,6 +92,11 @@ spec:
           description: Age of the resource
           # Displayed in all priorities
           jsonPath: .metadata.creationTimestamp
+        - name: suspend
+          type: string
+          description: Suspend reconciliation
+          # Displayed in all priorities
+          jsonPath: .spec.suspend
       subresources:
         status: {}
       schema:
@@ -308,6 +313,13 @@ spec:
                   enum:
                     - ""
                     - "RollingUpdate"
+                suspend:
+                  <<: *TypeStringBool
+                  description: |
+                    Suspend reconciliation of resources managed by a ClickHouse Installation.
+                    Works as the following:
+                     - When `suspend` is `true` operator stops reconciling all resources.
+                     - When `suspend` is `false` or not set, operator reconciles all resources.
                 troubleshoot:
                   <<: *TypeStringBool
                   description: |
@@ -1284,14 +1296,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.24.2
+# OPERATOR_VERSION=0.24.3
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1372,6 +1384,11 @@ spec:
           description: Age of the resource
           # Displayed in all priorities
           jsonPath: .metadata.creationTimestamp
+        - name: suspend
+          type: string
+          description: Suspend reconciliation
+          # Displayed in all priorities
+          jsonPath: .spec.suspend
       subresources:
         status: {}
       schema:
@@ -1588,6 +1605,13 @@ spec:
                   enum:
                     - ""
                     - "RollingUpdate"
+                suspend:
+                  <<: *TypeStringBool
+                  description: |
+                    Suspend reconciliation of resources managed by a ClickHouse Installation.
+                    Works as the following:
+                     - When `suspend` is `true` operator stops reconciling all resources.
+                     - When `suspend` is `false` or not set, operator reconciles all resources.
                 troubleshoot:
                   <<: *TypeStringBool
                   description: |
@@ -2567,7 +2591,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -3016,14 +3040,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.24.2
+# OPERATOR_VERSION=0.24.3
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.24.2
+    clickhouse-keeper.altinity.com/chop: 0.24.3
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -3104,6 +3128,11 @@ spec:
           description: Age of the resource
           # Displayed in all priorities
           jsonPath: .metadata.creationTimestamp
+        - name: suspend
+          type: string
+          description: Suspend reconciliation
+          # Displayed in all priorities
+          jsonPath: .spec.suspend
       subresources:
         status: {}
       schema:
@@ -3312,6 +3341,13 @@ spec:
                     - "disabled"
                     - "Enabled"
                     - "enabled"
+                suspend:
+                  <<: *TypeStringBool
+                  description: |
+                    Suspend reconciliation of resources managed by a ClickHouse Keeper.
+                    Works as the following:
+                     - When `suspend` is `true` operator stops reconciling all keeper resources.
+                     - When `suspend` is `false` or not set, operator reconciles all keeper resources.
                 namespaceDomainPattern:
                   type: string
                   description: |
@@ -3867,7 +3903,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
 ---
 # Template Parameters:
 #
@@ -3893,7 +3929,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
 rules:
 
   #
@@ -4112,7 +4148,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -4134,7 +4170,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -4557,7 +4593,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 data:
 ---
@@ -4573,7 +4609,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -4672,7 +4708,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -4772,7 +4808,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -4835,7 +4871,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 data:
 ---
@@ -4851,7 +4887,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -4883,18 +4919,6 @@ data:
             <level>information</level>
         </logger>
         <max_connections>4096</max_connections>
-        <openSSL>
-            <server>
-                <cacheSessions>true</cacheSessions>
-                <certificateFile>/etc/clickhouse-keeper/server.crt</certificateFile>
-                <dhParamsFile>/etc/clickhouse-keeper/dhparam.pem</dhParamsFile>
-                <disableProtocols>sslv2,sslv3</disableProtocols>
-                <loadDefaultCAFile>true</loadDefaultCAFile>
-                <preferServerCiphers>true</preferServerCiphers>
-                <privateKeyFile>/etc/clickhouse-keeper/server.key</privateKeyFile>
-                <verificationMode>none</verificationMode>
-            </server>
-        </openSSL>
     </clickhouse>
 
   01-keeper-02-readiness.xml: |
@@ -4941,7 +4965,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 data:
   readme: |
@@ -4959,7 +4983,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 data:
 ---
@@ -4967,7 +4991,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=kube-system
 #   COMMENT=
-#   OPERATOR_VERSION=0.24.2
+#   OPERATOR_VERSION=0.24.3
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -4977,7 +5001,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -4988,9 +5012,9 @@ stringData:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.24.2
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.24.3
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.24.2
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.24.3
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -5001,7 +5025,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -5049,7 +5073,7 @@ spec:
             name: etc-keeper-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.24.2
+          image: altinity/clickhouse-operator:0.24.3
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5125,7 +5149,7 @@ spec:
               name: metrics
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.24.2
+          image: altinity/metrics-exporter:0.24.3
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5216,7 +5240,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
     app: clickhouse-operator
 spec:
   ports:
