@@ -624,7 +624,7 @@ def test_010(self):
         delete_test_namespace()
 
 @TestScenario
-@Name("test_010_1. Test zookeeper initialization AFTER starting a cluster")
+@Name("test_010_1# Test zookeeper initialization AFTER starting a cluster")
 def test_010_1(self):
     create_shell_namespace_clickhouse_template()
     chi = "test-010-zkroot"
@@ -5087,7 +5087,7 @@ def check_replication(chi, replicas, token, table = ''):
                 assert out == f"{token}", error()
 
 @TestScenario
-@Name("test_053. Check that stadnard Kubernetes annotations are ignored if set to statefulset externally")
+@Name("test_053# Check that stadnard Kubernetes annotations are ignored if set to statefulset externally")
 @Tags("NO_PARALLEL")
 def test_053(self):
     version_from = "0.23.7"
