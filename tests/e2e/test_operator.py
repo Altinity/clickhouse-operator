@@ -5085,7 +5085,7 @@ def check_replication(chi, replicas, token, table = ''):
                 assert out == f"{token}", error()
 
 @TestScenario
-@Name("test_053. Check that stadnard Kubernetes annotations are ignored if set to statefulset externally")
+@Name("test_053. Check that standard Kubernetes annotations are ignored if set to StatefulSet externally")
 @Tags("NO_PARALLEL")
 def test_053(self):
     version_from = "0.23.7"
@@ -5121,6 +5121,7 @@ def test_053(self):
             assert kubectl.get_field("statefulset", sts, ".spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt") != "<none>"
 
         start_time = kubectl.get_field("pod", pod, ".status.startTime")
+
         def check_restart():
             with Then("ClickHouse pods should not be restarted during operator's restart"):
                 new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
@@ -5151,7 +5152,6 @@ def test_053(self):
             kubectl.wait_chi_status(chi, "Completed")
 
             check_restart()
-
 
     with Finally("I clean up"):
         delete_test_namespace()
