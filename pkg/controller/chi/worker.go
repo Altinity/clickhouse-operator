@@ -327,6 +327,14 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 		return nil
 	}
 
+	if new != nil {
+		n, err := w.c.kube.CR().Get(ctx, new.GetNamespace(), new.GetName())
+		if err != nil {
+			return err
+		}
+		new = n.(*api.ClickHouseInstallation)
+	}
+
 	if w.deleteCHI(ctx, old, new) {
 		// CHI is being deleted
 		return nil
