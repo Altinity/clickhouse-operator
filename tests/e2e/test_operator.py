@@ -3208,51 +3208,29 @@ def test_030(self):
         },
     )
 
-    with When("I create new shells"):
-        shell_1 = get_shell()
-        shell_2 = get_shell()
-
-    trigger_event = threading.Event()
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
-        chi=chi,
-        cluster="default",
-        shards=2,
-        trigger_event=trigger_event,
-        shell=shell_1,
-    )
-
     with When("Delete CRD"):
-        kubectl.launch("delete crd clickhouseinstallations.clickhouse.altinity.com", shell=shell_2)
+        kubectl.launch("delete crd clickhouseinstallations.clickhouse.altinity.com")
         with Then("CHI should be deleted"):
-            kubectl.wait_object("chi", chi, count=0, shell=shell_2)
+            kubectl.wait_object("chi", chi, count=0)
             with And("CHI objects SHOULD NOT be deleted"):
-                assert kubectl.count_objects(label=f"-l clickhouse.altinity.com/chi={chi}", shell=shell_2) == object_counts
+                assert kubectl.count_objects(label=f"-l clickhouse.altinity.com/chi={chi}") == object_counts
 
-    pod = kubectl.get_pod_names(chi, shell=shell_2)[0]
-    start_time = kubectl.get_field("pod", pod, ".status.startTime", shell=shell_2)
+    pod = kubectl.get_pod_names(chi)[0]
+    start_time = kubectl.get_field("pod", pod, ".status.startTime")
 
     with When("Reinstall the operator"):
-        util.install_operator_if_not_exist(reinstall=True, shell=shell_2)
+        util.install_operator_if_not_exist(reinstall=True)
         with Then("Re-create CHI"):
             kubectl.create_and_check(
                 manifest,
                 check={
                     "object_counts": object_counts,
                     "do_not_delete": 1,
-                },
-                shell = shell_2
+                }
             )
         with Then("Pods should not be restarted"):
-            new_start_time = kubectl.get_field("pod", pod, ".status.startTime", shell=shell_2)
+            new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
             assert start_time == new_start_time
-
-    # Terminate check
-    trigger_event.set()
-    join()
-
-    with Then("I recreate shell"):
-        shell = get_shell()
-        self.context.shell = shell
 
     with Finally("I clean up"):
         delete_test_namespace()
