@@ -148,29 +148,32 @@ def test_006(self):
 
     old_version = "clickhouse/clickhouse-server:23.8"
     new_version = "clickhouse/clickhouse-server:24.3"
-    with Then("Create initial position"):
+    chi = "test-006"
+
+    with Then(f"Start CHI with version {old_version}"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-1.yaml",
             check={
-                "pod_count": 2,
+                "pod_count": 1,
                 "pod_image": old_version,
                 "do_not_delete": 1,
             },
         )
-    with Then("Use different podTemplate and confirm that pod image is updated"):
+    with Then(f"Use different podTemplate and confirm that pod image is updated to {new_version}"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-2.yaml",
             check={
-                "pod_count": 2,
+                "pod_count": 1,
                 "pod_image": new_version,
                 "do_not_delete": 1,
             },
         )
-    with Then("Change image in podTemplate itself and confirm that pod image is updated"):
+
+    with Then(f"Change image in podTemplate itself and confirm that pod image is updated back to {old_version}"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-3.yaml",
             check={
-                "pod_count": 2,
+                "pod_count": 1,
                 "pod_image": old_version,
             },
         )
@@ -5156,6 +5159,51 @@ def test_053(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+@TestScenario
+@Name("test_054. Test that 'suspend' mode delays any changes until unsuspended")
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0"))
+def test_054(self):
+    create_shell_namespace_clickhouse_template()
+    chi = yaml_manifest.get_name(util.get_full_path("manifests/chi/test-006-ch-upgrade-1.yaml"))
+
+    old_version = "clickhouse/clickhouse-server:23.8"
+    new_version = "clickhouse/clickhouse-server:24.3"
+    with Then(f"Start CHI with version {old_version}"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-006-ch-upgrade-1.yaml",
+            check={
+                "pod_count": 1,
+                "pod_image": old_version,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Add suspend attribute to CHI"):
+        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/suspend","value":"yes"}}]\''
+        kubectl.launch(cmd)
+
+    with Then(f"Update podTemplate to {new_version} and confirm that pod image is NOT updated"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-006-ch-upgrade-2.yaml",
+            check={
+                "pod_count": 1,
+                "pod_image": old_version,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Remove suspend attribute from CHI"):
+        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"remove","path":"/spec/suspend"}}]\''
+        kubectl.launch(cmd)
+
+    kubectl.wait_chi_status(chi, "InProgress")
+    kubectl.wait_chi_status(chi, "Completed")
+
+    with Then(f"Confirm that pod image is updated to {new_version}"):
+        kubectl.check_pod_image(chi, new_version)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 @TestModule
 @Name("e2e.test_operator")
