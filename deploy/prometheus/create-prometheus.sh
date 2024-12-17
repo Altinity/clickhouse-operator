@@ -1,12 +1,10 @@
 #!/bin/bash
 
 echo "External value for \$PROMETHEUS_NAMESPACE=$PROMETHEUS_NAMESPACE"
-echo "External value for \$OPERATOR_NAMESPACE=$OPERATOR_NAMESPACE"
 echo "External value for \$VALIDATE_YAML=$VALIDATE_YAML"
 
 export PROMETHEUS_NAMESPACE="${PROMETHEUS_NAMESPACE:-prometheus}"
-export OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
-export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-v0.68.0}"
+export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-v0.79.0}"
 export ALERT_MANAGER_EXTERNAL_URL="${ALERT_MANAGER_EXTERNAL_URL:-http://localhost:9093}"
 # Possible values for "validate yaml" are values from --validate=XXX kubectl option. They are true/false ATM
 export VALIDATE_YAML="${VALIDATE_YAML:-true}"
@@ -15,7 +13,6 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 echo "OPTIONS"
 echo "Setup Prometheus into \$PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} namespace"
-echo "Expecting operator in \$OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} namespace"
 echo "Validate .yaml file   \$VALIDATE_YAML=${VALIDATE_YAML}"
 echo ""
 echo "!!! IMPORTANT !!!"
