@@ -3191,12 +3191,15 @@ def test_029(self):
 
 
 @TestScenario
-@Name("test_030. Test CRD deletion")
+@Name("test_099. Test CRD deletion. Should be executed at the end")
 @Tags("NO_PARALLEL")
-def test_030(self):
+def test_099(self):
     create_shell_namespace_clickhouse_template()
 
-    manifest = "manifests/chi/test-030.yaml"
+    # delete existing chis if any in order to avoid side effects
+    cleanup_chis(self)
+
+    manifest = "manifests/chi/test-099.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     object_counts = {"statefulset": 2, "pod": 2, "service": 3}
 
@@ -3537,8 +3540,11 @@ def test_034(self):
 
     with And("Re-create operator pod in order to restart metrics exporter to update the configuration [1]"):
         util.restart_operator()
+        kubectl.wait_chi_status(chi, "Completed")
+
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
+
 
     with Then("check for `chi_clickhouse_metric_fetch_errors` is not zero"):
         check_metrics_monitoring(
@@ -5184,6 +5190,16 @@ def test_054(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+def cleanup_chis(self):
+    with Given("Cleanup CHIs"):
+        ns = kubectl.get("ns", name="", ns="--all-namespaces")
+        if "items" in ns:
+            for n in ns["items"]:
+                ns_name = n["metadata"]["name"]
+                if ns_name.startswith("test") and ns_name != self.context.test_namespace:
+                    with Then(f"Delete ns {ns_name}"):
+                        util.delete_namespace(namespace = ns_name, delete_chi=True)
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"),
@@ -5196,14 +5212,7 @@ def test(self):
         shell = get_shell()
         self.context.shell = shell
 
-    with Given("Cleanup CHIs"):
-        ns = kubectl.get("ns", name="", ns="--all-namespaces")
-        if "items" in ns:
-            for n in ns["items"]:
-                ns_name = n["metadata"]["name"]
-                if ns_name.startswith("test"):
-                    with Then(f"Delete ns {ns_name}"):
-                        util.delete_namespace(namespace = ns_name, delete_chi=True)
+    cleanup_chis(self)
 
     # Placeholder for selective test running
     # run_tests = [test_008, test_009]
