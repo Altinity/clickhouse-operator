@@ -271,7 +271,6 @@ def test_operator_restart(self, manifest, service, version=None):
         shell_1 = get_shell()
         shell_2 = get_shell()
         shell_3 = get_shell()
-        shell_4 = get_shell()
 
     Check("run query until receive stop event", test=run_select_query, parallel=True)(
         host=service,
@@ -307,15 +306,14 @@ def test_operator_restart(self, manifest, service, version=None):
             "pod": 2,
             "service": 3,
         },
-        pod=f"chi-{chi}-{cluster}-0-0-0",
-        shell=shell_4
+        pod=f"chi-{chi}-{cluster}-0-0-0"
     )
     trigger_event.set()
     join()
 
-    with Then("I recreate shell"):
-        shell = get_shell()
-        self.context.shell = shell
+    # with Then("I recreate shell"):
+    #    shell = get_shell()
+    #    self.context.shell = shell
 
     with Then("Local tables should have exactly the same number of rows"):
         cnt0 = clickhouse.query(chi, "select count() from test_local", host=f'chi-{chi}-{cluster}-0-0-0')
@@ -356,16 +354,18 @@ def check_remote_servers(self, chi, shards, trigger_event, shell=None, cluster="
         cluster = chi
 
     ok_runs = 0
-    while not trigger_event.is_set():
-        chi_shards = get_shards_from_remote_servers(chi, cluster, shell=shell)
+    with Then(f"Check remote_servers contains {shards} shards until receiving a stop event"):
+        while not trigger_event.is_set():
+            chi_shards = get_shards_from_remote_servers(chi, cluster, shell=shell)
 
-        if chi_shards != shards:
-            with Then(f"Number of shards in {cluster} cluster should be {shards} got {chi_shards} instead"):
-                assert chi_shards == shards
-        ok_runs += 1
-        time.sleep(1)
+            if chi_shards != shards:
+                with Then(f"Number of shards in {cluster} cluster should be {shards} got {chi_shards} instead"):
+                    assert chi_shards == shards
 
-    with By(f"remote_servers were always correct {ok_runs} times"):
+            ok_runs += 1
+            time.sleep(0.5)
+
+    with Then(f"remote_servers were always correct {ok_runs} times"):
         assert ok_runs > 0
 
 
@@ -464,9 +464,9 @@ def test_008_3(self):
     trigger_event.set()
     join()
 
-    with Then("I recreate shell"):
-        shell = get_shell()
-        self.context.shell = shell
+    # with Then("I recreate shell"):
+    #    shell = get_shell()
+    #    self.context.shell = shell
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -540,9 +540,9 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
     trigger_event.set()
     join()
 
-    with Then("I recreate shell"):
-        shell = get_shell()
-        self.context.shell = shell
+    # with Then("I recreate shell"):
+    #    shell = get_shell()
+    #    self.context.shell = shell
 
     with Then("Check that table is here"):
         tables = clickhouse.query(chi, "SHOW TABLES")
@@ -3307,19 +3307,19 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
 
     client_pod = "clickhouse-client"
 
-    try:
-
+    with When("fCreate {client_pod} pod"):
         kubectl.launch(f'run {client_pod} --image={current().context.clickhouse_version} -- /bin/sh -c "sleep 3600"', shell=shell)
         kubectl.wait_pod_status(client_pod, "Running", shell=shell)
 
-        ok = 0
-        partial = 0
-        errors = 0
-        run = 0
-        partial_runs = []
-        error_runs = []
+    ok = 0
+    partial = 0
+    errors = 0
+    run = 0
+    partial_runs = []
+    error_runs = []
 
-        cmd = f'exec -n {self.context.test_namespace} {client_pod} -- clickhouse-client --user={user} --password={password} -h {host} -q "{query}"'
+    cmd = f'exec -n {self.context.test_namespace} {client_pod} -- clickhouse-client --user={user} --password={password} -h {host} -q "{query}"'
+    with Then("Run select queries until receiving a stop event"):
         while not trigger_event.is_set():
             run += 1
             # Adjust time to glog's format
@@ -3338,7 +3338,8 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
                 print("*** RUN_QUERY ERROR ***")
                 print(cnt_test)
             time.sleep(0.5)
-        with By(
+
+    with Then(
             f"{run} queries have been executed, of which: " +
             f"{ok} queries have been executed with no errors, " +
             f"{partial} queries returned incomplete results, " +
@@ -3348,13 +3349,11 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
         ):
             assert errors == 0, error()
             if partial > 0:
-                print(
-                    f"*** WARNING ***: cluster was partially unavailable, {partial} queries returned incomplete results"
-                )
-    finally:
-        with Finally("I clean up"):
-            with By("deleting pod"):
-                kubectl.launch(f"delete pod {client_pod}", shell=shell)
+                print(f"*** WARNING ***: cluster was partially unavailable, {partial} queries returned incomplete results")
+
+    # with Finally("I clean up"): # can not cleanup, since threads may join already and shell may be unavailable
+    #    with By("deleting pod"):
+    #        kubectl.launch(f"delete pod {client_pod}", shell=shell)
 
 
 @TestCheck
@@ -3362,14 +3361,17 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
     """Run an insert query in parallel until the stop signal is received."""
 
     client_pod = "clickhouse-insert"
-    try:
+
+    with Then(f"Create {client_pod} pod"):
         kubectl.launch(f'run {client_pod} --image={current().context.clickhouse_version} -- /bin/sh -c "sleep 3600"', shell=shell)
         kubectl.wait_pod_status(client_pod, "Running", shell=shell)
 
-        ok = 0
-        errors = 0
+    ok = 0
+    errors = 0
 
-        cmd = f'exec -n {self.context.test_namespace} {client_pod} -- clickhouse-client --user={user} --password={password} -h {host} -q "{query}"'
+    cmd = f'exec -n {self.context.test_namespace} {client_pod} -- clickhouse-client --user={user} --password={password} -h {host} -q "{query}"'
+
+    with Then("Run insert queries until receiving a stop event"):
         while not trigger_event.is_set():
             res = kubectl.launch(cmd, ok_to_fail=True, shell=shell)
             if res == "":
@@ -3377,13 +3379,13 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
             else:
                 note(f"WTF res={res}")
                 errors += 1
-        with By(f"{ok} inserts have been executed with no errors, {errors} inserts have failed"):
-            assert errors == 0, error()
-    finally:
-        with Finally("I clean up"):
-            with By("deleting pod"):
-                kubectl.launch(f"delete pod {client_pod}", shell=shell)
+            time.sleep(0.5)
+    with Then(f"{ok} inserts have been executed with no errors, {errors} inserts have failed"):
+        assert errors == 0, error()
 
+    # with Finally("I clean up"): # can not cleanup, since threads may join already and shell may be unavailable
+    #    with By("deleting pod"):
+    #        kubectl.launch(f"delete pod {client_pod}", shell=shell)
 
 @TestScenario
 @Name("test_032. Test rolling update logic")
@@ -3484,9 +3486,9 @@ def test_032(self):
     trigger_event.set()
     join()
 
-    with Then("I recreate shell"):
-        shell = get_shell()
-        self.context.shell = shell
+    # with Then("I recreate shell"):
+    #    shell = get_shell()
+    #    self.context.shell = shell
 
     with Finally("I clean up"):
         delete_test_namespace()
