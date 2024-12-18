@@ -1290,7 +1290,7 @@ def get_shards_from_remote_servers(chi, cluster, shell=None):
 def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wait=False):
     with Given(f"Cluster {cluster} is properly configured"):
         if current().context.operator_version >= "0.24" and force_wait is False:
-            print(f"operator {current().context.operator_version} does not require extra wait, skipping check")
+            note(f"operator {current().context.operator_version} does not require extra wait, skipping check")
         else:
             with By(f"remote_servers have {num_shards} shards"):
                 assert num_shards == get_shards_from_remote_servers(chi, cluster)
@@ -4583,7 +4583,6 @@ def test_047(self):
     check that data not inserted into zero-weighted shard in distributed table."""
 
     create_shell_namespace_clickhouse_template()
-    util.require_keeper(keeper_type=self.context.keeper_type)
     manifest = f"manifests/chi/test-047-zero-weighted-shard.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
@@ -4595,24 +4594,32 @@ def test_047(self):
                 "do_not_delete": 1,
                 },
             )
+    wait_for_cluster(chi, cluster, 2, force_wait = True)
+
+    with Then("I check weight is specified in /etc/clickhouse-server/config.d/chop-generated-remote_servers.xml file"):
+        r = kubectl.launch(
+            f"""exec chi-{chi}-default-0-0-0 -- bash -c 'cat """
+            f"""/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml | head -n 7 | tail -n 1'"""
+        )
+        assert "<weight>0</weight>" in r
+        r = kubectl.launch(
+            f"""exec chi-{chi}-default-0-0-0 -- bash -c 'cat """
+            f"""/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml | head -n 16 | tail -n 1'"""
+            )
+        assert "<weight>1</weight>" in r
+
+
     numbers = 100
     with When("I create distributed table"):
-        create_table = """
-            CREATE TABLE test_local_047 ON CLUSTER 'default' (a UInt32)
-            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-            PARTITION BY tuple()
-            ORDER BY a
-            """.replace(
-            "\r", ""
-        ).replace(
-            "\n", ""
-        )
-        clickhouse.query(chi, create_table)
-        clickhouse.query(
-            chi,
-            "CREATE TABLE test_distr_047 ON CLUSTER 'default' AS test_local_047 "
-            "Engine = Distributed('default', default, test_local_047, a%2)",
-        )
+        for shard in (0,1):
+            clickhouse.query(
+                chi,
+                "CREATE TABLE test_local_047 (a UInt32) Engine = MergeTree PARTITION BY tuple() ORDER BY a",
+                host = f"chi-{chi}-{cluster}-{shard}-0-0")
+            clickhouse.query(
+                chi,
+                "CREATE TABLE test_distr_047 AS test_local_047 Engine = Distributed('default', default, test_local_047, a%2)",
+                host = f"chi-{chi}-{cluster}-{shard}-0-0")
 
     with And("I insert data in the distributed table"):
         clickhouse.query(chi, f"INSERT INTO test_distr_047 select * from numbers({numbers})")
@@ -4626,18 +4633,6 @@ def test_047(self):
         assert out == f"{numbers}"
         out = clickhouse.query(chi, "SELECT count(*) from test_distr_047", host=f"chi-{chi}-{cluster}-1-0-0")
         assert out == f"{numbers}"
-
-    with Then("I check weight is specified in /etc/clickhouse-server/config.d/chop-generated-remote_servers.xml file"):
-        r = kubectl.launch(
-            f"""exec chi-{chi}-default-0-0-0 -- bash -c 'cat """
-            f"""/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml | head -n 7 | tail -n 1'"""
-        )
-        assert "<weight>0</weight>" in r
-        r = kubectl.launch(
-            f"""exec chi-{chi}-default-0-0-0 -- bash -c 'cat """
-            f"""/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml | head -n 16 | tail -n 1'"""
-            )
-        assert "<weight>1</weight>" in r
 
     with Finally("I clean up"):
         delete_test_namespace()
