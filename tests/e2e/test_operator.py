@@ -1597,9 +1597,18 @@ def test_014_0(self):
                 )
                 assert out == "1"
 
-    with When("Restart keeper pod"):
-        with Then("Delete Zookeeper pod"):
-            kubectl.launch(f"delete pod {self.context.keeper_type}-0")
+    with When("Restart (Zoo)Keeper pod"):
+        if self.context.keeper_type == "zookeeper":
+            keeper_pod = "zookeeper-0"
+        elif self.context.keeper_type == "clickhouse-keeper":
+            keeper_pod = "clickhouse-keeper-0"
+        elif self.context.keeper_type == "chk":
+            keeper_pod = "chk-clickhouse-keeper-test-0-0-0"
+        else:
+            error(f"Unsupported Keeper type {self.context.keeper_type}")
+
+        with Then("Delete (Zoo)Keeper pod"):
+            kubectl.launch(f"delete pod {keeper_pod}")
             time.sleep(1)
 
         with Then(f"try insert into the table while {self.context.keeper_type} offline table should be in readonly mode"):
@@ -1607,8 +1616,8 @@ def test_014_0(self):
             assert "Table is in readonly mode" in out
 
         with Then(f"Wait for {self.context.keeper_type} pod to come back"):
-            kubectl.wait_object("pod", f"{self.context.keeper_type}-0")
-            kubectl.wait_pod_status(f"{self.context.keeper_type}-0", "Running")
+            kubectl.wait_object("pod", keeper_pod)
+            kubectl.wait_pod_status(keeper_pod, "Running")
 
         with Then(f"Wait for ClickHouse to reconnect to {self.context.keeper_type} and switch from read-write mode"):
             util.wait_clickhouse_no_readonly_replicas(chi)
@@ -1663,7 +1672,7 @@ def test_014_0(self):
                 "do_not_delete": 1,
             },
         )
-        with Then("Tables are deleted in ZooKeeper"):
+        with Then("Tables are deleted in (Zoo)Keeper"):
             out = clickhouse.query_with_error(
                 chi_name,
                 f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{cluster}/tables/0/default'",
