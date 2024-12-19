@@ -368,6 +368,7 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.HostsCompletedCount = true
 		opts.Copy.HostsDeletedCount = true
 		opts.Copy.HostsDeleteCount = true
+		opts.Copy.HostsWithTablesCreated = true
 		opts.Copy.Pods = true
 		opts.Copy.PodIPs = true
 		opts.Copy.FQDNs = true
@@ -403,6 +404,7 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.HostsCompletedCount = true
 		opts.Copy.HostsDeletedCount = true
 		opts.Copy.HostsDeleteCount = true
+		opts.Copy.HostsWithTablesCreated = true
 		opts.Copy.Pods = true
 		opts.Copy.PodIPs = true
 		opts.Copy.FQDNs = true
