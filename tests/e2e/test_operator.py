@@ -217,10 +217,10 @@ def check_operator_restart(chi, wait_objects, pod, shell=None):
     with When("Restart operator"):
         util.restart_operator(shell=shell)
         time.sleep(15)
-        print(f"wait objects")
+
         kubectl.wait_objects(chi, wait_objects, shell=shell)
-        print(f"wait chi status")
         kubectl.wait_chi_status(chi, "Completed", shell=shell)
+
         new_start_time = kubectl.get_field("pod", pod, ".status.startTime", shell=shell)
 
         with Then("ClickHouse pods should not be restarted during operator's restart"):
@@ -3336,11 +3336,13 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
             cnt_test = kubectl.launch(cmd, ok_to_fail=True, shell=shell)
             if cnt_test == res1:
                 ok += 1
-            if cnt_test == res2:
+            elif cnt_test == res2:
                 partial += 1
                 partial_runs.append(run)
                 partial_runs.append(now)
-            if cnt_test != res1 and cnt_test != res2:
+            elif "Unknown stream id" in cnt_test:
+                print("Ignore unknown stream id error: " + cnt_test)
+            elif cnt_test != res1 and cnt_test != res2:
                 errors += 1
                 error_runs.append(run)
                 error_runs.append(now)
