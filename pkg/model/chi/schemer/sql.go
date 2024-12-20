@@ -246,10 +246,9 @@ func (s *ClusterSchemer) sqlVersion() string {
 }
 
 func (s *ClusterSchemer) sqlHostInCluster(cluster string) string {
-	// TODO: Change throwIf to select count() query to avoid exception in operator and ClickHouse logs
 	return heredoc.Docf(`
 		SELECT
-			throwIf(count()=0)
+			count()
 		FROM
 			system.clusters
 		WHERE
