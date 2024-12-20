@@ -13,7 +13,7 @@ spec:
           fsGroup: 101
         containers:
         - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:24.8.5.115
+          image: clickhouse/clickhouse-server:24.8.8.17
           ports:
           - name: http
             containerPort: 8123
