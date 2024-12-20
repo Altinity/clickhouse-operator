@@ -130,9 +130,9 @@ func (s *ClusterSchemer) HostDropTables(ctx context.Context, host *api.Host) err
 // IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
 func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *api.Host) bool {
 	inside := false
-	SQLs := []string{s.sqlHostInCluster()}
+	sql := s.sqlHostInCluster(host.Runtime.Address.ClusterName)
 	opts := clickhouse.NewQueryOptions().SetSilent(true)
-	err := s.ExecHost(ctx, host, SQLs, opts)
+	err := s.ExecHost(ctx, host, []string{sql}, opts)
 	if err == nil {
 		log.V(1).M(host).F().Info("The host %s is inside the cluster", host.GetName())
 		inside = true
