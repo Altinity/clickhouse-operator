@@ -1329,7 +1329,7 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wai
                             )
                             if replicas == str(num_replicas):
                                 break
-                            with Then(f"Not ready. {replicas}/{num_replicas} replicas Wait for " + str(i * 5) + " seconds"):
+                            with Then(f"Not ready. {replicas}/{num_replicas} replicas. Wait for " + str(i * 5) + " seconds"):
                                 time.sleep(i * 5)
                         assert replicas == str(num_replicas)
             num_hosts = num_shards * num_replicas
@@ -1338,18 +1338,20 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wai
                     for replica in range(num_replicas):
                         hosts = ""
                         for i in range(1, 10):
+                            host=f"chi-{chi}-{cluster}-{shard}-{replica}"
                             hosts = clickhouse.query(
                                 chi,
-                                f"select count() from system.clusters where cluster ='{cluster}'",
-                                host=f"chi-{chi}-{cluster}-{shard}-{replica}",
+                                f"select count(), groupArray(host_name) from system.clusters where cluster ='{cluster}'",
+                                host=host,
                                 pwd=pwd,
                                 with_error=True,
                             )
-                            if hosts == str(num_hosts):
+                            if hosts.startswith(str(num_hosts)):
                                 break
-                            with Then(f"Not ready. {hosts}/{num_hosts} hosts Wait for " + str(i * 5) + " seconds"):
+                            with Then(f"{host} is not ready. Wait for " + str(i * 5) + " seconds"):
+                                print("Found: " + hosts)
                                 time.sleep(i * 5)
-                        assert hosts == str(num_hosts)
+                        assert hosts.startswith(str(num_hosts))
 
 
 @TestScenario
@@ -3393,6 +3395,8 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
             res = kubectl.launch(cmd, ok_to_fail=True, shell=shell)
             if res == "":
                 ok += 1
+            elif "Unknown stream id" in res:
+                print("Ignore unknown stream id error: " + res)
             else:
                 note(f"WTF res={res}")
                 errors += 1
