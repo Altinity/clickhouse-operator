@@ -19,10 +19,10 @@ spec:
                 <disks>
                     <s3_disk>
                         <type>s3</type>
-                        <endpoint>https://sample-bucket.s3.us-east-2.amazonaws.com/s3_disk/{replica}</endpoint>
+                        <endpoint>https://sample-bucket.s3.amazonaws.com/s3_disk/{replica}</endpoint>
                         <access_key_id>your_access_key_id</access_key_id>
                         <secret_access_key>your_secret_access_key</secret_access_key>
-                        <region></region>
+                        <region>us-east-2</region>
                         <metadata_path>/var/lib/clickhouse/disks/s3_disk/</metadata_path>
                     </s3_disk>
                     <s3_cache>
