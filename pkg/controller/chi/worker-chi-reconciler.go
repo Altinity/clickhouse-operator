@@ -53,14 +53,6 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		return nil
 	}
 
-	if new != nil {
-		n, err := w.c.kube.CR().Get(ctx, new.GetNamespace(), new.GetName())
-		if err != nil {
-			return err
-		}
-		new = n.(*api.ClickHouseInstallation)
-	}
-
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
@@ -725,19 +717,21 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 // reconcileHostPrepare reconciles specified ClickHouse host
 func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error {
 	// Check whether ClickHouse is running and accessible and what version is available
-	if version, err := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true}); err == nil {
-		w.a.V(1).
-			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
-			WithAction(host.GetCR()).
-			M(host).F().
-			Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
-	} else {
-		w.a.V(1).
-			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
-			WithAction(host.GetCR()).
-			M(host).F().
-			Warning("Reconcile Host start. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
-	}
+
+	// alz 18.12.2024: Host may be down or not accessible, so no reason to wait
+	//	if version, err := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true}); err == nil {
+	//		w.a.V(1).
+	//			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
+	//			WithAction(host.GetCR()).
+	//			M(host).F().
+	//			Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
+	//	} else {
+	//		w.a.V(1).
+	//			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
+	//			WithAction(host.GetCR()).
+	//			M(host).F().
+	//			Warning("Reconcile Host start. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
+	//	}
 
 	if w.excludeHost(ctx, host) {
 		// Need to wait to complete queries only in case host is excluded from the cluster

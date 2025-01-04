@@ -22,7 +22,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 )
 
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
@@ -246,16 +245,15 @@ func (s *ClusterSchemer) sqlVersion() string {
 	return `SELECT version()`
 }
 
-func (s *ClusterSchemer) sqlHostInCluster() string {
-	// TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
+func (s *ClusterSchemer) sqlHostInCluster(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
-			throwIf(count()=0)
+			count()
 		FROM
 			system.clusters
 		WHERE
 			cluster='%s' AND is_local
 		`,
-		config.AllShardsOneReplicaClusterName,
+		cluster,
 	)
 }

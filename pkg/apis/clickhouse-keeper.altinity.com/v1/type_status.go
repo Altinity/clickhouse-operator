@@ -330,14 +330,12 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.TaskIDsCompleted = true
 		opts.Copy.Actions = true
 		opts.Copy.Errors = true
-		opts.Copy.HostsWithTablesCreated = true
 		opts.Copy.UsedTemplates = true
 	}
 
 	if opts.FieldGroupActions {
 		opts.Copy.Action = true
 		opts.Merge.Actions = true
-		opts.Copy.HostsWithTablesCreated = true
 		opts.Copy.UsedTemplates = true
 	}
 

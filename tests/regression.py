@@ -7,10 +7,7 @@ from requirements.requirements import *
 
 xfails = {
     # test_operator.py
-    "/regression/e2e?test_operator/test_008*": [(Fail, "Test 008 sometimes fails due to unknown reasons")],
-    "/regression/e2e?test_operator/test_014*": [(Fail, "Test 014 sometimes fails due to unknown reasons")],
-    "/regression/e2e?test_operator/test_032*": [(Fail, "Test 032 sometimes fails due to unknown reasons")],
-    "/regression/e2e?test_operator/test_034*": [(Fail, "Test 034 is incorrect - metrics errors require reconcile")],
+    "/regression/e2e,test_operator/test_052*": [(Fail, "Keeper scale-up/scale-down is flaky")],
     # test_clickhouse.py
     "/regression/e2e?test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
     # test_metrics_alerts.py

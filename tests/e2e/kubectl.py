@@ -203,6 +203,9 @@ def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None):
     out = launch(f"get {kind} {name} {label} -o json", ns=ns, ok_to_fail=ok_to_fail, shell=shell)
     return json.loads(out.strip())
 
+def get_chi_normalizedCompleted(chi, ns=None, shell=None):
+    chi_storage = get("configmap", f"chi-storage-{chi}", ns=ns)
+    return json.loads(chi_storage["data"]["status-normalizedCompleted"])
 
 def create_ns(ns):
     if ns is None:

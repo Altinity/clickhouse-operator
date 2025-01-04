@@ -50,11 +50,10 @@ spec:
       type: string
       description: Resource status
       JSONPath: .status.status
-    - name: hosts-unchanged
+    - name: hosts-completed
       type: integer
-      description: Unchanged hosts count
-      priority: 1 # show in wide view
-      JSONPath: .status.hostsUnchanged
+      description: Completed hosts count
+      JSONPath: .status.hostsCompleted
     - name: hosts-updated
       type: integer
       description: Updated hosts count
@@ -65,20 +64,11 @@ spec:
       description: Added hosts count
       priority: 1 # show in wide view
       JSONPath: .status.hostsAdded
-    - name: hosts-completed
-      type: integer
-      description: Completed hosts count
-      JSONPath: .status.hostsCompleted
     - name: hosts-deleted
       type: integer
       description: Hosts deleted count
       priority: 1 # show in wide view
       JSONPath: .status.hostsDeleted
-    - name: hosts-delete
-      type: integer
-      description: Hosts to be deleted count
-      priority: 1 # show in wide view
-      JSONPath: .status.hostsDelete
     - name: endpoint
       type: string
       description: Client access endpoint
@@ -1332,11 +1322,10 @@ spec:
       type: string
       description: Resource status
       JSONPath: .status.status
-    - name: hosts-unchanged
+    - name: hosts-completed
       type: integer
-      description: Unchanged hosts count
-      priority: 1 # show in wide view
-      JSONPath: .status.hostsUnchanged
+      description: Completed hosts count
+      JSONPath: .status.hostsCompleted
     - name: hosts-updated
       type: integer
       description: Updated hosts count
@@ -1347,20 +1336,11 @@ spec:
       description: Added hosts count
       priority: 1 # show in wide view
       JSONPath: .status.hostsAdded
-    - name: hosts-completed
-      type: integer
-      description: Completed hosts count
-      JSONPath: .status.hostsCompleted
     - name: hosts-deleted
       type: integer
       description: Hosts deleted count
       priority: 1 # show in wide view
       JSONPath: .status.hostsDeleted
-    - name: hosts-delete
-      type: integer
-      description: Hosts to be deleted count
-      priority: 1 # show in wide view
-      JSONPath: .status.hostsDelete
     - name: endpoint
       type: string
       description: Client access endpoint
@@ -3869,7 +3849,6 @@ metadata:
   namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.24.3
-
 # Template Parameters:
 #
 # NAMESPACE=${OPERATOR_NAMESPACE}
