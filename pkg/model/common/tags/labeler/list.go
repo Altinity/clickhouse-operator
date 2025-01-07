@@ -33,6 +33,7 @@ const (
 	LabelReplicaName                 = "APIGroupName" + "/" + "replica"
 	LabelConfigMap                   = "APIGroupName" + "/" + "ConfigMap"
 	LabelConfigMapValueCRCommon      = "CRCommon"
+	LabelConfigMapValueCRStorage      = "CRStorage"
 	LabelConfigMapValueCRCommonUsers = "CRCommonUsers"
 	LabelConfigMapValueHost          = "Host"
 	LabelService                     = "APIGroupName" + "/" + "Service"
