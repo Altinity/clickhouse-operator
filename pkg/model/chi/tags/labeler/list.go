@@ -39,6 +39,7 @@ var list = types.List{
 	labeler.LabelReplicaName:                 clickhouse_altinity_com.APIGroupName + "/" + "replica",
 	labeler.LabelConfigMap:                   clickhouse_altinity_com.APIGroupName + "/" + "ConfigMap",
 	labeler.LabelConfigMapValueCRCommon:      "ChiCommon",
+	labeler.LabelConfigMapValueCRStorage:      "ChiStorage",
 	labeler.LabelConfigMapValueCRCommonUsers: "ChiCommonUsers",
 	labeler.LabelConfigMapValueHost:          "Host",
 	labeler.LabelService:                     clickhouse_altinity_com.APIGroupName + "/" + "Service",
