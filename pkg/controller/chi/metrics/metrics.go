@@ -53,86 +53,72 @@ type Metrics struct {
 }
 
 func createMetrics() *Metrics {
+	m := &Metrics{}
 	// The unit u should be defined using the appropriate [UCUM](https://ucum.org) case-sensitive code.
-	CHIReconcilesStarted, _ := operator.Meter().Int64Counter(
+	m.CHIReconcilesStarted, _ = operator.Meter().Int64Counter(
 		"clickhouse_operator_chi_reconciles_started",
 		metric.WithDescription("number of CHI reconciles started"),
 		metric.WithUnit("items"),
 	)
-	CHIReconcilesCompleted, _ := operator.Meter().Int64Counter(
+	m.CHIReconcilesCompleted, _ = operator.Meter().Int64Counter(
 		"clickhouse_operator_chi_reconciles_completed",
 		metric.WithDescription("number of CHI reconciles completed successfully"),
 		metric.WithUnit("items"),
 	)
-	CHIReconcilesAborted, _ := operator.Meter().Int64Counter(
+	m.CHIReconcilesAborted, _ = operator.Meter().Int64Counter(
 		"clickhouse_operator_chi_reconciles_aborted",
 		metric.WithDescription("number of CHI reconciles aborted"),
 		metric.WithUnit("items"),
 	)
-	CHIReconcilesTimings, _ := operator.Meter().Float64Histogram(
+	m.CHIReconcilesTimings, _ = operator.Meter().Float64Histogram(
 		"clickhouse_operator_chi_reconciles_timings",
 		metric.WithDescription("timings of CHI reconciles completed successfully"),
 		metric.WithUnit("s"),
 	)
 
-	HostReconcilesStarted, _ := operator.Meter().Int64Counter(
+	m.HostReconcilesStarted, _ = operator.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_started",
 		metric.WithDescription("number of host reconciles started"),
 		metric.WithUnit("items"),
 	)
-	HostReconcilesCompleted, _ := operator.Meter().Int64Counter(
+	m.HostReconcilesCompleted, _ = operator.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_completed",
 		metric.WithDescription("number of host reconciles completed successfully"),
 		metric.WithUnit("items"),
 	)
-	HostReconcilesRestarts, _ := operator.Meter().Int64Counter(
+	m.HostReconcilesRestarts, _ = operator.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_restarts",
 		metric.WithDescription("number of host restarts during reconciles"),
 		metric.WithUnit("items"),
 	)
-	HostReconcilesErrors, _ := operator.Meter().Int64Counter(
+	m.HostReconcilesErrors, _ = operator.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_errors",
 		metric.WithDescription("number of host reconciles errors"),
 		metric.WithUnit("items"),
 	)
-	HostReconcilesTimings, _ := operator.Meter().Float64Histogram(
+	m.HostReconcilesTimings, _ = operator.Meter().Float64Histogram(
 		"clickhouse_operator_host_reconciles_timings",
 		metric.WithDescription("timings of host reconciles completed successfully"),
 		metric.WithUnit("s"),
 	)
 
-	PodAddEvents, _ := operator.Meter().Int64Counter(
+	m.PodAddEvents, _ = operator.Meter().Int64Counter(
 		"clickhouse_operator_pod_add_events",
 		metric.WithDescription("number PodAdd events"),
 		metric.WithUnit("items"),
 	)
-	PodUpdateEvents, _ := operator.Meter().Int64Counter(
+	m.PodUpdateEvents, _ = operator.Meter().Int64Counter(
 		"clickhouse_operator_pod_update_events",
 		metric.WithDescription("number PodUpdate events"),
 		metric.WithUnit("items"),
 	)
-	PodDeleteEvents, _ := operator.Meter().Int64Counter(
+	m.PodDeleteEvents, _ = operator.Meter().Int64Counter(
 		"clickhouse_operator_pod_delete_events",
 		metric.WithDescription("number PodDelete events"),
 		metric.WithUnit("items"),
 	)
 
-	return &Metrics{
-		CHIReconcilesStarted:   CHIReconcilesStarted,
-		CHIReconcilesCompleted: CHIReconcilesCompleted,
-		CHIReconcilesAborted:   CHIReconcilesAborted,
-		CHIReconcilesTimings:   CHIReconcilesTimings,
-
-		HostReconcilesStarted:   HostReconcilesStarted,
-		HostReconcilesCompleted: HostReconcilesCompleted,
-		HostReconcilesRestarts:  HostReconcilesRestarts,
-		HostReconcilesErrors:    HostReconcilesErrors,
-		HostReconcilesTimings:   HostReconcilesTimings,
-
-		PodAddEvents:    PodAddEvents,
-		PodUpdateEvents: PodUpdateEvents,
-		PodDeleteEvents: PodDeleteEvents,
-	}
+	return m
 }
 
 var m *Metrics
@@ -191,7 +177,7 @@ func HostReconcilesTimings(ctx context.Context, src labelsSource, seconds float6
 func PodAdd(ctx context.Context) {
 	ensureMetrics().PodAddEvents.Add(ctx, 1)
 }
-func metricsPodUpdate(ctx context.Context) {
+func PodUpdate(ctx context.Context) {
 	ensureMetrics().PodUpdateEvents.Add(ctx, 1)
 }
 func PodDelete(ctx context.Context) {
