@@ -28,21 +28,21 @@ func GetLabelsFromSource(src labelsSource) (labels map[string]string) {
 	)
 }
 
-func getLabelsFromName(chi labelsSource) map[string]string {
+func getLabelsFromName(src labelsSource) map[string]string {
 	return map[string]string{
-		"chi":       chi.GetName(),
-		"namespace": chi.GetNamespace(),
+		"chi":       src.GetName(),
+		"namespace": src.GetNamespace(),
 	}
 }
 
-func getLabelsFromLabels(chi labelsSource) map[string]string {
-	return chi.GetLabels()
+func getLabelsFromLabels(src labelsSource) map[string]string {
+	return src.GetLabels()
 }
 
-func getLabelsFromAnnotations(chi labelsSource) map[string]string {
+func getLabelsFromAnnotations(src labelsSource) map[string]string {
 	// Exclude skipped annotations
 	return util.CopyMapFilter(
-		chi.GetAnnotations(),
+		src.GetAnnotations(),
 		nil,
 		util.ListSkippedAnnotations(),
 	)
