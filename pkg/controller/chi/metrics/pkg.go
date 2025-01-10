@@ -16,6 +16,9 @@ package metrics
 
 import (
 	"context"
+	"sync"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func CHIInitZeroValues(ctx context.Context, src labelsSource) {
@@ -59,4 +62,39 @@ func PodUpdate(ctx context.Context) {
 }
 func PodDelete(ctx context.Context) {
 	podDelete(ctx)
+}
+
+var r = map[string]bool{}
+var mx = sync.Mutex{}
+
+func CHIRegister(ctx context.Context, src labelsSource) {
+	mx.Lock()
+	defer mx.Unlock()
+
+	if registered, found := r[createRegistryKey(src)]; found && registered {
+		// Already registered
+		return
+	}
+
+	// Need to register
+	r[createRegistryKey(src)] = true
+	chiRegister(ctx, src)
+}
+
+func CHIUnregister(ctx context.Context, src labelsSource) {
+	mx.Lock()
+	defer mx.Unlock()
+
+	if registered, found := r[createRegistryKey(src)]; !registered || !found {
+		// Already unregistered
+		return
+	}
+
+	// Need to unregister
+	r[createRegistryKey(src)] = false
+	chiUnregister(ctx, src)
+}
+
+func createRegistryKey(src labelsSource) string {
+	return util.NamespaceNameString(src)
 }
