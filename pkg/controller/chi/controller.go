@@ -131,7 +131,7 @@ func NewController(
 // initQueues
 func (c *Controller) initQueues() {
 	for i := 0; i < c.getQueuesNum(); i++ {
-		c.queues = append(c.queues,	c.createQueue())
+		c.queues = append(c.queues, c.createQueue())
 	}
 }
 
