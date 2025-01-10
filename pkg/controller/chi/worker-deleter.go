@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -247,6 +248,8 @@ func (w *worker) discoveryAndDeleteCR(ctx context.Context, cr api.ICustomResourc
 		log.V(2).Info("task is done")
 		return nil
 	}
+
+	metrics.CHIUnregister(ctx, cr)
 
 	objs := w.c.discovery(ctx, cr)
 	if objs.NumStatefulSet() > 0 {
