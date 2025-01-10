@@ -34,6 +34,8 @@ type Metrics struct {
 	CHIReconcilesAborted metric.Int64Counter
 	// CHIReconcilesTimings is a histogram of durations of successfully completed CHI reconciles
 	CHIReconcilesTimings metric.Float64Histogram
+	// CHI is a number (counter) of available CHIs
+	CHI metric.Int64UpDownCounter
 
 	// HostReconcilesStarted is a number (counter) of started host reconciles
 	HostReconcilesStarted metric.Int64Counter
@@ -74,6 +76,11 @@ func createMetrics() *Metrics {
 		"clickhouse_operator_chi_reconciles_timings",
 		metric.WithDescription("timings of CHI reconciles completed successfully"),
 		metric.WithUnit("s"),
+	)
+	m.CHI, _ = operator.Meter().Int64UpDownCounter(
+		"clickhouse_operator_chi",
+		metric.WithDescription("number of CHI available"),
+		metric.WithUnit("items"),
 	)
 
 	m.HostReconcilesStarted, _ = operator.Meter().Int64Counter(
@@ -156,6 +163,12 @@ func chiReconcilesAborted(ctx context.Context, src labelsSource) {
 }
 func chiReconcilesTimings(ctx context.Context, src labelsSource, seconds float64) {
 	ensureMetrics().CHIReconcilesTimings.Record(ctx, seconds, labels(src))
+}
+func chiRegister(ctx context.Context, src labelsSource) {
+	ensureMetrics().CHI.Add(ctx, 1, labels(src))
+}
+func chiUnregister(ctx context.Context, src labelsSource) {
+	ensureMetrics().CHI.Add(ctx, -1, labels(src))
 }
 
 func hostReconcilesStarted(ctx context.Context, src labelsSource) {
