@@ -16,22 +16,26 @@ package util
 
 import (
 	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
+type iNamespaceName interface {
+	GetNamespace() string
+	GetName() string
+}
+
 // NamespaceName returns namespace and anme from the meta
-func NamespaceName(meta meta.Object) (string, string) {
+func NamespaceName(meta iNamespaceName) (string, string) {
 	return meta.GetNamespace(), meta.GetName()
 }
 
 // NamespaceNameString returns namespace and name as one string
-func NamespaceNameString(meta meta.Object) string {
+func NamespaceNameString(meta iNamespaceName) string {
 	return meta.GetNamespace() + "/" + meta.GetName()
 }
 
 // NamespacedName returns NamespacedName from obj
-func NamespacedName(obj meta.Object) types.NamespacedName {
+func NamespacedName(obj iNamespaceName) types.NamespacedName {
 	return types.NamespacedName{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
