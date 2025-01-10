@@ -71,7 +71,7 @@ type Controller struct {
 	extClient  apiExtensions.Interface
 	chopClient chopClientSet.Interface
 
-	// queues used to organize events queue processed by operator
+	// queues used to organize events queue processed by the operator
 	queues []queue.PriorityQueue
 	// not used explicitly
 	recorder record.EventRecorder
@@ -130,17 +130,21 @@ func NewController(
 
 // initQueues
 func (c *Controller) initQueues() {
-	queuesNum := chop.Config().Reconcile.Runtime.ReconcileCHIsThreadsNumber + api.DefaultReconcileSystemThreadsNumber
-	for i := 0; i < queuesNum; i++ {
-		c.queues = append(
-			c.queues,
-			queue.New(),
-			//workqueue.NewNamedRateLimitingQueue(
-			//	workqueue.DefaultControllerRateLimiter(),
-			//	fmt.Sprintf("chi%d", i),
-			//),
-		)
+	for i := 0; i < c.getQueuesNum(); i++ {
+		c.queues = append(c.queues,	c.createQueue())
 	}
+}
+
+func (c *Controller) getQueuesNum() int {
+	return chop.Config().Reconcile.Runtime.ReconcileCHIsThreadsNumber + api.DefaultReconcileSystemThreadsNumber
+}
+
+func (c *Controller) createQueue() queue.PriorityQueue {
+	return queue.New()
+	//workqueue.NewNamedRateLimitingQueue(
+	//	workqueue.DefaultControllerRateLimiter(),
+	//	fmt.Sprintf("chi%d", i),
+	//),
 }
 
 func (c *Controller) addEventHandlersCHI(
