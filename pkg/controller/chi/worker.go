@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"errors"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -335,8 +336,11 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 		new = n.(*api.ClickHouseInstallation)
 	}
 
+	metrics.CHIRegister(ctx, new)
+
 	if w.deleteCHI(ctx, old, new) {
 		// CHI is being deleted
+		metrics.CHIUnregister(ctx, new)
 		return nil
 	}
 
