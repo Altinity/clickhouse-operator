@@ -130,11 +130,11 @@ func ensureMetrics() *Metrics {
 	return m
 }
 
-// CHIInitZeroValues initializes all metrics for CHI to zero values if not already present with appropriate labels
+// chiInitZeroValues initializes all metrics for CHI to zero values if not already present with appropriate labels
 //
 // This is due to `rate` prometheus function limitation where it expects the metric to be 0-initialized with all possible labels
 // and doesn't default to 0 if the metric is not present.
-func CHIInitZeroValues(ctx context.Context, src labelsSource) {
+func chiInitZeroValues(ctx context.Context, src labelsSource) {
 	ensureMetrics().CHIReconcilesStarted.Add(ctx, 0, labels(src))
 	ensureMetrics().CHIReconcilesCompleted.Add(ctx, 0, labels(src))
 	ensureMetrics().CHIReconcilesAborted.Add(ctx, 0, labels(src))
@@ -145,41 +145,41 @@ func CHIInitZeroValues(ctx context.Context, src labelsSource) {
 	ensureMetrics().HostReconcilesErrors.Add(ctx, 0, labels(src))
 }
 
-func CHIReconcilesStarted(ctx context.Context, src labelsSource) {
+func chiReconcilesStarted(ctx context.Context, src labelsSource) {
 	ensureMetrics().CHIReconcilesStarted.Add(ctx, 1, labels(src))
 }
-func CHIReconcilesCompleted(ctx context.Context, src labelsSource) {
+func chiReconcilesCompleted(ctx context.Context, src labelsSource) {
 	ensureMetrics().CHIReconcilesCompleted.Add(ctx, 1, labels(src))
 }
-func CHIReconcilesAborted(ctx context.Context, src labelsSource) {
+func chiReconcilesAborted(ctx context.Context, src labelsSource) {
 	ensureMetrics().CHIReconcilesAborted.Add(ctx, 1, labels(src))
 }
-func CHIReconcilesTimings(ctx context.Context, src labelsSource, seconds float64) {
+func chiReconcilesTimings(ctx context.Context, src labelsSource, seconds float64) {
 	ensureMetrics().CHIReconcilesTimings.Record(ctx, seconds, labels(src))
 }
 
-func HostReconcilesStarted(ctx context.Context, src labelsSource) {
+func hostReconcilesStarted(ctx context.Context, src labelsSource) {
 	ensureMetrics().HostReconcilesStarted.Add(ctx, 1, labels(src))
 }
-func HostReconcilesCompleted(ctx context.Context, src labelsSource) {
+func hostReconcilesCompleted(ctx context.Context, src labelsSource) {
 	ensureMetrics().HostReconcilesCompleted.Add(ctx, 1, labels(src))
 }
-func HostReconcilesRestart(ctx context.Context, src labelsSource) {
+func hostReconcilesRestart(ctx context.Context, src labelsSource) {
 	ensureMetrics().HostReconcilesRestarts.Add(ctx, 1, labels(src))
 }
-func HostReconcilesErrors(ctx context.Context, src labelsSource) {
+func hostReconcilesErrors(ctx context.Context, src labelsSource) {
 	ensureMetrics().HostReconcilesErrors.Add(ctx, 1, labels(src))
 }
-func HostReconcilesTimings(ctx context.Context, src labelsSource, seconds float64) {
+func hostReconcilesTimings(ctx context.Context, src labelsSource, seconds float64) {
 	ensureMetrics().HostReconcilesTimings.Record(ctx, seconds, labels(src))
 }
 
-func PodAdd(ctx context.Context) {
+func podAdd(ctx context.Context) {
 	ensureMetrics().PodAddEvents.Add(ctx, 1)
 }
-func PodUpdate(ctx context.Context) {
+func podUpdate(ctx context.Context) {
 	ensureMetrics().PodUpdateEvents.Add(ctx, 1)
 }
-func PodDelete(ctx context.Context) {
+func podDelete(ctx context.Context) {
 	ensureMetrics().PodDeleteEvents.Add(ctx, 1)
 }
