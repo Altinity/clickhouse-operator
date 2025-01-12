@@ -188,4 +188,4 @@ def check_metrics_monitoring(
                 with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                     time.sleep(i * 5)
 
-        assert expected_pattern_found, error()
+        assert expected_pattern_found, error(out)

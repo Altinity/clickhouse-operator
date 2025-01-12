@@ -3029,7 +3029,6 @@ def test_027(self):
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0"))
 def test_028(self):
     create_shell_namespace_clickhouse_template()
-
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     manifest = "manifests/chi/test-028-replication.yaml"
@@ -3043,17 +3042,17 @@ def test_028(self):
                 "manifests/chit/tpl-persistent-volume-100Mi.yaml",
             },
             "object_counts": {
-                "statefulset": 4,
-                "pod": 4,
-                "service": 5,
+                "statefulset": 2,
+                "pod": 2,
+                "service": 3,
             },
             "do_not_delete": 1,
         },
     )
 
-    sql = """SET skip_unavailable_shards=1; SYSTEM DROP DNS CACHE; SELECT getMacro('replica') AS replica, uptime() AS uptime,
+    sql = """SELECT getMacro('replica') AS replica, uptime() AS uptime,
      (SELECT count() FROM system.clusters WHERE cluster='all-sharded') AS total_hosts,
-     (SELECT count() online_hosts FROM cluster('all-sharded', system.one) ) AS online_hosts
+     (SELECT count() online_hosts FROM cluster('all-sharded', system.one) settings skip_unavailable_shards=1 ) AS online_hosts
      FORMAT JSONEachRow"""
     note("Before restart")
     out = clickhouse.query_with_error(chi, sql)
@@ -3085,8 +3084,8 @@ def test_028(self):
                     ch2 = clickhouse.query_with_error(
                         chi,
                         sql,
-                        pod="chi-test-028-replication-default-1-0-0",
-                        host="chi-test-028-replication-default-1-0",
+                        pod="chi-test-028-replication-default-0-1-0",
+                        host="chi-test-028-replication-default-0-1",
                         advanced_params="--connect_timeout=1 --send_timeout=10 --receive_timeout=10",
                     )
 
@@ -3124,16 +3123,16 @@ def test_028(self):
         with Then("Clear RollingUpdate restart policy"):
             cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"remove\",\"path\":\"/spec/restart\"}}]'"
             kubectl.launch(cmd)
-            time.sleep(15)
+            kubectl.wait_chi_status(chi, "InProgress")
             kubectl.wait_chi_status(chi, "Completed")
 
         with Then("Restart operator. CHI should not be restarted"):
             check_operator_restart(
                 chi=chi,
                 wait_objects={
-                    "statefulset": 4,
-                    "pod": 4,
-                    "service": 5,
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
                 },
                 pod=f"chi-{chi}-default-0-0-0",
             )
@@ -3148,12 +3147,13 @@ def test_028(self):
     with When("Stop installation"):
         cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/stop","value":"yes"}}]\''
         kubectl.launch(cmd)
+        kubectl.wait_chi_status(chi, "InProgress")
         kubectl.wait_chi_status(chi, "Completed")
         with Then("Stateful sets should be there but no running pods"):
             kubectl.wait_objects(chi, {
-                "statefulset": 4,
+                "statefulset": 2,
                 "pod": 0,
-                "service": 4,
+                "service": 2,
             })
 
     with Finally("I clean up"):
@@ -4482,7 +4482,7 @@ def test_045_2(self):
     create_shell_namespace_clickhouse_template()
 
     with Given("I set spec.reconcile.host.wait.queries property"):
-        util.apply_operator_config("manifests/chopconf/test-045-chopconf.yaml")
+        util.apply_operator_config("manifests/chopconf/no-wait-queries.yaml")
 
     test_045(manifest=f"manifests/chi/test-045-2-wait-query-finish.yaml")
 
@@ -4492,6 +4492,9 @@ def test_045_2(self):
 def test_046(self):
     """Check that clickhouse-operator creates metrics for reconcile and other clickhouse-operator events."""
     create_shell_namespace_clickhouse_template()
+    with Given("I change operator statefullSet timeout"):
+        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
+
     cluster = "default"
     manifest = f"manifests/chi/test-046-0-clickhouse-operator-metrics.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
@@ -4517,7 +4520,14 @@ def test_046(self):
                     container="clickhouse-operator",
                     port="9999",
                     expect_pattern=metric_name,
+                    max_retries=3
                 )
+
+    with Then(f"Check clickhouse-operator exposes clickhouse_operator_chi metrics"):
+        check_metrics([
+            "clickhouse_operator_chi{.*chi=\"test-046-operator-metrics\".*} 1",
+        ])
+
 
     with Then(f"Check clickhouse-operator exposes clickhouse_operator_chi_reconciles_* metrics"):
         check_metrics([
@@ -4592,6 +4602,17 @@ def test_046(self):
             "clickhouse_operator_host_reconciles_errors.*chi=\"test-046-operator-metrics\".*",
             "clickhouse_operator_host_reconciles_timings.*chi=\"test-046-operator-metrics\".*",
             ])
+
+    with Then("Stop CHI"):
+        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/stop","value":"yes"}}]\''
+        kubectl.launch(cmd)
+        kubectl.wait_chi_status(chi, "InProgress")
+        kubectl.wait_chi_status(chi, "Completed")
+
+    with Then(f"Check clickhouse-operator exposes clickhouse_operator_chi metric for stopped chi"):
+        check_metrics([
+            "clickhouse_operator_chi{.*chi=\"test-046-operator-metrics\".*} 1",
+        ])
 
     with Finally("I clean up"):
         delete_test_namespace()
