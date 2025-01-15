@@ -25,6 +25,13 @@ Altinity Kubernetes Operator for ClickHouse creates, configures and manages Clic
 - ClickHouse version upgrades
 - Exporting ClickHouse metrics to Prometheus
 
+## Community
+
+The Altinity Kubernetes Operator for ClickHouse is a community effort sponsored by Altinity. The best way to reach us or ask questions is:
+
+* Join the [Altinity Slack](https://altinity.com/slack) - Chat with the developers and other users
+* Log an [issue on GitHub](https://github.com/Altinity/clickhouse-operator/issues) - Ask questions, log bugs and feature requests
+
 ## Requirements
 
  * Kubernetes 1.19+
