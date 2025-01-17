@@ -67,6 +67,21 @@ func (c *Pod) Get(params ...any) (*core.Pod, error) {
 	return c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }
 
+func (c *Pod) GetRestartCounters(params ...any) (map[string]int, error) {
+	pod, err := c.Get(params...)
+	if err != nil {
+		return nil, err
+	}
+	if len(pod.Status.ContainerStatuses) < 1 {
+		return nil, nil
+	}
+	res := map[string]int{}
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		res[containerStatus.Name] = int(containerStatus.RestartCount)
+	}
+	return res, nil
+}
+
 // GetAll gets all pods for provided entity
 func (c *Pod) GetAll(obj any) []*core.Pod {
 	switch typed := obj.(type) {
