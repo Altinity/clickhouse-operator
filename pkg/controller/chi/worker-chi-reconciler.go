@@ -326,7 +326,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	// In case we have to force-restart host
 	// We'll do it via replicas: 0 in StatefulSet.
 	if w.shouldForceRestartHost(host) {
-		w.a.V(1).M(host).F().Info("Reconcile host: %s. Shutting host down due to force restart", host.GetName())
+		w.a.V(1).M(host).F().Info("Reconcile host. Shutting down due to force restart: %s", host.GetName())
 		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.stsReconciler.ReconcileStatefulSet(ctx, host, false, opts)
 		metrics.HostReconcilesRestart(ctx, host.GetCR())
