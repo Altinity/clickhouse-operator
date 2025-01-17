@@ -753,13 +753,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		M(host).F().
 		Info("Reconcile PVCs and check possible data loss for host: %s", host.GetName())
 
-	if storage.ErrIsDataLoss(
-		storage.NewStorageReconciler(
-			w.task,
-			w.c.namer,
-			storage.NewStoragePVC(w.c.kube.Storage()),
-		).ReconcilePVCs(ctx, host, api.DesiredStatefulSet),
-	) {
+	if storage.ErrIsDataLoss(w.reconcilePVCs(ctx, host)) {
 		// In case of data loss detection on existing volumes, we need to:
 		// 1. recreate StatefulSet
 		// 2. run tables migration again
@@ -804,6 +798,14 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
 	return nil
+}
+
+func (w *worker) reconcilePVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {
+	return storage.NewStorageReconciler(
+		w.task,
+		w.c.namer,
+		storage.NewStoragePVC(w.c.kube.Storage()),
+	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 }
 
 // reconcileHostBootstrap reconciles specified ClickHouse host
