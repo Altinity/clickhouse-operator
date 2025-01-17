@@ -652,17 +652,6 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
 
-	//si := host.GetRuntime().GetAddress().GetShardIndex()
-	//ri := host.GetRuntime().GetAddress().GetReplicaIndex()
-	////sleep := util.DecBottomed(si, 1, 0)*(si % 3)*20
-	//sleep := (2 - si)*90
-	//if ri > 0 {
-	//	sleep = 0
-	//}
-	//w.a.V(1).Info("Host [%d/%d]. Going to sleep %d sec", si, ri, sleep)
-	//time.Sleep((time.Duration)(sleep)*time.Second)
-	//w.a.V(1).Info("Host [%d/%d]. Done to sleep %d sec", si, ri)
-
 	metrics.HostReconcilesStarted(ctx, host.GetCR())
 	startTime := time.Now()
 
