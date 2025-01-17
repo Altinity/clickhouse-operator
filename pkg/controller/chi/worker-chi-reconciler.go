@@ -735,8 +735,8 @@ func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error
 // reconcileHostMain reconciles specified ClickHouse host
 func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	var (
-		reconcileStatefulSetOpts *statefulset.ReconcileOptions
-		migrateTableOpts         *migrateTableOptions
+		stsReconcileOpts *statefulset.ReconcileOptions
+		migrateTableOpts *migrateTableOptions
 	)
 
 	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
@@ -752,6 +752,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	w.a.V(1).
 		M(host).F().
 		Info("Reconcile PVCs and check possible data loss for host: %s", host.GetName())
+
 	if storage.ErrIsDataLoss(
 		storage.NewStorageReconciler(
 			w.task,
@@ -762,7 +763,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		// In case of data loss detection on existing volumes, we need to:
 		// 1. recreate StatefulSet
 		// 2. run tables migration again
-		reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetForceRecreate()
+		stsReconcileOpts = stsReconcileOpts.SetForceRecreate()
 		migrateTableOpts = &migrateTableOptions{
 			forceMigrate: true,
 			dropReplica:  true,
@@ -772,7 +773,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Info("Data loss detected for host: %s. Will do force migrate", host.GetName())
 	}
 
-	if err := w.reconcileHostStatefulSet(ctx, host, reconcileStatefulSetOpts); err != nil {
+	if err := w.reconcileHostStatefulSet(ctx, host, stsReconcileOpts); err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
