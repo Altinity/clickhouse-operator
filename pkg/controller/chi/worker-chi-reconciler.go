@@ -780,7 +780,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	_ = w.reconcileHostService(ctx, host)
 
 	// Prepare for tables migration.
-	// Sometimes service needs some time to start after creation|modification before being accessible for usage
+	// Sometimes service needs significant time to start after creation/modification before being accessible for usage
 	// Check whether ClickHouse is running and accessible and what version is available.
 	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
 		w.a.V(1).
