@@ -269,3 +269,21 @@ func MapMigrate(cur, new, old map[string]string) map[string]string {
 	removed := MapGetSortedKeys(SubtractStringMaps(CopyMap(old), new))
 	return MapDeleteKeys(MergeStringMapsPreserve(new, cur), removed...)
 }
+
+func MapsAreTheSame(m1, m2 map[string]int) bool {
+	if len(m1) != len(m2) {
+		return false
+	}
+
+	for k1, v1 := range m1 {
+		v2, found := m2[k1]
+		if !found {
+			return false
+		}
+		if v1 != v2 {
+			return false
+		}
+	}
+
+	return true
+}
