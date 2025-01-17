@@ -775,11 +775,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		return err
 	}
 	// Polish all new volumes that operator has to create
-	_ = storage.NewStorageReconciler(
-		w.task,
-		w.c.namer,
-		storage.NewStoragePVC(w.c.kube.Storage()),
-	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+	_ = w.reconcilePVCs(ctx, host)
 
 	_ = w.reconcileHostService(ctx, host)
 
