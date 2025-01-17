@@ -753,7 +753,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		M(host).F().
 		Info("Reconcile PVCs and check possible data loss for host: %s", host.GetName())
 
-	if storage.ErrIsDataLoss(w.reconcilePVCs(ctx, host)) {
+	if storage.ErrIsDataLoss(w.reconcileHostPVCs(ctx, host)) {
 		// In case of data loss detection on existing volumes, we need to:
 		// 1. recreate StatefulSet
 		// 2. run tables migration again
@@ -775,7 +775,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		return err
 	}
 	// Polish all new volumes that operator has to create
-	_ = w.reconcilePVCs(ctx, host)
+	_ = w.reconcileHostPVCs(ctx, host)
 
 	_ = w.reconcileHostService(ctx, host)
 
@@ -796,7 +796,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	return nil
 }
 
-func (w *worker) reconcilePVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {
+func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {
 	return storage.NewStorageReconciler(
 		w.task,
 		w.c.namer,
