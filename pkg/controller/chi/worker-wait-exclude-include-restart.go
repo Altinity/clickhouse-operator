@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -352,5 +353,16 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.Host) er
 	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
 		n, _ := w.ensureClusterSchemer(host).HostActiveQueriesNum(ctx, host)
 		return n <= 1
+	})
+}
+
+// waitHostRestart
+func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, start map[string]int) error {
+	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
+		cur, _ := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
+		if !util.MapsAreTheSame(start, cur) {
+			return false
+		}
+		return true
 	})
 }
