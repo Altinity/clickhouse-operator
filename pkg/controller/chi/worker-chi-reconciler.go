@@ -372,10 +372,16 @@ func (w *worker) hostSoftwareRestart( ctx context.Context,  host *api.Host) erro
 		w.a.V(1).M(host).F().Info("Host software restart abort 1. Host: %s err: %v", host.GetName(), err)
 		return err
 	}
-	...
-	err = w.waitHostRestart(ctx, host, restarts)
+
+	err = w.ensureClusterSchemer(host).HostClickHouseRestart(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 2. Host: %s err: %v", host.GetName(), err)
+		return err
+	}
+
+	err = w.waitHostRestart(ctx, host, restarts)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 3. Host: %s err: %v", host.GetName(), err)
 		return err
 	}
 
