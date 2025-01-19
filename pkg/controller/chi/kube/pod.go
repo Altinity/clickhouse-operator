@@ -16,7 +16,6 @@ package kube
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -25,6 +24,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
 type Pod struct {
