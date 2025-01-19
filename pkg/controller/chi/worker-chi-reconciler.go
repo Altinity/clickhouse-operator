@@ -743,15 +743,13 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
-			Warning("Reconcile Host interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
+			Warning("Reconcile Host Main interrupted with an error 1. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
 	w.setHasData(host)
 
-	w.a.V(1).
-		M(host).F().
-		Info("Reconcile PVCs and check possible data loss for host: %s", host.GetName())
+	w.a.V(1).M(host).F().Info("Reconcile PVCs and data loss for host: %s", host.GetName())
 
 	if storage.ErrIsDataLoss(w.reconcileHostPVCs(ctx, host)) {
 		stsReconcileOpts, migrateTableOpts = w.reconcileHostPVCsDataLossDetected(host)
@@ -764,7 +762,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
-			Warning("Reconcile Host interrupted with an error 3. Host: %s Err: %v", host.GetName(), err)
+			Warning("Reconcile Host Main interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
