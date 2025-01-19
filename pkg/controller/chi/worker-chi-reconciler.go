@@ -323,15 +323,10 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
 
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), version)
-	// In case we have to force-restart host
-	// We'll do it via replicas: 0 in StatefulSet.
+
+	// Start with force-restart host
 	if w.shouldForceRestartHost(host) {
-		w.a.V(1).M(host).F().Info("Reconcile host. Shutting down due to force restart: %s", host.GetName())
-		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
-		_ = w.stsReconciler.ReconcileStatefulSet(ctx, host, false, opts)
-		metrics.HostReconcilesRestart(ctx, host.GetCR())
-		// At this moment StatefulSet has 0 replicas.
-		// First stage of RollingUpdate completed.
+		_ = w.hostForceRestart(ctx, host, opts)
 	}
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
@@ -358,34 +353,47 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	return err
 }
 
-func (w *worker) hostForceRestart(ctx context.Context,  host *api.Host) error {
-	err := w.hostRestart(ctx, host)
-	if err != nil {
-		return err
+func (w *worker) hostForceRestart(ctx context.Context,  host *api.Host, opts *statefulset.ReconcileOptions) error {
+	w.a.V(1).M(host).F().Info("Reconcile host. Force restart: %s", host.GetName())
+
+	if w.hostSoftwareRestart(ctx, host) != nil {
+		_ = w.hostScaleDown(ctx, host, opts)
 	}
 
-	err =  w.hostScaleDown()
-	if err != nil {
-		return err
-	}
-
+	metrics.HostReconcilesRestart(ctx, host.GetCR())
 	return nil
 }
 
-func (w *worker) hostRestart( ctx context.Context,  host *api.Host) error {
+func (w *worker) hostSoftwareRestart( ctx context.Context,  host *api.Host) error {
+	w.a.V(1).M(host).F().Info("Reconcile host. Host software restart: %s", host.GetName())
+
 	restarts, err := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
 	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 1. Host: %s err: %v", host.GetName(), err)
 		return err
 	}
 	...
 	err = w.waitHostRestart(ctx, host, restarts)
 	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 2. Host: %s err: %v", host.GetName(), err)
 		return err
 	}
+
+	w.a.V(1).M(host).F().Info("Host software restart success. Host: %s", host.GetName())
 	return nil
 }
 
-func (w *worker) hostScaleDown() error {
+func (w *worker) hostScaleDown(ctx context.Context,  host *api.Host, opts *statefulset.ReconcileOptions) error {
+	w.a.V(1).M(host).F().Info("Reconcile host. Host shutdown via scale down: %s", host.GetName())
+
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
+	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, false, opts)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host shutdown abort 1. Host: %s err: %v", host.GetName(), err)
+		return err
+	}
+
+	w.a.V(1).M(host).F().Info("Host shutdown success. Host: %s", host.GetName())
 	return nil
 }
 
