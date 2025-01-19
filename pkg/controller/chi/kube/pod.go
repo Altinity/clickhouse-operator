@@ -16,6 +16,7 @@ package kube
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -72,14 +73,7 @@ func (c *Pod) GetRestartCounters(params ...any) (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(pod.Status.ContainerStatuses) < 1 {
-		return nil, nil
-	}
-	res := map[string]int{}
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		res[containerStatus.Name] = int(containerStatus.RestartCount)
-	}
-	return res, nil
+	return k8s.PodRestartCountersGet(pod), nil
 }
 
 // GetAll gets all pods for provided entity
