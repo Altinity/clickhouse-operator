@@ -358,6 +358,37 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	return err
 }
 
+func (w *worker) hostForceRestart(ctx context.Context,  host *api.Host) error {
+	err := w.hostRestart(ctx, host)
+	if err != nil {
+		return err
+	}
+
+	err =  w.hostScaleDown()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (w *worker) hostRestart( ctx context.Context,  host *api.Host) error {
+	restarts, err := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
+	if err != nil {
+		return err
+	}
+	...
+	err = w.waitHostRestart(ctx, host, restarts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (w *worker) hostScaleDown() error {
+	return nil
+}
+
 func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) string {
 	version, _ := w.getHostClickHouseVersion(
 		ctx,
