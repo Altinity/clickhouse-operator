@@ -774,11 +774,24 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Warning("Reconcile Host interrupted with an error 3. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
+
 	// Polish all new volumes that operator has to create
 	_ = w.reconcileHostPVCs(ctx, host)
-
 	_ = w.reconcileHostService(ctx, host)
+	_ = w.reconcileHostTables(ctx, host, migrateTableOpts)
 
+	return nil
+}
+
+func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {
+	return storage.NewStorageReconciler(
+		w.task,
+		w.c.namer,
+		storage.NewStoragePVC(w.c.kube.Storage()),
+	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+}
+
+func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, migrateTableOpts *migrateTableOptions) error {
 	// Prepare for tables migration.
 	// Sometimes service needs significant time to start after creation/modification before being accessible for usage
 	// Check whether ClickHouse is running and accessible and what version is available.
@@ -791,17 +804,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			M(host).F().
 			Warning("Check host for ClickHouse availability before migrating tables. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
 	}
-	_ = w.migrateTables(ctx, host, migrateTableOpts)
-
-	return nil
-}
-
-func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {
-	return storage.NewStorageReconciler(
-		w.task,
-		w.c.namer,
-		storage.NewStoragePVC(w.c.kube.Storage()),
-	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+	return w.migrateTables(ctx, host, migrateTableOpts)
 }
 
 // reconcileHostBootstrap reconciles specified ClickHouse host
