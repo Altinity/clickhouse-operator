@@ -686,20 +686,6 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	return nil
 }
 
-func (w *worker) reconcileHostPVCsDataLossDetected(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {
-	w.a.V(1).
-		M(host).F().
-		Info("Data loss detected for host: %s. Will do force data recovery", host.GetName())
-
-	// In case of data loss detection on existing volumes, we need to:
-	// 1. recreate StatefulSet
-	// 2. run tables migration again
-	return statefulset.NewReconcileStatefulSetOptions().SetForceRecreate(), &migrateTableOptions{
-		forceMigrate: true,
-		dropReplica:  true,
-	}
-}
-
 func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {
 	return storage.NewStorageReconciler(
 		w.task,
