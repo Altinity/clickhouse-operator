@@ -353,7 +353,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	return err
 }
 
-func (w *worker) hostForceRestart(ctx context.Context,  host *api.Host, opts *statefulset.ReconcileOptions) error {
+func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
 	w.a.V(1).M(host).F().Info("Reconcile host. Force restart: %s", host.GetName())
 
 	if w.hostSoftwareRestart(ctx, host) != nil {
@@ -364,7 +364,7 @@ func (w *worker) hostForceRestart(ctx context.Context,  host *api.Host, opts *st
 	return nil
 }
 
-func (w *worker) hostSoftwareRestart( ctx context.Context,  host *api.Host) error {
+func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error {
 	w.a.V(1).M(host).F().Info("Reconcile host. Host software restart: %s", host.GetName())
 
 	restarts, err := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
@@ -389,7 +389,7 @@ func (w *worker) hostSoftwareRestart( ctx context.Context,  host *api.Host) erro
 	return nil
 }
 
-func (w *worker) hostScaleDown(ctx context.Context,  host *api.Host, opts *statefulset.ReconcileOptions) error {
+func (w *worker) hostScaleDown(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
 	w.a.V(1).M(host).F().Info("Reconcile host. Host shutdown via scale down: %s", host.GetName())
 
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
