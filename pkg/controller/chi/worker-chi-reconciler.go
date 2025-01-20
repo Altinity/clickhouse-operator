@@ -373,7 +373,7 @@ func (w *worker) hostSoftwareRestart( ctx context.Context,  host *api.Host) erro
 		return err
 	}
 
-	err = w.ensureClusterSchemer(host).HostClickHouseRestart(ctx, host)
+	err = w.ensureClusterSchemer(host).HostShutdown(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 2. Host: %s err: %v", host.GetName(), err)
 		return err
