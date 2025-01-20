@@ -664,7 +664,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	w.a.V(1).M(host).F().Info("Reconcile PVCs and data loss for host: %s", host.GetName())
 
 	if storage.ErrIsDataLoss(w.reconcileHostPVCs(ctx, host)) {
-		stsReconcileOpts, migrateTableOpts = w.reconcileHostPVCsDataLossDetected(host)
+		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataLossDetected(host)
 		w.a.V(1).
 			M(host).F().
 			Info("Data loss detected for host: %s.", host.GetName())
