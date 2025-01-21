@@ -4023,10 +4023,17 @@ def test_039(self, step=0, delete_chi=0):
         with Then("Select in cluster with no secret should fail"):
             r = clickhouse.query_with_error(chi, "SELECT count(a) FROM secure_dist", pwd="qkrq")
             assert "AUTHENTICATION_FAILED" in r
+        with And("Select from all-sharded with no secret should fail"):
+            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one)", pwd="qkrq")
+            assert "AUTHENTICATION_FAILED" in r
     if step > 0:
         with Then("Select in cluster with secret should pass"):
             r = clickhouse.query(chi, "SELECT count() FROM secure_dist", pwd="qkrq")
             assert r == "10"
+        with And("Select from all-sharded with secret should pass"):
+            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one) limit 1", pwd="qkrq")
+            assert r == "0"
+
 
     if step == 4:
         with Then("Create replicated table to test interserver_https_port"):
