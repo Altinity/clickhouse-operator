@@ -1941,7 +1941,7 @@ def test_016(self):
 
     # test-016-settings-04.yaml
     with When("Add new custom4.xml config file"):
-        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-04.yaml",
             check={
@@ -1962,12 +1962,12 @@ def test_016(self):
             assert out == "test-custom4"
 
         with And("ClickHouse SHOULD BE restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
             assert start_time < new_start_time
 
     # test-016-settings-05.yaml
     with When("Add a change to an existing xml file"):
-        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-05.yaml",
             check={
@@ -1976,7 +1976,7 @@ def test_016(self):
         )
 
         with And("ClickHouse SHOULD BE restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
             assert start_time < new_start_time
 
         with And("Macro 'test' value should be changed"):
@@ -1988,7 +1988,7 @@ def test_016(self):
 
     # test-016-settings-06.yaml
     with When("Add I change a number of settings that does not requre a restart"):
-        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-06.yaml",
             check={
@@ -1997,7 +1997,7 @@ def test_016(self):
         )
 
         with And("ClickHouse SHOULD NOT BE restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
             assert start_time == new_start_time
 
     with Finally("I clean up"):
