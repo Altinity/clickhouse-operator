@@ -1987,7 +1987,7 @@ def test_016(self):
             assert out == "test-changed"
 
     # test-016-settings-06.yaml
-    with When("Add I change a number of settings that does not requre a restart"):
+    with When("Add I change a number of settings that does not require a restart"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-06.yaml",
