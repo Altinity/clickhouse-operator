@@ -17,7 +17,6 @@ package chi
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -363,7 +362,7 @@ func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *sta
 }
 
 func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error {
-	return fmt.Errorf("so be it")
+	//return fmt.Errorf("so be it")
 
 	w.a.V(1).M(host).F().Info("Reconcile host. Host software restart: %s", host.GetName())
 
