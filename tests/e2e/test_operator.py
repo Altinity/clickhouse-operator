@@ -3064,7 +3064,7 @@ def test_028(self):
             out = clickhouse.query_with_error(chi, "SELECT count(sleepEachRow(1)) FROM numbers(30) SETTINGS function_sleep_max_microseconds_per_block=0")
             assert out == "30"
 
-        pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
         with Then("Operator should start processing a change"):
             # TODO: Test needs to be improved
             kubectl.wait_chi_status(chi, "InProgress")
@@ -3101,7 +3101,7 @@ def test_028(self):
                     # print("Waiting 5 seconds")
                     time.sleep(5)
             end_time = time.time()
-            new_pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            new_pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
             print(f"Total restart time: {str(round(end_time - start_time))}")
             print(f"First replica downtime: {ch1_downtime}")
             print(f"Second replica downtime: {ch2_downtime}")
@@ -3117,7 +3117,7 @@ def test_028(self):
                 note("Restart is cleaned automatically")
             else:
                 note("Restart needs to be cleaned")
-                start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+                start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
 
         # We need to clear RollingUpdate restart policy because of new operator's IP address emerging sometimes
         with Then("Clear RollingUpdate restart policy"):
@@ -3139,7 +3139,7 @@ def test_028(self):
 
         with Then("Re-apply the original config. CHI should not be restarted"):
             kubectl.create_and_check(manifest=manifest, check={"do_not_delete": 1})
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
             print(f"old_start_time: {start_time}")
             print(f"new_start_time: {new_start_time}")
             assert start_time == new_start_time
