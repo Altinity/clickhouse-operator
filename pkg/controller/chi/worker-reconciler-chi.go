@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -353,7 +354,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
 	w.a.V(1).M(host).F().Info("Reconcile host. Force restart: %s", host.GetName())
 
-	if w.hostSoftwareRestart(ctx, host) != nil {
+	if host.IsStopped() || (w.hostSoftwareRestart(ctx, host) != nil) {
 		_ = w.hostScaleDown(ctx, host, opts)
 	}
 
@@ -362,9 +363,7 @@ func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *sta
 }
 
 func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error {
-	//return fmt.Errorf("so be it")
-
-	w.a.V(1).M(host).F().Info("Reconcile host. Host software restart: %s", host.GetName())
+	w.a.V(1).M(host).F().Info("Host software restart start. Host: %s", host.GetName())
 
 	restarts, err := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
 	if err != nil {
@@ -377,12 +376,54 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 		w.a.V(1).M(host).F().Info("Host software restart abort 2. Host: %s err: %v", host.GetName(), err)
 		return err
 	}
+	w.a.V(1).M(host).F().Info("Host software shutdown ok. Host: %s", host.GetName())
 
 	err = w.waitHostRestart(ctx, host, restarts)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 3. Host: %s err: %v", host.GetName(), err)
 		return err
 	}
+	w.a.V(1).M(host).F().Info("Host software restart ok. Host: %s", host.GetName())
+
+	err = w.waitHostIsStarted(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 4. Host: %s is not started", host.GetName())
+		return fmt.Errorf("host is not started")
+	}
+	w.a.V(1).M(host).F().Info("Host software pod is started. Host: %s ", host.GetName())
+
+	err = w.waitHostIsRunning(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 5. Host: %s is not running", host.GetName())
+		return fmt.Errorf("host is not running")
+	}
+	w.a.V(1).M(host).F().Info("Host software pod is running. Host: %s ", host.GetName())
+
+	err = w.waitHostIsReady(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 6. Host: %s is not ready", host.GetName())
+		return fmt.Errorf("host is not ready")
+	}
+	w.a.V(1).M(host).F().Info("Host software pod is ready. Host: %s ", host.GetName())
+
+	err = w.getHostSoftwareVersionErr(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 7. Host: %s err: %v", host.GetName(), err)
+		return err
+	}
+	w.a.V(1).M(host).F().Info("Host software version ok. Host: %s ", host.GetName())
+
+	if w.isPodCrushed(host) {
+		w.a.V(1).M(host).F().Info("Host software restart abort 8. Host: %s is crushed", host.GetName())
+		return fmt.Errorf("host is crushed")
+	}
+	w.a.V(1).M(host).F().Info("Host software is not crushed. Host: %s ", host.GetName())
+
+	if !w.isPodOK(host) {
+		w.a.V(1).M(host).F().Info("Host software restart abort 9. Host: %s is not ok", host.GetName())
+		return fmt.Errorf("host is not ok")
+	}
+	w.a.V(1).M(host).F().Info("Host software pod is ok. Host: %s ", host.GetName())
 
 	w.a.V(1).M(host).F().Info("Host software restart success. Host: %s", host.GetName())
 	return nil
