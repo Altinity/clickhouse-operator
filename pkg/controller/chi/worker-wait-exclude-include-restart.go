@@ -366,3 +366,33 @@ func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, start map[
 		return true
 	})
 }
+
+// waitHostIsReady
+func (w *worker) waitHostIsReady(ctx context.Context, host *api.Host) error {
+	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
+		if w.isPodReady(host) {
+			return false
+		}
+		return true
+	})
+}
+
+// waitHostIsStarted
+func (w *worker) waitHostIsStarted(ctx context.Context, host *api.Host) error {
+	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
+		if w.isPodStarted(host) {
+			return false
+		}
+		return true
+	})
+}
+
+// waitHostIsRunning
+func (w *worker) waitHostIsRunning(ctx context.Context, host *api.Host) error {
+	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
+		if w.isPodRunning(host) {
+			return false
+		}
+		return true
+	})
+}
