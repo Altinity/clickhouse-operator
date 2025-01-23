@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"errors"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -194,15 +195,36 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 }
 
 func (w *worker) isPodCrushed(host *api.Host) bool {
-	// pod.Status.ContainerStatuses[0].State.Waiting.Reason
 	if pod, err := w.c.kube.Pod().Get(host); err == nil {
-		if len(pod.Status.ContainerStatuses) > 0 {
-			if pod.Status.ContainerStatuses[0].State.Waiting != nil {
-				if pod.Status.ContainerStatuses[0].State.Waiting.Reason == "CrashLoopBackOff" {
-					return true
-				}
-			}
-		}
+		return k8s.PodHasCrushedContainers(pod)
+	}
+	return true
+}
+
+func (w *worker) isPodReady(host *api.Host) bool {
+	if pod, err := w.c.kube.Pod().Get(host); err == nil {
+		return !k8s.PodHasNotReadyContainers(pod)
+	}
+	return false
+}
+
+func (w *worker) isPodStarted(host *api.Host) bool {
+	if pod, err := w.c.kube.Pod().Get(host); err == nil {
+		return !k8s.PodHasNotStartedContainers(pod)
+	}
+	return false
+}
+
+func (w *worker) isPodRunning(host *api.Host) bool {
+	if pod, err := w.c.kube.Pod().Get(host); err == nil {
+		return k8s.PodPhaseIsRunning(pod)
+	}
+	return false
+}
+
+func (w *worker) isPodOK(host *api.Host) bool {
+	if pod, err := w.c.kube.Pod().Get(host); err == nil {
+		return k8s.IsPodOK(pod)
 	}
 	return false
 }
