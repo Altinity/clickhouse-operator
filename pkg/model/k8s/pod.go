@@ -31,3 +31,66 @@ func PodRestartCountersGet(pod *core.Pod) map[string]int {
 	}
 	return res
 }
+
+func PodHasCrushedContainers(pod *core.Pod) bool {
+	// pod.Status.ContainerStatuses[0].State.Waiting.Reason
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.State.Waiting != nil {
+			if containerStatus.State.Waiting.Reason == "CrashLoopBackOff" {
+				// Crashed
+				return true
+			}
+		}
+	}
+	// No crashed
+	return false
+}
+
+func PodHasNotReadyContainers(pod *core.Pod) bool {
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if !containerStatus.Ready  {
+			// Not ready
+			return true
+		}
+	}
+	// All are ready
+	return false
+}
+
+func PodHasNotStartedContainers(pod *core.Pod) bool {
+	res := true
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.Started != nil {
+			if *containerStatus.Started {
+				// Started
+				continue
+			}
+		}
+		// Not started
+		res = false
+	}
+	return res
+}
+
+func PodPhaseIsRunning(pod *core.Pod) bool {
+	return pod.Status.Phase == core.PodRunning
+}
+
+func IsPodOK(pod *core.Pod) bool {
+	if len(pod.Status.ContainerStatuses) < 1 {
+		return false
+	}
+	if PodHasCrushedContainers(pod) {
+		return false
+	}
+	if PodHasNotReadyContainers(pod) {
+		return false
+	}
+	if PodHasNotStartedContainers(pod) {
+		return false
+	}
+	if !PodPhaseIsRunning(pod) {
+		return false
+	}
+	return true
+}
