@@ -17,7 +17,6 @@ package chi
 import (
 	"context"
 	"errors"
-	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -47,6 +46,7 @@ import (
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/queue"

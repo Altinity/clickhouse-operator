@@ -48,7 +48,7 @@ func PodHasCrushedContainers(pod *core.Pod) bool {
 
 func PodHasNotReadyContainers(pod *core.Pod) bool {
 	for _, containerStatus := range pod.Status.ContainerStatuses {
-		if !containerStatus.Ready  {
+		if !containerStatus.Ready {
 			// Not ready
 			return true
 		}
