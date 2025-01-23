@@ -37,6 +37,20 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) str
 	return version
 }
 
+func (w *worker) getHostSoftwareVersionErr(ctx context.Context, host *api.Host) error {
+	version, err := w.getHostClickHouseVersion(
+		ctx,
+		host,
+		versionOptions{},
+	)
+	if err == nil {
+		w.a.V(1).M(host).F().Info("Host software version detected. Host: %s version: %s", host.GetName(), version)
+	} else {
+		w.a.V(1).M(host).F().Info("Host software version NOT detected. Host: %s Err: %v", host.GetName(), err)
+	}
+	return err
+}
+
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
 func (w *worker) getReconcileShardsWorkersNum(shards []*api.ChiShard, opts *common.ReconcileShardsAndHostsOptions) int {
 	availableWorkers := float64(chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber)
