@@ -234,6 +234,11 @@ func (w *worker) isPodRestarted(ctx context.Context, host *api.Host, start map[s
 	return !util.MapsAreTheSame(start, cur)
 }
 
+func (w *worker) doesHostHaveNoRunningQueries(ctx context.Context, host *api.Host) bool {
+	n, _ := w.ensureClusterSchemer(host).HostActiveQueriesNum(ctx, host)
+	return n <= 1
+}
+
 // normalize
 func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 	chi, err := w.normalizer.CreateTemplated(c, commonNormalizer.NewOptions())
