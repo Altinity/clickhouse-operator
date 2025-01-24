@@ -48,7 +48,7 @@ func Caller(skip string) (string, int, string) {
 	return "", 0, ""
 }
 
-// FunctionName returns name of thee calling function
+// FunctionName returns name of the calling function
 func FunctionName(fn interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
 }
