@@ -419,7 +419,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software is not crushed. Host: %s ", host.GetName())
 
-	if !w.isPodOK(host) {
+	if !w.isPodOK(ctx, host) {
 		w.a.V(1).M(host).F().Info("Host software restart abort 9. Host: %s is not ok", host.GetName())
 		return fmt.Errorf("host is not ok")
 	}
