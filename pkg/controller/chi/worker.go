@@ -201,28 +201,28 @@ func (w *worker) isPodCrushed(host *api.Host) bool {
 	return true
 }
 
-func (w *worker) isPodReady(host *api.Host) bool {
+func (w *worker) isPodReady(ctx context.Context, host *api.Host) bool {
 	if pod, err := w.c.kube.Pod().Get(host); err == nil {
 		return !k8s.PodHasNotReadyContainers(pod)
 	}
 	return false
 }
 
-func (w *worker) isPodStarted(host *api.Host) bool {
+func (w *worker) isPodStarted(ctx context.Context, host *api.Host) bool {
 	if pod, err := w.c.kube.Pod().Get(host); err == nil {
 		return !k8s.PodHasNotStartedContainers(pod)
 	}
 	return false
 }
 
-func (w *worker) isPodRunning(host *api.Host) bool {
+func (w *worker) isPodRunning(ctx context.Context, host *api.Host) bool {
 	if pod, err := w.c.kube.Pod().Get(host); err == nil {
 		return k8s.PodPhaseIsRunning(pod)
 	}
 	return false
 }
 
-func (w *worker) isPodOK(host *api.Host) bool {
+func (w *worker) isPodOK(ctx context.Context, host *api.Host) bool {
 	if pod, err := w.c.kube.Pod().Get(host); err == nil {
 		return k8s.IsPodOK(pod)
 	}
