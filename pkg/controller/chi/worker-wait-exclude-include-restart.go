@@ -22,7 +22,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -359,8 +358,7 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.Host) er
 // waitHostRestart
 func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, start map[string]int) error {
 	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
-		cur, _ := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
-		return !util.MapsAreTheSame(start, cur)
+		return w.isPodRestarted(ctx, host, start)
 	})
 }
 
