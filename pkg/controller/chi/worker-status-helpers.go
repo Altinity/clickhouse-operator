@@ -53,7 +53,7 @@ func (w *worker) isPodReady(ctx context.Context, host *api.Host) bool {
 
 func (w *worker) isPodStarted(ctx context.Context, host *api.Host) bool {
 	if pod, err := w.c.kube.Pod().Get(host); err == nil {
-		return !k8s.PodHasNotStartedContainers(pod)
+		return k8s.PodHasAllContainersStarted(pod)
 	}
 	return false
 }
