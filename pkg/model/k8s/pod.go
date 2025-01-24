@@ -57,19 +57,21 @@ func PodHasNotReadyContainers(pod *core.Pod) bool {
 	return false
 }
 
-func PodHasNotStartedContainers(pod *core.Pod) bool {
-	res := true
+func PodHasAllContainersStarted(pod *core.Pod) bool {
+	allStarted := true
 	for _, containerStatus := range pod.Status.ContainerStatuses {
-		if containerStatus.Started != nil {
-			if *containerStatus.Started {
-				// Started
-				continue
-			}
+		if (containerStatus.Started != nil) && (*containerStatus.Started) {
+			// Current container is started. no changes in all status
+		} else {
+			// Current container is NOT started
+			allStarted = false
 		}
-		// Not started
-		res = false
 	}
-	return res
+	return allStarted
+}
+
+func PodHasNotStartedContainers(pod *core.Pod) bool {
+	return !PodHasAllContainersStarted(pod)
 }
 
 func PodPhaseIsRunning(pod *core.Pod) bool {
