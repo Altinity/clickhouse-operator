@@ -349,10 +349,7 @@ func (w *worker) waitHostNotInCluster(ctx context.Context, host *api.Host) error
 
 // waitHostNoActiveQueries
 func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.Host) error {
-	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
-		n, _ := w.ensureClusterSchemer(host).HostActiveQueriesNum(ctx, host)
-		return n <= 1
-	})
+	return domain.PollHost(ctx, host, w.doesHostHaveNoRunningQueries)
 }
 
 // waitHostRestart
