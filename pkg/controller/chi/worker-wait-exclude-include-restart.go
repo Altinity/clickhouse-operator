@@ -360,39 +360,21 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.Host) er
 func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, start map[string]int) error {
 	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
 		cur, _ := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
-		if !util.MapsAreTheSame(start, cur) {
-			return false
-		}
-		return true
+		return !util.MapsAreTheSame(start, cur)
 	})
 }
 
 // waitHostIsReady
 func (w *worker) waitHostIsReady(ctx context.Context, host *api.Host) error {
-	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
-		if w.isPodReady(host) {
-			return false
-		}
-		return true
-	})
+	return domain.PollHost(ctx, host, w.isPodReady)
 }
 
 // waitHostIsStarted
 func (w *worker) waitHostIsStarted(ctx context.Context, host *api.Host) error {
-	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
-		if w.isPodStarted(host) {
-			return false
-		}
-		return true
-	})
+	return domain.PollHost(ctx, host, w.isPodStarted)
 }
 
 // waitHostIsRunning
 func (w *worker) waitHostIsRunning(ctx context.Context, host *api.Host) error {
-	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
-		if w.isPodRunning(host) {
-			return false
-		}
-		return true
-	})
+	return domain.PollHost(ctx, host, w.isPodRunning)
 }
