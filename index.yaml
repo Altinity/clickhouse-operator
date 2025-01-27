@@ -2,6 +2,28 @@ apiVersion: v1
 entries:
   altinity-clickhouse-operator:
   - apiVersion: v2
+    appVersion: 0.24.3
+    created: "2025-01-27T10:41:10.632587749Z"
+    description: 'Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).  The
+      ClickHouse Operator creates, configures and manages ClickHouse clusters running
+      on Kubernetes.  For upgrade please install CRDs separately: ```bash   kubectl
+      apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallations.clickhouse.altinity.com.yaml   kubectl
+      apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallationtemplates.clickhouse.altinity.com.yaml   kubectl
+      apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseoperatorconfigurations.clickhouse.altinity.com.yaml   kubectl
+      apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousekeeperinstallations.clickhouse-keeper.altinity.com.yaml
+      ```'
+    digest: 42e69144d97f512b91a9706e51a95bc300aae09a51692be54458d38d450db6ce
+    home: https://github.com/Altinity/clickhouse-operator
+    icon: https://logosandtypes.com/wp-content/uploads/2020/12/altinity.svg
+    maintainers:
+    - email: support@altinity.com
+      name: altinity
+    name: altinity-clickhouse-operator
+    type: application
+    urls:
+    - https://github.com/Altinity/clickhouse-operator/releases/download/release-0.24.3/altinity-clickhouse-operator-0.24.3.tgz
+    version: 0.24.3
+  - apiVersion: v2
     appVersion: 0.24.2
     created: "2024-12-06T15:15:08.388704318Z"
     description: 'Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).  The
@@ -420,4 +442,4 @@ entries:
     urls:
     - https://github.com/Altinity/clickhouse-operator/releases/download/release-0.20.1/altinity-clickhouse-operator-0.20.1.tgz
     version: 0.20.1
-generated: "2024-12-06T15:15:08.388856212Z"
+generated: "2025-01-27T10:41:10.632752828Z"
