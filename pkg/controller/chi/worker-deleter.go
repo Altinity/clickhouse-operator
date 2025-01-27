@@ -25,6 +25,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/model"
@@ -247,6 +248,8 @@ func (w *worker) discoveryAndDeleteCR(ctx context.Context, cr api.ICustomResourc
 		log.V(2).Info("task is done")
 		return nil
 	}
+
+	metrics.CHIUnregister(ctx, cr)
 
 	objs := w.c.discovery(ctx, cr)
 	if objs.NumStatefulSet() > 0 {

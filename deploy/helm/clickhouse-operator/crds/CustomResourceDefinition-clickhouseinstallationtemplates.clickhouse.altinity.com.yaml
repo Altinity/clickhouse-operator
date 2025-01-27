@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.24.2
+# OPERATOR_VERSION=0.24.3
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.2
+    clickhouse.altinity.com/chop: 0.24.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -53,11 +53,10 @@ spec:
           type: string
           description: Resource status
           jsonPath: .status.status
-        - name: hosts-unchanged
+        - name: hosts-completed
           type: integer
-          description: Unchanged hosts count
-          priority: 1 # show in wide view
-          jsonPath: .status.hostsUnchanged
+          description: Completed hosts count
+          jsonPath: .status.hostsCompleted
         - name: hosts-updated
           type: integer
           description: Updated hosts count
@@ -68,20 +67,11 @@ spec:
           description: Added hosts count
           priority: 1 # show in wide view
           jsonPath: .status.hostsAdded
-        - name: hosts-completed
-          type: integer
-          description: Completed hosts count
-          jsonPath: .status.hostsCompleted
         - name: hosts-deleted
           type: integer
           description: Hosts deleted count
           priority: 1 # show in wide view
           jsonPath: .status.hostsDeleted
-        - name: hosts-delete
-          type: integer
-          description: Hosts to be deleted count
-          priority: 1 # show in wide view
-          jsonPath: .status.hostsDelete
         - name: endpoint
           type: string
           description: Client access endpoint
@@ -92,6 +82,11 @@ spec:
           description: Age of the resource
           # Displayed in all priorities
           jsonPath: .metadata.creationTimestamp
+        - name: suspend
+          type: string
+          description: Suspend reconciliation
+          # Displayed in all priorities
+          jsonPath: .spec.suspend
       subresources:
         status: {}
       schema:
@@ -308,6 +303,13 @@ spec:
                   enum:
                     - ""
                     - "RollingUpdate"
+                suspend:
+                  !!merge <<: *TypeStringBool
+                  description: |
+                    Suspend reconciliation of resources managed by a ClickHouse Installation.
+                    Works as the following:
+                     - When `suspend` is `true` operator stops reconciling all resources.
+                     - When `suspend` is `false` or not set, operator reconciles all resources.
                 troubleshoot:
                   !!merge <<: *TypeStringBool
                   description: |

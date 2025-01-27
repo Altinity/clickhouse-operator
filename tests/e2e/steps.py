@@ -31,18 +31,16 @@ def get_shell(self, timeout=600):
 def create_test_namespace(self, force=False):
     """Create unique test namespace for test."""
 
-    if (self.cflags & PARALLEL) and not force:
-        self.context.test_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
-        self.context.operator_namespace = self.context.test_namespace
-        util.create_namespace(self.context.test_namespace)
-        util.install_operator_if_not_exist()
-        return self.context.test_namespace
-    else:
-        self.context.operator_namespace = self.context.test_namespace
-        util.create_namespace(self.context.test_namespace)
-        util.install_operator_if_not_exist()
-        return self.context.test_namespace
+    random_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
 
+    if not force: # (self.cflags & PARALLEL) and not force:
+        self.context.test_namespace = random_namespace
+
+    self.context.operator_namespace = self.context.test_namespace
+    util.create_namespace(self.context.test_namespace)
+    util.install_operator_if_not_exist()
+
+    return self.context.test_namespace
 
 @TestStep(Finally)
 def delete_test_namespace(self):
@@ -152,14 +150,15 @@ def check_metrics_monitoring(
         self,
         operator_namespace,
         operator_pod,
-        expect_pattern = "",
-        expect_metric = "",
-        expect_labels = "",
+        expect_pattern="",
+        expect_metric="",
+        expect_labels="",
         container="metrics-exporter",
         port="8888",
         max_retries=7
 ):
     with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern} {expect_metric} {expect_labels}"):
+        expected_pattern_found = False
         for i in range(1, max_retries):
             url_cmd = util.make_http_get_request("127.0.0.1", port, "/metrics")
             out = kubectl.launch(
@@ -171,23 +170,18 @@ def check_metrics_monitoring(
                 if len(lines) > 0:
                     metric = lines[0]
                     print(metric)
-                    expected_pattern_found = expect_labels in metric
-                else:
-                    expected_pattern_found = False
-                break
+                    assert expect_labels in metric, error(metric)
+                    return
 
             if expect_pattern != "":
                 rx = re.compile(expect_pattern, re.MULTILINE)
                 matches = rx.findall(out)
-                expected_pattern_found = False
 
                 if matches:
                     expected_pattern_found = True
-
-                if expected_pattern_found:
                     break
 
                 with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                     time.sleep(i * 5)
 
-        assert expected_pattern_found, error()
+        assert expected_pattern_found, error(out)

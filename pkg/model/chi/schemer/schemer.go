@@ -130,10 +130,9 @@ func (s *ClusterSchemer) HostDropTables(ctx context.Context, host *api.Host) err
 // IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
 func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *api.Host) bool {
 	inside := false
-	SQLs := []string{s.sqlHostInCluster()}
-	opts := clickhouse.NewQueryOptions().SetSilent(true)
-	err := s.ExecHost(ctx, host, SQLs, opts)
-	if err == nil {
+	sql := s.sqlHostInCluster(host.Runtime.Address.ClusterName)
+	res, err := s.QueryHostString(ctx, host, sql)
+	if err == nil && res == "1" {
 		log.V(1).M(host).F().Info("The host %s is inside the cluster", host.GetName())
 		inside = true
 	} else {
@@ -151,6 +150,12 @@ func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *api.Hos
 // HostClickHouseVersion returns ClickHouse version on the host
 func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *api.Host) (string, error) {
 	return s.QueryHostString(ctx, host, s.sqlVersion())
+}
+
+// HostShutdown shutdown a host
+func (s *ClusterSchemer) HostShutdown(ctx context.Context, host *api.Host) error {
+	log.V(1).M(host).F().Info("Host shutdown: %s", host.GetName())
+	return s.ExecHost(ctx, host, s.sqlShutDown(), clickhouse.NewQueryOptions().SetRetry(false))
 }
 
 func debugCreateSQLs(names, sqls []string, err error) ([]string, []string) {

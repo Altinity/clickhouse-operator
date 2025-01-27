@@ -24,6 +24,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
 type Pod struct {
@@ -65,6 +66,14 @@ func (c *Pod) Get(params ...any) (*core.Pod, error) {
 		panic(any("incorrect number or params"))
 	}
 	return c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
+}
+
+func (c *Pod) GetRestartCounters(params ...any) (map[string]int, error) {
+	pod, err := c.Get(params...)
+	if err != nil {
+		return nil, err
+	}
+	return k8s.PodRestartCountersGet(pod), nil
 }
 
 // GetAll gets all pods for provided entity

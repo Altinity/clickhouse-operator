@@ -230,8 +230,8 @@ spec:
                     exit 1;  
                   fi
                    '
-            initialDelaySeconds: 10
-            periodSeconds: 60
+            initialDelaySeconds: 15
+            periodSeconds: 10
             timeoutSeconds: 60
           livenessProbe:
             exec:

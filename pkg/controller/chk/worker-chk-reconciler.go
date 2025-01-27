@@ -43,6 +43,11 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		return nil
 	}
 
+	if new.Spec.Suspend.Value() {
+		log.V(2).M(new).F().Info("CR is suspended, skip reconcile")
+		return nil
+	}
+
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 

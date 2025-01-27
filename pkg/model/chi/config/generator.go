@@ -338,6 +338,19 @@ func (c *Generator) getRemoteServers(selector *config.HostSelector) string {
 		// <all-sharded>
 		clusterName = AllShardsOneReplicaClusterName
 		util.Iline(b, 8, "<%s>", clusterName)
+
+		// Add secret to all-sharded from the first cluster if present
+		cluster := c.cr.FindCluster(0)
+		// <secret>VALUE</secret>
+		switch cluster.GetSecret().Source() {
+		case chi.ClusterSecretSourcePlaintext:
+			// Secret value is explicitly specified
+			util.Iline(b, 12, "<secret>%s</secret>", cluster.GetSecret().Value)
+		case chi.ClusterSecretSourceSecretRef, chi.ClusterSecretSourceAuto:
+			// Use secret via ENV var from secret
+			util.Iline(b, 12, `<secret from_env="%s" />`, InternodeClusterSecretEnvName)
+		}
+
 		c.cr.WalkHosts(func(host *chi.Host) error {
 			if selector.Include(host) {
 				// <shard>

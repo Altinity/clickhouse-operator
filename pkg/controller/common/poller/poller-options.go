@@ -61,7 +61,7 @@ func (o *Options) FromConfig(config *api.OperatorConfig) *Options {
 	return o
 }
 
-// SetCreateTimeout sets create timeout
+// SetGetErrorTimeout sets get error timeout
 func (o *Options) SetGetErrorTimeout(timeout time.Duration) *Options {
 	if o == nil {
 		return nil

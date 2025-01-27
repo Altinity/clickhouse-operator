@@ -49,7 +49,7 @@ func NewAdapter(kubeClient kube.Interface, chopClient chopClientSet.Interface, n
 		kubeClient: kubeClient,
 		namer:      namer,
 
-		cr: NewCR(chopClient),
+		cr: NewCR(chopClient, kubeClient),
 
 		configMap:  NewConfigMap(kubeClient),
 		deployment: NewDeployment(kubeClient),

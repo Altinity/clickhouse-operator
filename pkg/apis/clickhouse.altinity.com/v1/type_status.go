@@ -368,6 +368,7 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.HostsCompletedCount = true
 		opts.Copy.HostsDeletedCount = true
 		opts.Copy.HostsDeleteCount = true
+		opts.Copy.HostsWithTablesCreated = true
 		opts.Copy.Pods = true
 		opts.Copy.PodIPs = true
 		opts.Copy.FQDNs = true
@@ -403,6 +404,7 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.HostsCompletedCount = true
 		opts.Copy.HostsDeletedCount = true
 		opts.Copy.HostsDeleteCount = true
+		opts.Copy.HostsWithTablesCreated = true
 		opts.Copy.Pods = true
 		opts.Copy.PodIPs = true
 		opts.Copy.FQDNs = true
@@ -735,14 +737,14 @@ func (s *Status) GetEndpoint() string {
 
 // GetNormalizedCR gets target CR
 func (s *Status) GetNormalizedCR() *ClickHouseInstallation {
-	return getInstallationWithReadLock(s, func(s *Status) *ClickHouseInstallation {
+	return getCRWithReadLock(s, func(s *Status) *ClickHouseInstallation {
 		return s.NormalizedCR
 	})
 }
 
 // GetNormalizedCRCompleted gets completed CR
 func (s *Status) GetNormalizedCRCompleted() *ClickHouseInstallation {
-	return getInstallationWithReadLock(s, func(s *Status) *ClickHouseInstallation {
+	return getCRWithReadLock(s, func(s *Status) *ClickHouseInstallation {
 		return s.NormalizedCRCompleted
 	})
 }
@@ -756,7 +758,7 @@ func (s *Status) GetHostsWithTablesCreated() []string {
 
 // Begin helpers
 
-func doWithWriteLock(s *Status, f func(s *Status)) {
+func doWithWriteLock(s *Status, f func(*Status)) {
 	if s == nil {
 		return
 	}
@@ -766,7 +768,7 @@ func doWithWriteLock(s *Status, f func(s *Status)) {
 	f(s)
 }
 
-func doWithReadLock(s *Status, f func(s *Status)) {
+func doWithReadLock(s *Status, f func(*Status)) {
 	if s == nil {
 		return
 	}
@@ -776,7 +778,7 @@ func doWithReadLock(s *Status, f func(s *Status)) {
 	f(s)
 }
 
-func getIntWithReadLock(s *Status, f func(s *Status) int) int {
+func getIntWithReadLock(s *Status, f func(*Status) int) int {
 	var zeroVal int
 	if s == nil {
 		return zeroVal
@@ -787,7 +789,7 @@ func getIntWithReadLock(s *Status, f func(s *Status) int) int {
 	return f(s)
 }
 
-func getStringWithReadLock(s *Status, f func(s *Status) string) string {
+func getStringWithReadLock(s *Status, f func(*Status) string) string {
 	var zeroVal string
 	if s == nil {
 		return zeroVal
@@ -798,7 +800,7 @@ func getStringWithReadLock(s *Status, f func(s *Status) string) string {
 	return f(s)
 }
 
-func getInstallationWithReadLock(s *Status, f func(s *Status) *ClickHouseInstallation) *ClickHouseInstallation {
+func getCRWithReadLock(s *Status, f func(*Status) *ClickHouseInstallation) *ClickHouseInstallation {
 	var zeroVal *ClickHouseInstallation
 	if s == nil {
 		return zeroVal
@@ -809,7 +811,7 @@ func getInstallationWithReadLock(s *Status, f func(s *Status) *ClickHouseInstall
 	return f(s)
 }
 
-func getStringArrWithReadLock(s *Status, f func(s *Status) []string) []string {
+func getStringArrWithReadLock(s *Status, f func(*Status) []string) []string {
 	emptyArr := make([]string, 0, 0)
 	if s == nil {
 		return emptyArr

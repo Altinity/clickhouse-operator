@@ -38,6 +38,8 @@ func (a *Annotator) Annotate(what interfaces.AnnotateType, params ...any) map[st
 	switch what {
 	case interfaces.AnnotateConfigMapCommon:
 		return a.GetCRScope()
+	case interfaces.AnnotateConfigMapStorage:
+		return a.GetCRScope()
 	case interfaces.AnnotateConfigMapCommonUsers:
 		return a.GetCRScope()
 	case interfaces.AnnotateConfigMapHost:

@@ -524,10 +524,83 @@ spec:
             identifier: "{{ $labels.hostname }}"
             summary: "Background Message Broker Schedule pool utilised high"
             description: |-
-              chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolTask = {{ with printf "chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolTask{tenant='%s',chi='%s',hostname='%s'}" .Labels.tenant .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
-              chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolSize = {{ with printf "chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolSize{tenant='%s',chi='%s',hostname='%s'}" .Labels.tenant .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolTask = {{ with printf "chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolTask{exported_namespace='%s',chi='%s',hostname='%s'}" .Labels.exported_namespace .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolSize = {{ with printf "chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolSize{exported_namespace='%s',chi='%s',hostname='%s'}" .Labels.exported_namespace .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
               - https://kb.altinity.com/altinity-kb-integrations/altinity-kb-kafka/background_message_broker_schedule_pool_size/
               - https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings#background_message_broker_schedule_pool_size
               - https://clickhouse.com/docs/en/operations/system-tables/metrics#backgroundmessagebrokerschedulepoolsize
               This pool is used for tasks related to message streaming from Apache Kafka or other message brokers.
               You need to increase `background_message_broker_schedule_pool_size` to fix the problem.
+
+        - alert: ClickHouseKafkaRebalanceAssignment
+          expr: increase(chi_clickhouse_event_KafkaRebalanceAssignments[5m]) > 600
+          for: 10m
+          labels:
+            severity: high
+            team: ClickHouse
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Kafka re-balance is too high"
+            description: |-
+              increase(chi_clickhouse_event_KafkaRebalanceAssignments[5m]) = {{ with printf "increase(chi_clickhouse_event_KafkaRebalanceAssignments{exported_namespace='%s',chi='%s',hostname='%s'}[5m])" .Labels.exported_namespace .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              Kafka partition re-balance happens too often
+              Check Kafka logs to find root cause for partition re-balance
+
+        - alert: ClickHouseKafkaCommitFailures
+          expr: increase(chi_clickhouse_event_KafkaCommitFailures[2h]) > 0
+          for: 10m
+          labels:
+            severity: high
+            team: ClickHouse
+          annotations:
+            description: |-
+              Commits from Kafka tables failed {{ with printf "increase(chi_clickhouse_event_KafkaCommitFailures{exported_namespace='%s',chi='%s',hostname='%s'}[2h])" .Labels.exported_namespace .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }} times in the last 2 hours. {{ end }}
+              
+              Potential Causes:
+              - The issue with very slow materialized view(s) that cannot flush data during `max.poll.interval.ms`.
+              - Kafka-side issue or connectivity issue with the Kafka cluster.
+              
+              Suggested Actions:
+              1. Check the `system.kafka_consumers` table for consumer states.
+              2. Review ClickHouse logs for messages containing `rdk`.
+              3. For slow materialized views:
+                 - Try to improve the speed of Materialized View (MV) flushing.
+                 - Decrease `kafka_max_block_size` (will not help if the reason of slowness is JOIN with big table in the MV).
+                 - Increase `<kafka><max_poll_interval_ms>600000</max_poll_interval_ms></kafka>` (Note: Increasing this may delay detection of malfunctioning consumers).
+
+        - alert: ClickHouseKafkaConsumerErrors
+          expr: increase(chi_clickhouse_event_KafkaConsumerErrors{}[2h]) > 0
+          for: 10m
+          labels:
+            severity: high
+            team: ClickHouse
+          annotations:
+            description: |-
+              Kafka consumer reported errors {{ with printf "increase(chi_clickhouse_event_KafkaConsumerErrors{exported_namespace='%s',chi='%s',hostname='%s'}[2h])" .Labels.exported_namespace .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }} {{ end }} times in the last 2 hours.
+              
+              Potential Actions:
+              1. Check the `system.kafka_consumers` table to verify the consumer states and troubleshoot.
+              2. Review ClickHouse logs for messages containing `rdk`. Errors in Kafka consumers are often related to connectivity, timeout, or other configuration issues.
+              
+              Look https://kb.altinity.com/altinity-kb-integrations/altinity-kb-kafka/error-handling/
+              
+
+        - alert: ClickHouseKafkaRebalanceRevocations
+          expr: increase(chi_clickhouse_event_KafkaRebalanceRevocations[2h]) > chi_clickhouse_metric_KafkaConsumers * 100
+          for: 10m
+          labels:
+            severity: high
+            team: ClickHouse
+          annotations:
+            description: |-
+              Kafka re-balance revocations exceeded the expected threshold.
+              `increase(chi_clickhouse_event_KafkaRebalanceRevocations[2h])` = {{ with printf "increase(chi_clickhouse_event_KafkaRebalanceRevocations{exported_namespace='%s',chi='%s',hostname='%s'}[2h])" .Labels.exported_namespace .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }}{{ end }} revocations,
+              compared to `chi_clickhouse_metric_KafkaConsumers` * 100 = {{ with printf "chi_clickhouse_metric_KafkaConsumers{exported_namespace='%s',chi='%s',hostname='%s'} * 100" .Labels.exported_namespace .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }}{{ end }}.
+              
+              Potential Causes:
+              - Excessive Kafka re-balance activity may indicate instability in the Kafka cluster, misconfigured partitions, or high consumer group churn.
+              - High consumer lag or network interruptions.
+              
+              Suggested Actions:
+              1. **Check the `system.kafka_consumers` table** for consumer lag, partition assignments, and state.
+              2. **Review ClickHouse logs for related errors**, especially `rdk` messages.

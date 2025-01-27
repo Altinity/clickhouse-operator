@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: test-030
+  name: test-099
 spec:
   useTemplates:
     - name: clickhouse-version

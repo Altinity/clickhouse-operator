@@ -71,7 +71,7 @@ type Controller struct {
 	extClient  apiExtensions.Interface
 	chopClient chopClientSet.Interface
 
-	// queues used to organize events queue processed by operator
+	// queues used to organize events queue processed by the operator
 	queues []queue.PriorityQueue
 	// not used explicitly
 	recorder record.EventRecorder
@@ -130,17 +130,21 @@ func NewController(
 
 // initQueues
 func (c *Controller) initQueues() {
-	queuesNum := chop.Config().Reconcile.Runtime.ReconcileCHIsThreadsNumber + api.DefaultReconcileSystemThreadsNumber
-	for i := 0; i < queuesNum; i++ {
-		c.queues = append(
-			c.queues,
-			queue.New(),
-			//workqueue.NewNamedRateLimitingQueue(
-			//	workqueue.DefaultControllerRateLimiter(),
-			//	fmt.Sprintf("chi%d", i),
-			//),
-		)
+	for i := 0; i < c.getQueuesNum(); i++ {
+		c.queues = append(c.queues, c.createQueue())
 	}
+}
+
+func (c *Controller) getQueuesNum() int {
+	return chop.Config().Reconcile.Runtime.ReconcileCHIsThreadsNumber + api.DefaultReconcileSystemThreadsNumber
+}
+
+func (c *Controller) createQueue() queue.PriorityQueue {
+	return queue.New()
+	//workqueue.NewNamedRateLimitingQueue(
+	//	workqueue.DefaultControllerRateLimiter(),
+	//	fmt.Sprintf("chi%d", i),
+	//),
 }
 
 func (c *Controller) addEventHandlersCHI(
@@ -149,7 +153,7 @@ func (c *Controller) addEventHandlersCHI(
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chi := obj.(*api.ClickHouseInstallation)
-			if !chop.Config().IsWatchedNamespace(chi.Namespace) {
+			if !shouldEnqueue(chi) {
 				return
 			}
 			log.V(3).M(chi).Info("chiInformer.AddFunc")
@@ -158,7 +162,7 @@ func (c *Controller) addEventHandlersCHI(
 		UpdateFunc: func(old, new interface{}) {
 			oldChi := old.(*api.ClickHouseInstallation)
 			newChi := new.(*api.ClickHouseInstallation)
-			if !chop.Config().IsWatchedNamespace(newChi.Namespace) {
+			if !shouldEnqueue(newChi) {
 				return
 			}
 			log.V(3).M(newChi).Info("chiInformer.UpdateFunc")
@@ -849,4 +853,18 @@ func (c *Controller) handleObject(obj interface{}) {
 
 	// Add CHI object into reconcile loop
 	// TODO c.enqueueObject(chi.Namespace, chi.Name, chi)
+}
+
+func shouldEnqueue(chi *api.ClickHouseInstallation) bool {
+	if !chop.Config().IsWatchedNamespace(chi.Namespace) {
+		return false
+	}
+
+	// if CR is suspended, should skip reconciliation
+	if chi.Spec.Suspend.Value() {
+		log.V(5).M(chi).Info("chiInformer: skip enqueue, CHI suspended")
+		return false
+	}
+
+	return true
 }
