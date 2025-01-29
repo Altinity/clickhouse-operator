@@ -90,6 +90,14 @@ serviceMonitor:
   enabled: false
   # serviceMonitor.additionalLabels -- additional labels for service monitor
   additionalLabels: {}
+  # serviceMonitor.interval --
+  interval: 30s
+  # serviceMonitor.scrapeTimeout -- Prometheus ServiceMonitor scrapeTimeout. If empty, Prometheus uses the global scrape timeout unless it is less than the target's scrape interval value in which the latter is used.
+  scrapeTimeout: ""
+  # serviceMonitor.relabelings -- Prometheus [RelabelConfigs] to apply to samples before scraping
+  relabelings: []
+  # serviceMonitor.metricRelabelings -- Prometheus [MetricRelabelConfigs] to apply to samples before ingestio
+  metricRelabelings: []
 # configs -- clickhouse operator configs
 # @default -- check the `values.yaml` file for the config content (auto-generated from latest operator release)
 configs:
