@@ -32,6 +32,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	core "k8s.io/api/core/v1"
 )
 
 // reconcileCR runs reconcile cycle for a Custom Resource
@@ -329,6 +330,10 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. Reconcile StatefulSet", host.GetName())
+	host.GetCR().GetRuntime().GetAttributes().AppendAdditionalEnvVarIfNotExists(core.EnvVar{
+		Name:  "CLICKHOUSE_SKIP_USER_SETUP",
+		Value: "1",
+	})
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
 	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, true, opts)
 	if err == nil {
@@ -706,6 +711,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 
 	w.a.V(1).M(host).F().Info("Reconcile PVCs and data loss for host: %s", host.GetName())
 
+	// In case data loss detected we may need to specify additional reconcile options
 	if storage.ErrIsDataLoss(w.reconcileHostPVCs(ctx, host)) {
 		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataLossDetected(host)
 		w.a.V(1).
