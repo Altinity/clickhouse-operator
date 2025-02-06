@@ -17,14 +17,12 @@ package chi
 import (
 	"context"
 	"errors"
-	"math"
-	"sync"
+	"fmt"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
@@ -323,15 +321,10 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
 
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), version)
-	// In case we have to force-restart host
-	// We'll do it via replicas: 0 in StatefulSet.
+
+	// Start with force-restart host
 	if w.shouldForceRestartHost(host) {
-		w.a.V(1).M(host).F().Info("Reconcile host: %s. Shutting host down due to force restart", host.GetName())
-		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
-		_ = w.stsReconciler.ReconcileStatefulSet(ctx, host, false, opts)
-		metrics.HostReconcilesRestart(ctx, host.GetCR())
-		// At this moment StatefulSet has 0 replicas.
-		// First stage of RollingUpdate completed.
+		_ = w.hostForceRestart(ctx, host, opts)
 	}
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
@@ -358,16 +351,96 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	return err
 }
 
-func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) string {
-	version, _ := w.getHostClickHouseVersion(
-		ctx,
-		host,
-		versionOptions{
-			skipNew:             true,
-			skipStoppedAncestor: true,
-		},
-	)
-	return version
+func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
+	w.a.V(1).M(host).F().Info("Reconcile host. Force restart: %s", host.GetName())
+
+	if host.IsStopped() || (w.hostSoftwareRestart(ctx, host) != nil) {
+		_ = w.hostScaleDown(ctx, host, opts)
+	}
+
+	metrics.HostReconcilesRestart(ctx, host.GetCR())
+	return nil
+}
+
+func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error {
+	w.a.V(1).M(host).F().Info("Host software restart start. Host: %s", host.GetName())
+
+	restarts, err := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 1. Host: %s err: %v", host.GetName(), err)
+		return err
+	}
+
+	err = w.ensureClusterSchemer(host).HostShutdown(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 2. Host: %s err: %v", host.GetName(), err)
+		return err
+	}
+	w.a.V(1).M(host).F().Info("Host software shutdown ok. Host: %s", host.GetName())
+
+	err = w.waitHostRestart(ctx, host, restarts)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 3. Host: %s err: %v", host.GetName(), err)
+		return err
+	}
+	w.a.V(1).M(host).F().Info("Host software restart ok. Host: %s", host.GetName())
+
+	err = w.waitHostIsStarted(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 4. Host: %s is not started", host.GetName())
+		return fmt.Errorf("host is not started")
+	}
+	w.a.V(1).M(host).F().Info("Host software pod is started. Host: %s ", host.GetName())
+
+	err = w.waitHostIsRunning(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 5. Host: %s is not running", host.GetName())
+		return fmt.Errorf("host is not running")
+	}
+	w.a.V(1).M(host).F().Info("Host software pod is running. Host: %s ", host.GetName())
+
+	err = w.waitHostIsReady(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 6. Host: %s is not ready", host.GetName())
+		return fmt.Errorf("host is not ready")
+	}
+	w.a.V(1).M(host).F().Info("Host software pod is ready. Host: %s ", host.GetName())
+
+	err = w.getHostSoftwareVersionErr(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software restart abort 7. Host: %s err: %v", host.GetName(), err)
+		return err
+	}
+	w.a.V(1).M(host).F().Info("Host software version ok. Host: %s ", host.GetName())
+
+	if w.isPodCrushed(host) {
+		w.a.V(1).M(host).F().Info("Host software restart abort 8. Host: %s is crushed", host.GetName())
+		return fmt.Errorf("host is crushed")
+	}
+	w.a.V(1).M(host).F().Info("Host software is not crushed. Host: %s ", host.GetName())
+
+	if !w.isPodOK(ctx, host) {
+		w.a.V(1).M(host).F().Info("Host software restart abort 9. Host: %s is not ok", host.GetName())
+		return fmt.Errorf("host is not ok")
+	}
+	w.a.V(1).M(host).F().Info("Host software pod is ok. Host: %s ", host.GetName())
+
+	w.a.V(1).M(host).F().Info("Host software restart success. Host: %s", host.GetName())
+	return nil
+}
+
+func (w *worker) hostScaleDown(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
+	w.a.V(1).M(host).F().Info("Reconcile host. Host shutdown via scale down: %s", host.GetName())
+
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
+	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, false, opts)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host shutdown abort 1. Host: %s err: %v", host.GetName(), err)
+		return err
+	}
+
+	w.a.V(1).M(host).F().Info("Host shutdown success. Host: %s", host.GetName())
+	return nil
 }
 
 // reconcileHostService reconciles host's Service
@@ -439,36 +512,6 @@ func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *api.Cluste
 	}
 }
 
-// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
-func (w *worker) getReconcileShardsWorkersNum(shards []*api.ChiShard, opts *common.ReconcileShardsAndHostsOptions) int {
-	availableWorkers := float64(chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber)
-	maxConcurrencyPercent := float64(chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
-	_100Percent := float64(100)
-	shardsNum := float64(len(shards))
-
-	if opts.FullFanOut {
-		// For full fan-out scenarios use all available workers.
-		// Always allow at least 1 worker.
-		return int(math.Max(availableWorkers, 1))
-	}
-
-	// For non-full fan-out scenarios respect .Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent.
-	// Always allow at least 1 worker.
-	maxAllowedWorkers := math.Max(math.Round((maxConcurrencyPercent/_100Percent)*shardsNum), 1)
-	return int(math.Min(availableWorkers, maxAllowedWorkers))
-}
-
-func (w *worker) reconcileShardsAndHostsFetchOpts(ctx context.Context) *common.ReconcileShardsAndHostsOptions {
-	// Try to fetch options
-	if opts, ok := ctx.Value(common.ReconcileShardsAndHostsOptionsCtxKey).(*common.ReconcileShardsAndHostsOptions); ok {
-		w.a.V(1).Info("found ReconcileShardsAndHostsOptionsCtxKey")
-		return opts
-	} else {
-		w.a.V(1).Info("not found ReconcileShardsAndHostsOptionsCtxKey, use empty opts")
-		return &common.ReconcileShardsAndHostsOptions{}
-	}
-}
-
 // reconcileShardsAndHosts reconciles shards and hosts of each shard
 func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiShard) error {
 	// Sanity check - has to have shard(s)
@@ -510,94 +553,6 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiS
 		return err
 	}
 	w.a.V(1).Info("Finished successfully rest of shards on workers: %d", workersNum)
-	return nil
-}
-
-func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShardIndex int, shards []*api.ChiShard) error {
-	if len(shards) == 0 {
-		return nil
-	}
-
-	type shardReconcile struct {
-		shard *api.ChiShard
-		index int
-	}
-
-	ch := make(chan *shardReconcile)
-	wg := sync.WaitGroup{}
-
-	// Launch tasks feeder
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer close(ch)
-		for i, shard := range shards {
-			ch <- &shardReconcile{
-				shard,
-				startShardIndex + i,
-			}
-		}
-	}()
-
-	// Launch workers
-	var err error
-	var errLock sync.Mutex
-	for i := 0; i < workersNum; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for rq := range ch {
-				w.a.V(1).Info("Starting shard index: %d on worker", rq.index)
-				if e := w.reconcileShardWithHosts(ctx, rq.shard); e != nil {
-					errLock.Lock()
-					err = e
-					errLock.Unlock()
-				}
-			}
-		}()
-	}
-
-	w.a.V(1).Info("Starting to wait shards from index: %d on workers.", startShardIndex)
-	wg.Wait()
-	w.a.V(1).Info("Finished to wait shards from index: %d on workers.", startShardIndex)
-	return err
-}
-
-func (w *worker) runConcurrentlyInBatches(ctx context.Context, workersNum int, start int, shards []*api.ChiShard) error {
-	for startShardIndex := 0; startShardIndex < len(shards); startShardIndex += workersNum {
-		endShardIndex := util.IncTopped(startShardIndex, workersNum, len(shards))
-		concurrentlyProcessedShards := shards[startShardIndex:endShardIndex]
-		w.a.V(1).Info("Starting shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
-
-		// Processing error protected with mutex
-		var err error
-		var errLock sync.Mutex
-
-		wg := sync.WaitGroup{}
-		wg.Add(len(concurrentlyProcessedShards))
-		// Launch shard concurrent processing
-		for j := range concurrentlyProcessedShards {
-			shard := concurrentlyProcessedShards[j]
-			w.a.V(1).Info("Starting shard on worker. Shard index: %d", start+startShardIndex+j)
-			go func() {
-				defer wg.Done()
-				w.a.V(1).Info("Starting shard on goroutine. Shard index: %d", start+startShardIndex+j)
-				if e := w.reconcileShardWithHosts(ctx, shard); e != nil {
-					errLock.Lock()
-					err = e
-					errLock.Unlock()
-				}
-				w.a.V(1).Info("Finished shard on goroutine. Shard index: %d", start+startShardIndex+j)
-			}()
-		}
-		w.a.V(1).Info("Starting to wait shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
-		wg.Wait()
-		w.a.V(1).Info("Finished to wait shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
-		if err != nil {
-			w.a.V(1).Warning("Skipping rest of shards due to an error: %v", err)
-			return err
-		}
-	}
 	return nil
 }
 
@@ -651,17 +606,6 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
-
-	//si := host.GetRuntime().GetAddress().GetShardIndex()
-	//ri := host.GetRuntime().GetAddress().GetReplicaIndex()
-	////sleep := util.DecBottomed(si, 1, 0)*(si % 3)*20
-	//sleep := (2 - si)*90
-	//if ri > 0 {
-	//	sleep = 0
-	//}
-	//w.a.V(1).Info("Host [%d/%d]. Going to sleep %d sec", si, ri, sleep)
-	//time.Sleep((time.Duration)(sleep)*time.Second)
-	//w.a.V(1).Info("Host [%d/%d]. Done to sleep %d sec", si, ri)
 
 	metrics.HostReconcilesStarted(ctx, host.GetCR())
 	startTime := time.Now()
@@ -746,61 +690,56 @@ func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error
 // reconcileHostMain reconciles specified ClickHouse host
 func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	var (
-		reconcileStatefulSetOpts *statefulset.ReconcileOptions
-		migrateTableOpts         *migrateTableOptions
+		stsReconcileOpts *statefulset.ReconcileOptions
+		migrateTableOpts *migrateTableOptions
 	)
 
 	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
-			Warning("Reconcile Host interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
+			Warning("Reconcile Host Main interrupted with an error 1. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
 	w.setHasData(host)
 
-	w.a.V(1).
-		M(host).F().
-		Info("Reconcile PVCs and check possible data loss for host: %s", host.GetName())
-	if storage.ErrIsDataLoss(
-		storage.NewStorageReconciler(
-			w.task,
-			w.c.namer,
-			storage.NewStoragePVC(w.c.kube.Storage()),
-		).ReconcilePVCs(ctx, host, api.DesiredStatefulSet),
-	) {
-		// In case of data loss detection on existing volumes, we need to:
-		// 1. recreate StatefulSet
-		// 2. run tables migration again
-		reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetForceRecreate()
-		migrateTableOpts = &migrateTableOptions{
-			forceMigrate: true,
-			dropReplica:  true,
-		}
+	w.a.V(1).M(host).F().Info("Reconcile PVCs and data loss for host: %s", host.GetName())
+
+	if storage.ErrIsDataLoss(w.reconcileHostPVCs(ctx, host)) {
+		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataLossDetected(host)
 		w.a.V(1).
 			M(host).F().
-			Info("Data loss detected for host: %s. Will do force migrate", host.GetName())
+			Info("Data loss detected for host: %s.", host.GetName())
 	}
 
-	if err := w.reconcileHostStatefulSet(ctx, host, reconcileStatefulSetOpts); err != nil {
+	if err := w.reconcileHostStatefulSet(ctx, host, stsReconcileOpts); err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
-			Warning("Reconcile Host interrupted with an error 3. Host: %s Err: %v", host.GetName(), err)
+			Warning("Reconcile Host Main interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
+
 	// Polish all new volumes that operator has to create
-	_ = storage.NewStorageReconciler(
+	_ = w.reconcileHostPVCs(ctx, host)
+	_ = w.reconcileHostService(ctx, host)
+	_ = w.reconcileHostTables(ctx, host, migrateTableOpts)
+
+	return nil
+}
+
+func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {
+	return storage.NewStorageReconciler(
 		w.task,
 		w.c.namer,
 		storage.NewStoragePVC(w.c.kube.Storage()),
 	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+}
 
-	_ = w.reconcileHostService(ctx, host)
-
+func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, migrateTableOpts *migrateTableOptions) error {
 	// Prepare for tables migration.
-	// Sometimes service needs some time to start after creation|modification before being accessible for usage
+	// Sometimes service needs significant time to start after creation/modification before being accessible for usage
 	// Check whether ClickHouse is running and accessible and what version is available.
 	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
 		w.a.V(1).
@@ -811,9 +750,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			M(host).F().
 			Warning("Check host for ClickHouse availability before migrating tables. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
 	}
-	_ = w.migrateTables(ctx, host, migrateTableOpts)
-
-	return nil
+	return w.migrateTables(ctx, host, migrateTableOpts)
 }
 
 // reconcileHostBootstrap reconciles specified ClickHouse host

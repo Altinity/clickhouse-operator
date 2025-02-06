@@ -313,7 +313,7 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
 		WithAction(host.GetCR()).
 		M(host).F().
-		Info("Create StatefulSet %s - started", util.NamespaceNameString(statefulSet))
+		Info("Create StatefulSet: %s - started", util.NamespaceNameString(statefulSet))
 
 	action := r.doCreateStatefulSet(ctx, host, opts)
 

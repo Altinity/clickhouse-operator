@@ -257,3 +257,7 @@ func (s *ClusterSchemer) sqlHostInCluster(cluster string) string {
 		cluster,
 	)
 }
+
+func (s *ClusterSchemer) sqlShutDown() []string {
+	return []string{"SYSTEM SHUTDOWN"}
+}

@@ -30,18 +30,24 @@ import (
 	commonTypes "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
+	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type CR struct {
 	chopClient chopClientSet.Interface
 	kubeClient kube.Interface
+	macro      interfaces.IMacro
 }
 
 func NewCR(chopClient chopClientSet.Interface, kubeClient kube.Interface) *CR {
 	return &CR{
 		chopClient: chopClient,
 		kubeClient: kubeClient,
+		macro:      commonMacro.New(macro.List),
 	}
 }
 
@@ -198,10 +204,14 @@ func (c *CR) buildResources(chi *api.ClickHouseInstallation) (*api.ClickHouseIns
 	if chi.Status.NormalizedCRCompleted != nil {
 		normalizedCompleted, _ = json.Marshal(chi.Status.NormalizedCRCompleted)
 	}
+
+	tagger := managers.NewTagManager(managers.TagManagerTypeClickHouse, chi)
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: c.buildCMNamespace(chi),
-			Name:      c.buildCMName(chi),
+			Namespace:   c.buildCMNamespace(chi),
+			Name:        c.buildCMName(chi),
+			Labels:      c.macro.Scope(chi).Map(tagger.Label(interfaces.LabelConfigMapStorage)),
+			Annotations: c.macro.Scope(chi).Map(tagger.Annotate(interfaces.AnnotateConfigMapStorage)),
 		},
 		Data: map[string]string{
 			statusNormalized:          string(normalized),

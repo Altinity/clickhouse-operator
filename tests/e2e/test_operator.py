@@ -1941,7 +1941,7 @@ def test_016(self):
 
     # test-016-settings-04.yaml
     with When("Add new custom4.xml config file"):
-        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-04.yaml",
             check={
@@ -1962,12 +1962,12 @@ def test_016(self):
             assert out == "test-custom4"
 
         with And("ClickHouse SHOULD BE restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
             assert start_time < new_start_time
 
     # test-016-settings-05.yaml
     with When("Add a change to an existing xml file"):
-        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-05.yaml",
             check={
@@ -1976,7 +1976,7 @@ def test_016(self):
         )
 
         with And("ClickHouse SHOULD BE restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
             assert start_time < new_start_time
 
         with And("Macro 'test' value should be changed"):
@@ -1987,8 +1987,8 @@ def test_016(self):
             assert out == "test-changed"
 
     # test-016-settings-06.yaml
-    with When("Add I change a number of settings that does not requre a restart"):
-        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+    with When("Add I change a number of settings that does not require a restart"):
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-06.yaml",
             check={
@@ -1997,7 +1997,7 @@ def test_016(self):
         )
 
         with And("ClickHouse SHOULD NOT BE restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
             assert start_time == new_start_time
 
     with Finally("I clean up"):
@@ -3029,7 +3029,6 @@ def test_027(self):
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0"))
 def test_028(self):
     create_shell_namespace_clickhouse_template()
-
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     manifest = "manifests/chi/test-028-replication.yaml"
@@ -3043,17 +3042,17 @@ def test_028(self):
                 "manifests/chit/tpl-persistent-volume-100Mi.yaml",
             },
             "object_counts": {
-                "statefulset": 4,
-                "pod": 4,
-                "service": 5,
+                "statefulset": 2,
+                "pod": 2,
+                "service": 3,
             },
             "do_not_delete": 1,
         },
     )
 
-    sql = """SET skip_unavailable_shards=1; SYSTEM DROP DNS CACHE; SELECT getMacro('replica') AS replica, uptime() AS uptime,
+    sql = """SELECT getMacro('replica') AS replica, uptime() AS uptime,
      (SELECT count() FROM system.clusters WHERE cluster='all-sharded') AS total_hosts,
-     (SELECT count() online_hosts FROM cluster('all-sharded', system.one) ) AS online_hosts
+     (SELECT count() online_hosts FROM cluster('all-sharded', system.one) settings skip_unavailable_shards=1 ) AS online_hosts
      FORMAT JSONEachRow"""
     note("Before restart")
     out = clickhouse.query_with_error(chi, sql)
@@ -3065,7 +3064,7 @@ def test_028(self):
             out = clickhouse.query_with_error(chi, "SELECT count(sleepEachRow(1)) FROM numbers(30) SETTINGS function_sleep_max_microseconds_per_block=0")
             assert out == "30"
 
-        pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
         with Then("Operator should start processing a change"):
             # TODO: Test needs to be improved
             kubectl.wait_chi_status(chi, "InProgress")
@@ -3086,10 +3085,9 @@ def test_028(self):
                     ch2 = clickhouse.query_with_error(
                         chi,
                         sql,
-                        pod="chi-test-028-replication-default-1-0-0",
-                        host="chi-test-028-replication-default-1-0",
-                        timeout=10,
-                        advanced_params="--connect_timeout=1 --send_timeout=10",
+                        pod="chi-test-028-replication-default-0-1-0",
+                        host="chi-test-028-replication-default-0-1",
+                        advanced_params="--connect_timeout=1 --send_timeout=10 --receive_timeout=10",
                     )
 
                     if "error" in ch1 or "Exception" in ch1 or ch2.endswith("1"):
@@ -3104,7 +3102,7 @@ def test_028(self):
                     # print("Waiting 5 seconds")
                     time.sleep(5)
             end_time = time.time()
-            new_pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            new_pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
             print(f"Total restart time: {str(round(end_time - start_time))}")
             print(f"First replica downtime: {ch1_downtime}")
             print(f"Second replica downtime: {ch2_downtime}")
@@ -3120,29 +3118,29 @@ def test_028(self):
                 note("Restart is cleaned automatically")
             else:
                 note("Restart needs to be cleaned")
-                start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+                start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
 
         # We need to clear RollingUpdate restart policy because of new operator's IP address emerging sometimes
         with Then("Clear RollingUpdate restart policy"):
             cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"remove\",\"path\":\"/spec/restart\"}}]'"
             kubectl.launch(cmd)
-            time.sleep(15)
+            kubectl.wait_chi_status(chi, "InProgress")
             kubectl.wait_chi_status(chi, "Completed")
 
         with Then("Restart operator. CHI should not be restarted"):
             check_operator_restart(
                 chi=chi,
                 wait_objects={
-                    "statefulset": 4,
-                    "pod": 4,
-                    "service": 5,
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
                 },
                 pod=f"chi-{chi}-default-0-0-0",
             )
 
         with Then("Re-apply the original config. CHI should not be restarted"):
             kubectl.create_and_check(manifest=manifest, check={"do_not_delete": 1})
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
             print(f"old_start_time: {start_time}")
             print(f"new_start_time: {new_start_time}")
             assert start_time == new_start_time
@@ -3150,12 +3148,13 @@ def test_028(self):
     with When("Stop installation"):
         cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/stop","value":"yes"}}]\''
         kubectl.launch(cmd)
+        kubectl.wait_chi_status(chi, "InProgress")
         kubectl.wait_chi_status(chi, "Completed")
         with Then("Stateful sets should be there but no running pods"):
             kubectl.wait_objects(chi, {
-                "statefulset": 4,
+                "statefulset": 2,
                 "pod": 0,
-                "service": 4,
+                "service": 2,
             })
 
     with Finally("I clean up"):
@@ -4025,10 +4024,17 @@ def test_039(self, step=0, delete_chi=0):
         with Then("Select in cluster with no secret should fail"):
             r = clickhouse.query_with_error(chi, "SELECT count(a) FROM secure_dist", pwd="qkrq")
             assert "AUTHENTICATION_FAILED" in r
+        with And("Select from all-sharded with no secret should fail"):
+            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one)", pwd="qkrq")
+            assert "AUTHENTICATION_FAILED" in r
     if step > 0:
         with Then("Select in cluster with secret should pass"):
             r = clickhouse.query(chi, "SELECT count() FROM secure_dist", pwd="qkrq")
             assert r == "10"
+        with And("Select from all-sharded with secret should pass"):
+            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one) limit 1", pwd="qkrq")
+            assert r == "0"
+
 
     if step == 4:
         with Then("Create replicated table to test interserver_https_port"):
@@ -4484,7 +4490,7 @@ def test_045_2(self):
     create_shell_namespace_clickhouse_template()
 
     with Given("I set spec.reconcile.host.wait.queries property"):
-        util.apply_operator_config("manifests/chopconf/test-045-chopconf.yaml")
+        util.apply_operator_config("manifests/chopconf/no-wait-queries.yaml")
 
     test_045(manifest=f"manifests/chi/test-045-2-wait-query-finish.yaml")
 
@@ -4494,6 +4500,9 @@ def test_045_2(self):
 def test_046(self):
     """Check that clickhouse-operator creates metrics for reconcile and other clickhouse-operator events."""
     create_shell_namespace_clickhouse_template()
+    with Given("I change operator statefullSet timeout"):
+        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
+
     cluster = "default"
     manifest = f"manifests/chi/test-046-0-clickhouse-operator-metrics.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
@@ -4519,7 +4528,14 @@ def test_046(self):
                     container="clickhouse-operator",
                     port="9999",
                     expect_pattern=metric_name,
+                    max_retries=3
                 )
+
+    with Then(f"Check clickhouse-operator exposes clickhouse_operator_chi metrics"):
+        check_metrics([
+            "clickhouse_operator_chi{.*chi=\"test-046-operator-metrics\".*} 1",
+        ])
+
 
     with Then(f"Check clickhouse-operator exposes clickhouse_operator_chi_reconciles_* metrics"):
         check_metrics([
@@ -4594,6 +4610,17 @@ def test_046(self):
             "clickhouse_operator_host_reconciles_errors.*chi=\"test-046-operator-metrics\".*",
             "clickhouse_operator_host_reconciles_timings.*chi=\"test-046-operator-metrics\".*",
             ])
+
+    with Then("Stop CHI"):
+        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/stop","value":"yes"}}]\''
+        kubectl.launch(cmd)
+        kubectl.wait_chi_status(chi, "InProgress")
+        kubectl.wait_chi_status(chi, "Completed")
+
+    with Then(f"Check clickhouse-operator exposes clickhouse_operator_chi metric for stopped chi"):
+        check_metrics([
+            "clickhouse_operator_chi{.*chi=\"test-046-operator-metrics\".*} 1",
+        ])
 
     with Finally("I clean up"):
         delete_test_namespace()

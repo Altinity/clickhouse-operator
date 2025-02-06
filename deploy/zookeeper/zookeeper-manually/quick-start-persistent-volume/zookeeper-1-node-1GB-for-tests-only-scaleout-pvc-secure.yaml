@@ -613,7 +613,7 @@ spec:
               command:
                 - /conf/zookeeperReady.sh
             failureThreshold: 3
-            initialDelaySeconds: 10
+            initialDelaySeconds: 15
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 10

@@ -349,8 +349,27 @@ func (w *worker) waitHostNotInCluster(ctx context.Context, host *api.Host) error
 
 // waitHostNoActiveQueries
 func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.Host) error {
+	return domain.PollHost(ctx, host, w.doesHostHaveNoRunningQueries)
+}
+
+// waitHostRestart
+func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, start map[string]int) error {
 	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
-		n, _ := w.ensureClusterSchemer(host).HostActiveQueriesNum(ctx, host)
-		return n <= 1
+		return w.isPodRestarted(ctx, host, start)
 	})
+}
+
+// waitHostIsReady
+func (w *worker) waitHostIsReady(ctx context.Context, host *api.Host) error {
+	return domain.PollHost(ctx, host, w.isPodReady)
+}
+
+// waitHostIsStarted
+func (w *worker) waitHostIsStarted(ctx context.Context, host *api.Host) error {
+	return domain.PollHost(ctx, host, w.isPodStarted)
+}
+
+// waitHostIsRunning
+func (w *worker) waitHostIsRunning(ctx context.Context, host *api.Host) error {
+	return domain.PollHost(ctx, host, w.isPodRunning)
 }

@@ -21,7 +21,7 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 )
 
@@ -63,7 +63,7 @@ func (c *CHOp) Init() error {
 }
 
 // Config returns operator config
-func (c *CHOp) Config() *v1.OperatorConfig {
+func (c *CHOp) Config() *api.OperatorConfig {
 	if c == nil {
 		return nil
 	}

@@ -152,6 +152,12 @@ func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *api.Ho
 	return s.QueryHostString(ctx, host, s.sqlVersion())
 }
 
+// HostShutdown shutdown a host
+func (s *ClusterSchemer) HostShutdown(ctx context.Context, host *api.Host) error {
+	log.V(1).M(host).F().Info("Host shutdown: %s", host.GetName())
+	return s.ExecHost(ctx, host, s.sqlShutDown(), clickhouse.NewQueryOptions().SetRetry(false))
+}
+
 func debugCreateSQLs(names, sqls []string, err error) ([]string, []string) {
 	if err != nil {
 		log.V(1).Warning("got error: %v", err)
