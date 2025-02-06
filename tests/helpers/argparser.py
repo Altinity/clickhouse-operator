@@ -3,7 +3,7 @@ def argparser(parser):
     parser.add_argument(
         "--native",
         action="store_true",
-        help="run tests without docker-compose, require only working kubectl + python",
+        help="run tests without docker compose, require only working kubectl + python",
         default=False,
     )
     parser.add_argument(

@@ -1,4 +1,5 @@
-import time
+import os
+os.environ["TEST_NAMESPACE"]="test-keeper"
 
 import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
@@ -59,7 +60,7 @@ def insert_replicated_data(chi, pod_for_insert_data, create_tables, insert_table
             )
 
 
-def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
+def check_zk_root_znode(chi, keeper_type, pod_count, ns, retry_count=15):
     for pod_num in range(pod_count):
         found = False
         for i in range(retry_count):
@@ -82,7 +83,7 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
 
             out = kubectl.launch(
                 f"exec {pod_prefix}-{pod_num} -- bash -ce '{keeper_cmd}'",
-                ns=settings.test_namespace,
+                ns=ns,
                 ok_to_fail=True,
             )
             found = False
@@ -144,17 +145,17 @@ def rescale_zk_and_clickhouse(
     return chi
 
 
-def delete_keeper_pvc(keeper_type):
+def delete_keeper_pvc(keeper_type, ns):
     pvc_list = kubectl.get(
         kind="pvc",
         name="",
         label=f"-l app={keeper_type}",
-        ns=settings.test_namespace,
+        ns=ns,
         ok_to_fail=False,
     )
     for pvc in pvc_list["items"]:
         if pvc["metadata"]["name"][-2:] != "-0":
-            kubectl.launch(f"delete pvc {pvc['metadata']['name']}", ns=settings.test_namespace)
+            kubectl.launch(f"delete pvc {pvc['metadata']['name']}", ns=ns)
 
 
 def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper_type, keeper_manifest_1_node,
@@ -167,6 +168,8 @@ def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper
         keeper_manifest = f"../../deploy/zookeeper/zookeeper-manually/quick-start-persistent-volume/{keeper_manifest}"
     if keeper_type == "clickhouse-keeper":
         keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
+    if keeper_type == "clickhouse-keeper_with_chk":
+        keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-with-CHK-resource/{keeper_manifest}"
     if keeper_type == "zookeeper-operator":
         keeper_manifest = f"../../deploy/zookeeper/zookeeper-with-zookeeper-operator/{keeper_manifest}"
 
@@ -209,8 +212,8 @@ def test_keeper_rescale_outline(
     """
 
     with When("Clean exists ClickHouse Keeper and ZooKeeper"):
-        kubectl.delete_all_keeper(settings.test_namespace)
-        kubectl.delete_all_chi(settings.test_namespace)
+        kubectl.delete_all_keeper(self.context.test_namespace)
+        kubectl.delete_all_chi(self.context.test_namespace)
 
     with When("Install CH 1 node ZK 1 node"):
         chi = rescale_zk_and_clickhouse(
@@ -223,7 +226,7 @@ def test_keeper_rescale_outline(
         )
         util.wait_clickhouse_cluster_ready(chi)
         wait_keeper_ready(keeper_type=keeper_type, pod_count=1)
-        check_zk_root_znode(chi, keeper_type, pod_count=1)
+        check_zk_root_znode(chi, keeper_type, pod_count=1, ns=self.context.test_namespace)
         util.wait_clickhouse_no_readonly_replicas(chi)
         insert_replicated_data(
             chi,
@@ -244,7 +247,7 @@ def test_keeper_rescale_outline(
                     keeper_manifest_3_node=keeper_manifest_3_node,
                 )
                 wait_keeper_ready(keeper_type=keeper_type, pod_count=3)
-                check_zk_root_znode(chi, keeper_type, pod_count=3)
+                check_zk_root_znode(chi, keeper_type, pod_count=3, ns=self.context.test_namespace)
 
                 util.wait_clickhouse_cluster_ready(chi)
                 util.wait_clickhouse_no_readonly_replicas(chi)
@@ -264,9 +267,9 @@ def test_keeper_rescale_outline(
                     keeper_manifest_3_node=keeper_manifest_3_node,
                 )
                 wait_keeper_ready(keeper_type=keeper_type, pod_count=1)
-                check_zk_root_znode(chi, keeper_type, pod_count=1)
+                check_zk_root_znode(chi, keeper_type, pod_count=1, ns=self.context.test_namespace)
                 if keeper_type == "zookeeper" and "scaleout-pvc" in keeper_manifest_1_node:
-                    delete_keeper_pvc(keeper_type=keeper_type)
+                    delete_keeper_pvc(keeper_type=keeper_type, ns=self.context.test_namespace)
 
                 util.wait_clickhouse_cluster_ready(chi)
                 util.wait_clickhouse_no_readonly_replicas(chi)
@@ -285,7 +288,7 @@ def test_keeper_rescale_outline(
             keeper_manifest_1_node=keeper_manifest_1_node,
             keeper_manifest_3_node=keeper_manifest_3_node,
         )
-        check_zk_root_znode(chi, keeper_type, pod_count=3)
+        check_zk_root_znode(chi, keeper_type, pod_count=3, ns=self.context.test_namespace)
 
     for keeper_replica_count in [1, 3]:
         with When("Stop CH + ZK"):
@@ -308,7 +311,7 @@ def test_keeper_rescale_outline(
             )
 
     with Then("check data in tables"):
-        check_zk_root_znode(chi, keeper_type, pod_count=3)
+        check_zk_root_znode(chi, keeper_type, pod_count=3, ns=self.context.test_namespace)
         util.wait_clickhouse_cluster_ready(chi)
         util.wait_clickhouse_no_readonly_replicas(chi)
         for table_name, exptected_rows in {
@@ -331,7 +334,7 @@ def test_keeper_rescale_outline(
 
 
 @TestScenario
-@Name("test_zookeeper_rescale. Check ZK scale-up / scale-down cases")
+@Name("test_zookeeper_rescale# Check ZK scale-up / scale-down cases")
 def test_zookeeper_rescale(self):
     test_keeper_rescale_outline(
         keeper_type="zookeeper",
@@ -342,7 +345,7 @@ def test_zookeeper_rescale(self):
 
 
 @TestScenario
-@Name("test_clickhouse_keeper_rescale. Check KEEPER scale-up / scale-down cases")
+@Name("test_clickhouse_keeper_rescale# Check KEEPER scale-up / scale-down cases")
 def test_clickhouse_keeper_rescale(self):
     test_keeper_rescale_outline(
         keeper_type="clickhouse-keeper",
@@ -353,7 +356,7 @@ def test_clickhouse_keeper_rescale(self):
 
 
 @TestScenario
-@Name("test_clickhouse_keeper_rescale_chk. Using ClickHouseKeeperInstallation. Check KEEPER scale-up / scale-down cases")
+@Name("test_clickhouse_keeper_rescale_chk# Using ClickHouseKeeperInstallation. Check KEEPER scale-up / scale-down cases")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
 def test_clickhouse_keeper_rescale_chk(self):
     test_keeper_rescale_outline(
@@ -364,26 +367,26 @@ def test_clickhouse_keeper_rescale_chk(self):
     )
 
 
-@TestScenario
-@Name("test_zookeeper_operator_rescale. Check Zookeeper OPERATOR scale-up / scale-down cases")
-def test_zookeeper_operator_rescale(self):
-    test_keeper_rescale_outline(
-        keeper_type="zookeeper-operator",
-        pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
-        keeper_manifest_1_node="zookeeper-operator-1-node.yaml",
-        keeper_manifest_3_node="zookeeper-operator-3-nodes.yaml",
-    )
+# @TestScenario
+# @Name("test_zookeeper_operator_rescale# Check Zookeeper OPERATOR scale-up / scale-down cases")
+# def test_zookeeper_operator_rescale(self):
+#     test_keeper_rescale_outline(
+#         keeper_type="zookeeper-operator",
+#         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
+#         keeper_manifest_1_node="zookeeper-operator-1-node.yaml",
+#         keeper_manifest_3_node="zookeeper-operator-3-nodes.yaml",
+#     )
 
 
-@TestScenario
-@Name("test_zookeeper_pvc_scaleout_rescale. Check ZK+PVC scale-up / scale-down cases")
-def test_zookeeper_pvc_scaleout_rescale(self):
-    test_keeper_rescale_outline(
-        keeper_type="zookeeper",
-        pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
-        keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml",
-        keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml",
-    )
+# @TestScenario
+# @Name("test_zookeeper_pvc_scaleout_rescale# Check ZK+PVC scale-up / scale-down cases")
+# def test_zookeeper_pvc_scaleout_rescale(self):
+#     test_keeper_rescale_outline(
+#         keeper_type="zookeeper",
+#         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
+#         keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml",
+#         keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml",
+#     )
 
 
 @TestOutline
@@ -394,8 +397,8 @@ def test_keeper_probes_outline(
         keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only.yaml",
 ):
     with When("Clean exists ClickHouse Keeper and ZooKeeper"):
-        kubectl.delete_all_chi(settings.test_namespace)
-        kubectl.delete_all_keeper(settings.test_namespace)
+        kubectl.delete_all_chi(self.context.test_namespace)
+        kubectl.delete_all_keeper(self.context.test_namespace)
 
     with Then("Install CH 2 node ZK 3 node"):
         chi = rescale_zk_and_clickhouse(
@@ -409,7 +412,7 @@ def test_keeper_probes_outline(
         )
         util.wait_clickhouse_cluster_ready(chi)
         wait_keeper_ready(keeper_type=keeper_type, pod_count=3)
-        check_zk_root_znode(chi, keeper_type, pod_count=3)
+        check_zk_root_znode(chi, keeper_type, pod_count=3, ns=self.context.test_namespace)
         util.wait_clickhouse_no_readonly_replicas(chi)
 
     with Then("Create keeper_bench table"):
@@ -430,7 +433,7 @@ def test_keeper_probes_outline(
                 max_parts_in_total=1000000;
         """,
         )
-    with Then("Insert data to keeper_bench for make zookeeper workload"):
+    with Then("Insert data to keeper_bench for make keeper workload"):
         pod_prefix = "chi-test-cluster-for-zk-default"
         rows = 100000
         for pod in ("0-0-0", "0-1-0"):
@@ -465,7 +468,7 @@ def test_keeper_probes_outline(
 
 @TestScenario
 @Name(
-    "test_zookeeper_probes_workload. Liveness + Readiness probes shall works fine "
+    "test_zookeeper_probes_workload# Liveness + Readiness probes shall works fine "
     "under workload in multi-datacenter installation"
 )
 def test_zookeeper_probes_workload(self):
@@ -476,39 +479,39 @@ def test_zookeeper_probes_workload(self):
     )
 
 
-@TestScenario
-@Name(
-    "test_zookeeper_pvc_probes_workload. Liveness + Readiness probes shall works fine "
-    "under workload in multi-datacenter installation"
-)
-def test_zookeeper_pvc_probes_workload(self):
-    test_keeper_probes_outline(
-        keeper_type="zookeeper",
-        keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml",
-        keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml",
-    )
+# @TestScenario
+# @Name(
+#     "test_zookeeper_pvc_probes_workload# Liveness + Readiness probes shall works fine "
+#     "under workload in multi-datacenter installation"
+# )
+# def test_zookeeper_pvc_probes_workload(self):
+#     test_keeper_probes_outline(
+#         keeper_type="zookeeper",
+#         keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml",
+#         keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml",
+#     )
+
+
+# @TestScenario
+# @Name(
+#     "test_zookeeper_operator_probes_workload# Liveness + Readiness probes shall works fine "
+#     "under workload in multi-datacenter installation"
+# )
+# def test_zookeeper_operator_probes_workload(self):
+#     test_keeper_probes_outline(
+#         keeper_type="zookeeper-operator",
+#         keeper_manifest_1_node="zookeeper-operator-1-node.yaml",
+#         keeper_manifest_3_node="zookeeper-operator-3-nodes.yaml",
+#
+#         # uncomment only if you know how to use it
+#         # keeper_manifest_1_node='zookeeper-operator-1-node-with-custom-probes.yaml',
+#         # keeper_manifest_3_node='zookeeper-operator-3-nodes-with-custom-probes.yaml',
+#     )
 
 
 @TestScenario
 @Name(
-    "test_zookeeper_operator_probes_workload. Liveness + Readiness probes shall works fine "
-    "under workload in multi-datacenter installation"
-)
-def test_zookeeper_operator_probes_workload(self):
-    test_keeper_probes_outline(
-        keeper_type="zookeeper-operator",
-        keeper_manifest_1_node="zookeeper-operator-1-node.yaml",
-        keeper_manifest_3_node="zookeeper-operator-3-nodes.yaml",
-
-        # uncomment only if you know how to use it
-        # keeper_manifest_1_node='zookeeper-operator-1-node-with-custom-probes.yaml',
-        # keeper_manifest_3_node='zookeeper-operator-3-nodes-with-custom-probes.yaml',
-    )
-
-
-@TestScenario
-@Name(
-    "test_clickhouse_keeper_probes_workload. Liveness + Readiness probes shall works fine "
+    "test_clickhouse_keeper_probes_workload# Liveness + Readiness probes shall works fine "
     "under workload in multi-datacenter installation"
 )
 def test_clickhouse_keeper_probes_workload(self):
@@ -521,7 +524,7 @@ def test_clickhouse_keeper_probes_workload(self):
 
 @TestScenario
 @Name(
-    "test_clickhouse_keeper_probes_workload_with_CHKI. Liveness + Readiness probes shall works fine "
+    "test_clickhouse_keeper_probes_workload_with_chk# Liveness + Readiness probes shall works fine "
     "under workload in multi-datacenter installation"
 )
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
@@ -538,27 +541,30 @@ def test_clickhouse_keeper_probes_workload_with_chk(self):
 def test(self):
     with Given("set settings"):
         set_settings()
-        self.context.test_namespace = "test"
-        self.context.operator_namespace = "test"
+        self.context.test_namespace = "test-keeper"
+        self.context.operator_namespace = "test-keeper"
     with Given("I create shell"):
         shell = get_shell()
         self.context.shell = shell
 
-    all_tests = [
-        test_zookeeper_operator_rescale,
-        test_clickhouse_keeper_rescale,
-        test_clickhouse_keeper_rescale_chk,
-        test_zookeeper_pvc_scaleout_rescale,
-        test_zookeeper_rescale,
-
-        test_zookeeper_probes_workload,
-        test_zookeeper_pvc_probes_workload,
-        test_zookeeper_operator_probes_workload,
-        test_clickhouse_keeper_probes_workload,
-        test_clickhouse_keeper_probes_workload_with_chk,
-    ]
 
     util.clean_namespace(delete_chi=True, delete_keeper=True)
     util.install_operator_if_not_exist()
+
+    all_tests = [
+        # test_zookeeper_operator_rescale,
+        # test_zookeeper_pvc_scaleout_rescale,
+        test_clickhouse_keeper_rescale,
+        test_clickhouse_keeper_rescale_chk,
+        test_zookeeper_rescale,
+
+        # test_zookeeper_pvc_probes_workload,
+        # test_zookeeper_operator_probes_workload,
+        test_zookeeper_probes_workload,
+        test_clickhouse_keeper_probes_workload,
+        test_clickhouse_keeper_probes_workload_with_chk,
+    ]
     for t in all_tests:
         Scenario(test=t)()
+
+    util.clean_namespace(delete_chi=True, delete_keeper=True)

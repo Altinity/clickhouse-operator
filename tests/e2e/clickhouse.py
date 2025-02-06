@@ -31,7 +31,7 @@ def query(
         return kubectl.launch(
             f"exec {pod_name} -n {current().context.test_namespace} -c {container}"
             f" --"
-            f" clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
+            f" clickhouse-client -mn --receive_timeout={timeout} -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f' --query="{sql}"'
             f" 2>&1",
             timeout=timeout,
@@ -42,7 +42,7 @@ def query(
         return kubectl.launch(
             f"exec {pod_name} -n {current().context.test_namespace} -c {container}"
             f" -- "
-            f"clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
+            f"clickhouse-client -mn --receive_timeout={timeout} -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f'--query="{sql}"',
             timeout=timeout,
             ns=current().context.test_namespace,

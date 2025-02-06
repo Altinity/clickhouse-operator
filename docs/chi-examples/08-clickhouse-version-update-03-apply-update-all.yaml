@@ -17,8 +17,8 @@ spec:
 
   templates:
     podTemplates:
-      - name: clickhouse:23.8
+      - name: clickhouse:24.8
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:24.8
