@@ -5130,9 +5130,9 @@ def test_053(self):
         current().context.operator_version = version_from
         create_shell_namespace_clickhouse_template()
 
-    manifest="manifests/chi/test-001.yaml"
+    manifest="manifests/chi/test-005-acm.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
-    sts = f"chi-{chi}-single-0-0"
+    sts = f"chi-{chi}-t1-0-0"
     pod = f"{sts}-0"
 
     kubectl.create_and_check(
