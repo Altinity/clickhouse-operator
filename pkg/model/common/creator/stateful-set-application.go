@@ -67,18 +67,20 @@ func (c *Creator) stsAppContainerSetupEnvVars(statefulSet *apps.StatefulSet, hos
 		return
 	}
 
-	log.V(2).F().Info("going to merge additional vars len()=%d", len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
-	log.V(2).F().Info("container env vars len()=%d", len(container.Env))
-	container.Env = util.MergeEnvVars(container.Env, host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()...)
-	log.V(2).F().Info("container env vars len()=%d", len(container.Env))
+	l := log.V(2).F().Info
 
-	log.V(2).F().Info("additional env vars for host: %s num: %d", host.GetName(), len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
+	l("going to merge additional vars len()=%d", len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
+	l("container env vars len()=%d", len(container.Env))
+	container.Env = util.MergeEnvVars(container.Env, host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()...)
+	l("container env vars len()=%d", len(container.Env))
+
+	l("additional env vars for host: %s num: %d", host.GetName(), len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
 	for _, envVar := range host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars() {
-		log.V(2).F().Info("additional env var for host: %s name: %s", host.GetName(), envVar.Name)
+		l("additional env var for host: %s name: %s", host.GetName(), envVar.Name)
 	}
-	log.V(2).F().Info("env vars for host: %s num: %d", host.GetName(), len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
+	l("env vars for host: %s num: %d", host.GetName(), len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
 	for _, envVar := range container.Env {
-		log.V(2).F().Info("env var for host: %s name: %s", host.GetName(), envVar.Name)
+		l("env var for host: %s name: %s", host.GetName(), envVar.Name)
 	}
 }
 
