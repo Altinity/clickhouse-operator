@@ -943,12 +943,13 @@ def test_011_3(self):
             sasl_username_env = ""
             sasl_password_env = ""
             for e in envs:
-                if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_USERNAME":
-                    sasl_username_env = e["name"]
-                if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_PASSWORD":
-                    sasl_password_env = e["name"]
-                if e["valueFrom"]["secretKeyRef"]["key"] == "pwduser5":
-                    user5_password_env = e["name"]
+                if "valueFrom" in e:
+                    if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_USERNAME":
+                        sasl_username_env = e["name"]
+                    if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_PASSWORD":
+                        sasl_password_env = e["name"]
+                    if e["valueFrom"]["secretKeyRef"]["key"] == "pwduser5":
+                        user5_password_env = e["name"]
 
             with By("Secrets are properly propagated to env variables"):
                 print(f"Found env variables: {sasl_username_env} {sasl_password_env} {user5_password_env}")
@@ -1897,7 +1898,7 @@ def test_016(self):
                 "1",
             )
         # Wait for changes to propagate
-        time.sleep(90)
+        time.sleep(60)
 
         with Then("test_norestart user should be available"):
             version = clickhouse.query(chi, sql="select version()", user="test_norestart")
@@ -4073,7 +4074,7 @@ def test_039_1(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_2. Inter-cluster communications with plan text secret")
+@Name("test_039_2. Inter-cluster communications with plane text secret")
 def test_039_2(self):
     """Check clickhouse-operator support inter-cluster communications with plan text secret."""
     create_shell_namespace_clickhouse_template()
