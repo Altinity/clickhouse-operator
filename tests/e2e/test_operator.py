@@ -34,6 +34,7 @@ def test_001(self):
             },
             "configmaps": 1,
             "pdb": {"single": 1},
+            "do_not_delete": 1,
         },
     )
     with Finally("I clean up"):
