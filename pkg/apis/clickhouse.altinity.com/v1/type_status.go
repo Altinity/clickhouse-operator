@@ -71,6 +71,7 @@ type Status struct {
 	PodIPs                 []string                `json:"pod-ips,omitempty"                yaml:"pod-ips,omitempty"`
 	FQDNs                  []string                `json:"fqdns,omitempty"                  yaml:"fqdns,omitempty"`
 	Endpoint               string                  `json:"endpoint,omitempty"               yaml:"endpoint,omitempty"`
+	Endpoints              []string                `json:"endpoints,omitempty"              yaml:"endpoints,omitempty"`
 	NormalizedCR           *ClickHouseInstallation `json:"normalized,omitempty"             yaml:"normalized,omitempty"`
 	NormalizedCRCompleted  *ClickHouseInstallation `json:"normalizedCompleted,omitempty"    yaml:"normalizedCompleted,omitempty"`
 	HostsWithTablesCreated []string                `json:"hostsWithTablesCreated,omitempty" yaml:"hostsWithTablesCreated,omitempty"`
@@ -95,6 +96,7 @@ type FillStatusParams struct {
 	Pods                []string
 	FQDNs               []string
 	Endpoint            string
+	Endpoints           []string
 	NormalizedCR        *ClickHouseInstallation
 }
 
@@ -123,6 +125,7 @@ func (s *Status) Fill(params *FillStatusParams) {
 		s.Pods = params.Pods
 		s.FQDNs = params.FQDNs
 		s.Endpoint = params.Endpoint
+		s.Endpoints = append([]string{}, params.Endpoints...)
 		s.NormalizedCR = params.NormalizedCR
 	})
 }
@@ -509,6 +512,7 @@ func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 			}
 			if opts.Copy.Endpoint {
 				s.Endpoint = from.Endpoint
+				s.Endpoints = from.Endpoints
 			}
 			if opts.Copy.NormalizedCR {
 				s.NormalizedCR = from.NormalizedCR
