@@ -21,6 +21,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type IConfigMapManager interface {
@@ -81,7 +82,7 @@ type IProbeManager interface {
 }
 
 type IServiceManager interface {
-	CreateService(what ServiceType, params ...any) *core.Service
+	CreateService(what ServiceType, params ...any) util.Slice[*core.Service]
 	SetCR(cr api.ICustomResource)
 	SetTagger(tagger ITagger)
 }
@@ -101,7 +102,7 @@ type ICreator interface {
 		template *api.VolumeClaimTemplate,
 	) *core.PersistentVolumeClaim
 	CreateClusterSecret(name string) *core.Secret
-	CreateService(what ServiceType, params ...any) *core.Service
+	CreateService(what ServiceType, params ...any) util.Slice[*core.Service]
 	CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet
 }
 
