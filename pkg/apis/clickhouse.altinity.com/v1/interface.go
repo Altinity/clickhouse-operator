@@ -30,7 +30,7 @@ type ICustomResource interface {
 	GetSpecA() any
 	GetSpec() ICRSpec
 	GetRuntime() ICustomResourceRuntime
-	GetRootServiceTemplate() (*ServiceTemplate, bool)
+	GetRootServiceTemplates() ([]*ServiceTemplate, bool)
 	GetReconciling() *Reconciling
 
 	WalkClusters(f func(cluster ICluster) error) []error
@@ -271,3 +271,8 @@ type WalkHostsAddressFn func(
 	host IHost,
 	address *types.HostScopeAddress,
 ) error
+
+type IGenerateName interface {
+	HasGenerateName() bool
+	GetGenerateName() string
+}
