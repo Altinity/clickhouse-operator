@@ -208,15 +208,17 @@ func (w *worker) reconcileCRServiceFinal(ctx context.Context, cr api.ICustomReso
 		return nil
 	}
 
-	// Create entry point for the whole CHI
-	if service := w.task.Creator().CreateService(interfaces.ServiceCR); service != nil {
-		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCR)
-		if err := w.reconcileService(ctx, cr, service, prevService); err != nil {
-			// Service not reconciled
-			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
-			return err
+	// Create entry point for the whole CR
+	for _, service := range w.task.Creator().CreateService(interfaces.ServiceCR) {
+		if service != nil {
+			prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCR).First()
+			if err := w.reconcileService(ctx, cr, service, prevService); err != nil {
+				// Service not reconciled
+				w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
+				return err
+			}
+			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
 		}
-		w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
 	}
 
 	return nil
@@ -366,12 +368,12 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 		log.V(2).Info("task is done")
 		return nil
 	}
-	service := w.task.Creator().CreateService(interfaces.ServiceHost, host)
+	service := w.task.Creator().CreateService(interfaces.ServiceHost, host).First()
 	if service == nil {
 		// This is not a problem, service may be omitted
 		return nil
 	}
-	prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceHost, host.GetAncestor())
+	prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceHost, host.GetAncestor()).First()
 	err := w.reconcileService(ctx, host.GetCR(), service, prevService)
 	if err == nil {
 		w.a.V(1).M(host).F().Info("DONE Reconcile service of the host: %s", host.GetName())
@@ -394,8 +396,8 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.Cluster) 
 	defer w.a.V(2).M(cluster).E().P()
 
 	// Add Cluster Service
-	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster); service != nil {
-		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCluster, cluster.GetAncestor())
+	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster).First(); service != nil {
+		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCluster, cluster.GetAncestor()).First()
 		if err := w.reconcileService(ctx, cluster.GetRuntime().GetCR(), service, prevService); err == nil {
 			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
 		} else {
