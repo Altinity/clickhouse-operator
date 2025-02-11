@@ -513,7 +513,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
     with When("I create new shells"):
         shell_1 = get_shell()
         shell_2 = get_shell()
-        shell_3 = get_shell()
+        # shell_3 = get_shell()
 
     Check("run query until receive stop event", test=run_select_query, parallel=True)(
         host=service,
@@ -575,7 +575,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_009_1(self, version_from="0.23.7", version_to=None):
+def test_009_1(self, version_from="0.24.3", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -591,7 +591,7 @@ def test_009_1(self, version_from="0.23.7", version_to=None):
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_009_2(self, version_from="0.23.7", version_to=None):
+def test_009_2(self, version_from="0.24.3", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 

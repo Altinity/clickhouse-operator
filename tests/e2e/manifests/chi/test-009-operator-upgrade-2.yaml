@@ -73,8 +73,8 @@ spec:
               volumeMounts:
                 - name: aws-ebs-volume-claim
                   mountPath: /var/lib/clickhouse
-              lifecycle:
-                preStop:
-                  exec:
-                    command: ["/bin/sh", "-c", "pkill -SIGTERM clickhouse-server"]
+              command:
+                - /bin/bash
+                - -c
+                - /usr/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml
           terminationGracePeriodSeconds: 360
