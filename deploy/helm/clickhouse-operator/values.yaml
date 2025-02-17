@@ -1,3 +1,5 @@
+namespaceOverride: ""
+
 operator:
   image:
     # operator.image.repository -- image repository
@@ -755,13 +757,13 @@ additionalResources: []
 #    kind: ConfigMap
 #    metadata:
 #      name: {{ include "altinity-clickhouse-operator.fullname" . }}-cm
-#      namespace: {{ .Release.Namespace }}
+#      namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
 #  - |
 #     apiVersion: v1
 #     kind: Secret
 #     metadata:
 #       name: {{ include "altinity-clickhouse-operator.fullname" . }}-s
-#       namespace: {{ .Release.Namespace }}
+#       namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
 #     stringData:
 #       mykey: my-value
 #  - |
@@ -769,7 +771,7 @@ additionalResources: []
 #     kind: ClickHouseInstallation
 #     metadata:
 #       name: {{ include "altinity-clickhouse-operator.fullname" . }}-chi
-#       namespace: {{ .Release.Namespace }}
+#       namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
 #     spec:
 #       configuration:
 #         clusters:
