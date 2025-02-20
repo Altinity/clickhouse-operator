@@ -198,12 +198,12 @@ type HostReconcileAttributesCounters struct {
 
 	// Attributes are used by config generator
 
-	add    int
-	remove int
-	modify int
-	found  int
+	_add    int
+	_remove int
+	_modify int
+	_found  int
 
-	exclude int
+	_exclude int
 }
 
 // NewHostReconcileAttributesCounters creates new reconcile attributes
@@ -213,8 +213,8 @@ func NewHostReconcileAttributesCounters() *HostReconcileAttributesCounters {
 	}
 }
 
-// Add adds to counters provided HostReconcileAttributes
-func (c *HostReconcileAttributesCounters) Add(a *HostReconcileAttributes) {
+// add adds to counters provided HostReconcileAttributes
+func (c *HostReconcileAttributesCounters) add(a *HostReconcileAttributes) {
 	if c == nil {
 		return
 	}
@@ -228,61 +228,61 @@ func (c *HostReconcileAttributesCounters) Add(a *HostReconcileAttributes) {
 	c.status[a.GetStatus()] = value
 
 	if a.IsAdd() {
-		c.add++
+		c._add++
 	}
 	if a.IsRemove() {
-		c.remove++
+		c._remove++
 	}
 	if a.IsModify() {
-		c.modify++
+		c._modify++
 	}
 	if a.IsFound() {
-		c.found++
+		c._found++
 	}
 	if a.IsExclude() {
-		c.exclude++
+		c._exclude++
 	}
 }
 
 // GetAdd gets added
-func (c *HostReconcileAttributesCounters) GetAdd() int {
+func (c *HostReconcileAttributesCounters) getAdd() int {
 	if c == nil {
 		return 0
 	}
-	return c.add
+	return c._add
 }
 
 // GetRemove gets removed
-func (c *HostReconcileAttributesCounters) GetRemove() int {
+func (c *HostReconcileAttributesCounters) getRemove() int {
 	if c == nil {
 		return 0
 	}
-	return c.remove
+	return c._remove
 }
 
 // GetModify gets modified
-func (c *HostReconcileAttributesCounters) GetModify() int {
+func (c *HostReconcileAttributesCounters) getModify() int {
 	if c == nil {
 		return 0
 	}
-	return c.modify
+	return c._modify
 }
 
 // GetFound gets found
-func (c *HostReconcileAttributesCounters) GetFound() int {
+func (c *HostReconcileAttributesCounters) getFound() int {
 	if c == nil {
 		return 0
 	}
-	return c.found
+	return c._found
 }
 
 // AddOnly checks whether counters have Add() only items
 func (c *HostReconcileAttributesCounters) AddOnly() bool {
-	return c.GetAdd() > 0 && c.GetFound() == 0 && c.GetModify() == 0 && c.GetRemove() == 0
+	return (c.getAdd() > 0) && (c.getFound() == 0) && (c.getModify() == 0) && (c.getRemove() == 0)
 }
 
 func (c *HostReconcileAttributesCounters) String() string {
-	return fmt.Sprintf("a: %d f: %d m: %d r: %d", c.GetAdd(), c.GetFound(), c.GetModify(), c.GetRemove())
+	return fmt.Sprintf("a: %d f: %d m: %d r: %d", c.getAdd(), c.getFound(), c.getModify(), c.getRemove())
 }
 
 type iWalkHosts interface {
@@ -291,7 +291,7 @@ type iWalkHosts interface {
 
 func (c *HostReconcileAttributesCounters) Count(src iWalkHosts) *HostReconcileAttributesCounters {
 	src.WalkHosts(func(host *Host) error {
-		c.Add(host.GetReconcileAttributes())
+		c.add(host.GetReconcileAttributes())
 		return nil
 	})
 	return c
