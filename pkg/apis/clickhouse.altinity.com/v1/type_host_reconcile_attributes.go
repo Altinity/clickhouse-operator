@@ -276,14 +276,6 @@ func (c *HostReconcileAttributesCounters) GetFound() int {
 	return c.found
 }
 
-// GetExclude gets exclude
-func (c *HostReconcileAttributesCounters) GetExclude() int {
-	if c == nil {
-		return 0
-	}
-	return c.exclude
-}
-
 // AddOnly checks whether counters have Add() only items
 func (c *HostReconcileAttributesCounters) AddOnly() bool {
 	return c.GetAdd() > 0 && c.GetFound() == 0 && c.GetModify() == 0 && c.GetRemove() == 0
