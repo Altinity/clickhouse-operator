@@ -133,12 +133,12 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 		return true
 	}
 
-	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusNew {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusNew) {
 		w.a.V(1).M(host).F().Info("Host is new, no restart applicable. Host: %s", host.GetName())
 		return false
 	}
 
-	if (host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame) && !host.HasAncestor() {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) && !host.HasAncestor() {
 		w.a.V(1).M(host).F().Info("Host already exists, but has no ancestor, no restart applicable. Host: %s", host.GetName())
 		return false
 	}

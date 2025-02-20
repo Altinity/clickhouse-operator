@@ -1069,7 +1069,7 @@ func (in *HostReconcileAttributesCounters) DeepCopyInto(out *HostReconcileAttrib
 	*out = *in
 	if in.status != nil {
 		in, out := &in.status, &out.status
-		*out = make(map[ObjectStatus]int, len(*in))
+		*out = make(map[types.ObjectStatus]int, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}

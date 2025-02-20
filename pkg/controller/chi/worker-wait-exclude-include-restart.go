@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -230,13 +231,13 @@ func (w *worker) shouldExcludeHost(host *api.Host) bool {
 			Info("Host should be restarted, need to exclude. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return true
-	case host.GetReconcileAttributes().GetStatus() == api.ObjectStatusNew:
+	case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusNew):
 		w.a.V(1).
 			M(host).F().
-			Info("Host is new, no need to exclude. Host/shard/cluster: %d/%d/%s",
+			Info("Host is a new one, no need to exclude. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
-	case host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame:
+	case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame):
 		w.a.V(1).
 			M(host).F().
 			Info("Host is the same, would not be updated, no need to exclude. Host/shard/cluster: %d/%d/%s",
@@ -280,7 +281,7 @@ func (w *worker) shouldWaitExcludeHost(host *api.Host) bool {
 // shouldWaitQueries determines whether reconciler should wait for the host to complete running queries
 func (w *worker) shouldWaitQueries(host *api.Host) bool {
 	switch {
-	case host.GetReconcileAttributes().GetStatus() == api.ObjectStatusNew:
+	case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusNew):
 		w.a.V(1).
 			M(host).F().
 			Info("No need to wait for queries to complete on a host, host is a new one. "+
@@ -315,9 +316,9 @@ func (w *worker) shouldWaitQueries(host *api.Host) bool {
 func (w *worker) shouldWaitIncludeHost(host *api.Host) bool {
 	status := host.GetReconcileAttributes().GetStatus()
 	switch {
-	case status == api.ObjectStatusNew:
+	case status.Is(types.ObjectStatusNew):
 		return false
-	case status == api.ObjectStatusSame:
+	case status.Is(types.ObjectStatusSame):
 		// The same host was not modified and no need to wait it to be included - it already is
 		return false
 	case host.GetShard().HostsCount() == 1:

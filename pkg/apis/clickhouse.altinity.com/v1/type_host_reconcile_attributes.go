@@ -16,22 +16,13 @@ package v1
 
 import (
 	"fmt"
-)
 
-// ObjectStatus specifies object status
-type ObjectStatus string
-
-// Possible values for object status
-const (
-	ObjectStatusModified ObjectStatus = "modified"
-	ObjectStatusNew      ObjectStatus = "new"
-	ObjectStatusSame     ObjectStatus = "same"
-	ObjectStatusUnknown  ObjectStatus = "unknown"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // HostReconcileAttributes defines host reconcile status and attributes
 type HostReconcileAttributes struct {
-	status ObjectStatus
+	status types.ObjectStatus
 
 	// Attributes are used by config generator
 
@@ -78,7 +69,7 @@ func (a *HostReconcileAttributes) Any(of *HostReconcileAttributes) bool {
 }
 
 // SetStatus sets status
-func (a *HostReconcileAttributes) SetStatus(status ObjectStatus) *HostReconcileAttributes {
+func (a *HostReconcileAttributes) SetStatus(status types.ObjectStatus) *HostReconcileAttributes {
 	if a == nil {
 		return a
 	}
@@ -87,9 +78,9 @@ func (a *HostReconcileAttributes) SetStatus(status ObjectStatus) *HostReconcileA
 }
 
 // GetStatus gets status
-func (a *HostReconcileAttributes) GetStatus() ObjectStatus {
+func (a *HostReconcileAttributes) GetStatus() types.ObjectStatus {
 	if a == nil {
-		return ObjectStatus("")
+		return types.ObjectStatusUnknown
 	}
 	return a.status
 }
@@ -216,7 +207,7 @@ func (a *HostReconcileAttributes) String() string {
 
 // HostReconcileAttributesCounters defines host reconcile status and attributes counters
 type HostReconcileAttributesCounters struct {
-	status map[ObjectStatus]int
+	status map[types.ObjectStatus]int
 
 	// Attributes are used by config generator
 
@@ -231,7 +222,7 @@ type HostReconcileAttributesCounters struct {
 // NewHostReconcileAttributesCounters creates new reconcile attributes
 func NewHostReconcileAttributesCounters() *HostReconcileAttributesCounters {
 	return &HostReconcileAttributesCounters{
-		status: make(map[ObjectStatus]int),
+		status: make(map[types.ObjectStatus]int),
 	}
 }
 
