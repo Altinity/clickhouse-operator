@@ -16,10 +16,10 @@ package config
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"strings"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // HostSelector specifies options for excluding host

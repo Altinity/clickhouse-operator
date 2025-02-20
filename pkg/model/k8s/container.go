@@ -15,8 +15,9 @@
 package k8s
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	core "k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // PodSpecAddContainer adds container to PodSpec

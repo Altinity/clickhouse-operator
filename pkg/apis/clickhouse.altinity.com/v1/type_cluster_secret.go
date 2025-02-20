@@ -15,8 +15,9 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	core "k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // ClusterSecret defines the shared secret for nodes to authenticate each other with
