@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -183,7 +184,7 @@ func (w *worker) getRemoteServersGeneratorOptions() *commonConfig.HostSelector {
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
-		api.NewHostReconcileAttributes().
+		types.NewHostReconcileAttributes().
 			SetAdd().
 			SetExclude(),
 	)

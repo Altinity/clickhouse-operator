@@ -16,6 +16,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"strings"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -24,7 +25,7 @@ import (
 // HostSelector specifies options for excluding host
 type HostSelector struct {
 	exclude struct {
-		attributes *api.HostReconcileAttributes
+		attributes *types.HostReconcileAttributes
 		hosts      []*api.Host
 	}
 }
@@ -55,7 +56,7 @@ func (o *HostSelector) ExcludeHosts(hosts ...*api.Host) *HostSelector {
 }
 
 // ExcludeReconcileAttributes specifies to exclude reconcile attributes
-func (o *HostSelector) ExcludeReconcileAttributes(attrs *api.HostReconcileAttributes) *HostSelector {
+func (o *HostSelector) ExcludeReconcileAttributes(attrs *types.HostReconcileAttributes) *HostSelector {
 	if (o == nil) || (attrs == nil) {
 		return o
 	}

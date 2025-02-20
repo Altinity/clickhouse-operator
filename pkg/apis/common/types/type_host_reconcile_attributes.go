@@ -16,7 +16,6 @@ package types
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // HostReconcileAttributes defines host reconcile status and attributes
@@ -219,8 +218,8 @@ func NewHostReconcileAttributesCounters() *HostReconcileAttributesCounters {
 	}
 }
 
-// add adds to counters provided HostReconcileAttributes
-func (c *HostReconcileAttributesCounters) add(a *HostReconcileAttributes) {
+// Add adds to counters provided HostReconcileAttributes
+func (c *HostReconcileAttributesCounters) Add(a *HostReconcileAttributes) {
 	if c == nil {
 		return
 	}
@@ -289,16 +288,4 @@ func (c *HostReconcileAttributesCounters) IsAddOnly() bool {
 
 func (c *HostReconcileAttributesCounters) String() string {
 	return fmt.Sprintf("a: %d f: %d m: %d r: %d", c.getAdd(), c.getFound(), c.getModify(), c.getRemove())
-}
-
-type iWalkHosts interface {
-	WalkHosts(func(host *v1.Host) error) []error
-}
-
-func (c *HostReconcileAttributesCounters) Count(src iWalkHosts) *HostReconcileAttributesCounters {
-	src.WalkHosts(func(host *v1.Host) error {
-		c.add(host.GetReconcileAttributes())
-		return nil
-	})
-	return c
 }
