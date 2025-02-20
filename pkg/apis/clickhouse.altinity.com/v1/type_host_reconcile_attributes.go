@@ -39,19 +39,6 @@ func NewHostReconcileAttributes() *HostReconcileAttributes {
 	return &HostReconcileAttributes{}
 }
 
-// Equal checks whether reconcile attributes are equal
-func (a *HostReconcileAttributes) Equal(to HostReconcileAttributes) bool {
-	if a == nil {
-		return false
-	}
-	return true &&
-		(a.add == to.add) &&
-		(a.remove == to.remove) &&
-		(a.modify == to.modify) &&
-		(a.found == to.found) &&
-		(a.exclude == to.exclude)
-}
-
 // Any checks whether any of the attributes is set
 func (a *HostReconcileAttributes) Any(of *HostReconcileAttributes) bool {
 	if a == nil {
