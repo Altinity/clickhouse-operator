@@ -151,7 +151,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 		}
 	case chop.Config().ClickHouse.Access.Username:
 		// User used by CHOp to access ClickHouse instances.
-		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
+		ip, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_IP)
 
 		profile = chopProfile
 		quota = ""
