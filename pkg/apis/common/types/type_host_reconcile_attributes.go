@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v1
+package types
 
 import (
 	"fmt"
-
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // HostReconcileAttributes defines host reconcile status and attributes
 type HostReconcileAttributes struct {
-	status types.ObjectStatus
+	status ObjectStatus
 
 	// Attributes are used by config generator
 
@@ -63,7 +62,7 @@ func (a *HostReconcileAttributes) HasIntersectionWith(b *HostReconcileAttributes
 }
 
 // SetStatus sets status
-func (a *HostReconcileAttributes) SetStatus(status types.ObjectStatus) *HostReconcileAttributes {
+func (a *HostReconcileAttributes) SetStatus(status ObjectStatus) *HostReconcileAttributes {
 	if a == nil {
 		return a
 	}
@@ -72,9 +71,9 @@ func (a *HostReconcileAttributes) SetStatus(status types.ObjectStatus) *HostReco
 }
 
 // GetStatus gets status
-func (a *HostReconcileAttributes) GetStatus() types.ObjectStatus {
+func (a *HostReconcileAttributes) GetStatus() ObjectStatus {
 	if a == nil {
-		return types.ObjectStatusUnknown
+		return ObjectStatusUnknown
 	}
 	return a.status
 }
@@ -201,7 +200,7 @@ func (a *HostReconcileAttributes) String() string {
 
 // HostReconcileAttributesCounters defines host reconcile status and attributes counters
 type HostReconcileAttributesCounters struct {
-	status map[types.ObjectStatus]int
+	status map[ObjectStatus]int
 
 	// Attributes are used by config generator
 
@@ -216,7 +215,7 @@ type HostReconcileAttributesCounters struct {
 // NewHostReconcileAttributesCounters creates new reconcile attributes
 func NewHostReconcileAttributesCounters() *HostReconcileAttributesCounters {
 	return &HostReconcileAttributesCounters{
-		status: make(map[types.ObjectStatus]int),
+		status: make(map[ObjectStatus]int),
 	}
 }
 
@@ -293,11 +292,11 @@ func (c *HostReconcileAttributesCounters) String() string {
 }
 
 type iWalkHosts interface {
-	WalkHosts(func(host *Host) error) []error
+	WalkHosts(func(host *v1.Host) error) []error
 }
 
 func (c *HostReconcileAttributesCounters) Count(src iWalkHosts) *HostReconcileAttributesCounters {
-	src.WalkHosts(func(host *Host) error {
+	src.WalkHosts(func(host *v1.Host) error {
 		c.add(host.GetReconcileAttributes())
 		return nil
 	})
