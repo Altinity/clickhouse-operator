@@ -244,7 +244,7 @@ func (c *HostReconcileAttributesCounters) add(a *HostReconcileAttributes) {
 	}
 }
 
-// GetAdd gets added
+// getAdd gets added
 func (c *HostReconcileAttributesCounters) getAdd() int {
 	if c == nil {
 		return 0
@@ -252,7 +252,7 @@ func (c *HostReconcileAttributesCounters) getAdd() int {
 	return c._add
 }
 
-// GetRemove gets removed
+// getRemove gets removed
 func (c *HostReconcileAttributesCounters) getRemove() int {
 	if c == nil {
 		return 0
@@ -260,7 +260,7 @@ func (c *HostReconcileAttributesCounters) getRemove() int {
 	return c._remove
 }
 
-// GetModify gets modified
+// getModify gets modified
 func (c *HostReconcileAttributesCounters) getModify() int {
 	if c == nil {
 		return 0
@@ -268,7 +268,7 @@ func (c *HostReconcileAttributesCounters) getModify() int {
 	return c._modify
 }
 
-// GetFound gets found
+// getFound gets found
 func (c *HostReconcileAttributesCounters) getFound() int {
 	if c == nil {
 		return 0
@@ -276,8 +276,8 @@ func (c *HostReconcileAttributesCounters) getFound() int {
 	return c._found
 }
 
-// AddOnly checks whether counters have Add() only items
-func (c *HostReconcileAttributesCounters) AddOnly() bool {
+// IsAddOnly checks whether counters have Add() only items
+func (c *HostReconcileAttributesCounters) IsAddOnly() bool {
 	return (c.getAdd() > 0) && (c.getFound() == 0) && (c.getModify() == 0) && (c.getRemove() == 0)
 }
 
