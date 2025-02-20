@@ -82,9 +82,14 @@ func (w *worker) doesHostHaveNoRunningQueries(ctx context.Context, host *api.Hos
 	return n <= 1
 }
 
+func (w *worker) isHostReplicationDelayed(ctx context.Context, host *api.Host) bool {
+	delay, _ := w.ensureClusterSchemer(host).HostMaxReplicaDelay(ctx, host)
+	return delay >= 10
+}
+
 // isCHIProcessedOnTheSameIP checks whether it is just a restart of the operator on the same IP
 func (w *worker) isCHIProcessedOnTheSameIP(chi *api.ClickHouseInstallation) bool {
-	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
+	ip, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_IP)
 	operatorIpIsTheSame := ip == chi.Status.GetCHOpIP()
 	log.V(1).Info("Operator IPs to process CHI: %s. Previous: %s Cur: %s", chi.Name, chi.Status.GetCHOpIP(), ip)
 
