@@ -211,7 +211,7 @@ type ReconcileAttributesCounters struct {
 	_exclude int
 }
 
-// NewReconcileAttributesCounters creates new reconcile attributes
+// NewReconcileAttributesCounters creates new reconcile attributes counters
 func NewReconcileAttributesCounters() *ReconcileAttributesCounters {
 	return &ReconcileAttributesCounters{
 		status: make(map[ObjectStatus]int),
