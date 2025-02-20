@@ -81,8 +81,8 @@ func (l *Labeler) LabelMyObjectsTree(ctx context.Context) error {
 	}
 
 	// What pod does operator run in?
-	name, ok1 := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAME)
-	namespace, ok2 := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
+	name, ok1 := chop.GetRuntimeParam(deployment.OPERATOR_POD_NAME)
+	namespace, ok2 := chop.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
 
 	if !ok1 || !ok2 {
 		str := fmt.Sprintf("ERROR read env vars: %s/%s ", deployment.OPERATOR_POD_NAME, deployment.OPERATOR_POD_NAMESPACE)
