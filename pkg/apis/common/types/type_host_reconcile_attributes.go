@@ -18,8 +18,8 @@ import (
 	"fmt"
 )
 
-// HostReconcileAttributes defines host reconcile status and attributes
-type HostReconcileAttributes struct {
+// ReconcileAttributes defines reconcile status and attributes
+type ReconcileAttributes struct {
 	status ObjectStatus
 
 	// Attributes are used by config generator
@@ -32,13 +32,13 @@ type HostReconcileAttributes struct {
 	exclude bool
 }
 
-// NewHostReconcileAttributes creates new reconcile attributes
-func NewHostReconcileAttributes() *HostReconcileAttributes {
-	return &HostReconcileAttributes{}
+// NewReconcileAttributes creates new reconcile attributes
+func NewReconcileAttributes() *ReconcileAttributes {
+	return &ReconcileAttributes{}
 }
 
 // HasIntersectionWith checks whether attributes `a` has intersection with `b`
-func (a *HostReconcileAttributes) HasIntersectionWith(b *HostReconcileAttributes) bool {
+func (a *ReconcileAttributes) HasIntersectionWith(b *ReconcileAttributes) bool {
 	if a == nil {
 		return false
 	}
@@ -61,7 +61,7 @@ func (a *HostReconcileAttributes) HasIntersectionWith(b *HostReconcileAttributes
 }
 
 // SetStatus sets status
-func (a *HostReconcileAttributes) SetStatus(status ObjectStatus) *HostReconcileAttributes {
+func (a *ReconcileAttributes) SetStatus(status ObjectStatus) *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
@@ -70,7 +70,7 @@ func (a *HostReconcileAttributes) SetStatus(status ObjectStatus) *HostReconcileA
 }
 
 // GetStatus gets status
-func (a *HostReconcileAttributes) GetStatus() ObjectStatus {
+func (a *ReconcileAttributes) GetStatus() ObjectStatus {
 	if a == nil {
 		return ObjectStatusUnknown
 	}
@@ -78,7 +78,7 @@ func (a *HostReconcileAttributes) GetStatus() ObjectStatus {
 }
 
 // SetAdd sets 'add' attribute
-func (a *HostReconcileAttributes) SetAdd() *HostReconcileAttributes {
+func (a *ReconcileAttributes) SetAdd() *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
@@ -87,7 +87,7 @@ func (a *HostReconcileAttributes) SetAdd() *HostReconcileAttributes {
 }
 
 // UnsetAdd unsets 'add' attribute
-func (a *HostReconcileAttributes) UnsetAdd() *HostReconcileAttributes {
+func (a *ReconcileAttributes) UnsetAdd() *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
@@ -96,7 +96,7 @@ func (a *HostReconcileAttributes) UnsetAdd() *HostReconcileAttributes {
 }
 
 // IsAdd checks whether 'add' attribute is set
-func (a *HostReconcileAttributes) IsAdd() bool {
+func (a *ReconcileAttributes) IsAdd() bool {
 	if a == nil {
 		return false
 	}
@@ -104,7 +104,7 @@ func (a *HostReconcileAttributes) IsAdd() bool {
 }
 
 // SetRemove sets 'remove' attribute
-func (a *HostReconcileAttributes) SetRemove() *HostReconcileAttributes {
+func (a *ReconcileAttributes) SetRemove() *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
@@ -113,7 +113,7 @@ func (a *HostReconcileAttributes) SetRemove() *HostReconcileAttributes {
 }
 
 // IsRemove checks whether 'remove' attribute is set
-func (a *HostReconcileAttributes) IsRemove() bool {
+func (a *ReconcileAttributes) IsRemove() bool {
 	if a == nil {
 		return false
 	}
@@ -121,7 +121,7 @@ func (a *HostReconcileAttributes) IsRemove() bool {
 }
 
 // SetModify sets 'modify' attribute
-func (a *HostReconcileAttributes) SetModify() *HostReconcileAttributes {
+func (a *ReconcileAttributes) SetModify() *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
@@ -130,7 +130,7 @@ func (a *HostReconcileAttributes) SetModify() *HostReconcileAttributes {
 }
 
 // IsModify checks whether 'modify' attribute is set
-func (a *HostReconcileAttributes) IsModify() bool {
+func (a *ReconcileAttributes) IsModify() bool {
 	if a == nil {
 		return false
 	}
@@ -138,7 +138,7 @@ func (a *HostReconcileAttributes) IsModify() bool {
 }
 
 // SetFound sets 'found' attribute
-func (a *HostReconcileAttributes) SetFound() *HostReconcileAttributes {
+func (a *ReconcileAttributes) SetFound() *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
@@ -147,7 +147,7 @@ func (a *HostReconcileAttributes) SetFound() *HostReconcileAttributes {
 }
 
 // IsFound checks whether 'found' attribute is set
-func (a *HostReconcileAttributes) IsFound() bool {
+func (a *ReconcileAttributes) IsFound() bool {
 	if a == nil {
 		return false
 	}
@@ -155,7 +155,7 @@ func (a *HostReconcileAttributes) IsFound() bool {
 }
 
 // SetExclude sets 'exclude' attribute
-func (a *HostReconcileAttributes) SetExclude() *HostReconcileAttributes {
+func (a *ReconcileAttributes) SetExclude() *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
@@ -164,7 +164,7 @@ func (a *HostReconcileAttributes) SetExclude() *HostReconcileAttributes {
 }
 
 // UnsetExclude unsets 'exclude' attribute
-func (a *HostReconcileAttributes) UnsetExclude() *HostReconcileAttributes {
+func (a *ReconcileAttributes) UnsetExclude() *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
@@ -173,7 +173,7 @@ func (a *HostReconcileAttributes) UnsetExclude() *HostReconcileAttributes {
 }
 
 // IsExclude checks whether 'exclude' attribute is set
-func (a *HostReconcileAttributes) IsExclude() bool {
+func (a *ReconcileAttributes) IsExclude() bool {
 	if a == nil {
 		return false
 	}
@@ -181,7 +181,7 @@ func (a *HostReconcileAttributes) IsExclude() bool {
 }
 
 // String returns string form
-func (a *HostReconcileAttributes) String() string {
+func (a *ReconcileAttributes) String() string {
 	if a == nil {
 		return "(nil)"
 	}
@@ -197,8 +197,8 @@ func (a *HostReconcileAttributes) String() string {
 	)
 }
 
-// HostReconcileAttributesCounters defines host reconcile status and attributes counters
-type HostReconcileAttributesCounters struct {
+// ReconcileAttributesCounters defines reconcile status and attributes counters
+type ReconcileAttributesCounters struct {
 	status map[ObjectStatus]int
 
 	// Attributes are used by config generator
@@ -211,15 +211,15 @@ type HostReconcileAttributesCounters struct {
 	_exclude int
 }
 
-// NewHostReconcileAttributesCounters creates new reconcile attributes
-func NewHostReconcileAttributesCounters() *HostReconcileAttributesCounters {
-	return &HostReconcileAttributesCounters{
+// NewReconcileAttributesCounters creates new reconcile attributes
+func NewReconcileAttributesCounters() *ReconcileAttributesCounters {
+	return &ReconcileAttributesCounters{
 		status: make(map[ObjectStatus]int),
 	}
 }
 
-// Add adds to counters provided HostReconcileAttributes
-func (c *HostReconcileAttributesCounters) Add(a *HostReconcileAttributes) {
+// Add adds to counters provided ReconcileAttributes
+func (c *ReconcileAttributesCounters) Add(a *ReconcileAttributes) {
 	if c == nil {
 		return
 	}
@@ -250,7 +250,7 @@ func (c *HostReconcileAttributesCounters) Add(a *HostReconcileAttributes) {
 }
 
 // getAdd gets added
-func (c *HostReconcileAttributesCounters) getAdd() int {
+func (c *ReconcileAttributesCounters) getAdd() int {
 	if c == nil {
 		return 0
 	}
@@ -258,7 +258,7 @@ func (c *HostReconcileAttributesCounters) getAdd() int {
 }
 
 // getRemove gets removed
-func (c *HostReconcileAttributesCounters) getRemove() int {
+func (c *ReconcileAttributesCounters) getRemove() int {
 	if c == nil {
 		return 0
 	}
@@ -266,7 +266,7 @@ func (c *HostReconcileAttributesCounters) getRemove() int {
 }
 
 // getModify gets modified
-func (c *HostReconcileAttributesCounters) getModify() int {
+func (c *ReconcileAttributesCounters) getModify() int {
 	if c == nil {
 		return 0
 	}
@@ -274,7 +274,7 @@ func (c *HostReconcileAttributesCounters) getModify() int {
 }
 
 // getFound gets found
-func (c *HostReconcileAttributesCounters) getFound() int {
+func (c *ReconcileAttributesCounters) getFound() int {
 	if c == nil {
 		return 0
 	}
@@ -282,10 +282,10 @@ func (c *HostReconcileAttributesCounters) getFound() int {
 }
 
 // IsAddOnly checks whether counters have Add() only items
-func (c *HostReconcileAttributesCounters) IsAddOnly() bool {
+func (c *ReconcileAttributesCounters) IsAddOnly() bool {
 	return (c.getAdd() > 0) && (c.getFound() == 0) && (c.getModify() == 0) && (c.getRemove() == 0)
 }
 
-func (c *HostReconcileAttributesCounters) String() string {
+func (c *ReconcileAttributesCounters) String() string {
 	return fmt.Sprintf("a: %d f: %d m: %d r: %d", c.getAdd(), c.getFound(), c.getModify(), c.getRemove())
 }

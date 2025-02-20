@@ -1059,7 +1059,7 @@ func (in *HostRuntime) DeepCopyInto(out *HostRuntime) {
 	}
 	if in.reconcileAttributes != nil {
 		in, out := &in.reconcileAttributes, &out.reconcileAttributes
-		*out = new(types.HostReconcileAttributes)
+		*out = new(types.ReconcileAttributes)
 		**out = **in
 	}
 	if in.replicas != nil {

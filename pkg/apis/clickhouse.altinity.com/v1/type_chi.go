@@ -292,7 +292,7 @@ func (cr *ClickHouseInstallation) HostsCount() int {
 }
 
 // HostsWithAttributesCount counts hosts by attributes
-func (cr *ClickHouseInstallation) HostsWithAttributesCount(a *types.HostReconcileAttributes) int {
+func (cr *ClickHouseInstallation) HostsWithAttributesCount(a *types.ReconcileAttributes) int {
 	count := 0
 	cr.WalkHosts(func(host *Host) error {
 		if host.GetReconcileAttributes().HasIntersectionWith(a) {
@@ -304,8 +304,8 @@ func (cr *ClickHouseInstallation) HostsWithAttributesCount(a *types.HostReconcil
 }
 
 // GetHostsAttributesCounters
-func (cr *ClickHouseInstallation) GetHostsAttributesCounters() *types.HostReconcileAttributesCounters {
-	counters := types.NewHostReconcileAttributesCounters()
+func (cr *ClickHouseInstallation) GetHostsAttributesCounters() *types.ReconcileAttributesCounters {
+	counters := types.NewReconcileAttributesCounters()
 	cr.WalkHosts(func(host *Host) error {
 		counters.Add(host.GetReconcileAttributes())
 		return nil

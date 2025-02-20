@@ -59,11 +59,11 @@ type HostSettings struct {
 
 type HostRuntime struct {
 	// Internal data
-	Address             HostAddress                    `json:"-" yaml:"-"`
-	Version             *swversion.SoftWareVersion     `json:"-" yaml:"-"`
-	reconcileAttributes *types.HostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
-	replicas            *types.Int32                   `json:"-" yaml:"-"`
-	hasData             bool                           `json:"-" yaml:"-"`
+	Address             HostAddress                `json:"-" yaml:"-"`
+	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
+	reconcileAttributes *types.ReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
+	replicas            *types.Int32               `json:"-" yaml:"-"`
+	hasData             bool                       `json:"-" yaml:"-"`
 
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
@@ -116,12 +116,12 @@ func (host *Host) SetTemplates(tl *TemplatesList) {
 }
 
 // GetReconcileAttributes is an ensurer getter
-func (host *Host) GetReconcileAttributes() *types.HostReconcileAttributes {
+func (host *Host) GetReconcileAttributes() *types.ReconcileAttributes {
 	if host == nil {
 		return nil
 	}
 	if host.Runtime.reconcileAttributes == nil {
-		host.Runtime.reconcileAttributes = types.NewHostReconcileAttributes()
+		host.Runtime.reconcileAttributes = types.NewReconcileAttributes()
 	}
 	return host.Runtime.reconcileAttributes
 }

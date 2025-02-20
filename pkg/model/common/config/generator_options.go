@@ -25,7 +25,7 @@ import (
 // HostSelector specifies options for excluding host
 type HostSelector struct {
 	exclude struct {
-		attributes *types.HostReconcileAttributes
+		attributes *types.ReconcileAttributes
 		hosts      []*api.Host
 	}
 }
@@ -56,7 +56,7 @@ func (o *HostSelector) ExcludeHosts(hosts ...*api.Host) *HostSelector {
 }
 
 // ExcludeReconcileAttributes specifies to exclude reconcile attributes
-func (o *HostSelector) ExcludeReconcileAttributes(attrs *types.HostReconcileAttributes) *HostSelector {
+func (o *HostSelector) ExcludeReconcileAttributes(attrs *types.ReconcileAttributes) *HostSelector {
 	if (o == nil) || (attrs == nil) {
 		return o
 	}
