@@ -130,13 +130,7 @@ func (w *worker) reconcile(ctx context.Context, cr *apiChk.ClickHouseKeeperInsta
 	w.a.V(2).M(cr).S().P()
 	defer w.a.V(2).M(cr).E().P()
 
-	counters := api.NewHostReconcileAttributesCounters()
-	cr.WalkHosts(func(host *api.Host) error {
-		counters.Add(host.GetReconcileAttributes())
-		return nil
-	})
-
-	if counters.AddOnly() {
+	if counters := api.NewHostReconcileAttributesCounters().Count(cr); counters.AddOnly() {
 		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CR: %s", util.NamespaceNameString(cr))
 		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
 			FullFanOut: true,
