@@ -39,20 +39,27 @@ func NewHostReconcileAttributes() *HostReconcileAttributes {
 	return &HostReconcileAttributes{}
 }
 
-// Any checks whether any of the attributes is set
-func (a *HostReconcileAttributes) Any(of *HostReconcileAttributes) bool {
+// HasIntersectionWith checks whether attributes `a` has intersection with `b`
+func (a *HostReconcileAttributes) HasIntersectionWith(b *HostReconcileAttributes) bool {
 	if a == nil {
 		return false
 	}
-	if of == nil {
+	if b == nil {
 		return false
 	}
-	return false ||
-		(a.add && of.add) ||
-		(a.remove && of.remove) ||
-		(a.modify && of.modify) ||
-		(a.found && of.found) ||
-		(a.exclude && of.exclude)
+	switch {
+	case a.add && b.add:
+		return true
+	case a.remove && b.remove:
+		return true
+	case a.modify && b.modify:
+		return true
+	case a.found && b.found:
+		return true
+	case a.exclude && b.exclude:
+		return true
+	}
+	return false
 }
 
 // SetStatus sets status
