@@ -295,7 +295,7 @@ func (cr *ClickHouseInstallation) HostsCount() int {
 func (cr *ClickHouseInstallation) HostsCountAttributes(a *HostReconcileAttributes) int {
 	count := 0
 	cr.WalkHosts(func(host *Host) error {
-		if host.GetReconcileAttributes().Any(a) {
+		if host.GetReconcileAttributes().HasIntersectionWith(a) {
 			count++
 		}
 		return nil

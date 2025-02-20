@@ -70,7 +70,7 @@ func (o *HostSelector) Exclude(host *api.Host) bool {
 		return false
 	}
 
-	if o.exclude.attributes.Any(host.GetReconcileAttributes()) {
+	if o.exclude.attributes.HasIntersectionWith(host.GetReconcileAttributes()) {
 		// Reconcile attributes specify to exclude this host
 		return true
 	}
@@ -91,7 +91,7 @@ func (o *HostSelector) Include(host *api.Host) bool {
 		return false
 	}
 
-	if o.exclude.attributes.Any(host.GetReconcileAttributes()) {
+	if o.exclude.attributes.HasIntersectionWith(host.GetReconcileAttributes()) {
 		// Reconcile attributes specify to exclude this host
 		return false
 	}
