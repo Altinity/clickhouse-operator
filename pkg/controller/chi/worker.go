@@ -178,7 +178,7 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 		return true
 	}
 
-	w.a.V(1).M(host).F().Info("Host restart is not required. Host: %s", host.GetName())
+	w.a.V(1).M(host).F().Info("Host force restart is not required. Host: %s", host.GetName())
 	return false
 }
 
