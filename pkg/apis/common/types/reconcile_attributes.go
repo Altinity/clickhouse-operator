@@ -184,7 +184,6 @@ type ReconcileAttributesCounters struct {
 	// Attributes are used by config generator
 
 	_add    int
-	_remove int
 	_modify int
 	_found  int
 
@@ -234,14 +233,6 @@ func (c *ReconcileAttributesCounters) getAdd() int {
 	return c._add
 }
 
-// getRemove gets removed
-func (c *ReconcileAttributesCounters) getRemove() int {
-	if c == nil {
-		return 0
-	}
-	return c._remove
-}
-
 // getModify gets modified
 func (c *ReconcileAttributesCounters) getModify() int {
 	if c == nil {
@@ -260,9 +251,9 @@ func (c *ReconcileAttributesCounters) getFound() int {
 
 // IsAddOnly checks whether counters have Add() only items
 func (c *ReconcileAttributesCounters) IsAddOnly() bool {
-	return (c.getAdd() > 0) && (c.getFound() == 0) && (c.getModify() == 0) && (c.getRemove() == 0)
+	return (c.getAdd() > 0) && (c.getFound() == 0) && (c.getModify() == 0)
 }
 
 func (c *ReconcileAttributesCounters) String() string {
-	return fmt.Sprintf("a: %d f: %d m: %d r: %d", c.getAdd(), c.getFound(), c.getModify(), c.getRemove())
+	return fmt.Sprintf("a: %d f: %d m: %d", c.getAdd(), c.getFound(), c.getModify())
 }
