@@ -394,22 +394,22 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInsta
 	w.a.V(2).M(cr).F().Info("action plan\n%s\n", ap.String())
 }
 
-func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *api.ClickHouseInstallation) {
+func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
 	}
 
-	w.a.V(1).M(_chi).F().S().Info("finalize reconcile")
+	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	if chi, err := w.createCRFromObjectMeta(_chi, true, commonNormalizer.NewOptions()); err == nil {
+	if chi, err := w.createCRFromObjectMeta(_cr, true, commonNormalizer.NewOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CR-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CR-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
 		opts := commonNormalizer.NewOptions()
 		opts.DefaultUserAdditionalIPs = ips
-		if chi, err := w.createCRFromObjectMeta(_chi, true, opts); err == nil {
+		if chi, err := w.createCRFromObjectMeta(_cr, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
 			chi.SetAncestor(chi.GetTarget())
 			chi.SetTarget(nil)
@@ -425,21 +425,21 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 				},
 			})
 		} else {
-			w.a.M(_chi).F().Error("internal unable to find CHI by %v err: %v", _chi.GetLabels(), err)
+			w.a.M(_cr).F().Error("internal unable to find CR by %v err: %v", _cr.GetLabels(), err)
 		}
 	} else {
-		w.a.M(_chi).F().Error("external unable to find CHI by %v err %v", _chi.GetLabels(), err)
+		w.a.M(_cr).F().Error("external unable to find CR by %v err %v", _cr.GetLabels(), err)
 	}
 
 	w.a.V(1).
-		WithEvent(_chi, a.EventActionReconcile, a.EventReasonReconcileCompleted).
-		WithAction(_chi).
-		WithActions(_chi).
-		M(_chi).F().
-		Info("reconcile completed successfully, task id: %s", _chi.GetSpecT().GetTaskID())
+		WithEvent(_cr, a.EventActionReconcile, a.EventReasonReconcileCompleted).
+		WithAction(_cr).
+		WithActions(_cr).
+		M(_cr).F().
+		Info("reconcile completed successfully, task id: %s", _cr.GetSpecT().GetTaskID())
 }
 
-func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *api.ClickHouseInstallation, err error) {
+func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *api.ClickHouseInstallation, err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -447,11 +447,11 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 
 	switch {
 	case err == nil:
-		chi.EnsureStatus().ReconcileComplete()
+		cr.EnsureStatus().ReconcileComplete()
 	case errors.Is(err, common.ErrCRUDAbort):
-		chi.EnsureStatus().ReconcileAbort()
+		cr.EnsureStatus().ReconcileAbort()
 	}
-	w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
+	w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
 				FieldGroupMain: true,
@@ -460,27 +460,27 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 	})
 
 	w.a.V(1).
-		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
-		WithAction(chi).
-		WithActions(chi).
-		M(chi).F().
-		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chi.GetSpecT().GetTaskID())
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+		WithAction(cr).
+		WithActions(cr).
+		M(cr).F().
+		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", cr.GetSpecT().GetTaskID())
 }
 
-func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
+func (w *worker) walkHosts(ctx context.Context, cr *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
 	}
 
-	existingObjects := w.c.discovery(ctx, chi)
+	existingObjects := w.c.discovery(ctx, cr)
 	ap.WalkAdded(
 		// Walk over added clusters
 		func(cluster api.ICluster) {
-			w.a.V(1).M(chi).Info("Walking over AP added clusters. Cluster: %s", cluster.GetName())
+			w.a.V(1).M(cr).Info("Walking over AP added clusters. Cluster: %s", cluster.GetName())
 
 			cluster.WalkHosts(func(host *api.Host) error {
-				w.a.V(1).M(chi).Info("Walking over hosts in added clusters. Cluster: %s Host: %s", cluster.GetName(), host.GetName())
+				w.a.V(1).M(cr).Info("Walking over hosts in added clusters. Cluster: %s Host: %s", cluster.GetName(), host.GetName())
 
 				// Name of the StatefulSet for this host
 				name := w.c.namer.Name(interfaces.NameStatefulSet, host)
@@ -488,7 +488,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 				found := false
 
 				existingObjects.WalkStatefulSet(func(meta meta.Object) {
-					w.a.V(3).M(chi).Info("Walking over existing sts list. sts: %s", util.NamespacedName(meta))
+					w.a.V(3).M(cr).Info("Walking over existing sts list. sts: %s", util.NamespacedName(meta))
 					if name == meta.GetName() {
 						// StatefulSet of this host already exist
 						found = true
@@ -498,11 +498,11 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 				if found {
 					// StatefulSet of this host already exist, we can't ADD it for sure
 					// It looks like FOUND is the most correct approach
-					w.a.V(1).M(chi).Info("Add host as FOUND via cluster. Host was found as sts. Host: %s", host.GetName())
+					w.a.V(1).M(cr).Info("Add host as FOUND via cluster. Host was found as sts. Host: %s", host.GetName())
 					host.GetReconcileAttributes().SetFound()
 				} else {
 					// StatefulSet of this host does not exist, looks like we need to ADD it
-					w.a.V(1).M(chi).Info("Add host as ADD via cluster. Host was not found as sts. Host: %s", host.GetName())
+					w.a.V(1).M(cr).Info("Add host as ADD via cluster. Host was not found as sts. Host: %s", host.GetName())
 					host.GetReconcileAttributes().SetAdd()
 				}
 
@@ -511,63 +511,67 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 		},
 		// Walk over added shards
 		func(shard api.IShard) {
-			w.a.V(1).M(chi).Info("Walking over AP added shards. Shard: %s", shard.GetName())
+			w.a.V(1).M(cr).Info("Walking over AP added shards. Shard: %s", shard.GetName())
 			// Mark all hosts of the shard as newly added
 			shard.WalkHosts(func(host *api.Host) error {
-				w.a.V(1).M(chi).Info("Add host as ADD via shard. Shard: %s Host: %s", shard.GetName(), host.GetName())
+				w.a.V(1).M(cr).Info("Add host as ADD via shard. Shard: %s Host: %s", shard.GetName(), host.GetName())
 				host.GetReconcileAttributes().SetAdd()
 				return nil
 			})
 		},
 		// Walk over added hosts
 		func(host *api.Host) {
-			w.a.V(1).M(chi).Info("Walking over AP added hosts. Host: %s", host.GetName())
-			w.a.V(1).M(chi).Info("Add host as ADD via host. Host: %s", host.GetName())
+			w.a.V(1).M(cr).Info("Walking over AP added hosts. Host: %s", host.GetName())
+			w.a.V(1).M(cr).Info("Add host as ADD via host. Host: %s", host.GetName())
 			host.GetReconcileAttributes().SetAdd()
 		},
 	)
 
 	ap.WalkModified(
 		func(cluster api.ICluster) {
-			w.a.V(1).M(chi).Info("Walking over AP modified clusters. Cluster: %s", cluster.GetName())
+			w.a.V(1).M(cr).Info("Walking over AP modified clusters. Cluster: %s", cluster.GetName())
 		},
 		func(shard api.IShard) {
-			w.a.V(1).M(chi).Info("Walking over AP modified shards. Shard: %s", shard.GetName())
+			w.a.V(1).M(cr).Info("Walking over AP modified shards. Shard: %s", shard.GetName())
 		},
 		func(host *api.Host) {
-			w.a.V(1).M(chi).Info("Walking over AP modified hosts. Host: %s", host.GetName())
-			w.a.V(1).M(chi).Info("Add host as MODIFIED via host. Host: %s", host.GetName())
+			w.a.V(1).M(cr).Info("Walking over AP modified hosts. Host: %s", host.GetName())
+			w.a.V(1).M(cr).Info("Add host as MODIFIED via host. Host: %s", host.GetName())
 			host.GetReconcileAttributes().SetModify()
 		},
 	)
 
-	chi.WalkHosts(func(host *api.Host) error {
-		w.a.V(3).M(chi).Info("Walking over CR hosts. Host: %s", host.GetName())
+	cr.WalkHosts(func(host *api.Host) error {
+		w.a.V(3).M(cr).Info("Walking over CR hosts. Host: %s", host.GetName())
 		_, err := w.c.kube.STS().Get(ctx, host)
 		switch {
 		case host.GetReconcileAttributes().IsAdd():
-			w.a.V(3).M(chi).Info("Walking over CR hosts. Host: is already listed as ADD. Host: %s", host.GetName())
+			w.a.V(3).M(cr).Info("Walking over CR hosts. Host: is already listed as ADD. Host: %s", host.GetName())
 			return nil
 		case host.GetReconcileAttributes().IsModify():
-			w.a.V(3).M(chi).Info("Walking over CR hosts. Host: is already listed as MODIFIED. Host: %s", host.GetName())
+			w.a.V(3).M(cr).Info("Walking over CR hosts. Host: is already listed as MODIFIED. Host: %s", host.GetName())
 			return nil
 		case host.HasAncestor():
-			w.a.V(1).M(chi).Info("Add host as FOUND via host because host has ancestor. Host: %s", host.GetName())
+			w.a.V(1).M(cr).Info("Add host as FOUND via host because host has an ancestor. Host: %s", host.GetName())
 			host.GetReconcileAttributes().SetFound()
 			return nil
 		case err == nil:
-			w.a.V(1).M(chi).Info("Add host as FOUND via host because has found sts. Host: %s", host.GetName())
+			w.a.V(1).M(cr).Info("Add host as FOUND via host because has found sts. Host: %s", host.GetName())
 			host.GetReconcileAttributes().SetFound()
 			return nil
 		default:
-			w.a.V(1).M(chi).Info("Add host as ADD via host. Host: %s", host.GetName())
+			w.a.V(1).M(cr).Info("Add host as ADD via host. Host: %s", host.GetName())
 			host.GetReconcileAttributes().SetAdd()
 			return nil
 		}
 	})
 
-	// Log hosts statuses
-	chi.WalkHosts(func(host *api.Host) error {
+	w.logHosts(cr)
+}
+
+// Log hosts statuses
+func (w *worker) logHosts(cr api.ICustomResource) {
+	cr.WalkHosts(func(host *api.Host) error {
 		switch {
 		case host.GetReconcileAttributes().IsAdd():
 			w.a.M(host).Info("ADD host: %s", host.Runtime.Address.CompactString())
@@ -583,7 +587,11 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 }
 
 // createCRFromObjectMeta
-func (w *worker) createCRFromObjectMeta(meta meta.Object, isCHI bool, options *commonNormalizer.Options) (*api.ClickHouseInstallation, error) {
+func (w *worker) createCRFromObjectMeta(
+	meta meta.Object,
+	isCHI bool,
+	options *commonNormalizer.Options,
+) (*api.ClickHouseInstallation, error) {
 	w.a.V(3).M(meta).S().P()
 	defer w.a.V(3).M(meta).E().P()
 
