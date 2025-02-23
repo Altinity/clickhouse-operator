@@ -35,7 +35,7 @@ func NewHostSelector() *HostSelector {
 	return &HostSelector{}
 }
 
-// ExcludeHost specifies to exclude a host
+// ExcludeHost adds host to the list of excluded
 func (o *HostSelector) ExcludeHost(host *api.Host) *HostSelector {
 	if (o == nil) || (host == nil) {
 		return o
@@ -45,7 +45,7 @@ func (o *HostSelector) ExcludeHost(host *api.Host) *HostSelector {
 	return o
 }
 
-// ExcludeHosts specifies to exclude list of hosts
+// ExcludeHosts add hosts to the list of excluded
 func (o *HostSelector) ExcludeHosts(hosts ...*api.Host) *HostSelector {
 	if (o == nil) || (len(hosts) == 0) {
 		return o
@@ -55,7 +55,7 @@ func (o *HostSelector) ExcludeHosts(hosts ...*api.Host) *HostSelector {
 	return o
 }
 
-// ExcludeReconcileAttributes specifies to exclude reconcile attributes
+// ExcludeReconcileAttributes set attributes as specification to exclude
 func (o *HostSelector) ExcludeReconcileAttributes(attrs *types.ReconcileAttributes) *HostSelector {
 	if (o == nil) || (attrs == nil) {
 		return o
@@ -63,6 +63,16 @@ func (o *HostSelector) ExcludeReconcileAttributes(attrs *types.ReconcileAttribut
 
 	o.exclude.attributes = attrs
 	return o
+}
+
+func (o *HostSelector) hasExcludedHost(host *api.Host) bool {
+	for _, excludedHost := range o.exclude.hosts {
+		if host == excludedHost {
+			// Host is in the list of excluded
+			return true
+		}
+	}
+	return false
 }
 
 // Exclude tells whether to exclude the host
@@ -76,11 +86,9 @@ func (o *HostSelector) Exclude(host *api.Host) bool {
 		return true
 	}
 
-	for _, hostToExclude := range o.exclude.hosts {
+	if o.hasExcludedHost(host) {
 		// Host is in the list to be excluded
-		if host == hostToExclude {
-			return true
-		}
+		return true
 	}
 
 	return false
@@ -97,11 +105,9 @@ func (o *HostSelector) Include(host *api.Host) bool {
 		return false
 	}
 
-	for _, hostToExclude := range o.exclude.hosts {
+	for o.hasExcludedHost(host) {
 		// Host is in the list to be excluded
-		if host == hostToExclude {
-			return false
-		}
+		return false
 	}
 
 	return true
