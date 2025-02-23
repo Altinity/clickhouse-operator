@@ -76,9 +76,9 @@ func (o *HostSelector) Exclude(host *api.Host) bool {
 		return true
 	}
 
-	for _, val := range o.exclude.hosts {
+	for _, hostToExclude := range o.exclude.hosts {
 		// Host is in the list to be excluded
-		if val == host {
+		if host == hostToExclude {
 			return true
 		}
 	}
@@ -97,9 +97,9 @@ func (o *HostSelector) Include(host *api.Host) bool {
 		return false
 	}
 
-	for _, val := range o.exclude.hosts {
+	for _, hostToExclude := range o.exclude.hosts {
 		// Host is in the list to be excluded
-		if val == host {
+		if host == hostToExclude {
 			return false
 		}
 	}
