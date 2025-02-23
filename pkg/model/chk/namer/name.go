@@ -39,19 +39,20 @@ func (n *Namer) createConfigMapNameHost(host *api.Host) string {
 }
 
 // createCRServiceName creates a name of a root ClickHouseInstallation Service resource
-func (n *Namer) createCRServiceName(cr api.ICustomResource) string {
+func (n *Namer) createCRServiceName(cr api.ICustomResource, templates ...*api.ServiceTemplate) string {
 	// Name can be generated either from default name pattern,
 	// or from personal name pattern provided in ServiceTemplate
 
 	// Start with default name pattern
 	pattern := patterns.Get(patternCRServiceName)
 
-	// ServiceTemplate may have personal name pattern specified
-	if template, ok := cr.GetRootServiceTemplate(); ok {
-		// ServiceTemplate available
-		if template.GenerateName != "" {
+	// May have service template specified
+	if len(templates) > 0 {
+		template := templates[0]
+		// ServiceTemplate may have personal name pattern specified
+		if template.HasGenerateName() {
 			// ServiceTemplate has explicitly specified name pattern
-			pattern = template.GenerateName
+			pattern = template.GetGenerateName()
 		}
 	}
 
@@ -60,7 +61,7 @@ func (n *Namer) createCRServiceName(cr api.ICustomResource) string {
 }
 
 // createCRServiceFQDN creates a FQD name of a root ClickHouseInstallation Service resource
-func (n *Namer) createCRServiceFQDN(cr api.ICustomResource, namespaceDomainPattern *types.String) string {
+func (n *Namer) createCRServiceFQDN(cr api.ICustomResource, namespaceDomainPattern *types.String, templates ...*api.ServiceTemplate) string {
 	// FQDN can be generated either from default pattern,
 	// or from personal pattern provided
 
@@ -72,10 +73,19 @@ func (n *Namer) createCRServiceFQDN(cr api.ICustomResource, namespaceDomainPatte
 		pattern = "%s." + namespaceDomainPattern.Value()
 	}
 
+	service := ""
+	// May have service template specified
+	if len(templates) > 0 {
+		template := templates[0]
+		service = n.createCRServiceName(cr, template)
+	} else {
+		service = n.createCRServiceName(cr)
+	}
+
 	// Create FQDN based on pattern available
 	return fmt.Sprintf(
 		pattern,
-		n.createCRServiceName(cr),
+		service,
 		cr.GetNamespace(),
 	)
 }
@@ -91,9 +101,9 @@ func (n *Namer) createClusterServiceName(cluster api.ICluster) string {
 	// ServiceTemplate may have personal name pattern specified
 	if template, ok := cluster.GetServiceTemplate(); ok {
 		// ServiceTemplate available
-		if template.GenerateName != "" {
+		if template.HasGenerateName() {
 			// ServiceTemplate has explicitly specified name pattern
-			pattern = template.GenerateName
+			pattern = template.GetGenerateName()
 		}
 	}
 
@@ -112,9 +122,9 @@ func (n *Namer) createShardServiceName(shard api.IShard) string {
 	// ServiceTemplate may have personal name pattern specified
 	if template, ok := shard.GetServiceTemplate(); ok {
 		// ServiceTemplate available
-		if template.GenerateName != "" {
+		if template.HasGenerateName() {
 			// ServiceTemplate has explicitly specified name pattern
-			pattern = template.GenerateName
+			pattern = template.GetGenerateName()
 		}
 	}
 
@@ -154,9 +164,9 @@ func (n *Namer) createStatefulSetServiceName(host *api.Host) string {
 	// ServiceTemplate may have personal name pattern specified
 	if template, ok := host.GetServiceTemplate(); ok {
 		// ServiceTemplate available
-		if template.GenerateName != "" {
+		if template.HasGenerateName() {
 			// ServiceTemplate has explicitly specified name pattern
-			pattern = template.GenerateName
+			pattern = template.GetGenerateName()
 		}
 	}
 

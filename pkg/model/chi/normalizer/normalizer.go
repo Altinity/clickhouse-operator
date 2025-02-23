@@ -188,7 +188,6 @@ func (n *Normalizer) fillCRAddressInfo() {
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
 	n.req.GetTarget().WalkHosts(func(host *chi.Host) error {
@@ -197,7 +196,23 @@ func (n *Normalizer) fillStatus() {
 		return nil
 	})
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
-	n.req.GetTarget().FillStatus(endpoint, pods, fqdns, ip)
+	n.req.GetTarget().FillStatus(n.endpoints(), pods, fqdns, ip)
+}
+
+func (n *Normalizer) endpoints() []string {
+	var names []string
+	if templates, ok := n.req.GetTarget().GetRootServiceTemplates(); ok {
+		for _, template := range templates {
+			names = append(names,
+				n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern(), template),
+			)
+		}
+	} else {
+		names = append(names,
+			n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern()),
+		)
+	}
+	return names
 }
 
 // normalizeTaskID normalizes .spec.taskID

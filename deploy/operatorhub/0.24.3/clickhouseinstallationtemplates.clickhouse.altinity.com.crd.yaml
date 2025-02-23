@@ -1,26 +1,26 @@
 # Template Parameters:
 #
-# KIND=ClickHouseInstallation
-# SINGULAR=clickhouseinstallation
-# PLURAL=clickhouseinstallations
-# SHORT=chi
-# OPERATOR_VERSION=0.25.0
+# KIND=ClickHouseInstallationTemplate
+# SINGULAR=clickhouseinstallationtemplate
+# PLURAL=clickhouseinstallationtemplates
+# SHORT=chit
+# OPERATOR_VERSION=0.24.3
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: clickhouseinstallations.clickhouse.altinity.com
+  name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.24.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
   names:
-    kind: ClickHouseInstallation
-    singular: clickhouseinstallation
-    plural: clickhouseinstallations
+    kind: ClickHouseInstallationTemplate
+    singular: clickhouseinstallationtemplate
+    plural: clickhouseinstallationtemplates
     shortNames:
-      - chi
+      - chit
   versions:
     - name: v1
       served: true
@@ -224,12 +224,6 @@ spec:
                 endpoint:
                   type: string
                   description: "Endpoint"
-                endpoints:
-                  type: array
-                  description: "All endpoints"
-                  nullable: true
-                  items:
-                    type: string
                 generation:
                   type: integer
                   minimum: 0
@@ -489,13 +483,7 @@ spec:
                           description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                         serviceTemplate:
                           type: string
-                          description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
-                        serviceTemplates:
-                          type: array
-                          description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
-                          nullable: true
-                          items:
-                            type: string
+                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
                         clusterServiceTemplate:
                           type: string
                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"

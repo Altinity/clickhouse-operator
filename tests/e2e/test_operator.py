@@ -34,6 +34,7 @@ def test_001(self):
             },
             "configmaps": 1,
             "pdb": {"single": 1},
+            "do_not_delete": 1,
         },
     )
     with Finally("I clean up"):
@@ -512,7 +513,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
     with When("I create new shells"):
         shell_1 = get_shell()
         shell_2 = get_shell()
-        shell_3 = get_shell()
+        # shell_3 = get_shell()
 
     Check("run query until receive stop event", test=run_select_query, parallel=True)(
         host=service,
@@ -574,7 +575,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_009_1(self, version_from="0.23.7", version_to=None):
+def test_009_1(self, version_from="0.24.3", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -590,7 +591,7 @@ def test_009_1(self, version_from="0.23.7", version_to=None):
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_009_2(self, version_from="0.23.7", version_to=None):
+def test_009_2(self, version_from="0.24.3", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -943,12 +944,13 @@ def test_011_3(self):
             sasl_username_env = ""
             sasl_password_env = ""
             for e in envs:
-                if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_USERNAME":
-                    sasl_username_env = e["name"]
-                if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_PASSWORD":
-                    sasl_password_env = e["name"]
-                if e["valueFrom"]["secretKeyRef"]["key"] == "pwduser5":
-                    user5_password_env = e["name"]
+                if "valueFrom" in e:
+                    if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_USERNAME":
+                        sasl_username_env = e["name"]
+                    if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_PASSWORD":
+                        sasl_password_env = e["name"]
+                    if e["valueFrom"]["secretKeyRef"]["key"] == "pwduser5":
+                        user5_password_env = e["name"]
 
             with By("Secrets are properly propagated to env variables"):
                 print(f"Found env variables: {sasl_username_env} {sasl_password_env} {user5_password_env}")
@@ -1897,7 +1899,7 @@ def test_016(self):
                 "1",
             )
         # Wait for changes to propagate
-        time.sleep(90)
+        time.sleep(60)
 
         with Then("test_norestart user should be available"):
             version = clickhouse.query(chi, sql="select version()", user="test_norestart")
@@ -4073,7 +4075,7 @@ def test_039_1(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_2. Inter-cluster communications with plan text secret")
+@Name("test_039_2. Inter-cluster communications with plane text secret")
 def test_039_2(self):
     """Check clickhouse-operator support inter-cluster communications with plan text secret."""
     create_shell_namespace_clickhouse_template()
@@ -5129,9 +5131,9 @@ def test_053(self):
         current().context.operator_version = version_from
         create_shell_namespace_clickhouse_template()
 
-    manifest="manifests/chi/test-001.yaml"
+    manifest="manifests/chi/test-005-acm.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
-    sts = f"chi-{chi}-single-0-0"
+    sts = f"chi-{chi}-t1-0-0"
     pod = f"{sts}-0"
 
     kubectl.create_and_check(

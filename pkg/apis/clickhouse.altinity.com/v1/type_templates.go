@@ -80,6 +80,20 @@ type ServiceTemplate struct {
 	Spec         core.ServiceSpec `json:"spec,omitempty"         yaml:"spec,omitempty"`
 }
 
+func (s *ServiceTemplate) HasGenerateName() bool {
+	if s == nil {
+		return false
+	}
+	return s.GenerateName != ""
+}
+
+func (s *ServiceTemplate) GetGenerateName() string {
+	if s == nil {
+		return ""
+	}
+	return s.GenerateName
+}
+
 // NewTemplates creates new Templates object
 func NewTemplates() *Templates {
 	return new(Templates)

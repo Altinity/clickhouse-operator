@@ -165,7 +165,7 @@ func (cr *ClickHouseKeeperInstallation) GetUsedTemplates() []*apiChi.TemplateRef
 }
 
 // FillStatus fills .Status
-func (cr *ClickHouseKeeperInstallation) FillStatus(endpoint string, pods, fqdns []string, ip string) {
+func (cr *ClickHouseKeeperInstallation) FillStatus(endpoints util.Slice[string], pods, fqdns []string, ip string) {
 	cr.EnsureStatus().Fill(&FillStatusParams{
 		CHOpIP:              ip,
 		ClustersCount:       cr.ClustersCount(),
@@ -180,7 +180,8 @@ func (cr *ClickHouseKeeperInstallation) FillStatus(endpoint string, pods, fqdns 
 		HostsDeletedCount:   0,
 		Pods:                pods,
 		FQDNs:               fqdns,
-		Endpoint:            endpoint,
+		Endpoint:            endpoints.First(),
+		Endpoints:           append([]string{}, endpoints...),
 		NormalizedCR: cr.Copy(types.CopyCROptions{
 			SkipStatus:        true,
 			SkipManagedFields: true,
@@ -348,13 +349,29 @@ func (cr *ClickHouseKeeperInstallation) GetServiceTemplate(name string) (*apiChi
 	return cr.GetSpecT().GetTemplates().GetServiceTemplatesIndex().Get(name), true
 }
 
-// GetRootServiceTemplate gets ServiceTemplate of a CHI
-func (cr *ClickHouseKeeperInstallation) GetRootServiceTemplate() (*apiChi.ServiceTemplate, bool) {
-	if !cr.GetSpecT().GetDefaults().Templates.HasServiceTemplate() {
+// GetServiceTemplates gets ServiceTemplates by name
+func (cr *ClickHouseKeeperInstallation) GetServiceTemplates(names ...string) ([]*apiChi.ServiceTemplate, bool) {
+	if len(names) == 0 {
 		return nil, false
 	}
-	name := cr.GetSpecT().GetDefaults().Templates.GetServiceTemplate()
-	return cr.GetServiceTemplate(name)
+	var res []*apiChi.ServiceTemplate
+	for _, name := range names {
+		if cr.GetSpecT().GetTemplates().GetServiceTemplatesIndex().Has(name) {
+			res = append(res, cr.GetSpecT().GetTemplates().GetServiceTemplatesIndex().Get(name))
+		}
+	}
+	if len(res) == len(names) {
+		return res, true
+	}
+	return nil, false
+}
+
+// GetRootServiceTemplates gets ServiceTemplates of a CR
+func (cr *ClickHouseKeeperInstallation) GetRootServiceTemplates() ([]*apiChi.ServiceTemplate, bool) {
+	if !cr.GetSpecT().GetDefaults().Templates.HasAnyServiceTemplate() {
+		return nil, false
+	}
+	return cr.GetServiceTemplates(cr.GetSpecT().GetDefaults().Templates.GetAllServiceTemplates()...)
 }
 
 // MatchNamespace matches namespace
