@@ -25,7 +25,6 @@ type ReconcileAttributes struct {
 	// Attributes are used by config generator
 
 	add    bool
-	remove bool
 	modify bool
 	found  bool
 
@@ -48,7 +47,6 @@ func (a *ReconcileAttributes) HasIntersectionWith(b *ReconcileAttributes) bool {
 	switch {
 	case a.add && b.add:
 		return true
-	case a.remove && b.remove:
 		return true
 	case a.modify && b.modify:
 		return true
@@ -101,23 +99,6 @@ func (a *ReconcileAttributes) IsAdd() bool {
 		return false
 	}
 	return a.add
-}
-
-// SetRemove sets 'remove' attribute
-func (a *ReconcileAttributes) SetRemove() *ReconcileAttributes {
-	if a == nil {
-		return a
-	}
-	a.remove = true
-	return a
-}
-
-// IsRemove checks whether 'remove' attribute is set
-func (a *ReconcileAttributes) IsRemove() bool {
-	if a == nil {
-		return false
-	}
-	return a.remove
 }
 
 // SetModify sets 'modify' attribute
@@ -187,10 +168,9 @@ func (a *ReconcileAttributes) String() string {
 	}
 
 	return fmt.Sprintf(
-		"status: %s, add: %t, remove: %t, modify: %t, found: %t, exclude: %t",
+		"status: %s, add: %t, modify: %t, found: %t, exclude: %t",
 		a.status,
 		a.add,
-		a.remove,
 		a.modify,
 		a.found,
 		a.exclude,
@@ -234,9 +214,6 @@ func (c *ReconcileAttributesCounters) Add(a *ReconcileAttributes) {
 
 	if a.IsAdd() {
 		c._add++
-	}
-	if a.IsRemove() {
-		c._remove++
 	}
 	if a.IsModify() {
 		c._modify++
