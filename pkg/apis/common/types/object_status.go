@@ -19,8 +19,8 @@ type ObjectStatus string
 
 // Possible values for object status
 const (
-	ObjectStatusModified ObjectStatus = "modified"
 	ObjectStatusNew      ObjectStatus = "new"
+	ObjectStatusModified ObjectStatus = "modified"
 	ObjectStatusSame     ObjectStatus = "same"
 	ObjectStatusUnknown  ObjectStatus = "unknown"
 )
