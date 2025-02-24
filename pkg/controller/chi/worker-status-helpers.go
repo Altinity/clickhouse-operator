@@ -83,9 +83,10 @@ func (w *worker) doesHostHaveNoRunningQueries(ctx context.Context, host *api.Hos
 	return n <= 1
 }
 
-func (w *worker) isHostReplicationDelayed(ctx context.Context, host *api.Host) bool {
+func (w *worker) doesHostHaveNoReplicationDelay(ctx context.Context, host *api.Host) bool {
 	delay, _ := w.ensureClusterSchemer(host).HostMaxReplicaDelay(ctx, host)
-	return delay >= 10
+	threshold := 10
+	return delay <= threshold
 }
 
 // isCHIProcessedOnTheSameIP checks whether it is just a restart of the operator on the same IP
@@ -185,7 +186,7 @@ func (w *worker) getRemoteServersGeneratorOptions() *commonConfig.HostSelector {
 	// 2. all explicitly excluded hosts
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
 		types.NewReconcileAttributes().
-			SetStatus(types.ObjectStatusNew).
+			SetStatus(types.ObjectStatusRequested).
 			SetExclude(),
 	)
 }
