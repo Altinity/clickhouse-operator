@@ -157,7 +157,7 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 		return true
 	}
 
-	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusNew) {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		w.a.V(1).M(host).F().Info("Host is new, no restart applicable. Host: %s", host.GetName())
 		return false
 	}
@@ -503,7 +503,7 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHo
 				} else {
 					// StatefulSet of this host does not exist, looks like we can name it as a NEW one
 					w.a.V(1).M(cr).Info("Add host as NEW via cluster. Host was not found as sts. Host: %s", host.GetName())
-					host.GetReconcileAttributes().SetStatus(types.ObjectStatusNew)
+					host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
 				}
 
 				return nil
@@ -515,7 +515,7 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHo
 			// Mark all hosts of the shard as newly added
 			shard.WalkHosts(func(host *api.Host) error {
 				w.a.V(1).M(cr).Info("Add host as NEW via shard. Shard: %s Host: %s", shard.GetName(), host.GetName())
-				host.GetReconcileAttributes().SetStatus(types.ObjectStatusNew)
+				host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
 				return nil
 			})
 		},
@@ -523,7 +523,7 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHo
 		func(host *api.Host) {
 			w.a.V(1).M(cr).Info("Walking over AP added hosts. Host: %s", host.GetName())
 			w.a.V(1).M(cr).Info("Add host as NEW via host. Host: %s", host.GetName())
-			host.GetReconcileAttributes().SetStatus(types.ObjectStatusNew)
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
 		},
 	)
 
@@ -546,7 +546,7 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHo
 		w.a.V(3).M(cr).Info("Walking over CR hosts. Host: %s", host.GetName())
 		_, err := w.c.kube.STS().Get(ctx, host)
 		switch {
-		case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusNew):
+		case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested):
 			w.a.V(3).M(cr).Info("Walking over CR hosts. Host: is already listed as NEW. Status is clear. Host: %s", host.GetName())
 			return nil
 		case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusModified):
@@ -562,7 +562,7 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHo
 			return nil
 		default:
 			w.a.V(1).M(cr).Info("Add host as New via host. Host: %s", host.GetName())
-			host.GetReconcileAttributes().SetStatus(types.ObjectStatusNew)
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
 			return nil
 		}
 	})
