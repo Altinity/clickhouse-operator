@@ -99,7 +99,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	w.newTask(new, old)
 	w.markReconcileStart(ctx, new, actionPlan)
 	w.excludeStoppedCHIFromMonitoring(new)
-	w.walkHosts(ctx, new, actionPlan)
+	w.setHostStatusesPreliminary(ctx, new, actionPlan)
 
 	if err := w.reconcile(ctx, new); err != nil {
 		// Something went wrong
