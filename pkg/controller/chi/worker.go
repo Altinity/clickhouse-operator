@@ -545,7 +545,7 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHo
 		w.a.V(3).M(cr).Info("Walking over CR hosts. Host: %s", host.GetName())
 		_, err := w.c.kube.STS().Get(ctx, host)
 		switch {
-		case host.GetReconcileAttributes().IsAdd():
+		case host.GetReconcileAttributes().IsNew():
 			w.a.V(3).M(cr).Info("Walking over CR hosts. Host: is already listed as ADD. Host: %s", host.GetName())
 			return nil
 		case host.GetReconcileAttributes().IsModify():
