@@ -185,7 +185,7 @@ func (w *worker) getRemoteServersGeneratorOptions() *commonConfig.HostSelector {
 	// 2. all explicitly excluded hosts
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
 		types.NewReconcileAttributes().
-			SetAdd().
+			SetStatus(types.ObjectStatusNew).
 			SetExclude(),
 	)
 }
