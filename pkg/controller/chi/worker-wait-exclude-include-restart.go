@@ -112,6 +112,13 @@ func (w *worker) shouldIncludeHost(host *api.Host) bool {
 	return true
 }
 
+func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusCreated) {
+		return true
+	}
+	return false
+}
+
 // includeHost includes host back back into ClickHouse clusters
 func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
@@ -133,6 +140,9 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
 	w.includeHostIntoClickHouseCluster(ctx, host)
+	if w.shouldWaitReplicationHost(host) {
+		_ = w.waitHostNoReplicationDelay(ctx, host)
+	}
 	_ = w.includeHostIntoService(ctx, host)
 
 	return nil
