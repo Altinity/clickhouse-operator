@@ -550,7 +550,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		return err
 	}
 	// Host is now added and functional
-	host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusNew) {
+		host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
+	}
 	if err := w.reconcileHostBootstrap(ctx, host); err != nil {
 		return err
 	}
