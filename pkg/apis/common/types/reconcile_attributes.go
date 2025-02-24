@@ -47,7 +47,6 @@ func (a *ReconcileAttributes) HasIntersectionWith(b *ReconcileAttributes) bool {
 	switch {
 	case a.add && b.add:
 		return true
-		return true
 	case a.modify && b.modify:
 		return true
 	case a.found && b.found:
