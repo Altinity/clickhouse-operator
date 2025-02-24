@@ -23,9 +23,9 @@ const (
 	ObjectStatusModified ObjectStatus = "modified"
 	ObjectStatusSame     ObjectStatus = "same"
 
-	ObjectStatusFound    ObjectStatus = "found"
-	ObjectStatusCreated  ObjectStatus = "created"
-	ObjectStatusUnknown  ObjectStatus = "unknown"
+	ObjectStatusFound   ObjectStatus = "found"
+	ObjectStatusCreated ObjectStatus = "created"
+	ObjectStatusUnknown ObjectStatus = "unknown"
 )
 
 func (s ObjectStatus) Is(b ObjectStatus) bool {

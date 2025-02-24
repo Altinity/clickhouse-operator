@@ -28,7 +28,7 @@ type ReconcileAttributes struct {
 // NewReconcileAttributes creates new reconcile attributes
 func NewReconcileAttributes() *ReconcileAttributes {
 	return &ReconcileAttributes{
-		status: ObjectStatusUnknown,
+		status:  ObjectStatusUnknown,
 		exclude: false,
 	}
 }
@@ -104,8 +104,8 @@ func (a *ReconcileAttributes) String() string {
 
 // ReconcileAttributesCounters defines reconcile status and attributes counters
 type ReconcileAttributesCounters struct {
-	status map[ObjectStatus]int
-	total int
+	status   map[ObjectStatus]int
+	total    int
 	counters int
 
 	_exclude int
@@ -163,7 +163,7 @@ func (c *ReconcileAttributesCounters) String() string {
 
 	res := ""
 	for k, v := range c.status {
-		res += fmt.Sprintf("%s: %d ",k, v)
+		res += fmt.Sprintf("%s: %d ", k, v)
 	}
 	return res
 }
