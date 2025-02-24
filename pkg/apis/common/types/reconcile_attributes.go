@@ -22,12 +22,6 @@ import (
 type ReconcileAttributes struct {
 	status ObjectStatus
 
-	// Attributes are used by config generator
-
-	add    bool
-	modify bool
-	found  bool
-
 	exclude bool
 }
 
@@ -45,11 +39,7 @@ func (a *ReconcileAttributes) HasIntersectionWith(b *ReconcileAttributes) bool {
 		return false
 	}
 	switch {
-	case a.add && b.add:
-		return true
-	case a.modify && b.modify:
-		return true
-	case a.found && b.found:
+	case a.GetStatus().Is(b.GetStatus()):
 		return true
 	case a.exclude && b.exclude:
 		return true
@@ -57,7 +47,7 @@ func (a *ReconcileAttributes) HasIntersectionWith(b *ReconcileAttributes) bool {
 	return false
 }
 
-// SetStatus sets status
+// SetStatus sets object status
 func (a *ReconcileAttributes) SetStatus(status ObjectStatus) *ReconcileAttributes {
 	if a == nil {
 		return a
@@ -66,72 +56,12 @@ func (a *ReconcileAttributes) SetStatus(status ObjectStatus) *ReconcileAttribute
 	return a
 }
 
-// GetStatus gets status
+// GetStatus gets object status
 func (a *ReconcileAttributes) GetStatus() ObjectStatus {
 	if a == nil {
 		return ObjectStatusUnknown
 	}
 	return a.status
-}
-
-// SetAdd sets 'add' attribute
-func (a *ReconcileAttributes) SetAdd() *ReconcileAttributes {
-	if a == nil {
-		return a
-	}
-	a.add = true
-	return a
-}
-
-// UnsetAdd unsets 'add' attribute
-func (a *ReconcileAttributes) UnsetAdd() *ReconcileAttributes {
-	if a == nil {
-		return a
-	}
-	a.add = false
-	return a
-}
-
-// IsAdd checks whether 'add' attribute is set
-func (a *ReconcileAttributes) IsAdd() bool {
-	if a == nil {
-		return false
-	}
-	return a.add
-}
-
-// SetModify sets 'modify' attribute
-func (a *ReconcileAttributes) SetModify() *ReconcileAttributes {
-	if a == nil {
-		return a
-	}
-	a.modify = true
-	return a
-}
-
-// IsModify checks whether 'modify' attribute is set
-func (a *ReconcileAttributes) IsModify() bool {
-	if a == nil {
-		return false
-	}
-	return a.modify
-}
-
-// SetFound sets 'found' attribute
-func (a *ReconcileAttributes) SetFound() *ReconcileAttributes {
-	if a == nil {
-		return a
-	}
-	a.found = true
-	return a
-}
-
-// IsFound checks whether 'found' attribute is set
-func (a *ReconcileAttributes) IsFound() bool {
-	if a == nil {
-		return false
-	}
-	return a.found
 }
 
 // SetExclude sets 'exclude' attribute
@@ -166,25 +96,14 @@ func (a *ReconcileAttributes) String() string {
 		return "(nil)"
 	}
 
-	return fmt.Sprintf(
-		"status: %s, add: %t, modify: %t, found: %t, exclude: %t",
-		a.status,
-		a.add,
-		a.modify,
-		a.found,
-		a.exclude,
-	)
+	return fmt.Sprintf("status: %s, exclude: %t", a.status, a.exclude)
 }
 
 // ReconcileAttributesCounters defines reconcile status and attributes counters
 type ReconcileAttributesCounters struct {
 	status map[ObjectStatus]int
-
-	// Attributes are used by config generator
-
-	_add    int
-	_modify int
-	_found  int
+	total int
+	counters int
 
 	_exclude int
 }
@@ -204,55 +123,44 @@ func (c *ReconcileAttributesCounters) Add(a *ReconcileAttributes) {
 
 	value, ok := c.status[a.GetStatus()]
 	if ok {
-		value = value + 1
+		value++
 	} else {
 		value = 1
 	}
-	c.status[a.GetStatus()] = value
 
-	if a.IsAdd() {
-		c._add++
-	}
-	if a.IsModify() {
-		c._modify++
-	}
-	if a.IsFound() {
-		c._found++
-	}
+	c.status[a.GetStatus()] = value
+	c.total++
+	c.counters = len(c.status)
+
 	if a.IsExclude() {
 		c._exclude++
 	}
 }
 
-// getAdd gets added
-func (c *ReconcileAttributesCounters) getAdd() int {
+// getCounterByStatus
+func (c *ReconcileAttributesCounters) getCounterByStatus(status ObjectStatus) int {
 	if c == nil {
 		return 0
 	}
-	return c._add
-}
-
-// getModify gets modified
-func (c *ReconcileAttributesCounters) getModify() int {
-	if c == nil {
-		return 0
+	if num, ok := c.status[status]; ok {
+		return num
 	}
-	return c._modify
+	return 0
 }
 
-// getFound gets found
-func (c *ReconcileAttributesCounters) getFound() int {
-	if c == nil {
-		return 0
-	}
-	return c._found
-}
-
-// IsAddOnly checks whether counters have Add() only items
-func (c *ReconcileAttributesCounters) IsAddOnly() bool {
-	return (c.getAdd() > 0) && (c.getFound() == 0) && (c.getModify() == 0)
+// IsNewOnly checks whether counters have 'New' items only
+func (c *ReconcileAttributesCounters) IsNewOnly() bool {
+	return c.getCounterByStatus(ObjectStatusNew) == c.total
 }
 
 func (c *ReconcileAttributesCounters) String() string {
-	return fmt.Sprintf("a: %d f: %d m: %d", c.getAdd(), c.getFound(), c.getModify())
+	if c == nil {
+		return ""
+	}
+
+	res := ""
+	for k, v := range c.status {
+		res += fmt.Sprintf("%s: %d ",k, v)
+	}
+	return res
 }
