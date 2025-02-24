@@ -151,9 +151,9 @@ func (c *ReconcileAttributesCounters) getCounterByStatus(status ObjectStatus) in
 	return 0
 }
 
-// IsNewOnly checks whether counters have 'New' items only
-func (c *ReconcileAttributesCounters) IsNewOnly() bool {
-	return c.getCounterByStatus(ObjectStatusNew) == c.total
+// IsNewOnly checks whether counters have specified status items only
+func (c *ReconcileAttributesCounters) HasOnly(status ObjectStatus) bool {
+	return c.getCounterByStatus(status) == c.total
 }
 
 func (c *ReconcileAttributesCounters) String() string {
