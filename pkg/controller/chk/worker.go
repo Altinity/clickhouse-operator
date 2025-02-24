@@ -300,7 +300,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *a
 		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", cr.GetSpecT().GetTaskID())
 }
 
-func (w *worker) walkHosts(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, ap *action_plan.ActionPlan) {
+func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -329,14 +329,14 @@ func (w *worker) walkHosts(ctx context.Context, cr *apiChk.ClickHouseKeeperInsta
 				})
 
 				if found {
-					// StatefulSet of this host already exist, we can't ADD it for sure
+					// StatefulSet of this host already exist, we can't name it a NEW one for sure
 					// It looks like FOUND is the most correct approach
 					w.a.V(1).M(cr).Info("Add host as FOUND via cluster. Host was found as sts. Host: %s", host.GetName())
-					host.GetReconcileAttributes().SetFound()
+					host.GetReconcileAttributes().SetStatus(types.ObjectStatusFound)
 				} else {
-					// StatefulSet of this host does not exist, looks like we need to ADD it
-					w.a.V(1).M(cr).Info("Add host as ADD via cluster. Host was not found as sts. Host: %s", host.GetName())
-					host.GetReconcileAttributes().SetAdd()
+					// StatefulSet of this host does not exist, looks like we can name it as a NEW one
+					w.a.V(1).M(cr).Info("Add host as NEW via cluster. Host was not found as sts. Host: %s", host.GetName())
+					host.GetReconcileAttributes().SetStatus(types.ObjectStatusNew)
 				}
 
 				return nil
@@ -347,16 +347,16 @@ func (w *worker) walkHosts(ctx context.Context, cr *apiChk.ClickHouseKeeperInsta
 			w.a.V(1).M(cr).Info("Walking over AP added shards. Shard: %s", shard.GetName())
 			// Mark all hosts of the shard as newly added
 			shard.WalkHosts(func(host *api.Host) error {
-				w.a.V(1).M(cr).Info("Add host as ADD via shard. Shard: %s Host: %s", shard.GetName(), host.GetName())
-				host.GetReconcileAttributes().SetAdd()
+				w.a.V(1).M(cr).Info("Add host as NEW via shard. Shard: %s Host: %s", shard.GetName(), host.GetName())
+				host.GetReconcileAttributes().SetStatus(types.ObjectStatusNew)
 				return nil
 			})
 		},
 		// Walk over added hosts
 		func(host *api.Host) {
 			w.a.V(1).M(cr).Info("Walking over AP added hosts. Host: %s", host.GetName())
-			w.a.V(1).M(cr).Info("Add host as ADD via host. Host: %s", host.GetName())
-			host.GetReconcileAttributes().SetAdd()
+			w.a.V(1).M(cr).Info("Add host as NEW via host. Host: %s", host.GetName())
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusNew)
 		},
 	)
 
@@ -370,31 +370,32 @@ func (w *worker) walkHosts(ctx context.Context, cr *apiChk.ClickHouseKeeperInsta
 		func(host *api.Host) {
 			w.a.V(1).M(cr).Info("Walking over AP modified hosts. Host: %s", host.GetName())
 			w.a.V(1).M(cr).Info("Add host as MODIFIED via host. Host: %s", host.GetName())
-			host.GetReconcileAttributes().SetModify()
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusModified)
 		},
 	)
 
+	// Fill gaps in host statuses. Fill unfilled hosts
 	cr.WalkHosts(func(host *api.Host) error {
 		w.a.V(3).M(cr).Info("Walking over CR hosts. Host: %s", host.GetName())
 		_, err := w.c.kube.STS().Get(ctx, host)
 		switch {
-		case host.GetReconcileAttributes().IsAdd():
-			w.a.V(3).M(cr).Info("Walking over CR hosts. Host: is already listed as ADD. Host: %s", host.GetName())
+		case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusNew):
+			w.a.V(3).M(cr).Info("Walking over CR hosts. Host: is already listed as NEW. Status is clear. Host: %s", host.GetName())
 			return nil
-		case host.GetReconcileAttributes().IsModify():
-			w.a.V(3).M(cr).Info("Walking over CR hosts. Host: is already listed as MODIFIED. Host: %s", host.GetName())
+		case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusModified):
+			w.a.V(3).M(cr).Info("Walking over CR hosts. Host: is already listed as MODIFIED. Status is clear. Host: %s", host.GetName())
 			return nil
 		case host.HasAncestor():
 			w.a.V(1).M(cr).Info("Add host as FOUND via host because host has an ancestor. Host: %s", host.GetName())
-			host.GetReconcileAttributes().SetFound()
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusFound)
 			return nil
 		case err == nil:
 			w.a.V(1).M(cr).Info("Add host as FOUND via host because has found sts. Host: %s", host.GetName())
-			host.GetReconcileAttributes().SetFound()
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusFound)
 			return nil
 		default:
-			w.a.V(1).M(cr).Info("Add host as ADD via host. Host: %s", host.GetName())
-			host.GetReconcileAttributes().SetAdd()
+			w.a.V(1).M(cr).Info("Add host as New via host. Host: %s", host.GetName())
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusNew)
 			return nil
 		}
 	})
@@ -405,16 +406,7 @@ func (w *worker) walkHosts(ctx context.Context, cr *apiChk.ClickHouseKeeperInsta
 // Log hosts statuses
 func (w *worker) logHosts(cr api.ICustomResource) {
 	cr.WalkHosts(func(host *api.Host) error {
-		switch {
-		case host.GetReconcileAttributes().IsAdd():
-			w.a.M(host).Info("ADD host: %s", host.Runtime.Address.CompactString())
-		case host.GetReconcileAttributes().IsModify():
-			w.a.M(host).Info("MODIFY host: %s", host.Runtime.Address.CompactString())
-		case host.GetReconcileAttributes().IsFound():
-			w.a.M(host).Info("FOUND host: %s", host.Runtime.Address.CompactString())
-		default:
-			w.a.M(host).Info("UNKNOWN host: %s", host.Runtime.Address.CompactString())
-		}
+		w.a.M(host).Info("Host status: %s. Host: %s", host.GetReconcileAttributes().GetStatus(), host.Runtime.Address.CompactString())
 		return nil
 	})
 }
