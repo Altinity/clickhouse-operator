@@ -353,6 +353,11 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.Host) er
 	return domain.PollHost(ctx, host, w.doesHostHaveNoRunningQueries)
 }
 
+// waitHostNoReplicationDelay
+func (w *worker) waitHostNoReplicationDelay(ctx context.Context, host *api.Host) error {
+	return domain.PollHost(ctx, host, w.isHostReplicationDelayed)
+}
+
 // waitHostRestart
 func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, start map[string]int) error {
 	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
