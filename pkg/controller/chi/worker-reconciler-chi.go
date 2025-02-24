@@ -141,7 +141,7 @@ func (w *worker) reconcile(ctx context.Context, cr *api.ClickHouseInstallation) 
 	w.a.V(2).M(cr).S().P()
 	defer w.a.V(2).M(cr).E().P()
 
-	if counters := cr.GetHostsAttributesCounters(); counters.IsAddOnly() {
+	if counters := cr.GetHostsAttributesCounters(); counters.IsNewOnly() {
 		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CR: %s", util.NamespaceNameString(cr))
 		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
 			FullFanOut: true,
@@ -632,7 +632,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		return err
 	}
 	// Host is now added and functional
-	host.GetReconcileAttributes().UnsetAdd()
+	host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
 	if err := w.reconcileHostBootstrap(ctx, host); err != nil {
 		return err
 	}
