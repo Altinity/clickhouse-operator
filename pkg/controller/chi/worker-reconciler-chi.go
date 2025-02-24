@@ -141,7 +141,7 @@ func (w *worker) reconcile(ctx context.Context, cr *api.ClickHouseInstallation) 
 	w.a.V(2).M(cr).S().P()
 	defer w.a.V(2).M(cr).E().P()
 
-	if counters := cr.GetHostsAttributesCounters(); counters.IsNewOnly() {
+	if counters := cr.GetHostsAttributesCounters(); counters.HasOnly(types.ObjectStatusRequested) {
 		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CR: %s", util.NamespaceNameString(cr))
 		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
 			FullFanOut: true,
@@ -234,7 +234,7 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 	// Wait for all hosts to be included into cluster
 	cr.WalkHosts(func(host *api.Host) error {
 		if host.ShouldIncludeIntoCluster() {
-			_ = w.waitHostInCluster(ctx, host)
+			_ = w.waitHostIsInCluster(ctx, host)
 		}
 		return nil
 	})
@@ -633,7 +633,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	}
 	// Host is now added and functional
 
-	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusNew) {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
 	}
 	if err := w.reconcileHostBootstrap(ctx, host); err != nil {
