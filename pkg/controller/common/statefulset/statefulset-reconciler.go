@@ -117,7 +117,7 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) types.ObjectStatus {
 			return types.ObjectStatusModified
 		}
 		r.a.V(1).M(new).Info("No cur StatefulSet available and it is not found and is a new one. New sts: %s", util.NamespaceNameString(new))
-		return types.ObjectStatusNew
+		return types.ObjectStatusRequested
 
 	default:
 		r.a.V(1).M(new).Warning("Have no StatefulSet available, nor it is not found. sts: %s err: %v", util.NamespaceNameString(new), err)
