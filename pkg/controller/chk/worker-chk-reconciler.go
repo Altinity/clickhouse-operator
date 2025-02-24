@@ -130,11 +130,13 @@ func (w *worker) reconcile(ctx context.Context, cr *apiChk.ClickHouseKeeperInsta
 	w.a.V(2).M(cr).S().P()
 	defer w.a.V(2).M(cr).E().P()
 
-	if counters := cr.GetHostsAttributesCounters(); counters.IsNewOnly() {
+	if counters := cr.GetHostsAttributesCounters(); counters.HasOnly(types.ObjectStatusRequested) {
 		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CR: %s", util.NamespaceNameString(cr))
 		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
 			FullFanOut: true,
 		})
+	} else {
+		w.a.V(1).M(cr).Info("Unable to use full fan-out mode. Counters: %s. CR: %s", counters, util.NamespaceNameString(cr))
 	}
 
 	return cr.WalkTillError(
@@ -550,7 +552,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		return err
 	}
 	// Host is now added and functional
-	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusNew) {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
 	}
 	if err := w.reconcileHostBootstrap(ctx, host); err != nil {
@@ -652,7 +654,7 @@ func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host) er
 	// Should we wait for host to startup
 	wait := false
 
-	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusNew) {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		wait = true
 	}
 
