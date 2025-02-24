@@ -27,7 +27,10 @@ type ReconcileAttributes struct {
 
 // NewReconcileAttributes creates new reconcile attributes
 func NewReconcileAttributes() *ReconcileAttributes {
-	return &ReconcileAttributes{}
+	return &ReconcileAttributes{
+		status: ObjectStatusUnknown,
+		exclude: false,
+	}
 }
 
 // HasIntersectionWith checks whether attributes `a` has intersection with `b`
