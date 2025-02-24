@@ -20,12 +20,18 @@ type ObjectStatus string
 // Possible values for object status
 const (
 	ObjectStatusNew      ObjectStatus = "new"
-	ObjectStatusFound    ObjectStatus = "found"
 	ObjectStatusModified ObjectStatus = "modified"
 	ObjectStatusSame     ObjectStatus = "same"
+
+	ObjectStatusFound    ObjectStatus = "found"
+	ObjectStatusCreated  ObjectStatus = "created"
 	ObjectStatusUnknown  ObjectStatus = "unknown"
 )
 
 func (s ObjectStatus) Is(b ObjectStatus) bool {
 	return s == b
+}
+
+func (s ObjectStatus) String() string {
+	return string(s)
 }
