@@ -37,8 +37,8 @@ type CHOp struct {
 	ConfigManager *ConfigManager
 }
 
-// NewCHOp creates new CHOp
-func NewCHOp(
+// newCHOp creates new CHOp
+func newCHOp(
 	version string,
 	commit string,
 	date string,
@@ -50,7 +50,7 @@ func NewCHOp(
 		Version:       version,
 		Commit:        commit,
 		Date:          date,
-		ConfigManager: NewConfigManager(kubeClient, chopClient, initConfigFilePath),
+		ConfigManager: newConfigManager(kubeClient, chopClient, initConfigFilePath),
 	}
 }
 
@@ -68,6 +68,14 @@ func (c *CHOp) Config() *api.OperatorConfig {
 		return nil
 	}
 	return c.ConfigManager.Config()
+}
+
+// GetRuntimeParam returns operator runtime parameter by name
+func (c *CHOp) GetRuntimeParam(name string) (string, bool) {
+	if c == nil {
+		return "", false
+	}
+	return c.ConfigManager.GetRuntimeParam(name)
 }
 
 // SetupLog sets up logging options

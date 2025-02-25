@@ -195,7 +195,7 @@ func (n *Normalizer) fillStatus() {
 		fqdns = append(fqdns, n.namer.Name(interfaces.NameFQDN, host))
 		return nil
 	})
-	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
+	ip, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_IP)
 	n.req.GetTarget().FillStatus(n.endpoints(), pods, fqdns, ip)
 }
 

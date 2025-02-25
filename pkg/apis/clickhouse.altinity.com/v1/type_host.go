@@ -15,10 +15,10 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -61,7 +61,7 @@ type HostRuntime struct {
 	// Internal data
 	Address             HostAddress                `json:"-" yaml:"-"`
 	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
-	reconcileAttributes *HostReconcileAttributes   `json:"-" yaml:"-" testdiff:"ignore"`
+	reconcileAttributes *types.ReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
 	replicas            *types.Int32               `json:"-" yaml:"-"`
 	hasData             bool                       `json:"-" yaml:"-"`
 
@@ -116,12 +116,12 @@ func (host *Host) SetTemplates(tl *TemplatesList) {
 }
 
 // GetReconcileAttributes is an ensurer getter
-func (host *Host) GetReconcileAttributes() *HostReconcileAttributes {
+func (host *Host) GetReconcileAttributes() *types.ReconcileAttributes {
 	if host == nil {
 		return nil
 	}
 	if host.Runtime.reconcileAttributes == nil {
-		host.Runtime.reconcileAttributes = NewHostReconcileAttributes()
+		host.Runtime.reconcileAttributes = types.NewReconcileAttributes()
 	}
 	return host.Runtime.reconcileAttributes
 }

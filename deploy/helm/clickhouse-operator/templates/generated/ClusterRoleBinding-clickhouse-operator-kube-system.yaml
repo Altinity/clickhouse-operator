@@ -11,7 +11,7 @@ metadata:
   name: {{ include "altinity-clickhouse-operator.fullname" . }}
   #namespace: kube-system
   labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -19,5 +19,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ include "altinity-clickhouse-operator.serviceAccountName" . }}
-    namespace: {{ .Release.Namespace }}
+    namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
 {{- end }}

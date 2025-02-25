@@ -12,7 +12,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: {{ printf "%s-metrics" (include "altinity-clickhouse-operator.fullname" .) }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
   labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
 spec:
   ports:

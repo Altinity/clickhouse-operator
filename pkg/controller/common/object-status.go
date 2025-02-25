@@ -15,16 +15,16 @@
 package common
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // GetObjectStatusFromMetas gets StatefulSet status from cur and new meta infos
-func GetObjectStatusFromMetas(labeler interfaces.ILabeler, curMeta, newMeta meta.Object) api.ObjectStatus {
+func GetObjectStatusFromMetas(labeler interfaces.ILabeler, curMeta, newMeta meta.Object) types.ObjectStatus {
 	// Try to perform label-based version comparison
 	curVersion, curHasLabel := labeler.GetObjectVersion(curMeta)
 	newVersion, newHasLabel := labeler.GetObjectVersion(newMeta)
@@ -34,7 +34,7 @@ func GetObjectStatusFromMetas(labeler interfaces.ILabeler, curMeta, newMeta meta
 			"Not enough labels to compare objects, can not say for sure what exactly is going on. Object: %s",
 			util.NamespaceNameString(newMeta),
 		)
-		return api.ObjectStatusUnknown
+		return types.ObjectStatusUnknown
 	}
 
 	//
@@ -46,7 +46,7 @@ func GetObjectStatusFromMetas(labeler interfaces.ILabeler, curMeta, newMeta meta
 			"cur and new objects are equal based on object version label. Update of the object is not required. Object: %s",
 			util.NamespaceNameString(newMeta),
 		)
-		return api.ObjectStatusSame
+		return types.ObjectStatusSame
 	}
 
 	log.M(newMeta).F().Info(
@@ -54,5 +54,5 @@ func GetObjectStatusFromMetas(labeler interfaces.ILabeler, curMeta, newMeta meta
 		util.NamespaceNameString(newMeta),
 	)
 
-	return api.ObjectStatusModified
+	return types.ObjectStatusModified
 }

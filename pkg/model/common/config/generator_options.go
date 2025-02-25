@@ -19,12 +19,13 @@ import (
 	"strings"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // HostSelector specifies options for excluding host
 type HostSelector struct {
 	exclude struct {
-		attributes *api.HostReconcileAttributes
+		attributes *types.ReconcileAttributes
 		hosts      []*api.Host
 	}
 }
@@ -34,7 +35,7 @@ func NewHostSelector() *HostSelector {
 	return &HostSelector{}
 }
 
-// ExcludeHost specifies to exclude a host
+// ExcludeHost adds host to the list of excluded
 func (o *HostSelector) ExcludeHost(host *api.Host) *HostSelector {
 	if (o == nil) || (host == nil) {
 		return o
@@ -44,7 +45,7 @@ func (o *HostSelector) ExcludeHost(host *api.Host) *HostSelector {
 	return o
 }
 
-// ExcludeHosts specifies to exclude list of hosts
+// ExcludeHosts add hosts to the list of excluded
 func (o *HostSelector) ExcludeHosts(hosts ...*api.Host) *HostSelector {
 	if (o == nil) || (len(hosts) == 0) {
 		return o
@@ -54,8 +55,8 @@ func (o *HostSelector) ExcludeHosts(hosts ...*api.Host) *HostSelector {
 	return o
 }
 
-// ExcludeReconcileAttributes specifies to exclude reconcile attributes
-func (o *HostSelector) ExcludeReconcileAttributes(attrs *api.HostReconcileAttributes) *HostSelector {
+// ExcludeReconcileAttributes set attributes as specification to exclude
+func (o *HostSelector) ExcludeReconcileAttributes(attrs *types.ReconcileAttributes) *HostSelector {
 	if (o == nil) || (attrs == nil) {
 		return o
 	}
@@ -64,22 +65,30 @@ func (o *HostSelector) ExcludeReconcileAttributes(attrs *api.HostReconcileAttrib
 	return o
 }
 
+func (o *HostSelector) hasExcludedHost(host *api.Host) bool {
+	for _, excludedHost := range o.exclude.hosts {
+		if host == excludedHost {
+			// Host is in the list of excluded
+			return true
+		}
+	}
+	return false
+}
+
 // Exclude tells whether to exclude the host
 func (o *HostSelector) Exclude(host *api.Host) bool {
 	if o == nil {
 		return false
 	}
 
-	if o.exclude.attributes.Any(host.GetReconcileAttributes()) {
+	if o.exclude.attributes.HasIntersectionWith(host.GetReconcileAttributes()) {
 		// Reconcile attributes specify to exclude this host
 		return true
 	}
 
-	for _, val := range o.exclude.hosts {
+	if o.hasExcludedHost(host) {
 		// Host is in the list to be excluded
-		if val == host {
-			return true
-		}
+		return true
 	}
 
 	return false
@@ -91,16 +100,14 @@ func (o *HostSelector) Include(host *api.Host) bool {
 		return false
 	}
 
-	if o.exclude.attributes.Any(host.GetReconcileAttributes()) {
+	if o.exclude.attributes.HasIntersectionWith(host.GetReconcileAttributes()) {
 		// Reconcile attributes specify to exclude this host
 		return false
 	}
 
-	for _, val := range o.exclude.hosts {
+	for o.hasExcludedHost(host) {
 		// Host is in the list to be excluded
-		if val == host {
-			return false
-		}
+		return false
 	}
 
 	return true

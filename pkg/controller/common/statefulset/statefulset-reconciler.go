@@ -91,7 +91,7 @@ func (r *Reconciler) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
 }
 
 // getStatefulSetStatus gets StatefulSet status
-func (r *Reconciler) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
+func (r *Reconciler) getStatefulSetStatus(host *api.Host) types.ObjectStatus {
 	new := host.Runtime.DesiredStatefulSet
 	r.a.V(2).M(new).S().Info(util.NamespaceNameString(new))
 	defer r.a.V(2).M(new).E().Info(util.NamespaceNameString(new))
@@ -114,14 +114,14 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 		r.a.V(1).M(new).Info("No cur StatefulSet available and the reason is - not found. Either new one or a deleted sts: %s", util.NamespaceNameString(new))
 		if host.HasAncestor() {
 			r.a.V(1).M(new).Warning("No cur StatefulSet available but host has an ancestor. Found deleted sts. for: %s", util.NamespaceNameString(new))
-			return api.ObjectStatusModified
+			return types.ObjectStatusModified
 		}
 		r.a.V(1).M(new).Info("No cur StatefulSet available and it is not found and is a new one. New sts: %s", util.NamespaceNameString(new))
-		return api.ObjectStatusNew
+		return types.ObjectStatusRequested
 
 	default:
 		r.a.V(1).M(new).Warning("Have no StatefulSet available, nor it is not found. sts: %s err: %v", util.NamespaceNameString(new), err)
-		return api.ObjectStatusUnknown
+		return types.ObjectStatusUnknown
 	}
 }
 
@@ -142,7 +142,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	r.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet))
 	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet))
 
-	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) {
 		r.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
 		if register {
 			host.GetCR().IEnsureStatus().HostUnchanged()
@@ -161,7 +161,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	host.Runtime.CurStatefulSet, err = r.sts.Get(ctx, newStatefulSet)
 
 	// Report diff to trace
-	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusModified {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusModified) {
 		r.a.V(1).M(host).F().Info("Need to reconcile MODIFIED StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
 		common.DumpStatefulSetDiff(host, host.Runtime.CurStatefulSet, newStatefulSet)
 	}

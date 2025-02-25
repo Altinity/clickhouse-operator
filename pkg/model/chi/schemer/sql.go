@@ -27,6 +27,17 @@ import (
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 const createTableDBEngines = `'Ordinary','Atomic','Memory','Lazy'`
 
+func (s *ClusterSchemer) sqlMaxReplicaDelay() string {
+	sql := heredoc.Docf(`
+		SELECT
+			MAX(absolute_delay)
+		FROM
+			system.replicas
+		`,
+	)
+	return sql
+}
+
 // sqlDropTable returns set of 'DROP TABLE ...' SQLs
 func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE

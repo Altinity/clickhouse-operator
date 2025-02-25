@@ -12,23 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package k8s
+package types
 
-import (
-	"fmt"
+// ObjectStatus specifies object status
+type ObjectStatus string
 
-	core "k8s.io/api/core/v1"
+// Possible values for object status
+const (
+	ObjectStatusRequested ObjectStatus = "requested"
+	ObjectStatusModified  ObjectStatus = "modified"
+	ObjectStatusSame      ObjectStatus = "same"
 
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	ObjectStatusFound   ObjectStatus = "found"
+	ObjectStatusCreated ObjectStatus = "created"
+	ObjectStatusUnknown ObjectStatus = "unknown"
 )
 
-// ServiceSpecVerifyPorts verifies core.ServiceSpec to have reasonable ports specified
-func ServiceSpecVerifyPorts(spec *core.ServiceSpec) error {
-	for i := range spec.Ports {
-		servicePort := &spec.Ports[i]
-		if types.IsPortInvalid(servicePort.Port) {
-			return fmt.Errorf(fmt.Sprintf("incorrect port :%d", servicePort.Port))
-		}
-	}
-	return nil
+func (s ObjectStatus) Is(b ObjectStatus) bool {
+	return s == b
+}
+
+func (s ObjectStatus) String() string {
+	return string(s)
 }

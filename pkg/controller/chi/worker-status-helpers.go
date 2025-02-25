@@ -20,6 +20,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -82,9 +83,15 @@ func (w *worker) doesHostHaveNoRunningQueries(ctx context.Context, host *api.Hos
 	return n <= 1
 }
 
+func (w *worker) doesHostHaveNoReplicationDelay(ctx context.Context, host *api.Host) bool {
+	delay, _ := w.ensureClusterSchemer(host).HostMaxReplicaDelay(ctx, host)
+	threshold := 10
+	return delay <= threshold
+}
+
 // isCHIProcessedOnTheSameIP checks whether it is just a restart of the operator on the same IP
 func (w *worker) isCHIProcessedOnTheSameIP(chi *api.ClickHouseInstallation) bool {
-	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
+	ip, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_IP)
 	operatorIpIsTheSame := ip == chi.Status.GetCHOpIP()
 	log.V(1).Info("Operator IPs to process CHI: %s. Previous: %s Cur: %s", chi.Name, chi.Status.GetCHOpIP(), ip)
 
@@ -178,8 +185,8 @@ func (w *worker) getRemoteServersGeneratorOptions() *commonConfig.HostSelector {
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
-		api.NewHostReconcileAttributes().
-			SetAdd().
+		types.NewReconcileAttributes().
+			SetStatus(types.ObjectStatusRequested).
 			SetExclude(),
 	)
 }

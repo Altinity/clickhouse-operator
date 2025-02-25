@@ -292,16 +292,26 @@ func (cr *ClickHouseKeeperInstallation) HostsCount() int {
 	return count
 }
 
-// HostsCountAttributes counts hosts by attributes
-func (cr *ClickHouseKeeperInstallation) HostsCountAttributes(a *apiChi.HostReconcileAttributes) int {
+// HostsWithAttributesCount counts hosts by attributes
+func (cr *ClickHouseKeeperInstallation) HostsWithAttributesCount(a *types.ReconcileAttributes) int {
 	count := 0
 	cr.WalkHosts(func(host *apiChi.Host) error {
-		if host.GetReconcileAttributes().Any(a) {
+		if host.GetReconcileAttributes().HasIntersectionWith(a) {
 			count++
 		}
 		return nil
 	})
 	return count
+}
+
+// GetHostsAttributesCounters
+func (cr *ClickHouseKeeperInstallation) GetHostsAttributesCounters() *types.ReconcileAttributesCounters {
+	counters := types.NewReconcileAttributesCounters()
+	cr.WalkHosts(func(host *apiChi.Host) error {
+		counters.Add(host.GetReconcileAttributes())
+		return nil
+	})
+	return counters
 }
 
 // GetHostTemplate gets HostTemplate by name
