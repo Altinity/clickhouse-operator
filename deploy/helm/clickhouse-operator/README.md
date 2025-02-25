@@ -43,6 +43,7 @@ For upgrade please install CRDs separately:
 | metrics.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
 | metrics.resources | object | `{}` | custom resource configuration |
 | nameOverride | string | `""` | override name of the chart |
+| namespaceOverride | string | `""` |  |
 | nodeSelector | object | `{}` | node for scheduler pod assignment, check `kubectl explain pod.spec.nodeSelector` for details |
 | operator.containerSecurityContext | object | `{}` |  |
 | operator.env | list | `[]` | additional environment variables for the clickhouse-operator container in deployment possible format value `[{"name": "SAMPLE", "value": "text"}]` |

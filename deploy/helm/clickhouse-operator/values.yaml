@@ -1,5 +1,4 @@
 namespaceOverride: ""
-
 operator:
   image:
     # operator.image.repository -- image repository

@@ -17,7 +17,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: medyagh/setup-minikube@master
+      - name: Set up yq
+        uses: frenck/action-setup-yq@v1
+
+      - name: Setup jq
+        uses: dcarbone/install-jq-action@v3
+
+      - name: Setup helm-docs
+        uses: gabe565/setup-helm-docs-action@v1
+
+      - name: Setup minikube
+        uses: medyagh/setup-minikube@master
         with:
           driver: docker
           container-runtime: containerd
@@ -29,6 +39,7 @@ jobs:
         run: |
           set -xe
           minikube kubectl create ns test
+          ./dev/generate_helm_chart.sh
           helm install -n test test-operator ./deploy/helm/clickhouse-operator/
           sleep 10
           workflow_count=$(kubectl get all --all-namespaces | grep -c "test-operator")
