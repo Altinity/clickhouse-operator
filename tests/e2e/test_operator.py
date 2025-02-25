@@ -1010,10 +1010,16 @@ def test_012(self):
         kubectl.check_service("service-test-012", "LoadBalancer")
     with And("There should be a service for shard 0"):
         kubectl.check_service("service-test-012-0-0", "ClusterIP")
+        with Then("clusterIP should be set"):
+            assert kubectl.get_field("service", "service-test-012-0-0", ".spec.clusterIP") != "None"
     with And("There should be a service for shard 1"):
         kubectl.check_service("service-test-012-1-0", "ClusterIP")
+        with Then("clusterIP should be set"):
+            assert kubectl.get_field("service", "service-test-012-1-0", ".spec.clusterIP") != "None"
     with And("There should be a service for default cluster"):
         kubectl.check_service("service-default", "ClusterIP")
+        with Then("clusterIP should be set"):
+            assert kubectl.get_field("service", "service-default", ".spec.clusterIP") != "None"
 
     node_port = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
     service_test_012_created = kubectl.get_field("service", "service-test-012", ".metadata.creationTimestamp")
@@ -1036,11 +1042,12 @@ def test_012(self):
             kubectl.check_service("service-default", "LoadBalancer")
 
         with And("Service for shard 0 change to headless one"):
-            service = kubectl.get("service", "service-test-012-0-0")
-            assert service["spec"]["type"] == "ClusterIP"
-            if service["spec"]["clusterIP"] != "None":
-                print("ERROR: clusterIP should be None but it is: " + service["spec"]["clusterIP"])
-            # assert service["spec"]["clusterIP"] == "None"
+            kubectl.check_service("service-test-012-0-0", "ClusterIP")
+            with Then("clusterIP should be None"):
+                clusterIP = kubectl.get_field("service", "service-test-012-0-0", ".spec.clusterIP")
+                if clusterIP != "None":
+                    print(f"ERROR: clusterIP should be None but it is: {clusterIP}")
+                # assert clusterIP == "None"
 
         with And("Service should not be re-created if type has not been changed"):
             assert service_test_012_created == kubectl.get_field("service", "service-test-012", ".metadata.creationTimestamp")
@@ -1050,6 +1057,8 @@ def test_012(self):
 
         with And("Additional internal service should be created"):
             kubectl.check_service("service-test-012-internal", "ClusterIP")
+            with Then("clusterIP should be None"):
+                assert kubectl.get_field("service", "service-test-012-internal", ".spec.clusterIP") == "None"
 
     with Finally("I clean up"):
         delete_test_namespace()
