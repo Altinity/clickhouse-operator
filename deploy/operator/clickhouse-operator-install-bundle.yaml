@@ -2701,6 +2701,7 @@ spec:
                                 items:
                                   type: object
                                   description: "setting: value pairs for configuration restart policy"
+                                  x-kubernetes-preserve-unknown-fields: true
                     access:
                       type: object
                       description: "parameters which use for connect to clickhouse from clickhouse-operator deployment"
