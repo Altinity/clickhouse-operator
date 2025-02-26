@@ -1,5 +1,5 @@
+# namespaceOverride -- override namespace where operator will install
 namespaceOverride: ""
-
 operator:
   image:
     # operator.image.repository -- image repository
