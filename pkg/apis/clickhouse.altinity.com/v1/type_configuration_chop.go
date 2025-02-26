@@ -1034,11 +1034,21 @@ func (c *OperatorConfig) isCHITemplateExt(file string) bool {
 	return false
 }
 
-// String returns string representation of a OperatorConfig
+// String returns string representation of an OperatorConfig
 func (c *OperatorConfig) String(hideCredentials bool) string {
 	conf := c
 	if hideCredentials {
-		conf = c.DeepCopy()
+		conf = c.copyWithHiddenCredentials()
+	}
+	if bytes, err := yaml.Marshal(conf); err == nil {
+		return string(bytes)
+	}
+
+	return ""
+}
+
+func (c *OperatorConfig) copyWithHiddenCredentials() *OperatorConfig {
+		conf := c.DeepCopy()
 		if conf.ClickHouse.Config.User.Default.Password != "" {
 			conf.ClickHouse.Config.User.Default.Password = PasswordReplacer
 		}
@@ -1055,12 +1065,8 @@ func (c *OperatorConfig) String(hideCredentials bool) string {
 		conf.CHConfigUserDefaultPassword = PasswordReplacer
 		conf.CHUsername = UsernameReplacer
 		conf.CHPassword = PasswordReplacer
-	}
-	if bytes, err := yaml.Marshal(conf); err == nil {
-		return string(bytes)
-	}
 
-	return ""
+	return conf
 }
 
 // IsWatchedNamespace returns whether specified namespace is in a list of watched
