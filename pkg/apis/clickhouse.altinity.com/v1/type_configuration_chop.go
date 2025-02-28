@@ -570,9 +570,9 @@ func (c *OperatorConfig) MergeFrom(from *OperatorConfig) error {
 		return nil
 	}
 
-		if err := mergo.Merge(c, *from, mergo.WithAppendSlice); err != nil {
-			return fmt.Errorf("FAIL merge config Error: %q", err)
-		}
+	if err := mergo.Merge(c, *from, mergo.WithAppendSlice); err != nil {
+		return fmt.Errorf("FAIL merge config Error: %q", err)
+	}
 
 	return nil
 }
@@ -1051,23 +1051,23 @@ func (c *OperatorConfig) String(hideCredentials bool) string {
 }
 
 func (c *OperatorConfig) copyWithHiddenCredentials() *OperatorConfig {
-		conf := c.DeepCopy()
-		if conf.ClickHouse.Config.User.Default.Password != "" {
-			conf.ClickHouse.Config.User.Default.Password = PasswordReplacer
-		}
-		//conf.ClickHouse.Access.Username = UsernameReplacer
-		if conf.ClickHouse.Access.Password != "" {
-			conf.ClickHouse.Access.Password = PasswordReplacer
-		}
-		//conf.ClickHouse.Access.Secret.Runtime.Username = UsernameReplacer
-		if conf.ClickHouse.Access.Secret.Runtime.Password != "" {
-			conf.ClickHouse.Access.Secret.Runtime.Password = PasswordReplacer
-		}
+	conf := c.DeepCopy()
+	if conf.ClickHouse.Config.User.Default.Password != "" {
+		conf.ClickHouse.Config.User.Default.Password = PasswordReplacer
+	}
+	//conf.ClickHouse.Access.Username = UsernameReplacer
+	if conf.ClickHouse.Access.Password != "" {
+		conf.ClickHouse.Access.Password = PasswordReplacer
+	}
+	//conf.ClickHouse.Access.Secret.Runtime.Username = UsernameReplacer
+	if conf.ClickHouse.Access.Secret.Runtime.Password != "" {
+		conf.ClickHouse.Access.Secret.Runtime.Password = PasswordReplacer
+	}
 
-		// DEPRECATED
-		conf.CHConfigUserDefaultPassword = PasswordReplacer
-		conf.CHUsername = UsernameReplacer
-		conf.CHPassword = PasswordReplacer
+	// DEPRECATED
+	conf.CHConfigUserDefaultPassword = PasswordReplacer
+	conf.CHUsername = UsernameReplacer
+	conf.CHPassword = PasswordReplacer
 
 	return conf
 }
