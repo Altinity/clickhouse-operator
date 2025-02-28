@@ -1,0 +1,19 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-055-chopconf
+
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: default
+    files:
+      config.d/test.xml: |
+         <yandex>
+            <macros>
+              <test>test</test>
+            </macros>
+         </yandex>

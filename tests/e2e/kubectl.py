@@ -479,6 +479,10 @@ def get_pod_spec(chi_name, pod_name="", ns=None, shell=None):
         pod = get("pod", pod_name, ns=ns, shell=shell)
     return pod["spec"]
 
+def get_clickhouse_start(chi_name, ns=None, shell=None):
+    pod_name = get_pod_names(chi_name, ns=ns, shell=shell)[0]
+    return get_field("pod", pod_name, ".status.containerStatuses[0].state.running.startedAt")
+
 
 def get_pod_image(chi_name, pod_name="", ns=None, shell=None):
     pod_image = get_pod_spec(chi_name, pod_name, ns, shell=shell)["containers"][0]["image"]
