@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -181,13 +182,13 @@ type OperatorConfigRestartPolicyRuleSet map[types.Matchable]types.StringBool
 
 // OperatorConfigRestartPolicyRule specifies ClickHouse version and rules for this version
 type OperatorConfigRestartPolicyRule struct {
-	Version string
-	Rules   []OperatorConfigRestartPolicyRuleSet
+	Version string                               `json:"version" yaml:"version"`
+	Rules   []OperatorConfigRestartPolicyRuleSet `json:"rules"   yaml:"rules"`
 }
 
 // OperatorConfigRestartPolicy specifies operator's configuration changes restart policy
 type OperatorConfigRestartPolicy struct {
-	Rules []OperatorConfigRestartPolicyRule
+	Rules []OperatorConfigRestartPolicyRule `json:"rules" yaml:"rules"`
 }
 
 // OperatorConfigFile specifies File section
@@ -250,7 +251,7 @@ type OperatorConfigDefault struct {
 
 // OperatorConfigClickHouse specifies ClickHouse section
 type OperatorConfigClickHouse struct {
-	Config              OperatorConfigConfig        `json:"configuration" yaml:"configuration"`
+	Config              OperatorConfigConfig        `json:"configuration"              yaml:"configuration"`
 	ConfigRestartPolicy OperatorConfigRestartPolicy `json:"configurationRestartPolicy" yaml:"configurationRestartPolicy"`
 
 	Access struct {
@@ -409,24 +410,30 @@ type OperatorConfigLabel struct {
 	// Whether to append *Scope* labels to StatefulSet and Pod.
 	AppendScopeString types.StringBool `json:"appendScope" yaml:"appendScope"`
 
-	Runtime struct {
-		AppendScope bool `json:"appendScope" yaml:"appendScope"`
-	} `json:"runtime" yaml:"runtime"`
+	Runtime OperatorConfigLabelRuntime `json:"runtime" yaml:"runtime"`
+}
+
+type OperatorConfigLabelRuntime struct {
+	AppendScope bool `json:"appendScope" yaml:"appendScope"`
 }
 
 type OperatorConfigMetrics struct {
-	Labels struct {
-		Exclude []string `json:"exclude" yaml:"exclude"`
-	} `json:"labels" yaml:"labels"`
+	Labels OperatorConfigMetricsLabels `json:"labels" yaml:"labels"`
+}
+
+type OperatorConfigMetricsLabels struct {
+	Exclude []string `json:"exclude" yaml:"exclude"`
 }
 
 type OperatorConfigStatus struct {
-	Fields struct {
-		Action  *types.StringBool `json:"action,omitempty"  yaml:"action,omitempty"`
-		Actions *types.StringBool `json:"actions,omitempty" yaml:"actions,omitempty"`
-		Error   *types.StringBool `json:"error,omitempty"   yaml:"error,omitempty"`
-		Errors  *types.StringBool `json:"errors,omitempty"  yaml:"errors,omitempty"`
-	} `json:"fields" yaml:"fields"`
+	Fields OperatorConfigStatusFields `json:"fields" yaml:"fields"`
+}
+
+type OperatorConfigStatusFields struct {
+	Action  *types.StringBool `json:"action,omitempty"  yaml:"action,omitempty"`
+	Actions *types.StringBool `json:"actions,omitempty" yaml:"actions,omitempty"`
+	Error   *types.StringBool `json:"error,omitempty"   yaml:"error,omitempty"`
+	Errors  *types.StringBool `json:"errors,omitempty"  yaml:"errors,omitempty"`
 }
 
 type ConfigCRSource struct {
@@ -439,13 +446,13 @@ type OperatorConfig struct {
 	Runtime     OperatorConfigRuntime    `json:"runtime"    yaml:"runtime"`
 	Watch       OperatorConfigWatch      `json:"watch"      yaml:"watch"`
 	ClickHouse  OperatorConfigClickHouse `json:"clickhouse" yaml:"clickhouse"`
-	Keeper      OperatorConfigKeeper     `json:"keeper" yaml:"keeper"`
+	Keeper      OperatorConfigKeeper     `json:"keeper"     yaml:"keeper"`
 	Template    OperatorConfigTemplate   `json:"template"   yaml:"template"`
 	Reconcile   OperatorConfigReconcile  `json:"reconcile"  yaml:"reconcile"`
 	Annotation  OperatorConfigAnnotation `json:"annotation" yaml:"annotation"`
 	Label       OperatorConfigLabel      `json:"label"      yaml:"label"`
 	Metrics     OperatorConfigMetrics    `json:"metrics"    yaml:"metrics"`
-	Status      OperatorConfigStatus     `json:"status"    yaml:"status"`
+	Status      OperatorConfigStatus     `json:"status"     yaml:"status"`
 	StatefulSet struct {
 		// Revision history limit
 		RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`
@@ -569,7 +576,7 @@ func (c *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) error 
 			return fmt.Errorf("FAIL merge config Error: %q", err)
 		}
 	case MergeTypeOverrideByNonEmptyValues:
-		if err := mergo.Merge(c, *from, mergo.WithOverride); err != nil {
+		if err := mergo.Merge(c, *from, mergo.WithAppendSlice); err != nil {
 			return fmt.Errorf("FAIL merge config Error: %q", err)
 		}
 	}
@@ -1041,6 +1048,9 @@ func (c *OperatorConfig) String(hideCredentials bool) string {
 		conf = c.copyWithHiddenCredentials()
 	}
 	if bytes, err := yaml.Marshal(conf); err == nil {
+		return string(bytes)
+	}
+	if bytes, err := json.MarshalIndent(conf, "", "  "); err == nil {
 		return string(bytes)
 	}
 
