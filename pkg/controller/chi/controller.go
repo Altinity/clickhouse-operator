@@ -217,6 +217,23 @@ func (c *Controller) addEventHandlersChopConfig(
 	chopInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chopConfig := obj.(*api.ClickHouseOperatorConfiguration)
+
+			log.V(1).M(chopConfig).Info("chopInformer.AddFunc")
+			log.V(1).M(chopConfig).Info("\n---\n chopConfig as string:\n%s", chopConfig)
+			log.V(1).M(chopConfig).Info("\n---\n chopConfig as value:\n%+v", chopConfig)
+			log.V(1).M(chopConfig).Info("\n---\n obj as string:\n%s", obj)
+			log.V(1).M(chopConfig).Info("\n---\n obj as value:\n%+v", obj)
+			log.V(1).M(chopConfig).Info("\n---\n")
+
+			d, err := c.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(chopConfig.Namespace).Get(context.TODO(), chopConfig.Name, controller.NewGetOptions())
+			if err != nil {
+				log.V(1).M(chopConfig).Error("Err: %v", err)
+			} else {
+				log.V(1).M(chopConfig).Info("direct chopConf")
+				log.V(1).M(chopConfig).Info("\n---\n direct chopConfig as string:\n%s", d)
+				log.V(1).M(chopConfig).Info("\n---\n direct chopConfig as value:\n%+v", d)
+			}
+
 			if !chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
