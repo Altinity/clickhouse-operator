@@ -71,6 +71,7 @@ def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None):
             shell=shell
         )
 
+
 def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
     delete_kind("chi", chi, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
     if wait:
@@ -89,11 +90,14 @@ def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
 def delete_chk(chk, ns=None, wait=True, ok_to_fail=False, shell=None):
     delete_kind("chk", chk, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
 
+
 def delete_all_chi(ns=None):
     delete_all("chi", ns=ns)
 
+
 def delete_all_chk(ns=None):
     delete_all("chk", ns=ns)
+
 
 def delete_all(kind, ns=None):
     crds = launch("get crds -o=custom-columns=name:.spec.names.shortNames[0]", ns=ns).splitlines()
@@ -203,9 +207,11 @@ def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None):
     out = launch(f"get {kind} {name} {label} -o json", ns=ns, ok_to_fail=ok_to_fail, shell=shell)
     return json.loads(out.strip())
 
+
 def get_chi_normalizedCompleted(chi, ns=None, shell=None):
     chi_storage = get("configmap", f"chi-storage-{chi}", ns=ns)
     return json.loads(chi_storage["data"]["status-normalizedCompleted"])
+
 
 def create_ns(ns):
     if ns is None:
@@ -478,6 +484,7 @@ def get_pod_spec(chi_name, pod_name="", ns=None, shell=None):
     else:
         pod = get("pod", pod_name, ns=ns, shell=shell)
     return pod["spec"]
+
 
 def get_clickhouse_start(chi_name, ns=None, shell=None):
     pod_name = get_pod_names(chi_name, ns=ns, shell=shell)[0]
