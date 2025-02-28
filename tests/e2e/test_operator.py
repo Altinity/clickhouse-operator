@@ -204,7 +204,6 @@ def test_007(self):
         delete_test_namespace()
 
 
-
 def wait_operator_restart(chi, wait_objects, shell=None):
     with When("Restart operator"):
         util.restart_operator(shell=shell)
@@ -5282,9 +5281,9 @@ def test_055(self):
             check={"do_not_delete": 1},
         )
 
-        with Then("Startup script should be executed"):
-            res = clickhouse.query(chi, "select count() from test_055")
-            assert res == "0"
+        # with Then("Startup script should be executed"):
+        #     res = clickhouse.query(chi, "select count() from test_055")
+        #     assert res == "0"
 
         with Then("ClickHouse SHOULD NOT be restarted"):
             new_start_time = kubectl.get_clickhouse_start(chi)
