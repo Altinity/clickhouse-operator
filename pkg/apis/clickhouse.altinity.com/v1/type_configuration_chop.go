@@ -565,21 +565,14 @@ type OperatorConfig struct {
 }
 
 // MergeFrom merges
-func (c *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) error {
+func (c *OperatorConfig) MergeFrom(from *OperatorConfig) error {
 	if from == nil {
 		return nil
 	}
 
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		if err := mergo.Merge(c, *from); err != nil {
-			return fmt.Errorf("FAIL merge config Error: %q", err)
-		}
-	case MergeTypeOverrideByNonEmptyValues:
 		if err := mergo.Merge(c, *from, mergo.WithAppendSlice); err != nil {
 			return fmt.Errorf("FAIL merge config Error: %q", err)
 		}
-	}
 
 	return nil
 }
