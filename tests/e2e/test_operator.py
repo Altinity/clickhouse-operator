@@ -5281,13 +5281,13 @@ def test_055(self):
             check={"do_not_delete": 1},
         )
 
-        # with Then("Startup script should be executed"):
-        #     res = clickhouse.query(chi, "select count() from test_055")
-        #     assert res == "0"
-
         with Then("ClickHouse SHOULD NOT be restarted"):
             new_start_time = kubectl.get_clickhouse_start(chi)
             assert start_time == new_start_time
+
+        with Then("Startup script SHODLD NOT be executed"):
+            res = clickhouse.query_with_error(chi, "select count() from test_055")
+            assert res != "0"
 
     with When(f"Add configuration file that SHOULD NOT be ignored by restart rules"):
         kubectl.create_and_check(
