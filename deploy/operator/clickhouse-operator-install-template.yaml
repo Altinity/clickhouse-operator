@@ -4281,6 +4281,7 @@ data:
               - files/*.xml: "yes"
               - files/config.d/*.xml: "yes"
               - files/config.d/*dict*.xml: "no"
+              - files/config.d/*no_restart*: "no"
     
               # exceptions in default profile
               - profiles/default/background_*_pool_size: "yes"
