@@ -11,9 +11,9 @@ spec:
     clusters:
       - name: default
     files:
-      config.d/test_no_restart.xml: |
-        <clickhouse>
+      config.d/test_restart.xml: |
+         <yandex>
             <macros>
               <test>test</test>
             </macros>
-        </clickhouse>
+         </yandex>

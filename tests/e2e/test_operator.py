@@ -5289,9 +5289,19 @@ def test_055(self):
             res = clickhouse.query_with_error(chi, "select count() from test_055")
             assert res != "0"
 
-    with When(f"Add configuration file that SHOULD NOT be ignored by restart rules"):
+    with When(f"Add another configuration file that SHOULD be ignored by restart rules"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-055-chopconf-3.yaml",
+            check={"do_not_delete": 1},
+        )
+
+        with Then("ClickHouse SHOULD NOT be restarted"):
+            new_start_time = kubectl.get_clickhouse_start(chi)
+            assert start_time == new_start_time
+
+    with When(f"Add configuration file that SHOULD NOT be ignored by restart rules"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-055-chopconf-4.yaml",
             check={"do_not_delete": 1},
         )
 
