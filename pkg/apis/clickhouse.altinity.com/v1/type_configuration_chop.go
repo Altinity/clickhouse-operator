@@ -1280,5 +1280,4 @@ func (c *OperatorConfig) move() {
 	if c.RevisionHistoryLimit != 0 {
 		c.StatefulSet.RevisionHistoryLimit = c.RevisionHistoryLimit
 	}
-
 }
