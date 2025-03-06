@@ -38,26 +38,22 @@ func (t Tags) Set(tag Tag, value int) Tags {
 }
 
 func (t Tags) UnSet(tag Tag) Tags {
-	if t == nil {
-		return nil
-	}
-	delete(t, tag)
+	util.MapDeleteKeys(t, tag)
 	return t
 }
 
 
 func (t Tags) Has(tag Tag) bool {
-	if t == nil {
-		return false
-	}
-	_, ok := t[tag]
-	return ok
+	return util.MapHasKeys(t, tag)
 }
 
 func (t Tags) Equal(b Tags) bool {
 	return util.MapsAreTheSame(t, b)
 }
 
+func (t Tags) HasIntersection(b Tags) bool {
+	return util.MapsHaveKeyValuePairsIntersection(t, b)
+}
 
 // String casts to a string
 func (t Tags) String() string {
