@@ -16,26 +16,28 @@ package util
 
 import (
 	"bytes"
-	"sort"
+	"reflect"
+	"slices"
+
+	"golang.org/x/exp/constraints"
 )
 
 // IncludeNonEmpty inserts (and overwrites) data into map object using specified key, if not empty value provided
-func IncludeNonEmpty(dst map[string]string, key, src string) {
+func IncludeNonEmpty[TKey comparable, TValue any](dst map[TKey]TValue, key TKey, value TValue) {
 	// Do not include empty value
-	if src == "" {
+	v := reflect.ValueOf(value)
+	if v.IsZero() {
 		return
 	}
 
 	// Include (and overwrite) value by specified key
-	dst[key] = src
-
-	return
+	dst[key] = value
 }
 
 // CopyMap creates a copy of the given map by copying over key by key.
 // It doesn't perform a deep-copy.
-func CopyMap(src map[string]string) map[string]string {
-	result := make(map[string]string, len(src))
+func CopyMap[TKey comparable, TValue any](src map[TKey]TValue) map[TKey]TValue {
+	result := make(map[TKey]TValue, len(src))
 	for key, value := range src {
 		result[key] = value
 	}
@@ -46,22 +48,22 @@ func CopyMap(src map[string]string) map[string]string {
 // Keys specified in 'include' are included,
 // keys specified in 'exclude' are excluded.
 // However, 'include' keys are applied only in case 'include' list is not empty.
-func CopyMapFilter(src map[string]string, include, exclude []string) map[string]string {
-	return CopyMapExclude(CopyMapInclude(src, include...), exclude...)
+func CopyMapFilter[TKey comparable, TValue any](src map[TKey]TValue, includeKeys, excludeKeys []TKey) map[TKey]TValue {
+	return CopyMapExclude(CopyMapInclude(src, includeKeys...), excludeKeys...)
 }
 
 // CopyMapInclude creates a copy of the given map but will include the given set of keys only.
 // However, keys are applied only in case list is not empty.
 // In case of an empty list, no filtering is performed and all keys are copied.
-func CopyMapInclude(src map[string]string, keys ...string) map[string]string {
-	if len(keys) == 0 {
+func CopyMapInclude[TKey comparable, TValue any](src map[TKey]TValue, includeKeys ...TKey) map[TKey]TValue {
+	if len(includeKeys) == 0 {
 		// No include list specified, just copy the whole map
 		return CopyMap(src)
 	}
 
 	// Include list specified, copy listed keys only
-	result := make(map[string]string, len(keys))
-	for _, key := range keys {
+	result := make(map[TKey]TValue, len(includeKeys))
+	for _, key := range includeKeys {
 		if value, ok := src[key]; ok {
 			result[key] = value
 		}
@@ -70,10 +72,10 @@ func CopyMapInclude(src map[string]string, keys ...string) map[string]string {
 }
 
 // CopyMapExclude creates a copy of the given map but will exclude the given set of keys.
-func CopyMapExclude(src map[string]string, exceptKeys ...string) map[string]string {
+func CopyMapExclude[TKey comparable, TValue any](src map[TKey]TValue, excludeKeys ...TKey) map[TKey]TValue {
 	result := CopyMap(src)
 
-	for _, key := range exceptKeys {
+	for _, key := range excludeKeys {
 		delete(result, key)
 	}
 
@@ -81,7 +83,7 @@ func CopyMapExclude(src map[string]string, exceptKeys ...string) map[string]stri
 }
 
 // MergeStringMapsOverwrite inserts (and overwrites) data into dst map object from src
-func MergeStringMapsOverwrite(dst, src map[string]string, keys ...string) map[string]string {
+func MergeStringMapsOverwrite[TKey comparable, TValue any](dst, src map[TKey]TValue, keys ...TKey) map[TKey]TValue {
 	if len(src) == 0 {
 		// Nothing to merge from
 		return dst
@@ -89,7 +91,7 @@ func MergeStringMapsOverwrite(dst, src map[string]string, keys ...string) map[st
 
 	var created bool
 	if dst == nil {
-		dst = make(map[string]string)
+		dst = make(map[TKey]TValue)
 		created = true
 	}
 
@@ -117,7 +119,7 @@ func MergeStringMapsOverwrite(dst, src map[string]string, keys ...string) map[st
 }
 
 // MergeStringMapsPreserve inserts (and preserved existing) data into dst map object from src
-func MergeStringMapsPreserve(dst, src map[string]string, keys ...string) map[string]string {
+func MergeStringMapsPreserve[TKey comparable, TValue any](dst, src map[TKey]TValue, keys ...TKey) map[TKey]TValue {
 	if len(src) == 0 {
 		// Nothing to merge from
 		return dst
@@ -125,7 +127,7 @@ func MergeStringMapsPreserve(dst, src map[string]string, keys ...string) map[str
 
 	var created bool
 	if dst == nil {
-		dst = make(map[string]string)
+		dst = make(map[TKey]TValue)
 		created = true
 	}
 
@@ -157,7 +159,7 @@ func MergeStringMapsPreserve(dst, src map[string]string, keys ...string) map[str
 }
 
 // SubtractStringMaps subtracts "delta" from "base" by keys
-func SubtractStringMaps(base, delta map[string]string) map[string]string {
+func SubtractStringMaps[TKey comparable, TValue any](base, delta map[TKey]TValue) map[TKey]TValue {
 	if len(delta) == 0 {
 		// Nothing to delete
 		return base
@@ -178,7 +180,7 @@ func SubtractStringMaps(base, delta map[string]string) map[string]string {
 }
 
 // MapDeleteKeys deletes multiple keys from the map
-func MapDeleteKeys(base map[string]string, keys ...string) map[string]string {
+func MapDeleteKeys[TKey comparable, TValue any](base map[TKey]TValue, keys ...TKey) map[TKey]TValue {
 	if len(keys) == 0 {
 		// Nothing to delete
 		return base
@@ -199,7 +201,7 @@ func MapDeleteKeys(base map[string]string, keys ...string) map[string]string {
 }
 
 // MapHasKeys checks whether map has all keys from specified list
-func MapHasKeys(m map[string]string, keys ...string) bool {
+func MapHasKeys[TKey comparable, TValue any](m map[TKey]TValue, keys ...TKey) bool {
 	for _, needle := range keys {
 		// Have we found this needle
 		found := false
@@ -217,19 +219,25 @@ func MapHasKeys(m map[string]string, keys ...string) bool {
 	return true
 }
 
-// Map2String returns named map[string]string mas as a string
-func Map2String(name string, m map[string]string) string {
+func cmp[T constraints.Ordered](a, b T) int {
+	if a < b {
+		return -1
+	}
+	if a > b {
+		return 1
+	}
+	return 0
+}
+
+// Map2String returns named map as a string
+func Map2String[TKey constraints.Ordered, TValue any](name string, m map[TKey]TValue) string {
 	// Write map entries according to sorted keys
 	// So we need to
 	// 1. Extract and sort all keys
 	// 2. Walk over keys and write map entries
 
 	// 1. Sort keys
-	var keys []string
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := MapGetSortedKeys(m)
 
 	// Walk over sorted keys
 	b := &bytes.Buffer{}
@@ -241,18 +249,19 @@ func Map2String(name string, m map[string]string) string {
 	return b.String()
 }
 
-func MapGetSortedKeys(m map[string]string) (keys []string) {
+func MapGetSortedKeys[TKey constraints.Ordered, TValue any](m map[TKey]TValue) (keys []TKey) {
 	if m == nil {
 		return nil
 	}
 	for key := range m {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	slices.SortStableFunc(keys, cmp)
+	//sort.Strings(keys)
 	return keys
 }
 
-func MapGetSortedKeysAndValues(m map[string]string) (keys []string, values []string) {
+func MapGetSortedKeysAndValues[TKey constraints.Ordered, TValue any](m map[TKey]TValue) (keys []TKey, values []TValue) {
 	if m == nil {
 		return nil, nil
 	}
@@ -265,12 +274,12 @@ func MapGetSortedKeysAndValues(m map[string]string) (keys []string, values []str
 	return keys, values
 }
 
-func MapMigrate(cur, new, old map[string]string) map[string]string {
+func MapMigrate[TKey constraints.Ordered, TValue any](cur, new, old map[TKey]TValue) map[TKey]TValue {
 	removed := MapGetSortedKeys(SubtractStringMaps(CopyMap(old), new))
 	return MapDeleteKeys(MergeStringMapsPreserve(new, cur), removed...)
 }
 
-func MapsAreTheSame(m1, m2 map[string]int) bool {
+func MapsAreTheSame[TKey comparable, TValue comparable](m1, m2 map[TKey]TValue) bool {
 	if len(m1) != len(m2) {
 		return false
 	}
