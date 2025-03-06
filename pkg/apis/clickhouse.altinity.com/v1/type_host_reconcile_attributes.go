@@ -33,6 +33,7 @@ const (
 
 const (
 	TagExclude types.Tag = "exclude"
+	TagLowPriority types.Tag = "low_priority"
 )
 
 // HostReconcileAttributes defines host reconcile status and attributes
@@ -201,6 +202,32 @@ func (a *HostReconcileAttributes) IsExclude() bool {
 		return false
 	}
 	return a.tags.Has(TagExclude)
+}
+
+// SetLowPriority sets 'LowPriority' attribute
+func (a *HostReconcileAttributes) SetLowPriority() *HostReconcileAttributes {
+	if a == nil {
+		return a
+	}
+	a.tags.Set(TagLowPriority)
+	return a
+}
+
+// UnsetLowPriority unsets 'LowPriority' attribute
+func (a *HostReconcileAttributes) UnsetLowPriority() *HostReconcileAttributes {
+	if a == nil {
+		return a
+	}
+	a.tags.UnSet(TagLowPriority)
+	return a
+}
+
+// IsLowPriority checks whether 'LowPriority' attribute is set
+func (a *HostReconcileAttributes) IsLowPriority() bool {
+	if a == nil {
+		return false
+	}
+	return a.tags.Has(TagLowPriority)
 }
 
 // String returns string form
