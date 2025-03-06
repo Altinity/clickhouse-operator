@@ -16,6 +16,8 @@ package v1
 
 import (
 	"fmt"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // ObjectStatus specifies object status
@@ -40,7 +42,7 @@ type HostReconcileAttributes struct {
 	modify bool
 	found  bool
 
-	exclude bool
+	tags types.Tags
 }
 
 // NewHostReconcileAttributes creates new reconcile attributes
