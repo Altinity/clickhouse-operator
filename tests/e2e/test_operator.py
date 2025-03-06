@@ -891,6 +891,22 @@ def test_011_2(self):
                 out = clickhouse.query_with_error("test-011-secured-default", "select 'OK'")
                 assert out == "OK", error()
 
+        with When("Default user is removed"):
+            kubectl.create_and_check(
+                manifest="manifests/chi/test-011-secured-default-3.yaml",
+                check={
+                    "do_not_delete": 1,
+                },
+            )
+
+            with Then("Wait until configuration is reloaded by ClickHouse"):
+                time.sleep(90)
+
+            with Then("Connection to localhost should fail with default user and no password"):
+                out = clickhouse.query_with_error("test-011-secured-default", "select 'OK'")
+                print(out)
+                assert out != "OK", error()
+
     with Finally("I clean up"):
         delete_test_namespace()
 
