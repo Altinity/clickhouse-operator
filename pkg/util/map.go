@@ -204,13 +204,7 @@ func MapDeleteKeys[TKey comparable, TValue any](base map[TKey]TValue, keys ...TK
 func MapHasKeys[TKey comparable, TValue any](m map[TKey]TValue, keys ...TKey) bool {
 	for _, needle := range keys {
 		// Have we found this needle
-		found := false
-		for key := range m {
-			if key == needle {
-				found = true
-				break // for
-			}
-		}
+		_, found := m[needle]
 		if !found {
 			return false
 		}
