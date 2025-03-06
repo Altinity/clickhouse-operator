@@ -16,7 +16,7 @@ package types
 
 import (
 	"encoding/json"
-	
+
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
