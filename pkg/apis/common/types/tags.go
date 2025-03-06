@@ -52,6 +52,28 @@ func (t Tags) Has(tag Tag) bool {
 	return ok
 }
 
+func (t Tags) Equal(b Tags) bool {
+	if len(t) != len(b) {
+		// Different set of tags means sets of tags are not equal
+		return false
+	}
+
+	for tagB, valueB := range b {
+		valueA, ok := t[tagB]
+		if !ok {
+			// A has no tag from B
+			return false
+		}
+		// A has tag from B
+		// Vaklues has to be the same to be considered equal
+		if valueA != valueB {
+			return false
+		}
+	}
+
+	return true
+}
+
 // String casts to a string
 func (t Tags) String() string {
 	if t == nil {
