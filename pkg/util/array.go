@@ -191,7 +191,7 @@ func SliceDistinct[T comparable](slice []T) (distinct []T) {
 	return distinct
 }
 
-func SlicesIntersect[T comparable](a , b []T) (intersection []T) {
+func SlicesIntersect[T comparable](a, b []T) (intersection []T) {
 	bDistinct := SliceDistinct(b)
 	for _, i := range SliceDistinct(a) {
 		for _, j := range bDistinct {

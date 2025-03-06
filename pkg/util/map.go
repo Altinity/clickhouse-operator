@@ -332,8 +332,8 @@ func MapsHaveSameKeyValuePairs[TKey comparable, TValue comparable](m1, m2 map[TK
 		v1, ok1 := m1[key]
 		v2, ok2 := m2[key]
 		if ok1 && ok2 && (v1 == v2) {
-				// The same
-				continue
+			// The same
+			continue
 		}
 		same = false
 	}

@@ -54,7 +54,7 @@ func (t Tags) Add(b Tags) Tags {
 
 	for keyB, valueB := range b {
 		if t.Has(keyB) {
-			t.SetValue(keyB, t.Get(keyB) + valueB)
+			t.SetValue(keyB, t.Get(keyB)+valueB)
 		} else {
 			t.SetValue(keyB, valueB)
 		}
@@ -68,7 +68,7 @@ func (t Tags) UnSet(tag Tag) Tags {
 	return t
 }
 
-func (t Tags) Get(tag Tag)int {
+func (t Tags) Get(tag Tag) int {
 	if t == nil {
 		return 0
 	}
@@ -77,7 +77,6 @@ func (t Tags) Get(tag Tag)int {
 	}
 	return 0
 }
-
 
 func (t Tags) Has(tag Tag) bool {
 	return util.MapHasKeys(t, tag)

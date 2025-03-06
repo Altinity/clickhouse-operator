@@ -32,7 +32,7 @@ const (
 )
 
 const (
-	TagExclude types.Tag = "exclude"
+	TagExclude     types.Tag = "exclude"
 	TagLowPriority types.Tag = "low_priority"
 )
 
