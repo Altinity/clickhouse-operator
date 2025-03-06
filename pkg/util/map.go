@@ -243,6 +243,16 @@ func Map2String[TKey constraints.Ordered, TValue any](name string, m map[TKey]TV
 	return b.String()
 }
 
+func MapGetKeys[TKey comparable, TValue any](m map[TKey]TValue) (keys []TKey) {
+	if m == nil {
+		return nil
+	}
+	for key := range m {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
 func MapGetSortedKeys[TKey constraints.Ordered, TValue any](m map[TKey]TValue) (keys []TKey) {
 	if m == nil {
 		return nil
@@ -293,4 +303,14 @@ func MapsAreTheSame[TKey comparable, TValue comparable](m1, m2 map[TKey]TValue) 
 	}
 
 	return true
+}
+
+func MapsIntersectKeys[TKey comparable, TValue any](m1, m2 map[TKey]TValue) (keysIntersection []TKey) {
+	keys1 := MapGetKeys(m1)
+	keys2 := MapGetKeys(m2)
+	return SlicesIntersect(keys1, keys2)
+}
+
+func MapsHasKeysIntersection[TKey comparable, TValue any](m1, m2 map[TKey]TValue) bool {
+	return len(MapsIntersectKeys(m1, m2)) > 0
 }
