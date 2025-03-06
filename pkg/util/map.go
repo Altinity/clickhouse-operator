@@ -180,32 +180,39 @@ func SubtractStringMaps[TKey comparable, TValue any](base, delta map[TKey]TValue
 }
 
 // MapDeleteKeys deletes multiple keys from the map
-func MapDeleteKeys[TKey comparable, TValue any](base map[TKey]TValue, keys ...TKey) map[TKey]TValue {
+func MapDeleteKeys[TKey comparable, TValue any](m map[TKey]TValue, keys ...TKey) map[TKey]TValue {
+	if len(m) == 0 {
+		// Nowhere to delete from
+		return m
+	}
 	if len(keys) == 0 {
 		// Nothing to delete
-		return base
-	}
-	if len(base) == 0 {
-		// Nowhere to delete from
-		return base
+		return m
 	}
 
 	// Extract delete keys from base
 	for _, key := range keys {
-		if _, ok := base[key]; ok {
-			delete(base, key)
+		if _, ok := m[key]; ok {
+			delete(m, key)
 		}
 	}
 
-	return base
+	return m
 }
 
 // MapHasKeys checks whether map has all keys from specified list
 func MapHasKeys[TKey comparable, TValue any](m map[TKey]TValue, keys ...TKey) bool {
+	if len(m) == 0 {
+		return false
+	}
+	if len(keys) == 0 {
+		return false
+	}
+
 	for _, needle := range keys {
 		// Have we found this needle
-		_, found := m[needle]
-		if !found {
+		if _, found := m[needle]; !found {
+			// No, not found
 			return false
 		}
 	}
@@ -311,6 +318,32 @@ func MapsIntersectKeys[TKey comparable, TValue any](m1, m2 map[TKey]TValue) (key
 	return SlicesIntersect(keys1, keys2)
 }
 
-func MapsHasKeysIntersection[TKey comparable, TValue any](m1, m2 map[TKey]TValue) bool {
+func MapsHaveKeysIntersection[TKey comparable, TValue any](m1, m2 map[TKey]TValue) bool {
 	return len(MapsIntersectKeys(m1, m2)) > 0
+}
+
+func MapsHaveSameKeyValuePairs[TKey comparable, TValue comparable](m1, m2 map[TKey]TValue, keys ...TKey) (same bool) {
+	if len(keys) == 0 {
+		return false
+	}
+
+	same = true
+	for _, key := range keys {
+		v1, ok1 := m1[key]
+		v2, ok2 := m2[key]
+		if ok1 && ok2 && (v1 == v2) {
+				// The same
+				continue
+		}
+		same = false
+	}
+
+	return same
+}
+
+func MapsHaveKeyValuePairsIntersection[TKey comparable, TValue comparable](m1, m2 map[TKey]TValue) bool {
+	keys1 := MapGetKeys(m1)
+	keys2 := MapGetKeys(m2)
+	keys := SlicesIntersect(keys1, keys2)
+	return MapsHaveSameKeyValuePairs(m1, m2, keys...)
 }
