@@ -65,7 +65,7 @@ func (t Tags) Equal(b Tags) bool {
 			return false
 		}
 		// A has tag from B
-		// Vaklues has to be the same to be considered equal
+		// Values has to be the same to be considered equal
 		if valueA != valueB {
 			return false
 		}
