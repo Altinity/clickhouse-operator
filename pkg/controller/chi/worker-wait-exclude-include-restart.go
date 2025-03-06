@@ -85,6 +85,7 @@ func (w *worker) excludeHost(ctx context.Context, host *api.Host) bool {
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
 	_ = w.excludeHostFromService(ctx, host)
+	// w.descendHostInClickHouseCluster(ctx, host)
 	w.excludeHostFromClickHouseCluster(ctx, host)
 	return true
 }
@@ -132,6 +133,7 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
 	w.includeHostIntoClickHouseCluster(ctx, host)
+	// w.ascendHostInClickHouseCluster(ctx, host)
 	_ = w.includeHostIntoService(ctx, host)
 
 	return nil
