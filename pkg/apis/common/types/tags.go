@@ -16,6 +16,7 @@ package types
 
 import (
 	"encoding/json"
+	
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -27,11 +28,37 @@ func NewTags() map[Tag]int {
 	return make(map[Tag]int)
 }
 
-func (t Tags) Set(tag Tag, value int) Tags {
+func (t Tags) Set(tag Tag) Tags {
+	if t == nil {
+		return nil
+	}
+	t[tag] = 1
+
+	return t
+}
+
+func (t Tags) SetValue(tag Tag, value int) Tags {
 	if t == nil {
 		return nil
 	}
 	t[tag] = value
+
+	return t
+}
+
+func (t Tags) Add(b Tags) Tags {
+	if len(b) == 0 {
+		// Nothing to add
+		return t
+	}
+
+	for keyB, valueB := range b {
+		if t.Has(keyB) {
+			t.SetValue(keyB, t.Get(keyB) + valueB)
+		} else {
+			t.SetValue(keyB, valueB)
+		}
+	}
 
 	return t
 }
