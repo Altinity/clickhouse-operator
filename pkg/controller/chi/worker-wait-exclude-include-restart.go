@@ -209,6 +209,44 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api
 	_ = w.waitHostInCluster(ctx, host)
 }
 
+func (w *worker) descendHostInClickHouseCluster(ctx context.Context, host *api.Host) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return
+	}
+
+	w.a.V(1).
+		M(host).F().
+		Info("going to descent host. Host/shard/cluster: %d/%d/%s",
+			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+
+	// Specify in options to exclude this host from ClickHouse config file
+	host.GetCR().GetRuntime().LockCommonConfig()
+	host.GetReconcileAttributes().SetLowPriority()
+	_ = w.reconcileConfigMapCommon(ctx, host.GetCR(), w.options())
+	host.GetCR().GetRuntime().UnlockCommonConfig()
+	w.task.WaitForConfigMapPropagation(ctx, host)
+}
+
+func (w *worker) ascendHostInClickHouseCluster(ctx context.Context, host *api.Host) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return
+	}
+
+	w.a.V(1).
+		M(host).F().
+		Info("going to ascend host. Host/shard/cluster: %d/%d/%s",
+			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+
+	// Specify in options to add this host into ClickHouse config file
+	host.GetCR().GetRuntime().LockCommonConfig()
+	host.GetReconcileAttributes().UnsetLowPriority()
+	_ = w.reconcileConfigMapCommon(ctx, host.GetCR(), w.options())
+	host.GetCR().GetRuntime().UnlockCommonConfig()
+	w.task.WaitForConfigMapPropagation(ctx, host)
+}
+
 // shouldExcludeHost determines whether host to be excluded from cluster before reconciling
 func (w *worker) shouldExcludeHost(host *api.Host) bool {
 	switch {
