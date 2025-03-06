@@ -281,14 +281,18 @@ func MapMigrate[TKey constraints.Ordered, TValue any](cur, new, old map[TKey]TVa
 
 func MapsAreTheSame[TKey comparable, TValue comparable](m1, m2 map[TKey]TValue) bool {
 	if len(m1) != len(m2) {
+		// Different set means not equal
 		return false
 	}
 
 	for k1, v1 := range m1 {
 		v2, found := m2[k1]
 		if !found {
+			// B has no key from A
 			return false
 		}
+		// A and B has the same key
+		// Values has to be the same to be considered equal
 		if v1 != v2 {
 			return false
 		}
