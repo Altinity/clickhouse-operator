@@ -15,8 +15,7 @@
 package types
 
 import (
-	"fmt"
-
+	"encoding/json"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -42,6 +41,16 @@ func (t Tags) UnSet(tag Tag) Tags {
 	return t
 }
 
+func (t Tags) Get(tag Tag)int {
+	if t == nil {
+		return 0
+	}
+	if value, ok := t[tag]; ok {
+		return value
+	}
+	return 0
+}
+
 
 func (t Tags) Has(tag Tag) bool {
 	return util.MapHasKeys(t, tag)
@@ -51,7 +60,7 @@ func (t Tags) Equal(b Tags) bool {
 	return util.MapsAreTheSame(t, b)
 }
 
-func (t Tags) HasIntersection(b Tags) bool {
+func (t Tags) HaveIntersection(b Tags) bool {
 	return util.MapsHaveKeyValuePairsIntersection(t, b)
 }
 
@@ -60,5 +69,6 @@ func (t Tags) String() string {
 	if t == nil {
 		return ""
 	}
-	return fmt.Sprintf("%v", t)
+	b, _ := json.Marshal(t)
+	return string(b)
 }
