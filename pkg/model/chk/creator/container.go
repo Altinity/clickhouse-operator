@@ -49,6 +49,10 @@ func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, ho
 func (cm *ContainerManager) EnsureLogContainer(statefulSet *apps.StatefulSet) {
 }
 
+func (cm *ContainerManager) SetupAdditionalEnvVars(host *chi.Host, appContainer *core.Container) {
+}
+
+// getContainerKeeper
 func (cm *ContainerManager) getContainerKeeper(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.KeeperContainerName)
 }
