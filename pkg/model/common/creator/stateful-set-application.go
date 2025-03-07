@@ -67,17 +67,16 @@ func (c *Creator) stsAppContainerSetupEnvVars(statefulSet *apps.StatefulSet, hos
 		return
 	}
 
-	c.buildAdditionalEnvVars(host, container)
 	c.setupAdditionalEnvVars(host, container)
+	c.applyAdditionalEnvVars(host, container)
 	c.logEnvVars(host, container)
 }
 
-
-func (c *Creator) buildAdditionalEnvVars(host *api.Host, container *core.Container) {
-
+func (c *Creator) setupAdditionalEnvVars(host *api.Host, container *core.Container) {
+	c.cm.SetupAdditionalEnvVars(host, container)
 }
 
-func (c *Creator) setupAdditionalEnvVars(host *api.Host, container *core.Container) {
+func (c *Creator) applyAdditionalEnvVars(host *api.Host, container *core.Container) {
 	l := log.V(2).F().Info
 	l("going to merge additional vars len()=%d", len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
 	l("container env vars len()=%d", len(container.Env))
