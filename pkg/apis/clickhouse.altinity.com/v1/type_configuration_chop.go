@@ -570,7 +570,7 @@ func (c *OperatorConfig) MergeFrom(from *OperatorConfig) error {
 		return nil
 	}
 
-	if err := mergo.Merge(c, *from, mergo.WithAppendSlice); err != nil {
+	if err := mergo.Merge(c, *from, mergo.WithAppendSlice, mergo.WithOverride); err != nil {
 		return fmt.Errorf("FAIL merge config Error: %q", err)
 	}
 
