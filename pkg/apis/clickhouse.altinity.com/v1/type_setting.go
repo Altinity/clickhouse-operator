@@ -16,11 +16,11 @@ package v1
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 

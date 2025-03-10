@@ -16,13 +16,13 @@ package subst
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"path/filepath"
 
 	core "k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
