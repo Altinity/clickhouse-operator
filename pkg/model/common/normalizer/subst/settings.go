@@ -16,6 +16,7 @@ package subst
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"path/filepath"
 
 	core "k8s.io/api/core/v1"
@@ -48,7 +49,7 @@ func substSettingsFieldWithDataFromDataSource(
 	dstField string,
 	srcSecretRefField string,
 	parseScalarString bool,
-	newSettingCreator func(api.ObjectAddress) (*api.Setting, error),
+	newSettingCreator func(types.ObjectAddress) (*api.Setting, error),
 ) bool {
 	// Has to have source field specified
 	if !settings.Has(srcSecretRefField) {
@@ -92,7 +93,7 @@ func ReplaceSettingsFieldWithSecretFieldValue(
 	secretGet SecretGetter,
 ) bool {
 	return substSettingsFieldWithDataFromDataSource(settings, req.GetTargetNamespace(), dstField, srcSecretRefField, true,
-		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
+		func(secretAddress types.ObjectAddress) (*api.Setting, error) {
 			secretFieldValue, err := fetchSecretFieldValue(secretAddress, secretGet)
 			if err != nil {
 				return nil, err
@@ -112,7 +113,7 @@ func ReplaceSettingsFieldWithEnvRefToSecretField(
 	parseScalarString bool,
 ) bool {
 	return substSettingsFieldWithDataFromDataSource(settings, req.GetTargetNamespace(), dstField, srcSecretRefField, parseScalarString,
-		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
+		func(secretAddress types.ObjectAddress) (*api.Setting, error) {
 			// ENV VAR name and value
 			// In case not OK env var name will be empty and config will be incorrect. CH may not start
 			envVarName, _ := util.BuildShellEnvVarName(envVarNamePrefix + "_" + settings.Name2Key(dstField))
@@ -141,7 +142,7 @@ func ReplaceSettingsFieldWithMountedFile(
 ) bool {
 	var defaultMode int32 = 0644
 	return substSettingsFieldWithDataFromDataSource(settings, req.GetTargetNamespace(), "", srcSecretRefField, false,
-		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
+		func(secretAddress types.ObjectAddress) (*api.Setting, error) {
 			volumeName, ok1 := util.BuildRFC1035Label(srcSecretRefField)
 			volumeMountName, ok2 := util.BuildRFC1035Label(srcSecretRefField)
 			filenameInSettingsOrFiles := srcSecretRefField
@@ -192,7 +193,7 @@ var ErrSecretValueNotFound = fmt.Errorf("secret value not found")
 
 // fetchSecretFieldValue fetches the value of the specified field in the specified secret
 // TODO this is the only usage of k8s API in the normalizer. How to remove it?
-func fetchSecretFieldValue(secretAddress api.ObjectAddress, secretGet SecretGetter) (string, error) {
+func fetchSecretFieldValue(secretAddress types.ObjectAddress, secretGet SecretGetter) (string, error) {
 
 	// Fetch the secret
 	secret, err := secretGet(secretAddress.Namespace, secretAddress.Name)
