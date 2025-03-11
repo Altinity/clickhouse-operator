@@ -80,12 +80,10 @@ def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
                 {
                     "statefulset": 0,
                     "pod": 0,
-                    "service": 0,
-                },
+                    "service": 0                },
                 ns,
                 shell=shell
             )
-
 
 def delete_chk(chk, ns=None, wait=True, ok_to_fail=False, shell=None):
     delete_kind("chk", chk, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
@@ -497,20 +495,14 @@ def get_pod_image(chi_name, pod_name="", ns=None, shell=None):
 
 
 def get_pod_names(chi_name, ns=None, shell=None):
-    pod_names = launch(
-        f"get pods -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
-        ns=ns,
-        shell=shell
-    ).splitlines()
-    return pod_names[1:]
+    return get_obj_names(chi_name, "pods", ns, shell)
 
-
-def get_obj_names(chi_name, obj_type="pods", ns=None):
-    pod_names = launch(
+def get_obj_names(chi_name, obj_type="pods", ns=None, shell=None):
+    obj_names = launch(
         f"get {obj_type} -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
         ns=ns,
     ).splitlines()
-    return pod_names[1:]
+    return obj_names[1:]
 
 
 def get_pod_volumes(chi_name, pod_name="", ns=None, shell=None):

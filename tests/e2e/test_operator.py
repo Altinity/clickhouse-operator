@@ -24,6 +24,7 @@ from datetime import datetime
 def test_001(self):
     create_shell_namespace_clickhouse_template()
 
+    chi = "test-001"
     kubectl.create_and_check(
         manifest="manifests/chi/test-001.yaml",
         check={
@@ -37,8 +38,21 @@ def test_001(self):
             "do_not_delete": 1,
         },
     )
+
+    with When("Delete CHI"):
+        kubectl.delete_chi(chi)
+    with Then("All objects should be deleted"):
+        cnt = kubectl.get_count("all", chi = chi)
+        objs = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
+        if len(objs)>0:
+            objs = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
+            print("Some objects were not deleted:")
+            print(objs)
+        assert cnt == 0
+
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 
 @TestScenario
