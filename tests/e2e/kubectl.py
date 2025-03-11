@@ -456,7 +456,7 @@ def get_default_storage_class(ns=None):
     out = launch(
         f"get storageclass "
         f"-o=custom-columns="
-        f'DEFAULT:".metadata.annotations.storageclass\.kubernetes\.io/is-default-class",NAME:.metadata.name',
+        r'DEFAULT:".metadata.annotations.storageclass\.kubernetes\.io/is-default-class",NAME:.metadata.name',
         ns=ns,
     ).splitlines()
     for line in out[1:]:
@@ -466,7 +466,7 @@ def get_default_storage_class(ns=None):
     out = launch(
         f"get storageclass "
         f"-o=custom-columns="
-        f'DEFAULT:".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class",NAME:.metadata.name',
+        r'DEFAULT:".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class",NAME:.metadata.name',
         ns=ns,
     ).splitlines()
     for line in out[1:]:

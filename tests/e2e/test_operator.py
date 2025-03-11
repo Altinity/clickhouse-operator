@@ -2894,7 +2894,7 @@ def test_025(self):
         kubectl.wait_field(
             "pod",
             "chi-test-025-rescaling-default-0-1-0",
-            ".metadata.labels.clickhouse\.altinity\.com/ready",
+            r".metadata.labels.clickhouse\.altinity\.com/ready",
             "yes",
             backoff=1,
         )
@@ -5194,9 +5194,9 @@ def test_053(self):
         time.sleep(10)
 
         with Then("Pod annotation kubectl.kubernetes.io/restartedAt should be populated"):
-            assert kubectl.get_field("pod", pod, ".metadata.annotations.kubectl\.kubernetes\.io/restartedAt") != "<none>"
+            assert kubectl.get_field("pod", pod, r".metadata.annotations.kubectl\.kubernetes\.io/restartedAt") != "<none>"
         with And("PodTemplate annotation kubectl.kubernetes.io/restartedAt should be populated"):
-            assert kubectl.get_field("statefulset", sts, ".spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt") != "<none>"
+            assert kubectl.get_field("statefulset", sts, r".spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt") != "<none>"
 
         start_time = kubectl.get_field("pod", pod, ".status.startTime")
 
