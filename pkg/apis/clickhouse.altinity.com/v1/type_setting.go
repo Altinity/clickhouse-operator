@@ -73,7 +73,7 @@ func (s *Setting) AsAny() any {
 	return nil
 }
 
-// Type gets type odf the setting
+// Type gets type of the setting
 func (s *Setting) Type() SettingType {
 	if s == nil {
 		return SettingTypeUnknown
