@@ -20,6 +20,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -233,7 +234,7 @@ var ErrDataSourceAddressHasIncorrectFormat = fmt.Errorf("data source address has
 
 // FetchDataSourceAddress fetches data source address from the setting.
 // defaultNamespace specifies default namespace to be used in case there is no namespace specified in data source address.
-func (s *Setting) FetchDataSourceAddress(defaultNamespace string, parseScalarString bool) (ObjectAddress, error) {
+func (s *Setting) FetchDataSourceAddress(defaultNamespace string, parseScalarString bool) (types.ObjectAddress, error) {
 	switch s.Type() {
 	case SettingTypeScalar:
 		if parseScalarString {
@@ -243,18 +244,18 @@ func (s *Setting) FetchDataSourceAddress(defaultNamespace string, parseScalarStr
 	case SettingTypeSource:
 		// Fetch k8s address of the field from the source ref
 		name, key := s.GetNameKey()
-		return ObjectAddress{
+		return types.ObjectAddress{
 			Namespace: defaultNamespace,
 			Name:      name,
 			Key:       key,
 		}, nil
 	}
 
-	return ObjectAddress{}, fmt.Errorf("%w - unknown setting type", ErrDataSourceAddressHasIncorrectFormat)
+	return types.ObjectAddress{}, fmt.Errorf("%w - unknown setting type", ErrDataSourceAddressHasIncorrectFormat)
 }
 
 // parseDataSourceAddress parses address into namespace, name, key triple
-func (s *Setting) parseDataSourceAddress(dataSourceAddress, defaultNamespace string) (addr ObjectAddress, err error) {
+func (s *Setting) parseDataSourceAddress(dataSourceAddress, defaultNamespace string) (addr types.ObjectAddress, err error) {
 	// Extract data source's namespace and name and then field name within the data source,
 	// by splitting namespace/name/field (aka key) triple. Namespace can be omitted though
 	switch tags := strings.Split(dataSourceAddress, "/"); len(tags) {
@@ -270,12 +271,12 @@ func (s *Setting) parseDataSourceAddress(dataSourceAddress, defaultNamespace str
 		addr.Key = tags[1]
 	default:
 		// Skip incorrect entry
-		return ObjectAddress{}, fmt.Errorf("%w, dataSourceAddress: %s", ErrDataSourceAddressHasIncorrectFormat, dataSourceAddress)
+		return types.ObjectAddress{}, fmt.Errorf("%w, dataSourceAddress: %s", ErrDataSourceAddressHasIncorrectFormat, dataSourceAddress)
 	}
 
 	// Sanity check for all address components being in place
 	if addr.AnyEmpty() {
-		return ObjectAddress{}, fmt.Errorf(
+		return types.ObjectAddress{}, fmt.Errorf(
 			"%w, %s/%s/%s",
 			ErrDataSourceAddressHasIncorrectFormat,
 			addr.Namespace, addr.Name, addr.Key,

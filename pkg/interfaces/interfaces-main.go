@@ -74,6 +74,7 @@ type IContainerManager interface {
 	GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool)
 	EnsureAppContainer(statefulSet *apps.StatefulSet, host *api.Host)
 	EnsureLogContainer(statefulSet *apps.StatefulSet)
+	SetupAdditionalEnvVars(host *api.Host, container *core.Container)
 }
 
 type IProbeManager interface {

@@ -71,6 +71,7 @@ def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None):
             shell=shell
         )
 
+
 def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
     delete_kind("chi", chi, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
     if wait:
@@ -79,21 +80,22 @@ def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
                 {
                     "statefulset": 0,
                     "pod": 0,
-                    "service": 0,
-                },
+                    "service": 0                },
                 ns,
                 shell=shell
             )
 
-
 def delete_chk(chk, ns=None, wait=True, ok_to_fail=False, shell=None):
     delete_kind("chk", chk, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
+
 
 def delete_all_chi(ns=None):
     delete_all("chi", ns=ns)
 
+
 def delete_all_chk(ns=None):
     delete_all("chk", ns=ns)
+
 
 def delete_all(kind, ns=None):
     crds = launch("get crds -o=custom-columns=name:.spec.names.shortNames[0]", ns=ns).splitlines()
@@ -203,9 +205,11 @@ def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None):
     out = launch(f"get {kind} {name} {label} -o json", ns=ns, ok_to_fail=ok_to_fail, shell=shell)
     return json.loads(out.strip())
 
+
 def get_chi_normalizedCompleted(chi, ns=None, shell=None):
     chi_storage = get("configmap", f"chi-storage-{chi}", ns=ns)
     return json.loads(chi_storage["data"]["status-normalizedCompleted"])
+
 
 def create_ns(ns):
     if ns is None:
@@ -452,7 +456,7 @@ def get_default_storage_class(ns=None):
     out = launch(
         f"get storageclass "
         f"-o=custom-columns="
-        f'DEFAULT:".metadata.annotations.storageclass\.kubernetes\.io/is-default-class",NAME:.metadata.name',
+        r'DEFAULT:".metadata.annotations.storageclass\.kubernetes\.io/is-default-class",NAME:.metadata.name',
         ns=ns,
     ).splitlines()
     for line in out[1:]:
@@ -462,7 +466,7 @@ def get_default_storage_class(ns=None):
     out = launch(
         f"get storageclass "
         f"-o=custom-columns="
-        f'DEFAULT:".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class",NAME:.metadata.name',
+        r'DEFAULT:".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class",NAME:.metadata.name',
         ns=ns,
     ).splitlines()
     for line in out[1:]:
@@ -480,26 +484,25 @@ def get_pod_spec(chi_name, pod_name="", ns=None, shell=None):
     return pod["spec"]
 
 
+def get_clickhouse_start(chi_name, ns=None, shell=None):
+    pod_name = get_pod_names(chi_name, ns=ns, shell=shell)[0]
+    return get_field("pod", pod_name, ".status.containerStatuses[0].state.running.startedAt")
+
+
 def get_pod_image(chi_name, pod_name="", ns=None, shell=None):
     pod_image = get_pod_spec(chi_name, pod_name, ns, shell=shell)["containers"][0]["image"]
     return pod_image
 
 
 def get_pod_names(chi_name, ns=None, shell=None):
-    pod_names = launch(
-        f"get pods -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
-        ns=ns,
-        shell=shell
-    ).splitlines()
-    return pod_names[1:]
+    return get_obj_names(chi_name, "pods", ns, shell)
 
-
-def get_obj_names(chi_name, obj_type="pods", ns=None):
-    pod_names = launch(
+def get_obj_names(chi_name, obj_type="pods", ns=None, shell=None):
+    obj_names = launch(
         f"get {obj_type} -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
         ns=ns,
     ).splitlines()
-    return pod_names[1:]
+    return obj_names[1:]
 
 
 def get_pod_volumes(chi_name, pod_name="", ns=None, shell=None):

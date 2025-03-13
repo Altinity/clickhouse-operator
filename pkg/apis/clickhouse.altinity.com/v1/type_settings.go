@@ -332,7 +332,7 @@ func (s *Settings) MarshalYAML() ([]byte, error) {
 // unmarshal
 func (s *Settings) unmarshal(data []byte, unmarshaller func(data []byte, v any) error) error {
 	if s == nil {
-		return fmt.Errorf("unable to unmashal with nil")
+		return fmt.Errorf("unable to unmarshal with nil")
 	}
 
 	// Prepare untyped map at first

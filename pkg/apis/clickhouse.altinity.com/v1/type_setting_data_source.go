@@ -16,12 +16,15 @@ package v1
 
 import (
 	"encoding/json"
+
 	core "k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // SettingSource defines setting as a ref to some data source
 type SettingSource struct {
-	ValueFrom *DataSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
+	ValueFrom *types.DataSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
 }
 
 // GetNameKey gets name and key from the secret ref

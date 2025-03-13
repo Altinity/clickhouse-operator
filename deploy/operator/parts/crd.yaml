@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.24.4
+# OPERATOR_VERSION=0.24.5
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.4
+    clickhouse.altinity.com/chop: 0.24.5
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1936,14 +1936,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.24.4
+# OPERATOR_VERSION=0.24.5
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.4
+    clickhouse.altinity.com/chop: 0.24.5
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -3871,7 +3871,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.4
+    clickhouse.altinity.com/chop: 0.24.5
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -4001,6 +4001,7 @@ spec:
                                 items:
                                   type: object
                                   description: "setting: value pairs for configuration restart policy"
+                                  x-kubernetes-preserve-unknown-fields: true
                     access:
                       type: object
                       description: "parameters which use for connect to clickhouse from clickhouse-operator deployment"
@@ -4489,14 +4490,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.24.4
+# OPERATOR_VERSION=0.24.5
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.24.4
+    clickhouse-keeper.altinity.com/chop: 0.24.5
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced

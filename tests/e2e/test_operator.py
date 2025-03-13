@@ -24,6 +24,7 @@ from datetime import datetime
 def test_001(self):
     create_shell_namespace_clickhouse_template()
 
+    chi = "test-001"
     kubectl.create_and_check(
         manifest="manifests/chi/test-001.yaml",
         check={
@@ -34,10 +35,24 @@ def test_001(self):
             },
             "configmaps": 1,
             "pdb": {"single": 1},
+            "do_not_delete": 1,
         },
     )
+
+    with When("Delete CHI"):
+        kubectl.delete_chi(chi)
+    with Then("All objects should be deleted"):
+        cnt = kubectl.get_count("all", chi = chi)
+        objs = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
+        if len(objs)>0:
+            objs = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
+            print("Some objects were not deleted:")
+            print(objs)
+        assert cnt == 0
+
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 
 @TestScenario
@@ -201,7 +216,6 @@ def test_007(self):
     )
     with Finally("I clean up"):
         delete_test_namespace()
-
 
 
 def wait_operator_restart(chi, wait_objects, shell=None):
@@ -891,6 +905,22 @@ def test_011_2(self):
                 out = clickhouse.query_with_error("test-011-secured-default", "select 'OK'")
                 assert out == "OK", error()
 
+        with When("Default user is removed"):
+            kubectl.create_and_check(
+                manifest="manifests/chi/test-011-secured-default-3.yaml",
+                check={
+                    "do_not_delete": 1,
+                },
+            )
+
+            with Then("Wait until configuration is reloaded by ClickHouse"):
+                time.sleep(90)
+
+            with Then("Connection to localhost should fail with default user and no password"):
+                out = clickhouse.query_with_error("test-011-secured-default", "select 'OK'")
+                print(out)
+                assert out != "OK", error()
+
     with Finally("I clean up"):
         delete_test_namespace()
 
@@ -1009,10 +1039,16 @@ def test_012(self):
         kubectl.check_service("service-test-012", "LoadBalancer")
     with And("There should be a service for shard 0"):
         kubectl.check_service("service-test-012-0-0", "ClusterIP")
+        with Then("clusterIP should be set"):
+            assert kubectl.get_field("service", "service-test-012-0-0", ".spec.clusterIP") != "None"
     with And("There should be a service for shard 1"):
         kubectl.check_service("service-test-012-1-0", "ClusterIP")
+        with Then("clusterIP should be set"):
+            assert kubectl.get_field("service", "service-test-012-1-0", ".spec.clusterIP") != "None"
     with And("There should be a service for default cluster"):
         kubectl.check_service("service-default", "ClusterIP")
+        with Then("clusterIP should be set"):
+            assert kubectl.get_field("service", "service-default", ".spec.clusterIP") != "None"
 
     node_port = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
     service_test_012_created = kubectl.get_field("service", "service-test-012", ".metadata.creationTimestamp")
@@ -1025,26 +1061,33 @@ def test_012(self):
                 "object_counts": {
                     "statefulset": 1,
                     "pod": 1,
-                    "service": 3,
+                    "service": 4,
                 },
                 "do_not_delete": 1,
             },
         )
 
-        with And("NodePort should not change"):
-            new_node_port = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
-            assert (
-                new_node_port == node_port
-            ), f"LoadBalancer.spec.ports[0].nodePort changed from {node_port} to {new_node_port}"
-
         with And("Service for default cluster should change to LoadBalancer"):
             kubectl.check_service("service-default", "LoadBalancer")
+
+        with And("Service for shard 0 change to headless one"):
+            kubectl.check_service("service-test-012-0-0", "ClusterIP")
+            with Then("clusterIP should be None"):
+                clusterIP = kubectl.get_field("service", "service-test-012-0-0", ".spec.clusterIP")
+                if clusterIP != "None":
+                    print(f"ERROR: clusterIP should be None but it is: {clusterIP}")
+                assert clusterIP == "None"
 
         with And("Service should not be re-created if type has not been changed"):
             assert service_test_012_created == kubectl.get_field("service", "service-test-012", ".metadata.creationTimestamp")
 
         with And("Service should be re-created if type has been changed"):
             assert service_default_created != kubectl.get_field("service", "service-default", ".metadata.creationTimestamp")
+
+        with And("Additional internal service should be created"):
+            kubectl.check_service("service-test-012-internal", "ClusterIP")
+            with Then("clusterIP should be None"):
+                assert kubectl.get_field("service", "service-test-012-internal", ".spec.clusterIP") == "None"
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -1851,6 +1894,7 @@ def test_016(self):
             "do_not_delete": 1,
         },
     )
+    time.sleep(30)
 
     with Then("Custom macro 'layer' should be available"):
         out = clickhouse.query(chi, sql="select substitution from system.macros where macro='layer'")
@@ -1885,7 +1929,7 @@ def test_016(self):
 
     # test-016-settings-02.yaml
     with When("Update users.d settings"):
-        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        start_time = kubectl.get_clickhouse_start(chi)
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-02.yaml",
             check={
@@ -1909,13 +1953,12 @@ def test_016(self):
             version_user2 = clickhouse.query(chi, sql="select version()", user="user2", pwd="qwerty")
             assert version == version_user2
         with And("ClickHouse SHOULD NOT be restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
-            assert start_time == new_start_time
+            new_start_time = kubectl.get_clickhouse_start(chi)
             assert start_time == new_start_time
 
     # test-016-settings-03.yaml
     with When("Update macro and dictionary settings"):
-        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        start_time = kubectl.get_clickhouse_start(chi)
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-03.yaml",
             check={
@@ -1937,12 +1980,12 @@ def test_016(self):
             assert out == "0"
 
         with And("ClickHouse SHOULD NOT BE restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            new_start_time = kubectl.get_clickhouse_start(chi)
             assert start_time == new_start_time
 
     # test-016-settings-04.yaml
     with When("Add new custom4.xml config file"):
-        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
+        start_time = kubectl.get_clickhouse_start(chi)
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-04.yaml",
             check={
@@ -1963,12 +2006,12 @@ def test_016(self):
             assert out == "test-custom4"
 
         with And("ClickHouse SHOULD BE restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
+            new_start_time = kubectl.get_clickhouse_start(chi)
             assert start_time < new_start_time
 
     # test-016-settings-05.yaml
     with When("Add a change to an existing xml file"):
-        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
+        start_time = kubectl.get_clickhouse_start(chi)
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-05.yaml",
             check={
@@ -1977,7 +2020,7 @@ def test_016(self):
         )
 
         with And("ClickHouse SHOULD BE restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
+            new_start_time = kubectl.get_clickhouse_start(chi)
             assert start_time < new_start_time
 
         with And("Macro 'test' value should be changed"):
@@ -1989,7 +2032,7 @@ def test_016(self):
 
     # test-016-settings-06.yaml
     with When("Add I change a number of settings that does not require a restart"):
-        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
+        start_time = kubectl.get_clickhouse_start(chi)
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-06.yaml",
             check={
@@ -1998,7 +2041,7 @@ def test_016(self):
         )
 
         with And("ClickHouse SHOULD NOT BE restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.containerStatuses[0].state.running.startedAt")
+            new_start_time = kubectl.get_clickhouse_start(chi)
             assert start_time == new_start_time
 
     with Finally("I clean up"):
@@ -2851,7 +2894,7 @@ def test_025(self):
         kubectl.wait_field(
             "pod",
             "chi-test-025-rescaling-default-0-1-0",
-            ".metadata.labels.clickhouse\.altinity\.com/ready",
+            r".metadata.labels.clickhouse\.altinity\.com/ready",
             "yes",
             backoff=1,
         )
@@ -3569,7 +3612,6 @@ def test_034(self):
 
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
-
 
     with Then("check for `chi_clickhouse_metric_fetch_errors` is not zero"):
         check_metrics_monitoring(
@@ -5152,9 +5194,9 @@ def test_053(self):
         time.sleep(10)
 
         with Then("Pod annotation kubectl.kubernetes.io/restartedAt should be populated"):
-            assert kubectl.get_field("pod", pod, ".metadata.annotations.kubectl\.kubernetes\.io/restartedAt") != "<none>"
+            assert kubectl.get_field("pod", pod, r".metadata.annotations.kubectl\.kubernetes\.io/restartedAt") != "<none>"
         with And("PodTemplate annotation kubectl.kubernetes.io/restartedAt should be populated"):
-            assert kubectl.get_field("statefulset", sts, ".spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt") != "<none>"
+            assert kubectl.get_field("statefulset", sts, r".spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt") != "<none>"
 
         start_time = kubectl.get_field("pod", pod, ".status.startTime")
 
@@ -5237,6 +5279,68 @@ def test_054(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
+@TestScenario
+@Name("test_055. Test that restart rules can be merged from CHOP configuration")
+def test_055(self):
+    create_shell_namespace_clickhouse_template()
+    with Given("Operator configuration is installed"):
+       util.apply_operator_config("manifests/chopconf/test-055-chopconf.yaml")
+
+    manifest = f"manifests/chi/test-055-chopconf.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "do_not_delete": 1,
+            },
+        )
+    start_time = kubectl.get_clickhouse_start(chi)
+
+    with When(f"Add configuration file that SHOULD be ignored by restart rules"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-055-chopconf-2.yaml",
+            check={"do_not_delete": 1},
+        )
+
+        with Then("ClickHouse SHOULD NOT be restarted"):
+            new_start_time = kubectl.get_clickhouse_start(chi)
+            assert start_time == new_start_time
+
+        with Then("Startup script SHODLD NOT be executed"):
+            res = clickhouse.query_with_error(chi, "select count() from test_055")
+            assert res != "0"
+
+    with When(f"Add another configuration file that SHOULD be ignored by restart rules"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-055-chopconf-3.yaml",
+            check={"do_not_delete": 1},
+        )
+
+        with Then("ClickHouse SHOULD NOT be restarted"):
+            new_start_time = kubectl.get_clickhouse_start(chi)
+            assert start_time == new_start_time
+
+    with When(f"Add configuration file that SHOULD NOT be ignored by restart rules"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-055-chopconf-4.yaml",
+            check={"do_not_delete": 1},
+        )
+
+        with Then("ClickHouse SHOULD be restarted"):
+            new_start_time = kubectl.get_clickhouse_start(chi)
+            assert start_time != new_start_time
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
 
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):
