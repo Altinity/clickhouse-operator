@@ -24,7 +24,7 @@ import (
 type ClusterSecret struct {
 	Auto      *types.StringBool `json:"auto,omitempty"      yaml:"auto,omitempty"`
 	Value     string            `json:"value,omitempty"     yaml:"value,omitempty"`
-	ValueFrom *DataSource       `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
+	ValueFrom *types.DataSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
 }
 
 // ClusterSecretSourceName specifies name of the source where secret is provided

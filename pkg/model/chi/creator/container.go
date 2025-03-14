@@ -50,7 +50,17 @@ func (cm *ContainerManager) EnsureLogContainer(statefulSet *apps.StatefulSet) {
 	cm.ensureContainerSpecifiedClickHouseLog(statefulSet)
 }
 
-// getContainerClickHouse(
+func (cm *ContainerManager) SetupAdditionalEnvVars(host *chi.Host, appContainer *core.Container) {
+	// Setup additional ENV VAR in case no command provided
+	if len(appContainer.Command) == 0 {
+		host.GetCR().GetRuntime().GetAttributes().AppendAdditionalEnvVarIfNotExists(core.EnvVar{
+			Name:  "CLICKHOUSE_SKIP_USER_SETUP",
+			Value: "1",
+		})
+	}
+}
+
+// getContainerClickHouse
 func (cm *ContainerManager) getContainerClickHouse(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseContainerName, 0)
 }

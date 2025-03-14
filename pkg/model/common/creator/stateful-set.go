@@ -60,9 +60,8 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 		},
 	}
 
-	// Apply basic pod template
+	// Setup basic pod template, than fine-tune application and storage
 	c.stsSetupPodTemplate(statefulSet, host)
-	// Fine-tune application and storage
 	c.stsSetupApplication(statefulSet, host)
 	c.stsSetupStorage(statefulSet, host)
 
