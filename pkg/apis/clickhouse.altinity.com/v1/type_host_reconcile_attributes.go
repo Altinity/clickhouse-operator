@@ -16,6 +16,8 @@ package v1
 
 import (
 	"fmt"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // ObjectStatus specifies object status
@@ -29,6 +31,11 @@ const (
 	ObjectStatusUnknown  ObjectStatus = "unknown"
 )
 
+const (
+	TagExclude     types.Tag = "exclude"
+	TagLowPriority types.Tag = "low_priority"
+)
+
 // HostReconcileAttributes defines host reconcile status and attributes
 type HostReconcileAttributes struct {
 	status ObjectStatus
@@ -40,7 +47,7 @@ type HostReconcileAttributes struct {
 	modify bool
 	found  bool
 
-	exclude bool
+	tags types.Tags
 }
 
 // NewHostReconcileAttributes creates new reconcile attributes
@@ -58,7 +65,7 @@ func (a *HostReconcileAttributes) Equal(to HostReconcileAttributes) bool {
 		(a.remove == to.remove) &&
 		(a.modify == to.modify) &&
 		(a.found == to.found) &&
-		(a.exclude == to.exclude)
+		(a.tags.Equal(to.tags))
 }
 
 // Any checks whether any of the attributes is set
@@ -74,7 +81,7 @@ func (a *HostReconcileAttributes) Any(of *HostReconcileAttributes) bool {
 		(a.remove && of.remove) ||
 		(a.modify && of.modify) ||
 		(a.found && of.found) ||
-		(a.exclude && of.exclude)
+		a.tags.HaveIntersection(of.tags)
 }
 
 // SetStatus sets status
@@ -176,7 +183,7 @@ func (a *HostReconcileAttributes) SetExclude() *HostReconcileAttributes {
 	if a == nil {
 		return a
 	}
-	a.exclude = true
+	a.tags.Set(TagExclude)
 	return a
 }
 
@@ -185,7 +192,7 @@ func (a *HostReconcileAttributes) UnsetExclude() *HostReconcileAttributes {
 	if a == nil {
 		return a
 	}
-	a.exclude = false
+	a.tags.UnSet(TagExclude)
 	return a
 }
 
@@ -194,7 +201,33 @@ func (a *HostReconcileAttributes) IsExclude() bool {
 	if a == nil {
 		return false
 	}
-	return a.exclude
+	return a.tags.Has(TagExclude)
+}
+
+// SetLowPriority sets 'LowPriority' attribute
+func (a *HostReconcileAttributes) SetLowPriority() *HostReconcileAttributes {
+	if a == nil {
+		return a
+	}
+	a.tags.Set(TagLowPriority)
+	return a
+}
+
+// UnsetLowPriority unsets 'LowPriority' attribute
+func (a *HostReconcileAttributes) UnsetLowPriority() *HostReconcileAttributes {
+	if a == nil {
+		return a
+	}
+	a.tags.UnSet(TagLowPriority)
+	return a
+}
+
+// IsLowPriority checks whether 'LowPriority' attribute is set
+func (a *HostReconcileAttributes) IsLowPriority() bool {
+	if a == nil {
+		return false
+	}
+	return a.tags.Has(TagLowPriority)
 }
 
 // String returns string form
@@ -210,7 +243,7 @@ func (a *HostReconcileAttributes) String() string {
 		a.remove,
 		a.modify,
 		a.found,
-		a.exclude,
+		a.tags,
 	)
 }
 
@@ -225,7 +258,7 @@ type HostReconcileAttributesCounters struct {
 	modify int
 	found  int
 
-	exclude int
+	tags types.Tags
 }
 
 // NewHostReconcileAttributesCounters creates new reconcile attributes
@@ -261,9 +294,7 @@ func (c *HostReconcileAttributesCounters) Add(a *HostReconcileAttributes) {
 	if a.IsFound() {
 		c.found++
 	}
-	if a.IsExclude() {
-		c.exclude++
-	}
+	c.tags.Add(a.tags)
 }
 
 // GetAdd gets added
@@ -303,7 +334,7 @@ func (c *HostReconcileAttributesCounters) GetExclude() int {
 	if c == nil {
 		return 0
 	}
-	return c.exclude
+	return c.tags.Get(TagExclude)
 }
 
 // AddOnly checks whether counters have Add() only items

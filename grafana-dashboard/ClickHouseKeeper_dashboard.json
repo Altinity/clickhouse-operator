@@ -600,7 +600,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Ethermals nodes",
+      "title": "Ephemeral Node count",
       "tooltip": {
         "shared": true,
         "sort": 0,

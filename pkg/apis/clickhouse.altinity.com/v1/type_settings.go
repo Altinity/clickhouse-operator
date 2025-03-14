@@ -80,10 +80,28 @@ func (s *Settings) ensureConverter() SettingsName2KeyConverter {
 		// Just return converter
 		return NewSettingsName2KeyConverterPlain()
 	}
-	if s.converter == nil {
-		s.converter = NewSettingsName2KeyConverterPlain()
+	if !s.HasConverter() {
+		s.SetConverter(NewSettingsName2KeyConverterPlain())
+	}
+	return s.GetConverter()
+}
+
+func (s *Settings) SetConverter(converter SettingsName2KeyConverter) *Settings {
+	if s != nil {
+		s.converter = converter
+	}
+	return s
+}
+
+func (s *Settings) GetConverter() SettingsName2KeyConverter {
+	if s == nil {
+		return nil
 	}
 	return s.converter
+}
+
+func (s *Settings) HasConverter() bool {
+	return s.GetConverter() != nil
 }
 
 // Ensure ensures settings are in place
@@ -332,7 +350,7 @@ func (s *Settings) MarshalYAML() ([]byte, error) {
 // unmarshal
 func (s *Settings) unmarshal(data []byte, unmarshaller func(data []byte, v any) error) error {
 	if s == nil {
-		return fmt.Errorf("unable to unmashal with nil")
+		return fmt.Errorf("unable to unmarshal with nil")
 	}
 
 	// Prepare untyped map at first

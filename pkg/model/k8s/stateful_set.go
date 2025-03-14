@@ -26,6 +26,7 @@ func StatefulSetContainerGet(statefulSet *apps.StatefulSet, namesOrIndexes ...an
 		// Find by name
 		case string:
 			name := typed
+			// Search for container name
 			if len(name) > 0 {
 				for i := range statefulSet.Spec.Template.Spec.Containers {
 					// Convenience wrapper
@@ -38,11 +39,9 @@ func StatefulSetContainerGet(statefulSet *apps.StatefulSet, namesOrIndexes ...an
 		// Find by index
 		case int:
 			index := typed
-			if index >= 0 {
-				if len(statefulSet.Spec.Template.Spec.Containers) > index {
-					// Existing index, get container
-					return &statefulSet.Spec.Template.Spec.Containers[index], true
-				}
+			if (0 <= index) && (index < len(statefulSet.Spec.Template.Spec.Containers)) {
+				// Existing index, get specified container
+				return &statefulSet.Spec.Template.Spec.Containers[index], true
 			}
 		}
 	}

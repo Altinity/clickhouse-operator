@@ -128,9 +128,9 @@ func (c *Generator) getHostZookeeper(host *chi.Host) string {
 		}
 
 		// <node>
-		//		<host>HOST</host>
-		//		<port>PORT</port>
-		//		<secure>%d</secure>
+		//		<host>[HOST]</host>
+		//		<port>[PORT]</port>
+		//		<secure>[SECURE]</secure>
 		// </node>
 		util.Iline(b, 8, "<node>")
 		util.Iline(b, 8, "    <host>%s</host>", node.Host)
@@ -227,10 +227,19 @@ func (c *Generator) getRemoteServersReplica(host *chi.Host, b *bytes.Buffer) {
 	} else {
 		port = host.TCPPort.Value()
 	}
+	// <replica>
+	//		<host>[HOST]</host>
+	//		<port>[PORT]</port>
+	//		<secure>[SECURE]</secure>
+	//		<priority>[PRIORITY]</priority>
+	// </replica>
 	util.Iline(b, 16, "<replica>")
 	util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
 	util.Iline(b, 16, "    <port>%d</port>", port)
 	util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
+	if host.GetReconcileAttributes().IsLowPriority() {
+		util.Iline(b, 16, "    <priority>1000</priority>")
+	}
 	util.Iline(b, 16, "</replica>")
 }
 
@@ -287,8 +296,8 @@ func (c *Generator) getRemoteServers(selector *config.HostSelector) string {
 
 			shard.WalkHosts(func(host *chi.Host) error {
 				if selector.Include(host) {
-					c.getRemoteServersReplica(host, b)
 					log.V(2).M(host).Info("Adding host to remote servers: %s", host.GetName())
+					c.getRemoteServersReplica(host, b)
 				} else {
 					log.V(1).M(host).Info("SKIP host from remote servers: %s", host.GetName())
 				}
