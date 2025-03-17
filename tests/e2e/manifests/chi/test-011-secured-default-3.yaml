@@ -1,0 +1,22 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-011-secured-default
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    users:
+      default/profile: readonly
+    files:
+      users.d/remove_default.xml: |
+        <clickhouse>
+          <users>
+            <default remove="1"/>
+          </users>
+        </clickhouse>
+    clusters:
+    - name: default
+      layout:
+        shardsCount: 1
+        replicasCount: 1

@@ -15,10 +15,14 @@
 package common
 
 import (
+	"context"
 	"time"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // task represents context of a worker. This also can be called "a reconcile task"
@@ -65,4 +69,46 @@ func (t *Task) CmUpdate() time.Time {
 
 func (t *Task) SetCmUpdate(update time.Time) {
 	t.cmUpdate = update
+}
+
+func (t *Task) WaitForConfigMapPropagation(ctx context.Context, host *api.Host) bool {
+	// No need to wait for ConfigMap propagation on stopped host
+	if host.IsStopped() {
+		log.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - host is stopped")
+		return false
+	}
+
+	// No need to wait on unchanged ConfigMap
+	if t.CmUpdate().IsZero() {
+		log.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - no changes in ConfigMap")
+		return false
+	}
+
+	// What timeout is expected to be enough for ConfigMap propagation?
+	// In case timeout is not specified, no need to wait
+	if !host.GetCR().GetReconciling().HasConfigMapPropagationTimeout() {
+		log.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable due to missing timeout value")
+		return false
+	}
+
+	timeout := host.GetCR().GetReconciling().GetConfigMapPropagationTimeoutDuration()
+
+	// How much time has elapsed since last ConfigMap update?
+	// May be there is no need to wait already
+	elapsed := time.Now().Sub(t.CmUpdate())
+	if elapsed >= timeout {
+		log.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. [elapsed/timeout: %s/%s]", elapsed, timeout)
+		return false
+	}
+
+	// Looks like we need to wait for Configmap propagation, after all
+	wait := timeout - elapsed
+	log.V(1).M(host).F().Info("Going to wait for ConfigMap propagation for: %s [elapsed/timeout: %s/%s]", wait, elapsed, timeout)
+	if util.WaitContextDoneOrTimeout(ctx, wait) {
+		log.V(2).Info("task is done")
+		return true
+	}
+
+	log.V(1).M(host).F().Info("Wait completed for: %s  of timeout: %s]", wait, timeout)
+	return false
 }

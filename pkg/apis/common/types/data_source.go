@@ -12,22 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v1
+package types
 
-type ObjectAddress struct {
-	Namespace string
-	Name      string
-	Key       string
-}
+import (
+	core "k8s.io/api/core/v1"
+)
 
-func (a ObjectAddress) AnyEmpty() bool {
-	return (a.Namespace == "") || (a.Name == "") || (a.Key == "")
-}
-
-func (a ObjectAddress) String() string {
-	return a.Render("/")
-}
-
-func (a ObjectAddress) Render(sep string) string {
-	return a.Namespace + sep + a.Name + sep + a.Key
+// DataSource is a set of possible data sources
+type DataSource struct {
+	// SecretKeyRef points to a secret and mirrors k8s SecretSource type
+	SecretKeyRef *core.SecretKeySelector `json:"secretKeyRef,omitempty" yaml:"secretKeyRef,omitempty"`
 }

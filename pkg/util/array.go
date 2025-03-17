@@ -177,3 +177,28 @@ func ConcatSlices[T any](slices [][]T) []T {
 
 	return result
 }
+
+// SliceDistinct returns distinct slice
+func SliceDistinct[T comparable](slice []T) (distinct []T) {
+	m := make(map[T]struct{}, len(slice))
+	for _, i := range slice {
+		if _, ok := m[i]; !ok {
+			m[i] = struct{}{}
+			distinct = append(distinct, i)
+		}
+	}
+
+	return distinct
+}
+
+func SlicesIntersect[T comparable](a, b []T) (intersection []T) {
+	bDistinct := SliceDistinct(b)
+	for _, i := range SliceDistinct(a) {
+		for _, j := range bDistinct {
+			if i == j {
+				intersection = append(intersection, i)
+			}
+		}
+	}
+	return intersection
+}

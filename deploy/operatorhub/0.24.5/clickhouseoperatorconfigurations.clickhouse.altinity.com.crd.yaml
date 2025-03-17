@@ -7,7 +7,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: ${OPERATOR_VERSION}
+    clickhouse.altinity.com/chop: 0.24.5
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -286,12 +286,11 @@ spec:
                           - to complete all running queries
                           - to be included into a ClickHouse cluster
                         respectfully before moving forward
-
                       properties:
                         wait:
                           type: object
                           properties:
-                            exclude:  &TypeStringBool
+                            exclude: &TypeStringBool
                               type: string
                               description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be excluded from a ClickHouse cluster"
                               enum:
@@ -320,10 +319,10 @@ spec:
                                 - "Enabled"
                                 - "enabled"
                             queries:
-                              <<: *TypeStringBool
+                              !!merge <<: *TypeStringBool
                               description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
                             include:
-                              <<: *TypeStringBool
+                              !!merge <<: *TypeStringBool
                               description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
                 annotation:
                   type: object
@@ -362,7 +361,7 @@ spec:
                         When propagating labels from the chi's `metadata.labels` section to child objects' `metadata.labels`,
                         exclude labels from the following list
                     appendScope:
-                      <<: *TypeStringBool
+                      !!merge <<: *TypeStringBool
                       description: |
                         Whether to append *Scope* labels to StatefulSet and Pod
                         - "LabelShardScopeIndex"
@@ -398,16 +397,16 @@ spec:
                       description: "defines status fields options"
                       properties:
                         action:
-                          <<: *TypeStringBool
+                          !!merge <<: *TypeStringBool
                           description: "Whether the operator should fill status field 'action'"
                         actions:
-                          <<: *TypeStringBool
+                          !!merge <<: *TypeStringBool
                           description: "Whether the operator should fill status field 'actions'"
                         error:
-                          <<: *TypeStringBool
+                          !!merge <<: *TypeStringBool
                           description: "Whether the operator should fill status field 'error'"
                         errors:
-                          <<: *TypeStringBool
+                          !!merge <<: *TypeStringBool
                           description: "Whether the operator should fill status field 'errors'"
                 statefulSet:
                   type: object
@@ -415,19 +414,14 @@ spec:
                   properties:
                     revisionHistoryLimit:
                       type: integer
-                      description: |
-                        revisionHistoryLimit is the maximum number of revisions that will be
-                        maintained in the StatefulSet's revision history.                         
-                        Look details in `statefulset.spec.revisionHistoryLimit`
+                      description: "revisionHistoryLimit is the maximum number of revisions that will be\nmaintained in the StatefulSet's revision history.                         \nLook details in `statefulset.spec.revisionHistoryLimit`\n"
                 pod:
                   type: object
                   description: "define pod specific parameters"
                   properties:
                     terminationGracePeriod:
                       type: integer
-                      description: |
-                        Optional duration in seconds the pod needs to terminate gracefully. 
-                        Look details in `pod.spec.terminationGracePeriodSeconds`
+                      description: "Optional duration in seconds the pod needs to terminate gracefully. \nLook details in `pod.spec.terminationGracePeriodSeconds`\n"
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"
