@@ -18,18 +18,21 @@ import (
 	"fmt"
 )
 
+const (
+	TagExclude     Tag = "exclude"
+	TagLowPriority Tag = "low_priority"
+)
+
 // ReconcileAttributes defines reconcile status and attributes
 type ReconcileAttributes struct {
 	status ObjectStatus
-
-	exclude bool
+	tags Tags
 }
 
 // NewReconcileAttributes creates new reconcile attributes
 func NewReconcileAttributes() *ReconcileAttributes {
 	return &ReconcileAttributes{
 		status:  ObjectStatusUnknown,
-		exclude: false,
 	}
 }
 
@@ -44,7 +47,7 @@ func (a *ReconcileAttributes) HasIntersectionWith(b *ReconcileAttributes) bool {
 	switch {
 	case a.GetStatus().Is(b.GetStatus()):
 		return true
-	case a.exclude && b.exclude:
+	case a.tags.HaveIntersection(b.tags):
 		return true
 	}
 	return false
@@ -72,7 +75,7 @@ func (a *ReconcileAttributes) SetExclude() *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
-	a.exclude = true
+	a.tags.Set(TagExclude)
 	return a
 }
 
@@ -81,7 +84,7 @@ func (a *ReconcileAttributes) UnsetExclude() *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
-	a.exclude = false
+	a.tags.UnSet(TagExclude)
 	return a
 }
 
@@ -90,8 +93,35 @@ func (a *ReconcileAttributes) IsExclude() bool {
 	if a == nil {
 		return false
 	}
-	return a.exclude
+	return a.tags.Has(TagExclude)
 }
+
+// SetLowPriority sets 'LowPriority' attribute
+func (a *ReconcileAttributes) SetLowPriority() *ReconcileAttributes {
+	if a == nil {
+		return a
+	}
+	a.tags.Set(TagLowPriority)
+	return a
+}
+
+// UnsetLowPriority unsets 'LowPriority' attribute
+func (a *ReconcileAttributes) UnsetLowPriority() *ReconcileAttributes {
+	if a == nil {
+		return a
+	}
+	a.tags.UnSet(TagLowPriority)
+	return a
+}
+
+// IsLowPriority checks whether 'LowPriority' attribute is set
+func (a *ReconcileAttributes) IsLowPriority() bool {
+	if a == nil {
+		return false
+	}
+	return a.tags.Has(TagLowPriority)
+}
+
 
 // String returns string form
 func (a *ReconcileAttributes) String() string {
@@ -99,7 +129,7 @@ func (a *ReconcileAttributes) String() string {
 		return "(nil)"
 	}
 
-	return fmt.Sprintf("status: %s, exclude: %t", a.status, a.exclude)
+	return fmt.Sprintf("status: %s, tags: %v", a.status, a.tags)
 }
 
 // ReconcileAttributesCounters defines reconcile status and attributes counters
@@ -107,8 +137,6 @@ type ReconcileAttributesCounters struct {
 	status   map[ObjectStatus]int
 	total    int
 	counters int
-
-	_exclude int
 }
 
 // NewReconcileAttributesCounters creates new reconcile attributes counters
@@ -134,21 +162,6 @@ func (c *ReconcileAttributesCounters) Add(a *ReconcileAttributes) {
 	c.status[a.GetStatus()] = value
 	c.total++
 	c.counters = len(c.status)
-
-	if a.IsExclude() {
-		c._exclude++
-	}
-}
-
-// getCounterByStatus
-func (c *ReconcileAttributesCounters) getCounterByStatus(status ObjectStatus) int {
-	if c == nil {
-		return 0
-	}
-	if num, ok := c.status[status]; ok {
-		return num
-	}
-	return 0
 }
 
 // IsNewOnly checks whether counters have specified status items only
@@ -166,4 +179,15 @@ func (c *ReconcileAttributesCounters) String() string {
 		res += fmt.Sprintf("%s: %d ", k, v)
 	}
 	return res
+}
+
+// getCounterByStatus
+func (c *ReconcileAttributesCounters) getCounterByStatus(status ObjectStatus) int {
+	if c == nil {
+		return 0
+	}
+	if num, ok := c.status[status]; ok {
+		return num
+	}
+	return 0
 }
