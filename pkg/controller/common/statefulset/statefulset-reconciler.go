@@ -16,11 +16,9 @@ package statefulset
 
 import (
 	"context"
-	"strings"
-	"time"
-
 	apps "k8s.io/api/apps/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	"strings"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -247,7 +245,7 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 		M(host).F().
 		Info("Update StatefulSet(%s) - started", util.NamespaceNameString(newStatefulSet))
 
-	if r.waitForConfigMapPropagation(ctx, host) {
+	if r.task.WaitForConfigMapPropagation(ctx, host) {
 		log.V(2).Info("task is done")
 		return nil
 	}
@@ -359,49 +357,6 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 
 	r.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
 	return nil
-}
-
-// waitForConfigMapPropagation
-func (r *Reconciler) waitForConfigMapPropagation(ctx context.Context, host *api.Host) bool {
-	// No need to wait for ConfigMap propagation on stopped host
-	if host.IsStopped() {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - host is stopped")
-		return false
-	}
-
-	// No need to wait on unchanged ConfigMap
-	if r.task.CmUpdate().IsZero() {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - no changes in ConfigMap")
-		return false
-	}
-
-	// What timeout is expected to be enough for ConfigMap propagation?
-	// In case timeout is not specified, no need to wait
-	if !host.GetCR().GetReconciling().HasConfigMapPropagationTimeout() {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable due to missing timeout value")
-		return false
-	}
-
-	timeout := host.GetCR().GetReconciling().GetConfigMapPropagationTimeoutDuration()
-
-	// How much time has elapsed since last ConfigMap update?
-	// May be there is no need to wait already
-	elapsed := time.Now().Sub(r.task.CmUpdate())
-	if elapsed >= timeout {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. [elapsed/timeout: %s/%s]", elapsed, timeout)
-		return false
-	}
-
-	// Looks like we need to wait for Configmap propagation, after all
-	wait := timeout - elapsed
-	r.a.V(1).M(host).F().Info("Going to wait for ConfigMap propagation for: %s [elapsed/timeout: %s/%s]", wait, elapsed, timeout)
-	if util.WaitContextDoneOrTimeout(ctx, wait) {
-		log.V(2).Info("task is done")
-		return true
-	}
-
-	r.a.V(1).M(host).F().Info("Wait completed for: %s  of timeout: %s]", wait, timeout)
-	return false
 }
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only

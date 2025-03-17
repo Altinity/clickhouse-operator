@@ -2732,6 +2732,7 @@ spec:
                                 items:
                                   type: object
                                   description: "setting: value pairs for configuration restart policy"
+                                  x-kubernetes-preserve-unknown-fields: true
                     access:
                       type: object
                       description: "parameters which use for connect to clickhouse from clickhouse-operator deployment"
@@ -4323,6 +4324,7 @@ data:
               - files/*.xml: "yes"
               - files/config.d/*.xml: "yes"
               - files/config.d/*dict*.xml: "no"
+              - files/config.d/*no_restart*: "no"
     
               # exceptions in default profile
               - profiles/default/background_*_pool_size: "yes"
