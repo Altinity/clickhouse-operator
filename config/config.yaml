@@ -179,11 +179,11 @@ clickhouse:
 
   ################################################
   ##
-  ## Additional sections
+  ## Addons specifies additional configuration sections
   ## Should it be called something like "templates"?
   ##
   ################################################
-  additions:
+  addons:
     rules:
       - version: "*"
         spec:
