@@ -47,7 +47,7 @@ func (a *ReconcileAttributes) HasIntersectionWith(b *ReconcileAttributes) bool {
 	switch {
 	case a.GetStatus().Is(b.GetStatus()):
 		return true
-	case a.tags.HaveIntersection(b.tags):
+	case a.tags.HasIntersectionWith(b.tags):
 		return true
 	}
 	return false
