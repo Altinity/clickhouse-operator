@@ -152,6 +152,7 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 
 	// w.includeHostIntoClickHouseCluster(ctx, host)
 	w.ascendHostInClickHouseCluster(ctx, host)
+	w.catchReplicationLag(ctx, host)
 	_ = w.includeHostIntoService(ctx, host)
 
 	return nil
@@ -222,7 +223,7 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api
 	_ = w.reconcileConfigMapCommon(ctx, host.GetCR(), w.options())
 	host.GetCR().GetRuntime().UnlockCommonConfig()
 
-	if !w.shouldWaitIncludeHostIntoClickHouseCluster(host) && !w.shouldWaitReplicationHost(host) {
+	if !w.shouldWaitIncludeHostIntoClickHouseCluster(host) {
 		w.a.V(1).
 			M(host).F().
 			Info("No need to wait neither for host to be included in CH cluster nor to catch replication lag. "+
