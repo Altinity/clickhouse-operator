@@ -775,8 +775,8 @@ func (s *Status) GetHostsWithTablesCreated() []string {
 	})
 }
 
-// GetHostsWithReplicaCatchUp gets hosts with replica catch-up
-func (s *Status) GetHostsWithReplicaCatchUp() []string {
+// GetHostsWithReplicaCaughtUp gets hosts with replica caught-up
+func (s *Status) GetHostsWithReplicaCaughtUp() []string {
 	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.HostsWithReplicaCaughtUp
 
