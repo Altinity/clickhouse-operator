@@ -45,38 +45,39 @@ const (
 // that application logic sticks to the synchronized getter/setters by auditing whether all explicit Go field-level
 // accesses are strictly within _this_ source file OR the generated deep copy source file.
 type Status struct {
-	CHOpVersion            string                        `json:"chop-version,omitempty"           yaml:"chop-version,omitempty"`
-	CHOpCommit             string                        `json:"chop-commit,omitempty"            yaml:"chop-commit,omitempty"`
-	CHOpDate               string                        `json:"chop-date,omitempty"              yaml:"chop-date,omitempty"`
-	CHOpIP                 string                        `json:"chop-ip,omitempty"                yaml:"chop-ip,omitempty"`
-	ClustersCount          int                           `json:"clusters,omitempty"               yaml:"clusters,omitempty"`
-	ShardsCount            int                           `json:"shards,omitempty"                 yaml:"shards,omitempty"`
-	ReplicasCount          int                           `json:"replicas,omitempty"               yaml:"replicas,omitempty"`
-	HostsCount             int                           `json:"hosts,omitempty"                  yaml:"hosts,omitempty"`
-	Status                 string                        `json:"status,omitempty"                 yaml:"status,omitempty"`
-	TaskID                 string                        `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
-	TaskIDsStarted         []string                      `json:"taskIDsStarted,omitempty"         yaml:"taskIDsStarted,omitempty"`
-	TaskIDsCompleted       []string                      `json:"taskIDsCompleted,omitempty"       yaml:"taskIDsCompleted,omitempty"`
-	Action                 string                        `json:"action,omitempty"                 yaml:"action,omitempty"`
-	Actions                []string                      `json:"actions,omitempty"                yaml:"actions,omitempty"`
-	Error                  string                        `json:"error,omitempty"                  yaml:"error,omitempty"`
-	Errors                 []string                      `json:"errors,omitempty"                 yaml:"errors,omitempty"`
-	HostsUpdatedCount      int                           `json:"hostsUpdated,omitempty"           yaml:"hostsUpdated,omitempty"`
-	HostsAddedCount        int                           `json:"hostsAdded,omitempty"             yaml:"hostsAdded,omitempty"`
-	HostsUnchangedCount    int                           `json:"hostsUnchanged,omitempty"         yaml:"hostsUnchanged,omitempty"`
-	HostsFailedCount       int                           `json:"hostsFailed,omitempty"            yaml:"hostsFailed,omitempty"`
-	HostsCompletedCount    int                           `json:"hostsCompleted,omitempty"         yaml:"hostsCompleted,omitempty"`
-	HostsDeletedCount      int                           `json:"hostsDeleted,omitempty"           yaml:"hostsDeleted,omitempty"`
-	HostsDeleteCount       int                           `json:"hostsDelete,omitempty"            yaml:"hostsDelete,omitempty"`
-	Pods                   []string                      `json:"pods,omitempty"                   yaml:"pods,omitempty"`
-	PodIPs                 []string                      `json:"pod-ips,omitempty"                yaml:"pod-ips,omitempty"`
-	FQDNs                  []string                      `json:"fqdns,omitempty"                  yaml:"fqdns,omitempty"`
-	Endpoint               string                        `json:"endpoint,omitempty"               yaml:"endpoint,omitempty"`
-	Endpoints              []string                      `json:"endpoints,omitempty"              yaml:"endpoints,omitempty"`
-	NormalizedCR           *ClickHouseKeeperInstallation `json:"normalized,omitempty"             yaml:"normalized,omitempty"`
-	NormalizedCRCompleted  *ClickHouseKeeperInstallation `json:"normalizedCompleted,omitempty"    yaml:"normalizedCompleted,omitempty"`
-	HostsWithTablesCreated []string                      `json:"hostsWithTablesCreated,omitempty" yaml:"hostsWithTablesCreated,omitempty"`
-	UsedTemplates          []*chi.TemplateRef            `json:"usedTemplates,omitempty"          yaml:"usedTemplates,omitempty"`
+	CHOpVersion              string                        `json:"chop-version,omitempty"             yaml:"chop-version,omitempty"`
+	CHOpCommit               string                        `json:"chop-commit,omitempty"              yaml:"chop-commit,omitempty"`
+	CHOpDate                 string                        `json:"chop-date,omitempty"                yaml:"chop-date,omitempty"`
+	CHOpIP                   string                        `json:"chop-ip,omitempty"                  yaml:"chop-ip,omitempty"`
+	ClustersCount            int                           `json:"clusters,omitempty"                 yaml:"clusters,omitempty"`
+	ShardsCount              int                           `json:"shards,omitempty"                   yaml:"shards,omitempty"`
+	ReplicasCount            int                           `json:"replicas,omitempty"                 yaml:"replicas,omitempty"`
+	HostsCount               int                           `json:"hosts,omitempty"                    yaml:"hosts,omitempty"`
+	Status                   string                        `json:"status,omitempty"                   yaml:"status,omitempty"`
+	TaskID                   string                        `json:"taskID,omitempty"                   yaml:"taskID,omitempty"`
+	TaskIDsStarted           []string                      `json:"taskIDsStarted,omitempty"           yaml:"taskIDsStarted,omitempty"`
+	TaskIDsCompleted         []string                      `json:"taskIDsCompleted,omitempty"         yaml:"taskIDsCompleted,omitempty"`
+	Action                   string                        `json:"action,omitempty"                   yaml:"action,omitempty"`
+	Actions                  []string                      `json:"actions,omitempty"                  yaml:"actions,omitempty"`
+	Error                    string                        `json:"error,omitempty"                    yaml:"error,omitempty"`
+	Errors                   []string                      `json:"errors,omitempty"                   yaml:"errors,omitempty"`
+	HostsUpdatedCount        int                           `json:"hostsUpdated,omitempty"             yaml:"hostsUpdated,omitempty"`
+	HostsAddedCount          int                           `json:"hostsAdded,omitempty"               yaml:"hostsAdded,omitempty"`
+	HostsUnchangedCount      int                           `json:"hostsUnchanged,omitempty"           yaml:"hostsUnchanged,omitempty"`
+	HostsFailedCount         int                           `json:"hostsFailed,omitempty"              yaml:"hostsFailed,omitempty"`
+	HostsCompletedCount      int                           `json:"hostsCompleted,omitempty"           yaml:"hostsCompleted,omitempty"`
+	HostsDeletedCount        int                           `json:"hostsDeleted,omitempty"             yaml:"hostsDeleted,omitempty"`
+	HostsDeleteCount         int                           `json:"hostsDelete,omitempty"              yaml:"hostsDelete,omitempty"`
+	Pods                     []string                      `json:"pods,omitempty"                     yaml:"pods,omitempty"`
+	PodIPs                   []string                      `json:"pod-ips,omitempty"                  yaml:"pod-ips,omitempty"`
+	FQDNs                    []string                      `json:"fqdns,omitempty"                    yaml:"fqdns,omitempty"`
+	Endpoint                 string                        `json:"endpoint,omitempty"                 yaml:"endpoint,omitempty"`
+	Endpoints                []string                      `json:"endpoints,omitempty"                yaml:"endpoints,omitempty"`
+	NormalizedCR             *ClickHouseKeeperInstallation `json:"normalized,omitempty"               yaml:"normalized,omitempty"`
+	NormalizedCRCompleted    *ClickHouseKeeperInstallation `json:"normalizedCompleted,omitempty"      yaml:"normalizedCompleted,omitempty"`
+	HostsWithTablesCreated   []string                      `json:"hostsWithTablesCreated,omitempty"   yaml:"hostsWithTablesCreated,omitempty"`
+	HostsWithReplicaCaughtUp []string                      `json:"hostsWithReplicaCaughtUp,omitempty" yaml:"hostsWithReplicaCaughtUp,omitempty"`
+	UsedTemplates            []*chi.TemplateRef            `json:"usedTemplates,omitempty"            yaml:"usedTemplates,omitempty"`
 
 	mu sync.RWMutex `json:"-" yaml:"-"`
 }
@@ -156,6 +157,16 @@ func (s *Status) SetAndPushError(err string) {
 		if len(s.Errors) > maxErrors {
 			s.Errors = s.Errors[:maxErrors]
 		}
+	})
+}
+
+// PushHostReplicaCatchUp pushes host to the list of hosts with replica catch-up
+func (s *Status) PushHostReplicaCatchUp(host string) {
+	doWithWriteLock(s, func(s *Status) {
+		if util.InArray(host, s.HostsWithReplicaCaughtUp) {
+			return
+		}
+		s.HostsWithReplicaCaughtUp = append(s.HostsWithReplicaCaughtUp, host)
 	})
 }
 
@@ -754,6 +765,14 @@ func (s *Status) GetNormalizedCRCompleted() *ClickHouseKeeperInstallation {
 func (s *Status) GetHostsWithTablesCreated() []string {
 	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.HostsWithTablesCreated
+	})
+}
+
+// GetHostsWithReplicaCatchUp gets hosts with replica catch-up
+func (s *Status) GetHostsWithReplicaCatchUp() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
+		return s.HostsWithReplicaCaughtUp
+
 	})
 }
 
