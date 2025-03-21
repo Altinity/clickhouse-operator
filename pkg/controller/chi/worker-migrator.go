@@ -96,16 +96,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 			"Adding tables on shard/host:%d/%d cluster:%s",
 			host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
 
-	err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host)
-	if err == nil {
-		w.a.V(1).
-			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
-			WithAction(host.GetCR()).
-			M(host).F().
-			Info("Tables added successfully on shard/host:%d/%d cluster:%s",
-				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
-		host.GetCR().IEnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
-	} else {
+	if err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host); err != nil {
 		w.a.V(1).
 			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
 			WithAction(host.GetCR()).
@@ -113,7 +104,17 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 			Error("ERROR add tables failed on shard/host:%d/%d cluster:%s err:%v",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName, err)
 	}
-	return err
+
+	w.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
+		WithAction(host.GetCR()).
+		M(host).F().
+		Info("Tables added successfully on shard/host:%d/%d cluster:%s",
+			host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
+
+	host.GetCR().IEnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
+
+	return nil
 }
 
 func (w *worker) setHasData(host *api.Host) {
