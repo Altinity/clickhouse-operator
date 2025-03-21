@@ -227,30 +227,6 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api
 			"Host/shard/cluster: %d/%d/%s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 	_ = w.waitHostIsInCluster(ctx, host)
-
-	if !w.shouldWaitReplicationHost(host) {
-		w.a.V(1).
-			M(host).F().
-			Info("No need to wait to catch replication lag. "+
-				"Host/shard/cluster: %d/%d/%s",
-				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-		return
-	}
-
-	w.a.V(1).
-		M(host).F().
-		Info("Wait for host catch replication lag - START "+
-			"Host/shard/cluster: %d/%d/%s",
-			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-
-	_ = w.waitHostHasNoReplicationDelay(ctx, host)
-
-	w.a.V(1).
-		M(host).F().
-		Info("Wait for host catch replication lag - COMPLETED "+
-			"Host/shard/cluster: %d/%d/%s",
-			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-
 }
 
 func (w *worker) descendHostInClickHouseCluster(ctx context.Context, host *api.Host) {
@@ -289,6 +265,31 @@ func (w *worker) ascendHostInClickHouseCluster(ctx context.Context, host *api.Ho
 	_ = w.reconcileConfigMapCommon(ctx, host.GetCR(), w.options())
 	host.GetCR().GetRuntime().UnlockCommonConfig()
 	w.task.WaitForConfigMapPropagation(ctx, host)
+}
+
+func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) {
+	if !w.shouldWaitReplicationHost(host) {
+		w.a.V(1).
+			M(host).F().
+			Info("No need to wait to catch replication lag. "+
+				"Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return
+	}
+
+	w.a.V(1).
+		M(host).F().
+		Info("Wait for host to catch replication lag - START "+
+			"Host/shard/cluster: %d/%d/%s",
+			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+
+	_ = w.waitHostHasNoReplicationDelay(ctx, host)
+
+	w.a.V(1).
+		M(host).F().
+		Info("Wait for host to catch replication lag - COMPLETED "+
+			"Host/shard/cluster: %d/%d/%s",
+			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 }
 
 // shouldExcludeHost determines whether host to be excluded from cluster before reconciling
