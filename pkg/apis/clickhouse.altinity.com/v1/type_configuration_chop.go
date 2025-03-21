@@ -389,10 +389,10 @@ type OperatorConfigReconcileHost struct {
 
 // OperatorConfigReconcileHostWait defines reconcile host wait config
 type OperatorConfigReconcileHostWait struct {
-	Exclude *types.StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
-	Queries *types.StringBool `json:"queries,omitempty" yaml:"queries,omitempty"`
-	Include *types.StringBool `json:"include,omitempty" yaml:"include,omitempty"`
-	Replicas struct {
+	Exclude  *types.StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
+	Queries  *types.StringBool `json:"queries,omitempty" yaml:"queries,omitempty"`
+	Include  *types.StringBool `json:"include,omitempty" yaml:"include,omitempty"`
+	Replicas *struct {
 		All *types.StringBool `json:"all,omitempty" yaml:"all,omitempty"`
 		New *types.StringBool `json:"new,omitempty" yaml:"new,omitempty"`
 	} `json:"replicas,omitempty" yaml:"replicas,omitempty"`
