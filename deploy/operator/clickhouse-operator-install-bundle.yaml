@@ -248,6 +248,12 @@ spec:
                   nullable: true
                   items:
                     type: string
+                hostsWithReplicaCaughtUp:
+                  type: array
+                  description: "List of hosts with replica caught up"
+                  nullable: true
+                  items:
+                    type: string
                 usedTemplates:
                   type: array
                   description: "List of templates used to build this CHI"
@@ -1539,6 +1545,12 @@ spec:
                 hostsWithTablesCreated:
                   type: array
                   description: "List of hosts with tables created by the operator"
+                  nullable: true
+                  items:
+                    type: string
+                hostsWithReplicaCaughtUp:
+                  type: array
+                  description: "List of hosts with replica caught up"
                   nullable: true
                   items:
                     type: string
@@ -3306,6 +3318,12 @@ spec:
                 hostsWithTablesCreated:
                   type: array
                   description: "List of hosts with tables created by the operator"
+                  nullable: true
+                  items:
+                    type: string
+                hostsWithReplicaCaughtUp:
+                  type: array
+                  description: "List of hosts with replica caught up"
                   nullable: true
                   items:
                     type: string
