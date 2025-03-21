@@ -114,9 +114,19 @@ func (w *worker) shouldIncludeHost(host *api.Host) bool {
 }
 
 func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
-	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusCreated) {
+	switch {
+	case chop.Config().Reconcile.Host.Wait.Replicas.All.Value():
+		// All replicas are explicitly requested to wait for replication to catch-up
 		return true
+	case chop.Config().Reconcile.Host.Wait.Replicas.New.Value():
+		// New replicas are explicitly requested to wait for replication to catch-up.
+		if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusCreated) {
+			// This is a new replica - certainly need to catch-up
+			return true
+		}
+		// This is not a new replica, it may have incomplete replication catch-up job
 	}
+
 	return false
 }
 
