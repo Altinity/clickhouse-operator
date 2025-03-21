@@ -94,6 +94,7 @@ type IStatus interface {
 	GetHostsWithTablesCreated() []string
 	GetHostsWithReplicaCaughtUp() []string
 	PushHostTablesCreated(host string)
+	PushHostReplicaCaughtUp(host string)
 
 	HasNormalizedCRCompleted() bool
 

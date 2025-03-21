@@ -160,8 +160,8 @@ func (s *Status) SetAndPushError(err string) {
 	})
 }
 
-// PushHostReplicaCatchUp pushes host to the list of hosts with replica catch-up
-func (s *Status) PushHostReplicaCatchUp(host string) {
+// PushHostReplicaCaughtUp pushes host to the list of hosts with replica caught-up
+func (s *Status) PushHostReplicaCaughtUp(host string) {
 	doWithWriteLock(s, func(s *Status) {
 		if util.InArray(host, s.HostsWithReplicaCaughtUp) {
 			return
@@ -532,6 +532,10 @@ func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 				s.HostsWithTablesCreated = nil
 				if len(from.HostsWithTablesCreated) > 0 {
 					s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, from.HostsWithTablesCreated...)
+				}
+				s.HostsWithReplicaCaughtUp = nil
+				if len(from.HostsWithReplicaCaughtUp) > 0 {
+					s.HostsWithReplicaCaughtUp = append(s.HostsWithReplicaCaughtUp, from.HostsWithReplicaCaughtUp...)
 				}
 			}
 			if opts.Copy.UsedTemplates {
