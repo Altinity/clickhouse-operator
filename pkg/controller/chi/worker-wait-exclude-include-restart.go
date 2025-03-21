@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -118,13 +119,23 @@ func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 	case chop.Config().Reconcile.Host.Wait.Replicas.All.Value():
 		// All replicas are explicitly requested to wait for replication to catch-up
 		return true
+
 	case chop.Config().Reconcile.Host.Wait.Replicas.New.Value():
 		// New replicas are explicitly requested to wait for replication to catch-up.
 		if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusCreated) {
 			// This is a new replica - certainly need to catch-up
 			return true
 		}
-		// This is not a new replica, it may have incomplete replication catch-up job
+
+		// This is not a new replica, it may have incomplete replication catch-up job still
+
+		if host.HasListedReplicaCaughtUp(w.c.namer.Name(interfaces.NameFQDN, host)) {
+			// Replica is already listed as caught, no need to catch-up again
+			return false
+		}
+
+		// Replica has never reached caught-up status, need to wait ffor replication
+		return true
 	}
 
 	return false
@@ -301,6 +312,8 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) {
 		Info("Wait for host to catch replication lag - COMPLETED "+
 			"Host/shard/cluster: %d/%d/%s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+
+	host.GetCR().IEnsureStatus().PushHostReplicaCaughtUp(w.c.namer.Name(interfaces.NameFQDN, host))
 }
 
 // shouldExcludeHost determines whether host to be excluded from cluster before reconciling
