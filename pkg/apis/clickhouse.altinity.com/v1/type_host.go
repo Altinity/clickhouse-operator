@@ -575,6 +575,13 @@ func (host *Host) AppendSpecifiedPortsToContainer(container *core.Container) {
 	)
 }
 
+func (host *Host) HasListedReplicaCaughtUp(name string) bool {
+	return util.InArray(
+		name,
+		host.GetCR().IEnsureStatus().GetHostsWithReplicaCaughtUp(),
+	)
+}
+
 func (host *Host) HasListedTablesCreated(name string) bool {
 	return util.InArray(
 		name,
