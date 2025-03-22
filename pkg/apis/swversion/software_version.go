@@ -29,11 +29,12 @@ type SoftWareVersion struct {
 }
 
 // NewSoftWareVersion creates new software version
-func NewSoftWareVersion(str string) *SoftWareVersion {
+// version - specifies original software version, such as 21.9.6.24-alpha
+func NewSoftWareVersion(version string) *SoftWareVersion {
 	// Need to have at least 3 parts in software version specification
-	if parts := strings.Split(str, "."); len(parts) >= 3 {
+	if parts := strings.Split(version, "."); len(parts) >= 3 {
 		return &SoftWareVersion{
-			Version: str,
+			Version: version,
 			Semver:  strings.Join(parts[0:2], "."),
 		}
 	}
