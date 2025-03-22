@@ -367,12 +367,14 @@ func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *sta
 func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error {
 	w.a.V(1).M(host).F().Info("Host software restart start. Host: %s", host.GetName())
 
+	// Get restart counters - they'll be used to check restart success
 	restarts, err := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 1. Host: %s err: %v", host.GetName(), err)
 		return err
 	}
 
+	// Issue SQL shutdown command - expect host to shutdown and pod be restarted by k8s
 	err = w.ensureClusterSchemer(host).HostShutdown(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 2. Host: %s err: %v", host.GetName(), err)
@@ -380,6 +382,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software shutdown ok. Host: %s", host.GetName())
 
+	// Wait for restart counters to change
 	err = w.waitHostRestart(ctx, host, restarts)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 3. Host: %s err: %v", host.GetName(), err)
@@ -387,6 +390,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software restart ok. Host: %s", host.GetName())
 
+	// Wait for pod to start
 	err = w.waitHostIsStarted(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 4. Host: %s is not started", host.GetName())
@@ -394,6 +398,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software pod is started. Host: %s ", host.GetName())
 
+	// Ensure pod is running
 	err = w.waitHostIsRunning(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 5. Host: %s is not running", host.GetName())
@@ -401,6 +406,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software pod is running. Host: %s ", host.GetName())
 
+	// Ensure pod is ready
 	err = w.waitHostIsReady(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 6. Host: %s is not ready", host.GetName())
@@ -408,6 +414,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software pod is ready. Host: %s ", host.GetName())
 
+	// At this stage we'd expect to have software up and able to respond its version
 	err = w.getHostSoftwareVersionErr(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 7. Host: %s err: %v", host.GetName(), err)
@@ -415,12 +422,14 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software version ok. Host: %s ", host.GetName())
 
+	// However, some containers within the pod may still have flapping problems and be in CrashLoopBackOff
 	if w.isPodCrushed(host) {
 		w.a.V(1).M(host).F().Info("Host software restart abort 8. Host: %s is crushed", host.GetName())
 		return fmt.Errorf("host is crushed")
 	}
 	w.a.V(1).M(host).F().Info("Host software is not crushed. Host: %s ", host.GetName())
 
+	// Check whole pod health
 	if !w.isPodOK(ctx, host) {
 		w.a.V(1).M(host).F().Info("Host software restart abort 9. Host: %s is not ok", host.GetName())
 		return fmt.Errorf("host is not ok")
@@ -428,6 +437,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	w.a.V(1).M(host).F().Info("Host software pod is ok. Host: %s ", host.GetName())
 
 	w.a.V(1).M(host).F().Info("Host software restart success. Host: %s", host.GetName())
+
 	return nil
 }
 
