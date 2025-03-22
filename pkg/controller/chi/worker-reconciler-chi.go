@@ -319,10 +319,9 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
-	version := w.getHostSoftwareVersion(ctx, host)
-	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), w.getHostSoftwareVersion(ctx, host))
 
-	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), version)
+	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
 
 	// Start with force-restart host
 	if w.shouldForceRestartHost(host) {
