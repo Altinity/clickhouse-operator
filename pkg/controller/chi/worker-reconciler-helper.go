@@ -30,8 +30,10 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) str
 		ctx,
 		host,
 		versionOptions{
-			skipNew:             true,
-			skipStoppedAncestor: true,
+			Skip{
+				New:             true,
+				StoppedAncestor: true,
+			},
 		},
 	)
 	return version

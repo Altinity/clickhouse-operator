@@ -46,7 +46,7 @@ func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Hos
 		host,
 		func(_ctx context.Context, _host *api.Host) bool {
 			var e error
-			version, e = w.getHostClickHouseVersion(_ctx, _host, versionOptions{skipStopped: true})
+			version, e = w.getHostClickHouseVersion(_ctx, _host, versionOptions{Skip{Stopped: true}})
 			if e == nil {
 				return true
 			}
