@@ -141,7 +141,7 @@ func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 	return false
 }
 
-// includeHost includes host back back into ClickHouse clusters
+// includeHost includes host back into all activities - such as cluster, service, etc
 func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
