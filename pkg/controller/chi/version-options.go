@@ -21,25 +21,29 @@ import (
 const unknownVersion = "failed to query"
 
 type versionOptions struct {
-	skipNew             bool
-	skipStopped         bool
-	skipStoppedAncestor bool
+	Skip
+}
+
+type Skip struct {
+	New             bool
+	Stopped         bool
+	StoppedAncestor bool
 }
 
 func (opts versionOptions) shouldSkip(host *api.Host) (bool, string) {
-	if opts.skipNew {
+	if opts.Skip.New {
 		if !host.HasAncestor() {
 			return true, "host is a new one, version is not not applicable"
 		}
 	}
 
-	if opts.skipStopped {
+	if opts.Skip.Stopped {
 		if host.IsStopped() {
 			return true, "host is stopped, version is not applicable"
 		}
 	}
 
-	if opts.skipStoppedAncestor {
+	if opts.Skip.StoppedAncestor {
 		if host.HasAncestor() && host.GetAncestor().IsStopped() {
 			return true, "host ancestor is stopped, version is not applicable"
 		}
