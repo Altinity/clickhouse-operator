@@ -784,7 +784,8 @@ func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error
 	}
 
 	// Include host back into all activities - such as cluster, service, etc
-	if err := w.includeHost(ctx, host); err != nil {
+	err := w.includeHost(ctx, host)
+	if err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
