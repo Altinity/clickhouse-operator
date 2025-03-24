@@ -26,31 +26,35 @@ import (
 )
 
 func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) string {
-	version, _ := w.getHostClickHouseVersion(
-		ctx,
-		host,
-		versionOptions{
-			Skip{
-				New:             true,
-				StoppedAncestor: true,
-			},
+	opts := versionOptions{
+		Skip{
+			New:             true,
+			StoppedAncestor: true,
 		},
-	)
-	return version
+	}
+
+	if skip, description := opts.shouldSkip(host); skip {
+		return description
+	}
+
+	version, err := w.getHostClickHouseVersion(ctx, host)
+	if err != nil {
+		return unknownVersion
+	}
+
+	host.Runtime.Version = version
+
+	return version.String()
 }
 
 func (w *worker) getHostSoftwareVersionErr(ctx context.Context, host *api.Host) error {
-	version, err := w.getHostClickHouseVersion(
-		ctx,
-		host,
-		versionOptions{},
-	)
-	if err == nil {
-		w.a.V(1).M(host).F().Info("Host software version detected. Host: %s version: %s", host.GetName(), version)
-	} else {
+	version, err := w.getHostClickHouseVersion(ctx, host)
+	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software version NOT detected. Host: %s Err: %v", host.GetName(), err)
 	}
-	return err
+
+	w.a.V(1).M(host).F().Info("Host software version detected. Host: %s version: %s", host.GetName(), version)
+	return nil
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile

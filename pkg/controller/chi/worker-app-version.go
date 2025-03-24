@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"fmt"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
@@ -23,30 +24,29 @@ import (
 )
 
 // getHostClickHouseVersion gets host ClickHouse version
-func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host, opts versionOptions) (string, error) {
-	if skip, description := opts.shouldSkip(host); skip {
-		return description, nil
-	}
-
+func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host) (*swversion.SoftWareVersion, error) {
 	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Warning("Failed to get ClickHouse version on host: %s", host.GetName())
-		return unknownVersion, err
+		return nil, err
 	}
 
 	w.a.V(1).M(host).F().Info("Get ClickHouse version on host: %s version: %s", host.GetName(), version)
-	host.Runtime.Version = swversion.NewSoftWareVersion(version)
+	v := swversion.NewSoftWareVersion(version)
+	if v.IsUnknown() {
+		return nil, fmt.Errorf("unknown version")
+	}
 
-	return version, nil
+	return v, nil
 }
 
-func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Host) (version string, err error) {
+func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Host) (version *swversion.SoftWareVersion, err error) {
 	err = domain.PollHost(
 		ctx,
 		host,
 		func(_ctx context.Context, _host *api.Host) bool {
 			var e error
-			version, e = w.getHostClickHouseVersion(_ctx, _host, versionOptions{Skip{Stopped: true}})
+			version, e = w.getHostClickHouseVersion(_ctx, _host)
 			if e == nil {
 				return true
 			}

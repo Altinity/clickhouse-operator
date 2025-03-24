@@ -777,13 +777,13 @@ func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *
 	if err != nil {
 		w.a.V(1).
 			M(host).F().
-			Warning("Check host for ClickHouse availability before migrating tables. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
+			Warning("Check host for ClickHouse availability before migrating tables. Host: %s Failed to get ClickHouse version. Err: %s", host.GetName(), err)
 		return err
 	}
 
 	w.a.V(1).
 		M(host).F().
-		Info("Check host for ClickHouse availability before migrating tables. Host: %s ClickHouse version running: %s", host.GetName(), version)
+		Info("Check host for ClickHouse availability before migrating tables. Host: %s ClickHouse version available: %s", host.GetName(), version)
 
 	return w.migrateTables(ctx, host, opts)
 }
