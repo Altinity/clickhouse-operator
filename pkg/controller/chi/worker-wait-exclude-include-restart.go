@@ -143,19 +143,6 @@ func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 
 // includeHost includes host back into all activities - such as cluster, service, etc
 func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	if !w.shouldIncludeHost(host) {
-		w.a.V(1).
-			M(host).F().
-			Info("No need to include host into cluster. Host/shard/cluster: %d/%d/%s",
-				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-		return nil
-	}
-
 	w.a.V(1).
 		M(host).F().
 		Info("Include host into cluster. Host/shard/cluster: %d/%d/%s",

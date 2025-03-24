@@ -640,7 +640,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
 	}
-	if err := w.reconcileHostBootstrap(ctx, host); err != nil {
+	if err := w.reconcileHostInclude(ctx, host); err != nil {
 		return err
 	}
 
@@ -768,8 +768,21 @@ func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, migrat
 	return w.migrateTables(ctx, host, migrateTableOpts)
 }
 
-// reconcileHostBootstrap reconciles specified ClickHouse host
-func (w *worker) reconcileHostBootstrap(ctx context.Context, host *api.Host) error {
+// reconcileHostInclude includes specified ClickHouse host into all activities
+func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	if !w.shouldIncludeHost(host) {
+		w.a.V(1).
+			M(host).F().
+			Info("No need to include host into cluster. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return nil
+	}
+
 	// Include host back into all activities - such as cluster, service, etc
 	if err := w.includeHost(ctx, host); err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
@@ -781,19 +794,23 @@ func (w *worker) reconcileHostBootstrap(ctx context.Context, host *api.Host) err
 
 	// Ensure host is running and accessible and what version is available.
 	// Sometimes service needs some time to start after creation|modification before being accessible for usage
-	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
-		w.a.V(1).
-			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
-			WithAction(host.GetCR()).
-			M(host).F().
-			Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
-	} else {
+	// However, it is expected to have host up and running at this point
+	version, err := w.pollHostForClickHouseVersion(ctx, host)
+	if err != nil {
 		w.a.V(1).
 			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
+
+		return err
 	}
+
+	w.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
+		WithAction(host.GetCR()).
+		M(host).F().
+		Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
 
 	return nil
 }
