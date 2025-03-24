@@ -17,14 +17,12 @@ package chi
 import (
 	"context"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type migrateTableOptions struct {
@@ -62,24 +60,8 @@ func (a migrateTableOptionsArr) First() *migrateTableOptions {
 }
 
 // migrateTables
-func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*migrateTableOptions) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	if !w.shouldMigrateTables(host, opts...) {
-		w.a.V(1).
-			M(host).F().
-			Info(
-				"No need to add tables on host %d to shard %d in cluster %s",
-				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-		return nil
-	}
-
-	// Need to migrate tables
-
-	if w.shouldDropReplica(host, opts...) {
+func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrateTableOptions) error {
+	if w.shouldDropReplica(host, opts) {
 		w.a.V(1).
 			M(host).F().
 			Info(

@@ -752,20 +752,40 @@ func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.
 	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 }
 
-func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, migrateTableOpts *migrateTableOptions) error {
-	// Prepare for tables migration.
-	// Sometimes service needs significant time to start after creation/modification before being accessible for usage
-	// Check whether ClickHouse is running and accessible and what version is available.
-	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
+func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *migrateTableOptions) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	if !w.shouldMigrateTables(host, opts) {
 		w.a.V(1).
 			M(host).F().
-			Info("Check host for ClickHouse availability before migrating tables. Host: %s ClickHouse version running: %s", host.GetName(), version)
-	} else {
+			Info(
+				"No need to add tables on host %d to shard %d in cluster %s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return nil
+	}
+
+	// Need to migrate tables
+
+	// Prepare for tables migration.
+	// Ensure host is running and accessible and what version is available.
+	// Sometimes service needs some time to start after creation|modification before being accessible for usage
+	// However, it is expected to have host up and running at this point
+	version, err := w.pollHostForClickHouseVersion(ctx, host)
+	if err != nil {
 		w.a.V(1).
 			M(host).F().
 			Warning("Check host for ClickHouse availability before migrating tables. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
+		return err
 	}
-	return w.migrateTables(ctx, host, migrateTableOpts)
+
+	w.a.V(1).
+		M(host).F().
+		Info("Check host for ClickHouse availability before migrating tables. Host: %s ClickHouse version running: %s", host.GetName(), version)
+
+	return w.migrateTables(ctx, host, opts)
 }
 
 // reconcileHostInclude includes specified ClickHouse host into all activities
