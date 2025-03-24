@@ -47,11 +47,10 @@ func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, s
 	}
 
 	if err != nil {
+		// The Service is either not found or not updated. Try to recreate it
 		if apiErrors.IsNotFound(err) {
-			// The Service is either not found or not updated. Try to recreate it
 			w.a.V(1).M(cr).F().Info("Service: %s not found. err: %v", util.NamespaceNameString(service), err)
 		} else {
-			// The Service is either not found or not updated. Try to recreate it
 			w.a.WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateFailed).
 				WithAction(cr).
 				WithError(cr).
@@ -92,7 +91,8 @@ func (w *worker) updateService(
 	if curService.Spec.Type != targetService.Spec.Type {
 		return fmt.Errorf(
 			"just recreate the service in case of service type change '%s'=>'%s'",
-			curService.Spec.Type, targetService.Spec.Type)
+			curService.Spec.Type, targetService.Spec.Type,
+		)
 	}
 
 	// Updating a Service is a complicated business
@@ -102,15 +102,19 @@ func (w *worker) updateService(
 	// spec.resourceVersion is required in order to update an object
 	newService.ResourceVersion = curService.ResourceVersion
 
-	//
-	// Migrate ClusterIP to the new service
-	//
-	// spec.clusterIP field is immutable, need to use already assigned value
-	// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
-	// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
-	// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
-	// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
-	newService.Spec.ClusterIP = curService.Spec.ClusterIP
+	if newService.Spec.ClusterIP == core.ClusterIPNone {
+		// In case for new service no ClusterIP is requested, we'll keep it it unassigned.
+		// Otherwise we need to migrate IP address assigned earlier to new service in order to reuse it
+		log.V(1).Info("switch service %s to IP-less mode. ClusterIP=None", util.NamespacedName(newService))
+	} else {
+		// Migrate ClusterIP to the new service
+		// spec.clusterIP field is immutable, need to use already assigned value
+		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+		// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
+		// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
+		newService.Spec.ClusterIP = curService.Spec.ClusterIP
+	}
 
 	//
 	// Migrate existing ports to the new service for NodePort and LoadBalancer services
@@ -125,9 +129,13 @@ func (w *worker) updateService(
 	// No changes in service type is allowed.
 	// Already exposed port details can not be changed.
 
-	serviceTypeIsNodePort := (curService.Spec.Type == core.ServiceTypeNodePort) && (newService.Spec.Type == core.ServiceTypeNodePort)
-	serviceTypeIsLoadBalancer := (curService.Spec.Type == core.ServiceTypeLoadBalancer) && (newService.Spec.Type == core.ServiceTypeLoadBalancer)
-	if serviceTypeIsNodePort || serviceTypeIsLoadBalancer {
+	// Service type of new and cur service is the same.
+	// In case it is not the same service has to be just recreated.
+	// So we can check for one type only - let's check for type of new service
+	typeIsNodePort := newService.Spec.Type == core.ServiceTypeNodePort
+	typeIsLoadBalancer := newService.Spec.Type == core.ServiceTypeLoadBalancer
+	if typeIsNodePort || typeIsLoadBalancer {
+		// Migrate cur ports to new service
 		for i := range newService.Spec.Ports {
 			newPort := &newService.Spec.Ports[i]
 			for j := range curService.Spec.Ports {
