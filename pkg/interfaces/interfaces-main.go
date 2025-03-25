@@ -73,6 +73,7 @@ type IVolumeManager interface {
 type IContainerManager interface {
 	NewDefaultAppContainer(host *api.Host) core.Container
 	GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool)
+	GetAppImageTag(statefulSet *apps.StatefulSet) (string, bool)
 	EnsureAppContainer(statefulSet *apps.StatefulSet, host *api.Host)
 	EnsureLogContainer(statefulSet *apps.StatefulSet)
 	SetupAdditionalEnvVars(host *api.Host, container *core.Container)
