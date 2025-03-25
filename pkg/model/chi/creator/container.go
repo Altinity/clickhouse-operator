@@ -42,6 +42,10 @@ func (cm *ContainerManager) GetAppContainer(statefulSet *apps.StatefulSet) (*cor
 	return cm.getContainerClickHouse(statefulSet)
 }
 
+func (cm *ContainerManager) GetAppImageTag(statefulSet *apps.StatefulSet) (string, bool) {
+	return cm.getImageTagClickHouse(statefulSet)
+}
+
 func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, host *chi.Host) {
 	cm.ensureContainerSpecifiedClickHouse(statefulSet, host)
 }
@@ -70,7 +74,6 @@ func (cm *ContainerManager) getContainerClickHouseLog(statefulSet *apps.Stateful
 	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseLogContainerName)
 }
 
-
 // getImageTagClickHouse
 func (cm *ContainerManager) getImageTagClickHouse(statefulSet *apps.StatefulSet) (string, bool) {
 	container, ok := cm.getContainerClickHouse(statefulSet)
@@ -85,7 +88,6 @@ func (cm *ContainerManager) getImageTagClickHouse(statefulSet *apps.StatefulSet)
 
 	return tag, true
 }
-
 
 // ensureContainerSpecifiedClickHouse
 func (cm *ContainerManager) ensureContainerSpecifiedClickHouse(statefulSet *apps.StatefulSet, host *chi.Host) {
