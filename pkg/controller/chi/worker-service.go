@@ -103,11 +103,11 @@ func (w *worker) updateService(
 	newService.ResourceVersion = curService.ResourceVersion
 
 	if newService.Spec.ClusterIP == core.ClusterIPNone {
-		// In case for new service no ClusterIP is requested, we'll keep it it unassigned.
+		// In case if new service has no ClusterIP requested, we'll keep it unassigned.
 		// Otherwise we need to migrate IP address assigned earlier to new service in order to reuse it
 		log.V(1).Info("switch service %s to IP-less mode. ClusterIP=None", util.NamespacedName(newService))
 	} else {
-		// Migrate ClusterIP to the new service
+		// Migrate assigned IP value - ClusterIP - to the new service
 		// spec.clusterIP field is immutable, need to use already assigned value
 		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
 		// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
@@ -180,7 +180,7 @@ func (w *worker) updateService(
 	newService.SetFinalizers(w.prepareFinalizers(curService, newService, ensureService(prevService)))
 
 	//
-	// And only now we are ready to actually update the service with new version of the service
+	// And only now we are ready to actually update the service with the new version of the service
 	//
 
 	err := w.c.updateService(ctx, newService)
