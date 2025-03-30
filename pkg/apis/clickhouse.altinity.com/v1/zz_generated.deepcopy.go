@@ -1632,6 +1632,7 @@ func (in *OperatorConfigReconcileHostWait) DeepCopyInto(out *OperatorConfigRecon
 		*out = new(types.StringBool)
 		**out = **in
 	}
+	in.Replicas = out.Replicas
 	return
 }
 
@@ -2237,6 +2238,11 @@ func (in *Status) DeepCopyInto(out *Status) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.HostsWithReplicaCaughtUp != nil {
+		in, out := &in.HostsWithReplicaCaughtUp, &out.HostsWithReplicaCaughtUp
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.UsedTemplates != nil {
 		in, out := &in.UsedTemplates, &out.UsedTemplates
 		*out = make([]*TemplateRef, len(*in))
@@ -2485,6 +2491,11 @@ func (in *ZookeeperNode) DeepCopyInto(out *ZookeeperNode) {
 	if in.Secure != nil {
 		in, out := &in.Secure, &out.Secure
 		*out = new(types.StringBool)
+		**out = **in
+	}
+	if in.AvailabilityZone != nil {
+		in, out := &in.AvailabilityZone, &out.AvailabilityZone
+		*out = new(types.String)
 		**out = **in
 	}
 	return
