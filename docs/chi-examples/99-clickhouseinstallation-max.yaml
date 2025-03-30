@@ -137,12 +137,15 @@ spec:
         - host: zookeeper-0.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
           secure: yes
+          availabilityZone: az1
         - host: zookeeper-1.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
           secure: yes
+          availabilityZone: az2
         - host: zookeeper-2.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
           secure: yes
+          availabilityZone: az3
       session_timeout_ms: 30000
       operation_timeout_ms: 10000
       root: "/path/to/zookeeper/root/node"
