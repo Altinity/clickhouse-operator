@@ -4542,6 +4542,10 @@ data:
           exclude: true
           queries: true
           include: false
+          replicas:
+            all: no
+            new: yes
+            delay: 10
 
     ################################################
     ##
