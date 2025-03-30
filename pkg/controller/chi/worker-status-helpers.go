@@ -85,8 +85,7 @@ func (w *worker) doesHostHaveNoRunningQueries(ctx context.Context, host *api.Hos
 
 func (w *worker) doesHostHaveNoReplicationDelay(ctx context.Context, host *api.Host) bool {
 	delay, _ := w.ensureClusterSchemer(host).HostMaxReplicaDelay(ctx, host)
-	threshold := 10
-	return delay <= threshold
+	return delay <= chop.Config().Reconcile.Host.Wait.Replicas.Delay.IntValue()
 }
 
 // isCHIProcessedOnTheSameIP checks whether it is just a restart of the operator on the same IP
