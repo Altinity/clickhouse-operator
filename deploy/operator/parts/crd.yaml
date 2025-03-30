@@ -682,6 +682,9 @@ spec:
                                   - "Enabled"
                                   - "enabled"
                                 description: "if a secure connection to Zookeeper is required"
+                              availabilityZone:
+                                type: string
+                                description: "availability zone for Zookeeper node"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
@@ -836,6 +839,9 @@ spec:
                                         - "Enabled"
                                         - "enabled"
                                       description: "if a secure connection to Zookeeper is required"
+                                    availabilityZone:
+                                      type: string
+                                      description: "availability zone for Zookeeper node"
                               session_timeout_ms:
                                 type: integer
                                 description: "session timeout during connect to Zookeeper"
@@ -2668,6 +2674,9 @@ spec:
                                   - "Enabled"
                                   - "enabled"
                                 description: "if a secure connection to Zookeeper is required"
+                              availabilityZone:
+                                type: string
+                                description: "availability zone for Zookeeper node"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
@@ -2822,6 +2831,9 @@ spec:
                                         - "Enabled"
                                         - "enabled"
                                       description: "if a secure connection to Zookeeper is required"
+                                    availabilityZone:
+                                      type: string
+                                      description: "availability zone for Zookeeper node"
                               session_timeout_ms:
                                 type: integer
                                 description: "session timeout during connect to Zookeeper"
