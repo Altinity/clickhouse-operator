@@ -138,6 +138,9 @@ func (c *Generator) getHostZookeeper(host *chi.Host) string {
 		if node.Secure.HasValue() {
 			util.Iline(b, 8, "    <secure>%d</secure>", c.getSecure(node))
 		}
+		if node.AvailabilityZone.HasValue() {
+			util.Iline(b, 8, "    <availability_zone>%s</availability_zone>", node.AvailabilityZone.Value())
+		}
 		util.Iline(b, 8, "</node>")
 	}
 
