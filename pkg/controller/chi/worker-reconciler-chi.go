@@ -413,8 +413,8 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software pod is ready. Host: %s ", host.GetName())
 
-	// At this stage we'd expect to have software up and able to respond its version
-	err = w.getHostSoftwareVersionErr(ctx, host)
+	// At this stage we'd expect to have software up and able to respond
+	err = w.isHostSoftwareAbleToRespond(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 7. Host: %s err: %v", host.GetName(), err)
 		return err
