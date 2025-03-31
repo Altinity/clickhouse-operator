@@ -18,8 +18,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-const unknownVersion = "failed to query"
-
 type versionOptions struct {
 	Skip
 }
