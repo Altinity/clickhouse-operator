@@ -26,6 +26,8 @@ type SoftWareVersion struct {
 	Version string
 	// Semver specifies semver adaptation, truncated to 3 numbers, such as 21.9.6 for 21.9.6.24-alpha original version
 	Semver string
+	// Description specifies description if needed
+	Description string
 }
 
 // NewSoftWareVersion creates new software version
@@ -39,6 +41,15 @@ func NewSoftWareVersion(version string) *SoftWareVersion {
 		}
 	}
 	return nil
+}
+
+
+func MinVersion() *SoftWareVersion {
+	return NewSoftWareVersion("0.0.1")
+}
+
+func MaxVersion() *SoftWareVersion {
+	return NewSoftWareVersion("99.99.99")
 }
 
 // Matches checks whether software version matches specified constraint or not
@@ -74,10 +85,26 @@ func (v *SoftWareVersion) IsUnknown() bool {
 	return false
 }
 
+func (v *SoftWareVersion) SetDescription(desc string) *SoftWareVersion {
+	if v == nil {
+		return nil
+	}
+	v.Description = desc
+	return v
+}
+
 // String makes a string
 func (v *SoftWareVersion) String() string {
 	if v == nil {
 		return ""
 	}
 	return v.Version
+}
+
+// Render makes a string
+func (v *SoftWareVersion) Render() string {
+	if v == nil {
+		return ""
+	}
+	return v.String() + "[" + v.Description + "]"
 }
