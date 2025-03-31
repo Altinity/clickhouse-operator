@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	knownVersion = "ok to query CH"
+	knownVersion   = "ok to query CH"
 	unknownVersion = "failed to query CH"
 )
 
@@ -47,6 +47,7 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *sw
 		// Need to report version from the tag
 		if tagOk {
 			if version := swversion.NewSoftWareVersionFromTag(tag); version != nil {
+				// Able to report version from the tag
 				return version.SetDescription(description)
 			}
 		}
@@ -58,11 +59,11 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *sw
 	// Try to report version from the app
 
 	if version, err := w.getHostClickHouseVersion(ctx, host); err == nil {
-		// Able to fetch version from the host - report version
+		// Able to fetch version from the app - report version
 		return version.SetDescription(knownVersion)
 	}
 
-	// Unable to fetch version fom the host - report min one
+	// Unable to fetch version fom the app - report min one
 	return swversion.MinVersion().SetDescription(unknownVersion)
 }
 
