@@ -47,13 +47,14 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) str
 	return version.String()
 }
 
-func (w *worker) getHostSoftwareVersionErr(ctx context.Context, host *api.Host) error {
+func (w *worker) isHostSoftwareAbleToRespond(ctx context.Context, host *api.Host) error {
+	// Check whether the software is able to respond its version
 	version, err := w.getHostClickHouseVersion(ctx, host)
 	if err != nil {
-		w.a.V(1).M(host).F().Info("Host software version NOT detected. Host: %s Err: %v", host.GetName(), err)
+		w.a.V(1).M(host).F().Info("Host software is not alive - version NOT detected. Host: %s Err: %v", host.GetName(), err)
 	}
 
-	w.a.V(1).M(host).F().Info("Host software version detected. Host: %s version: %s", host.GetName(), version)
+	w.a.V(1).M(host).F().Info("Host software is alive - version detected. Host: %s version: %s", host.GetName(), version)
 	return nil
 }
 
