@@ -134,7 +134,7 @@ func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 			return false
 		}
 
-		// Replica has never reached caught-up status, need to wait ffor replication
+		// Replica has never reached caught-up status, need to wait for replication to commence
 		return true
 	}
 
