@@ -16,15 +16,15 @@ package chi
 
 import (
 	"context"
+	"math"
+	"sync"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"k8s.io/apimachinery/pkg/version"
-	"math"
-	"sync"
 )
 
 const (
