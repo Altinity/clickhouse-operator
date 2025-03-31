@@ -41,7 +41,7 @@ func NewSoftWareVersion(version string) *SoftWareVersion {
 	return nil
 }
 
-// Matches checks whether software version matches specified constraint
+// Matches checks whether software version matches specified constraint or not
 func (v *SoftWareVersion) Matches(constraint string) bool {
 	if v == nil {
 		return false
@@ -63,7 +63,7 @@ func (v *SoftWareVersion) Matches(constraint string) bool {
 	return matches
 }
 
-// IsUnknown checks whether software version is unknown
+// IsUnknown checks whether software version is unknown or not
 func (v *SoftWareVersion) IsUnknown() bool {
 	if v == nil {
 		return true
@@ -74,7 +74,7 @@ func (v *SoftWareVersion) IsUnknown() bool {
 	return false
 }
 
-// String makes string
+// String makes a string
 func (v *SoftWareVersion) String() string {
 	if v == nil {
 		return ""
