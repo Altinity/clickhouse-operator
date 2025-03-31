@@ -106,6 +106,7 @@ type ICreator interface {
 	CreateClusterSecret(name string) *core.Secret
 	CreateService(what ServiceType, params ...any) util.Slice[*core.Service]
 	CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet
+	GetAppImageTag(host *api.Host) (string, bool)
 }
 
 type IEventEmitter interface {
