@@ -182,6 +182,10 @@ func (c *Creator) stsGetAppContainer(statefulSet *apps.StatefulSet) (*core.Conta
 	return c.cm.GetAppContainer(statefulSet)
 }
 
+func (c *Creator) GetAppImageTag(host *api.Host) (string, bool) {
+	return c.cm.GetAppImageTag(host.Runtime.DesiredStatefulSet)
+}
+
 // stsEnsureAppContainerNamedPortsSpecified
 func (c *Creator) stsEnsureAppContainerNamedPortsSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
 	// Ensure ClickHouse container has all named ports specified
