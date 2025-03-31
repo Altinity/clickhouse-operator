@@ -23,6 +23,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 )
 
+var errUnknownVersion = fmt.Errorf("unknown version")
+
 // getHostClickHouseVersion gets host ClickHouse version
 func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host) (*swversion.SoftWareVersion, error) {
 	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
@@ -34,7 +36,7 @@ func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host) (
 	w.a.V(1).M(host).F().Info("Get ClickHouse version on host: %s version: %s", host.GetName(), version)
 	v := swversion.NewSoftWareVersion(version)
 	if v.IsUnknown() {
-		return nil, fmt.Errorf("unknown version")
+		return nil, errUnknownVersion
 	}
 
 	return v, nil
