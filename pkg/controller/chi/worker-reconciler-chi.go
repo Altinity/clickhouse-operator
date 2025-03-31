@@ -319,9 +319,13 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
-	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), w.getHostSoftwareVersion(ctx, host))
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
+	version := w.getHostSoftwareVersion(ctx, host)
 
+	host.Runtime.Version = version
 	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+
+	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName())
 
 	// Start with force-restart host
 	if w.shouldForceRestartHost(host) {
@@ -330,7 +334,6 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. Reconcile StatefulSet", host.GetName())
-	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
 	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, true, opts)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
