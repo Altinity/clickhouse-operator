@@ -15,6 +15,8 @@
 package swversion
 
 import (
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -31,18 +33,48 @@ type SoftWareVersion struct {
 }
 
 // NewSoftWareVersion creates new software version
-// version - specifies original software version, such as 21.9.6.24-alpha
+// version - specifies original software version, such as: 21 or 21.1 or 21.9.6.24-alpha
 func NewSoftWareVersion(version string) *SoftWareVersion {
+	if strings.TrimSpace(version) == "" {
+		return nil
+	}
+
+	// Fetch comma-separated parts of the software version
+	parts := strings.Split(version, ".")
+
+	// Need to have at least something to as a major version
+	if len(parts) < 1 {
+		return nil
+	}
+
 	// Need to have at least 3 parts in software version specification
-	if parts := strings.Split(version, "."); len(parts) >= 3 {
-		return &SoftWareVersion{
-			Version: version,
-			Semver:  strings.Join(parts[0:2], "."),
+	for len(parts) < 3 {
+		parts = append(parts, "0")
+	}
+
+	// Take first 3 parts and ensure they are digits
+	parts = parts[0:2]
+	for _, part := range parts {
+		if _, err := strconv.Atoi(part); err != nil {
+			return nil
 		}
 	}
-	return nil
+
+	// Build version
+	return &SoftWareVersion{
+		Version: version,
+		Semver:  strings.Join(parts, "."),
+	}
 }
 
+func NewSoftWareVersionFromTag(tag string) *SoftWareVersion {
+	if strings.ToLower(strings.TrimSpace(tag)) == "latest" {
+		return MaxVersion()
+	}
+
+	r := regexp.MustCompile(`\d+(\.\d+)+`)
+	return NewSoftWareVersion(r.FindString(tag))
+}
 
 func MinVersion() *SoftWareVersion {
 	return NewSoftWareVersion("0.0.1")
