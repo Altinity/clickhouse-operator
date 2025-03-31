@@ -17,15 +17,22 @@ package chi
 import (
 	"context"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"k8s.io/apimachinery/pkg/version"
 	"math"
 	"sync"
 )
 
-func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) string {
+const (
+	knownVersion = "ok to query CH"
+	unknownVersion = "failed to query CH"
+)
+
+func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
 	opts := versionOptions{
 		Skip{
 			New:             true,
@@ -33,18 +40,30 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) str
 		},
 	}
 
+	// Fetch tag from the image
+	tag, tagOk := w.task.Creator().GetAppImageTag(host)
+
 	if skip, description := opts.shouldSkip(host); skip {
-		return description
+		// Need to report version from the tag
+		if tagOk {
+			if version := swversion.NewSoftWareVersionFromTag(tag); version != nil {
+				return version.SetDescription(description)
+			}
+		}
+
+		// Unable to report version from the tag - report min one
+		return swversion.MinVersion().SetDescription(description)
 	}
 
-	version, err := w.getHostClickHouseVersion(ctx, host)
-	if err != nil {
-		return unknownVersion
+	// Try to report version from the app
+
+	if version, err := w.getHostClickHouseVersion(ctx, host); err == nil {
+		// Able to fetch version from the host - report version
+		return version.SetDescription(knownVersion)
 	}
 
-	host.Runtime.Version = version
-
-	return version.String()
+	// Unable to fetch version fom the host - report min one
+	return swversion.MinVersion().SetDescription(unknownVersion)
 }
 
 func (w *worker) isHostSoftwareAbleToRespond(ctx context.Context, host *api.Host) error {
