@@ -31,7 +31,9 @@ func GetObjectStatusFromMetas(labeler interfaces.ILabeler, curMeta, newMeta meta
 
 	if !curHasLabel || !newHasLabel {
 		log.M(newMeta).F().Warning(
-			"Not enough labels to compare objects, can not say for sure what exactly is going on. Object: %s",
+			"Not enough labels to compare objects, can not say for sure what exactly is going on. curHasLabel: %t newHasLabel: %t Object: %s ",
+			curHasLabel,
+			newHasLabel,
 			util.NamespaceNameString(newMeta),
 		)
 		return types.ObjectStatusUnknown
