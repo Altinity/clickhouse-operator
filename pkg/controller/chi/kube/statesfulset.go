@@ -63,7 +63,11 @@ func (c *STS) Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 			// Namespaced name
 			name = c.namer.Name(interfaces.NameStatefulSet, obj)
 			namespace = typedObj.Runtime.Address.Namespace
+		default:
+			panic("unknown type")
 		}
+	default:
+		panic("unexxpected number of args")
 	}
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, controller.NewGetOptions())
 }
