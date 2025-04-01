@@ -124,6 +124,7 @@ clickhouse:
           - files/*.xml: "yes"
           - files/config.d/*.xml: "yes"
           - files/config.d/*dict*.xml: "no"
+          - files/config.d/*no_restart*: "no"
 
           # exceptions in default profile
           - profiles/default/background_*_pool_size: "yes"
@@ -147,7 +148,6 @@ clickhouse:
     # These credentials are used for:
     #   1. Metrics requests
     #   2. Schema maintenance
-    #   3. DROP DNS CACHE
     # User with these credentials can be specified in additional ClickHouse .xml config files,
     # located in 'clickhouse.configuration.file.path.user' folder
     username: "clickhouse_operator"
@@ -250,7 +250,7 @@ reconcile:
   # Reconcile runtime settings
   runtime:
     # Max number of concurrent CHI reconciles in progress
-    reconcileCHIsThreadsNumber: 10
+    reconcileCHIsThreadsNumber: 1
 
     # The operator reconciles shards concurrently in each CHI with the following limitations:
     #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
@@ -261,7 +261,7 @@ reconcile:
     # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
 
     # Max number of concurrent shard reconciles within one CHI in progress
-    reconcileShardsThreadsNumber: 5
+    reconcileShardsThreadsNumber: 1
     # Max percentage of concurrent shard reconciles within one CHI in progress
     reconcileShardsMaxConcurrencyPercent: 50
 
@@ -306,6 +306,10 @@ reconcile:
       exclude: true
       queries: true
       include: false
+      replicas:
+        all: no
+        new: yes
+        delay: 10
 
 ################################################
 ##
