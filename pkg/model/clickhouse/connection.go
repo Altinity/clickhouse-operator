@@ -20,6 +20,7 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
+	"encoding/pem"
 
 	// go-clickhouse is explicitly required in order to setup connection to clickhouse db
 	//goch "github.com/mailru/go-clickhouse"
@@ -74,8 +75,10 @@ func (c *Connection) SetLog(l log.Announcer) *Connection {
 func (c *Connection) connect(ctx context.Context) {
 	// Add root CA
 	if c.params.rootCA != "" {
+		der, _ := pem.Decode([]byte(c.params.rootCA))
+
 		rootCAs := x509.NewCertPool()
-		if cert, err := x509.ParseCertificate([]byte(c.params.rootCA)); err != nil {
+		if cert, err := x509.ParseCertificate(der.Bytes); err != nil {
 			c.l.V(1).F().Error("unable to parse CERT specified in rootCA: %v", err)
 		} else {
 			rootCAs.AddCert(cert)
