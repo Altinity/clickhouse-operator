@@ -151,6 +151,14 @@ func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
 // shouldForceRestartHost checks whether cluster requires hosts restart
 func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	switch {
+	case host.HasAncestor() && host.GetAncestor().IsStopped():
+		w.a.V(1).M(host).F().Info("Host ancestor is stopped, no restart applicable. Host: %s", host.GetName())
+		return false
+
+	case host.HasAncestor() && host.GetAncestor().IsTroubleshoot():
+		w.a.V(1).M(host).F().Info("Host ancestor is in troubleshoot, no restart applicable. Host: %s", host.GetName())
+		return false
+
 	case host.IsStopped():
 		w.a.V(1).M(host).F().Info("Host is stopped, no restart applicable. Host: %s", host.GetName())
 		return false
