@@ -151,17 +151,17 @@ func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
 // shouldForceRestartHost checks whether cluster requires hosts restart
 func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	switch {
-	case host.GetCR().IsRollingUpdate():
-		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
-		return true
-
 	case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested):
 		w.a.V(1).M(host).F().Info("Host is new, no restart applicable. Host: %s", host.GetName())
 		return false
 
-	case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) && !host.HasAncestor():
-		w.a.V(1).M(host).F().Info("Host already exists, but has no ancestor, no restart applicable. Host: %s", host.GetName())
+	case !host.HasAncestor():
+		w.a.V(1).M(host).F().Info("Host has no ancestor, no restart applicable. Host: %s", host.GetName())
 		return false
+
+	case host.GetCR().IsRollingUpdate():
+		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
+		return true
 
 	case model.IsConfigurationChangeRequiresReboot(host):
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
