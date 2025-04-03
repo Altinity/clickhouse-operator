@@ -123,6 +123,13 @@ func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
 
+	case host.IsTroubleshoot():
+		w.a.V(1).
+			M(host).F().
+			Info("Host is in troubleshoot, no need to wait for replication to catch up. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return false
+
 	case host.GetShard().HostsCount() == 1:
 		w.a.V(1).
 			M(host).F().
@@ -326,24 +333,35 @@ func (w *worker) shouldExcludeHost(host *api.Host) bool {
 			Info("Host is stopped, no need to exclude stopped host. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
+
+	case host.IsTroubleshoot():
+		w.a.V(1).
+			M(host).F().
+			Info("Host is in troubleshoot, no need to exclude stopped host. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return false
+
 	case host.GetShard().HostsCount() == 1:
 		w.a.V(1).
 			M(host).F().
 			Info("Host is the only host in the shard (means no replication), no need to exclude. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
+
 	case w.shouldForceRestartHost(host):
 		w.a.V(1).
 			M(host).F().
 			Info("Host should be restarted, need to exclude. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return true
+
 	case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested):
 		w.a.V(1).
 			M(host).F().
 			Info("Host is a new one, no need to exclude. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
+
 	case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame):
 		w.a.V(1).
 			M(host).F().
