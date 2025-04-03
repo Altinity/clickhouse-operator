@@ -116,6 +116,20 @@ func (w *worker) shouldIncludeHost(host *api.Host) bool {
 
 func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 	switch {
+	case host.IsStopped():
+		w.a.V(1).
+			M(host).F().
+			Info("Host is stopped, no need to wait for replication to catch up. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return false
+
+	case host.GetShard().HostsCount() == 1:
+		w.a.V(1).
+			M(host).F().
+			Info("Host is the only host in the shard (means no replication), no need to wait for replication to catch up. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return false
+
 	case chop.Config().Reconcile.Host.Wait.Replicas.All.Value():
 		// All replicas are explicitly requested to wait for replication to catch-up
 		return true
