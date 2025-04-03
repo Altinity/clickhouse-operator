@@ -816,25 +816,30 @@ func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error
 		return err
 	}
 
+	l := w.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
+		WithAction(host.GetCR()).
+		M(host).F()
+
+	// In case host is unable to report its version we are done with inclusion
+	switch {
+	case host.IsStopped():
+		l.Info("Reconcile Host completed. Host is stopped: %s", host.GetName())
+		return nil
+	case host.IsTroubleshoot():
+		return nil
+		l.Info("Reconcile Host completed. Host is in troubleshoot mode: %s", host.GetName())
+	}
+
 	// Ensure host is running and accessible and what version is available.
 	// Sometimes service needs some time to start after creation|modification before being accessible for usage
 	// However, it is expected to have host up and running at this point
 	version, err := w.pollHostForClickHouseVersion(ctx, host)
 	if err != nil {
-		w.a.V(1).
-			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
-			WithAction(host.GetCR()).
-			M(host).F().
-			Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
-
+		l.Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
 		return err
 	}
 
-	w.a.V(1).
-		WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
-		WithAction(host.GetCR()).
-		M(host).F().
-		Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
-
+	l.Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
 	return nil
 }
