@@ -134,7 +134,7 @@ func (c *Creator) stsSetupHostAliases(statefulSet *apps.StatefulSet, host *api.H
 
 // stsAppContainerSetupTroubleshootingMode
 func (c *Creator) stsAppContainerSetupTroubleshootingMode(statefulSet *apps.StatefulSet, host *api.Host) {
-	if !host.GetCR().IsTroubleshoot() {
+	if !host.IsTroubleshoot() {
 		// We are not troubleshooting
 		return
 	}
