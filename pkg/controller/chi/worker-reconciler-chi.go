@@ -319,21 +319,18 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
-	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
-	version := w.getHostSoftwareVersion(ctx, host)
-
-	host.Runtime.Version = version
-	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
-
-	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), version.Render())
+	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. App version: %s", host.GetName(), host.Runtime.Version.Render())
 
 	// Start with force-restart host
 	if w.shouldForceRestartHost(host) {
+		w.a.V(1).M(host).F().Info("Reconcile host STS force restart: %s", host.GetName())
 		_ = w.hostForceRestart(ctx, host, opts)
 	}
 
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
-	w.a.V(1).M(host).F().Info("Reconcile host: %s. Reconcile StatefulSet", host.GetName())
+	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. Reconcile StatefulSet", host.GetName())
 	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, true, opts)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
@@ -630,7 +627,11 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	}
 
 	// Create artifacts
-	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+	version := w.getHostSoftwareVersion(ctx, host)
+	host.Runtime.Version = version
+	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), host.Runtime.Version.Render())
 
 	if err := w.reconcileHostPrepare(ctx, host); err != nil {
 		return err
