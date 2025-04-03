@@ -44,7 +44,7 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *sw
 	tag, tagOk := w.task.Creator().GetAppImageTag(host)
 
 	if skip, description := opts.shouldSkip(host); skip {
-		// Need to report version from the tag
+		w.a.V(1).M(host).F().Info("Need to report version from the tag. Tag: %s Host: %s ", tag, host.GetName())
 		if tagOk {
 			if version := swversion.NewSoftWareVersionFromTag(tag); version != nil {
 				// Able to report version from the tag
