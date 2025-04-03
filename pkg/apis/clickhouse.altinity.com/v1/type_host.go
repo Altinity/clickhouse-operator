@@ -345,6 +345,11 @@ func (host *Host) IsStopped() bool {
 	return host.GetCR().IsStopped()
 }
 
+// IsTroubleshoot checks whether host is in troubleshoot
+func (host *Host) IsTroubleshoot() bool {
+	return host.GetCR().IsTroubleshoot()
+}
+
 // IsInNewCluster checks whether host is in a new cluster
 // TODO unify with model HostIsNewOne
 func (host *Host) IsInNewCluster() bool {
