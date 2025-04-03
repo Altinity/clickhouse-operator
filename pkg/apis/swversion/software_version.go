@@ -53,7 +53,7 @@ func NewSoftWareVersion(version string) *SoftWareVersion {
 	}
 
 	// Take first 3 parts and ensure they are digits
-	parts = parts[0:2]
+	parts = parts[0:3]
 	for _, part := range parts {
 		if _, err := strconv.Atoi(part); err != nil {
 			return nil
