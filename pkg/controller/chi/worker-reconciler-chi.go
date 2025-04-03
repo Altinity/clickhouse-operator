@@ -106,6 +106,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 			WithError(new).
 			M(new).F().
 			Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
+		err = common.ErrCRUDAbort
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 		if errors.Is(err, common.ErrCRUDAbort) {
 			metrics.CHIReconcilesAborted(ctx, new)
@@ -837,10 +838,10 @@ func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error
 	// However, it is expected to have host up and running at this point
 	version, err := w.pollHostForClickHouseVersion(ctx, host)
 	if err != nil {
-		l.Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
+		l.Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version", host.GetName())
 		return err
 	}
 
-	l.Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
+	l.Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version.Render())
 	return nil
 }
