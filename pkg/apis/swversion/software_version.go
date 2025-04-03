@@ -26,7 +26,7 @@ import (
 type SoftWareVersion struct {
 	// Version specifies original software version, such as 21.9.6.24-alpha
 	Version string
-	// Semver specifies semver adaptation, truncated to 3 numbers, such as 21.9.6 for 21.9.6.24-alpha original version
+	// Semver specifies semver - version truncated to 3 numbers, such as 21.9.6 for 21.9.6.24-alpha
 	Semver string
 	// Description specifies description if needed
 	Description string
@@ -111,7 +111,7 @@ func (v *SoftWareVersion) IsUnknown() bool {
 	if v == nil {
 		return true
 	}
-	if len(v.Version) == 0 {
+	if len(v.Semver) == 0 {
 		return true
 	}
 	return false
@@ -130,7 +130,7 @@ func (v *SoftWareVersion) String() string {
 	if v == nil {
 		return ""
 	}
-	return v.Version
+	return v.Semver
 }
 
 // Render makes a string
@@ -138,5 +138,5 @@ func (v *SoftWareVersion) Render() string {
 	if v == nil {
 		return ""
 	}
-	return v.String() + "[" + v.Description + "]"
+	return v.Semver + "[" + v.Version + "/" + v.Description + "]"
 }
