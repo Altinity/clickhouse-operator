@@ -113,6 +113,10 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 		// Stopped host is not able to receive any data, migration is inapplicable
 		return false
 
+	case host.IsTroubleshoot():
+		// Troubleshooted host is not able to receive any data, migration is inapplicable
+		return false
+
 	case o.ForceMigrate():
 		// Force migration requested
 		return true
