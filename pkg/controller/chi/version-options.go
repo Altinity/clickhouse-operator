@@ -30,16 +30,6 @@ type Skip struct {
 
 func (opts versionOptions) shouldSkip(host *api.Host) (bool, string) {
 	switch {
-	case host.IsStopped():
-		if opts.Skip.Stopped {
-			return true, "host is stopped, version cannot be fetched"
-		}
-
-	case host.IsTroubleshoot():
-		if opts.Skip.Stopped {
-			return true, "host is in troubleshoot, version cannot be fetched"
-		}
-
 	case !host.HasAncestor():
 		if opts.Skip.New {
 			return true, "host is a new one, version cannot be fetched"
@@ -48,6 +38,11 @@ func (opts versionOptions) shouldSkip(host *api.Host) (bool, string) {
 	case host.HasAncestor() && host.GetAncestor().IsStopped():
 		if opts.Skip.StoppedAncestor {
 			return true, "host ancestor is stopped, version is not applicable"
+		}
+
+	case host.HasAncestor() && host.GetAncestor().IsTroubleshoot():
+		if opts.Skip.StoppedAncestor {
+			return true, "host ancestor is troubleshoot, version is not applicable"
 		}
 	}
 
