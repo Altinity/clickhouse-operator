@@ -106,6 +106,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 			WithError(new).
 			M(new).F().
 			Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
+		err = common.ErrCRUDAbort
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 		if errors.Is(err, common.ErrCRUDAbort) {
 			metrics.CHIReconcilesAborted(ctx, new)
@@ -319,19 +320,18 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
-	version := w.getHostSoftwareVersion(ctx, host)
-	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
-
-	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), version)
+	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. App version: %s", host.GetName(), host.Runtime.Version.Render())
 
 	// Start with force-restart host
 	if w.shouldForceRestartHost(host) {
+		w.a.V(1).M(host).F().Info("Reconcile host STS force restart: %s", host.GetName())
 		_ = w.hostForceRestart(ctx, host, opts)
 	}
 
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
-	w.a.V(1).M(host).F().Info("Reconcile host: %s. Reconcile StatefulSet", host.GetName())
-	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
+	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. Reconcile StatefulSet", host.GetName())
 	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, true, opts)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
@@ -367,12 +367,14 @@ func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *sta
 func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error {
 	w.a.V(1).M(host).F().Info("Host software restart start. Host: %s", host.GetName())
 
+	// Get restart counters - they'll be used to check restart success
 	restarts, err := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 1. Host: %s err: %v", host.GetName(), err)
 		return err
 	}
 
+	// Issue SQL shutdown command - expect host to shutdown and pod be restarted by k8s
 	err = w.ensureClusterSchemer(host).HostShutdown(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 2. Host: %s err: %v", host.GetName(), err)
@@ -380,6 +382,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software shutdown ok. Host: %s", host.GetName())
 
+	// Wait for restart counters to change
 	err = w.waitHostRestart(ctx, host, restarts)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 3. Host: %s err: %v", host.GetName(), err)
@@ -387,6 +390,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software restart ok. Host: %s", host.GetName())
 
+	// Wait for pod to start
 	err = w.waitHostIsStarted(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 4. Host: %s is not started", host.GetName())
@@ -394,6 +398,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software pod is started. Host: %s ", host.GetName())
 
+	// Ensure pod is running
 	err = w.waitHostIsRunning(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 5. Host: %s is not running", host.GetName())
@@ -401,6 +406,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software pod is running. Host: %s ", host.GetName())
 
+	// Ensure pod is ready
 	err = w.waitHostIsReady(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 6. Host: %s is not ready", host.GetName())
@@ -408,19 +414,22 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	}
 	w.a.V(1).M(host).F().Info("Host software pod is ready. Host: %s ", host.GetName())
 
-	err = w.getHostSoftwareVersionErr(ctx, host)
+	// At this stage we'd expect to have software up and able to respond
+	err = w.isHostSoftwareAbleToRespond(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 7. Host: %s err: %v", host.GetName(), err)
 		return err
 	}
 	w.a.V(1).M(host).F().Info("Host software version ok. Host: %s ", host.GetName())
 
+	// However, some containers within the pod may still have flapping problems and be in CrashLoopBackOff
 	if w.isPodCrushed(host) {
 		w.a.V(1).M(host).F().Info("Host software restart abort 8. Host: %s is crushed", host.GetName())
 		return fmt.Errorf("host is crushed")
 	}
 	w.a.V(1).M(host).F().Info("Host software is not crushed. Host: %s ", host.GetName())
 
+	// Check whole pod health
 	if !w.isPodOK(ctx, host) {
 		w.a.V(1).M(host).F().Info("Host software restart abort 9. Host: %s is not ok", host.GetName())
 		return fmt.Errorf("host is not ok")
@@ -428,6 +437,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	w.a.V(1).M(host).F().Info("Host software pod is ok. Host: %s ", host.GetName())
 
 	w.a.V(1).M(host).F().Info("Host software restart success. Host: %s", host.GetName())
+
 	return nil
 }
 
@@ -618,7 +628,11 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	}
 
 	// Create artifacts
-	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+	version := w.getHostSoftwareVersion(ctx, host)
+	host.Runtime.Version = version
+	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), host.Runtime.Version.Render())
 
 	if err := w.reconcileHostPrepare(ctx, host); err != nil {
 		return err
@@ -631,7 +645,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
 	}
-	if err := w.reconcileHostBootstrap(ctx, host); err != nil {
+	if err := w.reconcileHostInclude(ctx, host); err != nil {
 		return err
 	}
 
@@ -743,25 +757,60 @@ func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.
 	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 }
 
-func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, migrateTableOpts *migrateTableOptions) error {
-	// Prepare for tables migration.
-	// Sometimes service needs significant time to start after creation/modification before being accessible for usage
-	// Check whether ClickHouse is running and accessible and what version is available.
-	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
-		w.a.V(1).
-			M(host).F().
-			Info("Check host for ClickHouse availability before migrating tables. Host: %s ClickHouse version running: %s", host.GetName(), version)
-	} else {
-		w.a.V(1).
-			M(host).F().
-			Warning("Check host for ClickHouse availability before migrating tables. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
+func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *migrateTableOptions) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
 	}
-	return w.migrateTables(ctx, host, migrateTableOpts)
+
+	if !w.shouldMigrateTables(host, opts) {
+		w.a.V(1).
+			M(host).F().
+			Info(
+				"No need to add tables on host %d to shard %d in cluster %s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return nil
+	}
+
+	// Need to migrate tables
+
+	// Prepare for tables migration.
+	// Ensure host is running and accessible and what version is available.
+	// Sometimes service needs some time to start after creation|modification before being accessible for usage
+	// However, it is expected to have host up and running at this point
+	version, err := w.pollHostForClickHouseVersion(ctx, host)
+	if err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Check host for ClickHouse availability before migrating tables. Host: %s Failed to get ClickHouse version. Err: %s", host.GetName(), err)
+		return err
+	}
+
+	w.a.V(1).
+		M(host).F().
+		Info("Check host for ClickHouse availability before migrating tables. Host: %s ClickHouse version available: %s", host.GetName(), version)
+
+	return w.migrateTables(ctx, host, opts)
 }
 
-// reconcileHostBootstrap reconciles specified ClickHouse host
-func (w *worker) reconcileHostBootstrap(ctx context.Context, host *api.Host) error {
-	if err := w.includeHost(ctx, host); err != nil {
+// reconcileHostInclude includes specified ClickHouse host into all activities
+func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	if !w.shouldIncludeHost(host) {
+		w.a.V(1).
+			M(host).F().
+			Info("No need to include host into cluster. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return nil
+	}
+
+	// Include host back into all activities - such as cluster, service, etc
+	err := w.includeHost(ctx, host)
+	if err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
@@ -769,21 +818,23 @@ func (w *worker) reconcileHostBootstrap(ctx context.Context, host *api.Host) err
 		return err
 	}
 
-	// Ensure host is running and accessible and what version is available.
-	// Sometimes service needs some time to start after creation|modification before being accessible for usage
-	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
-		w.a.V(1).
-			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
-			WithAction(host.GetCR()).
-			M(host).F().
-			Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
-	} else {
-		w.a.V(1).
-			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
-			WithAction(host.GetCR()).
-			M(host).F().
-			Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
+	l := w.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
+		WithAction(host.GetCR()).
+		M(host).F()
+
+	// In case host is unable to report its version we are done with inclusion
+	switch {
+	case host.IsStopped():
+		l.Info("Reconcile Host completed. Host is stopped: %s", host.GetName())
+		return nil
+	case host.IsTroubleshoot():
+		return nil
+		l.Info("Reconcile Host completed. Host is in troubleshoot mode: %s", host.GetName())
 	}
 
+	// Report host software version
+	version := w.getHostSoftwareVersion(ctx, host, &VersionOptions{})
+	l.Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version.Render())
 	return nil
 }

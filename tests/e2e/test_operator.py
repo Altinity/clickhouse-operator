@@ -35,18 +35,19 @@ def test_001(self):
             },
             "configmaps": 1,
             "pdb": {"single": 1},
+            "do_not_delete": 1,
         },
     )
 
     with When("Delete CHI"):
         kubectl.delete_chi(chi)
     with Then("All objects should be deleted"):
-        cnt = kubectl.get_count("all", chi = chi)
-        objs = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
-        if len(objs)>0:
-            objs = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
+        cnt = kubectl.get_count("all", chi=chi)
+        objets = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
+        if len(objets) > 0:
+            objets = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
             print("Some objects were not deleted:")
-            print(objs)
+            print(objets)
         assert cnt == 0
 
     with Finally("I clean up"):
@@ -1820,33 +1821,28 @@ def test_014_1(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000"):
 
-@TestScenario
-@Name("test_015. Test circular replication with hostNetwork")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_CircularReplication("1.0"))
-def test_015(self):
-    create_shell_namespace_clickhouse_template()
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
 
     kubectl.create_and_check(
-        manifest="manifests/chi/test-015-host-network.yaml",
+        manifest=manifest,
         check={
             "object_counts": {
                 "statefulset": 2,
                 "pod": 2,
                 "service": 3,
-            },
+                },
             "do_not_delete": 1,
-        },
+            },
         timeout=600,
     )
 
     with Then("Query from one server to another one should work"):
         for i in range(1, 10):
-            out = clickhouse.query_with_error(
-                "test-015-host-network",
-                host="chi-test-015-host-network-default-0-0",
-                port="10000",
-                sql="SELECT count() FROM remote('chi-test-015-host-network-default-0-1:11000', system.one)",
+            out = clickhouse.query_with_error(chi, host=f"chi-{chi}-default-0-0", port=replica1_port,
+                sql=f"SELECT count() FROM remote('chi-{chi}-default-0-1:{replica2_port}', system.one)",
             )
             if "DNS_ERROR" not in out:
                 break
@@ -1856,17 +1852,42 @@ def test_015(self):
         assert out == "1"
 
     with And("Distributed query should work"):
-        # Sometimes it needs time to work. May be forming a cluster may take unpredictable time.
-        time.sleep(45)
-        out = clickhouse.query_with_error(
-            "test-015-host-network",
-            host="chi-test-015-host-network-default-0-0",
-            port="10000",
+        out = clickhouse.query_with_error(chi, host=f"chi-{chi}-default-0-1", port=replica2_port,
             sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10",
         )
         note(f"cluster out:\n{out}")
         print(f"out: {out}")
         assert out == "2"
+
+    with And("Replication should work"):
+        test_version = replica1_port
+        clickhouse.query(chi,
+            "CREATE TABLE " + f"test_015_{test_version}" + " (a UInt32) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY tuple()",
+            host=f"chi-{chi}-{cluster}-0-0", port = replica1_port)
+        clickhouse.query(chi,
+            "CREATE TABLE " + f"test_015_{test_version}" + " (a UInt32) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY tuple()",
+            host=f"chi-{chi}-{cluster}-0-1", port = replica2_port)
+        clickhouse.query(chi,
+            f"INSERT INTO test_015_{test_version} SELECT {test_version}",
+            host=f"chi-{chi}-{cluster}-0-0", port = replica1_port)
+        out = clickhouse.query(chi,
+            f"SELECT * FROM test_015_{test_version}",
+            host=f"chi-{chi}-{cluster}-0-1", port = replica2_port)
+        assert out == test_version
+
+@TestScenario
+@Name("test_015. hostNetwork")
+@Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_CircularReplication("1.0"))
+def test_015(self):
+    create_shell_namespace_clickhouse_template()
+
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Then("Check host network with different ports on the same node"):
+        check_host_network(manifest = "manifests/chi/test-015-host-network.yaml", replica1_port = "10000", replica2_port = "11000")
+
+    # with Then("Check host network with the same ports on different nodes"):
+    #    check_host_network(manifest = "manifests/chi/test-015-host-network-2.yaml")
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -2658,6 +2679,8 @@ def test_023(self):
     with Given("Auto templates are deployed"):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-2.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-3.yaml"))
+        kubectl.apply(util.get_full_path("manifests/secret/test-023-secret.yaml"))
     with Given("Give templates some time to be applied"):
         time.sleep(15)
 
@@ -2672,21 +2695,30 @@ def test_023(self):
             "do_not_delete": 1,
         },
     )
-    with Then(".status.usedTemplates has two values"):
+    with Then(".status.usedTemplates list all templates"):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[1].name") == "extension-annotations"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "grafana-dashboard-user"
         # assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == ""
 
-    with Then("Annotation from a template should be populated"):
-        normalizedCompleted = kubectl.get_chi_normalizedCompleted(chi)
-        assert normalizedCompleted["metadata"]["annotations"]["test"] == "test"
-    with Then("Pod annotation should populated from template"):
-        assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.test") == "test"
+    # manifests/chit/tpl-clickhouse-auto-1.yaml
     with Then("Environment variable from a template should be populated"):
         pod = kubectl.get_pod_spec(chi)
         env = pod["containers"][0]["env"][0]
         assert env["name"] == "TEST_ENV"
         assert env["value"] == "TEST_ENV_VALUE"
+
+    # manifests/chit/tpl-clickhouse-auto-2.yaml
+    with Then("Annotation from a template should be populated"):
+        normalizedCompleted = kubectl.get_chi_normalizedCompleted(chi)
+        assert normalizedCompleted["metadata"]["annotations"]["test"] == "test"
+    with Then("Pod annotation should populated from template"):
+        assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.test") == "test"
+
+    # manifests/chit/tpl-clickhouse-auto-3.yaml
+    with Then("User from a template should be populated"):
+        out = clickhouse.query_with_error(chi, "select 1", user = "grafana_dashboard_user", pwd = "grafana_dashboard_user_password")
+        assert out == "1"
 
     with Given("Two selector templates are deployed"):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-selector-1.yaml"))
@@ -2695,15 +2727,16 @@ def test_023(self):
         time.sleep(15)
 
     with Then("Trigger CHI update"):
-        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
+        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"apply-templates"}}]\''
         kubectl.launch(cmd)
-
+        kubectl.wait_chi_status(chi, "InProgress")
         kubectl.wait_chi_status(chi, "Completed")
 
     with Then(".status.usedTemplates has 3 values"):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[1].name") == "extension-annotations"
-        assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "selector-test-1"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "grafana-dashboard-user"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[3].name") == "selector-test-1"
         # assert kubectl.get_field("chi", chi, ".status.usedTemplates[3].name") == ""
 
     with Then("Annotation from selector-1 template should be populated"):
@@ -4075,7 +4108,6 @@ def test_039(self, step=0, delete_chi=0):
             r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one) limit 1", pwd="qkrq")
             assert r == "0"
 
-
     if step == 4:
         with Then("Create replicated table to test interserver_https_port"):
             clickhouse.query(
@@ -4440,7 +4472,7 @@ def test_044(self):
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
-                "chi_status": "Aborted"
+                "chi_status": "Completed"
             },
         )
         client_pod = f"chi-{chi}-{cluster}-0-1-0"

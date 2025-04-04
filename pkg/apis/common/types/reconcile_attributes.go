@@ -26,13 +26,13 @@ const (
 // ReconcileAttributes defines reconcile status and attributes
 type ReconcileAttributes struct {
 	status ObjectStatus
-	tags Tags
+	tags   Tags
 }
 
 // NewReconcileAttributes creates new reconcile attributes
 func NewReconcileAttributes() *ReconcileAttributes {
 	return &ReconcileAttributes{
-		status:  ObjectStatusUnknown,
+		status: ObjectStatusUnknown,
 	}
 }
 
@@ -47,7 +47,7 @@ func (a *ReconcileAttributes) HasIntersectionWith(b *ReconcileAttributes) bool {
 	switch {
 	case a.GetStatus().Is(b.GetStatus()):
 		return true
-	case a.tags.HaveIntersection(b.tags):
+	case a.tags.HasIntersectionWith(b.tags):
 		return true
 	}
 	return false
@@ -121,7 +121,6 @@ func (a *ReconcileAttributes) IsLowPriority() bool {
 	}
 	return a.tags.Has(TagLowPriority)
 }
-
 
 // String returns string form
 func (a *ReconcileAttributes) String() string {

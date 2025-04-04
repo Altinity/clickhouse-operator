@@ -593,6 +593,11 @@ func (in *Status) DeepCopyInto(out *Status) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.HostsWithReplicaCaughtUp != nil {
+		in, out := &in.HostsWithReplicaCaughtUp, &out.HostsWithReplicaCaughtUp
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.UsedTemplates != nil {
 		in, out := &in.UsedTemplates, &out.UsedTemplates
 		*out = make([]*clickhousealtinitycomv1.TemplateRef, len(*in))

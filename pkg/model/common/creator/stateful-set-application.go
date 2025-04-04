@@ -134,7 +134,7 @@ func (c *Creator) stsSetupHostAliases(statefulSet *apps.StatefulSet, host *api.H
 
 // stsAppContainerSetupTroubleshootingMode
 func (c *Creator) stsAppContainerSetupTroubleshootingMode(statefulSet *apps.StatefulSet, host *api.Host) {
-	if !host.GetCR().IsTroubleshoot() {
+	if !host.IsTroubleshoot() {
 		// We are not troubleshooting
 		return
 	}
@@ -180,6 +180,10 @@ func (c *Creator) stsSetupLogContainer(statefulSet *apps.StatefulSet, host *api.
 // stsGetAppContainer is a unification wrapper
 func (c *Creator) stsGetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return c.cm.GetAppContainer(statefulSet)
+}
+
+func (c *Creator) GetAppImageTag(host *api.Host) (string, bool) {
+	return c.cm.GetAppImageTag(host.Runtime.DesiredStatefulSet)
 }
 
 // stsEnsureAppContainerNamedPortsSpecified

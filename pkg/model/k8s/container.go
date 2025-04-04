@@ -15,6 +15,7 @@
 package k8s
 
 import (
+	docker "github.com/novln/docker-parser"
 	core "k8s.io/api/core/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -113,4 +114,15 @@ func ContainerEnsurePortByName(container *core.Container, name string, port int3
 		Name:          name,
 		ContainerPort: port,
 	})
+}
+
+func ContainerGetImageTag(container *core.Container) (string, bool) {
+	if container == nil {
+		return "", false
+	}
+	parts, err := docker.Parse(container.Image)
+	if err != nil {
+		return "", false
+	}
+	return parts.Tag(), true
 }

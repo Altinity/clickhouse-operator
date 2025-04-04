@@ -102,13 +102,14 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) types.ObjectStatus {
 
 	cur, err := r.sts.Get(context.TODO(), new)
 	switch {
-	case cur != nil:
+	case (err == nil) && (cur != nil):
+		// StatefulSet is found
 		r.a.V(1).M(new).Info("Have StatefulSet available, try to perform label-based comparison for sts: %s", util.NamespaceNameString(new))
 		return common.GetObjectStatusFromMetas(r.labeler, cur, new)
 
 	case apiErrors.IsNotFound(err):
 		// StatefulSet is not found at the moment.
-		// However, it may be just deleted
+		// It is either new or - however - it may be just deleted
 		r.a.V(1).M(new).Info("No cur StatefulSet available and the reason is - not found. Either new one or a deleted sts: %s", util.NamespaceNameString(new))
 		if host.HasAncestor() {
 			r.a.V(1).M(new).Warning("No cur StatefulSet available but host has an ancestor. Found deleted sts. for: %s", util.NamespaceNameString(new))
@@ -118,7 +119,10 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) types.ObjectStatus {
 		return types.ObjectStatusRequested
 
 	default:
+		// Other error
 		r.a.V(1).M(new).Warning("Have no StatefulSet available, nor it is not found. sts: %s err: %v", util.NamespaceNameString(new), err)
+		r.a.V(2).M(new).Info("host sts cur: %s", cur)
+		r.a.V(2).M(new).Info("host sts err: %s", err)
 		return types.ObjectStatusUnknown
 	}
 }

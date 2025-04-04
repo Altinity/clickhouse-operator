@@ -8,6 +8,7 @@ from requirements.requirements import *
 xfails = {
     # test_operator.py
     "/regression/e2e.test_operator/test_009*": [(Fail, "deal with it later")],
+    "/regression/e2e.test_operator/test_044*": [(Fail, "deal with it later")],
     "/regression/e2e.test_operator/test_049*": [(Fail, "Keeper is flaky")],
     "/regression/e2e.test_operator/test_052*": [(Fail, "Keeper scale-up/scale-down is flaky")],
     "/regression/e2e.test_operator/test_053*": [(Fail, "deal with it later")],

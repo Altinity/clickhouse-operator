@@ -254,6 +254,12 @@ spec:
                   nullable: true
                   items:
                     type: string
+                hostsWithReplicaCaughtUp:
+                  type: array
+                  description: "List of hosts with replica caught up"
+                  nullable: true
+                  items:
+                    type: string
                 usedTemplates:
                   type: array
                   description: "List of templates used to build this CHI"
@@ -407,7 +413,7 @@ spec:
                       description: |
                         define should replicas be specified by FQDN in `<host></host>`.
                         In case of "no" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup
-                        "yes" by default
+                        "no" by default
                     distributedDDL:
                       type: object
                       description: |

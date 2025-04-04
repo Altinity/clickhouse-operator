@@ -16,39 +16,71 @@ package chi
 
 import (
 	"context"
+	"math"
+	"sync"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"math"
-	"sync"
 )
 
-func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) string {
-	version, _ := w.getHostClickHouseVersion(
-		ctx,
-		host,
-		versionOptions{
-			skipNew:             true,
-			skipStoppedAncestor: true,
-		},
-	)
-	return version
+const (
+	knownVersion   = "ok to query CH"
+	unknownVersion = "failed to query CH"
+)
+
+func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host, _opts ...*VersionOptions) *swversion.SoftWareVersion {
+	var opts *VersionOptions
+	if len(_opts) > 0 {
+		opts = _opts[0]
+	} else {
+		opts = &VersionOptions{
+			Skip{
+				New:             true,
+				StoppedAncestor: true,
+			},
+		}
+	}
+
+	// Fetch tag from the image
+	tag, tagOk := w.task.Creator().GetAppImageTag(host)
+
+	if skip, description := opts.shouldSkip(host); skip {
+		w.a.V(1).M(host).F().Info("Need to report version from the tag. Tag: %s Host: %s ", tag, host.GetName())
+		if tagOk {
+			if version := swversion.NewSoftWareVersionFromTag(tag); version != nil {
+				// Able to report version from the tag
+				return version.SetDescription(description)
+			}
+		}
+
+		// Unable to report version from the tag - report min one
+		return swversion.MinVersion().SetDescription(description)
+	}
+
+	// Try to report version from the app
+
+	if version, err := w.getHostClickHouseVersion(ctx, host); err == nil {
+		// Able to fetch version from the app - report version
+		return version.SetDescription(knownVersion)
+	}
+
+	// Unable to fetch version fom the app - report min one
+	return swversion.MinVersion().SetDescription(unknownVersion)
 }
 
-func (w *worker) getHostSoftwareVersionErr(ctx context.Context, host *api.Host) error {
-	version, err := w.getHostClickHouseVersion(
-		ctx,
-		host,
-		versionOptions{},
-	)
-	if err == nil {
-		w.a.V(1).M(host).F().Info("Host software version detected. Host: %s version: %s", host.GetName(), version)
-	} else {
-		w.a.V(1).M(host).F().Info("Host software version NOT detected. Host: %s Err: %v", host.GetName(), err)
+func (w *worker) isHostSoftwareAbleToRespond(ctx context.Context, host *api.Host) error {
+	// Check whether the software is able to respond its version
+	version, err := w.getHostClickHouseVersion(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software is not alive - version NOT detected. Host: %s Err: %v", host.GetName(), err)
 	}
-	return err
+
+	w.a.V(1).M(host).F().Info("Host software is alive - version detected. Host: %s version: %s", host.GetName(), version)
+	return nil
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile

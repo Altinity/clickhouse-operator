@@ -135,6 +135,10 @@ const (
 	OnStatefulSetUpdateFailureActionIgnore = "ignore"
 )
 
+const (
+	defaultMaxReplicationDelay = 10
+)
+
 // OperatorConfig specifies operator configuration
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
@@ -389,9 +393,16 @@ type OperatorConfigReconcileHost struct {
 
 // OperatorConfigReconcileHostWait defines reconcile host wait config
 type OperatorConfigReconcileHostWait struct {
-	Exclude *types.StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
-	Queries *types.StringBool `json:"queries,omitempty" yaml:"queries,omitempty"`
-	Include *types.StringBool `json:"include,omitempty" yaml:"include,omitempty"`
+	Exclude  *types.StringBool                        `json:"exclude,omitempty"  yaml:"exclude,omitempty"`
+	Queries  *types.StringBool                        `json:"queries,omitempty"  yaml:"queries,omitempty"`
+	Include  *types.StringBool                        `json:"include,omitempty"  yaml:"include,omitempty"`
+	Replicas *OperatorConfigReconcileHostWaitReplicas `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+}
+
+type OperatorConfigReconcileHostWaitReplicas struct {
+	All   *types.StringBool `json:"all,omitempty"   yaml:"all,omitempty"`
+	New   *types.StringBool `json:"new,omitempty"   yaml:"new,omitempty"`
+	Delay *types.Int32      `json:"delay,omitempty" yaml:"delay,omitempty"`
 }
 
 // OperatorConfigAnnotation specifies annotation section
@@ -802,6 +813,18 @@ func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
 	}
 }
 
+func (c *OperatorConfig) normalizeSectionReconcileHost() {
+	// Timeouts
+	if c.Reconcile.Host.Wait.Replicas == nil {
+		c.Reconcile.Host.Wait.Replicas = &OperatorConfigReconcileHostWaitReplicas{}
+	}
+
+	if c.Reconcile.Host.Wait.Replicas.Delay == nil {
+		// Default update timeout in seconds
+		c.Reconcile.Host.Wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
+	}
+}
+
 func (c *OperatorConfig) normalizeSectionClickHouseConfigurationUserDefault() {
 	// Default values for ClickHouse user configuration
 	// 1. user/profile
@@ -944,8 +967,9 @@ func (c *OperatorConfig) normalize() {
 	c.normalizeSectionClickHouseMetrics()
 	c.normalizeSectionKeeperConfigurationFile()
 	c.normalizeSectionTemplate()
-	c.normalizeSectionReconcileStatefulSet()
 	c.normalizeSectionReconcileRuntime()
+	c.normalizeSectionReconcileStatefulSet()
+	c.normalizeSectionReconcileHost()
 	c.normalizeSectionLogger()
 	c.normalizeSectionLabel()
 	c.normalizeSectionStatefulSet()

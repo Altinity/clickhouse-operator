@@ -18,33 +18,18 @@ spec:
       - name: default
         layout:
           shardsCount: 1
-          replicas:
-            - templates:
-                hostTemplate: replica-0
-            - templates:
-                hostTemplate: replica-1
-
+          replicasCount: 2
   templates:
-    hostTemplates:
-      - name: replica-0
-        spec:
-          tcpPort: 10000
-          httpPort: 10001
-          interserverHTTPPort: 10002
-      - name: replica-1
-        spec:
-          tcpPort: 11000
-          httpPort: 11001
-          interserverHTTPPort: 11002
-
     podTemplates:
       - name: pod-distribution
         # podDistribution:
-        # - type: CircularReplication
+        #  - scope: ClickHouseInstallation
+        #    type: ClickHouseAntiAffinity
         spec:
           hostNetwork: true
           dnsPolicy: ClusterFirstWithHostNet
           containers:
             - name: clickhouse-pod
               image: clickhouse/clickhouse-server:24.8
+
 

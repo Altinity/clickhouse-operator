@@ -18,30 +18,31 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-const unknownVersion = "failed to query"
-
-type versionOptions struct {
-	skipNew             bool
-	skipStopped         bool
-	skipStoppedAncestor bool
+type VersionOptions struct {
+	Skip
 }
 
-func (opts versionOptions) shouldSkip(host *api.Host) (bool, string) {
-	if opts.skipNew {
-		if !host.HasAncestor() {
-			return true, "host is a new one, version is not not applicable"
-		}
-	}
+type Skip struct {
+	New             bool
+	Stopped         bool
+	StoppedAncestor bool
+}
 
-	if opts.skipStopped {
-		if host.IsStopped() {
-			return true, "host is stopped, version is not applicable"
+func (opts *VersionOptions) shouldSkip(host *api.Host) (bool, string) {
+	switch {
+	case !host.HasAncestor():
+		if opts.Skip.New {
+			return true, "host is a new one, version cannot be fetched"
 		}
-	}
 
-	if opts.skipStoppedAncestor {
-		if host.HasAncestor() && host.GetAncestor().IsStopped() {
+	case host.HasAncestor() && host.GetAncestor().IsStopped():
+		if opts.Skip.StoppedAncestor {
 			return true, "host ancestor is stopped, version is not applicable"
+		}
+
+	case host.HasAncestor() && host.GetAncestor().IsTroubleshoot():
+		if opts.Skip.StoppedAncestor {
+			return true, "host ancestor is troubleshoot, version is not applicable"
 		}
 	}
 

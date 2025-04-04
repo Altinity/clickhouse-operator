@@ -248,6 +248,12 @@ spec:
                   nullable: true
                   items:
                     type: string
+                hostsWithReplicaCaughtUp:
+                  type: array
+                  description: "List of hosts with replica caught up"
+                  nullable: true
+                  items:
+                    type: string
                 usedTemplates:
                   type: array
                   description: "List of templates used to build this CHI"
@@ -439,7 +445,7 @@ spec:
                       description: |
                         define should replicas be specified by FQDN in `<host></host>`.
                         In case of "no" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup
-                        "yes" by default
+                        "no" by default
                     distributedDDL:
                       type: object
                       description: |
@@ -542,6 +548,9 @@ spec:
                               secure:
                                 <<: *TypeStringBool
                                 description: "if a secure connection to Zookeeper is required"
+                              availabilityZone:
+                                type: string
+                                description: "availability zone for Zookeeper node"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
@@ -1542,6 +1551,12 @@ spec:
                   nullable: true
                   items:
                     type: string
+                hostsWithReplicaCaughtUp:
+                  type: array
+                  description: "List of hosts with replica caught up"
+                  nullable: true
+                  items:
+                    type: string
                 usedTemplates:
                   type: array
                   description: "List of templates used to build this CHI"
@@ -1733,7 +1748,7 @@ spec:
                       description: |
                         define should replicas be specified by FQDN in `<host></host>`.
                         In case of "no" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup
-                        "yes" by default
+                        "no" by default
                     distributedDDL:
                       type: object
                       description: |
@@ -1836,6 +1851,9 @@ spec:
                               secure:
                                 <<: *TypeStringBool
                                 description: "if a secure connection to Zookeeper is required"
+                              availabilityZone:
+                                type: string
+                                description: "availability zone for Zookeeper node"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
@@ -2913,6 +2931,19 @@ spec:
                             include:
                               <<: *TypeStringBool
                               description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
+                            replicas:
+                              type: object
+                              description: "Whether the operator during reconcile procedure should wait for replicas to catch-up"
+                              properties:
+                                all:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for all replicas to catch-up"
+                                new:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for new replicas to catch-up"
+                                delay:
+                                  type: integer
+                                  description: "replication max absolute delay to consider replica is not delayed"
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
@@ -3299,6 +3330,12 @@ spec:
                   nullable: true
                   items:
                     type: string
+                hostsWithReplicaCaughtUp:
+                  type: array
+                  description: "List of hosts with replica caught up"
+                  nullable: true
+                  items:
+                    type: string
                 usedTemplates:
                   type: array
                   description: "List of templates used to build this CHI"
@@ -3452,7 +3489,7 @@ spec:
                       description: |
                         define should replicas be specified by FQDN in `<host></host>`.
                         In case of "no" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup
-                        "yes" by default
+                        "no" by default
                     distributedDDL:
                       type: object
                       description: |
@@ -4372,11 +4409,11 @@ data:
     
       ################################################
       ##
-      ## Additional sections
+      ## Addons specifies additional configuration sections
       ## Should it be called something like "templates"?
       ##
       ################################################
-      additions:
+      addons:
         rules:
           - version: "*"
             spec:
@@ -4551,6 +4588,10 @@ data:
           exclude: true
           queries: true
           include: false
+          replicas:
+            all: no
+            new: yes
+            delay: 10
     
     ################################################
     ##

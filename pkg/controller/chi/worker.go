@@ -150,36 +150,47 @@ func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
 func (w *worker) shouldForceRestartHost(host *api.Host) bool {
-	// RollingUpdate purpose is to always shut the host down.
-	// It is such an interesting policy.
-	if host.GetCR().IsRollingUpdate() {
-		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
-		return true
-	}
+	switch {
+	case host.HasAncestor() && host.GetAncestor().IsStopped():
+		w.a.V(1).M(host).F().Info("Host ancestor is stopped, no restart applicable. Host: %s", host.GetName())
+		return false
 
-	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
+	case host.HasAncestor() && host.GetAncestor().IsTroubleshoot():
+		w.a.V(1).M(host).F().Info("Host ancestor is in troubleshoot, no restart applicable. Host: %s", host.GetName())
+		return false
+
+	case host.IsStopped():
+		w.a.V(1).M(host).F().Info("Host is stopped, no restart applicable. Host: %s", host.GetName())
+		return false
+
+	case host.IsTroubleshoot():
+		w.a.V(1).M(host).F().Info("Host is in troubleshoot, no restart applicable. Host: %s", host.GetName())
+		return false
+
+	case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested):
 		w.a.V(1).M(host).F().Info("Host is new, no restart applicable. Host: %s", host.GetName())
 		return false
-	}
 
-	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) && !host.HasAncestor() {
-		w.a.V(1).M(host).F().Info("Host already exists, but has no ancestor, no restart applicable. Host: %s", host.GetName())
+	case !host.HasAncestor():
+		w.a.V(1).M(host).F().Info("Host has no ancestor, no restart applicable. Host: %s", host.GetName())
 		return false
-	}
 
-	// For some configuration changes we have to force restart host
-	if model.IsConfigurationChangeRequiresReboot(host) {
+	case host.GetCR().IsRollingUpdate():
+		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
+		return true
+
+	case model.IsConfigurationChangeRequiresReboot(host):
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
-	}
 
-	if host.Runtime.Version.IsUnknown() && w.isPodCrushed(host) {
+	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(host):
 		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
 		return true
-	}
 
-	w.a.V(1).M(host).F().Info("Host force restart is not required. Host: %s", host.GetName())
-	return false
+	default:
+		w.a.V(1).M(host).F().Info("Host force restart is not required. Host: %s", host.GetName())
+		return false
+	}
 }
 
 // normalize

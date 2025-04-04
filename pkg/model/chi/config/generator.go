@@ -131,12 +131,16 @@ func (c *Generator) getHostZookeeper(host *chi.Host) string {
 		//		<host>[HOST]</host>
 		//		<port>[PORT]</port>
 		//		<secure>[SECURE]</secure>
+		//		<availability_zone>[ZONE]</availability_zone>
 		// </node>
 		util.Iline(b, 8, "<node>")
 		util.Iline(b, 8, "    <host>%s</host>", node.Host)
 		util.Iline(b, 8, "    <port>%d</port>", node.Port.Value())
 		if node.Secure.HasValue() {
 			util.Iline(b, 8, "    <secure>%d</secure>", c.getSecure(node))
+		}
+		if node.AvailabilityZone.HasValue() {
+			util.Iline(b, 8, "    <availability_zone>%s</availability_zone>", node.AvailabilityZone.Value())
 		}
 		util.Iline(b, 8, "</node>")
 	}
