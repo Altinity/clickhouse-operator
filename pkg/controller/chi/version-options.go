@@ -18,7 +18,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-type versionOptions struct {
+type VersionOptions struct {
 	Skip
 }
 
@@ -28,7 +28,7 @@ type Skip struct {
 	StoppedAncestor bool
 }
 
-func (opts versionOptions) shouldSkip(host *api.Host) (bool, string) {
+func (opts *VersionOptions) shouldSkip(host *api.Host) (bool, string) {
 	switch {
 	case !host.HasAncestor():
 		if opts.Skip.New {
