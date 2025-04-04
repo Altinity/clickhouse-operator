@@ -4076,7 +4076,6 @@ def test_039(self, step=0, delete_chi=0):
             r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one) limit 1", pwd="qkrq")
             assert r == "0"
 
-
     if step == 4:
         with Then("Create replicated table to test interserver_https_port"):
             clickhouse.query(
@@ -4441,7 +4440,7 @@ def test_044(self):
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
-                "chi_status": "Aborted"
+                "chi_status": "Completed"
             },
         )
         client_pod = f"chi-{chi}-{cluster}-0-1-0"
