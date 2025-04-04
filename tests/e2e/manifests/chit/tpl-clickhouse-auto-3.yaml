@@ -1,0 +1,20 @@
+# test_023
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: grafana-dashboard-user
+spec:
+  templating:
+    policy: auto
+  configuration:
+    profiles:
+      grafana_dashboard_profile/readonly: 2
+    users:
+      grafana_dashboard_user/profile: grafana_dashboard_profile
+      grafana_dashboard_user/password:
+        valueFrom:
+          secretKeyRef:
+            name: test-023-secret
+            key: password

@@ -60,7 +60,7 @@ const (
 	DirPathDataStorage = "/var/lib/clickhouse-keeper"
 
 	// DirPathLogStorage  specifies full path of data folder where ClickHouse would place its log files
-	DirPathLogStorage = "/var/log/clickhouse-keeper-log"
+	DirPathLogStorage = "/var/log/clickhouse-keeper"
 )
 
 const (
