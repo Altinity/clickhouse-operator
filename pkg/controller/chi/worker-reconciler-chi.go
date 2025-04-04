@@ -833,15 +833,8 @@ func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error
 		l.Info("Reconcile Host completed. Host is in troubleshoot mode: %s", host.GetName())
 	}
 
-	// Ensure host is running and accessible and what version is available.
-	// Sometimes service needs some time to start after creation|modification before being accessible for usage
-	// However, it is expected to have host up and running at this point
-	version, err := w.pollHostForClickHouseVersion(ctx, host)
-	if err != nil {
-		l.Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version", host.GetName())
-		return err
-	}
-
+	// Report host software version
+	version := w.getHostSoftwareVersion(ctx, host, &VersionOptions{})
 	l.Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version.Render())
 	return nil
 }
