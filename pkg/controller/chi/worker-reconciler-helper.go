@@ -32,12 +32,17 @@ const (
 	unknownVersion = "failed to query CH"
 )
 
-func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
-	opts := versionOptions{
-		Skip{
-			New:             true,
-			StoppedAncestor: true,
-		},
+func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host, _opts ...*VersionOptions) *swversion.SoftWareVersion {
+	var opts *VersionOptions
+	if len(_opts) > 0 {
+		opts = _opts[0]
+	} else {
+		opts = &VersionOptions{
+			Skip{
+				New:             true,
+				StoppedAncestor: true,
+			},
+		}
 	}
 
 	// Fetch tag from the image
