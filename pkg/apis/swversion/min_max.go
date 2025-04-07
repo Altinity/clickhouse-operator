@@ -14,14 +14,6 @@
 
 package swversion
 
-import (
-	"regexp"
-	"strconv"
-	"strings"
-
-	"github.com/Masterminds/semver/v3"
-)
-
 func MinVersion() *SoftWareVersion {
 	return NewSoftWareVersion("0.0.1")
 }
