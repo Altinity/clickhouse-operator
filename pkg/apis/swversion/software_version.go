@@ -87,14 +87,6 @@ func NewSoftWareVersionFromTag(tag string) *SoftWareVersion {
 	return NewSoftWareVersion(r.FindString(tag))
 }
 
-func MinVersion() *SoftWareVersion {
-	return NewSoftWareVersion("0.0.1")
-}
-
-func MaxVersion() *SoftWareVersion {
-	return NewSoftWareVersion("99.99.99")
-}
-
 // Matches checks whether software version matches specified constraint or not
 func (v *SoftWareVersion) Matches(constraint string) bool {
 	if v == nil {
