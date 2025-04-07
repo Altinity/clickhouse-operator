@@ -30,6 +30,8 @@ type SoftWareVersion struct {
 	normalized string
 	// description specifies description if needed
 	description string
+	// semver specifies semver version
+	semver *semver.Version
 }
 
 // NewSoftWareVersion creates new software version
@@ -60,10 +62,19 @@ func NewSoftWareVersion(version string) *SoftWareVersion {
 		}
 	}
 
+	// Normalized version of the original
+	normalized := strings.Join(parts, ".")
+
 	// Build version
+	_semver, err := semver.NewVersion(normalized)
+	if err != nil {
+		return nil
+	}
+
 	return &SoftWareVersion{
-		original: version,
-		normalized:  strings.Join(parts, "."),
+		original:   version,
+		normalized: normalized,
+		semver:     _semver,
 	}
 }
 
@@ -95,13 +106,8 @@ func (v *SoftWareVersion) Matches(constraint string) bool {
 		return false
 	}
 
-	_semver, err := semver.NewVersion(v.normalized)
-	if err != nil {
-		return false
-	}
-
 	// Validate a version against a constraint.
-	matches, _ := c.Validate(_semver)
+	matches, _ := c.Validate(v.semver)
 
 	return matches
 }
