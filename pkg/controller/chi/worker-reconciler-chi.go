@@ -170,7 +170,7 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 	defer w.a.V(2).M(cr).E().P()
 
 	// Create artifacts
-	cr.WalkHosts(func(host *api.Host) error{
+	cr.WalkHosts(func(host *api.Host) error {
 		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
 		version := w.getHostSoftwareVersion(ctx, host)
 		host.Runtime.Version = version
@@ -178,7 +178,7 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 		return nil
 	})
 
-	cr.WalkHosts(func(host *api.Host) error{
+	cr.WalkHosts(func(host *api.Host) error {
 		w.a.V(1).M(host).F().Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
 		return nil
 	})
