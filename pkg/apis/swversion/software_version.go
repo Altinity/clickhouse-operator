@@ -112,6 +112,11 @@ func (v *SoftWareVersion) Matches(constraint string) bool {
 	return matches
 }
 
+// Cmp compares two versions
+func (v *SoftWareVersion) Cmp(to *SoftWareVersion) int {
+	return v.semver.Compare(to.semver)
+}
+
 // IsUnknown checks whether software version is unknown or not
 func (v *SoftWareVersion) IsUnknown() bool {
 	if v == nil {
