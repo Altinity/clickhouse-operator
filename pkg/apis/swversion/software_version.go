@@ -24,12 +24,12 @@ import (
 
 // SoftWareVersion specifies software version and software semver
 type SoftWareVersion struct {
-	// Version specifies original software version, such as 21.9.6.24-alpha
-	Version string
-	// Semver specifies semver - version truncated to 3 numbers, such as 21.9.6 for 21.9.6.24-alpha
-	Semver string
-	// Description specifies description if needed
-	Description string
+	// original specifies original software version, such as 21.9.6.24-alpha
+	original string
+	// normalized specifies semver-compatible - version truncated to 3 numbers, such as 21.9.6 for 21.9.6.24-alpha
+	normalized string
+	// description specifies description if needed
+	description string
 }
 
 // NewSoftWareVersion creates new software version
@@ -62,8 +62,8 @@ func NewSoftWareVersion(version string) *SoftWareVersion {
 
 	// Build version
 	return &SoftWareVersion{
-		Version: version,
-		Semver:  strings.Join(parts, "."),
+		original: version,
+		normalized:  strings.Join(parts, "."),
 	}
 }
 
@@ -95,7 +95,7 @@ func (v *SoftWareVersion) Matches(constraint string) bool {
 		return false
 	}
 
-	_semver, err := semver.NewVersion(v.Semver)
+	_semver, err := semver.NewVersion(v.normalized)
 	if err != nil {
 		return false
 	}
@@ -111,7 +111,7 @@ func (v *SoftWareVersion) IsUnknown() bool {
 	if v == nil {
 		return true
 	}
-	if len(v.Semver) == 0 {
+	if len(v.normalized) == 0 {
 		return true
 	}
 	return false
@@ -121,7 +121,7 @@ func (v *SoftWareVersion) SetDescription(desc string) *SoftWareVersion {
 	if v == nil {
 		return nil
 	}
-	v.Description = desc
+	v.description = desc
 	return v
 }
 
@@ -130,7 +130,7 @@ func (v *SoftWareVersion) String() string {
 	if v == nil {
 		return ""
 	}
-	return v.Semver
+	return v.normalized
 }
 
 // Render makes a string
@@ -138,5 +138,5 @@ func (v *SoftWareVersion) Render() string {
 	if v == nil {
 		return ""
 	}
-	return v.Semver + "[" + v.Version + "/" + v.Description + "]"
+	return v.normalized + "[" + v.original + "/" + v.description + "]"
 }
