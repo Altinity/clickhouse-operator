@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
@@ -717,4 +718,18 @@ func (cr *ClickHouseInstallation) IsNonZero() bool {
 
 func (cr *ClickHouseInstallation) NamespaceName() (string, string) {
 	return util.NamespaceName(cr)
+}
+
+func (cr *ClickHouseInstallation) FinfMinMaxVersions() {
+	cr.runtime.MinVersion = swversion.MaxVersion()
+	cr.runtime.MaxVersion = swversion.MinVersion()
+	cr.WalkHosts(func(host *Host) error {
+		if host.Runtime.Version.Cmp(cr.runtime.MinVersion) < 0 {
+			cr.runtime.MinVersion = host.Runtime.Version
+		}
+		if host.Runtime.Version.Cmp(cr.runtime.MaxVersion) > 0 {
+			cr.runtime.MaxVersion = host.Runtime.Version
+		}
+		return nil
+	})
 }
