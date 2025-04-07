@@ -169,6 +169,20 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 	w.a.V(2).M(cr).S().P()
 	defer w.a.V(2).M(cr).E().P()
 
+	// Create artifacts
+	cr.WalkHosts(func(host *api.Host) error{
+		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+		version := w.getHostSoftwareVersion(ctx, host)
+		host.Runtime.Version = version
+		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+		return nil
+	})
+
+	cr.WalkHosts(func(host *api.Host) error{
+		w.a.V(1).M(host).F().Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
+		return nil
+	})
+
 	// CR common ConfigMap without added hosts
 	cr.GetRuntime().LockCommonConfig()
 	if err := w.reconcileConfigMapCommon(ctx, cr, w.options()); err != nil {
@@ -627,11 +641,6 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		defer w.reconcileCRServiceFinal(ctx, host.GetCR())
 	}
 
-	// Create artifacts
-	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
-	version := w.getHostSoftwareVersion(ctx, host)
-	host.Runtime.Version = version
-	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), host.Runtime.Version.Render())
 
 	if err := w.reconcileHostPrepare(ctx, host); err != nil {
