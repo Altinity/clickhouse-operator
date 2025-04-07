@@ -183,6 +183,9 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 		return nil
 	})
 
+	cr.FindMinMaxVersions()
+	w.a.V(1).M(cr).F().Info("CR software versions [min, max]: %s %s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
+
 	// CR common ConfigMap without added hosts
 	cr.GetRuntime().LockCommonConfig()
 	if err := w.reconcileConfigMapCommon(ctx, cr, w.options()); err != nil {

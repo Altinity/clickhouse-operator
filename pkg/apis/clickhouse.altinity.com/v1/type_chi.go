@@ -720,7 +720,7 @@ func (cr *ClickHouseInstallation) NamespaceName() (string, string) {
 	return util.NamespaceName(cr)
 }
 
-func (cr *ClickHouseInstallation) FinfMinMaxVersions() {
+func (cr *ClickHouseInstallation) FindMinMaxVersions() {
 	cr.runtime.MinVersion = swversion.MaxVersion()
 	cr.runtime.MaxVersion = swversion.MinVersion()
 	cr.WalkHosts(func(host *Host) error {
@@ -732,4 +732,12 @@ func (cr *ClickHouseInstallation) FinfMinMaxVersions() {
 		}
 		return nil
 	})
+}
+
+func (cr *ClickHouseInstallation) GetMinVersion() *swversion.SoftWareVersion {
+	return cr.runtime.MinVersion
+}
+
+func (cr *ClickHouseInstallation) GetMaxVersion() *swversion.SoftWareVersion {
+	return cr.runtime.MaxVersion
 }
