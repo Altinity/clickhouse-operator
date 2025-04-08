@@ -53,12 +53,12 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host, _op
 		if tagOk {
 			if version := swversion.NewSoftWareVersionFromTag(tag); version != nil {
 				// Able to report version from the tag
-				return version.SetDescription(description)
+				return version.SetDescription("parsed from tag: '" + tag + "' via " + description)
 			}
 		}
 
 		// Unable to report version from the tag - report min one
-		return swversion.MinVersion().SetDescription(description)
+		return swversion.MinVersion().SetDescription("set min version cause unable to parse from tag: '" + tag + "' via " + description)
 	}
 
 	// Try to report version from the app

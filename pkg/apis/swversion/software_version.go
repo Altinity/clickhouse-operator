@@ -24,12 +24,14 @@ import (
 
 // SoftWareVersion specifies software version and software semver
 type SoftWareVersion struct {
-	// Version specifies original software version, such as 21.9.6.24-alpha
-	Version string
-	// Semver specifies semver - version truncated to 3 numbers, such as 21.9.6 for 21.9.6.24-alpha
-	Semver string
-	// Description specifies description if needed
-	Description string
+	// original specifies original software version, such as 21.9.6.24-alpha
+	original string
+	// normalized specifies semver-compatible - version truncated to 3 numbers, such as 21.9.6 for 21.9.6.24-alpha
+	normalized string
+	// description specifies description if needed
+	description string
+	// semver specifies semver version
+	semver *semver.Version
 }
 
 // NewSoftWareVersion creates new software version
@@ -60,10 +62,19 @@ func NewSoftWareVersion(version string) *SoftWareVersion {
 		}
 	}
 
+	// Normalized version of the original
+	normalized := strings.Join(parts, ".")
+
 	// Build version
+	_semver, err := semver.NewVersion(normalized)
+	if err != nil {
+		return nil
+	}
+
 	return &SoftWareVersion{
-		Version: version,
-		Semver:  strings.Join(parts, "."),
+		original:   version,
+		normalized: normalized,
+		semver:     _semver,
 	}
 }
 
@@ -74,14 +85,6 @@ func NewSoftWareVersionFromTag(tag string) *SoftWareVersion {
 
 	r := regexp.MustCompile(`\d+(\.\d+)+`)
 	return NewSoftWareVersion(r.FindString(tag))
-}
-
-func MinVersion() *SoftWareVersion {
-	return NewSoftWareVersion("0.0.1")
-}
-
-func MaxVersion() *SoftWareVersion {
-	return NewSoftWareVersion("99.99.99")
 }
 
 // Matches checks whether software version matches specified constraint or not
@@ -95,15 +98,15 @@ func (v *SoftWareVersion) Matches(constraint string) bool {
 		return false
 	}
 
-	_semver, err := semver.NewVersion(v.Semver)
-	if err != nil {
-		return false
-	}
-
 	// Validate a version against a constraint.
-	matches, _ := c.Validate(_semver)
+	matches, _ := c.Validate(v.semver)
 
 	return matches
+}
+
+// Cmp compares two versions
+func (v *SoftWareVersion) Cmp(to *SoftWareVersion) int {
+	return v.semver.Compare(to.semver)
 }
 
 // IsUnknown checks whether software version is unknown or not
@@ -111,7 +114,7 @@ func (v *SoftWareVersion) IsUnknown() bool {
 	if v == nil {
 		return true
 	}
-	if len(v.Semver) == 0 {
+	if len(v.normalized) == 0 {
 		return true
 	}
 	return false
@@ -121,7 +124,7 @@ func (v *SoftWareVersion) SetDescription(desc string) *SoftWareVersion {
 	if v == nil {
 		return nil
 	}
-	v.Description = desc
+	v.description = desc
 	return v
 }
 
@@ -130,7 +133,7 @@ func (v *SoftWareVersion) String() string {
 	if v == nil {
 		return ""
 	}
-	return v.Semver
+	return v.normalized
 }
 
 // Render makes a string
@@ -138,5 +141,5 @@ func (v *SoftWareVersion) Render() string {
 	if v == nil {
 		return ""
 	}
-	return v.Semver + "[" + v.Version + "/" + v.Description + "]"
+	return v.normalized + "[" + v.original + "/" + v.description + "]"
 }
