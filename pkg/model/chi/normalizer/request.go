@@ -21,11 +21,11 @@ import (
 
 // Request specifies normalization Request
 type Request struct {
-	*normalizer.Request
+	*normalizer.Request[api.ClickHouseInstallation]
 }
 
 // NewRequest creates new Request
-func NewRequest(options *normalizer.Options) *Request {
+func NewRequest(options *normalizer.Options[api.ClickHouseInstallation]) *Request {
 	return &Request{
 		normalizer.NewRequest(options),
 	}
