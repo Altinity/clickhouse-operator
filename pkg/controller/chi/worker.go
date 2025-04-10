@@ -193,29 +193,27 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	}
 }
 
-// normalize
-func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	chi, err := w.normalizer.CreateTemplated(c, commonNormalizer.NewOptions())
-	if err != nil {
-		w.a.WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
-			WithError(chi).
-			M(chi).F().
-			Error("FAILED to normalize CR 1: %v", err)
-	}
+// normalizeBase
+func (w *worker) normalizeBase(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+	chi := w.createTemplated(c, commonNormalizer.NewOptions())
 
 	ips := w.c.getPodsIPs(chi)
 	w.a.V(1).M(chi).Info("IPs of the CHI normalizer %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
 	opts := commonNormalizer.NewOptions()
 	opts.DefaultUserAdditionalIPs = ips
 
-	chi, err = w.normalizer.CreateTemplated(c, opts)
+	chi = w.createTemplated(c, opts)
+	return chi
+}
+
+func (w *worker) createTemplated(c *api.ClickHouseInstallation, opts *commonNormalizer.Options) *api.ClickHouseInstallation {
+	chi, err := w.normalizer.CreateTemplated(c, opts)
 	if err != nil {
 		w.a.WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithError(chi).
 			M(chi).F().
-			Error("FAILED to normalize CHI 2: %v", err)
+			Error("FAILED to normalize CR: %v", err)
 	}
-
 	return chi
 }
 
