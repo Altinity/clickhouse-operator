@@ -21,15 +21,20 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-const (
-	// .spec.useTemplate.useType
-	UseTypeMerge = "merge"
-)
+// ApplyTemplates applies templates provided by 'subj' over 'target'
+func ApplyTemplates(target *api.ClickHouseInstallation, subj TemplateSubject) (appliedTemplates []*api.TemplateRef) {
+	// Prepare list of templates to be applied to the target
+	templates := prepareListOfTemplates(subj)
 
-type TemplateSubject interface {
-	GetNamespace() string
-	GetLabels() map[string]string
-	GetUsedTemplates() []*api.TemplateRef
+	// Apply templates from the list and count applied templates - just to make nice log entry
+	for _, template := range templates {
+		if applyTemplate(target, template, subj) {
+			appliedTemplates = append(appliedTemplates, template)
+		}
+	}
+
+	log.V(1).M(subj).F().Info("Applied templates num: %d", len(appliedTemplates))
+	return appliedTemplates
 }
 
 func getListOfAutoTemplates() []*api.ClickHouseInstallation {
@@ -79,22 +84,6 @@ func prepareListOfManualTemplates(subj TemplateSubject) (templates []*api.Templa
 	}
 
 	return templates
-}
-
-// ApplyTemplates applies templates provided by 'subj' over 'target'
-func ApplyTemplates(target *api.ClickHouseInstallation, subj TemplateSubject) (appliedTemplates []*api.TemplateRef) {
-	// Prepare list of templates to be applied to the target
-	templates := prepareListOfTemplates(subj)
-
-	// Apply templates from the list and count applied templates - just to make nice log entry
-	for _, template := range templates {
-		if applyTemplate(target, template, subj) {
-			appliedTemplates = append(appliedTemplates, template)
-		}
-	}
-
-	log.V(1).M(subj).F().Info("Applied templates num: %d", len(appliedTemplates))
-	return appliedTemplates
 }
 
 // applyTemplate finds and applies a template over target
@@ -176,36 +165,4 @@ func mergeFromTemplate(target, template *api.ClickHouseInstallation) *api.ClickH
 	target.GetSpecT().MergeFrom(template.GetSpecT(), api.MergeTypeOverrideByNonEmptyValues)
 
 	return target
-}
-
-// NormalizeTemplatesList normalizes list of templates use specifications
-func NormalizeTemplatesList(templates []*api.TemplateRef) []*api.TemplateRef {
-	for i := range templates {
-		templates[i] = normalizeTemplateRef(templates[i])
-	}
-	return templates
-}
-
-// normalizeTemplateRef normalizes TemplateRef
-func normalizeTemplateRef(templateRef *api.TemplateRef) *api.TemplateRef {
-	// Check Name
-	if templateRef.Name == "" {
-		// This is strange, don't know what to do in this case
-	}
-
-	// Check Namespace
-	if templateRef.Namespace == "" {
-		// So far do nothing with empty namespace
-	}
-
-	// Ensure UseType
-	switch templateRef.UseType {
-	case UseTypeMerge:
-		// Known use type, all is fine, do nothing
-	default:
-		// Unknown use type - overwrite with default value
-		templateRef.UseType = UseTypeMerge
-	}
-
-	return templateRef
 }
