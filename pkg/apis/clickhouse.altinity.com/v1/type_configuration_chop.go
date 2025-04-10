@@ -355,9 +355,6 @@ type OperatorConfigCHIRuntime struct {
 	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
 	Templates []*ClickHouseInstallation `json:"-" yaml:"-"`
 	mutex     sync.RWMutex              `json:"-" yaml:"-"`
-
-	// ClickHouseInstallation template
-	Template *ClickHouseInstallation `json:"-" yaml:"-"`
 }
 
 // OperatorConfigReconcile specifies reconcile section
