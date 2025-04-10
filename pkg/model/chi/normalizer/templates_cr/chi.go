@@ -21,19 +21,19 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// ApplyTemplates applies templates provided by 'subj' over 'target'
-func ApplyTemplates(target *api.ClickHouseInstallation, subj TemplateSubject) (appliedTemplates []*api.TemplateRef) {
+// ApplyTemplates applies templates provided by 'templatesSrc' over 'target'
+func ApplyTemplates(target *api.ClickHouseInstallation, templatesSrc TemplateRefListSource) (appliedTemplates []*api.TemplateRef) {
 	// Prepare list of templates to be applied to the target
-	templates := prepareListOfTemplates(subj)
+	templates := prepareListOfTemplates(templatesSrc)
 
 	// Apply templates from the list and count applied templates - just to make nice log entry
 	for _, template := range templates {
-		if applyTemplate(target, template, subj) {
+		if applyTemplate(target, template, templatesSrc) {
 			appliedTemplates = append(appliedTemplates, template)
 		}
 	}
 
-	log.V(1).M(subj).F().Info("Applied templates num: %d", len(appliedTemplates))
+	log.V(1).M(templatesSrc).F().Info("Applied templates num: %d", len(appliedTemplates))
 	return appliedTemplates
 }
 
@@ -46,15 +46,15 @@ func getTemplate(templateRef *api.TemplateRef, fallbackNamespace string) *api.Cl
 }
 
 // prepareListOfTemplates prepares list of CHI templates to be used by the CHI
-func prepareListOfTemplates(subj TemplateSubject) (templates []*api.TemplateRef) {
+func prepareListOfTemplates(templatesSrc TemplateRefListSource) (templates []*api.TemplateRef) {
 	// 1. Get list of auto templates available
-	templates = append(templates, prepareListOfAutoTemplates(subj)...)
+	templates = append(templates, prepareListOfAutoTemplates(templatesSrc)...)
 	// 2. Append templates which are explicitly requested by the CHI
-	templates = append(templates, prepareListOfManualTemplates(subj)...)
+	templates = append(templates, prepareListOfManualTemplates(templatesSrc)...)
 	// 3 Normalize list of templates
-	templates = NormalizeTemplatesList(templates)
+	templates = NormalizeTemplateRefList(templates)
 
-	log.V(1).M(subj).F().Info("Found applicable templates num: %d", len(templates))
+	log.V(1).M(templatesSrc).F().Info("Found applicable templates num: %d", len(templates))
 	return templates
 }
 
@@ -77,20 +77,20 @@ func prepareListOfAutoTemplates(subj any) (templates []*api.TemplateRef) {
 	return templates
 }
 
-func prepareListOfManualTemplates(subj TemplateSubject) (templates []*api.TemplateRef) {
-	if len(subj.GetUsedTemplates()) > 0 {
-		log.V(1).M(subj).F().Info("Found manual-templates num: %d", len(subj.GetUsedTemplates()))
-		templates = append(templates, subj.GetUsedTemplates()...)
+func prepareListOfManualTemplates(templatesSrc TemplateRefListSource) (templates []*api.TemplateRef) {
+	if len(templatesSrc.GetUsedTemplates()) > 0 {
+		log.V(1).M(templatesSrc).F().Info("Found manual-templates num: %d", len(templatesSrc.GetUsedTemplates()))
+		templates = append(templates, templatesSrc.GetUsedTemplates()...)
 	}
 
 	return templates
 }
 
 // applyTemplate finds and applies a template over target
-// 'subj' is used to determine whether the template should be applied or not
-func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.TemplateRef, subj TemplateSubject) bool {
+// 'templatesSrc' is used to determine whether the template should be applied or not
+func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.TemplateRef, templatesSrc TemplateRefListSource) bool {
 	// Find and apply (merge) template
-	if template := findApplicableTemplate(templateRef, subj); template != nil {
+	if template := findApplicableTemplate(templateRef, templatesSrc); template != nil {
 		mergeFromTemplate(target, template)
 		return true
 	}
@@ -98,7 +98,7 @@ func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.Template
 	return false
 }
 
-func findApplicableTemplate(templateRef *api.TemplateRef, subj TemplateSubject) *api.ClickHouseInstallation {
+func findApplicableTemplate(templateRef *api.TemplateRef, templatesSrc TemplateRefListSource) *api.ClickHouseInstallation {
 	if templateRef == nil {
 		log.Warning("unable to apply template - nil templateRef provided")
 		// Template is not applied
@@ -106,7 +106,7 @@ func findApplicableTemplate(templateRef *api.TemplateRef, subj TemplateSubject) 
 	}
 
 	// What template are we going to apply?
-	defaultNamespace := subj.GetNamespace()
+	defaultNamespace := templatesSrc.GetNamespace()
 	template := getTemplate(templateRef, defaultNamespace)
 	if template == nil {
 		log.V(1).M(templateRef).F().Warning(
@@ -120,11 +120,11 @@ func findApplicableTemplate(templateRef *api.TemplateRef, subj TemplateSubject) 
 	// This is determined by matching selector of the template and target's labels
 	// Convenience wrapper
 	selector := template.GetSpecT().Templating.GetSelector()
-	if !selector.Matches(subj.GetLabels()) {
+	if !selector.Matches(templatesSrc.GetLabels()) {
 		// This template does not want to be applied to this CHI
 		log.V(1).M(templateRef).F().Info(
 			"Skip template: %s/%s. Selector: %v does not match labels: %v",
-			templateRef.Namespace, templateRef.Name, selector, subj.GetLabels())
+			templateRef.Namespace, templateRef.Name, selector, templatesSrc.GetLabels())
 		// Template is not applied
 		return nil
 	}
@@ -135,7 +135,7 @@ func findApplicableTemplate(templateRef *api.TemplateRef, subj TemplateSubject) 
 
 	log.V(1).M(templateRef).F().Info(
 		"Apply template: %s/%s. Selector: %v matches labels: %v",
-		templateRef.Namespace, templateRef.Name, selector, subj.GetLabels())
+		templateRef.Namespace, templateRef.Name, selector, templatesSrc.GetLabels())
 
 	return template
 }

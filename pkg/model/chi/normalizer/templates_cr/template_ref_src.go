@@ -18,7 +18,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-type TemplateSubject interface {
+type TemplateRefListSource interface {
 	GetNamespace() string
 	GetLabels() map[string]string
 	GetUsedTemplates() []*api.TemplateRef

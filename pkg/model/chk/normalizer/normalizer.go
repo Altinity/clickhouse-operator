@@ -86,7 +86,7 @@ func (n *Normalizer) buildTargetFromTemplates(subj *chk.ClickHouseKeeperInstalla
 	n.req.GetTarget().MergeFrom(subj, chi.MergeTypeOverrideByNonEmptyValues)
 }
 
-func (n *Normalizer) applyCRTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
+func (n *Normalizer) applyCRTemplatesOnTarget(subj crTemplatesNormalizer.TemplateRefListSource) {
 	//for _, template := range crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), subj) {
 	//	n.req.GetTarget().EnsureStatus().PushUsedTemplate(template)
 	//}

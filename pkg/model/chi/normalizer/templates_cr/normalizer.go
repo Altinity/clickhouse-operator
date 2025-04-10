@@ -18,8 +18,8 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-// NormalizeTemplatesList normalizes list of templates use specifications
-func NormalizeTemplatesList(templates []*api.TemplateRef) []*api.TemplateRef {
+// NormalizeTemplateRefList normalizes list of templates use specifications
+func NormalizeTemplateRefList(templates []*api.TemplateRef) []*api.TemplateRef {
 	for i := range templates {
 		templates[i] = normalizeTemplateRef(templates[i])
 	}
