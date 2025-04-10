@@ -55,13 +55,14 @@ func New() *Normalizer {
 }
 
 // CreateTemplated produces ready-to-use object
-func (n *Normalizer) CreateTemplated(subj *chk.ClickHouseKeeperInstallation, options *normalizer.Options) (
+func (n *Normalizer) CreateTemplated(subj *chk.ClickHouseKeeperInstallation, options *normalizer.Options[chk.ClickHouseKeeperInstallation]) (
 	*chk.ClickHouseKeeperInstallation,
 	error,
 ) {
 	// Normalization starts with a new request
 	n.buildRequest(options)
 	// Ensure normalization subject presence
+
 	subj = n.ensureSubject(subj)
 	// Build target from all templates and subject
 	n.buildTargetFromTemplates(subj)
@@ -69,7 +70,7 @@ func (n *Normalizer) CreateTemplated(subj *chk.ClickHouseKeeperInstallation, opt
 	return n.normalizeTarget()
 }
 
-func (n *Normalizer) buildRequest(options *normalizer.Options) {
+func (n *Normalizer) buildRequest(options *normalizer.Options[chk.ClickHouseKeeperInstallation]) {
 	n.req = NewRequest(options)
 }
 
@@ -79,14 +80,23 @@ func (n *Normalizer) buildTargetFromTemplates(subj *chk.ClickHouseKeeperInstalla
 
 	// At this moment we have target available - it is either newly created or a system-wide template
 
-	// Apply CR templates - both auto and explicitly requested - on top of target
-	n.applyCRTemplatesOnTarget(subj)
+	// Apply internal CR templates on top of target
+	n.applyInternalCRTemplatesOnTarget()
+
+	// Apply external CR templates - both auto and explicitly requested - on top of target
+	n.applyExternalCRTemplatesOnTarget(subj)
 
 	// After all CR templates applied, place provided 'subject' on top of the whole target stack
 	n.applyCROnTarget(subj)
 }
 
-func (n *Normalizer) applyCRTemplatesOnTarget(templateRefSrc crTemplatesNormalizer.TemplateRefListSource) {
+func (n *Normalizer) applyInternalCRTemplatesOnTarget() {
+	for _, template := range n.req.Options().Templates {
+		n.req.GetTarget().MergeFrom(template, chi.MergeTypeOverrideByNonEmptyValues)
+	}
+}
+
+func (n *Normalizer) applyExternalCRTemplatesOnTarget(templateRefSrc crTemplatesNormalizer.TemplateRefListSource) {
 }
 
 func (n *Normalizer) applyCROnTarget(cr *chk.ClickHouseKeeperInstallation) {

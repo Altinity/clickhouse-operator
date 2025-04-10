@@ -62,7 +62,7 @@ func New(secretGet subst.SecretGetter) *Normalizer {
 }
 
 // CreateTemplated produces ready-to-use object
-func (n *Normalizer) CreateTemplated(subj *chi.ClickHouseInstallation, options *normalizer.Options) (
+func (n *Normalizer) CreateTemplated(subj *chi.ClickHouseInstallation, options *normalizer.Options[chi.ClickHouseInstallation]) (
 	*chi.ClickHouseInstallation,
 	error,
 ) {
@@ -76,7 +76,7 @@ func (n *Normalizer) CreateTemplated(subj *chi.ClickHouseInstallation, options *
 	return n.normalizeTarget()
 }
 
-func (n *Normalizer) buildRequest(options *normalizer.Options) {
+func (n *Normalizer) buildRequest(options *normalizer.Options[chi.ClickHouseInstallation]) {
 	n.req = NewRequest(options)
 }
 
@@ -86,14 +86,23 @@ func (n *Normalizer) buildTargetFromTemplates(subj *chi.ClickHouseInstallation) 
 
 	// At this moment we have target available - it is either newly created or a system-wide template
 
-	// Apply CR templates - both auto and explicitly requested - on top of target
-	n.applyCRTemplatesOnTarget(subj)
+	// Apply internal CR templates on top of target
+	n.applyInternalCRTemplatesOnTarget()
+
+	// Apply external CR templates - both auto and explicitly requested - on top of target
+	n.applyExternalCRTemplatesOnTarget(subj)
 
 	// After all CR templates applied, place provided 'subject' on top of the whole target stack
 	n.applyCROnTarget(subj)
 }
 
-func (n *Normalizer) applyCRTemplatesOnTarget(templateRefSrc crTemplatesNormalizer.TemplateRefListSource) {
+func (n *Normalizer) applyInternalCRTemplatesOnTarget() {
+	for _, template := range n.req.Options().Templates {
+		n.req.GetTarget().MergeFrom(template, chi.MergeTypeOverrideByNonEmptyValues)
+	}
+}
+
+func (n *Normalizer) applyExternalCRTemplatesOnTarget(templateRefSrc crTemplatesNormalizer.TemplateRefListSource) {
 	usedTemplates := crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), templateRefSrc)
 	n.req.GetTarget().EnsureStatus().PushUsedTemplate(usedTemplates...)
 }
