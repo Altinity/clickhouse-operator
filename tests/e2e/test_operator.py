@@ -2727,10 +2727,7 @@ def test_023(self):
         time.sleep(15)
 
     with Then("Trigger CHI update"):
-        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"apply-templates"}}]\''
-        kubectl.launch(cmd)
-        kubectl.wait_chi_status(chi, "InProgress")
-        kubectl.wait_chi_status(chi, "Completed")
+        kubectl.force_reconcile(chi, "apply-templates")
 
     with Then(".status.usedTemplates has 3 values"):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
@@ -3781,17 +3778,18 @@ def test_036(self):
     wait_for_cluster(chi, cluster, 1, 2)
 
     with And("I create replicated table with some data"):
+        clickhouse.query(chi, "CREATE DATABASE test_036 ON CLUSTER '{cluster}'")
         create_table = """
-            CREATE TABLE test_local_036 ON CLUSTER '{cluster}' (a UInt32)
+            CREATE TABLE test_036.test_local_036 ON CLUSTER '{cluster}' (a UInt32)
             Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
             PARTITION BY tuple()
             ORDER BY a
             """.replace("\r", "").replace("\n", "")
         clickhouse.query(chi, create_table)
-        clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
+        clickhouse.query(chi, f"INSERT INTO test_036.test_local_036 select * from numbers(10000)")
 
-        clickhouse.query(chi, "CREATE DATABASE test_memory_036 ON CLUSTER '{cluster}' Engine = Memory")
-        clickhouse.query(chi, "CREATE VIEW test_memory_036.test_view ON CLUSTER '{cluster}' AS SELECT * from system.tables")
+        clickhouse.query(chi, "CREATE DATABASE test_036_mem ON CLUSTER '{cluster}' Engine = Memory")
+        clickhouse.query(chi, "CREATE VIEW test_036_mem.test_view ON CLUSTER '{cluster}' AS SELECT * from system.tables")
 
     def delete_pv():
         with When("Delete PV", description="delete PV on replica 0"):
@@ -3878,10 +3876,7 @@ def test_036(self):
 
     def check_data_is_recovered(reconcile_task_id):
         with Then(f"Kick operator to start reconcile cycle to fix lost {reconcile_task_id}"):
-            cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"{reconcile_task_id}"}}]\''
-            kubectl.launch(cmd)
-            kubectl.wait_chi_status(chi, "InProgress")
-            kubectl.wait_chi_status(chi, "Completed")
+            kubectl.force_reconcile(chi, reconcile_task_id)
             wait_for_cluster(chi, cluster, 1, 2)
 
         with Then("I check PV is in place"):
@@ -3899,32 +3894,27 @@ def test_036(self):
             assert size == "1Gi", error()
 
         with And("I check data on each replica"):
-            with By("checking data on the replica 0"):
-                r = clickhouse.query(
-                    chi,
-                    pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
-                    sql="SELECT count(*) FROM test_local_036",
-                )
-                assert r == "10000", error()
-            with And("checking data on the replica 1"):
-                r = clickhouse.query(
-                    chi,
-                    pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
-                    sql="SELECT count(*) FROM test_local_036",
-                )
-                assert r == "10000", error()
-            with And("checking view in Memory engine exists"):
-                r = clickhouse.query(
-                    chi,
-                    pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
-                    sql="SELECT count(*) FROM system.tables where name = 'test_view'",
-                )
-                assert r == "1", error()
-                r = clickhouse.query(
-                    chi,
-                    pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
-                    sql="SELECT count(*) FROM system.tables where name = 'test_view'",
-                )
+            for replica in (0,1):
+                with By(f"Check that databases exist on replica {replica}"):
+                    r = clickhouse.query(
+                        chi,
+                        pod=f"chi-test-036-volume-re-provisioning-simple-0-{replica}-0",
+                        sql="SELECT count(*) FROM system.databases where name like 'test_036%'",
+                        )
+                    assert r == "2", error()
+                with And(f"checking data on the replica {replica}"):
+                    r = clickhouse.query(
+                        chi,
+                        pod=f"chi-test-036-volume-re-provisioning-simple-0-{replica}-0",
+                        sql="SELECT count(*) FROM test_036.test_local_036",
+                        )
+                    assert r == "10000", error()
+                with And("checking view in Memory engine exists"):
+                    r = clickhouse.query(
+                        chi,
+                        pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
+                        sql="SELECT count(*) FROM system.tables where name = 'test_view'",
+                        )
                 assert r == "1", error()
 
     delete_sts_and_pvc()
@@ -4472,9 +4462,11 @@ def test_044(self):
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
-                "chi_status": "Completed"
+                "chi_status": "InProgress"
             },
         )
+        kubectl.wait_chi_status(chi, "Aborted", retries=6) # Fail faster than default
+
         client_pod = f"chi-{chi}-{cluster}-0-1-0"
         kubectl.wait_field(
             "pod",
@@ -4487,15 +4479,7 @@ def test_044(self):
             r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
             assert not ("test_local" in r), error()
 
-    with When("I update CHI manifest to trigger reconcile"):
-        with By("adding taskID to CHI"):
-            kubectl.create_and_check(
-                manifest="manifests/chi/test-044-2-slow-propagation.yaml",
-                check={
-                    "pod_count": 2,
-                    "do_not_delete": 1,
-                },
-            )
+    kubectl.force_reconcile(chi)
 
     with Then("I check schema is propagated"):
         with By("checking schema on the slow replica"):
@@ -5237,28 +5221,22 @@ def test_053(self):
                 # print(f"pod start_time new: {new_start_time}")
                 assert start_time == new_start_time
 
+        start_time = kubectl.get_field("pod", pod, ".status.startTime")
+
         with Then("Trigger reconcile"):
-            start_time = kubectl.get_field("pod", pod, ".status.startTime")
-
-            cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"Reconcile"}}]\''
-            kubectl.launch(cmd)
-            kubectl.wait_chi_status(chi, "InProgress")
-            kubectl.wait_chi_status(chi, "Completed")
-
+            kubectl.force_reconcile(chi)
             check_restart()
 
         with When("Restart operator"):
             util.restart_operator()
             kubectl.wait_chi_status(chi, "InProgress")
             kubectl.wait_chi_status(chi, "Completed")
-
             check_restart()
 
         with When(f"upgrade operator to {version_to}"):
             util.install_operator_version(version_to)
             kubectl.wait_chi_status(chi, "InProgress")
             kubectl.wait_chi_status(chi, "Completed")
-
             check_restart()
 
     with Finally("I clean up"):

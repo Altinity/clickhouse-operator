@@ -632,3 +632,10 @@ def check_pdb(chi, clusters, ns=None, shell=None):
             assert labels["clickhouse.altinity.com/cluster"] == c
             assert labels["clickhouse.altinity.com/namespace"] == current().context.test_namespace
             assert pdb["spec"]["maxUnavailable"] == clusters[c]
+
+def force_reconcile(chi, taskID="reconcile", ns=None, shell=None):
+    with Then(f"Trigger CHI reconcile with taskID:\"{taskID}\""):
+        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"{taskID}"}}]\''
+        launch(cmd, ns=ns, shell=shell)
+        wait_chi_status(chi, "InProgress", ns=ns, shell=shell)
+        wait_chi_status(chi, "Completed", ns=ns, shell=shell)
