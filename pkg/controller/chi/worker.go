@@ -195,18 +195,39 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 
 // normalizeBase
 func (w *worker) normalizeBase(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	chi := w.createTemplated(c, commonNormalizer.NewOptions())
+	chi := w.createTemplated(c, commonNormalizer.NewOptions[api.ClickHouseInstallation]())
 
 	ips := w.c.getPodsIPs(chi)
 	w.a.V(1).M(chi).Info("IPs of the CHI normalizer %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-	opts := commonNormalizer.NewOptions()
-	opts.DefaultUserAdditionalIPs = ips
-
-	chi = w.createTemplated(c, opts)
+	if len(ips) > 0 {
+		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
+		opts.DefaultUserAdditionalIPs = ips
+		chi = w.createTemplated(c, opts)
+	}
 	return chi
 }
 
-func (w *worker) createTemplated(c *api.ClickHouseInstallation, opts *commonNormalizer.Options) *api.ClickHouseInstallation {
+// normalizeBase
+func (w *worker) normalizeExt(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+	chi := c
+
+	ips := w.c.getPodsIPs(c)
+	w.a.V(1).M(c).Info("IPs of the CHI normalizer %s/%s: len: %d %v", c.Namespace, c.Name, len(ips), ips)
+	var templates []*api.ClickHouseInstallation
+	if len(ips) > 0 || len(templates) > 0 {
+		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
+		opts.DefaultUserAdditionalIPs = ips
+		opts.Templates = templates
+		chi = w.createTemplated(c, opts)
+	}
+	return chi
+}
+
+func (w *worker) createTemplated(c *api.ClickHouseInstallation, _opts ...*commonNormalizer.Options[api.ClickHouseInstallation]) *api.ClickHouseInstallation {
+	opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
+	if len(_opts) > 0 {
+		opts = _opts[0]
+	}
 	chi, err := w.normalizer.CreateTemplated(c, opts)
 	if err != nil {
 		w.a.WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
@@ -249,11 +270,11 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 // updateEndpoints updates endpoints
 func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
 
-	if chi, err := w.createCRFromObjectMeta(new.GetObjectMeta(), false, commonNormalizer.NewOptions()); err == nil {
+	if chi, err := w.createCRFromObjectMeta(new.GetObjectMeta(), false, commonNormalizer.NewOptions[api.ClickHouseInstallation]()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CR-1 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CR-1 update endpoints %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := commonNormalizer.NewOptions()
+		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCRFromObjectMeta(new.GetObjectMeta(), false, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-1")
@@ -412,11 +433,11 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	if chi, err := w.createCRFromObjectMeta(_cr, true, commonNormalizer.NewOptions()); err == nil {
+	if chi, err := w.createCRFromObjectMeta(_cr, true, commonNormalizer.NewOptions[api.ClickHouseInstallation]()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CR-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CR-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := commonNormalizer.NewOptions()
+		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCRFromObjectMeta(_cr, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
@@ -591,7 +612,7 @@ func (w *worker) logHosts(cr api.ICustomResource) {
 func (w *worker) createCRFromObjectMeta(
 	meta meta.Object,
 	isCHI bool,
-	options *commonNormalizer.Options,
+	options *commonNormalizer.Options[api.ClickHouseInstallation],
 ) (*api.ClickHouseInstallation, error) {
 	w.a.V(3).M(meta).S().P()
 	defer w.a.V(3).M(meta).E().P()
