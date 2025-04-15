@@ -42,11 +42,16 @@ func isSettingsChangeRequiresReboot(host *api.Host, configurationRestartPolicyRu
 
 // hostVersionMatches checks whether host's ClickHouse version matches specified constraint
 func hostVersionMatches(host *api.Host, versionConstraint string) bool {
-	// Special version of "*" - default version - has to satisfy all host versions
+	// Special version of "*" - default version - has to satisfy all versions
 	// Default version will also be used in case ClickHouse version is unknown.
-	// ClickHouse version may be unknown due to host being down - for example, because of incorrect "settings" section.
-	// ClickHouse is not willing to start in case incorrect/unknown settings are provided in config file.
 	return (versionConstraint == "*") || host.Runtime.Version.Matches(versionConstraint)
+}
+
+// chiVersionMatches checks whether chi's ClickHouse version matches specified constraint
+func chiVersionMatches(chi *api.ClickHouseInstallation, versionConstraint string) bool {
+	// Special version of "*" - default version - has to satisfy all versions
+	// Default version will also be used in case ClickHouse version is unknown.
+	return (versionConstraint == "*") || chi.EnsureRuntime().MinVersion.Matches(versionConstraint)
 }
 
 // ruleMatches checks whether provided rule (rule set) matches specified `path`
@@ -87,6 +92,17 @@ func getLatestConfigMatchValue(host *api.Host, path string) (matches bool, value
 		}
 	}
 	return matches, value
+}
+
+func GetConfigMatchSpecs(chi *api.ClickHouseInstallation) (specs []*api.ChiSpec) {
+	for _, r := range chop.Config().ClickHouse.Addons.Rules {
+		// Check ClickHouse version of a particular rule
+		_ = fmt.Sprintf("%s", r.Version)
+		if chiVersionMatches(chi, r.Version) {
+			specs = append(specs, r.Spec)
+		}
+	}
+	return specs
 }
 
 // isListedChangeRequiresReboot checks whether any of the provided paths requires reboot to apply configuration
