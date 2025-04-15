@@ -40,10 +40,10 @@ func (cr *ClickHouseInstallation) GetSpecA() any {
 }
 
 func (cr *ClickHouseInstallation) GetRuntime() ICustomResourceRuntime {
-	return cr.ensureRuntime()
+	return cr.EnsureRuntime()
 }
 
-func (cr *ClickHouseInstallation) ensureRuntime() *ClickHouseInstallationRuntime {
+func (cr *ClickHouseInstallation) EnsureRuntime() *ClickHouseInstallationRuntime {
 	if cr == nil {
 		return nil
 	}
@@ -221,7 +221,7 @@ func (cr *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type 
 	cr.GetSpecT().MergeFrom(from.GetSpecT(), _type)
 
 	// Copy service attributes
-	cr.ensureRuntime().attributes = from.ensureRuntime().attributes
+	cr.EnsureRuntime().attributes = from.EnsureRuntime().attributes
 
 	cr.EnsureStatus().CopyFrom(from.Status, types.CopyStatusOptions{
 		CopyStatusFieldGroup: types.CopyStatusFieldGroup{
