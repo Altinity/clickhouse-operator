@@ -273,7 +273,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	defer w.a.V(2).M(chi).E().P()
 
 	var err error
-	chi, err = w.normalizer.CreateTemplated(chi, normalizer.NewOptions())
+	chi, err = w.normalizer.CreateTemplated(chi, normalizer.NewOptions[api.ClickHouseInstallation]())
 	if err != nil {
 		w.a.WithEvent(chi, a.EventActionDelete, a.EventReasonDeleteFailed).
 			WithError(chi).

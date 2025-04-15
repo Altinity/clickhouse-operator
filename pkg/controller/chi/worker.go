@@ -193,29 +193,18 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	}
 }
 
-// normalize
-func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	chi, err := w.normalizer.CreateTemplated(c, commonNormalizer.NewOptions())
+func (w *worker) createTemplated(c *api.ClickHouseInstallation, _opts ...*commonNormalizer.Options[api.ClickHouseInstallation]) *api.ClickHouseInstallation {
+	opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
+	if len(_opts) > 0 {
+		opts = _opts[0]
+	}
+	chi, err := w.normalizer.CreateTemplated(c, opts)
 	if err != nil {
 		w.a.WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithError(chi).
 			M(chi).F().
-			Error("FAILED to normalize CR 1: %v", err)
+			Error("FAILED to normalize CR: %v", err)
 	}
-
-	ips := w.c.getPodsIPs(chi)
-	w.a.V(1).M(chi).Info("IPs of the CHI normalizer %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-	opts := commonNormalizer.NewOptions()
-	opts.DefaultUserAdditionalIPs = ips
-
-	chi, err = w.normalizer.CreateTemplated(c, opts)
-	if err != nil {
-		w.a.WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
-			WithError(chi).
-			M(chi).F().
-			Error("FAILED to normalize CHI 2: %v", err)
-	}
-
 	return chi
 }
 
@@ -250,33 +239,41 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 
 // updateEndpoints updates endpoints
 func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
-
-	if chi, err := w.createCRFromObjectMeta(new.GetObjectMeta(), false, commonNormalizer.NewOptions()); err == nil {
-		w.a.V(1).M(chi).Info("updating endpoints for CR-1 %s", chi.Name)
-		ips := w.c.getPodsIPs(chi)
-		w.a.V(1).M(chi).Info("IPs of the CR-1 update endpoints %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := commonNormalizer.NewOptions()
-		opts.DefaultUserAdditionalIPs = ips
-		if chi, err := w.createCRFromObjectMeta(new.GetObjectMeta(), false, opts); err == nil {
-			w.a.V(1).M(chi).Info("Update users IPS-1")
-
-			// TODO unify with finalize reconcile
-			w.newTask(chi, chi.GetAncestorT())
-			w.reconcileConfigMapCommonUsers(ctx, chi)
-			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
-				TolerateAbsence: true,
-				CopyStatusOptions: types.CopyStatusOptions{
-					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
-						FieldGroupNormalized: true,
-					},
+	w.updateFromMeta(
+		ctx,
+		new.GetObjectMeta(),
+		false,
+		types.UpdateStatusOptions{
+			TolerateAbsence: true,
+			CopyStatusOptions: types.CopyStatusOptions{
+				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+					FieldGroupNormalized: true,
 				},
-			})
-		} else {
-			w.a.M(new.GetObjectMeta()).F().Error("internal unable to find CHI by %v err: %v", new.GetLabels(), err)
-		}
-	} else {
-		w.a.M(new.GetObjectMeta()).F().Error("external unable to find CHI by %v err %v", new.GetLabels(), err)
+			},
+		},
+		nil,
+	)
+	return nil
+}
+
+func (w *worker) updateFromMeta(
+	ctx context.Context,
+	obj meta.Object,
+	searchByName bool,
+	updateStatusOpts types.UpdateStatusOptions,
+	f func(*api.ClickHouseInstallation),
+) error {
+	chi, _ := w.buildFromMeta(ctx, obj, searchByName)
+
+	if f != nil {
+		f(chi)
 	}
+
+	// TODO unify with finalize reconcile
+	w.newTask(chi, chi.GetAncestorT())
+	w.reconcileConfigMapCommonUsers(ctx, chi)
+	w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
+
 	return nil
 }
 
@@ -410,37 +407,26 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 		log.V(2).Info("task is done")
 		return
 	}
-
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	if chi, err := w.createCRFromObjectMeta(_cr, true, commonNormalizer.NewOptions()); err == nil {
-		w.a.V(1).M(chi).Info("updating endpoints for CR-2 %s", chi.Name)
-		ips := w.c.getPodsIPs(chi)
-		w.a.V(1).M(chi).Info("IPs of the CR-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := commonNormalizer.NewOptions()
-		opts.DefaultUserAdditionalIPs = ips
-		if chi, err := w.createCRFromObjectMeta(_cr, true, opts); err == nil {
-			w.a.V(1).M(chi).Info("Update users IPS-2")
-			chi.SetAncestor(chi.GetTarget())
-			chi.SetTarget(nil)
-			chi.EnsureStatus().ReconcileComplete()
-			// TODO unify with update endpoints
-			w.newTask(chi, chi.GetAncestorT())
-			w.reconcileConfigMapCommonUsers(ctx, chi)
-			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
-				CopyStatusOptions: types.CopyStatusOptions{
-					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
-						FieldGroupWholeStatus: true,
-					},
+	w.updateFromMeta(
+		ctx,
+		_cr,
+		true,
+		types.UpdateStatusOptions{
+			CopyStatusOptions: types.CopyStatusOptions{
+				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+					FieldGroupWholeStatus: true,
 				},
-			})
-		} else {
-			w.a.M(_cr).F().Error("internal unable to find CR by %v err: %v", _cr.GetLabels(), err)
-		}
-	} else {
-		w.a.M(_cr).F().Error("external unable to find CR by %v err %v", _cr.GetLabels(), err)
-	}
+			},
+		},
+		func(c *api.ClickHouseInstallation) {
+			c.SetAncestor(c.GetTarget())
+			c.SetTarget(nil)
+			c.EnsureStatus().ReconcileComplete()
+		},
+	)
 
 	w.a.V(1).
 		WithEvent(_cr, a.EventActionReconcile, a.EventReasonReconcileCompleted).
@@ -589,16 +575,16 @@ func (w *worker) logHosts(cr api.ICustomResource) {
 	})
 }
 
-// createCRFromObjectMeta
-func (w *worker) createCRFromObjectMeta(
-	meta meta.Object,
-	isCHI bool,
-	options *commonNormalizer.Options,
+// createTemplatedCRFromObjectMeta
+func (w *worker) createTemplatedCRFromObjectMeta(
+	obj meta.Object,
+	searchByName bool,
+	options *commonNormalizer.Options[api.ClickHouseInstallation],
 ) (*api.ClickHouseInstallation, error) {
-	w.a.V(3).M(meta).S().P()
-	defer w.a.V(3).M(meta).E().P()
+	w.a.V(3).M(obj).S().P()
+	defer w.a.V(3).M(obj).E().P()
 
-	chi, err := w.c.GetCHIByObjectMeta(meta, isCHI)
+	chi, err := w.c.GetCHIByObjectMeta(obj, searchByName)
 	if err != nil {
 		return nil, err
 	}

@@ -12,29 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package normalizer
+package templates_cr
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 )
 
-// Request specifies normalization Request
-type Request struct {
-	*normalizer.Request[api.ClickHouseInstallation]
-}
-
-// NewRequest creates new Request
-func NewRequest(options *normalizer.Options[api.ClickHouseInstallation]) *Request {
-	return &Request{
-		normalizer.NewRequest(options),
-	}
-}
-
-func (c *Request) GetTarget() *api.ClickHouseInstallation {
-	return c.Request.GetTarget().(*api.ClickHouseInstallation)
-}
-
-func (c *Request) SetTarget(target *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	return c.Request.SetTarget(target).(*api.ClickHouseInstallation)
+type TemplateRefListSource interface {
+	GetNamespace() string
+	GetLabels() map[string]string
+	GetUsedTemplates() []*api.TemplateRef
 }

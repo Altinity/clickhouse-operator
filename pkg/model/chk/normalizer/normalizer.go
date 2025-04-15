@@ -55,13 +55,14 @@ func New() *Normalizer {
 }
 
 // CreateTemplated produces ready-to-use object
-func (n *Normalizer) CreateTemplated(subj *chk.ClickHouseKeeperInstallation, options *normalizer.Options) (
+func (n *Normalizer) CreateTemplated(subj *chk.ClickHouseKeeperInstallation, options *normalizer.Options[chk.ClickHouseKeeperInstallation]) (
 	*chk.ClickHouseKeeperInstallation,
 	error,
 ) {
 	// Normalization starts with a new request
 	n.buildRequest(options)
 	// Ensure normalization subject presence
+
 	subj = n.ensureSubject(subj)
 	// Build target from all templates and subject
 	n.buildTargetFromTemplates(subj)
@@ -69,27 +70,37 @@ func (n *Normalizer) CreateTemplated(subj *chk.ClickHouseKeeperInstallation, opt
 	return n.normalizeTarget()
 }
 
-func (n *Normalizer) buildRequest(options *normalizer.Options) {
+func (n *Normalizer) buildRequest(options *normalizer.Options[chk.ClickHouseKeeperInstallation]) {
 	n.req = NewRequest(options)
 }
 
 func (n *Normalizer) buildTargetFromTemplates(subj *chk.ClickHouseKeeperInstallation) {
 	// Create new target that will be populated with data during normalization process
-	n.req.SetTarget(n.createTarget())
+	n.req.SetTarget(n.newSubject())
 
 	// At this moment we have target available - it is either newly created or a system-wide template
 
-	// Apply CR templates - both auto and explicitly requested - on top of target
-	n.applyCRTemplatesOnTarget(subj)
+	// Apply internal CR templates on top of target
+	n.applyInternalCRTemplatesOnTarget()
 
-	// After all CR templates applied, place provided 'subject' on top of the whole stack (target)
-	n.req.GetTarget().MergeFrom(subj, chi.MergeTypeOverrideByNonEmptyValues)
+	// Apply external CR templates - both auto and explicitly requested - on top of target
+	n.applyExternalCRTemplatesOnTarget(subj)
+
+	// After all CR templates applied, place provided 'subject' on top of the whole target stack
+	n.applyCROnTarget(subj)
 }
 
-func (n *Normalizer) applyCRTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
-	//for _, template := range crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), subj) {
-	//	n.req.GetTarget().EnsureStatus().PushUsedTemplate(template)
-	//}
+func (n *Normalizer) applyInternalCRTemplatesOnTarget() {
+	for _, template := range n.req.Options().Templates {
+		n.req.GetTarget().MergeFrom(template, chi.MergeTypeOverrideByNonEmptyValues)
+	}
+}
+
+func (n *Normalizer) applyExternalCRTemplatesOnTarget(templateRefSrc crTemplatesNormalizer.TemplateRefListSource) {
+}
+
+func (n *Normalizer) applyCROnTarget(cr *chk.ClickHouseKeeperInstallation) {
+	n.req.GetTarget().MergeFrom(cr, chi.MergeTypeOverrideByNonEmptyValues)
 }
 
 func (n *Normalizer) newSubject() *chk.ClickHouseKeeperInstallation {
@@ -115,24 +126,6 @@ func (n *Normalizer) ensureSubject(subj *chk.ClickHouseKeeperInstallation) *chk.
 	} else {
 		// Subject specified
 		return subj
-	}
-}
-
-func (n *Normalizer) getTargetTemplate() *chk.ClickHouseKeeperInstallation {
-	return nil // return chop.Config().Template.CHI.Runtime.Template
-}
-
-func (n *Normalizer) hasTargetTemplate() bool {
-	return n.getTargetTemplate() != nil
-}
-
-func (n *Normalizer) createTarget() *chk.ClickHouseKeeperInstallation {
-	if n.hasTargetTemplate() {
-		// Template specified - start with template
-		return n.getTargetTemplate().DeepCopy()
-	} else {
-		// No template specified - start with clear page
-		return n.newSubject()
 	}
 }
 

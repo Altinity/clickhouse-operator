@@ -195,6 +195,17 @@ type OperatorConfigRestartPolicy struct {
 	Rules []OperatorConfigRestartPolicyRule `json:"rules" yaml:"rules"`
 }
 
+// OperatorConfigAddonRule specifies ClickHouse version and rules for this version
+type OperatorConfigAddonRule struct {
+	Version string   `json:"version" yaml:"version"`
+	Spec    *ChiSpec `json:"spec"    yaml:"spec"`
+}
+
+// OperatorConfigRestartPolicy specifies operator's configuration changes restart policy
+type OperatorConfigAddons struct {
+	Rules []OperatorConfigAddonRule `json:"rules" yaml:"rules"`
+}
+
 // OperatorConfigFile specifies File section
 type OperatorConfigFile struct {
 	Path struct {
@@ -295,6 +306,8 @@ type OperatorConfigClickHouse struct {
 		} `json:"timeouts" yaml:"timeouts"`
 	} `json:"access" yaml:"access"`
 
+	Addons OperatorConfigAddons `json:"addons" yaml:"addons"`
+
 	// Metrics used to specify how the operator fetches metrics from ClickHouse instances
 	Metrics struct {
 		Timeouts struct {
@@ -355,9 +368,6 @@ type OperatorConfigCHIRuntime struct {
 	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
 	Templates []*ClickHouseInstallation `json:"-" yaml:"-"`
 	mutex     sync.RWMutex              `json:"-" yaml:"-"`
-
-	// ClickHouseInstallation template
-	Template *ClickHouseInstallation `json:"-" yaml:"-"`
 }
 
 // OperatorConfigReconcile specifies reconcile section

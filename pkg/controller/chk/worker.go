@@ -172,7 +172,7 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 
 // normalize
 func (w *worker) normalize(c *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	chk, err := normalizer.New().CreateTemplated(c, commonNormalizer.NewOptions())
+	chk, err := normalizer.New().CreateTemplated(c, commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]())
 	if err != nil {
 		w.a.WithEvent(chk, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithError(chk).
@@ -236,11 +236,11 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	if chi, err := w.createCRFromObjectMeta(_cr, true, commonNormalizer.NewOptions()); err == nil {
+	if chi, err := w.createCRFromObjectMeta(_cr, true, commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CR-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CR-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := commonNormalizer.NewOptions()
+		opts := commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCRFromObjectMeta(_cr, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
@@ -434,7 +434,7 @@ func (w *worker) options() *config.FilesGeneratorOptions {
 func (w *worker) createCRFromObjectMeta(
 	meta meta.Object,
 	isCHI bool,
-	options *commonNormalizer.Options,
+	options *commonNormalizer.Options[apiChk.ClickHouseKeeperInstallation],
 ) (*apiChk.ClickHouseKeeperInstallation, error) {
 	w.a.V(3).M(meta).S().P()
 	defer w.a.V(3).M(meta).E().P()

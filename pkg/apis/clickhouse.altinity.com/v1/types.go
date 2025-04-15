@@ -71,6 +71,20 @@ func (runtime *ClickHouseInstallationRuntime) UnlockCommonConfig() {
 	runtime.commonConfigMutex.Unlock()
 }
 
+func (runtime *ClickHouseInstallationRuntime) HasReferenceSoftwareVersion() bool {
+	if runtime == nil {
+		return false
+	}
+	return runtime.MinVersion != nil
+}
+
+func (runtime *ClickHouseInstallationRuntime) GetReferenceSoftwareVersion() *swversion.SoftWareVersion {
+	if runtime.HasReferenceSoftwareVersion() {
+		return runtime.MinVersion
+	}
+	return nil
+}
+
 // +genclient
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

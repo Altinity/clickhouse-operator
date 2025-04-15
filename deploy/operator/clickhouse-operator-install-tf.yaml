@@ -2795,6 +2795,43 @@ spec:
                               minimum: 1
                               maximum: 600
                               description: "Timout to perform SQL query from the operator to ClickHouse instances. In seconds."
+                    addons:
+                      type: object
+                      description: "Configuration addons specifies additional settings"
+                      properties:
+                        rules:
+                          type: array
+                          description: "Array of set of rules per specified ClickHouse versions"
+                          items:
+                            type: object
+                            properties:
+                              version:
+                                type: string
+                                description: "ClickHouse version expression"
+                              spec:
+                                type: object
+                                description: "settings spec"
+                                properties:
+                                  users:
+                                    type: object
+                                    description: "see same section from CR spec"
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  profiles:
+                                    type: object
+                                    description: "see same section from CR spec"
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  quotas:
+                                    type: object
+                                    description: "see same section from CR spec"
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  settings:
+                                    type: object
+                                    description: "see same section from CR spec"
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  files:
+                                    type: object
+                                    description: "see same section from CR spec"
+                                    x-kubernetes-preserve-unknown-fields: true
                     metrics:
                       type: object
                       description: "parameters which use for connect to fetch metrics from clickhouse by clickhouse-operator"

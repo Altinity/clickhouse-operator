@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -29,8 +31,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
+	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -58,24 +62,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	metrics.CHIReconcilesStarted(ctx, new)
 	startTime := time.Now()
 
-	w.a.M(new).F().Info("Changing OLD to Normalized COMPLETED: %s", util.NamespaceNameString(new))
-
-	if new.HasAncestor() {
-		w.a.M(new).F().Info("has ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(new))
-		old = new.GetAncestorT()
-	} else {
-		w.a.M(new).F().Info("has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(new))
-		old = nil
-	}
-
-	w.a.M(new).F().Info("Normalized OLD: %s", util.NamespaceNameString(new))
-	old = w.normalize(old)
-
-	w.a.M(new).F().Info("Normalized NEW: %s", util.NamespaceNameString(new))
-	new = w.normalize(new)
-
-	new.SetAncestor(old)
-	common.LogOldAndNew("normalized", old, new)
+	old, new, _ = w.build(ctx, old, new)
 
 	actionPlan := action_plan.NewActionPlan(old, new)
 	common.LogActionPlan(actionPlan)
@@ -95,7 +82,6 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		return nil
 	}
 
-	w.newTask(new, old)
 	w.markReconcileStart(ctx, new, actionPlan)
 	w.excludeStoppedCHIFromMonitoring(new)
 	w.setHostStatusesPreliminary(ctx, new, actionPlan)
@@ -129,6 +115,111 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	}
 
 	return nil
+}
+
+func (w *worker) build(ctx context.Context, _old, _new *api.ClickHouseInstallation) (*api.ClickHouseInstallation, *api.ClickHouseInstallation, error) {
+	l := w.a.V(1).M(_new).F()
+
+	old := _old
+	new := _new
+	if new.HasAncestor() {
+		l.Info("has ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(new))
+		old = new.GetAncestorT()
+	} else {
+		l.Info("has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(new))
+		old = nil
+	}
+
+	old = w.createTemplated(old)
+	new = w.createTemplated(new)
+	new.SetAncestor(old)
+	w.newTask(new, old)
+	w.findMinMaxVersions(ctx, new)
+
+	common.LogOldAndNew("norm stage 1:", old, new)
+
+	// build appropriate template
+	templates := w.buildTemplates(new)
+	ips := w.c.getPodsIPs(new)
+
+	w.a.V(1).M(new).Info("IPs of the CHI normalizer %s: len: %d %v", util.NamespacedName(new), len(ips), ips)
+	if len(ips) > 0 || len(templates) > 0 {
+		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
+		opts.DefaultUserAdditionalIPs = ips
+		opts.Templates = templates
+		new = w.createTemplated(_new, opts)
+		new.SetAncestor(old)
+		w.newTask(new, old)
+		w.findMinMaxVersions(ctx, new)
+		common.LogOldAndNew("norm stage 2:", old, new)
+	}
+
+	w.fillCurSTS(ctx, new)
+	w.logSWVersion(ctx, new)
+
+	return old, new, nil
+}
+
+func (w *worker) buildFromMeta(ctx context.Context, obj meta.Object, searchByName bool) (*api.ClickHouseInstallation, error) {
+	chi, err := w.createTemplatedCRFromObjectMeta(obj, searchByName, commonNormalizer.NewOptions[api.ClickHouseInstallation]())
+	if err != nil {
+		w.a.M(obj).F().Error("UNABLE-1 to find obj by %t %v err %v", searchByName, obj.GetLabels(), err)
+		return nil, err
+	}
+
+	w.newTask(chi, w.createTemplated(nil))
+	w.findMinMaxVersions(ctx, chi)
+	templates := w.buildTemplates(chi)
+	ips := w.c.getPodsIPs(chi)
+	if len(ips) > 0 || len(templates) > 0 {
+		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
+		opts.DefaultUserAdditionalIPs = ips
+		opts.Templates = templates
+
+		chi, err = w.createTemplatedCRFromObjectMeta(obj, searchByName, opts)
+		if err != nil {
+			w.a.M(obj).F().Error("UNABLE-2 to find obj by %t %v err %v", searchByName, obj.GetLabels(), err)
+			return nil, err
+		}
+	}
+
+	return chi, nil
+}
+
+func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*api.ClickHouseInstallation) {
+	for _, spec := range model.GetConfigMatchSpecs(chi) {
+		templates = append(templates, &api.ClickHouseInstallation{
+			Spec: *spec,
+		})
+	}
+	return nil
+}
+
+func (w *worker) findMinMaxVersions(ctx context.Context, chi *api.ClickHouseInstallation) {
+	// Create artifacts
+	chi.WalkHosts(func(host *api.Host) error {
+		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+		version := w.getHostSoftwareVersion(ctx, host)
+		host.Runtime.Version = version
+		return nil
+	})
+	chi.FindMinMaxVersions()
+}
+
+func (w *worker) fillCurSTS(ctx context.Context, chi *api.ClickHouseInstallation) {
+	chi.WalkHosts(func(host *api.Host) error {
+		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+		return nil
+	})
+}
+
+func (w *worker) logSWVersion(ctx context.Context, chi *api.ClickHouseInstallation) {
+	l := w.a.V(1).F()
+	chi.WalkHosts(func(host *api.Host) error {
+		l.M(host).Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
+		return nil
+	})
+	l.M(chi).Info("CR software versions [min, max]: %s %s", chi.GetMinVersion().Render(), chi.GetMaxVersion().Render())
 }
 
 // reconcile reconciles Custom Resource
@@ -168,23 +259,6 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 
 	w.a.V(2).M(cr).S().P()
 	defer w.a.V(2).M(cr).E().P()
-
-	// Create artifacts
-	cr.WalkHosts(func(host *api.Host) error {
-		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
-		version := w.getHostSoftwareVersion(ctx, host)
-		host.Runtime.Version = version
-		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
-		return nil
-	})
-
-	cr.WalkHosts(func(host *api.Host) error {
-		w.a.V(1).M(host).F().Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
-		return nil
-	})
-
-	cr.FindMinMaxVersions()
-	w.a.V(1).M(cr).F().Info("CR software versions [min, max]: %s %s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
 
 	// CR common ConfigMap without added hosts
 	cr.GetRuntime().LockCommonConfig()
