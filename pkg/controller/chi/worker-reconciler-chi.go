@@ -18,8 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"time"
+
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -32,6 +33,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
+	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -130,9 +132,10 @@ func (w *worker) build(ctx context.Context, _old, _new *api.ClickHouseInstallati
 	old = w.createTemplated(old)
 	new = w.createTemplated(new)
 	new.SetAncestor(old)
-	common.LogOldAndNew("norm stage 1:", old, new)
 	w.newTask(new, old)
 	w.findMinMaxVersions(ctx, new)
+
+	common.LogOldAndNew("norm stage 1:", old, new)
 
 	// build appropriate template
 	templates := w.buildTemplates(new)
@@ -156,11 +159,37 @@ func (w *worker) build(ctx context.Context, _old, _new *api.ClickHouseInstallati
 	return old, new, nil
 }
 
-func (w *worker)buildTemplates(chi *api.ClickHouseInstallation) []*api.ClickHouseInstallation {
+func (w *worker) buildFromMeta(ctx context.Context, obj meta.Object, searchByName bool) (*api.ClickHouseInstallation, error) {
+	chi, err := w.createTemplatedCRFromObjectMeta(obj, searchByName, commonNormalizer.NewOptions[api.ClickHouseInstallation]())
+	if err != nil {
+		w.a.M(obj).F().Error("UNABLE-1 to find obj by %t %v err %v", searchByName, obj.GetLabels(), err)
+		return nil, err
+	}
+
+	w.newTask(chi, w.createTemplated(nil))
+	w.findMinMaxVersions(ctx, chi)
+	templates := w.buildTemplates(chi)
+	ips := w.c.getPodsIPs(chi)
+	if len(ips) > 0 || len(templates) > 0 {
+		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
+		opts.DefaultUserAdditionalIPs = ips
+		opts.Templates = templates
+
+		chi, err = w.createTemplatedCRFromObjectMeta(obj, searchByName, opts)
+		if err != nil {
+			w.a.M(obj).F().Error("UNABLE-2 to find obj by %t %v err %v", searchByName, obj.GetLabels(), err)
+			return nil, err
+		}
+	}
+
+	return chi, nil
+}
+
+func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) []*api.ClickHouseInstallation {
 	return nil
 }
 
-func (w *worker)findMinMaxVersions(ctx context.Context, chi *api.ClickHouseInstallation) {
+func (w *worker) findMinMaxVersions(ctx context.Context, chi *api.ClickHouseInstallation) {
 	// Create artifacts
 	chi.WalkHosts(func(host *api.Host) error {
 		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
