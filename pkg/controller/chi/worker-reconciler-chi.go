@@ -31,6 +31,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
@@ -185,7 +186,12 @@ func (w *worker) buildFromMeta(ctx context.Context, obj meta.Object, searchByNam
 	return chi, nil
 }
 
-func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) []*api.ClickHouseInstallation {
+func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*api.ClickHouseInstallation) {
+	for _, spec := range model.GetConfigMatchSpecs(chi) {
+		templates = append(templates, &api.ClickHouseInstallation{
+			Spec: *spec,
+		})
+	}
 	return nil
 }
 
