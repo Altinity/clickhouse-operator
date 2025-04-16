@@ -4436,10 +4436,9 @@ def test_044(self):
     util.require_keeper(keeper_type=self.context.keeper_type)
     operator_namespace = current().context.operator_namespace
 
-    with Given("I change operator statefullSet timeout"):
-        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
+    util.apply_operator_config("manifests/chopconf/test-044-chopconf.yaml")
 
-    with And("CHI with 1 replica is installed"):
+    with Given("CHI with 1 replica is installed"):
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -4448,7 +4447,7 @@ def test_044(self):
             },
         )
 
-    with When("I create replicated table on the first replica"):
+    with And("I create replicated table on the first replica"):
         clickhouse.query(
             chi,
             """CREATE TABLE test_local (a UInt32)
@@ -4456,7 +4455,7 @@ def test_044(self):
             PARTITION BY tuple() ORDER BY a"""
         )
 
-    with And("I add 1 slow replica"):
+    with Then("I add 1 slow replica"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-044-1-slow-propagation.yaml",
             check={
@@ -4465,7 +4464,7 @@ def test_044(self):
                 "chi_status": "InProgress"
             },
         )
-        kubectl.wait_chi_status(chi, "Aborted", retries=6) # Fail faster than default
+        kubectl.wait_chi_status(chi, "Aborted", retries=7) # Fail faster than default
 
         client_pod = f"chi-{chi}-{cluster}-0-1-0"
         kubectl.wait_field(
