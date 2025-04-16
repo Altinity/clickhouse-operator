@@ -9,10 +9,8 @@ xfails = {
     # test_operator.py
     "/regression/e2e.test_operator/test_009*": [(Fail, "deal with it later")],
     "/regression/e2e.test_operator/test_014*": [(Fail, "test 14 is affected by other tests")],
-    "/regression/e2e.test_operator/test_044*": [(Fail, "deal with it later")],
     "/regression/e2e.test_operator/test_049*": [(Fail, "Keeper is flaky")],
     "/regression/e2e.test_operator/test_052*": [(Fail, "Keeper scale-up/scale-down is flaky")],
-    "/regression/e2e.test_operator/test_053*": [(Fail, "deal with it later")],
     # test_clickhouse.py
     "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
     # test_metrics_alerts.py

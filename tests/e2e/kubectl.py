@@ -399,12 +399,13 @@ def wait_field(
     shell=None,
 ):
     with Then(f"{kind} {name} {field} should be {value}"):
+        cur_value = get_field(kind, name, field, ns, shell=shell)
         for i in range(1, retries):
-            cur_value = get_field(kind, name, field, ns, shell=shell)
             if cur_value == value:
                 break
             with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
                 time.sleep(i * backoff)
+            cur_value = get_field(kind, name, field, ns, shell=shell)
         assert cur_value == value or throw_error is False, error()
 
 
