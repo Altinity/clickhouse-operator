@@ -224,7 +224,7 @@ func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 			Selector:                 m.tagger.Selector(interfaces.SelectorHostScope, host),
 			ClusterIP:                TemplateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
-			PublishNotReadyAddresses: true,
+			PublishNotReadyAddresses: false,
 		},
 	}
 	creator.SvcAppendSpecifiedPorts(svc, host)
