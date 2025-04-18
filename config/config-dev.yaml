@@ -173,9 +173,61 @@ clickhouse:
     # Specified in seconds.
     timeouts:
       # Timout to setup connection from the operator to ClickHouse instances. In seconds.
-      connect: 2
+      connect: 1
       # Timout to perform SQL query from the operator to ClickHouse instances. In seconds.
-      query: 5
+      query: 4
+
+  ################################################
+  ##
+  ## Addons specifies additional configuration sections
+  ## Should it be called something like "templates"?
+  ##
+  ################################################
+  addons:
+    rules:
+      - version: "*"
+        spec:
+          configuration:
+            users:
+            profiles:
+            quotas:
+            settings:
+            files:
+      - version: ">= 23.3"
+        spec:
+          configuration:
+            ###
+            ### users.d is global while description depends on CH version which may vary on per-host basis
+            ### In case of global-ness this may be better to implement via auto-templates
+            ###
+            ### As a solution, this may be applied on the whole cluster based on any of its hosts
+            ###
+            ### What to do when host is just created? CH version is not known prior to CH started and user config is required before CH started.
+            ### We do not have any info about the cluster on initial creation
+            ###
+            users:
+              "{clickhouseOperatorUser}/access_management": 1
+              "{clickhouseOperatorUser}/named_collection_control": 1
+              "{clickhouseOperatorUser}/show_named_collections": 1
+              "{clickhouseOperatorUser}/show_named_collections_secrets": 1
+            profiles:
+            quotas:
+            settings:
+            files:
+
+      - version: ">= 23.5"
+        spec:
+          configuration:
+            users:
+            profiles:
+            quotas:
+            settings:
+              ##
+              ## this may be added on per-host basis into host's conf.d folder
+              ##
+              format_display_secret_in_show_and_select: 1
+              display_secrets_in_show_and_select: 1
+            files:
 
   #################################################
   ##
