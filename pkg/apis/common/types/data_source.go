@@ -23,3 +23,22 @@ type DataSource struct {
 	// SecretKeyRef points to a secret and mirrors k8s SecretSource type
 	SecretKeyRef *core.SecretKeySelector `json:"secretKeyRef,omitempty" yaml:"secretKeyRef,omitempty"`
 }
+
+func (in *DataSource) DeepCopy() *DataSource {
+	if in == nil {
+		return nil
+	}
+	out := new(DataSource)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *DataSource) DeepCopyInto(out *DataSource) {
+	*out = *in
+	if in.SecretKeyRef != nil {
+		in, out := &in.SecretKeyRef, &out.SecretKeyRef
+		*out = new(core.SecretKeySelector)
+		(*in).DeepCopyInto(*out)
+	}
+	return
+}
