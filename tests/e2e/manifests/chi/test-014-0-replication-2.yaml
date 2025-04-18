@@ -18,7 +18,6 @@ spec:
           port: 2181
       session_timeout_ms: 5000
       operation_timeout_ms: 5000
-      root: /test/root/path
     clusters:
       - name: default
         layout:
@@ -28,3 +27,8 @@ spec:
       default/database_atomic_wait_for_drop_and_detach_synchronously: 1
       default/allow_experimental_live_view: 1
       default/allow_experimental_database_replicated: 1
+    users:
+      test_014/password: test_014
+      test_014/networks/ip: "::/1"
+    settings:
+      logger/level: information
