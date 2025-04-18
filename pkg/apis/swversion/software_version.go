@@ -34,6 +34,25 @@ type SoftWareVersion struct {
 	semver *semver.Version
 }
 
+func (in *SoftWareVersion) DeepCopy() *SoftWareVersion {
+	if in == nil {
+		return nil
+	}
+	out := new(SoftWareVersion)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *SoftWareVersion) DeepCopyInto(out *SoftWareVersion) {
+	*out = *in
+	if in.semver != nil {
+		in, out := &in.semver, &out.semver
+		*out = new(semver.Version)
+		*out = *in
+	}
+	return
+}
+
 // NewSoftWareVersion creates new software version
 // version - specifies original software version, such as: 21 or 21.1 or 21.9.6.24-alpha
 func NewSoftWareVersion(version string) *SoftWareVersion {
