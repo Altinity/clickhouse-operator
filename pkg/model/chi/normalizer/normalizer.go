@@ -563,10 +563,16 @@ func (n *Normalizer) normalizeUsersList(users *chi.Settings, extraUsernames ...s
 const defaultUsername = "default"
 const chopProfile = "clickhouse_operator"
 
+const clickhouseOperatorUserMacro = "{clickhouseOperatorUser}"
+
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings) *chi.Settings {
 	// Ensure and normalizeTarget user settings
-	users = users.Ensure().Normalize()
+	users = users.Ensure().Normalize(&chi.SettingsNormalizerOptions{
+		Macros: map[string]string{
+			clickhouseOperatorUserMacro: chop.Config().ClickHouse.Access.Username,
+		},
+	})
 
 	// Add special "default" user to the list of users, which is used/required for:
 	// 1. ClickHouse hosts to communicate with each other
