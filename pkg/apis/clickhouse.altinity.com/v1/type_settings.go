@@ -64,6 +64,10 @@ func NewSettings() *Settings {
 	return s
 }
 
+func NewSettingsScalarFromMap(m map[string]string) *Settings {
+	return NewSettings().SetScalarsFromMap(m)
+}
+
 // ensureDataStorage ensures all internals of the structure are in place
 func (s *Settings) ensureDataStorage() {
 	if s == nil {
