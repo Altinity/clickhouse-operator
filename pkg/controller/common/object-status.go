@@ -52,8 +52,9 @@ func GetObjectStatusFromMetas(labeler interfaces.ILabeler, curMeta, newMeta meta
 	}
 
 	log.M(newMeta).F().Info(
-		"cur and new objects ARE DIFFERENT based on object version label: Update of the object is required. Object: %s",
+		"cur and new objects ARE DIFFERENT based on object version label: Update of the object is required. Object: %s. Cur: %s New: %s",
 		util.NamespaceNameString(newMeta),
+		curVersion, newVersion,
 	)
 
 	return types.ObjectStatusModified
