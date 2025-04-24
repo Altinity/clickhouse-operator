@@ -1469,6 +1469,9 @@ def test_014_0(self):
         "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)",
         "CREATE DATABASE test_memory_014 ON CLUSTER '{cluster}' Engine = Memory",
         "CREATE VIEW test_memory_014.test_view2_014 ON CLUSTER '{cluster}' AS SELECT * from system.tables",
+        # dictionary with a user, requires special settings for clickhouse_operator user
+        "CREATE DICTIONARY test_dict_014_2 (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local_014' user 'test_014' PASSWORD 'test_014')) LAYOUT(FLAT()) LIFETIME(0)"
+
     ]
 
     chi_version = clickhouse.query(chi_name, "select value from system.build_options where name='VERSION_INTEGER'")
@@ -1510,51 +1513,65 @@ def test_014_0(self):
                 )
 
     def check_schema_propagation(replicas):
-        with Then("Schema objects should be migrated to the new replicas"):
-            for replica in replicas:
-                host = f"chi-{chi_name}-{cluster}-0-{replica}"
-                print(f"Checking replica {host}")
-                print("Checking tables and views")
-                for obj in schema_objects:
-                    print(f"Checking {obj}")
+        for replica in replicas:
+            host = f"chi-{chi_name}-{cluster}-0-{replica}"
+            with Then(f"Schema objects should be migrated to {host}"):
+                with Then("Checking tables and views"):
+                    for obj in schema_objects:
+                        print(f"Checking {obj}")
+                        out = clickhouse.query(
+                            chi_name,
+                            f"SELECT count() FROM system.tables WHERE name = '{obj}'",
+                            host=host,
+                        )
+                        assert out == "1"
+
+                with And("Checking dictionaries"):
                     out = clickhouse.query(
                         chi_name,
-                        f"SELECT count() FROM system.tables WHERE name = '{obj}'",
+                        f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict_014'",
                         host=host,
                     )
                     assert out == "1"
-
-                print("Checking dictionaries")
-                out = clickhouse.query(
-                    chi_name,
-                    f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict_014'",
-                    host=host,
-                )
-                assert out == "1"
-
-                print("Checking database engine")
-                out = clickhouse.query(
-                    chi_name,
-                    f"SELECT engine FROM system.databases WHERE name = 'test_atomic_014'",
-                    host=host,
-                )
-                assert out == "Atomic"
-
-                if "test_s3_014" in create_ddls:
                     out = clickhouse.query(
                         chi_name,
-                        f"SELECT engine FROM system.databases WHERE name = 'test_s3_014'",
+                        f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict_014_2'",
                         host=host,
+                    )
+                    assert out == "1"
+                    with Then("Checking dictionary with hidden properties"):
+                        out = clickhouse.query_with_error(
+                            chi_name,
+                            f"SELECT count() FROM test_dict_014_2",
+                            host=host,
                         )
-                    assert out == "S3"
+                        if "Exception" in out:
+                            print(out)
+                        assert "Exception" not in out, error(out)
 
-                print("Checking functions")
-                out = clickhouse.query(
-                    chi_name,
-                    f"SELECT count() FROM system.functions WHERE name = 'test_014'",
-                    host=host,
-                )
-                assert out == "1"
+                with And("Checking database engines"):
+                    out = clickhouse.query(
+                        chi_name,
+                        f"SELECT engine FROM system.databases WHERE name = 'test_atomic_014'",
+                        host=host,
+                    )
+                    assert out == "Atomic"
+
+                    if "test_s3_014" in create_ddls:
+                        out = clickhouse.query(
+                            chi_name,
+                            f"SELECT engine FROM system.databases WHERE name = 'test_s3_014'",
+                            host=host,
+                            )
+                        assert out == "S3"
+
+                with And("Checking functions"):
+                    out = clickhouse.query(
+                        chi_name,
+                        f"SELECT count() FROM system.functions WHERE name = 'test_014'",
+                        host=host,
+                    )
+                    assert out == "1"
 
         with And("Replicated database should have correct uuid, so new tables are automatically created"):
             import time
@@ -1725,7 +1742,7 @@ def test_014_0(self):
                 chi_name,
                 f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{cluster}/tables/0/default'",
             )
-            note(f"Found {out} replicated tables in {self.context.keeper_type}")
+            print(f"Found {out} replicated tables in {self.context.keeper_type}")
             assert "DB::Exception: No node" in out or out == "0"
 
     with Finally("I clean up"):
