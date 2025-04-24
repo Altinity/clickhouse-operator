@@ -28,6 +28,8 @@ For upgrade please install CRDs separately:
 |-----|------|---------|-------------|
 | additionalResources | list | `[]` | list of additional resources to create (processed via `tpl` function), useful for create ClickHouse clusters together with clickhouse-operator. check `kubectl explain chi` for details |
 | affinity | object | `{}` | affinity for scheduler pod assignment, check `kubectl explain pod.spec.affinity` for details |
+| commonAnnotations | object | `{}` | set of annotations that will be applied to all the resources for the operator |
+| commonLabels | object | `{}` | set of labels that will be applied to all the resources for the operator |
 | configs | object | check the `values.yaml` file for the config content (auto-generated from latest operator release) | clickhouse operator configs |
 | dashboards.additionalLabels | object | `{"grafana_dashboard":""}` | labels to add to a secret with dashboards |
 | dashboards.annotations | object | `{}` | annotations to add to a secret with dashboards |
@@ -43,6 +45,7 @@ For upgrade please install CRDs separately:
 | metrics.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
 | metrics.resources | object | `{}` | custom resource configuration |
 | nameOverride | string | `""` | override name of the chart |
+| namespaceOverride | string | `""` |  |
 | nodeSelector | object | `{}` | node for scheduler pod assignment, check `kubectl explain pod.spec.nodeSelector` for details |
 | operator.containerSecurityContext | object | `{}` |  |
 | operator.env | list | `[]` | additional environment variables for the clickhouse-operator container in deployment possible format value `[{"name": "SAMPLE", "value": "text"}]` |
