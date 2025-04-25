@@ -4503,8 +4503,8 @@ data:
                   ##
                   ## this may be added on per-host basis into host's conf.d folder
                   ##
-                  format_display_secret_in_show_and_select: 1
-                  display_secrets_in_show_and_select: 1
+    #              format_display_secret_in_show_and_select: 1
+    #              display_secrets_in_show_and_select: 1
                 files:
     
       #################################################
