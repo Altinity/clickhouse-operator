@@ -51,8 +51,8 @@ helm.sh/chart: {{ include "altinity-clickhouse-operator.chart" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
-{{- if .Values.podLabels }}
-{{ toYaml .Values.podLabels }}
+{{- if .Values.commonLabels }}
+{{ toYaml .Values.commonLabels }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
@@ -63,6 +63,17 @@ Selector labels
 {{- define "altinity-clickhouse-operator.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "altinity-clickhouse-operator.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+{{/*
+Common annotations
+*/}}
+{{- define "altinity-clickhouse-operator.annotations" -}}
+meta.helm.sh/release-name: {{ .Release.Name }}
+meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+{{- if .Values.commonAnnotations }}
+{{ toYaml .Values.commonAnnotations }}
+{{- end -}}
 {{- end -}}
 
 {{/*
