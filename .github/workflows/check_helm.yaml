@@ -25,6 +25,10 @@ jobs:
           cpus: max
           memory: max
 
+      - uses: gabe565/setup-helm-docs-action@v1
+        with:
+          version: latest
+
       - name: Local Helm Test
         run: |
           set -xe
