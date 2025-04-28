@@ -43,11 +43,10 @@ def test_001(self):
         kubectl.delete_chi(chi)
     with Then("All objects should be deleted"):
         cnt = kubectl.get_count("all", chi=chi)
-        objets = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
-        if len(objets) > 0:
-            objets = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
+        not_deleted_objects = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb,secrets")
+        if len(not_deleted_objects) > 0:
             print("Some objects were not deleted:")
-            print(objets)
+            print(not_deleted_objects)
         assert cnt == 0
 
     with Finally("I clean up"):
@@ -1454,7 +1453,7 @@ def test_014_0(self):
         "test_atomic_014.test_mv2_014",
     ]
     create_ddls = [
-        "CREATE TABLE test_local_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
+        "CREATE TABLE test_local_014 ON CLUSTER '{cluster}' (a Int8, b Int8 ALIAS a) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
         "CREATE VIEW test_view_014 as SELECT * FROM test_local_014",
         "CREATE VIEW a_view_014 as SELECT * FROM test_view_014",
         "CREATE MATERIALIZED VIEW test_mv_014 Engine = Log as SELECT * from test_local_014",
@@ -1470,7 +1469,7 @@ def test_014_0(self):
         "CREATE DATABASE test_memory_014 ON CLUSTER '{cluster}' Engine = Memory",
         "CREATE VIEW test_memory_014.test_view2_014 ON CLUSTER '{cluster}' AS SELECT * from system.tables",
         # dictionary with a user, requires special settings for clickhouse_operator user
-        "CREATE DICTIONARY test_dict_014_2 (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local_014' user 'test_014' PASSWORD 'test_014')) LAYOUT(FLAT()) LIFETIME(0)"
+        "CREATE DICTIONARY test_dict_014_2 ON CLUSTER '{cluster}' (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local_014' user 'test_014' PASSWORD 'test_014')) LAYOUT(FLAT()) LIFETIME(0)"
 
     ]
 
