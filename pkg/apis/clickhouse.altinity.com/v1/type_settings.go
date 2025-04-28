@@ -64,6 +64,10 @@ func NewSettings() *Settings {
 	return s
 }
 
+func NewSettingsScalarFromMap(m map[string]string) *Settings {
+	return NewSettings().SetScalarsFromMap(m)
+}
+
 // ensureDataStorage ensures all internals of the structure are in place
 func (s *Settings) ensureDataStorage() {
 	if s == nil {
@@ -584,9 +588,17 @@ func (s *Settings) AsSortedSliceOfStrings() []string {
 	return res
 }
 
+type SettingsNormalizerOptions struct {
+	Macros map[string]string
+}
+
 // Normalize normalizes settings
-func (s *Settings) Normalize() *Settings {
+func (s *Settings) Normalize(_opts ...*SettingsNormalizerOptions) *Settings {
 	s.normalizeKeys()
+	if len(_opts) > 0 {
+		opts := _opts[0]
+		s.macroKeys(opts.Macros)
+	}
 	return s
 }
 
@@ -615,6 +627,34 @@ func (s *Settings) normalizeKeys() {
 	// Delete entries with un-normalized keys
 	for _, unNormalizedKey := range keysToNormalize {
 		s.DeleteKey(unNormalizedKey)
+	}
+}
+
+// macroKeys
+func (s *Settings) macroKeys(macros map[string]string) {
+	if s.Len() == 0 {
+		return
+	}
+
+	var keysToProcess []string
+
+	// Find entries with keys to macro
+	s.WalkKeys(func(key string, _ *Setting) {
+		if _, modified := macro(macros, key); modified {
+			// Changed something. This path has to be normalized
+			keysToProcess = append(keysToProcess, key)
+		}
+	})
+
+	// Add entries with normalized keys
+	for _, originalKey := range keysToProcess {
+		processedKey, _ := macro(macros, originalKey)
+		s.SetKey(processedKey, s.GetKey(originalKey))
+	}
+
+	// Delete entries with before-processed keys
+	for _, beforeProcessedKey := range keysToProcess {
+		s.DeleteKey(beforeProcessedKey)
 	}
 }
 
@@ -655,6 +695,14 @@ func normalizeKeyAsPath(path string) (string, bool) {
 	normalized = strings.Trim(normalized, "/")
 
 	return normalized, normalized != path
+}
+
+func macro(macros map[string]string, str string) (string, bool) {
+	processed := str
+	for macro, value := range macros {
+		processed = strings.ReplaceAll(processed, macro, value)
+	}
+	return processed, processed != str
 }
 
 // getPrefixFromPath

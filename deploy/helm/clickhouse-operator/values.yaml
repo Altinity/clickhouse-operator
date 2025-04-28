@@ -1,5 +1,8 @@
 namespaceOverride: ""
-
+# commonLabels -- set of labels that will be applied to all the resources for the operator
+commonLabels: {}
+# commonAnnotations -- set of annotations that will be applied to all the resources for the operator
+commonAnnotations: {}
 operator:
   image:
     # operator.image.repository -- image repository

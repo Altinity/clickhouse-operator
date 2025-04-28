@@ -6,9 +6,10 @@ metadata:
   namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
   labels:
     {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
-  {{- if .Values.serviceMonitor.additionalLabels }}
+    {{- if .Values.serviceMonitor.additionalLabels }}
     {{- toYaml .Values.serviceMonitor.additionalLabels | nindent 4 }}
-  {{- end }}
+    {{- end }}
+  annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
 spec:
   endpoints:
     - port: clickhouse-metrics # 8888

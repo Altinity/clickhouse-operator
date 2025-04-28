@@ -27,11 +27,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-const (
-	knownVersion   = "ok to query CH"
-	unknownVersion = "failed to query CH"
-)
-
 func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host, _opts ...*VersionOptions) *swversion.SoftWareVersion {
 	var opts *VersionOptions
 	if len(_opts) > 0 {
@@ -46,17 +41,20 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host, _op
 	}
 
 	// Fetch tag from the image
-	tag, tagOk := w.task.Creator().GetAppImageTag(host)
+	tag, tagFound := w.task.Creator().GetAppImageTag(host)
+	var tagBasedVersion *swversion.SoftWareVersion
+	if tagFound {
+		tagBasedVersion = swversion.NewSoftWareVersionFromTag(tag)
+	}
 
 	if skip, description := opts.shouldSkip(host); skip {
+		// We know for sure no need to even try to check version from the host itself
+		// Just fall back to tag-based version
 		w.a.V(1).M(host).F().Info("Need to report version from the tag. Tag: %s Host: %s ", tag, host.GetName())
-		if tagOk {
-			if version := swversion.NewSoftWareVersionFromTag(tag); version != nil {
-				// Able to report version from the tag
-				return version.SetDescription("parsed from tag: '" + tag + "' via " + description)
-			}
+		if tagBasedVersion != nil {
+			// Able to report version from the tag
+			return tagBasedVersion.SetDescription("parsed from tag: '" + tag + "' via " + description)
 		}
-
 		// Unable to report version from the tag - report min one
 		return swversion.MinVersion().SetDescription("set min version cause unable to parse from tag: '" + tag + "' via " + description)
 	}
@@ -65,11 +63,19 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host, _op
 
 	if version, err := w.getHostClickHouseVersion(ctx, host); err == nil {
 		// Able to fetch version from the app - report version
-		return version.SetDescription(knownVersion)
+		return version.SetDescription("fetched from host")
 	}
 
-	// Unable to fetch version fom the app - report min one
-	return swversion.MinVersion().SetDescription(unknownVersion)
+	// Unable to fetch version fom the app
+	// Try to fallback to tag-based version
+
+	if tagBasedVersion != nil {
+		// Able to report version from the tag
+		return tagBasedVersion.SetDescription("parsed from tag: '" + tag + "'")
+	}
+
+	// Unable to report version from the tag - report min one
+	return swversion.MinVersion().SetDescription("min - unable to parse neither from host nor from tag: '" + tag + "'")
 }
 
 func (w *worker) isHostSoftwareAbleToRespond(ctx context.Context, host *api.Host) error {

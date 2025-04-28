@@ -28,6 +28,7 @@ import (
 	log "github.com/golang/glog"
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
+
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -197,8 +198,20 @@ type OperatorConfigRestartPolicy struct {
 
 // OperatorConfigAddonRule specifies ClickHouse version and rules for this version
 type OperatorConfigAddonRule struct {
-	Version string   `json:"version" yaml:"version"`
-	Spec    *ChiSpec `json:"spec"    yaml:"spec"`
+	Version string     `json:"version,omitempty" yaml:"version,omitempty"`
+	Spec    *AddonSpec `json:"spec,omitempty"    yaml:"spec,omitempty"`
+}
+
+type AddonSpec struct {
+	Configuration *AddonConfiguration `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+}
+
+type AddonConfiguration struct {
+	Users    map[string]string `json:"users,omitempty"     yaml:"users,omitempty"`
+	Profiles map[string]string `json:"profiles,omitempty"  yaml:"profiles,omitempty"`
+	Quotas   map[string]string `json:"quotas,omitempty"    yaml:"quotas,omitempty"`
+	Settings map[string]string `json:"settings,omitempty"  yaml:"settings,omitempty"`
+	Files    map[string]string `json:"files,omitempty"     yaml:"files,omitempty"`
 }
 
 // OperatorConfigRestartPolicy specifies operator's configuration changes restart policy

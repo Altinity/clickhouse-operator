@@ -2777,28 +2777,32 @@ spec:
                             description: "ClickHouse version expression"
                           spec:
                             type: object
-                            description: "settings spec"
+                            description: "spec"
                             properties:
-                              users:
+                              configuration:
                                 type: object
-                                description: "see same section from CR spec"
-                                x-kubernetes-preserve-unknown-fields: true
-                              profiles:
-                                type: object
-                                description: "see same section from CR spec"
-                                x-kubernetes-preserve-unknown-fields: true
-                              quotas:
-                                type: object
-                                description: "see same section from CR spec"
-                                x-kubernetes-preserve-unknown-fields: true
-                              settings:
-                                type: object
-                                description: "see same section from CR spec"
-                                x-kubernetes-preserve-unknown-fields: true
-                              files:
-                                type: object
-                                description: "see same section from CR spec"
-                                x-kubernetes-preserve-unknown-fields: true
+                                description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
+                                properties:
+                                  users:
+                                    type: object
+                                    description: "see same section from CR spec"
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  profiles:
+                                    type: object
+                                    description: "see same section from CR spec"
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  quotas:
+                                    type: object
+                                    description: "see same section from CR spec"
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  settings:
+                                    type: object
+                                    description: "see same section from CR spec"
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  files:
+                                    type: object
+                                    description: "see same section from CR spec"
+                                    x-kubernetes-preserve-unknown-fields: true
                 metrics:
                   type: object
                   description: "parameters which use for connect to fetch metrics from clickhouse by clickhouse-operator"
@@ -4339,6 +4343,10 @@ data:
               - settings/macros/*: "no"
               - settings/remote_servers/*: "no"
               - settings/user_directories/*: "no"
+
+              # these settings should not lead to pod restarts
+              - settings/format_display_secret_in_show_and_select: "no"
+              - settings/display_secrets_in_show_and_select: "no"
 
               - zookeeper/*: "yes"
 

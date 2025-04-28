@@ -29,6 +29,27 @@ type ReconcileAttributes struct {
 	tags   Tags
 }
 
+func (in *ReconcileAttributes) DeepCopy() *ReconcileAttributes {
+	if in == nil {
+		return nil
+	}
+	out := new(ReconcileAttributes)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *ReconcileAttributes) DeepCopyInto(out *ReconcileAttributes) {
+	*out = *in
+	if in.tags != nil {
+		in, out := &in.tags, &out.tags
+		*out = make(Tags, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	return
+}
+
 // NewReconcileAttributes creates new reconcile attributes
 func NewReconcileAttributes() *ReconcileAttributes {
 	return &ReconcileAttributes{

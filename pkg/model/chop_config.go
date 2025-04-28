@@ -15,8 +15,6 @@
 package model
 
 import (
-	"fmt"
-
 	"gopkg.in/d4l3k/messagediff.v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -38,6 +36,23 @@ func isSettingsChangeRequiresReboot(host *api.Host, configurationRestartPolicyRu
 	}
 	affectedPaths := api.ListAffectedSettingsPathsFromDiff(a, b, diff, configurationRestartPolicyRulesSection)
 	return isListedChangeRequiresReboot(host, affectedPaths)
+}
+
+func versionMatches(target any, versionConstraint string) bool {
+	switch typed := target.(type) {
+	case *api.Host:
+		host := typed
+		matches := hostVersionMatches(host, versionConstraint)
+		log.Info("versionConstraint host: %s version: %s constraint: %s matches: %t", host.GetName(), host.Runtime.Version.Render(), versionConstraint, matches)
+		return matches
+	case *api.ClickHouseInstallation:
+		chi := typed
+		matches := chiVersionMatches(chi, versionConstraint)
+		log.Info("versionConstraint chi: %s version: %s constraint: %s matches: %t", chi.GetName(), chi.EnsureRuntime().MinVersion.Render(), versionConstraint, matches)
+		return matches
+	default:
+		panic("unexpected flow")
+	}
 }
 
 // hostVersionMatches checks whether host's ClickHouse version matches specified constraint
@@ -78,8 +93,7 @@ func getLatestConfigMatchValue(host *api.Host, path string) (matches bool, value
 	// Check all rules
 	for _, r := range chop.Config().ClickHouse.ConfigRestartPolicy.Rules {
 		// Check ClickHouse version of a particular rule
-		_ = fmt.Sprintf("%s", r.Version)
-		if hostVersionMatches(host, r.Version) {
+		if versionMatches(host, r.Version) {
 			// Yes, this is ClickHouse version of the host.
 			// Check whether any rule matches specified path.
 			for _, rule := range r.Rules {
@@ -96,10 +110,16 @@ func getLatestConfigMatchValue(host *api.Host, path string) (matches bool, value
 
 func GetConfigMatchSpecs(chi *api.ClickHouseInstallation) (specs []*api.ChiSpec) {
 	for _, r := range chop.Config().ClickHouse.Addons.Rules {
-		// Check ClickHouse version of a particular rule
-		_ = fmt.Sprintf("%s", r.Version)
-		if chiVersionMatches(chi, r.Version) {
-			specs = append(specs, r.Spec)
+		if versionMatches(chi, r.Version) {
+			specs = append(specs, &api.ChiSpec{
+				Configuration: &api.Configuration{
+					Users:    api.NewSettingsScalarFromMap(r.Spec.Configuration.Users),
+					Profiles: api.NewSettingsScalarFromMap(r.Spec.Configuration.Profiles),
+					Quotas:   api.NewSettingsScalarFromMap(r.Spec.Configuration.Quotas),
+					Settings: api.NewSettingsScalarFromMap(r.Spec.Configuration.Settings),
+					Files:    api.NewSettingsScalarFromMap(r.Spec.Configuration.Files),
+				},
+			})
 		}
 	}
 	return specs

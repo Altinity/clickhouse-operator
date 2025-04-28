@@ -175,7 +175,6 @@ func (w *worker) buildFromMeta(ctx context.Context, obj meta.Object, searchByNam
 		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
 		opts.Templates = templates
-
 		chi, err = w.createTemplatedCRFromObjectMeta(obj, searchByName, opts)
 		if err != nil {
 			w.a.M(obj).F().Error("UNABLE-2 to find obj by %t %v err %v", searchByName, obj.GetLabels(), err)
@@ -192,7 +191,7 @@ func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*a
 			Spec: *spec,
 		})
 	}
-	return nil
+	return templates
 }
 
 func (w *worker) findMinMaxVersions(ctx context.Context, chi *api.ClickHouseInstallation) {

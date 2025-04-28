@@ -113,6 +113,10 @@ clickhouse:
           - settings/remote_servers/*: "no"
           - settings/user_directories/*: "no"
 
+          # these settings should not lead to pod restarts
+          - settings/format_display_secret_in_show_and_select: "no"
+          - settings/display_secrets_in_show_and_select: "no"
+
           - zookeeper/*: "yes"
 
           - files/*.xml: "yes"

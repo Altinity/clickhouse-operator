@@ -322,7 +322,7 @@ def test_operator_restart(self, manifest, service, version=None):
         pod=f"chi-{chi}-{cluster}-0-0-0"
     )
     trigger_event.set()
-    time.sleep(5) # let threads to finish
+    time.sleep(5)   # let threads to finish
     join()
 
     # with Then("I recreate shell"):
@@ -4872,13 +4872,9 @@ def test_050(self):
             assert kubectl.get_field("pvc", f"-l clickhouse.altinity.com/chi={chi}", f".metadata.{type}s.{key}") == value
 
     test_labels(chi, "label", "include_this_label", "test-050-label")
-
     test_labels(chi, "label", "exclude_this_label", "<none>")
-
     test_labels(chi, "annotation", "include_this_annotation", "test-050-annotation")
-
     test_labels(chi, "annotation", "exclude_this_annotation", "<none>")
-
 
     with Then("Check that exposed metrics do not have labels and annotations that are excluded"):
         operator_namespace=current().context.operator_namespace
@@ -4888,7 +4884,7 @@ def test_050(self):
         # chi_clickhouse_metric_VersionInteger{chi="test-050",exclude_this_annotation="test-050-annotation",hostname="chi-test-050-default-0-0.test-050-e1884706-9a94-11ef-a786-367ddacfe5fd.svc.cluster.local",include_this_annotation="test-050-annotation",include_this_label="test-050-label",namespace="test-050-e1884706-9a94-11ef-a786-367ddacfe5fd"}
         expect_labels = f"chi=\"test-050\",hostname=\"chi-test-050-default-0-0.{operator_namespace}.svc.cluster.local\",include_this_annotation=\"test-050-annotation\",include_this_label=\"test-050-label\""
         check_metrics_monitoring(
-            operator_namespace = operator_namespace,
+            operator_namespace=operator_namespace,
             operator_pod=operator_pod,
             expect_metric="chi_clickhouse_metric_VersionInteger",
             expect_labels=expect_labels
@@ -5086,6 +5082,7 @@ def test_051_1(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_052. Clickhouse-keeper scale-up/scale-down")
 def test_052(self):
@@ -5158,7 +5155,6 @@ def test_052(self):
 
     # check_replication(chi, {0,1}, 4)
 
-
     with Then("Rescale CHK back to 1 replica"):
         kubectl.create_and_check(
             manifest="manifests/chk/test-052-chk-rescale-1.yaml", kind="chk",
@@ -5192,6 +5188,7 @@ def check_replication(chi, replicas, token, table = ''):
                 out = clickhouse.query(chi, f"SELECT a from {table} where a={token}", host=f"chi-{chi}-{cluster}-0-{replica}-0")
                 assert out == f"{token}", error()
 
+
 @TestScenario
 @Name("test_053. Check that standard Kubernetes annotations are ignored if set to StatefulSet externally")
 @Tags("NO_PARALLEL")
@@ -5202,7 +5199,7 @@ def test_053(self):
         current().context.operator_version = version_from
         create_shell_namespace_clickhouse_template()
 
-    manifest="manifests/chi/test-005-acm.yaml"
+    manifest = "manifests/chi/test-005-acm.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     sts = f"chi-{chi}-t1-0-0"
     pod = f"{sts}-0"
@@ -5258,6 +5255,7 @@ def test_053(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_054. Test that 'suspend' mode delays any changes until unsuspended")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0"))
@@ -5303,6 +5301,7 @@ def test_054(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 @TestScenario
 @Name("test_055. Test that restart rules can be merged from CHOP configuration")
@@ -5375,6 +5374,7 @@ def cleanup_chis(self):
                 if ns_name.startswith("test") and ns_name != self.context.test_namespace:
                     with Then(f"Delete ns {ns_name}"):
                         util.delete_namespace(namespace = ns_name, delete_chi=True)
+
 
 @TestModule
 @Name("e2e.test_operator")
