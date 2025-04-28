@@ -224,6 +224,12 @@ spec:
                 endpoint:
                   type: string
                   description: "Endpoint"
+                endpoints:
+                  type: array
+                  description: "All endpoints"
+                  nullable: true
+                  items:
+                    type: string
                 generation:
                   type: integer
                   minimum: 0
@@ -239,6 +245,12 @@ spec:
                 hostsWithTablesCreated:
                   type: array
                   description: "List of hosts with tables created by the operator"
+                  nullable: true
+                  items:
+                    type: string
+                hostsWithReplicaCaughtUp:
+                  type: array
+                  description: "List of hosts with replica caught up"
                   nullable: true
                   items:
                     type: string
@@ -483,7 +495,13 @@ spec:
                           description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                         serviceTemplate:
                           type: string
-                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                          description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                        serviceTemplates:
+                          type: array
+                          description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                          nullable: true
+                          items:
+                            type: string
                         clusterServiceTemplate:
                           type: string
                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -530,6 +548,9 @@ spec:
                               secure:
                                 !!merge <<: *TypeStringBool
                                 description: "if a secure connection to Zookeeper is required"
+                              availabilityZone:
+                                type: string
+                                description: "availability zone for Zookeeper node"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
