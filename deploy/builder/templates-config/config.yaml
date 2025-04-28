@@ -217,8 +217,7 @@ clickhouse:
           configuration:
             users:
             profiles:
-              clickhouse_operator:
-                format_display_secret_in_show_and_select: 1
+              clickhouse_operator/format_display_secret_in_show_and_select: 1
             quotas:
             settings:
               ##
