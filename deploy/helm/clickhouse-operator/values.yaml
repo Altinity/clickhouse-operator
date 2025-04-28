@@ -303,6 +303,9 @@ configs:
                 - settings/macros/*: "no"
                 - settings/remote_servers/*: "no"
                 - settings/user_directories/*: "no"
+                # these settings should not lead to pod restarts
+                - settings/format_display_secret_in_show_and_select: "no"
+                - settings/display_secrets_in_show_and_select: "no"
                 - zookeeper/*: "yes"
                 - files/*.xml: "yes"
                 - files/config.d/*.xml: "yes"
@@ -357,11 +360,11 @@ configs:
             query: 4
         ################################################
         ##
-        ## Additional sections
+        ## Addons specifies additional configuration sections
         ## Should it be called something like "templates"?
         ##
         ################################################
-        additions:
+        addons:
           rules:
             - version: "*"
               spec:
@@ -524,6 +527,10 @@ configs:
             exclude: true
             queries: true
             include: false
+            replicas:
+              all: no
+              new: yes
+              delay: 10
       ################################################
       ##
       ## Annotations management section
