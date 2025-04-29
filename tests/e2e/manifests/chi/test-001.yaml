@@ -6,3 +6,5 @@ spec:
   configuration:
     clusters:
       - name: single
+        secret:
+          auto: "yes"

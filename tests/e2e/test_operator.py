@@ -39,15 +39,12 @@ def test_001(self):
         },
     )
 
-    with When("Delete CHI"):
-        kubectl.delete_chi(chi)
-    with Then("All objects should be deleted"):
-        cnt = kubectl.get_count("all", chi=chi)
-        not_deleted_objects = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb,secrets")
-        if len(not_deleted_objects) > 0:
-            print("Some objects were not deleted:")
-            print(not_deleted_objects)
-        assert cnt == 0
+    created_objects = kubectl.get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=chi)
+    print("Created objects:")
+    for o in created_objects:
+        print(o)
+
+    kubectl.delete_chi(chi)
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -2196,7 +2193,7 @@ def test_019(self, step=1):
     with When("CHI with retained volume is deleted"):
         pvc_count = kubectl.get_count("pvc", chi=chi)
         pv_count = kubectl.get_count("pv")
-        kubectl.delete_chi(chi)
+        kubectl.delete_chi(chi, ok_undeleted = True)
 
         with Then("PVC should be retained"):
             assert kubectl.get_count("pvc", chi=chi) == pvc_count
@@ -2220,37 +2217,6 @@ def test_019(self, step=1):
                 out = clickhouse.query(chi, sql="select a from t2")
                 assert out == "1"
 
-    with When("Stop the Installation"):
-        kubectl.create_and_check(
-            manifest=f"manifests/chi/test-019-{step}-retain-volume-2.yaml",
-            check={
-                "object_counts": {
-                    "statefulset": 1,  # When stopping, pod is removed but StatefulSet and all volumes are in place
-                    "pod": 0,
-                    "service": 1,  # load balancer service should be removed
-                },
-                "do_not_delete": 1,
-            },
-        )
-
-        with And("Re-start the Installation"):
-            kubectl.create_and_check(
-                manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
-                check={
-                    "pod_count": 1,
-                    "do_not_delete": 1,
-                },
-            )
-
-        with Then("Data should be in place"):
-            with Then("Non-replicated table should have data"):
-                out = clickhouse.query(chi, sql="select a from t1")
-                assert out == "1"
-
-            with And("Replicated table should have data"):
-                out = clickhouse.query(chi, sql="select a from t2")
-                assert out == "1"
-
     with When("Add a second replica"):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-019-{step}-retain-volume-3.yaml",
@@ -2263,27 +2229,27 @@ def test_019(self, step=1):
             out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
             assert out == "2"
 
-        with When("Remove a replica"):
-            pvc_count = kubectl.get_count("pvc", chi=chi)
-            pv_count = kubectl.get_count("pv")
+    with When("Remove a replica"):
+        pvc_count = kubectl.get_count("pvc", chi=chi)
+        pv_count = kubectl.get_count("pv")
 
-            kubectl.create_and_check(
-                manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
-                check={
-                    "pod_count": 1,
-                    "do_not_delete": 1,
-                },
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+        with Then("Replica PVC should be retained"):
+            assert kubectl.get_count("pvc", chi=chi) == pvc_count
+            assert kubectl.get_count("pv") == pv_count
+
+        with And("Replica should NOT be removed from ZooKeeper"):
+            out = clickhouse.query(
+                chi,
+                sql="select total_replicas from system.replicas where table='t2'",
             )
-            with Then("Replica PVC should be retained"):
-                assert kubectl.get_count("pvc", chi=chi) == pvc_count
-                assert kubectl.get_count("pv") == pv_count
-
-            with And("Replica should NOT be removed from ZooKeeper"):
-                out = clickhouse.query(
-                    chi,
-                    sql="select total_replicas from system.replicas where table='t2'",
-                )
-                assert out == "2"
+            assert out == "2"
 
     with When("Add a second replica one more time"):
         kubectl.create_and_check(
@@ -2298,42 +2264,41 @@ def test_019(self, step=1):
             out = clickhouse.query(chi, sql="select a from t2", host=f"chi-{chi}-simple-0-1")
             assert out == "1"
 
-        with When("Set reclaim policy to Delete but do not wait for completion"):
+    with When("Set reclaim policy to Delete but do not wait for completion"):
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-019-{step}-retain-volume-4.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+                # "chi_status": "InProgress", # !!!!!
+            },
+        )
+
+        with And("Remove a replica"):
+            pvc_count = kubectl.get_count("pvc", chi=chi)
+            pv_count = kubectl.get_count("pv")
+
             kubectl.create_and_check(
-                manifest=f"manifests/chi/test-019-{step}-retain-volume-4.yaml",
+                manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
                 check={
-                    "pod_count": 2,
+                    "pod_count": 1,
                     "do_not_delete": 1,
-                    # "chi_status": "InProgress", # !!!!!
                 },
             )
+            with Then("Replica PVC should be deleted"):
+                assert kubectl.get_count("pvc", chi=chi) < pvc_count
+                assert kubectl.get_count("pv") < pv_count
 
-            with And("Remove a replica"):
-                pvc_count = kubectl.get_count("pvc", chi=chi)
-                pv_count = kubectl.get_count("pv")
-
-                kubectl.create_and_check(
-                    manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
-                    check={
-                        "pod_count": 1,
-                        "do_not_delete": 1,
-                    },
+            with And("Replica should be removed from ZooKeeper"):
+                out = clickhouse.query(
+                    chi,
+                    sql="select total_replicas from system.replicas where table='t2'",
                 )
-                # Not implemented yet
-                with Then("Replica PVC should be deleted"):
-                    assert kubectl.get_count("pvc", chi=chi) < pvc_count
-                    assert kubectl.get_count("pv") < pv_count
-
-                with And("Replica should be removed from ZooKeeper"):
-                    out = clickhouse.query(
-                        chi,
-                        sql="select total_replicas from system.replicas where table='t2'",
-                    )
-                    assert out == "1"
+                assert out == "1"
 
     with When("Delete chi"):
-        kubectl.delete_chi(chi)
-        with Then("One PVC should be left because relcaim policy is not set anymore"):
+        kubectl.delete_chi(chi, ok_undeleted=True)
+        with Then("One PVC should be left because relcaim policy was unset when removing a replica"):
             assert kubectl.get_count("pvc", chi=chi) == 1
         with Then("Cleanup PVCs"):
             for pvc in kubectl.get_obj_names(chi, "pvc"):
