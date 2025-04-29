@@ -5328,6 +5328,88 @@ def test_055(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+@TestScenario
+@Name("test_056. Test replica delay")
+def test_056(self):
+    create_shell_namespace_clickhouse_template()
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    manifest = f"manifests/chi/test-056-replica-delay.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "do_not_delete": 1,
+                "status": "InPtogress"
+            },
+        )
+
+    with Then("Create a replicated table"):
+        clickhouse.query(chi, "CREATE TABLE test_056 (a Int8) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY a PARTITION by a")
+        clickhouse.query(chi, "INSERT INTO test_056 SELECT 1")
+
+    with And("STOP REPLICATED EENDS"):
+        clickhouse.query(chi, "SYSTEM STOP REPLICATED SENDS")
+
+    with When("Add one more replica, but do not wait for completion"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-056-replica-delay-2.yaml",
+            check={
+                "do_not_delete": 1,
+                "pod_count": 2,
+                "chi_status": "InProgress",
+            },
+        )
+
+        with Then("Table should be created on a new replica"):
+            retries = 10
+            out = 0
+            while retries>0:
+                out = clickhouse.query_with_error(chi, "select count() from system.tables where name='test_056'", host=f"chi-{chi}-{cluster}-0-1-0")
+                if out == "1":
+                    break
+                with Then("Not ready. Wait for 10 seconds"):
+                    time.sleep(10)
+                retries = retries-1
+            assert out == "1", error("Table was not created on a new replica")
+
+        with And("Table should have no data replicated"):
+            out = clickhouse.query(chi, "select count() from test_056", host=f"chi-{chi}-{cluster}-0-1-0")
+            assert out == "0", error("Table data has been replicated")
+
+        with And("Replication delay should be non-zero"):
+            out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
+            assert out != "0"
+
+        with And("Wait 30 seconds"):
+            time.sleep(30)
+
+        with And("Replica still should be unready"):
+            pod = kubectl.get("pod", f"chi-{chi}-{cluster}-0-1-0")
+            assert pod["metadata"]["labels"]["clickhouse.altinity.com/ready"] !=  "yes",  error("Replica should be unready")
+
+    with When("START REPLICATED SENDS"):
+        clickhouse.query(chi, "SYSTEM START REPLICATED SENDS", host=f"chi-{chi}-{cluster}-0-0-0")
+        time.sleep(10)
+
+        with Then("Replication delay should be zero"):
+            out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
+            assert out == "0"
+
+        with And("Table data should be replicated"):
+            out = clickhouse.query(chi, "select count() from test_056", host=f"chi-{chi}-{cluster}-0-1-0")
+            assert out == "1"
+
+
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):
