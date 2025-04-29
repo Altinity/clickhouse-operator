@@ -5332,6 +5332,9 @@ def test_055(self):
 @Name("test_056. Test replica delay")
 def test_056(self):
     create_shell_namespace_clickhouse_template()
+    with Given("I change operator statefullSet timeout"):
+        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
+
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     manifest = f"manifests/chi/test-056-replica-delay.yaml"
@@ -5388,10 +5391,14 @@ def test_056(self):
             out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
             assert out != "0"
 
-        with And("Wait 30 seconds"):
-            time.sleep(30)
+        with And("Wait 90 seconds"):
+            time.sleep(90)
 
-        with And("Replica still should be unready"):
+        with And("Replication delay should be non-zero"):
+            out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
+            assert out != "0"
+
+        with And("Replica still should be unready after reconcile timeout"):
             pod = kubectl.get("pod", f"chi-{chi}-{cluster}-0-1-0")
             assert pod["metadata"]["labels"]["clickhouse.altinity.com/ready"] !=  "yes",  error("Replica should be unready")
 
