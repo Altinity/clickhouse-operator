@@ -1,4 +1,4 @@
-{{- if (and .Values.rbac.create (not .Values.rbac.namespaceScoped)) -}}
+{{- if (and .Values.rbac.create .Values.rbac.namespaceScoped) -}}
 # Specifies either
 #   ClusterRole
 # or
@@ -7,10 +7,10 @@
 # ClusterRole is namespace-less and must have unique name
 # Role is namespace-bound
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: {{ include "altinity-clickhouse-operator.fullname" . }}
-  #namespace: kube-system
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
   labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
   annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
 rules:

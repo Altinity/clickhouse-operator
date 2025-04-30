@@ -1,4 +1,4 @@
-{{- if (and .Values.rbac.create (not .Values.rbac.namespaceScoped)) -}}
+{{- if (and .Values.rbac.create .Values.rbac.namespaceScoped) -}}
 # Specifies either
 #   ClusterRoleBinding between ClusterRole and ServiceAccount.
 # or
@@ -6,15 +6,15 @@
 # ClusterRoleBinding is namespace-less and must have unique name
 # RoleBinding is namespace-bound
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: {{ include "altinity-clickhouse-operator.fullname" . }}
-  #namespace: kube-system
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
   labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
   annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: {{ include "altinity-clickhouse-operator.fullname" . }}
 subjects:
   - kind: ServiceAccount
