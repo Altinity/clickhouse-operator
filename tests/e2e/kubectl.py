@@ -72,18 +72,29 @@ def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None):
         )
 
 
-def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
+def delete_chi(chi, ns=None, wait=True, ok_undeleted = False, ok_to_fail=False, shell=None):
     delete_kind("chi", chi, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
     if wait:
-            wait_objects(
-                chi,
-                {
-                    "statefulset": 0,
-                    "pod": 0,
-                    "service": 0                },
-                ns,
-                shell=shell
-            )
+        wait_objects(
+            chi,
+            {
+                "statefulset": 0,
+                "pod": 0,
+                "service": 0                },
+            ns,
+            shell=shell
+        )
+
+        with Then("All objects should be deleted"):
+            cnt = get_count("all", chi=chi, ns=ns, shell=shell)
+            not_deleted_objects = get_obj_names(chi, "pod,service,sts,pvc,cm,pdb,secret", ns=ns, shell=shell)
+            not_deleted_objects_ext = get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=chi, ns=ns, shell=shell)
+            if len(not_deleted_objects) > 0 or len(not_deleted_objects_ext) > 0:
+                print("WARNING: some objects were not deleted:")
+                for o in not_deleted_objects_ext:
+                    print(o)
+
+            assert ok_undeleted or cnt == 0
 
 def delete_chk(chk, ns=None, wait=True, ok_to_fail=False, shell=None):
     delete_kind("chk", chk, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
@@ -376,7 +387,7 @@ def wait_chk_status(chk, status, ns=None, retries=max_retries, throw_error=True,
 
 
 def get_chi_status(chi, ns=None):
-    get_field("chi", chi, ".status.status", ns)
+    return get_field("chi", chi, ".status.status", ns)
 
 
 def wait_pod_status(pod, status,shell=None, ns=None):
@@ -504,6 +515,13 @@ def get_obj_names(chi_name, obj_type="pods", ns=None, shell=None):
         ns=ns,
     ).splitlines()
     return obj_names[1:]
+
+def get_obj_names_grepped(obj_type="pods", grep = '', ns=None, shell=None):
+    obj_names = launch(
+        f"get {obj_type} -o=custom-columns=type:.kind,name:.metadata.name",
+        ns=ns,
+    ).splitlines()[1:]
+    return sorted(filter(lambda o: grep in o, obj_names))
 
 
 def get_pod_volumes(chi_name, pod_name="", ns=None, shell=None):
