@@ -619,9 +619,10 @@ def test_010(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
+    chi = "test-010-zk-init"
 
     kubectl.create_and_check(
-        manifest="manifests/chi/test-010-zkroot.yaml",
+        manifest="manifests/chi/test-010-zk-init.yaml",
         check={
             "apply_templates": {
                 current().context.clickhouse_template,
@@ -632,8 +633,11 @@ def test_010(self):
     )
     time.sleep(10)
     with And("ClickHouse should not complain regarding zookeeper path"):
-        out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/' limit 1")
+        out = clickhouse.query_with_error(chi, "select path from system.zookeeper where path = '/' limit 1")
         assert "/" == out
+    with And("Availability zone should be set"):
+        out = clickhouse.query_with_error(chi, "select availability_zone from system.zookeeper_connection")
+        assert "my-azone" == out
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -642,10 +646,10 @@ def test_010(self):
 @Name("test_010_1. Test zookeeper initialization AFTER starting a cluster")
 def test_010_1(self):
     create_shell_namespace_clickhouse_template()
-    chi = "test-010-zkroot"
+    chi = "test-010-zk-init"
 
     kubectl.create_and_check(
-        manifest="manifests/chi/test-010-zkroot.yaml",
+        manifest="manifests/chi/test-010-zk-init.yaml",
         check={
             "apply_templates": {
                 current().context.clickhouse_template,
@@ -658,16 +662,16 @@ def test_010_1(self):
     with Then("Wait 60 seconds for operator to start creating ZooKeeper root"):
         time.sleep(60)
 
-    # with Then("CHI should be in progress with no pods created yet"):
-    #    assert kubectl.get_chi_status(chi) == "InProgress"
-    #    assert kubectl.get_count("pod", chi = chi) == 0
+    with Then("CHI should be in progress with no pods created yet"):
+        assert kubectl.get_chi_status(chi) == "InProgress"
+        assert kubectl.get_count("pod", chi = chi) == 0
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     kubectl.wait_chi_status(chi, "Completed")
 
     with And("ClickHouse should not complain regarding zookeeper path"):
-        out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/' limit 1")
+        out = clickhouse.query_with_error(chi, "select path from system.zookeeper where path = '/' limit 1")
         assert "/" == out
 
     with Finally("I clean up"):

@@ -387,7 +387,7 @@ def wait_chk_status(chk, status, ns=None, retries=max_retries, throw_error=True,
 
 
 def get_chi_status(chi, ns=None):
-    get_field("chi", chi, ".status.status", ns)
+    return get_field("chi", chi, ".status.status", ns)
 
 
 def wait_pod_status(pod, status,shell=None, ns=None):
