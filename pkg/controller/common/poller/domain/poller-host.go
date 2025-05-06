@@ -39,7 +39,7 @@ func PollHost(
 
 	return poller.New(ctx, fmt.Sprintf("%s/%s", host.Runtime.Address.Namespace, host.Runtime.Address.HostName)).
 		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
-		WithMain(&poller.Functions{
+		WithFunctions(&poller.Functions{
 			IsDone: func(_ctx context.Context, _ any) bool {
 				return isDoneFn(_ctx, host)
 			},

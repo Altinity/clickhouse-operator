@@ -568,7 +568,7 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 	return err
 }
 
-// reconcileCluster reconciles ChkCluster, excluding nested shards
+// reconcileCluster reconciles cluster, excluding nested shards
 func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -578,6 +578,14 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 	w.a.V(2).M(cluster).S().P()
 	defer w.a.V(2).M(cluster).E().P()
 
+	w.reconcileClusterService(ctx, cluster)
+	w.reconcileClusterSecret(ctx, cluster)
+	w.reconcileClusterPodDisruptionBudget(ctx, cluster)
+	reconcileZookeeperRootPath(cluster)
+	return nil
+}
+
+func (w *worker) reconcileClusterService(ctx context.Context, cluster *api.Cluster) {
 	// Add Cluster Service
 	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster).First(); service != nil {
 		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCluster, cluster.GetAncestor()).First()
@@ -587,30 +595,27 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
 		}
 	}
-
-	w.reconcileClusterSecret(ctx, cluster)
-
-	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
-	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
-		w.task.RegistryReconciled().RegisterPDB(pdb.GetObjectMeta())
-	} else {
-		w.task.RegistryFailed().RegisterPDB(pdb.GetObjectMeta())
-	}
-
-	reconcileZookeeperRootPath(cluster)
-	return nil
 }
 
 func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *api.Cluster) {
 	// Add cluster's Auto Secret
 	if cluster.Secret.Source() == api.ClusterSecretSourceAuto {
-		if secret := w.task.Creator().CreateClusterSecret(w.c.namer.Name(interfaces.NameClusterAutoSecret, cluster)); secret != nil {
+		if secret := w.task.Creator().CreateClusterSecret(cluster); secret != nil {
 			if err := w.reconcileSecret(ctx, cluster.Runtime.CHI, secret); err == nil {
 				w.task.RegistryReconciled().RegisterSecret(secret.GetObjectMeta())
 			} else {
 				w.task.RegistryFailed().RegisterSecret(secret.GetObjectMeta())
 			}
 		}
+	}
+}
+
+func (w *worker) reconcileClusterPodDisruptionBudget(ctx context.Context, cluster *api.Cluster) {
+	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
+	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
+		w.task.RegistryReconciled().RegisterPDB(pdb.GetObjectMeta())
+	} else {
+		w.task.RegistryFailed().RegisterPDB(pdb.GetObjectMeta())
 	}
 }
 

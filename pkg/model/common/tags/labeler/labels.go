@@ -157,6 +157,19 @@ func (l *Labeler) _labelPDB(cluster api.ICluster) map[string]string {
 	return l.getClusterScope(cluster)
 }
 
+func (l *Labeler) labelSecret(params ...any) map[string]string {
+	var cluster api.ICluster
+	if len(params) > 0 {
+		cluster = params[0].(api.ICluster)
+		return l._labelSecret(cluster)
+	}
+	panic("not enough params for labeler")
+}
+
+func (l *Labeler) _labelSecret(cluster api.ICluster) map[string]string {
+	return l.getClusterScope(cluster)
+}
+
 func (l *Labeler) labelSTS(params ...any) map[string]string {
 	var host *api.Host
 	if len(params) > 0 {

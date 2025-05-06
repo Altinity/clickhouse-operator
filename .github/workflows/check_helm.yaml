@@ -21,14 +21,19 @@ jobs:
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.31.0
+          kubernetes-version: v1.33.0
           cpus: max
           memory: max
+
+      - uses: gabe565/setup-helm-docs-action@v1
+        with:
+          version: latest
 
       - name: Local Helm Test
         run: |
           set -xe
           minikube kubectl create ns test
+          ./dev/generate_helm_chart.sh
           helm install -n test test-operator ./deploy/helm/clickhouse-operator/
           sleep 10
           workflow_count=$(kubectl get all --all-namespaces | grep -c "test-operator")

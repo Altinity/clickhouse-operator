@@ -171,8 +171,19 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 
 	// w.includeHostIntoClickHouseCluster(ctx, host)
 	w.ascendHostInClickHouseCluster(ctx, host)
-	w.catchReplicationLag(ctx, host)
-	_ = w.includeHostIntoService(ctx, host)
+	err := w.catchReplicationLag(ctx, host)
+	if err == nil {
+		w.a.V(1).
+			M(host).F().
+			Info("Replication lag is fine - include host into cluster. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		_ = w.includeHostIntoService(ctx, host)
+	} else {
+		w.a.V(1).
+			M(host).F().
+			Warning("Will NOT include host into cluster due to replication lag. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+	}
 
 	return nil
 }
@@ -297,14 +308,14 @@ func (w *worker) ascendHostInClickHouseCluster(ctx context.Context, host *api.Ho
 	w.task.WaitForConfigMapPropagation(ctx, host)
 }
 
-func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) {
+func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error {
 	if !w.shouldWaitReplicationHost(host) {
 		w.a.V(1).
 			M(host).F().
 			Info("No need to wait to catch replication lag. "+
 				"Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-		return
+		return nil
 	}
 
 	w.a.V(1).
@@ -313,15 +324,28 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) {
 			"Host/shard/cluster: %d/%d/%s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	_ = w.waitHostHasNoReplicationDelay(ctx, host)
+	err := w.waitHostHasNoReplicationDelay(ctx, host)
+	if err == nil {
+		w.a.V(1).
+			M(host).F().
+			Info("Wait for host to catch replication lag - COMPLETED "+
+				"Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName,
+			)
 
-	w.a.V(1).
-		M(host).F().
-		Info("Wait for host to catch replication lag - COMPLETED "+
-			"Host/shard/cluster: %d/%d/%s",
-			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		host.GetCR().IEnsureStatus().PushHostReplicaCaughtUp(w.c.namer.Name(interfaces.NameFQDN, host))
+	} else {
+		w.a.V(1).
+			M(host).F().
+			Info("Wait for host to catch replication lag - FAILED "+
+				"Host/shard/cluster: %d/%d/%s"+
+				"err: %v ",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName,
+				err,
+			)
+	}
 
-	host.GetCR().IEnsureStatus().PushHostReplicaCaughtUp(w.c.namer.Name(interfaces.NameFQDN, host))
+	return err
 }
 
 // shouldExcludeHost determines whether host to be excluded from cluster before reconciling

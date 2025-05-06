@@ -103,7 +103,7 @@ type ICreator interface {
 		host *api.Host,
 		template *api.VolumeClaimTemplate,
 	) *core.PersistentVolumeClaim
-	CreateClusterSecret(name string) *core.Secret
+	CreateClusterSecret(cluster api.ICluster) *core.Secret
 	CreateService(what ServiceType, params ...any) util.Slice[*core.Service]
 	CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet
 	GetAppImageTag(host *api.Host) (string, bool)

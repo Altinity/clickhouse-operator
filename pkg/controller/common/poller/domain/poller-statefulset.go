@@ -56,7 +56,7 @@ func (p *StatefulSetPoller) PollHostStatefulSet(
 		fmt.Sprintf("%s/%s", host.Runtime.Address.Namespace, host.Runtime.Address.StatefulSet),
 	).WithOptions(
 		poller.NewOptions().FromConfig(chop.Config()),
-	).WithMain(
+	).WithFunctions(
 		&poller.Functions{
 			Get: func(_ctx context.Context) (any, error) {
 				return p.kubeSTS.Get(ctx, host)

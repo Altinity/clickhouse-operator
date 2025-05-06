@@ -4391,7 +4391,6 @@ data:
               - settings/user_directories/*: "no"
     
               # these settings should not lead to pod restarts
-              - settings/format_display_secret_in_show_and_select: "no"
               - settings/display_secrets_in_show_and_select: "no"
     
               - zookeeper/*: "yes"
@@ -4495,12 +4494,12 @@ data:
               configuration:
                 users:
                 profiles:
+                  clickhouse_operator/format_display_secrets_in_show_and_select: 1
                 quotas:
                 settings:
                   ##
                   ## this may be added on per-host basis into host's conf.d folder
                   ##
-                  format_display_secret_in_show_and_select: 1
                   display_secrets_in_show_and_select: 1
                 files:
     

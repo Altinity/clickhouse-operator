@@ -7,8 +7,6 @@ spec:
     host:
       wait:
         exclude: "false"
-        replicas:
-          new: "no"
     statefulSet:
       update:
         timeout: 60
