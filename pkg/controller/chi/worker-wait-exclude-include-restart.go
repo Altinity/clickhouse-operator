@@ -175,7 +175,7 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 	if err == nil {
 		w.a.V(1).
 			M(host).F().
-			Info("Replication lag is fine - include host into cluster due to replication lag. Host/shard/cluster: %d/%d/%s",
+			Info("Replication lag is fine - include host into cluster. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		_ = w.includeHostIntoService(ctx, host)
 	} else {
