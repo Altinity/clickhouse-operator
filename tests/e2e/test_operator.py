@@ -5332,16 +5332,17 @@ def test_055(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_056. Test replica delay")
 def test_056(self):
     create_shell_namespace_clickhouse_template()
-    with Given("I change operator statefullSet timeout"):
+    with Given("I change operator StatefulSet timeout"):
         util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
-    manifest = f"manifests/chi/test-056-replica-delay.yaml"
+    manifest = f"manifests/chi/test-056-replica-delay-1.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
 
@@ -5354,7 +5355,7 @@ def test_056(self):
                     current().context.clickhouse_template,
                 },
                 "do_not_delete": 1,
-                "status": "InPtogress"
+                "status": "InProgress"
             },
         )
 
@@ -5362,7 +5363,7 @@ def test_056(self):
         clickhouse.query(chi, "CREATE TABLE test_056 (a Int8) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY a PARTITION by a")
         clickhouse.query(chi, "INSERT INTO test_056 SELECT 1")
 
-    with And("STOP REPLICATED EENDS"):
+    with And("STOP REPLICATED SENDS"):
         clickhouse.query(chi, "SYSTEM STOP REPLICATED SENDS")
 
     with When("Add one more replica, but do not wait for completion"):
@@ -5376,15 +5377,15 @@ def test_056(self):
         )
 
         with Then("Table should be created on a new replica"):
-            retries = 10
+            retries_left = 10
             out = 0
-            while retries>0:
+            while retries_left > 0:
                 out = clickhouse.query_with_error(chi, "select count() from system.tables where name='test_056'", host=f"chi-{chi}-{cluster}-0-1-0")
                 if out == "1":
                     break
                 with Then("Not ready. Wait for 10 seconds"):
                     time.sleep(10)
-                retries = retries-1
+                retries_left = retries_left-1
             assert out == "1", error("Table was not created on a new replica")
 
         with And("Table should have no data replicated"):
@@ -5393,18 +5394,22 @@ def test_056(self):
 
         with And("Replication delay should be non-zero"):
             out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
+            print(f"max(absolute_delay)={out}")
             assert out != "0"
 
-        with And("Wait 90 seconds"):
+        with And("Wait 90 seconds - more than sts update timeout"):
             time.sleep(90)
 
         with And("Replication delay should be non-zero"):
             out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
+            print(f"max(absolute_delay)={out}")
             assert out != "0"
 
         with And("Replica still should be unready after reconcile timeout"):
             pod = kubectl.get("pod", f"chi-{chi}-{cluster}-0-1-0")
-            assert pod["metadata"]["labels"]["clickhouse.altinity.com/ready"] !=  "yes",  error("Replica should be unready")
+            ready = pod["metadata"]["labels"]["clickhouse.altinity.com/ready"]
+            print(f"ready label={ready}")
+            assert ready != "yes", error("Replica should be unready")
 
     with When("START REPLICATED SENDS"):
         clickhouse.query(chi, "SYSTEM START REPLICATED SENDS", host=f"chi-{chi}-{cluster}-0-0-0")
@@ -5412,15 +5417,16 @@ def test_056(self):
 
         with Then("Replication delay should be zero"):
             out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
+            print(f"max(absolute_delay)={out}")
             assert out == "0"
 
         with And("Table data should be replicated"):
             out = clickhouse.query(chi, "select count() from test_056", host=f"chi-{chi}-{cluster}-0-1-0")
             assert out == "1"
 
-
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):
