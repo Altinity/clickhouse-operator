@@ -171,8 +171,19 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 
 	// w.includeHostIntoClickHouseCluster(ctx, host)
 	w.ascendHostInClickHouseCluster(ctx, host)
-	_ = w.catchReplicationLag(ctx, host)
-	_ = w.includeHostIntoService(ctx, host)
+	err := w.catchReplicationLag(ctx, host)
+	if err == nil {
+		w.a.V(1).
+			M(host).F().
+			Info("Replication lag is fine - include host into cluster due to replication lag. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		_ = w.includeHostIntoService(ctx, host)
+	} else {
+		w.a.V(1).
+			M(host).F().
+			Warning("Will NOT include host into cluster due to replication lag. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+	}
 
 	return nil
 }
@@ -297,7 +308,7 @@ func (w *worker) ascendHostInClickHouseCluster(ctx context.Context, host *api.Ho
 	w.task.WaitForConfigMapPropagation(ctx, host)
 }
 
-func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host)error {
+func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error {
 	if !w.shouldWaitReplicationHost(host) {
 		w.a.V(1).
 			M(host).F().
@@ -327,7 +338,7 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host)error {
 		w.a.V(1).
 			M(host).F().
 			Info("Wait for host to catch replication lag - FAILED "+
-				"Host/shard/cluster: %d/%d/%s" +
+				"Host/shard/cluster: %d/%d/%s"+
 				"err: %v ",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName,
 				err,
