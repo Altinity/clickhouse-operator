@@ -86,7 +86,7 @@ func (c *STS) Delete(ctx context.Context, namespace, name string) error {
 	c.kubeClient.AppsV1().StatefulSets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	return poller.New(ctx, fmt.Sprintf("%s/%s", namespace, name)).
 		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
-		WithMain(&poller.Functions{
+		WithFunctions(&poller.Functions{
 			IsDone: func(_ctx context.Context, _ any) bool {
 				_, err := c.Get(ctx, namespace, name)
 				return errors.IsNotFound(err)
