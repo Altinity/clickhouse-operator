@@ -20,4 +20,13 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "altinity-clickhouse-operator.serviceAccountName" . }}
     namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
+# Template Parameters:
+#
+# NAMESPACE=kube-system
+# COMMENT=
+# ROLE_KIND=Role
+# ROLE_NAME=clickhouse-operator
+# ROLE_BINDING_KIND=RoleBinding
+# ROLE_BINDING_NAME=clickhouse-operator
+#
 {{- end }}
