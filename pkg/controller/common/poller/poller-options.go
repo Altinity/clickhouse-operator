@@ -69,3 +69,30 @@ func (o *Options) SetGetErrorTimeout(timeout time.Duration) *Options {
 	o.GetErrorTimeout = timeout
 	return o
 }
+
+// Merge merges options
+func (o *Options) Merge(from *Options) *Options {
+	if o == nil {
+		return nil
+	}
+	if from == nil {
+		return o
+	}
+
+	if from.StartBotheringAfterTimeout > 0 {
+		o.StartBotheringAfterTimeout = from.StartBotheringAfterTimeout
+	}
+	if from.GetErrorTimeout > 0 {
+		o.GetErrorTimeout = from.GetErrorTimeout
+	}
+	if from.Timeout > 0 {
+		o.Timeout = from.Timeout
+	}
+	if from.MainInterval > 0 {
+		o.MainInterval = from.MainInterval
+	}
+	if from.BackgroundInterval > 0 {
+		o.MainInterval = from.MainInterval
+	}
+	return o
+}
