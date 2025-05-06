@@ -16,14 +16,15 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -506,7 +507,7 @@ func (w *worker) waitHostHasNoActiveQueries(ctx context.Context, host *api.Host)
 
 // waitHostHasNoReplicationDelay
 func (w *worker) waitHostHasNoReplicationDelay(ctx context.Context, host *api.Host) error {
-	return domain.PollHost(ctx, host, w.doesHostHaveNoReplicationDelay)
+	return domain.PollHost(ctx, host, w.doesHostHaveNoReplicationDelay, &poller.Options{Timeout: time.Hour * 24 * 365 * 100})
 }
 
 // waitHostRestart

@@ -85,6 +85,7 @@ func (w *worker) doesHostHaveNoRunningQueries(ctx context.Context, host *api.Hos
 
 func (w *worker) doesHostHaveNoReplicationDelay(ctx context.Context, host *api.Host) bool {
 	delay, _ := w.ensureClusterSchemer(host).HostMaxReplicaDelay(ctx, host)
+	log.V(1).Info("replication lag %d host: %s", delay, host.GetName())
 	return delay <= chop.Config().Reconcile.Host.Wait.Replicas.Delay.IntValue()
 }
 
