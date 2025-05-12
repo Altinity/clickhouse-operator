@@ -244,7 +244,6 @@ func (w *worker) reconcile(ctx context.Context, cr *api.ClickHouseInstallation) 
 		ctx,
 		w.reconcileCRAuxObjectsPreliminary,
 		w.reconcileCluster,
-		w.reconcileShardsAndHosts,
 		w.reconcileCRAuxObjectsFinal,
 	)
 }
@@ -581,7 +580,9 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 	w.reconcileClusterService(ctx, cluster)
 	w.reconcileClusterSecret(ctx, cluster)
 	w.reconcileClusterPodDisruptionBudget(ctx, cluster)
-	reconcileZookeeperRootPath(cluster)
+	reconcileClusterZookeeperRootPath(cluster)
+
+	w.reconcileClusterShardsAndHosts(ctx, cluster)
 	return nil
 }
 
@@ -619,15 +620,17 @@ func (w *worker) reconcileClusterPodDisruptionBudget(ctx context.Context, cluste
 	}
 }
 
-// reconcileShardsAndHosts reconciles shards and hosts of each shard
-func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiShard) error {
+// reconcileClusterShardsAndHosts reconciles shards and hosts of each shard
+func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *api.Cluster) error {
+	shards := cluster.Layout.Shards[:]
+
 	// Sanity check - has to have shard(s)
 	if len(shards) == 0 {
 		return nil
 	}
 
-	log.V(1).F().S().Info("reconcileShardsAndHosts start")
-	defer log.V(1).F().E().Info("reconcileShardsAndHosts end")
+	log.V(1).F().S().Info("reconcileClusterShardsAndHosts start")
+	defer log.V(1).F().E().Info("reconcileClusterShardsAndHosts end")
 
 	opts := w.reconcileShardsAndHostsFetchOpts(ctx)
 
@@ -653,7 +656,7 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiS
 
 	// Process shards using specified concurrency level while maintaining specified max concurrency percentage.
 	// Loop over shards.
-	workersNum := w.getReconcileShardsWorkersNum(shards, opts)
+	workersNum := w.getReconcileShardsWorkersNum(len(shards), opts)
 	w.a.V(1).Info("Starting rest of shards on workers. Workers num: %d", workersNum)
 	if err := w.runConcurrently(ctx, workersNum, startShard, shards[startShard:]); err != nil {
 		w.a.V(1).Info("Finished with ERROR rest of shards on workers: %d, err: %v", workersNum, err)
