@@ -89,12 +89,12 @@ func (w *worker) isHostSoftwareAbleToRespond(ctx context.Context, host *api.Host
 	return nil
 }
 
-// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
-func (w *worker) getReconcileShardsWorkersNum(shards []*api.ChiShard, opts *common.ReconcileShardsAndHostsOptions) int {
+// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shards reconcile
+func (w *worker) getReconcileShardsWorkersNum(_shardsNum int, opts *common.ReconcileShardsAndHostsOptions) int {
 	availableWorkers := float64(chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber)
 	maxConcurrencyPercent := float64(chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
 	_100Percent := float64(100)
-	shardsNum := float64(len(shards))
+	shardsNum := float64(_shardsNum)
 
 	if opts.FullFanOut {
 		// For full fan-out scenarios use all available workers.
