@@ -483,9 +483,9 @@ configs:
           #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
           # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
 
-          # Max number of concurrent shard reconciles within one CHI in progress
+          # Max number of concurrent shard reconciles within one cluster in progress
           reconcileShardsThreadsNumber: 5
-          # Max percentage of concurrent shard reconciles within one CHI in progress
+          # Max percentage of concurrent shard reconciles within one cluster in progress
           reconcileShardsMaxConcurrencyPercent: 50
         # Reconcile StatefulSet scenario
         statefulSet:

@@ -1584,6 +1584,24 @@ spec:
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
+                          reconcile:
+                            type: object
+                            description: "allow tuning reconciling process"
+                            properties:
+                              runtime:
+                                type: object
+                                description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                                properties:
+                                  reconcileShardsThreadsNumber:
+                                    type: integer
+                                    minimum: 1
+                                    maximum: 65535
+                                    description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
+                                  reconcileShardsMaxConcurrencyPercent:
+                                    type: integer
+                                    minimum: 0
+                                    maximum: 100
+                                    description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                 templates:
                   type: object
                   description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
@@ -3576,6 +3594,24 @@ spec:
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
+                          reconcile:
+                            type: object
+                            description: "allow tuning reconciling process"
+                            properties:
+                              runtime:
+                                type: object
+                                description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                                properties:
+                                  reconcileShardsThreadsNumber:
+                                    type: integer
+                                    minimum: 1
+                                    maximum: 65535
+                                    description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
+                                  reconcileShardsMaxConcurrencyPercent:
+                                    type: integer
+                                    minimum: 0
+                                    maximum: 100
+                                    description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                 templates:
                   type: object
                   description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
