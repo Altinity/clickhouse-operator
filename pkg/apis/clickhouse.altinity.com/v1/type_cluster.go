@@ -31,8 +31,16 @@ type Cluster struct {
 	Secret            *ClusterSecret    `json:"secret,omitempty"            yaml:"secret,omitempty"`
 	PDBMaxUnavailable *types.Int32      `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
 	Layout            *ChiClusterLayout `json:"layout,omitempty"            yaml:"layout,omitempty"`
+	Reconcile         ClusterReconcile  `json:"reconcile"                   yaml:"reconcile"`
 
 	Runtime ChiClusterRuntime `json:"-" yaml:"-"`
+}
+
+type ClusterReconcile struct {
+	Runtime struct {
+		ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
+		ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
+	} `json:"runtime" yaml:"runtime"`
 }
 
 type ChiClusterRuntime struct {
