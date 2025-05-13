@@ -284,6 +284,9 @@ func (w *worker) reconcileCRServicePreliminary(ctx context.Context, cr api.ICust
 
 // reconcileCRServiceFinal runs second stage of CR reconcile process
 func (w *worker) reconcileCRServiceFinal(ctx context.Context, cr api.ICustomResource) error {
+	log.V(2).F().S().Info("second stage")
+	defer log.V(2).F().E().Info("second stage")
+
 	if cr.IsStopped() {
 		// Stopped CHI must have no entry point
 		return nil
@@ -577,16 +580,26 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 	w.a.V(2).M(cluster).S().P()
 	defer w.a.V(2).M(cluster).E().P()
 
-	w.reconcileClusterService(ctx, cluster)
-	w.reconcileClusterSecret(ctx, cluster)
-	w.reconcileClusterPodDisruptionBudget(ctx, cluster)
-	reconcileClusterZookeeperRootPath(cluster)
+	if err := w.reconcileClusterService(ctx, cluster); err != nil {
+		return err
+	}
+	if err := w.reconcileClusterSecret(ctx, cluster); err != nil {
+		return err
+	}
+	if err := w.reconcileClusterPodDisruptionBudget(ctx, cluster); err != nil {
+		return err
+	}
+	if err := reconcileClusterZookeeperRootPath(cluster); err != nil {
+		return err
+	}
+	if err := w.reconcileClusterShardsAndHosts(ctx, cluster); err != nil {
+		return err
+	}
 
-	w.reconcileClusterShardsAndHosts(ctx, cluster)
 	return nil
 }
 
-func (w *worker) reconcileClusterService(ctx context.Context, cluster *api.Cluster) {
+func (w *worker) reconcileClusterService(ctx context.Context, cluster *api.Cluster) error {
 	// Add Cluster Service
 	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster).First(); service != nil {
 		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCluster, cluster.GetAncestor()).First()
@@ -596,9 +609,10 @@ func (w *worker) reconcileClusterService(ctx context.Context, cluster *api.Clust
 			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
 		}
 	}
+	return nil
 }
 
-func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *api.Cluster) {
+func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *api.Cluster) error {
 	// Add cluster's Auto Secret
 	if cluster.Secret.Source() == api.ClusterSecretSourceAuto {
 		if secret := w.task.Creator().CreateClusterSecret(cluster); secret != nil {
@@ -609,15 +623,17 @@ func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *api.Cluste
 			}
 		}
 	}
+	return nil
 }
 
-func (w *worker) reconcileClusterPodDisruptionBudget(ctx context.Context, cluster *api.Cluster) {
+func (w *worker) reconcileClusterPodDisruptionBudget(ctx context.Context, cluster *api.Cluster) error {
 	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
 	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
 		w.task.RegistryReconciled().RegisterPDB(pdb.GetObjectMeta())
 	} else {
 		w.task.RegistryFailed().RegisterPDB(pdb.GetObjectMeta())
 	}
+	return nil
 }
 
 // reconcileClusterShardsAndHosts reconciles shards and hosts of each shard
@@ -656,7 +672,7 @@ func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *ap
 
 	// Process shards using specified concurrency level while maintaining specified max concurrency percentage.
 	// Loop over shards.
-	workersNum := w.getReconcileShardsWorkersNum(len(shards), opts)
+	workersNum := w.getReconcileShardsWorkersNum(cluster, opts)
 	w.a.V(1).Info("Starting rest of shards on workers. Workers num: %d", workersNum)
 	if err := w.runConcurrently(ctx, workersNum, startShard, shards[startShard:]); err != nil {
 		w.a.V(1).Info("Finished with ERROR rest of shards on workers: %d, err: %v", workersNum, err)
