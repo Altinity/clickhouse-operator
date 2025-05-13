@@ -47,7 +47,7 @@ func NewHostStatefulSetPoller(poller *StatefulSetPoller, kube interfaces.IKube, 
 
 // WaitHostStatefulSetReady polls host's StatefulSet until it is ready
 func (p *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error {
-	// Wait for StatefulSet to reach generation
+	log.V(2).F().Info("Wait for StatefulSet to reach generation")
 	err := p.PollHostStatefulSet(
 		ctx,
 		host,
@@ -63,10 +63,11 @@ func (p *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, ho
 		},
 	)
 	if err != nil {
+		log.V(1).F().Warning("FAILED wait for StatefulSet to reach generation")
 		return err
 	}
 
-	// Wait StatefulSet to reach ready status
+	log.V(2).F().Info("Wait StatefulSet to reach ready status")
 	err = p.PollHostStatefulSet(
 		ctx,
 		host,
@@ -78,8 +79,12 @@ func (p *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, ho
 			p.deleteReadyMark(_ctx, host)
 		},
 	)
+	if err != nil {
+		log.V(1).F().Warning("FAILED wait StatefulSet to reach ready status")
+		return err
+	}
 
-	return err
+	return nil
 }
 
 //// waitHostNotReady polls host's StatefulSet for not exists or not ready
