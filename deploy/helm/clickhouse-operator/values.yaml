@@ -71,8 +71,10 @@ serviceAccount:
   # serviceAccount.name -- the name of the service account to use; if not set and create is true, a name is generated using the fullname template
   name:
 rbac:
-  # rbac.create -- specifies whether cluster roles and cluster role bindings should be created
+  # rbac.create -- specifies whether rbac resources should be created
   create: true
+  # rbac.namespaceScoped -- specifies whether to create roles and rolebindings at the cluster level or namespace level
+  namespaceScoped: false
 secret:
   # secret.create -- create a secret with operator credentials
   create: true

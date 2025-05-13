@@ -4291,6 +4291,259 @@ subjects:
 ---
 # Template Parameters:
 #
+# NAMESPACE=kube-system
+# COMMENT=
+# ROLE_KIND=Role
+# ROLE_NAME=clickhouse-operator
+# ROLE_BINDING_KIND=RoleBinding
+# ROLE_BINDING_NAME=clickhouse-operator
+#
+
+
+# Specifies either
+#   ClusterRole
+# or
+#   Role
+# to be bound to ServiceAccount.
+# ClusterRole is namespace-less and must have unique name
+# Role is namespace-bound
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: clickhouse-operator
+  namespace: kube-system
+  labels:
+    clickhouse.altinity.com/chop: 0.25.0
+rules:
+
+  #
+  # Core API group
+  #
+
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - services
+      - persistentvolumeclaims
+      - secrets
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+      - create
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - endpoints
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumes
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+
+  #
+  # apps.* resources
+  #
+
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+      - create
+      - delete
+  - apiGroups:
+      - apps
+    resources:
+      - replicasets
+    verbs:
+      - get
+      - patch
+      - update
+      - delete
+  # The operator deployment personally, identified by name
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    resourceNames:
+      - clickhouse-operator
+    verbs:
+      - get
+      - patch
+      - update
+      - delete
+
+  #
+  # policy.* resources
+  #
+
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+      - create
+      - delete
+
+  #
+  # apiextensions
+  #
+
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - get
+      - list
+
+  #
+  # The operator's specific Custom Resources
+  #
+
+  # clickhouse - related resources
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhouseinstallations
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+      - update
+      - delete
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhouseinstallationtemplates
+      - clickhouseoperatorconfigurations
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhouseinstallations/finalizers
+      - clickhouseinstallationtemplates/finalizers
+      - clickhouseoperatorconfigurations/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhouseinstallations/status
+      - clickhouseinstallationtemplates/status
+      - clickhouseoperatorconfigurations/status
+    verbs:
+      - get
+      - update
+      - patch
+      - create
+      - delete
+
+  # clickhouse-keeper - related resources
+  - apiGroups:
+      - clickhouse-keeper.altinity.com
+    resources:
+      - clickhousekeeperinstallations
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+      - update
+      - delete
+  - apiGroups:
+      - clickhouse-keeper.altinity.com
+    resources:
+      - clickhousekeeperinstallations/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - clickhouse-keeper.altinity.com
+    resources:
+      - clickhousekeeperinstallations/status
+    verbs:
+      - get
+      - update
+      - patch
+      - create
+      - delete
+---
+# Specifies either
+#   ClusterRoleBinding between ClusterRole and ServiceAccount.
+# or
+#   RoleBinding between Role and ServiceAccount.
+# ClusterRoleBinding is namespace-less and must have unique name
+# RoleBinding is namespace-bound
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: clickhouse-operator
+  namespace: kube-system
+  labels:
+    clickhouse.altinity.com/chop: 0.25.0
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: clickhouse-operator
+subjects:
+  - kind: ServiceAccount
+    name: clickhouse-operator
+    namespace: kube-system
+---
+# Template Parameters:
+#
 # NAME=etc-clickhouse-operator-files
 # NAMESPACE=kube-system
 # COMMENT=
