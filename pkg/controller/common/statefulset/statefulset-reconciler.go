@@ -374,7 +374,7 @@ func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, op
 	log.V(1).M(host).F().P()
 	statefulSet := host.Runtime.DesiredStatefulSet
 
-	log.V(1).Info("Create StatefulSet %s", util.NamespaceNameString(statefulSet))
+	log.V(1).Info("Create StatefulSet: %s", util.NamespaceNameString(statefulSet))
 	if _, err := r.sts.Create(ctx, statefulSet); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet create failed. err: %v", err)
 		return common.ErrCRUDRecreate
@@ -430,7 +430,7 @@ func (r *Reconciler) doUpdateStatefulSet(
 	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
 	if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
-		log.V(1).M(host).F().Error("StatefulSet update wait failed. err: %v", err)
+		log.V(1).M(host).F().Error("StatefulSet update FAILED - wait for ready StatefulSet failed. err: %v", err)
 		return r.fallback.OnStatefulSetUpdateFailed(ctx, oldStatefulSet, host, r.sts)
 	}
 
