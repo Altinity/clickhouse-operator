@@ -218,6 +218,12 @@ spec:
         layout:
           shardsCount: 3
           replicasCount: 2
+        reconcile:
+          runtime:
+            # Max number of concurrent shard reconciles within one cluster in progress
+            reconcileShardsThreadsNumber: 5
+            # Max percentage of concurrent shard reconciles within one cluster in progress
+            reconcileShardsMaxConcurrencyPercent: 50
 
       - name: shards-only
         templates:
