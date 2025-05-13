@@ -156,8 +156,7 @@ if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
         envsubst
 fi
 
-# Render RBAC section for ClusterRole
-if [[ "${MANIFEST_PRINT_RBAC_CLUSTERED}" == "yes" ]]; then
+if [[ "${MANIFEST_PRINT_RBAC_CLUSTERED}" == "yes" || "${MANIFEST_PRINT_RBAC_NAMESPACED}" == "yes" ]]; then
     # Render Account
     SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-01-service-account.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
@@ -168,7 +167,10 @@ if [[ "${MANIFEST_PRINT_RBAC_CLUSTERED}" == "yes" ]]; then
         NAME="clickhouse-operator"                \
         OPERATOR_VERSION="${OPERATOR_VERSION}"    \
         envsubst
+fi
 
+# Render RBAC section for ClusterRole
+if [[ "${MANIFEST_PRINT_RBAC_CLUSTERED}" == "yes" ]]; then
     # Render Role
     SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-02-role.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
@@ -186,16 +188,6 @@ fi
 
 # Render RBAC section for Role
 if [[ "${MANIFEST_PRINT_RBAC_NAMESPACED}" == "yes" ]]; then
-    # Render Account
-    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-01-service-account.yaml"
-    ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
-    render_separator
-    cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
-        NAMESPACE="${OPERATOR_NAMESPACE}"         \
-        NAME="clickhouse-operator"                \
-        OPERATOR_VERSION="${OPERATOR_VERSION}"    \
-        envsubst
-
     # Render Role
     SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-02-role.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
@@ -210,7 +202,6 @@ if [[ "${MANIFEST_PRINT_RBAC_NAMESPACED}" == "yes" ]]; then
         OPERATOR_VERSION="${OPERATOR_VERSION}"    \
         envsubst
 fi
-
 
 # Render header/beginning of ConfigMap yaml specification:
 # apiVersion: v1

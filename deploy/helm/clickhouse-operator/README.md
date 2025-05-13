@@ -56,7 +56,8 @@ For upgrade please install CRDs separately:
 | podAnnotations | object | check the `values.yaml` file | annotations to add to the clickhouse-operator pod, check `kubectl explain pod.spec.annotations` for details |
 | podLabels | object | `{}` | labels to add to the clickhouse-operator pod |
 | podSecurityContext | object | `{}` |  |
-| rbac.create | bool | `true` | specifies whether cluster roles and cluster role bindings should be created |
+| rbac.create | bool | `true` | specifies whether rbac resources should be created |
+| rbac.namespaceScoped | bool | `false` | specifies whether to create roles and rolebindings at the cluster level or namespace level |
 | secret.create | bool | `true` | create a secret with operator credentials |
 | secret.password | string | `"clickhouse_operator_password"` | operator credentials password |
 | secret.username | string | `"clickhouse_operator"` | operator credentials username |
