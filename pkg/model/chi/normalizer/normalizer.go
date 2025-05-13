@@ -42,6 +42,20 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+const (
+	// defaultReconcileShardsThreadsNumber specifies the default number of threads usable for concurrent shard reconciliation
+	// within a single cluster reconciliation. Defaults to 1, which means strictly sequential shard reconciliation.
+	defaultReconcileShardsThreadsNumber = 1
+
+	// defaultReconcileShardsMaxConcurrencyPercent specifies the maximum integer percentage of shards that may be reconciled
+	// concurrently during cluster reconciliation. This counterbalances the fact that this is an operator setting,
+	// that different clusters will have different shard counts, and that the shard concurrency capacity is specified
+	// above in terms of a number of threads to use (up to). Example: overriding to 100 means all shards may be
+	// reconciled concurrently, if the number of shard reconciliation threads is greater than or equal to the number
+	// of shards in the cluster.
+	defaultReconcileShardsMaxConcurrencyPercent = 50
+)
+
 // Normalizer specifies structures normalizer
 type Normalizer struct {
 	secretGet subst.SecretGetter
@@ -691,6 +705,8 @@ func (n *Normalizer) normalizeCluster(cluster *chi.Cluster) *chi.Cluster {
 	}
 	cluster.FillShardReplicaSpecified()
 	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
+	cluster.Reconcile = n.normalizeClusterReconcile(cluster.Reconcile)
+
 	n.ensureClusterLayoutShards(cluster.Layout)
 	n.ensureClusterLayoutReplicas(cluster.Layout)
 
@@ -833,6 +849,22 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 	}
 
 	return clusterLayout
+}
+
+func (n *Normalizer) normalizeClusterReconcile(reconcile chi.ClusterReconcile) chi.ClusterReconcile {
+	if reconcile.Runtime.ReconcileShardsThreadsNumber == 0 {
+		reconcile.Runtime.ReconcileShardsThreadsNumber = chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber
+	}
+	if reconcile.Runtime.ReconcileShardsThreadsNumber == 0 {
+		reconcile.Runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
+	}
+	if reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent = chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent
+	}
+	if reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
+	}
+	return reconcile
 }
 
 // ensureClusterLayoutShards ensures slice layout.Shards is in place
