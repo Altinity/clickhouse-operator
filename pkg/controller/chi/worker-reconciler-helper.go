@@ -21,7 +21,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -90,11 +89,11 @@ func (w *worker) isHostSoftwareAbleToRespond(ctx context.Context, host *api.Host
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shards reconcile
-func (w *worker) getReconcileShardsWorkersNum(_shardsNum int, opts *common.ReconcileShardsAndHostsOptions) int {
-	availableWorkers := float64(chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber)
-	maxConcurrencyPercent := float64(chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
+func (w *worker) getReconcileShardsWorkersNum(cluster *api.Cluster, opts *common.ReconcileShardsAndHostsOptions) int {
+	availableWorkers := float64(cluster.Reconcile.Runtime.ReconcileShardsThreadsNumber)
+	maxConcurrencyPercent := float64(cluster.Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
 	_100Percent := float64(100)
-	shardsNum := float64(_shardsNum)
+	shardsNum := float64(len(cluster.Layout.Shards))
 
 	if opts.FullFanOut {
 		// For full fan-out scenarios use all available workers.
