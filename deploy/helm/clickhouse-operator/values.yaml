@@ -74,7 +74,7 @@ rbac:
   # rbac.create -- specifies whether rbac resources should be created
   create: true
   # rbac.namespaceScoped -- specifies whether to create roles and rolebindings at the cluster level or namespace level
-  namespaceScoped: true
+  namespaceScoped: false
 secret:
   # secret.create -- create a secret with operator credentials
   create: true
