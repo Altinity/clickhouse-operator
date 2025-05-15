@@ -156,8 +156,8 @@ def test_005(self):
 def test_006(self):
     create_shell_namespace_clickhouse_template()
 
-    old_version = "clickhouse/clickhouse-server:23.8"
-    new_version = "clickhouse/clickhouse-server:24.3"
+    old_version = "clickhouse/clickhouse-server:24.8"
+    new_version = "clickhouse/clickhouse-server:25.3"
     chi = "test-006"
 
     with Then(f"Start CHI with version {old_version}"):
@@ -1177,7 +1177,7 @@ def test_013_1(self):
         "CREATE TABLE s3_engine_table (name String, value UInt32)ENGINE = S3('https://storage.test.net/my-test1/test-data.csv.gz', 'CSV', 'gzip')",
         "CREATE TABLE embeddedrocksdb_table (key UInt64, value String) Engine = EmbeddedRocksDB " "PRIMARY KEY(key)",
         "CREATE TABLE postgresql_table (float_nullable Nullable(Float32), str String, int_id Int32 ) ENGINE = PostgreSQL('localhost:5432', 'public_db', 'test_table', 'postges_user', 'postgres_password')",
-        "CREATE TABLE externaldistributed_table (id UInt32, name String, age UInt32, money UInt32) ENGINE = ExternalDistributed('PostgreSQL', 'localhost:5432', 'clickhouse', 'test_replicas', 'postgres', 'mysecretpassword')",
+        # Deprecated in 25.3 "CREATE TABLE externaldistributed_table (id UInt32, name String, age UInt32, money UInt32) ENGINE = ExternalDistributed('PostgreSQL', 'localhost:5432', 'clickhouse', 'test_replicas', 'postgres', 'mysecretpassword')",
 
         # "CREATE TABLE materialized_postgresql_table (key UInt64, value UInt64) ENGINE = "
         # "MaterializedPostgreSQL('localhost:5433', 'postgres_database', 'postgresql_replica', "
@@ -2107,19 +2107,20 @@ def test_017(self):
         "insert into test_max select 0, 5898217176+number from numbers(10) settings max_block_size=1",
         "OPTIMIZE TABLE test_max FINAL",
     ]
-
-    for q in queries:
-        note(q)
     test_query = "select min(offset), max(offset) from test_max"
-    note(test_query)
+
+    res = ""
 
     for shard in range(pod_count):
         host = f"chi-{chi}-default-{shard}-0"
         for q in queries:
             clickhouse.query(chi, host=host, sql=q)
         out = clickhouse.query(chi, host=host, sql=test_query)
+        if res == "":
+            res = out
         ver = clickhouse.query(chi, host=host, sql="select version()")
-        note(f"version: {ver}, result: {out}")
+        print(f"version: {ver}, result: {out}")
+        assert res == out, error("Aggregate state may be different between versions")
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -5231,8 +5232,8 @@ def test_054(self):
     create_shell_namespace_clickhouse_template()
     chi = yaml_manifest.get_name(util.get_full_path("manifests/chi/test-006-ch-upgrade-1.yaml"))
 
-    old_version = "clickhouse/clickhouse-server:23.8"
-    new_version = "clickhouse/clickhouse-server:24.3"
+    old_version = "clickhouse/clickhouse-server:24.8"
+    new_version = "clickhouse/clickhouse-server:25.3"
     with Then(f"Start CHI with version {old_version}"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-1.yaml",
