@@ -689,6 +689,8 @@ func (n *Normalizer) normalizeCluster(cluster *chi.Cluster) *chi.Cluster {
 	cluster.InheritZookeeperFrom(n.req.GetTarget())
 	// Inherit from .spec.configuration.files
 	cluster.InheritFilesFrom(n.req.GetTarget())
+	// Inherit from .spec.reconciling
+	cluster.InheritReconcileFrom(n.req.GetTarget())
 	// Inherit from .spec.defaults
 	cluster.InheritTemplatesFrom(n.req.GetTarget())
 
@@ -852,19 +854,24 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 }
 
 func (n *Normalizer) normalizeClusterReconcile(reconcile chi.ClusterReconcile) chi.ClusterReconcile {
-	if reconcile.Runtime.ReconcileShardsThreadsNumber == 0 {
-		reconcile.Runtime.ReconcileShardsThreadsNumber = chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber
-	}
-	if reconcile.Runtime.ReconcileShardsThreadsNumber == 0 {
-		reconcile.Runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
-	}
-	if reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
-		reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent = chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent
-	}
-	if reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
-		reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
-	}
+	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
 	return reconcile
+}
+
+func (n *Normalizer) normalizeReconcileRuntime(runtime chi.ReconcileRuntime) chi.ReconcileRuntime {
+	if runtime.ReconcileShardsThreadsNumber == 0 {
+		runtime.ReconcileShardsThreadsNumber = chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber
+	}
+	if runtime.ReconcileShardsThreadsNumber == 0 {
+		runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
+	}
+	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		runtime.ReconcileShardsMaxConcurrencyPercent = chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent
+	}
+	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
+	}
+	return runtime
 }
 
 // ensureClusterLayoutShards ensures slice layout.Shards is in place
