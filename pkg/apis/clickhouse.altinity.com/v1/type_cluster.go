@@ -37,10 +37,34 @@ type Cluster struct {
 }
 
 type ClusterReconcile struct {
-	Runtime struct {
-		ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
-		ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
-	} `json:"runtime" yaml:"runtime"`
+	Runtime ReconcileRuntime `json:"runtime" yaml:"runtime"`
+}
+
+type ReconcileRuntime struct {
+	ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
+	ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
+}
+
+func (r ReconcileRuntime) MergeFrom(from ReconcileRuntime, _type MergeType) ReconcileRuntime {
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if r.ReconcileShardsThreadsNumber == 0 {
+			r.ReconcileShardsThreadsNumber = from.ReconcileShardsThreadsNumber
+		}
+		if r.ReconcileShardsMaxConcurrencyPercent == 0 {
+			r.ReconcileShardsMaxConcurrencyPercent = from.ReconcileShardsMaxConcurrencyPercent
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		if from.ReconcileShardsThreadsNumber != 0 {
+			// Override by non-empty values only
+			r.ReconcileShardsThreadsNumber = from.ReconcileShardsThreadsNumber
+		}
+		if from.ReconcileShardsMaxConcurrencyPercent != 0 {
+			// Override by non-empty values only
+			r.ReconcileShardsMaxConcurrencyPercent = from.ReconcileShardsMaxConcurrencyPercent
+		}
+	}
+	return r
 }
 
 type ChiClusterRuntime struct {
@@ -204,6 +228,14 @@ func (cluster *Cluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 
 		return false
 	})
+}
+
+// InheritReconcileFrom inherits reconcile runtime from CHI
+func (cluster *Cluster) InheritReconcileFrom(chi *ClickHouseInstallation) {
+	if chi.Spec.Reconciling == nil {
+		return
+	}
+	cluster.Reconcile.Runtime = cluster.Reconcile.Runtime.MergeFrom(chi.Spec.Reconciling.Runtime, MergeTypeFillEmptyValues)
 }
 
 // InheritTemplatesFrom inherits templates from CHI
