@@ -37,7 +37,7 @@ spec:
             ckop: my
           containers:
             - name: clickhouse
-              image: clickhouse-server:22.10.3.27
+              image: clickhouse/clickhouse-server:latest
               imagePullPolicy: IfNotPresent
               volumeMounts:
                 - mountPath: /var/lib/clickhouse
