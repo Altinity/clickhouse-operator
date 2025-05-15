@@ -97,6 +97,13 @@ spec:
         # Behavior policy for failed Service, `Retain` by default
         service: Retain
 
+    # Optional, overwrites reconcile.runtime from the operator's config
+    runtime:
+      # Max number of concurrent shard reconciles within one cluster in progress
+      reconcileShardsThreadsNumber: 5
+      # Max percentage of concurrent shard reconciles within one cluster in progress
+      reconcileShardsMaxConcurrencyPercent: 50
+
   # List of templates used by a CHI
   useTemplates:
     - name: template1
@@ -219,6 +226,7 @@ spec:
           shardsCount: 3
           replicasCount: 2
         reconcile:
+          #  Overwrites reconcile.runtime from the operator's config
           runtime:
             # Max number of concurrent shard reconciles within one cluster in progress
             reconcileShardsThreadsNumber: 5
