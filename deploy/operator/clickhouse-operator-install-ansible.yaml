@@ -622,7 +622,7 @@ spec:
                         any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
                         look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                        secret value will pass in `pod.spec.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
+                        secret value will pass in `pod.spec.env`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
                         it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
 
                       # nullable: true
@@ -1943,7 +1943,7 @@ spec:
                         any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
                         look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                        secret value will pass in `pod.spec.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
+                        secret value will pass in `pod.spec.env`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
                         it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
 
                       # nullable: true
@@ -2981,7 +2981,7 @@ spec:
                         wait:
                           type: object
                           properties:
-                            exclude:  &TypeStringBool
+                            exclude: &TypeStringBool
                               type: string
                               description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be excluded from a ClickHouse cluster"
                               enum:
@@ -4039,7 +4039,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: clickhouse-operator
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
 ---
@@ -4053,7 +4053,6 @@ metadata:
 # ROLE_BINDING_NAME=clickhouse-operator
 #
 
-
 # Specifies either
 #   ClusterRole
 # or
@@ -4065,11 +4064,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: clickhouse-operator
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
 rules:
-
   #
   # Core API group
   #
@@ -4284,7 +4282,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: clickhouse-operator
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
 roleRef:
@@ -4294,7 +4292,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: clickhouse-operator
-    namespace: {{ namespace }}
+    namespace: { { namespace } }
 ---
 # Template Parameters:
 #
@@ -4306,7 +4304,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-files
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
@@ -4326,7 +4324,7 @@ data:
     #   CH_CREDENTIALS_SECRET_NAMESPACE=
     #   CH_CREDENTIALS_SECRET_NAME=clickhouse-operator
     #   VERBOSITY=1
-    
+
     ################################################
     ##
     ## Watch section
@@ -4339,7 +4337,7 @@ data:
       # Regexp is applicable.
       #namespaces: ["dev", "test"]
       namespaces: [{{ namespace }}]
-    
+
     clickhouse:
       configuration:
         ################################################
@@ -4397,7 +4395,7 @@ data:
         network:
           # Default host_regexp to limit network connectivity from outside
           hostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
-    
+
       ################################################
       ##
       ## Configuration restart policy section
@@ -4415,9 +4413,9 @@ data:
             rules:
               # see https://kb.altinity.com/altinity-kb-setup-and-maintenance/altinity-kb-server-config-files/#server-config-configxml-sections-which-dont-require-restart
               # to be replaced with "select * from system.server_settings where changeable_without_restart = 'No'"
-    
+
               - settings/*: "yes"
-    
+
               # single values
               - settings/access_control_path: "no"
               - settings/dictionaries_config: "no"
@@ -4426,30 +4424,30 @@ data:
               - settings/max_concurrent_queries: "no"
               - settings/models_config: "no"
               - settings/user_defined_executable_functions_config: "no"
-    
+
               # structured XML
               - settings/logger/*: "no"
               - settings/macros/*: "no"
               - settings/remote_servers/*: "no"
               - settings/user_directories/*: "no"
-    
+
               # these settings should not lead to pod restarts
               - settings/display_secrets_in_show_and_select: "no"
-    
+
               - zookeeper/*: "yes"
-    
+
               - files/*.xml: "yes"
               - files/config.d/*.xml: "yes"
               - files/config.d/*dict*.xml: "no"
               - files/config.d/*no_restart*: "no"
-    
+
               # exceptions in default profile
               - profiles/default/background_*_pool_size: "yes"
               - profiles/default/max_*_for_server: "yes"
           - version: "21.*"
             rules:
               - settings/logger: "yes"
-    
+
       #################################################
       ##
       ## Access to ClickHouse instances
@@ -4470,7 +4468,7 @@ data:
         username: ""
         password: ""
         rootCA: ""
-    
+
         # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
         # Can be used instead of explicitly specified username and password available in sections:
         #   - clickhouse.access.username
@@ -4485,7 +4483,7 @@ data:
           name: "clickhouse-operator"
         # Port where to connect to ClickHouse instances to
         port: 8123
-    
+
         # Timeouts used to limit connection and queries from the operator to ClickHouse instances
         # Specified in seconds.
         timeouts:
@@ -4493,7 +4491,7 @@ data:
           connect: 1
           # Timout to perform SQL query from the operator to ClickHouse instances. In seconds.
           query: 4
-    
+
       ################################################
       ##
       ## Addons specifies additional configuration sections
@@ -4531,7 +4529,7 @@ data:
                 quotas:
                 settings:
                 files:
-    
+
           - version: ">= 23.5"
             spec:
               configuration:
@@ -4545,13 +4543,13 @@ data:
                   ##
                   display_secrets_in_show_and_select: 1
                 files:
-    
+
       #################################################
       ##
       ## Metrics collection
       ##
       ################################################
-    
+
       metrics:
         # Timeouts used to limit connection and queries from the metrics exporter to ClickHouse instances
         # Specified in seconds.
@@ -4560,7 +4558,7 @@ data:
           # Upon reaching this timeout metrics collection is aborted and no more metrics are collected in this cycle.
           # All collected metrics are returned.
           collect: 9
-    
+
     keeper:
       configuration:
         ################################################
@@ -4580,7 +4578,7 @@ data:
             # Path to the folder where Keeper configuration files with users' settings are located.
             # Files are common for all instances within a CHI.
             user: chk/users.d
-    
+
     ################################################
     ##
     ## Template(s) management section
@@ -4593,7 +4591,7 @@ data:
         #   - ReadOnStart. Accept CHIT updates on the operators start only.
         #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
         policy: ApplyOnNextReconcile
-    
+
         # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
         # Templates are added to the list of all templates and used when CHI is reconciled.
         # Templates are applied in sorted alpha-numeric order.
@@ -4604,12 +4602,12 @@ data:
         #   - ReadOnStart. Accept CHIT updates on the operators start only.
         #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
         policy: ApplyOnNextReconcile
-    
+
         # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
         # Templates are added to the list of all templates and used when CHI is reconciled.
         # Templates are applied in sorted alpha-numeric order.
         path: chk/templates.d
-    
+
     ################################################
     ##
     ## Reconcile section
@@ -4620,7 +4618,7 @@ data:
       runtime:
         # Max number of concurrent CHI reconciles in progress
         reconcileCHIsThreadsNumber: 10
-    
+
         # The operator reconciles shards concurrently in each CHI with the following limitations:
         #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
         #      can not be greater than 'reconcileShardsThreadsNumber'.
@@ -4628,12 +4626,12 @@ data:
         #      can not be greater than 'reconcileShardsMaxConcurrencyPercent'.
         #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
         # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
-    
+
         # Max number of concurrent shard reconciles within one cluster in progress
         reconcileShardsThreadsNumber: 5
         # Max percentage of concurrent shard reconciles within one cluster in progress
         reconcileShardsMaxConcurrencyPercent: 50
-    
+
       # Reconcile StatefulSet scenario
       statefulSet:
         # Create StatefulSet scenario
@@ -4646,7 +4644,7 @@ data:
           # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
           # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
           onFailure: ignore
-    
+
         # Update StatefulSet scenario
         update:
           # How many seconds to wait for created/updated StatefulSet to be 'Ready'
@@ -4663,7 +4661,7 @@ data:
           #    Follow 'abort' path afterwards.
           # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
           onFailure: abort
-    
+
       # Reconcile Host scenario
       host:
         # Whether the operator during reconcile procedure should wait for a ClickHouse host:
@@ -4679,7 +4677,7 @@ data:
             all: no
             new: yes
             delay: 10
-    
+
     ################################################
     ##
     ## Annotations management section
@@ -4694,7 +4692,7 @@ data:
       include: []
       # Exclude annotations from the following list:
       exclude: []
-    
+
     ################################################
     ##
     ## Labels management section
@@ -4723,7 +4721,7 @@ data:
       #  LabelClusterScopeCycleIndex
       #  LabelClusterScopeCycleOffset
       appendScope: "no"
-    
+
     ################################################
     ##
     ## Metrics management section
@@ -4732,7 +4730,7 @@ data:
     metrics:
       labels:
         exclude: []
-    
+
     ################################################
     ##
     ## Status management section
@@ -4744,7 +4742,7 @@ data:
         actions: false
         error: false
         errors: false
-    
+
     ################################################
     ##
     ## StatefulSet management section
@@ -4752,7 +4750,7 @@ data:
     ################################################
     statefulSet:
       revisionHistoryLimit: 0
-    
+
     ################################################
     ##
     ## Pod management section
@@ -4764,7 +4762,7 @@ data:
       # SIGTERM and SIGKILL during Pod termination process.
       # Increase this number is case of slow shutdown.
       terminationGracePeriod: 30
-    
+
     ################################################
     ##
     ## Log parameters section
@@ -4789,7 +4787,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-confd-files
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
@@ -4805,7 +4803,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-configd-files
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
@@ -4904,7 +4902,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-templatesd-files
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
@@ -5004,7 +5002,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-usersd-files
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
@@ -5067,7 +5065,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-keeper-operator-confd-files
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
@@ -5083,7 +5081,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-keeper-operator-configd-files
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
@@ -5161,7 +5159,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-keeper-operator-templatesd-files
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
@@ -5179,7 +5177,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-keeper-operator-usersd-files
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
@@ -5197,14 +5195,14 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: clickhouse-operator
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
 type: Opaque
 stringData:
   username: clickhouse_operator
-  password: {{ password }}
+  password: { { password } }
 ---
 # Template Parameters:
 #
@@ -5221,7 +5219,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: clickhouse-operator
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
@@ -5235,10 +5233,10 @@ spec:
       labels:
         app: clickhouse-operator
       annotations:
-        prometheus.io/port: '8888'
-        prometheus.io/scrape: 'true'
-        clickhouse-operator-metrics/port: '9999'
-        clickhouse-operator-metrics/scrape: 'true'
+        prometheus.io/port: "8888"
+        prometheus.io/scrape: "true"
+        clickhouse-operator-metrics/port: "9999"
+        clickhouse-operator-metrics/scrape: "true"
     spec:
       serviceAccountName: clickhouse-operator
       volumes:
@@ -5436,7 +5434,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: clickhouse-operator-metrics
-  namespace: {{ namespace }}
+  namespace: { { namespace } }
   labels:
     clickhouse.altinity.com/chop: 0.25.0
     app: clickhouse-operator
