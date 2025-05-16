@@ -100,7 +100,7 @@ spec:
       test_quota/interval/duration: 3600
     settings:
       compression/case/method: zstd
-      # will pass in `pod.spec.evn`, and generate with from_env=XXX in XML, no updates when updates `secret`
+      # will pass in `pod.spec.env`, and generate with from_env=XXX in XML, no updates when updates `secret`
       disable_internal_dns_cache:
         valueFrom:
           secretKeyRef:
