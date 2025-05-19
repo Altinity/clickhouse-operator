@@ -390,8 +390,11 @@ def get_chi_status(chi, ns=None):
     return get_field("chi", chi, ".status.status", ns)
 
 
-def wait_pod_status(pod, status,shell=None, ns=None):
+def wait_pod_status(pod, status, shell=None, ns=None):
     wait_field("pod", pod, ".status.phase", status, ns, shell=shell)
+
+def get_pod_status(pod, shell=None, ns=None):
+    return get_field("pod", pod, ".status.phase", ns, shell=shell)
 
 
 def wait_container_status(pod, status, ns=None):

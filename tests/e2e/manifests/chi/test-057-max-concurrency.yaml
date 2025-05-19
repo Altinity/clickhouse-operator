@@ -1,0 +1,16 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-057-max-concurrency"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  reconciling:
+    runtime:
+      reconcileShardsMaxConcurrencyPercent: 100
+  configuration:
+    clusters:
+      - name: "default"
+        layout:
+          shardsCount: 4
+          replicasCount: 1

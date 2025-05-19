@@ -5428,6 +5428,38 @@ def test_056(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+@TestScenario
+@Name("test_057. Test reconcile concurrency settings on CHI level")
+def test_057(self):
+    create_shell_namespace_clickhouse_template()
+
+    manifest = f"manifests/chi/test-057-max-concurrency.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "do_not_delete": 1,
+                "chi_status": "InProgress",
+            },
+        )
+
+    with When("Last first shard is Running"):
+        kubectl.wait_pod_status(f"chi-{chi}-{cluster}-0-0-0", "Running")
+        with Then("Other shards are running or being created"):
+            for shard in [1,2,3]:
+                pod_status = kubectl.get_pod_status(f"chi-{chi}-{cluster}-{shard}-0-0")
+                assert pod_status in ["Running", "ContainerCreating"]
+
+    kubectl.wait_chi_status(chi, "Completed")
+
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):
