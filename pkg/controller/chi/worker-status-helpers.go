@@ -170,7 +170,7 @@ func (w *worker) isAfterFinalizerInstalled(old, new *api.ClickHouseInstallation)
 	return w.isGenerationTheSame(old, new) && finalizerIsInstalled
 }
 
-// isGenerationTheSame checks whether old ans new CHI have the same generation
+// isGenerationTheSame checks whether old and new CHI have the same generation
 func (w *worker) isGenerationTheSame(old, new *api.ClickHouseInstallation) bool {
 	if !w.areUsableOldAndNew(old, new) {
 		return false
