@@ -1,0 +1,44 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "clickhouse-with-ca"
+spec:
+  configuration:
+    clusters:
+      - name: "cluster1"
+        secure: "yes"
+        insecure: "no"
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+    settings:
+      https_port: 8443
+      tcp_port_secure: 9440
+    users:
+      admin/password: password
+      admin/networks/ip: "::/0"
+    files:
+      openssl.xml: |
+        <yandex>
+          <openSSL>
+            <server>
+              <certificateFile>/etc/clickhouse-server/secrets.d/server.crt/test-056-root-ca/server.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/secrets.d/server.key/test-056-root-ca/server.key</privateKeyFile>
+              <verificationMode>none</verificationMode>
+              <loadDefaultCAFile>true</loadDefaultCAFile>
+              <cacheSessions>true</cacheSessions>
+              <disableProtocols>sslv2,sslv3</disableProtocols>
+              <preferServerCiphers>true</preferServerCiphers>
+            </server>
+          </openSSL>
+        </yandex>
+      server.crt:
+        valueFrom:
+          secretKeyRef:
+            name: test-056-root-ca
+            key: server.crt
+      server.key:
+        valueFrom:
+          secretKeyRef:
+            name: test-056-root-ca
+            key: server.key
