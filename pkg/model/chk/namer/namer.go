@@ -50,9 +50,20 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 		return n.createConfigMapNameCommonUsers(cr)
 
 	case interfaces.NameCRService:
+		if len(params) > 1 {
+			cr := params[0].(api.ICustomResource)
+			template := params[1].(*api.ServiceTemplate)
+			return n.createCRServiceName(cr, template)
+		}
 		cr := params[0].(api.ICustomResource)
 		return n.createCRServiceName(cr)
 	case interfaces.NameCRServiceFQDN:
+		if len(params) > 2 {
+			cr := params[0].(api.ICustomResource)
+			namespaceDomainPattern := params[1].(*types.String)
+			template := params[2].(*api.ServiceTemplate)
+			return n.createCRServiceFQDN(cr, namespaceDomainPattern, template)
+		}
 		cr := params[0].(api.ICustomResource)
 		namespaceDomainPattern := params[1].(*types.String)
 		return n.createCRServiceFQDN(cr, namespaceDomainPattern)

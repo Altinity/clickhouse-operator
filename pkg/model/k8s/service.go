@@ -16,9 +16,10 @@ package k8s
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 
 	core "k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // ServiceSpecVerifyPorts verifies core.ServiceSpec to have reasonable ports specified

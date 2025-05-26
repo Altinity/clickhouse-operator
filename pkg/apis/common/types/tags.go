@@ -86,7 +86,7 @@ func (t Tags) Equal(b Tags) bool {
 	return util.MapsAreTheSame(t, b)
 }
 
-func (t Tags) HaveIntersection(b Tags) bool {
+func (t Tags) HasIntersectionWith(b Tags) bool {
 	return util.MapsHaveKeyValuePairsIntersection(t, b)
 }
 

@@ -27,6 +27,8 @@ type Reconciling struct {
 	ConfigMapPropagationTimeout int `json:"configMapPropagationTimeout,omitempty" yaml:"configMapPropagationTimeout,omitempty"`
 	// Cleanup specifies cleanup behavior
 	Cleanup *Cleanup `json:"cleanup,omitempty" yaml:"cleanup,omitempty"`
+	// Runtime specifies runtime settings
+	Runtime ReconcileRuntime `json:"runtime" yaml:"runtime"`
 }
 
 // NewReconciling creates new reconciling
@@ -64,6 +66,7 @@ func (t *Reconciling) MergeFrom(from *Reconciling, _type MergeType) *Reconciling
 	}
 
 	t.Cleanup = t.Cleanup.MergeFrom(from.Cleanup, _type)
+	t.Runtime = t.Runtime.MergeFrom(from.Runtime, _type)
 
 	return t
 }

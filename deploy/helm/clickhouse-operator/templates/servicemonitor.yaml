@@ -3,12 +3,13 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ printf "%s-clickhouse-metrics" (include "altinity-clickhouse-operator.fullname" .) }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
   labels:
     {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
-  {{- if .Values.serviceMonitor.additionalLabels }}
+    {{- if .Values.serviceMonitor.additionalLabels }}
     {{- toYaml .Values.serviceMonitor.additionalLabels | nindent 4 }}
-  {{- end }}
+    {{- end }}
+  annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
 spec:
   endpoints:
     - port: clickhouse-metrics # 8888
@@ -16,4 +17,18 @@ spec:
   selector:
     matchLabels:
       {{- include "altinity-clickhouse-operator.selectorLabels" . | nindent 6 }}
+  {{- with .Values.serviceMonitor.interval }}
+  interval: {{ . }}
+  {{- end }}
+  {{- with .Values.serviceMonitor.scrapeTimeout }}
+  scrapeTimeout: {{ . }}
+  {{- end }}
+  {{- with .Values.serviceMonitor.relabelings }}
+  relabelings:
+    {{- toYaml . | nindent 8 }}
+  {{- end }}
+  {{- with .Values.serviceMonitor.metricRelabelings }}
+  metricRelabelings:
+    {{- toYaml . | nindent 8 }}
+  {{- end }}
 {{- end }}

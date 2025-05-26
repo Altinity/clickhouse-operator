@@ -20,9 +20,10 @@ import (
 
 // ZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
 type ZookeeperNode struct {
-	Host   string            `json:"host,omitempty"   yaml:"host,omitempty"`
-	Port   *types.Int32      `json:"port,omitempty"   yaml:"port,omitempty"`
-	Secure *types.StringBool `json:"secure,omitempty" yaml:"secure,omitempty"`
+	Host             string            `json:"host,omitempty"             yaml:"host,omitempty"`
+	Port             *types.Int32      `json:"port,omitempty"             yaml:"port,omitempty"`
+	Secure           *types.StringBool `json:"secure,omitempty"           yaml:"secure,omitempty"`
+	AvailabilityZone *types.String     `json:"availabilityZone,omitempty" yaml:"availabilityZone,omitempty"`
 }
 
 func (zkNode *ZookeeperNode) String() string {
@@ -42,7 +43,7 @@ func (zkNode *ZookeeperNode) Equal(to *ZookeeperNode) bool {
 		return false
 	}
 
-	return zkNode.hostEqual(to) && zkNode.portEqual(to) && zkNode.secureEqual(to)
+	return zkNode.hostEqual(to) && zkNode.portEqual(to) && zkNode.secureEqual(to) && zkNode.availabilityZoneEqual(to)
 }
 
 func (zkNode *ZookeeperNode) hostEqual(to *ZookeeperNode) bool {
@@ -55,6 +56,10 @@ func (zkNode *ZookeeperNode) portEqual(to *ZookeeperNode) bool {
 
 func (zkNode *ZookeeperNode) secureEqual(to *ZookeeperNode) bool {
 	return zkNode.Secure.Value() == to.Secure.Value()
+}
+
+func (zkNode *ZookeeperNode) availabilityZoneEqual(to *ZookeeperNode) bool {
+	return zkNode.AvailabilityZone.Value() == to.AvailabilityZone.Value()
 }
 
 // IsSecure checks whether zookeeper node is secure

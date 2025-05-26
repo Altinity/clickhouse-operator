@@ -50,8 +50,8 @@ type SettingsName2KeyConverter interface {
 
 // Settings specifies settings
 type Settings struct {
-	// m is a data storage
-	m map[string]*Setting
+	// data is a data storage
+	data map[string]*Setting
 	// converter is an interface to describe different converters.
 	// Implements 'Strategy' pattern.
 	converter SettingsName2KeyConverter `json:"-" yaml:"-" testdiff:"ignore"`
@@ -60,17 +60,21 @@ type Settings struct {
 // NewSettings creates new settings
 func NewSettings() *Settings {
 	s := &Settings{}
-	s.ensureInternals()
+	s.ensureDataStorage()
 	return s
 }
 
-// ensureInternals ensures all internals of the structure are in place
-func (s *Settings) ensureInternals() {
+func NewSettingsScalarFromMap(m map[string]string) *Settings {
+	return NewSettings().SetScalarsFromMap(m)
+}
+
+// ensureDataStorage ensures all internals of the structure are in place
+func (s *Settings) ensureDataStorage() {
 	if s == nil {
 		return
 	}
-	if s.m == nil {
-		s.m = make(map[string]*Setting)
+	if s.data == nil {
+		s.data = make(map[string]*Setting)
 	}
 }
 
@@ -127,7 +131,7 @@ func (s *Settings) Len() int {
 	if s == nil {
 		return 0
 	}
-	return len(s.m)
+	return len(s.data)
 }
 
 // WalkKeys walks over settings with a function. Function receives key and setting.
@@ -139,7 +143,7 @@ func (s *Settings) WalkKeys(f func(key string, setting *Setting)) {
 		return
 	}
 	// Walk storage keys
-	for key := range s.m {
+	for key := range s.data {
 		f(key, s.GetKey(key))
 	}
 }
@@ -194,7 +198,7 @@ func (s *Settings) HasKey(key string) bool {
 		return false
 	}
 	// Check storage key exists
-	_, ok := s.m[key]
+	_, ok := s.data[key]
 	return ok
 }
 
@@ -213,7 +217,7 @@ func (s *Settings) GetKey(key string) *Setting {
 		return nil
 	}
 	// get value by storage key
-	return s.m[key]
+	return s.data[key]
 }
 
 // Get gets named setting.
@@ -233,9 +237,9 @@ func (s *Settings) SetKey(key string, setting *Setting) *Settings {
 	if s == nil {
 		return s
 	}
-	s.ensureInternals()
+	s.ensureDataStorage()
 	// Set with storage key
-	s.m[key] = setting
+	s.data[key] = setting
 	return s
 }
 
@@ -254,7 +258,7 @@ func (s *Settings) DeleteKey(key string) {
 		return
 	}
 	// Delete storage key
-	delete(s.m, key)
+	delete(s.data, key)
 }
 
 // Delete deletes named setting
@@ -406,44 +410,44 @@ func (s *Settings) marshal(marshaller func(v any) ([]byte, error)) ([]byte, erro
 	return marshaller(raw)
 }
 
-// fetchPort is the base function to fetch *Int32 port value
-func (s *Settings) fetchPort(name string) *types.Int32 {
+// getInt32Ptr gets Int32 pointer value
+func (s *Settings) getInt32Ptr(name string) *types.Int32 {
 	return s.Get(name).ScalarInt32Ptr()
 }
 
 // GetTCPPort gets TCP port from settings
 func (s *Settings) GetTCPPort() *types.Int32 {
-	return s.fetchPort("tcp_port")
+	return s.getInt32Ptr("tcp_port")
 }
 
 // GetTCPPortSecure gets TCP port secure from settings
 func (s *Settings) GetTCPPortSecure() *types.Int32 {
-	return s.fetchPort("tcp_port_secure")
+	return s.getInt32Ptr("tcp_port_secure")
 }
 
 // GetHTTPPort gets HTTP port from settings
 func (s *Settings) GetHTTPPort() *types.Int32 {
-	return s.fetchPort("http_port")
+	return s.getInt32Ptr("http_port")
 }
 
 // GetHTTPSPort gets HTTPS port from settings
 func (s *Settings) GetHTTPSPort() *types.Int32 {
-	return s.fetchPort("https_port")
+	return s.getInt32Ptr("https_port")
 }
 
 // GetInterserverHTTPPort gets interserver HTTP port from settings
 func (s *Settings) GetInterserverHTTPPort() *types.Int32 {
-	return s.fetchPort("interserver_http_port")
+	return s.getInt32Ptr("interserver_http_port")
 }
 
 // GetZKPort gets Zookeeper port from settings
 func (s *Settings) GetZKPort() *types.Int32 {
-	return s.fetchPort("keeper_server/tcp_port")
+	return s.getInt32Ptr("keeper_server/tcp_port")
 }
 
 // GetRaftPort gets Raft port from settings
 func (s *Settings) GetRaftPort() *types.Int32 {
-	return s.fetchPort("keeper_server/raft_configuration/server/port")
+	return s.getInt32Ptr("keeper_server/raft_configuration/server/port")
 }
 
 // MergeFrom merges into `dst` non-empty new-key-values from `from` in case no such `key` already in `src`
@@ -584,9 +588,17 @@ func (s *Settings) AsSortedSliceOfStrings() []string {
 	return res
 }
 
+type SettingsNormalizerOptions struct {
+	Macros map[string]string
+}
+
 // Normalize normalizes settings
-func (s *Settings) Normalize() *Settings {
+func (s *Settings) Normalize(_opts ...*SettingsNormalizerOptions) *Settings {
 	s.normalizeKeys()
+	if len(_opts) > 0 {
+		opts := _opts[0]
+		s.macroKeys(opts.Macros)
+	}
 	return s
 }
 
@@ -615,6 +627,34 @@ func (s *Settings) normalizeKeys() {
 	// Delete entries with un-normalized keys
 	for _, unNormalizedKey := range keysToNormalize {
 		s.DeleteKey(unNormalizedKey)
+	}
+}
+
+// macroKeys
+func (s *Settings) macroKeys(macros map[string]string) {
+	if s.Len() == 0 {
+		return
+	}
+
+	var keysToProcess []string
+
+	// Find entries with keys to macro
+	s.WalkKeys(func(key string, _ *Setting) {
+		if _, modified := macro(macros, key); modified {
+			// Changed something. This path has to be normalized
+			keysToProcess = append(keysToProcess, key)
+		}
+	})
+
+	// Add entries with normalized keys
+	for _, originalKey := range keysToProcess {
+		processedKey, _ := macro(macros, originalKey)
+		s.SetKey(processedKey, s.GetKey(originalKey))
+	}
+
+	// Delete entries with before-processed keys
+	for _, beforeProcessedKey := range keysToProcess {
+		s.DeleteKey(beforeProcessedKey)
 	}
 }
 
@@ -655,6 +695,14 @@ func normalizeKeyAsPath(path string) (string, bool) {
 	normalized = strings.Trim(normalized, "/")
 
 	return normalized, normalized != path
+}
+
+func macro(macros map[string]string, str string) (string, bool) {
+	processed := str
+	for macro, value := range macros {
+		processed = strings.ReplaceAll(processed, macro, value)
+	}
+	return processed, processed != str
 }
 
 // getPrefixFromPath

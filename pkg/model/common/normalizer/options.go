@@ -14,18 +14,24 @@
 
 package normalizer
 
+import (
+	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+)
+
 // Options specifies normalization options
-type Options struct {
+type Options[T chi.ClickHouseInstallation | chk.ClickHouseKeeperInstallation] struct {
 	// WithDefaultCluster specifies whether to insert default cluster in case no cluster specified
 	WithDefaultCluster bool
 	// DefaultUserAdditionalIPs specifies set of additional IPs applied to default user
 	DefaultUserAdditionalIPs   []string
 	DefaultUserInsertHostRegex bool
+	Templates                  []*T
 }
 
 // NewOptions creates new Options
-func NewOptions() *Options {
-	return &Options{
+func NewOptions[T chi.ClickHouseInstallation | chk.ClickHouseKeeperInstallation]() *Options[T] {
+	return &Options[T]{
 		DefaultUserInsertHostRegex: true,
 	}
 }

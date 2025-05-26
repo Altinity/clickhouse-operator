@@ -124,7 +124,7 @@ func (in *ChkReplica) DeepCopyInto(out *ChkReplica) {
 	if in.Templates != nil {
 		in, out := &in.Templates, &out.Templates
 		*out = new(clickhousealtinitycomv1.TemplatesList)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Hosts != nil {
 		in, out := &in.Hosts, &out.Hosts
@@ -215,7 +215,7 @@ func (in *ChkShard) DeepCopyInto(out *ChkShard) {
 	if in.Templates != nil {
 		in, out := &in.Templates, &out.Templates
 		*out = new(clickhousealtinitycomv1.TemplatesList)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Hosts != nil {
 		in, out := &in.Hosts, &out.Hosts
@@ -441,7 +441,7 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 	if in.Templates != nil {
 		in, out := &in.Templates, &out.Templates
 		*out = new(clickhousealtinitycomv1.TemplatesList)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Layout != nil {
 		in, out := &in.Layout, &out.Layout
@@ -512,6 +512,11 @@ func (in *FillStatusParams) DeepCopyInto(out *FillStatusParams) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Endpoints != nil {
+		in, out := &in.Endpoints, &out.Endpoints
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.NormalizedCR != nil {
 		in, out := &in.NormalizedCR, &out.NormalizedCR
 		*out = new(ClickHouseKeeperInstallation)
@@ -568,6 +573,11 @@ func (in *Status) DeepCopyInto(out *Status) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Endpoints != nil {
+		in, out := &in.Endpoints, &out.Endpoints
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.NormalizedCR != nil {
 		in, out := &in.NormalizedCR, &out.NormalizedCR
 		*out = new(ClickHouseKeeperInstallation)
@@ -580,6 +590,11 @@ func (in *Status) DeepCopyInto(out *Status) {
 	}
 	if in.HostsWithTablesCreated != nil {
 		in, out := &in.HostsWithTablesCreated, &out.HostsWithTablesCreated
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.HostsWithReplicaCaughtUp != nil {
+		in, out := &in.HostsWithReplicaCaughtUp, &out.HostsWithReplicaCaughtUp
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

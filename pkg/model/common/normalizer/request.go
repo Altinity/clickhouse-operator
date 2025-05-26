@@ -18,32 +18,33 @@ import (
 	core "k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // Request specifies normalization request
-type Request struct {
+type Request[T chi.ClickHouseInstallation | chk.ClickHouseKeeperInstallation] struct {
 	// target specifies current target being normalized
-	target api.ICustomResource
+	target chi.ICustomResource
 	// options specifies normalization options
-	options *Options
+	options *Options[T]
 }
 
 // NewRequest creates new Context
-func NewRequest(options *Options) *Request {
-	return &Request{
+func NewRequest[T chi.ClickHouseInstallation | chk.ClickHouseKeeperInstallation](options *Options[T]) *Request[T] {
+	return &Request[T]{
 		options: options,
 	}
 }
 
-func (c *Request) GetTarget() api.ICustomResource {
+func (c *Request[T]) GetTarget() chi.ICustomResource {
 	if c == nil {
 		return nil
 	}
 	return c.target
 }
 
-func (c *Request) SetTarget(target api.ICustomResource) api.ICustomResource {
+func (c *Request[T]) SetTarget(target chi.ICustomResource) chi.ICustomResource {
 	if c == nil {
 		return nil
 	}
@@ -51,18 +52,18 @@ func (c *Request) SetTarget(target api.ICustomResource) api.ICustomResource {
 	return c.target
 }
 
-func (c *Request) Options() *Options {
+func (c *Request[T]) Options() *Options[T] {
 	if c == nil {
 		return nil
 	}
 	return c.options
 }
 
-func (c *Request) GetTargetNamespace() string {
+func (c *Request[_]) GetTargetNamespace() string {
 	return c.GetTarget().GetNamespace()
 }
 
-func (c *Request) AppendAdditionalEnvVar(envVar core.EnvVar) {
+func (c *Request[_]) AppendAdditionalEnvVar(envVar core.EnvVar) {
 	if c == nil {
 		return
 	}
@@ -71,14 +72,14 @@ func (c *Request) AppendAdditionalEnvVar(envVar core.EnvVar) {
 	log.V(2).F().Info("added env var %s len()=%d", envVar.Name, len(c.GetTarget().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
 }
 
-func (c *Request) AppendAdditionalVolume(volume core.Volume) {
+func (c *Request[_]) AppendAdditionalVolume(volume core.Volume) {
 	if c == nil {
 		return
 	}
 	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeIfNotExists(volume)
 }
 
-func (c *Request) AppendAdditionalVolumeMount(volumeMount core.VolumeMount) {
+func (c *Request[_]) AppendAdditionalVolumeMount(volumeMount core.VolumeMount) {
 	if c == nil {
 		return
 	}

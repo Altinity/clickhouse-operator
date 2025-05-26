@@ -28,6 +28,7 @@ import (
 	log "github.com/golang/glog"
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
+
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -135,6 +136,10 @@ const (
 	OnStatefulSetUpdateFailureActionIgnore = "ignore"
 )
 
+const (
+	defaultMaxReplicationDelay = 10
+)
+
 // OperatorConfig specifies operator configuration
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
@@ -189,6 +194,29 @@ type OperatorConfigRestartPolicyRule struct {
 // OperatorConfigRestartPolicy specifies operator's configuration changes restart policy
 type OperatorConfigRestartPolicy struct {
 	Rules []OperatorConfigRestartPolicyRule `json:"rules" yaml:"rules"`
+}
+
+// OperatorConfigAddonRule specifies ClickHouse version and rules for this version
+type OperatorConfigAddonRule struct {
+	Version string     `json:"version,omitempty" yaml:"version,omitempty"`
+	Spec    *AddonSpec `json:"spec,omitempty"    yaml:"spec,omitempty"`
+}
+
+type AddonSpec struct {
+	Configuration *AddonConfiguration `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+}
+
+type AddonConfiguration struct {
+	Users    map[string]string `json:"users,omitempty"     yaml:"users,omitempty"`
+	Profiles map[string]string `json:"profiles,omitempty"  yaml:"profiles,omitempty"`
+	Quotas   map[string]string `json:"quotas,omitempty"    yaml:"quotas,omitempty"`
+	Settings map[string]string `json:"settings,omitempty"  yaml:"settings,omitempty"`
+	Files    map[string]string `json:"files,omitempty"     yaml:"files,omitempty"`
+}
+
+// OperatorConfigRestartPolicy specifies operator's configuration changes restart policy
+type OperatorConfigAddons struct {
+	Rules []OperatorConfigAddonRule `json:"rules" yaml:"rules"`
 }
 
 // OperatorConfigFile specifies File section
@@ -291,6 +319,8 @@ type OperatorConfigClickHouse struct {
 		} `json:"timeouts" yaml:"timeouts"`
 	} `json:"access" yaml:"access"`
 
+	Addons OperatorConfigAddons `json:"addons" yaml:"addons"`
+
 	// Metrics used to specify how the operator fetches metrics from ClickHouse instances
 	Metrics struct {
 		Timeouts struct {
@@ -351,9 +381,6 @@ type OperatorConfigCHIRuntime struct {
 	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
 	Templates []*ClickHouseInstallation `json:"-" yaml:"-"`
 	mutex     sync.RWMutex              `json:"-" yaml:"-"`
-
-	// ClickHouseInstallation template
-	Template *ClickHouseInstallation `json:"-" yaml:"-"`
 }
 
 // OperatorConfigReconcile specifies reconcile section
@@ -389,9 +416,16 @@ type OperatorConfigReconcileHost struct {
 
 // OperatorConfigReconcileHostWait defines reconcile host wait config
 type OperatorConfigReconcileHostWait struct {
-	Exclude *types.StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
-	Queries *types.StringBool `json:"queries,omitempty" yaml:"queries,omitempty"`
-	Include *types.StringBool `json:"include,omitempty" yaml:"include,omitempty"`
+	Exclude  *types.StringBool                        `json:"exclude,omitempty"  yaml:"exclude,omitempty"`
+	Queries  *types.StringBool                        `json:"queries,omitempty"  yaml:"queries,omitempty"`
+	Include  *types.StringBool                        `json:"include,omitempty"  yaml:"include,omitempty"`
+	Replicas *OperatorConfigReconcileHostWaitReplicas `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+}
+
+type OperatorConfigReconcileHostWaitReplicas struct {
+	All   *types.StringBool `json:"all,omitempty"   yaml:"all,omitempty"`
+	New   *types.StringBool `json:"new,omitempty"   yaml:"new,omitempty"`
+	Delay *types.Int32      `json:"delay,omitempty" yaml:"delay,omitempty"`
 }
 
 // OperatorConfigAnnotation specifies annotation section
@@ -802,6 +836,18 @@ func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
 	}
 }
 
+func (c *OperatorConfig) normalizeSectionReconcileHost() {
+	// Timeouts
+	if c.Reconcile.Host.Wait.Replicas == nil {
+		c.Reconcile.Host.Wait.Replicas = &OperatorConfigReconcileHostWaitReplicas{}
+	}
+
+	if c.Reconcile.Host.Wait.Replicas.Delay == nil {
+		// Default update timeout in seconds
+		c.Reconcile.Host.Wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
+	}
+}
+
 func (c *OperatorConfig) normalizeSectionClickHouseConfigurationUserDefault() {
 	// Default values for ClickHouse user configuration
 	// 1. user/profile
@@ -944,8 +990,9 @@ func (c *OperatorConfig) normalize() {
 	c.normalizeSectionClickHouseMetrics()
 	c.normalizeSectionKeeperConfigurationFile()
 	c.normalizeSectionTemplate()
-	c.normalizeSectionReconcileStatefulSet()
 	c.normalizeSectionReconcileRuntime()
+	c.normalizeSectionReconcileStatefulSet()
+	c.normalizeSectionReconcileHost()
 	c.normalizeSectionLogger()
 	c.normalizeSectionLabel()
 	c.normalizeSectionStatefulSet()

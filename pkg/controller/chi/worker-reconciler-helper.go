@@ -16,47 +16,84 @@ package chi
 
 import (
 	"context"
+	"math"
+	"sync"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"math"
-	"sync"
 )
 
-func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) string {
-	version, _ := w.getHostClickHouseVersion(
-		ctx,
-		host,
-		versionOptions{
-			skipNew:             true,
-			skipStoppedAncestor: true,
-		},
-	)
-	return version
-}
-
-func (w *worker) getHostSoftwareVersionErr(ctx context.Context, host *api.Host) error {
-	version, err := w.getHostClickHouseVersion(
-		ctx,
-		host,
-		versionOptions{},
-	)
-	if err == nil {
-		w.a.V(1).M(host).F().Info("Host software version detected. Host: %s version: %s", host.GetName(), version)
+func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host, _opts ...*VersionOptions) *swversion.SoftWareVersion {
+	var opts *VersionOptions
+	if len(_opts) > 0 {
+		opts = _opts[0]
 	} else {
-		w.a.V(1).M(host).F().Info("Host software version NOT detected. Host: %s Err: %v", host.GetName(), err)
+		opts = &VersionOptions{
+			Skip{
+				New:             true,
+				StoppedAncestor: true,
+			},
+		}
 	}
-	return err
+
+	// Fetch tag from the image
+	tag, tagFound := w.task.Creator().GetAppImageTag(host)
+	var tagBasedVersion *swversion.SoftWareVersion
+	if tagFound {
+		tagBasedVersion = swversion.NewSoftWareVersionFromTag(tag)
+	}
+
+	if skip, description := opts.shouldSkip(host); skip {
+		// We know for sure no need to even try to check version from the host itself
+		// Just fall back to tag-based version
+		w.a.V(1).M(host).F().Info("Need to report version from the tag. Tag: %s Host: %s ", tag, host.GetName())
+		if tagBasedVersion != nil {
+			// Able to report version from the tag
+			return tagBasedVersion.SetDescription("parsed from tag: '" + tag + "' via " + description)
+		}
+		// Unable to report version from the tag - report min one
+		return swversion.MinVersion().SetDescription("set min version cause unable to parse from tag: '" + tag + "' via " + description)
+	}
+
+	// Try to report version from the app
+
+	if version, err := w.getHostClickHouseVersion(ctx, host); err == nil {
+		// Able to fetch version from the app - report version
+		return version.SetDescription("fetched from host")
+	}
+
+	// Unable to fetch version fom the app
+	// Try to fallback to tag-based version
+
+	if tagBasedVersion != nil {
+		// Able to report version from the tag
+		return tagBasedVersion.SetDescription("parsed from tag: '" + tag + "'")
+	}
+
+	// Unable to report version from the tag - report min one
+	return swversion.MinVersion().SetDescription("min - unable to parse neither from host nor from tag: '" + tag + "'")
 }
 
-// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
-func (w *worker) getReconcileShardsWorkersNum(shards []*api.ChiShard, opts *common.ReconcileShardsAndHostsOptions) int {
-	availableWorkers := float64(chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber)
-	maxConcurrencyPercent := float64(chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
+func (w *worker) isHostSoftwareAbleToRespond(ctx context.Context, host *api.Host) error {
+	// Check whether the software is able to respond its version
+	version, err := w.getHostClickHouseVersion(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host software is not alive - version NOT detected. Host: %s Err: %v", host.GetName(), err)
+	}
+
+	w.a.V(1).M(host).F().Info("Host software is alive - version detected. Host: %s version: %s", host.GetName(), version)
+	return nil
+}
+
+// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shards reconcile
+func (w *worker) getReconcileShardsWorkersNum(cluster *api.Cluster, opts *common.ReconcileShardsAndHostsOptions) int {
+	availableWorkers := float64(cluster.Reconcile.Runtime.ReconcileShardsThreadsNumber)
+	maxConcurrencyPercent := float64(cluster.Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
 	_100Percent := float64(100)
-	shardsNum := float64(len(shards))
+	shardsNum := float64(len(cluster.Layout.Shards))
 
 	if opts.FullFanOut {
 		// For full fan-out scenarios use all available workers.

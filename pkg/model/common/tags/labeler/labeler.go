@@ -68,6 +68,9 @@ func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]str
 	case interfaces.LabelPDB:
 		return l.labelPDB(params...)
 
+	case interfaces.LabelSecret:
+		return l.labelSecret(params...)
+
 	case interfaces.LabelSTS:
 		return l.labelSTS(params...)
 

@@ -97,6 +97,13 @@ spec:
         # Behavior policy for failed Service, `Retain` by default
         service: Retain
 
+    # Optional, overwrites reconcile.runtime from the operator's config
+    runtime:
+      # Max number of concurrent shard reconciles within one cluster in progress
+      reconcileShardsThreadsNumber: 5
+      # Max percentage of concurrent shard reconciles within one cluster in progress
+      reconcileShardsMaxConcurrencyPercent: 50
+
   # List of templates used by a CHI
   useTemplates:
     - name: template1
@@ -136,10 +143,16 @@ spec:
       nodes:
         - host: zookeeper-0.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
+          secure: yes
+          availabilityZone: az1
         - host: zookeeper-1.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
+          secure: yes
+          availabilityZone: az2
         - host: zookeeper-2.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
+          secure: yes
+          availabilityZone: az3
       session_timeout_ms: 30000
       operation_timeout_ms: 10000
       root: "/path/to/zookeeper/root/node"
@@ -212,6 +225,13 @@ spec:
         layout:
           shardsCount: 3
           replicasCount: 2
+        reconcile:
+          #  Overwrites reconcile.runtime from the operator's config
+          runtime:
+            # Max number of concurrent shard reconciles within one cluster in progress
+            reconcileShardsThreadsNumber: 5
+            # Max percentage of concurrent shard reconciles within one cluster in progress
+            reconcileShardsMaxConcurrencyPercent: 50
 
       - name: shards-only
         templates:

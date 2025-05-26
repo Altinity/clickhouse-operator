@@ -75,8 +75,8 @@ clickhouse_version_old = get_ch_version(clickhouse_template_old)
 keeper_type = os.getenv("KEEPER_TYPE") if "KEEPER_TYPE" in os.environ else "zookeeper" # zookeeper | clickhouse_keeper
 
 prometheus_namespace = "prometheus"
-prometheus_operator_version = "0.68"
-prometheus_scrape_interval = 10
+prometheus_operator_version = "0.78.1"
+prometheus_scrape_interval = 5
 
 minio_version = "latest"
 

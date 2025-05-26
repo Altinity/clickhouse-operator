@@ -1,4 +1,4 @@
-{{- if .Values.rbac.create -}}
+{{- if (and .Values.rbac.create (not .Values.rbac.namespaceScoped)) -}}
 # Specifies either
 #   ClusterRole
 # or
@@ -12,7 +12,7 @@ metadata:
   name: {{ include "altinity-clickhouse-operator.fullname" . }}
   #namespace: kube-system
   labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
-  namespace: {{ .Release.Namespace }}
+  annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
 rules:
   #
   # Core API group

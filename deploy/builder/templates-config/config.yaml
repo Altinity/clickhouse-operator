@@ -113,6 +113,9 @@ clickhouse:
           - settings/remote_servers/*: "no"
           - settings/user_directories/*: "no"
 
+          # these settings should not lead to pod restarts
+          - settings/display_secrets_in_show_and_select: "no"
+
           - zookeeper/*: "yes"
 
           - files/*.xml: "yes"
@@ -170,6 +173,58 @@ clickhouse:
       connect: 1
       # Timout to perform SQL query from the operator to ClickHouse instances. In seconds.
       query: 4
+
+  ################################################
+  ##
+  ## Addons specifies additional configuration sections
+  ## Should it be called something like "templates"?
+  ##
+  ################################################
+  addons:
+    rules:
+      - version: "*"
+        spec:
+          configuration:
+            users:
+            profiles:
+            quotas:
+            settings:
+            files:
+      - version: ">= 23.3"
+        spec:
+          configuration:
+            ###
+            ### users.d is global while description depends on CH version which may vary on per-host basis
+            ### In case of global-ness this may be better to implement via auto-templates
+            ###
+            ### As a solution, this may be applied on the whole cluster based on any of its hosts
+            ###
+            ### What to do when host is just created? CH version is not known prior to CH started and user config is required before CH started.
+            ### We do not have any info about the cluster on initial creation
+            ###
+            users:
+              "{clickhouseOperatorUser}/access_management": 1
+              "{clickhouseOperatorUser}/named_collection_control": 1
+              "{clickhouseOperatorUser}/show_named_collections": 1
+              "{clickhouseOperatorUser}/show_named_collections_secrets": 1
+            profiles:
+            quotas:
+            settings:
+            files:
+
+      - version: ">= 23.5"
+        spec:
+          configuration:
+            users:
+            profiles:
+              clickhouse_operator/format_display_secrets_in_show_and_select: 1
+            quotas:
+            settings:
+              ##
+              ## this may be added on per-host basis into host's conf.d folder
+              ##
+              display_secrets_in_show_and_select: 1
+            files:
 
   #################################################
   ##
@@ -254,9 +309,9 @@ reconcile:
     #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
     # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
 
-    # Max number of concurrent shard reconciles within one CHI in progress
+    # Max number of concurrent shard reconciles within one cluster in progress
     reconcileShardsThreadsNumber: 5
-    # Max percentage of concurrent shard reconciles within one CHI in progress
+    # Max percentage of concurrent shard reconciles within one cluster in progress
     reconcileShardsMaxConcurrencyPercent: 50
 
   # Reconcile StatefulSet scenario
@@ -300,6 +355,10 @@ reconcile:
       exclude: true
       queries: true
       include: false
+      replicas:
+        all: no
+        new: yes
+        delay: 10
 
 ################################################
 ##

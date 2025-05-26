@@ -16,9 +16,10 @@ package statefulset
 
 import (
 	"context"
+	"strings"
+
 	apps "k8s.io/api/apps/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
-	"strings"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -89,7 +90,7 @@ func (r *Reconciler) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
 }
 
 // getStatefulSetStatus gets StatefulSet status
-func (r *Reconciler) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
+func (r *Reconciler) getStatefulSetStatus(host *api.Host) types.ObjectStatus {
 	new := host.Runtime.DesiredStatefulSet
 	r.a.V(2).M(new).S().Info(util.NamespaceNameString(new))
 	defer r.a.V(2).M(new).E().Info(util.NamespaceNameString(new))
@@ -102,24 +103,28 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 
 	cur, err := r.sts.Get(context.TODO(), new)
 	switch {
-	case cur != nil:
+	case (err == nil) && (cur != nil):
+		// StatefulSet is found
 		r.a.V(1).M(new).Info("Have StatefulSet available, try to perform label-based comparison for sts: %s", util.NamespaceNameString(new))
 		return common.GetObjectStatusFromMetas(r.labeler, cur, new)
 
 	case apiErrors.IsNotFound(err):
 		// StatefulSet is not found at the moment.
-		// However, it may be just deleted
+		// It is either new or - however - it may be just deleted
 		r.a.V(1).M(new).Info("No cur StatefulSet available and the reason is - not found. Either new one or a deleted sts: %s", util.NamespaceNameString(new))
 		if host.HasAncestor() {
 			r.a.V(1).M(new).Warning("No cur StatefulSet available but host has an ancestor. Found deleted sts. for: %s", util.NamespaceNameString(new))
-			return api.ObjectStatusModified
+			return types.ObjectStatusModified
 		}
 		r.a.V(1).M(new).Info("No cur StatefulSet available and it is not found and is a new one. New sts: %s", util.NamespaceNameString(new))
-		return api.ObjectStatusNew
+		return types.ObjectStatusRequested
 
 	default:
+		// Other error
 		r.a.V(1).M(new).Warning("Have no StatefulSet available, nor it is not found. sts: %s err: %v", util.NamespaceNameString(new), err)
-		return api.ObjectStatusUnknown
+		r.a.V(2).M(new).Info("host sts cur: %s", cur)
+		r.a.V(2).M(new).Info("host sts err: %s", err)
+		return types.ObjectStatusUnknown
 	}
 }
 
@@ -140,7 +145,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	r.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet))
 	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet))
 
-	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) {
 		r.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
 		if register {
 			host.GetCR().IEnsureStatus().HostUnchanged()
@@ -159,7 +164,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	host.Runtime.CurStatefulSet, err = r.sts.Get(ctx, newStatefulSet)
 
 	// Report diff to trace
-	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusModified {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusModified) {
 		r.a.V(1).M(host).F().Info("Need to reconcile MODIFIED StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
 		common.DumpStatefulSetDiff(host, host.Runtime.CurStatefulSet, newStatefulSet)
 	}
@@ -369,7 +374,7 @@ func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, op
 	log.V(1).M(host).F().P()
 	statefulSet := host.Runtime.DesiredStatefulSet
 
-	log.V(1).Info("Create StatefulSet %s", util.NamespaceNameString(statefulSet))
+	log.V(1).Info("Create StatefulSet: %s", util.NamespaceNameString(statefulSet))
 	if _, err := r.sts.Create(ctx, statefulSet); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet create failed. err: %v", err)
 		return common.ErrCRUDRecreate
@@ -425,7 +430,7 @@ func (r *Reconciler) doUpdateStatefulSet(
 	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
 	if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
-		log.V(1).M(host).F().Error("StatefulSet update wait failed. err: %v", err)
+		log.V(1).M(host).F().Error("StatefulSet update FAILED - wait for ready StatefulSet failed. err: %v", err)
 		return r.fallback.OnStatefulSetUpdateFailed(ctx, oldStatefulSet, host, r.sts)
 	}
 

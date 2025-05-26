@@ -152,6 +152,11 @@ func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *api.Ho
 	return s.QueryHostString(ctx, host, s.sqlVersion())
 }
 
+// HostMaxReplicaDelay returns max replica delay on the host
+func (s *ClusterSchemer) HostMaxReplicaDelay(ctx context.Context, host *api.Host) (int, error) {
+	return s.QueryHostInt(ctx, host, s.sqlMaxReplicaDelay())
+}
+
 // HostShutdown shutdown a host
 func (s *ClusterSchemer) HostShutdown(ctx context.Context, host *api.Host) error {
 	log.V(1).M(host).F().Info("Host shutdown: %s", host.GetName())

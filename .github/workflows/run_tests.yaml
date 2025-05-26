@@ -47,7 +47,7 @@ jobs:
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.31.0
+          kubernetes-version: v1.31.2
           cpus: max
           memory: max
 
@@ -116,7 +116,7 @@ jobs:
         with:
           name: testflows-report
           path: |
-            tests/report.html
+            tests/*.html
           if-no-files-found: error
           retention-days: 90
 

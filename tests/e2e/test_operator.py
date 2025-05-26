@@ -39,20 +39,15 @@ def test_001(self):
         },
     )
 
-    with When("Delete CHI"):
-        kubectl.delete_chi(chi)
-    with Then("All objects should be deleted"):
-        cnt = kubectl.get_count("all", chi = chi)
-        objs = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
-        if len(objs)>0:
-            objs = kubectl.get_obj_names(chi, "pod,service,sts,pvc,cm,pdb")
-            print("Some objects were not deleted:")
-            print(objs)
-        assert cnt == 0
+    created_objects = kubectl.get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=chi)
+    print("Created objects:")
+    for o in created_objects:
+        print(o)
+
+    kubectl.delete_chi(chi)
 
     with Finally("I clean up"):
         delete_test_namespace()
-
 
 
 @TestScenario
@@ -161,8 +156,8 @@ def test_005(self):
 def test_006(self):
     create_shell_namespace_clickhouse_template()
 
-    old_version = "clickhouse/clickhouse-server:23.8"
-    new_version = "clickhouse/clickhouse-server:24.3"
+    old_version = "clickhouse/clickhouse-server:24.8"
+    new_version = "clickhouse/clickhouse-server:25.3"
     chi = "test-006"
 
     with Then(f"Start CHI with version {old_version}"):
@@ -323,7 +318,7 @@ def test_operator_restart(self, manifest, service, version=None):
         pod=f"chi-{chi}-{cluster}-0-0-0"
     )
     trigger_event.set()
-    time.sleep(5) # let threads to finish
+    time.sleep(5)   # let threads to finish
     join()
 
     # with Then("I recreate shell"):
@@ -588,7 +583,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_009_1(self, version_from="0.24.3", version_to=None):
+def test_009_1(self, version_from="0.24.5", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -604,7 +599,7 @@ def test_009_1(self, version_from="0.24.3", version_to=None):
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_009_2(self, version_from="0.24.3", version_to=None):
+def test_009_2(self, version_from="0.24.5", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -624,9 +619,10 @@ def test_010(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
+    chi = "test-010-zk-init"
 
     kubectl.create_and_check(
-        manifest="manifests/chi/test-010-zkroot.yaml",
+        manifest="manifests/chi/test-010-zk-init.yaml",
         check={
             "apply_templates": {
                 current().context.clickhouse_template,
@@ -637,8 +633,11 @@ def test_010(self):
     )
     time.sleep(10)
     with And("ClickHouse should not complain regarding zookeeper path"):
-        out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/' limit 1")
+        out = clickhouse.query_with_error(chi, "select path from system.zookeeper where path = '/' limit 1")
         assert "/" == out
+    with And("Availability zone should be set"):
+        out = clickhouse.query_with_error(chi, "select availability_zone from system.zookeeper_connection")
+        assert "my-azone" == out
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -647,10 +646,10 @@ def test_010(self):
 @Name("test_010_1. Test zookeeper initialization AFTER starting a cluster")
 def test_010_1(self):
     create_shell_namespace_clickhouse_template()
-    chi = "test-010-zkroot"
+    chi = "test-010-zk-init"
 
     kubectl.create_and_check(
-        manifest="manifests/chi/test-010-zkroot.yaml",
+        manifest="manifests/chi/test-010-zk-init.yaml",
         check={
             "apply_templates": {
                 current().context.clickhouse_template,
@@ -663,16 +662,16 @@ def test_010_1(self):
     with Then("Wait 60 seconds for operator to start creating ZooKeeper root"):
         time.sleep(60)
 
-    # with Then("CHI should be in progress with no pods created yet"):
-    #    assert kubectl.get_chi_status(chi) == "InProgress"
-    #    assert kubectl.get_count("pod", chi = chi) == 0
+    with Then("CHI should be in progress with no pods created yet"):
+        assert kubectl.get_chi_status(chi) == "InProgress"
+        assert kubectl.get_count("pod", chi = chi) == 0
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     kubectl.wait_chi_status(chi, "Completed")
 
     with And("ClickHouse should not complain regarding zookeeper path"):
-        out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/' limit 1")
+        out = clickhouse.query_with_error(chi, "select path from system.zookeeper where path = '/' limit 1")
         assert "/" == out
 
     with Finally("I clean up"):
@@ -1178,7 +1177,7 @@ def test_013_1(self):
         "CREATE TABLE s3_engine_table (name String, value UInt32)ENGINE = S3('https://storage.test.net/my-test1/test-data.csv.gz', 'CSV', 'gzip')",
         "CREATE TABLE embeddedrocksdb_table (key UInt64, value String) Engine = EmbeddedRocksDB " "PRIMARY KEY(key)",
         "CREATE TABLE postgresql_table (float_nullable Nullable(Float32), str String, int_id Int32 ) ENGINE = PostgreSQL('localhost:5432', 'public_db', 'test_table', 'postges_user', 'postgres_password')",
-        "CREATE TABLE externaldistributed_table (id UInt32, name String, age UInt32, money UInt32) ENGINE = ExternalDistributed('PostgreSQL', 'localhost:5432', 'clickhouse', 'test_replicas', 'postgres', 'mysecretpassword')",
+        # Deprecated in 25.3 "CREATE TABLE externaldistributed_table (id UInt32, name String, age UInt32, money UInt32) ENGINE = ExternalDistributed('PostgreSQL', 'localhost:5432', 'clickhouse', 'test_replicas', 'postgres', 'mysecretpassword')",
 
         # "CREATE TABLE materialized_postgresql_table (key UInt64, value UInt64) ENGINE = "
         # "MaterializedPostgreSQL('localhost:5433', 'postgres_database', 'postgresql_replica', "
@@ -1455,7 +1454,7 @@ def test_014_0(self):
         "test_atomic_014.test_mv2_014",
     ]
     create_ddls = [
-        "CREATE TABLE test_local_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
+        "CREATE TABLE test_local_014 ON CLUSTER '{cluster}' (a Int8, b Int8 ALIAS a) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
         "CREATE VIEW test_view_014 as SELECT * FROM test_local_014",
         "CREATE VIEW a_view_014 as SELECT * FROM test_view_014",
         "CREATE MATERIALIZED VIEW test_mv_014 Engine = Log as SELECT * from test_local_014",
@@ -1470,6 +1469,9 @@ def test_014_0(self):
         "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)",
         "CREATE DATABASE test_memory_014 ON CLUSTER '{cluster}' Engine = Memory",
         "CREATE VIEW test_memory_014.test_view2_014 ON CLUSTER '{cluster}' AS SELECT * from system.tables",
+        # dictionary with a user, requires special settings for clickhouse_operator user
+        "CREATE DICTIONARY test_dict_014_2 ON CLUSTER '{cluster}' (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local_014' user 'test_014' PASSWORD 'test_014')) LAYOUT(FLAT()) LIFETIME(0)"
+
     ]
 
     chi_version = clickhouse.query(chi_name, "select value from system.build_options where name='VERSION_INTEGER'")
@@ -1511,51 +1513,65 @@ def test_014_0(self):
                 )
 
     def check_schema_propagation(replicas):
-        with Then("Schema objects should be migrated to the new replicas"):
-            for replica in replicas:
-                host = f"chi-{chi_name}-{cluster}-0-{replica}"
-                print(f"Checking replica {host}")
-                print("Checking tables and views")
-                for obj in schema_objects:
-                    print(f"Checking {obj}")
+        for replica in replicas:
+            host = f"chi-{chi_name}-{cluster}-0-{replica}"
+            with Then(f"Schema objects should be migrated to {host}"):
+                with Then("Checking tables and views"):
+                    for obj in schema_objects:
+                        print(f"Checking {obj}")
+                        out = clickhouse.query(
+                            chi_name,
+                            f"SELECT count() FROM system.tables WHERE name = '{obj}'",
+                            host=host,
+                        )
+                        assert out == "1"
+
+                with And("Checking dictionaries"):
                     out = clickhouse.query(
                         chi_name,
-                        f"SELECT count() FROM system.tables WHERE name = '{obj}'",
+                        f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict_014'",
                         host=host,
                     )
                     assert out == "1"
-
-                print("Checking dictionaries")
-                out = clickhouse.query(
-                    chi_name,
-                    f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict_014'",
-                    host=host,
-                )
-                assert out == "1"
-
-                print("Checking database engine")
-                out = clickhouse.query(
-                    chi_name,
-                    f"SELECT engine FROM system.databases WHERE name = 'test_atomic_014'",
-                    host=host,
-                )
-                assert out == "Atomic"
-
-                if "test_s3_014" in create_ddls:
                     out = clickhouse.query(
                         chi_name,
-                        f"SELECT engine FROM system.databases WHERE name = 'test_s3_014'",
+                        f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict_014_2'",
                         host=host,
+                    )
+                    assert out == "1"
+                    with Then("Checking dictionary with hidden properties"):
+                        out = clickhouse.query_with_error(
+                            chi_name,
+                            f"SELECT count() FROM test_dict_014_2",
+                            host=host,
                         )
-                    assert out == "S3"
+                        if "Exception" in out:
+                            print(out)
+                        assert "Exception" not in out, error(out)
 
-                print("Checking functions")
-                out = clickhouse.query(
-                    chi_name,
-                    f"SELECT count() FROM system.functions WHERE name = 'test_014'",
-                    host=host,
-                )
-                assert out == "1"
+                with And("Checking database engines"):
+                    out = clickhouse.query(
+                        chi_name,
+                        f"SELECT engine FROM system.databases WHERE name = 'test_atomic_014'",
+                        host=host,
+                    )
+                    assert out == "Atomic"
+
+                    if "test_s3_014" in create_ddls:
+                        out = clickhouse.query(
+                            chi_name,
+                            f"SELECT engine FROM system.databases WHERE name = 'test_s3_014'",
+                            host=host,
+                            )
+                        assert out == "S3"
+
+                with And("Checking functions"):
+                    out = clickhouse.query(
+                        chi_name,
+                        f"SELECT count() FROM system.functions WHERE name = 'test_014'",
+                        host=host,
+                    )
+                    assert out == "1"
 
         with And("Replicated database should have correct uuid, so new tables are automatically created"):
             import time
@@ -1726,7 +1742,7 @@ def test_014_0(self):
                 chi_name,
                 f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{cluster}/tables/0/default'",
             )
-            note(f"Found {out} replicated tables in {self.context.keeper_type}")
+            print(f"Found {out} replicated tables in {self.context.keeper_type}")
             assert "DB::Exception: No node" in out or out == "0"
 
     with Finally("I clean up"):
@@ -1822,33 +1838,28 @@ def test_014_1(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000"):
 
-@TestScenario
-@Name("test_015. Test circular replication with hostNetwork")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_CircularReplication("1.0"))
-def test_015(self):
-    create_shell_namespace_clickhouse_template()
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
 
     kubectl.create_and_check(
-        manifest="manifests/chi/test-015-host-network.yaml",
+        manifest=manifest,
         check={
             "object_counts": {
                 "statefulset": 2,
                 "pod": 2,
                 "service": 3,
-            },
+                },
             "do_not_delete": 1,
-        },
+            },
         timeout=600,
     )
 
     with Then("Query from one server to another one should work"):
         for i in range(1, 10):
-            out = clickhouse.query_with_error(
-                "test-015-host-network",
-                host="chi-test-015-host-network-default-0-0",
-                port="10000",
-                sql="SELECT count() FROM remote('chi-test-015-host-network-default-0-1:11000', system.one)",
+            out = clickhouse.query_with_error(chi, host=f"chi-{chi}-default-0-0", port=replica1_port,
+                sql=f"SELECT count() FROM remote('chi-{chi}-default-0-1:{replica2_port}', system.one)",
             )
             if "DNS_ERROR" not in out:
                 break
@@ -1858,17 +1869,42 @@ def test_015(self):
         assert out == "1"
 
     with And("Distributed query should work"):
-        # Sometimes it needs time to work. May be forming a cluster may take unpredictable time.
-        time.sleep(45)
-        out = clickhouse.query_with_error(
-            "test-015-host-network",
-            host="chi-test-015-host-network-default-0-0",
-            port="10000",
+        out = clickhouse.query_with_error(chi, host=f"chi-{chi}-default-0-1", port=replica2_port,
             sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10",
         )
         note(f"cluster out:\n{out}")
         print(f"out: {out}")
         assert out == "2"
+
+    with And("Replication should work"):
+        test_version = replica1_port
+        clickhouse.query(chi,
+            "CREATE TABLE " + f"test_015_{test_version}" + " (a UInt32) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY tuple()",
+            host=f"chi-{chi}-{cluster}-0-0", port = replica1_port)
+        clickhouse.query(chi,
+            "CREATE TABLE " + f"test_015_{test_version}" + " (a UInt32) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY tuple()",
+            host=f"chi-{chi}-{cluster}-0-1", port = replica2_port)
+        clickhouse.query(chi,
+            f"INSERT INTO test_015_{test_version} SELECT {test_version}",
+            host=f"chi-{chi}-{cluster}-0-0", port = replica1_port)
+        out = clickhouse.query(chi,
+            f"SELECT * FROM test_015_{test_version}",
+            host=f"chi-{chi}-{cluster}-0-1", port = replica2_port)
+        assert out == test_version
+
+@TestScenario
+@Name("test_015. hostNetwork")
+@Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_CircularReplication("1.0"))
+def test_015(self):
+    create_shell_namespace_clickhouse_template()
+
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Then("Check host network with different ports on the same node"):
+        check_host_network(manifest = "manifests/chi/test-015-host-network.yaml", replica1_port = "10000", replica2_port = "11000")
+
+    # with Then("Check host network with the same ports on different nodes"):
+    #    check_host_network(manifest = "manifests/chi/test-015-host-network-2.yaml")
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -2071,19 +2107,20 @@ def test_017(self):
         "insert into test_max select 0, 5898217176+number from numbers(10) settings max_block_size=1",
         "OPTIMIZE TABLE test_max FINAL",
     ]
-
-    for q in queries:
-        note(q)
     test_query = "select min(offset), max(offset) from test_max"
-    note(test_query)
+
+    res = ""
 
     for shard in range(pod_count):
         host = f"chi-{chi}-default-{shard}-0"
         for q in queries:
             clickhouse.query(chi, host=host, sql=q)
         out = clickhouse.query(chi, host=host, sql=test_query)
+        if res == "":
+            res = out
         ver = clickhouse.query(chi, host=host, sql="select version()")
-        note(f"version: {ver}, result: {out}")
+        print(f"version: {ver}, result: {out}")
+        assert res == out, error("Aggregate state may be different between versions")
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -2161,7 +2198,7 @@ def test_019(self, step=1):
     with When("CHI with retained volume is deleted"):
         pvc_count = kubectl.get_count("pvc", chi=chi)
         pv_count = kubectl.get_count("pv")
-        kubectl.delete_chi(chi)
+        kubectl.delete_chi(chi, ok_undeleted = True)
 
         with Then("PVC should be retained"):
             assert kubectl.get_count("pvc", chi=chi) == pvc_count
@@ -2185,37 +2222,6 @@ def test_019(self, step=1):
                 out = clickhouse.query(chi, sql="select a from t2")
                 assert out == "1"
 
-    with When("Stop the Installation"):
-        kubectl.create_and_check(
-            manifest=f"manifests/chi/test-019-{step}-retain-volume-2.yaml",
-            check={
-                "object_counts": {
-                    "statefulset": 1,  # When stopping, pod is removed but StatefulSet and all volumes are in place
-                    "pod": 0,
-                    "service": 1,  # load balancer service should be removed
-                },
-                "do_not_delete": 1,
-            },
-        )
-
-        with And("Re-start the Installation"):
-            kubectl.create_and_check(
-                manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
-                check={
-                    "pod_count": 1,
-                    "do_not_delete": 1,
-                },
-            )
-
-        with Then("Data should be in place"):
-            with Then("Non-replicated table should have data"):
-                out = clickhouse.query(chi, sql="select a from t1")
-                assert out == "1"
-
-            with And("Replicated table should have data"):
-                out = clickhouse.query(chi, sql="select a from t2")
-                assert out == "1"
-
     with When("Add a second replica"):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-019-{step}-retain-volume-3.yaml",
@@ -2228,27 +2234,27 @@ def test_019(self, step=1):
             out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
             assert out == "2"
 
-        with When("Remove a replica"):
-            pvc_count = kubectl.get_count("pvc", chi=chi)
-            pv_count = kubectl.get_count("pv")
+    with When("Remove a replica"):
+        pvc_count = kubectl.get_count("pvc", chi=chi)
+        pv_count = kubectl.get_count("pv")
 
-            kubectl.create_and_check(
-                manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
-                check={
-                    "pod_count": 1,
-                    "do_not_delete": 1,
-                },
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+        with Then("Replica PVC should be retained"):
+            assert kubectl.get_count("pvc", chi=chi) == pvc_count
+            assert kubectl.get_count("pv") == pv_count
+
+        with And("Replica should NOT be removed from ZooKeeper"):
+            out = clickhouse.query(
+                chi,
+                sql="select total_replicas from system.replicas where table='t2'",
             )
-            with Then("Replica PVC should be retained"):
-                assert kubectl.get_count("pvc", chi=chi) == pvc_count
-                assert kubectl.get_count("pv") == pv_count
-
-            with And("Replica should NOT be removed from ZooKeeper"):
-                out = clickhouse.query(
-                    chi,
-                    sql="select total_replicas from system.replicas where table='t2'",
-                )
-                assert out == "2"
+            assert out == "2"
 
     with When("Add a second replica one more time"):
         kubectl.create_and_check(
@@ -2263,42 +2269,41 @@ def test_019(self, step=1):
             out = clickhouse.query(chi, sql="select a from t2", host=f"chi-{chi}-simple-0-1")
             assert out == "1"
 
-        with When("Set reclaim policy to Delete but do not wait for completion"):
+    with When("Set reclaim policy to Delete but do not wait for completion"):
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-019-{step}-retain-volume-4.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+                # "chi_status": "InProgress", # !!!!!
+            },
+        )
+
+        with And("Remove a replica"):
+            pvc_count = kubectl.get_count("pvc", chi=chi)
+            pv_count = kubectl.get_count("pv")
+
             kubectl.create_and_check(
-                manifest=f"manifests/chi/test-019-{step}-retain-volume-4.yaml",
+                manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
                 check={
-                    "pod_count": 2,
+                    "pod_count": 1,
                     "do_not_delete": 1,
-                    # "chi_status": "InProgress", # !!!!!
                 },
             )
+            with Then("Replica PVC should be deleted"):
+                assert kubectl.get_count("pvc", chi=chi) < pvc_count
+                assert kubectl.get_count("pv") < pv_count
 
-            with And("Remove a replica"):
-                pvc_count = kubectl.get_count("pvc", chi=chi)
-                pv_count = kubectl.get_count("pv")
-
-                kubectl.create_and_check(
-                    manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
-                    check={
-                        "pod_count": 1,
-                        "do_not_delete": 1,
-                    },
+            with And("Replica should be removed from ZooKeeper"):
+                out = clickhouse.query(
+                    chi,
+                    sql="select total_replicas from system.replicas where table='t2'",
                 )
-                # Not implemented yet
-                with Then("Replica PVC should be deleted"):
-                    assert kubectl.get_count("pvc", chi=chi) < pvc_count
-                    assert kubectl.get_count("pv") < pv_count
-
-                with And("Replica should be removed from ZooKeeper"):
-                    out = clickhouse.query(
-                        chi,
-                        sql="select total_replicas from system.replicas where table='t2'",
-                    )
-                    assert out == "1"
+                assert out == "1"
 
     with When("Delete chi"):
-        kubectl.delete_chi(chi)
-        with Then("One PVC should be left because relcaim policy is not set anymore"):
+        kubectl.delete_chi(chi, ok_undeleted=True)
+        with Then("One PVC should be left because relcaim policy was unset when removing a replica"):
             assert kubectl.get_count("pvc", chi=chi) == 1
         with Then("Cleanup PVCs"):
             for pvc in kubectl.get_obj_names(chi, "pvc"):
@@ -2660,6 +2665,8 @@ def test_023(self):
     with Given("Auto templates are deployed"):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-2.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-3.yaml"))
+        kubectl.apply(util.get_full_path("manifests/secret/test-023-secret.yaml"))
     with Given("Give templates some time to be applied"):
         time.sleep(15)
 
@@ -2674,21 +2681,30 @@ def test_023(self):
             "do_not_delete": 1,
         },
     )
-    with Then(".status.usedTemplates has two values"):
+    with Then(".status.usedTemplates list all templates"):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[1].name") == "extension-annotations"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "grafana-dashboard-user"
         # assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == ""
 
-    with Then("Annotation from a template should be populated"):
-        normalizedCompleted = kubectl.get_chi_normalizedCompleted(chi)
-        assert normalizedCompleted["metadata"]["annotations"]["test"] == "test"
-    with Then("Pod annotation should populated from template"):
-        assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.test") == "test"
+    # manifests/chit/tpl-clickhouse-auto-1.yaml
     with Then("Environment variable from a template should be populated"):
         pod = kubectl.get_pod_spec(chi)
         env = pod["containers"][0]["env"][0]
         assert env["name"] == "TEST_ENV"
         assert env["value"] == "TEST_ENV_VALUE"
+
+    # manifests/chit/tpl-clickhouse-auto-2.yaml
+    with Then("Annotation from a template should be populated"):
+        normalizedCompleted = kubectl.get_chi_normalizedCompleted(chi)
+        assert normalizedCompleted["metadata"]["annotations"]["test"] == "test"
+    with Then("Pod annotation should populated from template"):
+        assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.test") == "test"
+
+    # manifests/chit/tpl-clickhouse-auto-3.yaml
+    with Then("User from a template should be populated"):
+        out = clickhouse.query_with_error(chi, "select 1", user = "grafana_dashboard_user", pwd = "grafana_dashboard_user_password")
+        assert out == "1"
 
     with Given("Two selector templates are deployed"):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-selector-1.yaml"))
@@ -2697,15 +2713,13 @@ def test_023(self):
         time.sleep(15)
 
     with Then("Trigger CHI update"):
-        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
-        kubectl.launch(cmd)
-
-        kubectl.wait_chi_status(chi, "Completed")
+        kubectl.force_reconcile(chi, "apply-templates")
 
     with Then(".status.usedTemplates has 3 values"):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[1].name") == "extension-annotations"
-        assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "selector-test-1"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "grafana-dashboard-user"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[3].name") == "selector-test-1"
         # assert kubectl.get_field("chi", chi, ".status.usedTemplates[3].name") == ""
 
     with Then("Annotation from selector-1 template should be populated"):
@@ -3750,17 +3764,18 @@ def test_036(self):
     wait_for_cluster(chi, cluster, 1, 2)
 
     with And("I create replicated table with some data"):
+        clickhouse.query(chi, "CREATE DATABASE test_036 ON CLUSTER '{cluster}'")
         create_table = """
-            CREATE TABLE test_local_036 ON CLUSTER '{cluster}' (a UInt32)
+            CREATE TABLE test_036.test_local_036 ON CLUSTER '{cluster}' (a UInt32)
             Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
             PARTITION BY tuple()
             ORDER BY a
             """.replace("\r", "").replace("\n", "")
         clickhouse.query(chi, create_table)
-        clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
+        clickhouse.query(chi, f"INSERT INTO test_036.test_local_036 select * from numbers(10000)")
 
-        clickhouse.query(chi, "CREATE DATABASE test_memory_036 ON CLUSTER '{cluster}' Engine = Memory")
-        clickhouse.query(chi, "CREATE VIEW test_memory_036.test_view ON CLUSTER '{cluster}' AS SELECT * from system.tables")
+        clickhouse.query(chi, "CREATE DATABASE test_036_mem ON CLUSTER '{cluster}' Engine = Memory")
+        clickhouse.query(chi, "CREATE VIEW test_036_mem.test_view ON CLUSTER '{cluster}' AS SELECT * from system.tables")
 
     def delete_pv():
         with When("Delete PV", description="delete PV on replica 0"):
@@ -3847,10 +3862,7 @@ def test_036(self):
 
     def check_data_is_recovered(reconcile_task_id):
         with Then(f"Kick operator to start reconcile cycle to fix lost {reconcile_task_id}"):
-            cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"{reconcile_task_id}"}}]\''
-            kubectl.launch(cmd)
-            kubectl.wait_chi_status(chi, "InProgress")
-            kubectl.wait_chi_status(chi, "Completed")
+            kubectl.force_reconcile(chi, reconcile_task_id)
             wait_for_cluster(chi, cluster, 1, 2)
 
         with Then("I check PV is in place"):
@@ -3868,32 +3880,27 @@ def test_036(self):
             assert size == "1Gi", error()
 
         with And("I check data on each replica"):
-            with By("checking data on the replica 0"):
-                r = clickhouse.query(
-                    chi,
-                    pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
-                    sql="SELECT count(*) FROM test_local_036",
-                )
-                assert r == "10000", error()
-            with And("checking data on the replica 1"):
-                r = clickhouse.query(
-                    chi,
-                    pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
-                    sql="SELECT count(*) FROM test_local_036",
-                )
-                assert r == "10000", error()
-            with And("checking view in Memory engine exists"):
-                r = clickhouse.query(
-                    chi,
-                    pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
-                    sql="SELECT count(*) FROM system.tables where name = 'test_view'",
-                )
-                assert r == "1", error()
-                r = clickhouse.query(
-                    chi,
-                    pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
-                    sql="SELECT count(*) FROM system.tables where name = 'test_view'",
-                )
+            for replica in (0,1):
+                with By(f"Check that databases exist on replica {replica}"):
+                    r = clickhouse.query(
+                        chi,
+                        pod=f"chi-test-036-volume-re-provisioning-simple-0-{replica}-0",
+                        sql="SELECT count(*) FROM system.databases where name like 'test_036%'",
+                        )
+                    assert r == "2", error()
+                with And(f"checking data on the replica {replica}"):
+                    r = clickhouse.query(
+                        chi,
+                        pod=f"chi-test-036-volume-re-provisioning-simple-0-{replica}-0",
+                        sql="SELECT count(*) FROM test_036.test_local_036",
+                        )
+                    assert r == "10000", error()
+                with And("checking view in Memory engine exists"):
+                    r = clickhouse.query(
+                        chi,
+                        pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
+                        sql="SELECT count(*) FROM system.tables where name = 'test_view'",
+                        )
                 assert r == "1", error()
 
     delete_sts_and_pvc()
@@ -4076,7 +4083,6 @@ def test_039(self, step=0, delete_chi=0):
         with And("Select from all-sharded with secret should pass"):
             r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one) limit 1", pwd="qkrq")
             assert r == "0"
-
 
     if step == 4:
         with Then("Create replicated table to test interserver_https_port"):
@@ -4416,10 +4422,9 @@ def test_044(self):
     util.require_keeper(keeper_type=self.context.keeper_type)
     operator_namespace = current().context.operator_namespace
 
-    with Given("I change operator statefullSet timeout"):
-        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
+    util.apply_operator_config("manifests/chopconf/test-044-chopconf.yaml")
 
-    with And("CHI with 1 replica is installed"):
+    with Given("CHI with 1 replica is installed"):
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -4428,7 +4433,7 @@ def test_044(self):
             },
         )
 
-    with When("I create replicated table on the first replica"):
+    with And("I create replicated table on the first replica"):
         clickhouse.query(
             chi,
             """CREATE TABLE test_local (a UInt32)
@@ -4436,15 +4441,17 @@ def test_044(self):
             PARTITION BY tuple() ORDER BY a"""
         )
 
-    with And("I add 1 slow replica"):
+    with Then("I add 1 slow replica"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-044-1-slow-propagation.yaml",
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
-                "chi_status": "Aborted"
+                "chi_status": "InProgress"
             },
         )
+        kubectl.wait_chi_status(chi, "Aborted", retries=7) # Fail faster than default
+
         client_pod = f"chi-{chi}-{cluster}-0-1-0"
         kubectl.wait_field(
             "pod",
@@ -4457,15 +4464,7 @@ def test_044(self):
             r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
             assert not ("test_local" in r), error()
 
-    with When("I update CHI manifest to trigger reconcile"):
-        with By("adding taskID to CHI"):
-            kubectl.create_and_check(
-                manifest="manifests/chi/test-044-2-slow-propagation.yaml",
-                check={
-                    "pod_count": 2,
-                    "do_not_delete": 1,
-                },
-            )
+    kubectl.force_reconcile(chi)
 
     with Then("I check schema is propagated"):
         with By("checking schema on the slow replica"):
@@ -4842,13 +4841,9 @@ def test_050(self):
             assert kubectl.get_field("pvc", f"-l clickhouse.altinity.com/chi={chi}", f".metadata.{type}s.{key}") == value
 
     test_labels(chi, "label", "include_this_label", "test-050-label")
-
     test_labels(chi, "label", "exclude_this_label", "<none>")
-
     test_labels(chi, "annotation", "include_this_annotation", "test-050-annotation")
-
     test_labels(chi, "annotation", "exclude_this_annotation", "<none>")
-
 
     with Then("Check that exposed metrics do not have labels and annotations that are excluded"):
         operator_namespace=current().context.operator_namespace
@@ -4858,7 +4853,7 @@ def test_050(self):
         # chi_clickhouse_metric_VersionInteger{chi="test-050",exclude_this_annotation="test-050-annotation",hostname="chi-test-050-default-0-0.test-050-e1884706-9a94-11ef-a786-367ddacfe5fd.svc.cluster.local",include_this_annotation="test-050-annotation",include_this_label="test-050-label",namespace="test-050-e1884706-9a94-11ef-a786-367ddacfe5fd"}
         expect_labels = f"chi=\"test-050\",hostname=\"chi-test-050-default-0-0.{operator_namespace}.svc.cluster.local\",include_this_annotation=\"test-050-annotation\",include_this_label=\"test-050-label\""
         check_metrics_monitoring(
-            operator_namespace = operator_namespace,
+            operator_namespace=operator_namespace,
             operator_pod=operator_pod,
             expect_metric="chi_clickhouse_metric_VersionInteger",
             expect_labels=expect_labels
@@ -5056,6 +5051,7 @@ def test_051_1(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_052. Clickhouse-keeper scale-up/scale-down")
 def test_052(self):
@@ -5128,7 +5124,6 @@ def test_052(self):
 
     # check_replication(chi, {0,1}, 4)
 
-
     with Then("Rescale CHK back to 1 replica"):
         kubectl.create_and_check(
             manifest="manifests/chk/test-052-chk-rescale-1.yaml", kind="chk",
@@ -5162,6 +5157,7 @@ def check_replication(chi, replicas, token, table = ''):
                 out = clickhouse.query(chi, f"SELECT a from {table} where a={token}", host=f"chi-{chi}-{cluster}-0-{replica}-0")
                 assert out == f"{token}", error()
 
+
 @TestScenario
 @Name("test_053. Check that standard Kubernetes annotations are ignored if set to StatefulSet externally")
 @Tags("NO_PARALLEL")
@@ -5172,7 +5168,7 @@ def test_053(self):
         current().context.operator_version = version_from
         create_shell_namespace_clickhouse_template()
 
-    manifest="manifests/chi/test-005-acm.yaml"
+    manifest = "manifests/chi/test-005-acm.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     sts = f"chi-{chi}-t1-0-0"
     pod = f"{sts}-0"
@@ -5207,32 +5203,27 @@ def test_053(self):
                 # print(f"pod start_time new: {new_start_time}")
                 assert start_time == new_start_time
 
+        start_time = kubectl.get_field("pod", pod, ".status.startTime")
+
         with Then("Trigger reconcile"):
-            start_time = kubectl.get_field("pod", pod, ".status.startTime")
-
-            cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"Reconcile"}}]\''
-            kubectl.launch(cmd)
-            kubectl.wait_chi_status(chi, "InProgress")
-            kubectl.wait_chi_status(chi, "Completed")
-
+            kubectl.force_reconcile(chi)
             check_restart()
 
         with When("Restart operator"):
             util.restart_operator()
             kubectl.wait_chi_status(chi, "InProgress")
             kubectl.wait_chi_status(chi, "Completed")
-
             check_restart()
 
         with When(f"upgrade operator to {version_to}"):
             util.install_operator_version(version_to)
             kubectl.wait_chi_status(chi, "InProgress")
             kubectl.wait_chi_status(chi, "Completed")
-
             check_restart()
 
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 @TestScenario
 @Name("test_054. Test that 'suspend' mode delays any changes until unsuspended")
@@ -5241,8 +5232,8 @@ def test_054(self):
     create_shell_namespace_clickhouse_template()
     chi = yaml_manifest.get_name(util.get_full_path("manifests/chi/test-006-ch-upgrade-1.yaml"))
 
-    old_version = "clickhouse/clickhouse-server:23.8"
-    new_version = "clickhouse/clickhouse-server:24.3"
+    old_version = "clickhouse/clickhouse-server:24.8"
+    new_version = "clickhouse/clickhouse-server:25.3"
     with Then(f"Start CHI with version {old_version}"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-1.yaml",
@@ -5279,6 +5270,7 @@ def test_054(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 @TestScenario
 @Name("test_055. Test that restart rules can be merged from CHOP configuration")
@@ -5342,6 +5334,133 @@ def test_055(self):
         delete_test_namespace()
 
 
+@TestScenario
+@Name("test_056. Test replica delay")
+def test_056(self):
+    create_shell_namespace_clickhouse_template()
+    with Given("I change operator StatefulSet timeout"):
+        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
+
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    manifest = f"manifests/chi/test-056-replica-delay-1.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "do_not_delete": 1,
+                "status": "InProgress"
+            },
+        )
+
+    with Then("Create a replicated table"):
+        clickhouse.query(chi, "CREATE TABLE test_056 (a Int8) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY a PARTITION by a")
+        clickhouse.query(chi, "INSERT INTO test_056 SELECT 1")
+
+    with And("STOP REPLICATED SENDS"):
+        clickhouse.query(chi, "SYSTEM STOP REPLICATED SENDS")
+
+    with When("Add one more replica, but do not wait for completion"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-056-replica-delay-2.yaml",
+            check={
+                "do_not_delete": 1,
+                "pod_count": 2,
+                "chi_status": "InProgress",
+            },
+        )
+
+        with Then("Table should be created on a new replica"):
+            retries_left = 10
+            out = 0
+            while retries_left > 0:
+                out = clickhouse.query_with_error(chi, "select count() from system.tables where name='test_056'", host=f"chi-{chi}-{cluster}-0-1-0")
+                if out == "1":
+                    break
+                with Then("Not ready. Wait for 10 seconds"):
+                    time.sleep(10)
+                retries_left = retries_left-1
+            assert out == "1", error("Table was not created on a new replica")
+
+        with And("Table should have no data replicated"):
+            out = clickhouse.query(chi, "select count() from test_056", host=f"chi-{chi}-{cluster}-0-1-0")
+            assert out == "0", error("Table data has been replicated")
+
+        with And("Replication delay should be non-zero"):
+            out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
+            print(f"max(absolute_delay)={out}")
+            assert out != "0"
+
+        with And("Wait 90 seconds - more than sts update timeout"):
+            time.sleep(90)
+
+        with And("Replication delay should be non-zero"):
+            out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
+            print(f"max(absolute_delay)={out}")
+            assert out != "0"
+
+        with And("Replica still should be unready after reconcile timeout"):
+            pod = kubectl.get("pod", f"chi-{chi}-{cluster}-0-1-0")
+            ready = pod["metadata"]["labels"]["clickhouse.altinity.com/ready"]
+            print(f"ready label={ready}")
+            assert ready != "yes", error("Replica should be unready")
+
+    with When("START REPLICATED SENDS"):
+        clickhouse.query(chi, "SYSTEM START REPLICATED SENDS", host=f"chi-{chi}-{cluster}-0-0-0")
+        time.sleep(10)
+
+        with Then("Replication delay should be zero"):
+            out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
+            print(f"max(absolute_delay)={out}")
+            assert out == "0"
+
+        with And("Table data should be replicated"):
+            out = clickhouse.query(chi, "select count() from test_056", host=f"chi-{chi}-{cluster}-0-1-0")
+            assert out == "1"
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+@TestScenario
+@Name("test_057. Test reconcile concurrency settings on CHI level")
+def test_057(self):
+    create_shell_namespace_clickhouse_template()
+
+    manifest = f"manifests/chi/test-057-max-concurrency.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "do_not_delete": 1,
+                "chi_status": "InProgress",
+            },
+        )
+
+    with When("Last first shard is Running"):
+        kubectl.wait_pod_status(f"chi-{chi}-{cluster}-0-0-0", "Running")
+        with Then("Other shards are running or being created"):
+            for shard in [1,2,3]:
+                pod_status = kubectl.get_pod_status(f"chi-{chi}-{cluster}-{shard}-0-0")
+                assert pod_status in ["Running", "ContainerCreating"]
+
+    kubectl.wait_chi_status(chi, "Completed")
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):
         ns = kubectl.get("ns", name="", ns="--all-namespaces")
@@ -5351,6 +5470,7 @@ def cleanup_chis(self):
                 if ns_name.startswith("test") and ns_name != self.context.test_namespace:
                     with Then(f"Delete ns {ns_name}"):
                         util.delete_namespace(namespace = ns_name, delete_chi=True)
+
 
 @TestModule
 @Name("e2e.test_operator")

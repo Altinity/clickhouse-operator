@@ -62,8 +62,8 @@ type ConfigManager struct {
 	runtimeParams map[string]string
 }
 
-// NewConfigManager creates new ConfigManager
-func NewConfigManager(
+// newConfigManager creates new ConfigManager
+func newConfigManager(
 	kubeClient *kube.Clientset,
 	chopClient *chopClientSet.Clientset,
 	initConfigFilePath string,

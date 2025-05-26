@@ -42,6 +42,20 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+const (
+	// defaultReconcileShardsThreadsNumber specifies the default number of threads usable for concurrent shard reconciliation
+	// within a single cluster reconciliation. Defaults to 1, which means strictly sequential shard reconciliation.
+	defaultReconcileShardsThreadsNumber = 1
+
+	// defaultReconcileShardsMaxConcurrencyPercent specifies the maximum integer percentage of shards that may be reconciled
+	// concurrently during cluster reconciliation. This counterbalances the fact that this is an operator setting,
+	// that different clusters will have different shard counts, and that the shard concurrency capacity is specified
+	// above in terms of a number of threads to use (up to). Example: overriding to 100 means all shards may be
+	// reconciled concurrently, if the number of shard reconciliation threads is greater than or equal to the number
+	// of shards in the cluster.
+	defaultReconcileShardsMaxConcurrencyPercent = 50
+)
+
 // Normalizer specifies structures normalizer
 type Normalizer struct {
 	secretGet subst.SecretGetter
@@ -62,7 +76,7 @@ func New(secretGet subst.SecretGetter) *Normalizer {
 }
 
 // CreateTemplated produces ready-to-use object
-func (n *Normalizer) CreateTemplated(subj *chi.ClickHouseInstallation, options *normalizer.Options) (
+func (n *Normalizer) CreateTemplated(subj *chi.ClickHouseInstallation, options *normalizer.Options[chi.ClickHouseInstallation]) (
 	*chi.ClickHouseInstallation,
 	error,
 ) {
@@ -76,26 +90,39 @@ func (n *Normalizer) CreateTemplated(subj *chi.ClickHouseInstallation, options *
 	return n.normalizeTarget()
 }
 
-func (n *Normalizer) buildRequest(options *normalizer.Options) {
+func (n *Normalizer) buildRequest(options *normalizer.Options[chi.ClickHouseInstallation]) {
 	n.req = NewRequest(options)
 }
 
 func (n *Normalizer) buildTargetFromTemplates(subj *chi.ClickHouseInstallation) {
 	// Create new target that will be populated with data during normalization process
-	n.req.SetTarget(n.createTarget())
+	n.req.SetTarget(n.newSubject())
 
 	// At this moment we have target available - it is either newly created or a system-wide template
 
-	// Apply CR templates - both auto and explicitly requested - on top of target
-	n.applyCRTemplatesOnTarget(subj)
+	// Apply internal CR templates on top of target
+	n.applyInternalCRTemplatesOnTarget()
 
-	// After all CR templates applied, place provided 'subject' on top of the whole stack (target)
-	n.req.GetTarget().MergeFrom(subj, chi.MergeTypeOverrideByNonEmptyValues)
+	// Apply external CR templates - both auto and explicitly requested - on top of target
+	n.applyExternalCRTemplatesOnTarget(subj)
+
+	// After all CR templates applied, place provided 'subject' on top of the whole target stack
+	n.applyCROnTarget(subj)
 }
 
-func (n *Normalizer) applyCRTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
-	usedTemplates := crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), subj)
+func (n *Normalizer) applyInternalCRTemplatesOnTarget() {
+	for _, template := range n.req.Options().Templates {
+		n.req.GetTarget().MergeFrom(template, chi.MergeTypeOverrideByNonEmptyValues)
+	}
+}
+
+func (n *Normalizer) applyExternalCRTemplatesOnTarget(templateRefSrc crTemplatesNormalizer.TemplateRefListSource) {
+	usedTemplates := crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), templateRefSrc)
 	n.req.GetTarget().EnsureStatus().PushUsedTemplate(usedTemplates...)
+}
+
+func (n *Normalizer) applyCROnTarget(cr *chi.ClickHouseInstallation) {
+	n.req.GetTarget().MergeFrom(cr, chi.MergeTypeOverrideByNonEmptyValues)
 }
 
 func (n *Normalizer) newSubject() *chi.ClickHouseInstallation {
@@ -121,24 +148,6 @@ func (n *Normalizer) ensureSubject(subj *chi.ClickHouseInstallation) *chi.ClickH
 	} else {
 		// Subject specified
 		return subj
-	}
-}
-
-func (n *Normalizer) getTargetTemplate() *chi.ClickHouseInstallation {
-	return chop.Config().Template.CHI.Runtime.Template
-}
-
-func (n *Normalizer) hasTargetTemplate() bool {
-	return n.getTargetTemplate() != nil
-}
-
-func (n *Normalizer) createTarget() *chi.ClickHouseInstallation {
-	if n.hasTargetTemplate() {
-		// Template specified - start with template
-		return n.getTargetTemplate().DeepCopy()
-	} else {
-		// No template specified - start with clear page
-		return n.newSubject()
 	}
 }
 
@@ -188,7 +197,6 @@ func (n *Normalizer) fillCRAddressInfo() {
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
 	n.req.GetTarget().WalkHosts(func(host *chi.Host) error {
@@ -196,8 +204,24 @@ func (n *Normalizer) fillStatus() {
 		fqdns = append(fqdns, n.namer.Name(interfaces.NameFQDN, host))
 		return nil
 	})
-	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
-	n.req.GetTarget().FillStatus(endpoint, pods, fqdns, ip)
+	ip, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_IP)
+	n.req.GetTarget().FillStatus(n.endpoints(), pods, fqdns, ip)
+}
+
+func (n *Normalizer) endpoints() []string {
+	var names []string
+	if templates, ok := n.req.GetTarget().GetRootServiceTemplates(); ok {
+		for _, template := range templates {
+			names = append(names,
+				n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern(), template),
+			)
+		}
+	} else {
+		names = append(names,
+			n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern()),
+		)
+	}
+	return names
 }
 
 // normalizeTaskID normalizes .spec.taskID
@@ -454,7 +478,7 @@ func (n *Normalizer) normalizeServiceTemplate(template *chi.ServiceTemplate) {
 
 // normalizeUseTemplates is a wrapper to hold the name of normalized section
 func (n *Normalizer) normalizeUseTemplates(templates []*chi.TemplateRef) []*chi.TemplateRef {
-	return crTemplatesNormalizer.NormalizeTemplatesList(templates)
+	return crTemplatesNormalizer.NormalizeTemplateRefList(templates)
 }
 
 // normalizeClusters normalizes clusters
@@ -553,10 +577,16 @@ func (n *Normalizer) normalizeUsersList(users *chi.Settings, extraUsernames ...s
 const defaultUsername = "default"
 const chopProfile = "clickhouse_operator"
 
+const clickhouseOperatorUserMacro = "{clickhouseOperatorUser}"
+
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings) *chi.Settings {
 	// Ensure and normalizeTarget user settings
-	users = users.Ensure().Normalize()
+	users = users.Ensure().Normalize(&chi.SettingsNormalizerOptions{
+		Macros: map[string]string{
+			clickhouseOperatorUserMacro: chop.Config().ClickHouse.Access.Username,
+		},
+	})
 
 	// Add special "default" user to the list of users, which is used/required for:
 	// 1. ClickHouse hosts to communicate with each other
@@ -659,6 +689,8 @@ func (n *Normalizer) normalizeCluster(cluster *chi.Cluster) *chi.Cluster {
 	cluster.InheritZookeeperFrom(n.req.GetTarget())
 	// Inherit from .spec.configuration.files
 	cluster.InheritFilesFrom(n.req.GetTarget())
+	// Inherit from .spec.reconciling
+	cluster.InheritReconcileFrom(n.req.GetTarget())
 	// Inherit from .spec.defaults
 	cluster.InheritTemplatesFrom(n.req.GetTarget())
 
@@ -675,6 +707,8 @@ func (n *Normalizer) normalizeCluster(cluster *chi.Cluster) *chi.Cluster {
 	}
 	cluster.FillShardReplicaSpecified()
 	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
+	cluster.Reconcile = n.normalizeClusterReconcile(cluster.Reconcile)
+
 	n.ensureClusterLayoutShards(cluster.Layout)
 	n.ensureClusterLayoutReplicas(cluster.Layout)
 
@@ -817,6 +851,27 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 	}
 
 	return clusterLayout
+}
+
+func (n *Normalizer) normalizeClusterReconcile(reconcile chi.ClusterReconcile) chi.ClusterReconcile {
+	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
+	return reconcile
+}
+
+func (n *Normalizer) normalizeReconcileRuntime(runtime chi.ReconcileRuntime) chi.ReconcileRuntime {
+	if runtime.ReconcileShardsThreadsNumber == 0 {
+		runtime.ReconcileShardsThreadsNumber = chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber
+	}
+	if runtime.ReconcileShardsThreadsNumber == 0 {
+		runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
+	}
+	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		runtime.ReconcileShardsMaxConcurrencyPercent = chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent
+	}
+	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
+	}
+	return runtime
 }
 
 // ensureClusterLayoutShards ensures slice layout.Shards is in place

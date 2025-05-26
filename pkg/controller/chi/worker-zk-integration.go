@@ -19,18 +19,19 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
 )
 
-func reconcileZookeeperRootPath(cluster *api.Cluster) {
-	if !shouldReconcileZookeeperPath(cluster) {
+func reconcileClusterZookeeperRootPath(cluster *api.Cluster) error {
+	if !shouldReconcileClusterZookeeperPath(cluster) {
 		// Nothing to reconcile
-		return
+		return nil
 	}
 	conn := zookeeper.NewConnection(cluster.Zookeeper.Nodes)
 	path := zookeeper.NewPathManager(conn)
 	path.Ensure(cluster.Zookeeper.Root)
 	path.Close()
+	return nil
 }
 
-func shouldReconcileZookeeperPath(cluster *api.Cluster) bool {
+func shouldReconcileClusterZookeeperPath(cluster *api.Cluster) bool {
 	if cluster.IsStopped() {
 		// Nothing to reconcile
 		return false

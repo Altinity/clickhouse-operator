@@ -16,7 +16,6 @@ package chi
 
 import (
 	"context"
-
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -188,10 +187,21 @@ func (c *Controller) deleteServiceCR(ctx context.Context, cr api.ICustomResource
 		return nil
 	}
 
-	serviceName := c.namer.Name(interfaces.NameCRService, cr)
-	namespace := cr.GetNamespace()
-	log.V(1).M(cr).F().Info("%s/%s", namespace, serviceName)
-	return c.deleteServiceIfExists(ctx, namespace, serviceName)
+	if templates, ok := cr.GetRootServiceTemplates(); ok {
+		for _, template := range templates {
+			serviceName := c.namer.Name(interfaces.NameCRService, cr, template)
+			namespace := cr.GetNamespace()
+			log.V(1).M(cr).F().Info("%s/%s", namespace, serviceName)
+			c.deleteServiceIfExists(ctx, namespace, serviceName)
+		}
+	} else {
+		serviceName := c.namer.Name(interfaces.NameCRService, cr)
+		namespace := cr.GetNamespace()
+		log.V(1).M(cr).F().Info("%s/%s", namespace, serviceName)
+		c.deleteServiceIfExists(ctx, namespace, serviceName)
+	}
+
+	return nil
 }
 
 // deleteSecretCluster

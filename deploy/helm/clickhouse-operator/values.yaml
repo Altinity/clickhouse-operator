@@ -1,3 +1,8 @@
+namespaceOverride: ""
+# commonLabels -- set of labels that will be applied to all the resources for the operator
+commonLabels: {}
+# commonAnnotations -- set of annotations that will be applied to all the resources for the operator
+commonAnnotations: {}
 operator:
   image:
     # operator.image.repository -- image repository
@@ -66,8 +71,10 @@ serviceAccount:
   # serviceAccount.name -- the name of the service account to use; if not set and create is true, a name is generated using the fullname template
   name:
 rbac:
-  # rbac.create -- specifies whether cluster roles and cluster role bindings should be created
+  # rbac.create -- specifies whether rbac resources should be created
   create: true
+  # rbac.namespaceScoped -- specifies whether to create roles and rolebindings at the cluster level or namespace level
+  namespaceScoped: false
 secret:
   # secret.create -- create a secret with operator credentials
   create: true
@@ -90,6 +97,14 @@ serviceMonitor:
   enabled: false
   # serviceMonitor.additionalLabels -- additional labels for service monitor
   additionalLabels: {}
+  # serviceMonitor.interval --
+  interval: 30s
+  # serviceMonitor.scrapeTimeout -- Prometheus ServiceMonitor scrapeTimeout. If empty, Prometheus uses the global scrape timeout unless it is less than the target's scrape interval value in which the latter is used.
+  scrapeTimeout: ""
+  # serviceMonitor.relabelings -- Prometheus [RelabelConfigs] to apply to samples before scraping
+  relabelings: []
+  # serviceMonitor.metricRelabelings -- Prometheus [MetricRelabelConfigs] to apply to samples before ingestio
+  metricRelabelings: []
 # configs -- clickhouse operator configs
 # @default -- check the `values.yaml` file for the config content (auto-generated from latest operator release)
 configs:
@@ -290,6 +305,8 @@ configs:
                 - settings/macros/*: "no"
                 - settings/remote_servers/*: "no"
                 - settings/user_directories/*: "no"
+                # these settings should not lead to pod restarts
+                - settings/display_secrets_in_show_and_select: "no"
                 - zookeeper/*: "yes"
                 - files/*.xml: "yes"
                 - files/config.d/*.xml: "yes"
@@ -342,6 +359,56 @@ configs:
             connect: 1
             # Timout to perform SQL query from the operator to ClickHouse instances. In seconds.
             query: 4
+        ################################################
+        ##
+        ## Addons specifies additional configuration sections
+        ## Should it be called something like "templates"?
+        ##
+        ################################################
+        addons:
+          rules:
+            - version: "*"
+              spec:
+                configuration:
+                  users:
+                  profiles:
+                  quotas:
+                  settings:
+                  files:
+            - version: ">= 23.3"
+              spec:
+                configuration:
+                  ###
+                  ### users.d is global while description depends on CH version which may vary on per-host basis
+                  ### In case of global-ness this may be better to implement via auto-templates
+                  ###
+                  ### As a solution, this may be applied on the whole cluster based on any of its hosts
+                  ###
+                  ### What to do when host is just created? CH version is not known prior to CH started and user config is required before CH started.
+                  ### We do not have any info about the cluster on initial creation
+                  ###
+                  users:
+                    "{clickhouseOperatorUser}/access_management": 1
+                    "{clickhouseOperatorUser}/named_collection_control": 1
+                    "{clickhouseOperatorUser}/show_named_collections": 1
+                    "{clickhouseOperatorUser}/show_named_collections_secrets": 1
+                  profiles:
+                  quotas:
+                  settings:
+                  files:
+            - version: ">= 23.5"
+              spec:
+                configuration:
+                  users:
+                  profiles:
+                    clickhouse_operator/format_display_secrets_in_show_and_select: 1
+                  quotas:
+                  settings:
+                    ##
+                    ## this may be added on per-host basis into host's conf.d folder
+                    ##
+                    display_secrets_in_show_and_select: 1
+                  files:
         #################################################
         ##
         ## Metrics collection
@@ -418,9 +485,9 @@ configs:
           #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
           # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
 
-          # Max number of concurrent shard reconciles within one CHI in progress
+          # Max number of concurrent shard reconciles within one cluster in progress
           reconcileShardsThreadsNumber: 5
-          # Max percentage of concurrent shard reconciles within one CHI in progress
+          # Max percentage of concurrent shard reconciles within one cluster in progress
           reconcileShardsMaxConcurrencyPercent: 50
         # Reconcile StatefulSet scenario
         statefulSet:
@@ -461,6 +528,10 @@ configs:
             exclude: true
             queries: true
             include: false
+            replicas:
+              all: no
+              new: yes
+              delay: 10
       ################################################
       ##
       ## Annotations management section
@@ -756,13 +827,13 @@ additionalResources: []
 #    kind: ConfigMap
 #    metadata:
 #      name: {{ include "altinity-clickhouse-operator.fullname" . }}-cm
-#      namespace: {{ .Release.Namespace }}
+#      namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
 #  - |
 #     apiVersion: v1
 #     kind: Secret
 #     metadata:
 #       name: {{ include "altinity-clickhouse-operator.fullname" . }}-s
-#       namespace: {{ .Release.Namespace }}
+#       namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
 #     stringData:
 #       mykey: my-value
 #  - |
@@ -770,7 +841,7 @@ additionalResources: []
 #     kind: ClickHouseInstallation
 #     metadata:
 #       name: {{ include "altinity-clickhouse-operator.fullname" . }}-chi
-#       namespace: {{ .Release.Namespace }}
+#       namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
 #     spec:
 #       configuration:
 #         clusters:

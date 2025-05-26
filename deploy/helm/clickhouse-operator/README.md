@@ -1,6 +1,6 @@
 # altinity-clickhouse-operator
 
-![Version: 0.24.5](https://img.shields.io/badge/Version-0.24.5-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.24.5](https://img.shields.io/badge/AppVersion-0.24.5-informational?style=flat-square)
+![Version: 0.25.0](https://img.shields.io/badge/Version-0.25.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.25.0](https://img.shields.io/badge/AppVersion-0.25.0-informational?style=flat-square)
 
 Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
 
@@ -28,6 +28,8 @@ For upgrade please install CRDs separately:
 |-----|------|---------|-------------|
 | additionalResources | list | `[]` | list of additional resources to create (processed via `tpl` function), useful for create ClickHouse clusters together with clickhouse-operator. check `kubectl explain chi` for details |
 | affinity | object | `{}` | affinity for scheduler pod assignment, check `kubectl explain pod.spec.affinity` for details |
+| commonAnnotations | object | `{}` | set of annotations that will be applied to all the resources for the operator |
+| commonLabels | object | `{}` | set of labels that will be applied to all the resources for the operator |
 | configs | object | check the `values.yaml` file for the config content (auto-generated from latest operator release) | clickhouse operator configs |
 | dashboards.additionalLabels | object | `{"grafana_dashboard":""}` | labels to add to a secret with dashboards |
 | dashboards.annotations | object | `{}` | annotations to add to a secret with dashboards |
@@ -43,6 +45,7 @@ For upgrade please install CRDs separately:
 | metrics.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
 | metrics.resources | object | `{}` | custom resource configuration |
 | nameOverride | string | `""` | override name of the chart |
+| namespaceOverride | string | `""` |  |
 | nodeSelector | object | `{}` | node for scheduler pod assignment, check `kubectl explain pod.spec.nodeSelector` for details |
 | operator.containerSecurityContext | object | `{}` |  |
 | operator.env | list | `[]` | additional environment variables for the clickhouse-operator container in deployment possible format value `[{"name": "SAMPLE", "value": "text"}]` |
@@ -53,7 +56,8 @@ For upgrade please install CRDs separately:
 | podAnnotations | object | check the `values.yaml` file | annotations to add to the clickhouse-operator pod, check `kubectl explain pod.spec.annotations` for details |
 | podLabels | object | `{}` | labels to add to the clickhouse-operator pod |
 | podSecurityContext | object | `{}` |  |
-| rbac.create | bool | `true` | specifies whether cluster roles and cluster role bindings should be created |
+| rbac.create | bool | `true` | specifies whether rbac resources should be created |
+| rbac.namespaceScoped | bool | `false` | specifies whether to create roles and rolebindings at the cluster level or namespace level |
 | secret.create | bool | `true` | create a secret with operator credentials |
 | secret.password | string | `"clickhouse_operator_password"` | operator credentials password |
 | secret.username | string | `"clickhouse_operator"` | operator credentials username |
@@ -62,6 +66,10 @@ For upgrade please install CRDs separately:
 | serviceAccount.name | string | `nil` | the name of the service account to use; if not set and create is true, a name is generated using the fullname template |
 | serviceMonitor.additionalLabels | object | `{}` | additional labels for service monitor |
 | serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) |
+| serviceMonitor.interval | string | `"30s"` |  |
+| serviceMonitor.metricRelabelings | list | `[]` | Prometheus [MetricRelabelConfigs] to apply to samples before ingestio |
+| serviceMonitor.relabelings | list | `[]` | Prometheus [RelabelConfigs] to apply to samples before scraping |
+| serviceMonitor.scrapeTimeout | string | `""` | Prometheus ServiceMonitor scrapeTimeout. If empty, Prometheus uses the global scrape timeout unless it is less than the target's scrape interval value in which the latter is used. |
 | tolerations | list | `[]` | tolerations for scheduler pod assignment, check `kubectl explain pod.spec.tolerations` for details |
 | topologySpreadConstraints | list | `[]` |  |
 
