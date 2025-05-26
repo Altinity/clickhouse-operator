@@ -23,8 +23,6 @@ import (
 	"encoding/pem"
 	"fmt"
 
-	// go-clickhouse is explicitly required in order to setup connection to clickhouse db
-	//goch "github.com/mailru/go-clickhouse"
 	goch "github.com/mailru/go-clickhouse/v2"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
