@@ -597,7 +597,7 @@ func (s *Settings) Normalize(_opts ...*SettingsNormalizerOptions) *Settings {
 	s.normalizeKeys()
 	if len(_opts) > 0 {
 		opts := _opts[0]
-		s.macroKeys(opts.Macros)
+		s.macrosApplyOnKeys(opts.Macros)
 	}
 	return s
 }
@@ -630,32 +630,42 @@ func (s *Settings) normalizeKeys() {
 	}
 }
 
-// macroKeys
-func (s *Settings) macroKeys(macros map[string]string) {
+// macrosApplyOnKeys - applies macros on keys
+func (s *Settings) macrosApplyOnKeys(macros map[string]string) {
 	if s.Len() == 0 {
 		return
 	}
 
-	var keysToProcess []string
+	var keysToModify []string
 
-	// Find entries with keys to macro
+	// Find entries with keys to macro replace
 	s.WalkKeys(func(key string, _ *Setting) {
-		if _, modified := macro(macros, key); modified {
-			// Changed something. This path has to be normalized
-			keysToProcess = append(keysToProcess, key)
+		if _, modified := macrosApply(macros, key); modified {
+			// Applied macros will modified the key. This path has to be processed
+			keysToModify = append(keysToModify, key)
 		}
 	})
 
-	// Add entries with normalized keys
-	for _, originalKey := range keysToProcess {
-		processedKey, _ := macro(macros, originalKey)
-		s.SetKey(processedKey, s.GetKey(originalKey))
+	// Add entries with modified keys
+	for _, originalKey := range keysToModify {
+		modifiedKey, _ := macrosApply(macros, originalKey)
+		s.SetKey(modifiedKey, s.GetKey(originalKey))
 	}
 
 	// Delete entries with before-processed keys
-	for _, beforeProcessedKey := range keysToProcess {
-		s.DeleteKey(beforeProcessedKey)
+	for _, beforeModificationKey := range keysToModify {
+		s.DeleteKey(beforeModificationKey)
 	}
+}
+
+// macrosApply applies all macros specified in `macros` map over target `str`
+// returns modified string and flag, whether incoming string was modified at all
+func macrosApply(macros map[string]string, str string) (string, bool) {
+	modified := str
+	for macro, value := range macros {
+		modified = strings.ReplaceAll(modified, macro, value)
+	}
+	return modified, modified != str
 }
 
 const xmlTagClickHouse = "clickhouse"
@@ -695,14 +705,6 @@ func normalizeKeyAsPath(path string) (string, bool) {
 	normalized = strings.Trim(normalized, "/")
 
 	return normalized, normalized != path
-}
-
-func macro(macros map[string]string, str string) (string, bool) {
-	processed := str
-	for macro, value := range macros {
-		processed = strings.ReplaceAll(processed, macro, value)
-	}
-	return processed, processed != str
 }
 
 // getPrefixFromPath
