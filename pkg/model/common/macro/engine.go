@@ -49,6 +49,7 @@ func (e *Engine) Scope(scope any) interfaces.IMacro {
 	}
 }
 
+// Get gets macros by its name. Accepts macros name, returns macros value to be expanded, such as "{chi}" or "{chk}"
 func (e *Engine) Get(macros string) string {
 	return e.macros.Get(macros)
 }
