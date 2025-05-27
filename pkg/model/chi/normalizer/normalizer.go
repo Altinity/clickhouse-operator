@@ -28,12 +28,12 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
+	macrosList "github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	crTemplatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates_cr"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
@@ -70,7 +70,7 @@ func New(secretGet subst.SecretGetter) *Normalizer {
 	return &Normalizer{
 		secretGet: secretGet,
 		namer:     managers.NewNameManager(managers.NameManagerTypeClickHouse),
-		macro:     commonMacro.New(macro.List),
+		macro:     macro.New(macrosList.Get()),
 		labeler:   labeler.New(nil),
 	}
 }
@@ -581,7 +581,7 @@ const clickhouseOperatorUserMacro = "{clickhouseOperatorUser}"
 
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings) *chi.Settings {
-	// Ensure and normalizeTarget user settings
+	// Ensure and normalize target user settings
 	users = users.Ensure().Normalize(&chi.SettingsNormalizerOptions{
 		Macros: map[string]string{
 			clickhouseOperatorUserMacro: chop.Config().ClickHouse.Access.Username,
@@ -589,10 +589,10 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings) *chi.Setti
 	})
 
 	// Add special "default" user to the list of users, which is used/required for:
-	// 1. ClickHouse hosts to communicate with each other
-	// 2. Specify host_regexp for default user as "allowed hosts to visit from"
+	//   1. ClickHouse hosts to communicate with each other
+	//   2. Specify host_regexp for default user as "allowed hosts to visit from"
 	// Add special "chop" user to the list of users, which is used/required for:
-	// 1. Operator to communicate with hosts
+	//   1. Operator to communicate with hosts
 	usernames := n.normalizeUsersList(
 		// User-based settings section contains non-explicit users list in it - as part of paths
 		users,
