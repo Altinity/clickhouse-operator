@@ -33,7 +33,7 @@ import (
 const clickHouseDriverName = "chhttp"
 
 func init() {
-	goch.RegisterTLSConfig(tlsSettings, &tls.Config{InsecureSkipVerify: true})
+	setupTLSBasic()
 }
 
 // Connection specifies clickhouse database connection object
@@ -73,7 +73,7 @@ func (c *Connection) SetLog(l log.Announcer) *Connection {
 // connect performs connect
 func (c *Connection) connect(ctx context.Context) {
 	// ClickHouse connection may have custom TLS options specified
-	c.setupTLS()
+	c.setupTLSAdvanced()
 
 	c.l.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
 	dbConnection, err := sql.Open(clickHouseDriverName, c.params.GetDSN())
@@ -95,7 +95,13 @@ func (c *Connection) connect(ctx context.Context) {
 	c.db = dbConnection
 }
 
-func (c *Connection) setupTLS() {
+func setupTLSBasic() {
+	goch.RegisterTLSConfig(tlsSettings, &tls.Config{
+		InsecureSkipVerify: true,
+	})
+}
+
+func (c *Connection) setupTLSAdvanced() {
 	// Convenience wrapper
 	certString := c.params.rootCA
 
