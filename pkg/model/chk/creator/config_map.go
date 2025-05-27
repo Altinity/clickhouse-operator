@@ -21,10 +21,10 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
+	macrosList "github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
-	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 )
 
 type ConfigMapManager struct {
@@ -40,7 +40,7 @@ type ConfigMapManager struct {
 func NewConfigMapManager() *ConfigMapManager {
 	return &ConfigMapManager{
 		or:      NewOwnerReferencer(),
-		macro:   commonMacro.New(macro.List),
+		macro:   macro.New(macrosList.Get()),
 		namer:   namer.New(),
 		labeler: nil,
 	}
