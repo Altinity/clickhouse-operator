@@ -597,7 +597,7 @@ func (s *Settings) Normalize(_opts ...*SettingsNormalizerOptions) *Settings {
 	s.normalizeKeys()
 	if len(_opts) > 0 {
 		opts := _opts[0]
-		s.macrosApplyOnKeys(opts.Macros)
+		s.applyMacrosOnKeys(util.NewReplacer(opts.Macros))
 	}
 	return s
 }
@@ -630,8 +630,8 @@ func (s *Settings) normalizeKeys() {
 	}
 }
 
-// macrosApplyOnKeys - applies macros on keys
-func (s *Settings) macrosApplyOnKeys(macros map[string]string) {
+// applyMacrosOnKeys - applies macros on keys
+func (s *Settings) applyMacrosOnKeys(macros *util.Replacer) {
 	if s.Len() == 0 {
 		return
 	}
@@ -640,7 +640,7 @@ func (s *Settings) macrosApplyOnKeys(macros map[string]string) {
 
 	// Find entries with keys to macro replace
 	s.WalkKeys(func(key string, _ *Setting) {
-		if _, modified := macrosApply(macros, key); modified {
+		if _, modified := macros.LineEx(key); modified {
 			// Applied macros will modified the key. This path has to be processed
 			keysToModify = append(keysToModify, key)
 		}
@@ -648,7 +648,7 @@ func (s *Settings) macrosApplyOnKeys(macros map[string]string) {
 
 	// Add entries with modified keys
 	for _, originalKey := range keysToModify {
-		modifiedKey, _ := macrosApply(macros, originalKey)
+		modifiedKey := macros.Line(originalKey)
 		s.SetKey(modifiedKey, s.GetKey(originalKey))
 	}
 
@@ -656,16 +656,6 @@ func (s *Settings) macrosApplyOnKeys(macros map[string]string) {
 	for _, beforeModificationKey := range keysToModify {
 		s.DeleteKey(beforeModificationKey)
 	}
-}
-
-// macrosApply applies all macros specified in `macros` map over target `str`
-// returns modified string and flag, whether incoming string was modified at all
-func macrosApply(macros map[string]string, str string) (string, bool) {
-	modified := str
-	for macro, value := range macros {
-		modified = strings.ReplaceAll(modified, macro, value)
-	}
-	return modified, modified != str
 }
 
 const xmlTagClickHouse = "clickhouse"
