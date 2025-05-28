@@ -51,6 +51,12 @@ func (e *Replacer) Line(line string) string {
 	return e.stringReplacer.Replace(line)
 }
 
+// LineEx expands line with macros(es)
+func (e *Replacer) LineEx(line string) (string, bool) {
+	res := e.Line(line)
+	return res, res != line
+}
+
 // Map expands map with macros(es)
 func (e *Replacer) Map(_map map[string]string) map[string]string {
 	if e == nil {
@@ -58,6 +64,11 @@ func (e *Replacer) Map(_map map[string]string) map[string]string {
 		return _map
 	}
 	return e.mapReplacer.Replace(_map)
+}
+
+// MapEx expands map with macros(es)
+func (e *Replacer) MapEx(_map map[string]string) (map[string]string, bool) {
+	return e.mapReplacer.ReplaceEx(_map)
 }
 
 // MapReplacer replaces a list of strings with replacements on a map.
@@ -87,4 +98,27 @@ func (r *MapReplacer) Replace(m map[string]string) map[string]string {
 		result[r.Replacer.Replace(key)] = r.Replacer.Replace(m[key])
 	}
 	return result
+}
+
+// Replace returns a copy of m with all replacements performed.
+func (r *MapReplacer) ReplaceEx(m map[string]string) (map[string]string, bool) {
+	if r == nil {
+		// No replacement
+		return m, false
+	}
+	if len(m) == 0 {
+		// Nothing to replace
+		return m, false
+	}
+	result := make(map[string]string, len(m))
+	modified := false
+	for key, value := range m {
+		resultKey := r.Replacer.Replace(key)
+		resultValue := r.Replacer.Replace(value)
+		result[resultKey] = resultValue
+		modifiedKey := key != resultKey
+		modifiedValue := value != resultValue
+		modified = modified || modifiedKey || modifiedValue
+	}
+	return result, modified
 }
