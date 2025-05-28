@@ -16,6 +16,42 @@ package util
 
 import "strings"
 
+type Replacer struct {
+	macroToExpansionMap map[string]string
+	stringReplacer      *strings.Replacer
+	mapReplacer         *MapReplacer
+}
+
+// NewReplacer
+func NewReplacer(macroToExpansionMap ...map[string]string) *Replacer {
+	r := &Replacer{
+		macroToExpansionMap: make(map[string]string),
+	}
+
+	if len(macroToExpansionMap) > 0 {
+		r.macroToExpansionMap = macroToExpansionMap[0]
+	}
+
+	var replacements []string
+	for macro, expansion := range r.macroToExpansionMap {
+		replacements = append(replacements, macro, expansion)
+	}
+
+	r.stringReplacer = strings.NewReplacer(replacements...)
+	r.mapReplacer = NewMapReplacer(r.stringReplacer)
+	return r
+}
+
+// Line expands line with macros(es)
+func (e *Replacer) Line(line string) string {
+	return e.stringReplacer.Replace(line)
+}
+
+// Map expands map with macros(es)
+func (e *Replacer) Map(_map map[string]string) map[string]string {
+	return e.mapReplacer.Replace(_map)
+}
+
 // MapReplacer replaces a list of strings with replacements on a map.
 type MapReplacer struct {
 	*strings.Replacer

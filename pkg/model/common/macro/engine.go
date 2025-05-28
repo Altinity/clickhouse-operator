@@ -18,6 +18,7 @@ import (
 	"strconv"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/short"
@@ -48,8 +49,8 @@ func (e *Engine) Scope(scope any) interfaces.IMacro {
 }
 
 // Get gets macros by its name. Accepts macros name, returns macros value to be expanded, such as "{chi}" or "{chk}"
-func (e *Engine) Get(macros string) string {
-	return e.macros.Get(macros)
+func (e *Engine) Get(macrosName string) string {
+	return e.macros.Get(macrosName)
 }
 
 // Line expands line with macros(es)
@@ -87,16 +88,16 @@ func (e *Engine) Map(_map map[string]string) map[string]string {
 }
 
 // newReplacerCR
-func (e *Engine) newReplacerCR(cr api.ICustomResource) *Replacer {
-	return NewReplacer(map[string]string{
+func (e *Engine) newReplacerCR(cr api.ICustomResource) *util.Replacer {
+	return util.NewReplacer(map[string]string{
 		e.Get(MacrosNamespace): e.namer.Name(short.Namespace, cr),
 		e.Get(MacrosCRName):    e.namer.Name(short.CRName, cr),
 	})
 }
 
 // newReplacerCluster
-func (e *Engine) newReplacerCluster(cluster api.ICluster) *Replacer {
-	return NewReplacer(map[string]string{
+func (e *Engine) newReplacerCluster(cluster api.ICluster) *util.Replacer {
+	return util.NewReplacer(map[string]string{
 		e.Get(MacrosNamespace):    e.namer.Name(short.Namespace, cluster),
 		e.Get(MacrosCRName):       e.namer.Name(short.CRName, cluster),
 		e.Get(MacrosClusterName):  e.namer.Name(short.ClusterName, cluster),
@@ -105,8 +106,8 @@ func (e *Engine) newReplacerCluster(cluster api.ICluster) *Replacer {
 }
 
 // newReplacerShard
-func (e *Engine) newReplacerShard(shard api.IShard) *Replacer {
-	return NewReplacer(map[string]string{
+func (e *Engine) newReplacerShard(shard api.IShard) *util.Replacer {
+	return util.NewReplacer(map[string]string{
 		e.Get(MacrosNamespace):    e.namer.Name(short.Namespace, shard),
 		e.Get(MacrosCRName):       e.namer.Name(short.CRName, shard),
 		e.Get(MacrosClusterName):  e.namer.Name(short.ClusterName, shard),
@@ -139,8 +140,8 @@ func clusterScopeIndexOfPreviousCycleTail(host api.IHost) int {
 }
 
 // newReplacerHost
-func (e *Engine) newReplacerHost(host api.IHost) *Replacer {
-	return NewReplacer(map[string]string{
+func (e *Engine) newReplacerHost(host api.IHost) *util.Replacer {
+	return util.NewReplacer(map[string]string{
 		e.Get(MacrosNamespace):                                      e.namer.Name(short.Namespace, host),
 		e.Get(MacrosCRName):                                         e.namer.Name(short.CRName, host),
 		e.Get(MacrosClusterName):                                    e.namer.Name(short.ClusterName, host),
