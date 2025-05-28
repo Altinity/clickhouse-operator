@@ -22,13 +22,13 @@ import (
 
 type Replacer struct {
 	macroToExpansionMap map[string]string
-	stringReplacer *strings.Replacer
-	mapReplacer *util.MapReplacer
+	stringReplacer      *strings.Replacer
+	mapReplacer         *util.MapReplacer
 }
 
 // New
 func NewReplacer(macroToExpansionMap ...map[string]string) *Replacer {
-	r :=  &Replacer{
+	r := &Replacer{
 		macroToExpansionMap: make(map[string]string),
 	}
 
