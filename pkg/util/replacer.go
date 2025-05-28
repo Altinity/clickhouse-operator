@@ -44,11 +44,19 @@ func NewReplacer(macroToExpansionMap ...map[string]string) *Replacer {
 
 // Line expands line with macros(es)
 func (e *Replacer) Line(line string) string {
+	if e == nil {
+		// No replacement
+		return line
+	}
 	return e.stringReplacer.Replace(line)
 }
 
 // Map expands map with macros(es)
 func (e *Replacer) Map(_map map[string]string) map[string]string {
+	if e == nil {
+		// No replacement
+		return _map
+	}
 	return e.mapReplacer.Replace(_map)
 }
 
@@ -66,12 +74,17 @@ func NewMapReplacer(r *strings.Replacer) *MapReplacer {
 
 // Replace returns a copy of m with all replacements performed.
 func (r *MapReplacer) Replace(m map[string]string) map[string]string {
+	if r == nil {
+		// No replacement
+		return m
+	}
 	if len(m) == 0 {
+		// Nothing to replace
 		return m
 	}
 	result := make(map[string]string, len(m))
 	for key := range m {
-		result[key] = r.Replacer.Replace(m[key])
+		result[r.Replacer.Replace(key)] = r.Replacer.Replace(m[key])
 	}
 	return result
 }

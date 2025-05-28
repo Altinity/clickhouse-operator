@@ -55,36 +55,26 @@ func (e *Engine) Get(macrosName string) string {
 
 // Line expands line with macros(es)
 func (e *Engine) Line(line string) string {
-	switch t := e.scope.(type) {
-	case api.ICustomResource:
-		return e.newReplacerCR(t).Line(line)
-	case api.ICluster:
-		return e.newReplacerCluster(t).Line(line)
-	case api.IShard:
-		return e.newReplacerShard(t).Line(line)
-	case api.IHost:
-		return e.newReplacerHost(t).Line(line)
-	default:
-		return "unknown scope"
-	}
+	return e.newReplacer().Line(line)
 }
 
 // Map expands map with macros(es)
 func (e *Engine) Map(_map map[string]string) map[string]string {
+	return e.newReplacer().Map(_map)
+}
+
+func (e *Engine) newReplacer() *util.Replacer {
 	switch t := e.scope.(type) {
 	case api.ICustomResource:
-		return e.newReplacerCR(t).Map(_map)
+		return e.newReplacerCR(t)
 	case api.ICluster:
-		return e.newReplacerCluster(t).Map(_map)
+		return e.newReplacerCluster(t)
 	case api.IShard:
-		return e.newReplacerShard(t).Map(_map)
+		return e.newReplacerShard(t)
 	case api.IHost:
-		return e.newReplacerHost(t).Map(_map)
-	default:
-		return map[string]string{
-			"unknown scope": "unknown scope",
-		}
+		return e.newReplacerHost(t)
 	}
+	return nil
 }
 
 // newReplacerCR
