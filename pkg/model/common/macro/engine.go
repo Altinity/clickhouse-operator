@@ -63,20 +63,6 @@ func (e *Engine) Map(_map map[string]string) map[string]string {
 	return e.newReplacer().Map(_map)
 }
 
-func (e *Engine) newReplacer() *util.Replacer {
-	switch t := e.scope.(type) {
-	case api.ICustomResource:
-		return e.newReplacerCR(t)
-	case api.ICluster:
-		return e.newReplacerCluster(t)
-	case api.IShard:
-		return e.newReplacerShard(t)
-	case api.IHost:
-		return e.newReplacerHost(t)
-	}
-	return nil
-}
-
 // newReplacerCR
 func (e *Engine) newReplacerCR(cr api.ICustomResource) *util.Replacer {
 	return util.NewReplacer(map[string]string{
@@ -107,28 +93,6 @@ func (e *Engine) newReplacerShard(shard api.IShard) *util.Replacer {
 	})
 }
 
-// clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
-func clusterScopeIndexOfPreviousCycleTail(host api.IHost) int {
-	if host.GetRuntime().GetAddress().GetClusterScopeCycleOffset() == 0 {
-		// This is the cycle head - the first host of the cycle
-		// We need to point to previous host in this cluster - which would be previous cycle tail
-
-		if host.GetRuntime().GetAddress().GetClusterScopeIndex() == 0 {
-			// This is the very first host in the cluster - head of the first cycle
-			// No previous host available, so just point to the same host, mainly because label must be an empty string
-			// or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character
-			// So we can't set it to "-1"
-			return host.GetRuntime().GetAddress().GetClusterScopeIndex()
-		}
-
-		// This is head of non-first cycle, point to previous host in the cluster - which would be previous cycle tail
-		return host.GetRuntime().GetAddress().GetClusterScopeIndex() - 1
-	}
-
-	// This is not cycle head - just point to the same host
-	return host.GetRuntime().GetAddress().GetClusterScopeIndex()
-}
-
 // newReplacerHost
 func (e *Engine) newReplacerHost(host api.IHost) *util.Replacer {
 	return util.NewReplacer(map[string]string{
@@ -151,4 +115,40 @@ func (e *Engine) newReplacerHost(host api.IHost) *util.Replacer {
 		e.Get(MacrosClusterScopeCycleOffset):                        strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeCycleOffset()), // TODO use appropriate namePart function
 		e.Get(MacrosClusterScopeCycleHeadPointsToPreviousCycleTail): strconv.Itoa(clusterScopeIndexOfPreviousCycleTail(host)),
 	})
+}
+
+// clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
+func clusterScopeIndexOfPreviousCycleTail(host api.IHost) int {
+	if host.GetRuntime().GetAddress().GetClusterScopeCycleOffset() == 0 {
+		// This is the cycle head - the first host of the cycle
+		// We need to point to previous host in this cluster - which would be previous cycle tail
+
+		if host.GetRuntime().GetAddress().GetClusterScopeIndex() == 0 {
+			// This is the very first host in the cluster - head of the first cycle
+			// No previous host available, so just point to the same host, mainly because label must be an empty string
+			// or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character
+			// So we can't set it to "-1"
+			return host.GetRuntime().GetAddress().GetClusterScopeIndex()
+		}
+
+		// This is head of non-first cycle, point to previous host in the cluster - which would be previous cycle tail
+		return host.GetRuntime().GetAddress().GetClusterScopeIndex() - 1
+	}
+
+	// This is not cycle head - just point to the same host
+	return host.GetRuntime().GetAddress().GetClusterScopeIndex()
+}
+
+func (e *Engine) newReplacer() *util.Replacer {
+	switch t := e.scope.(type) {
+	case api.ICustomResource:
+		return e.newReplacerCR(t)
+	case api.ICluster:
+		return e.newReplacerCluster(t)
+	case api.IShard:
+		return e.newReplacerShard(t)
+	case api.IHost:
+		return e.newReplacerHost(t)
+	}
+	return nil
 }
