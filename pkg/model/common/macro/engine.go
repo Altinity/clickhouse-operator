@@ -16,13 +16,11 @@ package macro
 
 import (
 	"strconv"
-	"strings"
-
+	
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/short"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Engine
@@ -58,13 +56,13 @@ func (e *Engine) Get(macros string) string {
 func (e *Engine) Line(line string) string {
 	switch t := e.scope.(type) {
 	case api.ICustomResource:
-		return e.newLineMacroReplacerCR(t).Replace(line)
+		return e.newReplacerCR(t).Line(line)
 	case api.ICluster:
-		return e.newLineMacroReplacerCluster(t).Replace(line)
+		return e.newReplacerCluster(t).Line(line)
 	case api.IShard:
-		return e.newLineMacroReplacerShard(t).Replace(line)
+		return e.newReplacerShard(t).Line(line)
 	case api.IHost:
-		return e.newLineMacroReplacerHost(t).Replace(line)
+		return e.newReplacerHost(t).Line(line)
 	default:
 		return "unknown scope"
 	}
@@ -74,13 +72,13 @@ func (e *Engine) Line(line string) string {
 func (e *Engine) Map(_map map[string]string) map[string]string {
 	switch t := e.scope.(type) {
 	case api.ICustomResource:
-		return e.newMapMacroReplacerCR(t).Replace(_map)
+		return e.newReplacerCR(t).Map(_map)
 	case api.ICluster:
-		return e.newMapMacroReplacerCluster(t).Replace(_map)
+		return e.newReplacerCluster(t).Map(_map)
 	case api.IShard:
-		return e.newMapMacroReplacerShard(t).Replace(_map)
+		return e.newReplacerShard(t).Map(_map)
 	case api.IHost:
-		return e.newMapMacroReplacerHost(t).Replace(_map)
+		return e.newReplacerHost(t).Map(_map)
 	default:
 		return map[string]string{
 			"unknown scope": "unknown scope",
@@ -88,49 +86,34 @@ func (e *Engine) Map(_map map[string]string) map[string]string {
 	}
 }
 
-// newLineMacroReplacerCR
-func (e *Engine) newLineMacroReplacerCR(cr api.ICustomResource) *strings.Replacer {
-	return strings.NewReplacer(
-		e.Get(MacrosNamespace), e.namer.Name(short.Namespace, cr),
-		e.Get(MacrosCRName), e.namer.Name(short.CRName, cr),
-	)
+// newReplacerCR
+func (e *Engine) newReplacerCR(cr api.ICustomResource) *Replacer {
+	return NewReplacer(map[string]string{
+		e.Get(MacrosNamespace): e.namer.Name(short.Namespace, cr),
+		e.Get(MacrosCRName): e.namer.Name(short.CRName, cr),
+	})
 }
 
-// newMapMacroReplacerCR
-func (e *Engine) newMapMacroReplacerCR(cr api.ICustomResource) *util.MapReplacer {
-	return util.NewMapReplacer(e.newLineMacroReplacerCR(cr))
+// newReplacerCluster
+func (e *Engine) newReplacerCluster(cluster api.ICluster) *Replacer {
+	return NewReplacer(map[string]string{
+		e.Get(MacrosNamespace): e.namer.Name(short.Namespace, cluster),
+		e.Get(MacrosCRName): e.namer.Name(short.CRName, cluster),
+		e.Get(MacrosClusterName): e.namer.Name(short.ClusterName, cluster),
+		e.Get(MacrosClusterIndex): strconv.Itoa(cluster.GetRuntime().GetAddress().GetClusterIndex()),
+	})
 }
 
-// newLineMacroReplacerCluster
-func (e *Engine) newLineMacroReplacerCluster(cluster api.ICluster) *strings.Replacer {
-	return strings.NewReplacer(
-		e.Get(MacrosNamespace), e.namer.Name(short.Namespace, cluster),
-		e.Get(MacrosCRName), e.namer.Name(short.CRName, cluster),
-		e.Get(MacrosClusterName), e.namer.Name(short.ClusterName, cluster),
-		e.Get(MacrosClusterIndex), strconv.Itoa(cluster.GetRuntime().GetAddress().GetClusterIndex()),
-	)
-}
-
-// newMapMacroReplacerCluster
-func (e *Engine) newMapMacroReplacerCluster(cluster api.ICluster) *util.MapReplacer {
-	return util.NewMapReplacer(e.newLineMacroReplacerCluster(cluster))
-}
-
-// newLineMacroReplacerShard
-func (e *Engine) newLineMacroReplacerShard(shard api.IShard) *strings.Replacer {
-	return strings.NewReplacer(
-		e.Get(MacrosNamespace), e.namer.Name(short.Namespace, shard),
-		e.Get(MacrosCRName), e.namer.Name(short.CRName, shard),
-		e.Get(MacrosClusterName), e.namer.Name(short.ClusterName, shard),
-		e.Get(MacrosClusterIndex), strconv.Itoa(shard.GetRuntime().GetAddress().GetClusterIndex()),
-		e.Get(MacrosShardName), e.namer.Name(short.ShardName, shard),
-		e.Get(MacrosShardIndex), strconv.Itoa(shard.GetRuntime().GetAddress().GetShardIndex()),
-	)
-}
-
-// newMapMacroReplacerShard
-func (e *Engine) newMapMacroReplacerShard(shard api.IShard) *util.MapReplacer {
-	return util.NewMapReplacer(e.newLineMacroReplacerShard(shard))
+// newReplacerShard
+func (e *Engine) newReplacerShard(shard api.IShard) *Replacer {
+	return NewReplacer(map[string]string{
+		e.Get(MacrosNamespace): e.namer.Name(short.Namespace, shard),
+		e.Get(MacrosCRName): e.namer.Name(short.CRName, shard),
+		e.Get(MacrosClusterName): e.namer.Name(short.ClusterName, shard),
+		e.Get(MacrosClusterIndex): strconv.Itoa(shard.GetRuntime().GetAddress().GetClusterIndex()),
+		e.Get(MacrosShardName): e.namer.Name(short.ShardName, shard),
+		e.Get(MacrosShardIndex): strconv.Itoa(shard.GetRuntime().GetAddress().GetShardIndex()),
+	})
 }
 
 // clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
@@ -155,31 +138,26 @@ func clusterScopeIndexOfPreviousCycleTail(host api.IHost) int {
 	return host.GetRuntime().GetAddress().GetClusterScopeIndex()
 }
 
-// newLineMacroReplacerHost
-func (e *Engine) newLineMacroReplacerHost(host api.IHost) *strings.Replacer {
-	return strings.NewReplacer(
-		e.Get(MacrosNamespace), e.namer.Name(short.Namespace, host),
-		e.Get(MacrosCRName), e.namer.Name(short.CRName, host),
-		e.Get(MacrosClusterName), e.namer.Name(short.ClusterName, host),
-		e.Get(MacrosClusterIndex), strconv.Itoa(host.GetRuntime().GetAddress().GetClusterIndex()),
-		e.Get(MacrosShardName), e.namer.Name(short.ShardName, host),
-		e.Get(MacrosShardIndex), strconv.Itoa(host.GetRuntime().GetAddress().GetShardIndex()),
-		e.Get(MacrosShardScopeIndex), strconv.Itoa(host.GetRuntime().GetAddress().GetShardScopeIndex()), // TODO use appropriate namePart function
-		e.Get(MacrosReplicaName), e.namer.Name(short.ReplicaName, host),
-		e.Get(MacrosReplicaIndex), strconv.Itoa(host.GetRuntime().GetAddress().GetReplicaIndex()),
-		e.Get(MacrosReplicaScopeIndex), strconv.Itoa(host.GetRuntime().GetAddress().GetReplicaScopeIndex()), // TODO use appropriate namePart function
-		e.Get(MacrosHostName), e.namer.Name(short.HostName, host),
-		e.Get(MacrosCRScopeIndex), strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeIndex()), // TODO use appropriate namePart function
-		e.Get(MacrosCRScopeCycleIndex), strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeCycleIndex()), // TODO use appropriate namePart function
-		e.Get(MacrosCRScopeCycleOffset), strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeCycleOffset()), // TODO use appropriate namePart function
-		e.Get(MacrosClusterScopeIndex), strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeIndex()), // TODO use appropriate namePart function
-		e.Get(MacrosClusterScopeCycleIndex), strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeCycleIndex()), // TODO use appropriate namePart function
-		e.Get(MacrosClusterScopeCycleOffset), strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeCycleOffset()), // TODO use appropriate namePart function
-		e.Get(MacrosClusterScopeCycleHeadPointsToPreviousCycleTail), strconv.Itoa(clusterScopeIndexOfPreviousCycleTail(host)),
-	)
-}
-
-// newMapMacroReplacerHost
-func (e *Engine) newMapMacroReplacerHost(host api.IHost) *util.MapReplacer {
-	return util.NewMapReplacer(e.newLineMacroReplacerHost(host))
+// newReplacerHost
+func (e *Engine) newReplacerHost(host api.IHost) *Replacer {
+	return NewReplacer(map[string]string{
+		e.Get(MacrosNamespace): e.namer.Name(short.Namespace, host),
+		e.Get(MacrosCRName): e.namer.Name(short.CRName, host),
+		e.Get(MacrosClusterName): e.namer.Name(short.ClusterName, host),
+		e.Get(MacrosClusterIndex): strconv.Itoa(host.GetRuntime().GetAddress().GetClusterIndex()),
+		e.Get(MacrosShardName): e.namer.Name(short.ShardName, host),
+		e.Get(MacrosShardIndex): strconv.Itoa(host.GetRuntime().GetAddress().GetShardIndex()),
+		e.Get(MacrosShardScopeIndex): strconv.Itoa(host.GetRuntime().GetAddress().GetShardScopeIndex()), // TODO use appropriate namePart function
+		e.Get(MacrosReplicaName): e.namer.Name(short.ReplicaName, host),
+		e.Get(MacrosReplicaIndex): strconv.Itoa(host.GetRuntime().GetAddress().GetReplicaIndex()),
+		e.Get(MacrosReplicaScopeIndex): strconv.Itoa(host.GetRuntime().GetAddress().GetReplicaScopeIndex()), // TODO use appropriate namePart function
+		e.Get(MacrosHostName): e.namer.Name(short.HostName, host),
+		e.Get(MacrosCRScopeIndex): strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeIndex()), // TODO use appropriate namePart function
+		e.Get(MacrosCRScopeCycleIndex): strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeCycleIndex()), // TODO use appropriate namePart function
+		e.Get(MacrosCRScopeCycleOffset): strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeCycleOffset()), // TODO use appropriate namePart function
+		e.Get(MacrosClusterScopeIndex): strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeIndex()), // TODO use appropriate namePart function
+		e.Get(MacrosClusterScopeCycleIndex): strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeCycleIndex()), // TODO use appropriate namePart function
+		e.Get(MacrosClusterScopeCycleOffset): strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeCycleOffset()), // TODO use appropriate namePart function
+		e.Get(MacrosClusterScopeCycleHeadPointsToPreviousCycleTail): strconv.Itoa(clusterScopeIndexOfPreviousCycleTail(host)),
+	})
 }
