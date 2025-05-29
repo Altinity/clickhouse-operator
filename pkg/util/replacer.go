@@ -20,6 +20,7 @@ type Replacer struct {
 	macroToExpansionMap map[string]string
 	stringReplacer      *strings.Replacer
 	mapReplacer         *MapReplacer
+	sliceReplacer *SliceReplacer
 }
 
 // NewReplacer
@@ -39,6 +40,7 @@ func NewReplacer(macroToExpansionMap ...map[string]string) *Replacer {
 
 	r.stringReplacer = strings.NewReplacer(replacements...)
 	r.mapReplacer = NewMapReplacer(r.stringReplacer)
+	r.sliceReplacer = NewSliceReplacer(r.stringReplacer)
 	return r
 }
 
@@ -69,6 +71,20 @@ func (e *Replacer) Map(_map map[string]string) map[string]string {
 // MapEx expands map with macros(es)
 func (e *Replacer) MapEx(_map map[string]string) (map[string]string, bool) {
 	return e.mapReplacer.ReplaceEx(_map)
+}
+
+// Slice expands slice with macros(es)
+func (e *Replacer) Slice(s []string) []string {
+	if e == nil {
+		// No replacement
+		return s
+	}
+	return e.sliceReplacer.Replace(s)
+}
+
+// SliceEx expands slice with macros(es)
+func (e *Replacer) SliceEx(s []string) ([]string, bool) {
+	return e.sliceReplacer.ReplaceEx(s)
 }
 
 // MapReplacer replaces a list of strings with replacements on a map.
@@ -119,6 +135,57 @@ func (r *MapReplacer) ReplaceEx(m map[string]string) (map[string]string, bool) {
 		modifiedKey := key != resultKey
 		modifiedValue := value != resultValue
 		modified = modified || modifiedKey || modifiedValue
+	}
+	return result, modified
+}
+
+// SliceReplacer replaces a list of strings with replacements on a slice.
+type SliceReplacer struct {
+	*strings.Replacer
+}
+
+// NewSliceReplacer creates new SliceReplacer
+func NewSliceReplacer(r *strings.Replacer) *SliceReplacer {
+	return &SliceReplacer{
+		r,
+	}
+}
+
+// Replace returns a copy of m with all replacements performed.
+func (r *SliceReplacer) Replace(m []string) []string {
+	if r == nil {
+		// No replacement
+		return m
+	}
+	if len(m) == 0 {
+		// Nothing to replace
+		return m
+	}
+	result := make([]string, len(m))
+	for i, value := range m {
+		resultValue := r.Replacer.Replace(value)
+		result[i] = resultValue
+	}
+	return result
+}
+
+// Replace returns a copy of m with all replacements performed.
+func (r *SliceReplacer) ReplaceEx(m []string) ([]string, bool) {
+	if r == nil {
+		// No replacement
+		return m, false
+	}
+	if len(m) == 0 {
+		// Nothing to replace
+		return m, false
+	}
+	result := make([]string, len(m))
+	modified := false
+	for i, value := range m {
+		resultValue := r.Replacer.Replace(value)
+		result[i] = resultValue
+		modifiedValue := value != resultValue
+		modified = modified || modifiedValue
 	}
 	return result, modified
 }
