@@ -597,7 +597,9 @@ func (s *Settings) Normalize(_opts ...*SettingsNormalizerOptions) *Settings {
 	s.normalizeKeys()
 	if len(_opts) > 0 {
 		opts := _opts[0]
-		s.applyMacrosOnKeys(util.NewReplacer(opts.Macros))
+		macros := util.NewReplacer(opts.Macros)
+		s.applyMacrosOnKeys(macros)
+		s.applyMacrosOnValues(macros)
 	}
 	return s
 }
@@ -656,6 +658,12 @@ func (s *Settings) applyMacrosOnKeys(macros *util.Replacer) {
 	for _, beforeModificationKey := range keysToModify {
 		s.DeleteKey(beforeModificationKey)
 	}
+}
+
+func (s *Settings) applyMacrosOnValues(macros *util.Replacer) {
+	s.Walk(func(name string, setting *Setting){
+		setting.ApplyMacros(macros)
+	})
 }
 
 const xmlTagClickHouse = "clickhouse"
