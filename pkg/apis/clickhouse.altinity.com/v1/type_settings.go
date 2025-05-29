@@ -661,7 +661,7 @@ func (s *Settings) applyMacrosOnKeys(macros *util.Replacer) {
 }
 
 func (s *Settings) applyMacrosOnValues(macros *util.Replacer) {
-	s.Walk(func(name string, setting *Setting){
+	s.Walk(func(name string, setting *Setting) {
 		setting.ApplyMacros(macros)
 	})
 }

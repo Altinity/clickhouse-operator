@@ -20,7 +20,7 @@ type Replacer struct {
 	macroToExpansionMap map[string]string
 	stringReplacer      *strings.Replacer
 	mapReplacer         *MapReplacer
-	sliceReplacer *SliceReplacer
+	sliceReplacer       *SliceReplacer
 }
 
 // NewReplacer
