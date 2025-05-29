@@ -638,21 +638,21 @@ func (s *Settings) applyMacrosOnKeys(macros *util.Replacer) {
 
 	var keysToModify []string
 
-	// Find entries with keys to macro replace
+	// Find keys which are to be modified
 	s.WalkKeys(func(key string, _ *Setting) {
 		if _, modified := macros.LineEx(key); modified {
-			// Applied macros will modified the key. This path has to be processed
+			// Applied macros will modify the key
 			keysToModify = append(keysToModify, key)
 		}
 	})
 
-	// Add entries with modified keys
+	// Add entries with modified keys [modified key] => value
 	for _, originalKey := range keysToModify {
 		modifiedKey := macros.Line(originalKey)
 		s.SetKey(modifiedKey, s.GetKey(originalKey))
 	}
 
-	// Delete entries with before-processed keys
+	// Delete entries with before-modification keys
 	for _, beforeModificationKey := range keysToModify {
 		s.DeleteKey(beforeModificationKey)
 	}
