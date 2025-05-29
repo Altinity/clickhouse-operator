@@ -57,6 +57,10 @@ const (
 // Ensure required interface implementation
 var _ yaml.Marshaler = &Setting{}
 
+func (s *Setting) IsEmpty() bool {
+	return s == nil
+}
+
 // AsAny gets value of a setting as vector. ScalarString value is casted to vector
 func (s *Setting) AsAny() any {
 	if s == nil {
@@ -150,6 +154,20 @@ func (s *Setting) HasValue() bool {
 		return s.src.HasValue()
 	default:
 		return false
+	}
+}
+
+// ApplyMacros applies macros on the Setting
+func (s *Setting) ApplyMacros(macros *util.Replacer) {
+	if s == nil {
+		return
+	}
+
+	switch s.Type() {
+	case SettingTypeScalar:
+		s.scalar = macros.Line(s.scalar)
+	case SettingTypeVector:
+		s.vector = macros.Slice(s.vector)
 	}
 }
 
