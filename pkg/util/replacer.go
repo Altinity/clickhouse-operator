@@ -50,6 +50,19 @@ func NewReplacer(macroToExpansionMaps ...map[string]string) *Replacer {
 	return r
 }
 
+func NewReplacerFrom(from ...*Replacer) *Replacer {
+	// Combine expansion maps from all replacers
+	var macroToExpansionMap = make(map[string]string)
+	for _, replacer := range from {
+		for macro, expansion := range replacer.macroToExpansionMap {
+			macroToExpansionMap[macro] = expansion
+		}
+	}
+
+	// Build new replacer from combined expansion map
+	return NewReplacer(macroToExpansionMap)
+}
+
 // Line expands line with macros(es)
 func (e *Replacer) Line(line string) string {
 	if e == nil {
