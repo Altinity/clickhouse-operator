@@ -32,12 +32,8 @@ type Engine struct {
 }
 
 // New
-func New(macrosList types.List) *Engine {
-	return &Engine{
-		namer:      short.NewNamer(short.TargetNames),
-		macrosList: macrosList,
-		scope:      nil,
-	}
+func New(macrosList types.List) interfaces.IMacro {
+	return new(macrosList)
 }
 
 // Scope produces scoped macro engine
@@ -78,6 +74,15 @@ func (e *Engine) Replacer() *util.Replacer {
 		return e.newReplacerHost(t)
 	}
 	return nil
+}
+
+// new
+func new(macrosList types.List) *Engine {
+	return &Engine{
+		namer:      short.NewNamer(short.TargetNames),
+		macrosList: macrosList,
+		scope:      nil,
+	}
 }
 
 // newReplacerCR
