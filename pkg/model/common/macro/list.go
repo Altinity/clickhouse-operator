@@ -19,7 +19,7 @@ const (
 	MacrosNamespace = "name for macro: {namespace}"
 
 	// MacrosCRName is a sanitized Custom Resource name
-	MacrosCRName = "name for macro: {chi}"
+	MacrosCRName = "name for macro: {chi} or {chk}"
 
 	// MacrosClusterName is a sanitized cluster name
 	MacrosClusterName = "name for macro: {cluster}"
