@@ -26,41 +26,58 @@ import (
 
 // Engine
 type Engine struct {
-	namer  *short.Namer
-	macros types.List
-	scope  any
+	namer      *short.Namer
+	macrosList types.List
+	scope      any
 }
 
 // New
-func New(macros types.List) *Engine {
+func New(macrosList types.List) *Engine {
 	return &Engine{
-		namer:  short.NewNamer(short.TargetNames),
-		macros: macros,
-		scope:  nil,
+		namer:      short.NewNamer(short.TargetNames),
+		macrosList: macrosList,
+		scope:      nil,
 	}
 }
 
+// Scope produces scoped macro engine
 func (e *Engine) Scope(scope any) interfaces.IMacro {
 	return &Engine{
-		namer:  e.namer,
-		macros: e.macros,
-		scope:  scope,
+		namer:      e.namer,
+		macrosList: e.macrosList,
+		scope:      scope,
 	}
 }
 
-// Get gets macros by its name. Accepts macros name, returns macros value to be expanded, such as "{chi}" or "{chk}"
+// Get gets macros by its name.
+// Accepts macros name, returns macros expandable to be expanded, such as "{chi}" or "{chk}"
 func (e *Engine) Get(macrosName string) string {
-	return e.macros.Get(macrosName)
+	return e.macrosList.Get(macrosName)
 }
 
 // Line expands line with macros(es)
-func (e *Engine) Line(line string) string {
-	return e.newReplacer().Line(line)
+func (e *Engine) Line(lineToExpand string) string {
+	return e.Replacer().Line(lineToExpand)
 }
 
 // Map expands map with macros(es)
-func (e *Engine) Map(_map map[string]string) map[string]string {
-	return e.newReplacer().Map(_map)
+func (e *Engine) Map(mapToExpand map[string]string) map[string]string {
+	return e.Replacer().Map(mapToExpand)
+}
+
+// Replacer produces ready-to-use replacer
+func (e *Engine) Replacer() *util.Replacer {
+	switch t := e.scope.(type) {
+	case api.ICustomResource:
+		return e.newReplacerCR(t)
+	case api.ICluster:
+		return e.newReplacerCluster(t)
+	case api.IShard:
+		return e.newReplacerShard(t)
+	case api.IHost:
+		return e.newReplacerHost(t)
+	}
+	return nil
 }
 
 // newReplacerCR
@@ -137,18 +154,4 @@ func clusterScopeIndexOfPreviousCycleTail(host api.IHost) int {
 
 	// This is not cycle head - just point to the same host
 	return host.GetRuntime().GetAddress().GetClusterScopeIndex()
-}
-
-func (e *Engine) newReplacer() *util.Replacer {
-	switch t := e.scope.(type) {
-	case api.ICustomResource:
-		return e.newReplacerCR(t)
-	case api.ICluster:
-		return e.newReplacerCluster(t)
-	case api.IShard:
-		return e.newReplacerShard(t)
-	case api.IHost:
-		return e.newReplacerHost(t)
-	}
-	return nil
 }
