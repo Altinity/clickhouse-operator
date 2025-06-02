@@ -589,7 +589,7 @@ func (s *Settings) AsSortedSliceOfStrings() []string {
 }
 
 type SettingsNormalizerOptions struct {
-	Macros map[string]string
+	Replacers []*util.Replacer
 }
 
 // Normalize normalizes settings
@@ -597,7 +597,7 @@ func (s *Settings) Normalize(_opts ...*SettingsNormalizerOptions) *Settings {
 	s.normalizeKeys()
 	if len(_opts) > 0 {
 		opts := _opts[0]
-		macros := util.NewReplacer(opts.Macros)
+		macros := util.NewReplacerFrom(opts.Replacers...)
 		s.applyMacrosOnKeys(macros)
 		s.applyMacrosOnValues(macros)
 	}
