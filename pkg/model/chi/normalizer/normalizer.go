@@ -582,8 +582,12 @@ const clickhouseOperatorUserMacro = "{clickhouseOperatorUser}"
 func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings) *chi.Settings {
 	// Ensure and normalize target user settings
 	users = users.Ensure().Normalize(&chi.SettingsNormalizerOptions{
-		Macros: map[string]string{
-			clickhouseOperatorUserMacro: chop.Config().ClickHouse.Access.Username,
+		Replacers: []*util.Replacer{
+			util.NewReplacer(
+				map[string]string{
+					clickhouseOperatorUserMacro: chop.Config().ClickHouse.Access.Username,
+				},
+			),
 		},
 	})
 
