@@ -24,23 +24,29 @@ type Replacer struct {
 }
 
 // NewReplacer
-func NewReplacer(macroToExpansionMap ...map[string]string) *Replacer {
+func NewReplacer(macroToExpansionMaps ...map[string]string) *Replacer {
 	r := &Replacer{
 		macroToExpansionMap: make(map[string]string),
 	}
 
-	if len(macroToExpansionMap) > 0 {
-		r.macroToExpansionMap = macroToExpansionMap[0]
+	// Fill unified expansion map
+	for _, macroToExpansionMap := range macroToExpansionMaps {
+		for macro, expansion := range macroToExpansionMap {
+			r.macroToExpansionMap[macro] = expansion
+		}
 	}
 
+	// Fill [replaced, replacement] pairs in slice
 	var replacements []string
 	for macro, expansion := range r.macroToExpansionMap {
 		replacements = append(replacements, macro, expansion)
 	}
 
+	// Fill replacers
 	r.stringReplacer = strings.NewReplacer(replacements...)
 	r.mapReplacer = NewMapReplacer(r.stringReplacer)
 	r.sliceReplacer = NewSliceReplacer(r.stringReplacer)
+
 	return r
 }
 
