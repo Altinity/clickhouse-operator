@@ -26,10 +26,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	crTemplatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates_cr"
-	macrosList "github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
@@ -49,7 +48,7 @@ type Normalizer struct {
 func New() *Normalizer {
 	return &Normalizer{
 		namer:   managers.NewNameManager(managers.NameManagerTypeKeeper),
-		macro:   macro.New(macrosList.Get()),
+		macro:   macro.New(),
 		labeler: labeler.New(nil),
 	}
 }

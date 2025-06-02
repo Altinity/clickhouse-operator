@@ -18,8 +18,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	macrosList "github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 )
 
@@ -30,7 +29,7 @@ type Namer struct {
 
 // New creates new namer with specified context
 func New() *Namer {
-	me := macro.New(macrosList.Get())
+	me := macro.New()
 	return &Namer{
 		commonNamer: commonNamer.New(me),
 		macro:       me,

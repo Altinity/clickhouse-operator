@@ -21,11 +21,10 @@ import (
 
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	macrosList "github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -46,7 +45,7 @@ type ServiceManager struct {
 func NewServiceManager() *ServiceManager {
 	return &ServiceManager{
 		or:      NewOwnerReferencer(),
-		macro:   macro.New(macrosList.Get()),
+		macro:   macro.New(),
 		namer:   namer.New(),
 		labeler: nil,
 	}

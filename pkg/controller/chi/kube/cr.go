@@ -31,8 +31,7 @@ import (
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	macrosList "github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -47,7 +46,7 @@ func NewCR(chopClient chopClientSet.Interface, kubeClient kube.Interface) *CR {
 	return &CR{
 		chopClient: chopClient,
 		kubeClient: kubeClient,
-		macro:      macro.New(macrosList.Get()),
+		macro:      macro.New(),
 	}
 }
 
