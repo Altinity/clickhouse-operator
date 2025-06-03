@@ -578,16 +578,20 @@ const chopProfile = "clickhouse_operator"
 
 const clickhouseOperatorUserMacro = "{clickhouseOperatorUser}"
 
+func clickhouseOperatorUserMacroReplacer() *util.Replacer {
+	return util.NewReplacer(
+		map[string]string{
+			clickhouseOperatorUserMacro: chop.Config().ClickHouse.Access.Username,
+		},
+	)
+}
+
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings) *chi.Settings {
 	// Ensure and normalize target user settings
 	users = users.Ensure().Normalize(&chi.SettingsNormalizerOptions{
 		Replacers: []*util.Replacer{
-			util.NewReplacer(
-				map[string]string{
-					clickhouseOperatorUserMacro: chop.Config().ClickHouse.Access.Username,
-				},
-			),
+			clickhouseOperatorUserMacroReplacer(),
 		},
 	})
 
