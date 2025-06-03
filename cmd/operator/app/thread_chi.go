@@ -23,6 +23,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
 )
 
@@ -84,6 +85,12 @@ func initClickHouse(ctx context.Context) {
 		kubeInformerFactory,
 	)
 
+	// Register callback for configuration changes to reconcile all CHIs
+	chop.Get().ConfigManager.RegisterConfigChangeCallback(func(cm *chop.ConfigManager) {
+		log.V(1).F().Info("Configuration changed, triggering reconciliation for all CHIs")
+		reconcileAllCHIsOnConfigChange(ctx, cm.Config().CHOPSecretHash)
+	})
+
 	// Start Informers
 	kubeInformerFactory.Start(ctx.Done())
 	chopInformerFactory.Start(ctx.Done())
@@ -97,4 +104,98 @@ func runClickHouse(ctx context.Context) {
 	// Start main CHI controller
 	log.V(1).F().Info("Starting CHI controller")
 	chiController.Run(ctx)
+}
+
+// reconcileAllCHIsOnConfigChange triggers reconciliation for all ClickHouseInstallations
+// in watched namespaces when configuration changes occur
+func reconcileAllCHIsOnConfigChange(ctx context.Context, chopSecretHash string) {
+	// Get the ConfigManager instance
+	configManager := chop.Get().ConfigManager
+	if configManager == nil {
+		log.V(1).F().Error("ConfigManager is nil, cannot reconcile CHIs")
+		return
+	}
+
+	// Get the chopClient from ConfigManager
+	chopClient := configManager.ChopClient()
+	if chopClient == nil {
+		log.V(1).F().Error("chopClient is nil, cannot reconcile CHIs")
+		return
+	}
+
+	// Get watched namespaces from configuration
+	config := configManager.Config()
+	if config == nil {
+		log.V(1).F().Error("Config is nil, cannot determine watched namespaces")
+		return
+	}
+
+	watchedNamespaces := config.Watch.Namespaces
+
+	// If no specific namespaces are configured, we need to handle the "watch all namespaces" case
+	if len(watchedNamespaces) == 0 {
+		// Default to operator's own namespace if available
+		if operatorNamespace, ok := configManager.GetRuntimeParam("OPERATOR_POD_NAMESPACE"); ok && operatorNamespace != "" {
+			watchedNamespaces = []string{operatorNamespace}
+		} else {
+			log.V(1).F().Warning("Cannot determine operator namespace, skipping CHI reconciliation")
+			return
+		}
+	}
+
+	// Process each watched namespace
+	for _, namespace := range watchedNamespaces {
+		if namespace == "" {
+			continue
+		}
+
+		// List all ClickHouseInstallations in this namespace
+		chiList, err := chopClient.ClickhouseV1().ClickHouseInstallations(namespace).List(ctx, controller.NewListOptions())
+		if err != nil {
+			log.V(1).F().Error("Failed to list ClickHouseInstallations in namespace %s: %v", namespace, err)
+			continue
+		}
+
+		// Process each CHI in the namespace
+		for i := range chiList.Items {
+			oldChi := &chiList.Items[i]
+			newChi := oldChi.DeepCopy()
+
+			// Current DeepCopy does not include the Reconcile settings, so we need to set them explicitly
+			for k := range newChi.Spec.Configuration.Clusters {
+				newChi.Spec.Configuration.Clusters[k].Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent = oldChi.Spec.Configuration.Clusters[k].Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent
+
+				newChi.Spec.Configuration.Clusters[k].Reconcile.Runtime.ReconcileShardsThreadsNumber = oldChi.Spec.Configuration.Clusters[k].Reconcile.Runtime.ReconcileShardsThreadsNumber
+
+				if newChi.Spec.Configuration.Clusters[k].Reconcile.Runtime.ReconcileShardsThreadsNumber == 0 {
+					newChi.Spec.Configuration.Clusters[k].Reconcile.Runtime.ReconcileShardsThreadsNumber = 1
+				}
+			}
+
+			if newChi.Annotations == nil {
+				newChi.Annotations = make(map[string]string)
+			}
+
+			// Add unique annotation to trigger reconciliation
+			reconcileAnnotation := "internal.altinity.com/chop-secret-hash"
+			newChi.Annotations[reconcileAnnotation] = chopSecretHash
+
+			for k := range newChi.Spec.Templates.PodTemplates {
+				if newChi.Spec.Templates.PodTemplates[k].ObjectMeta.Annotations == nil {
+					newChi.Spec.Templates.PodTemplates[k].ObjectMeta.Annotations = make(map[string]string)
+				}
+				newChi.Spec.Templates.PodTemplates[k].ObjectMeta.Annotations[reconcileAnnotation] = chopSecretHash
+			}
+
+			newChi.SetGeneration(newChi.GetGeneration() + 1)
+
+			// Update the CHI in the Kubernetes API
+			_, err := chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Update(ctx, newChi, controller.NewUpdateOptions())
+			if err != nil {
+				log.V(1).F().Error("Failed to update CHI %s/%s: %v", namespace, newChi.Name, err)
+			}
+		}
+	}
+
+	log.V(1).F().Info("Completed reconciliation trigger for all CHIs")
 }

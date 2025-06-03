@@ -176,7 +176,11 @@ func (w *worker) isGenerationTheSame(old, new *api.ClickHouseInstallation) bool 
 		return false
 	}
 
-	return old.GetGeneration() == new.GetGeneration()
+	if old.GetGeneration() == new.GetGeneration() {
+		return true
+	}
+
+	return false
 }
 
 // getRemoteServersGeneratorOptions build base set of RemoteServersOptions

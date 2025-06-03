@@ -596,9 +596,7 @@ func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error
 
 // reconcileHostMain reconciles specified ClickHouse host
 func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
-	var (
-		reconcileStatefulSetOpts *statefulset.ReconcileOptions
-	)
+	var reconcileStatefulSetOpts *statefulset.ReconcileOptions
 
 	//if !host.IsLast() {
 	//	reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetDoNotWait()

@@ -596,6 +596,9 @@ type OperatorConfig struct {
 	TerminationGracePeriod int `json:"terminationGracePeriod" yaml:"terminationGracePeriod"`
 	// Revision history limit
 	RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`
+
+	// Secret hash used to verify that CHOP secret is not changed
+	CHOPSecretHash string `json:"chopSecretHash" yaml:"chopSecretHash"`
 }
 
 // MergeFrom merges
@@ -920,7 +923,6 @@ func (c *OperatorConfig) normalizeSectionClickHouseAccess() {
 	}
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Access.Timeouts.Query = c.ClickHouse.Access.Timeouts.Query * time.Second
-
 }
 
 func (c *OperatorConfig) normalizeSectionClickHouseMetrics() {
@@ -954,15 +956,15 @@ func (c *OperatorConfig) normalizeSectionReconcileRuntime() {
 		c.Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
 	}
 
-	//reconcileWaitExclude: true
-	//reconcileWaitInclude: false
+	// reconcileWaitExclude: true
+	// reconcileWaitInclude: false
 }
 
 func (c *OperatorConfig) normalizeSectionLabel() {
-	//config.IncludeIntoPropagationAnnotations
-	//config.ExcludeFromPropagationAnnotations
-	//config.IncludeIntoPropagationLabels
-	//config.ExcludeFromPropagationLabels
+	// config.IncludeIntoPropagationAnnotations
+	// config.ExcludeFromPropagationAnnotations
+	// config.IncludeIntoPropagationLabels
+	// config.ExcludeFromPropagationLabels
 	// Whether to append *Scope* labels to StatefulSet and Pod.
 	c.Label.Runtime.AppendScope = c.Label.AppendScopeString.Value()
 }
@@ -1102,11 +1104,11 @@ func (c *OperatorConfig) copyWithHiddenCredentials() *OperatorConfig {
 	if conf.ClickHouse.Config.User.Default.Password != "" {
 		conf.ClickHouse.Config.User.Default.Password = PasswordReplacer
 	}
-	//conf.ClickHouse.Access.Username = UsernameReplacer
+	// conf.ClickHouse.Access.Username = UsernameReplacer
 	if conf.ClickHouse.Access.Password != "" {
 		conf.ClickHouse.Access.Password = PasswordReplacer
 	}
-	//conf.ClickHouse.Access.Secret.Runtime.Username = UsernameReplacer
+	// conf.ClickHouse.Access.Secret.Runtime.Username = UsernameReplacer
 	if conf.ClickHouse.Access.Secret.Runtime.Password != "" {
 		conf.ClickHouse.Access.Secret.Runtime.Password = PasswordReplacer
 	}
@@ -1148,7 +1150,7 @@ func (c *OperatorConfig) GetInformerNamespace() string {
 
 		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
 		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
-		var labelRegexp = regexp.MustCompile("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
+		labelRegexp := regexp.MustCompile("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
 		if labelRegexp.MatchString(c.Watch.Namespaces[0]) {
 			namespace = c.Watch.Namespaces[0]
 		}

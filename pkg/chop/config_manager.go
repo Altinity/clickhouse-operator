@@ -16,22 +16,36 @@ package chop
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
+	"sync"
+	"time"
 
 	"github.com/kubernetes-sigs/yaml"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	kube "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"k8s.io/apimachinery/pkg/util/dump"
 )
+
+// ConfigChangeCallback defines the signature for configuration change callbacks
+type ConfigChangeCallback func(*ConfigManager)
 
 // ConfigManager specifies configuration manager in charge of operator's configuration
 type ConfigManager struct {
@@ -60,6 +74,15 @@ type ConfigManager struct {
 
 	// runtimeParams is set/map of runtime params, influencing configuration
 	runtimeParams map[string]string
+
+	// Secret watcher fields
+	secretInformer cache.SharedIndexInformer
+	secretMutex    sync.RWMutex
+	stopCh         chan struct{}
+
+	// Configuration change callbacks
+	callbacks      []ConfigChangeCallback
+	callbacksMutex sync.RWMutex
 }
 
 // newConfigManager creates new ConfigManager
@@ -72,6 +95,7 @@ func newConfigManager(
 		kubeClient:         kubeClient,
 		chopClient:         chopClient,
 		initConfigFilePath: initConfigFilePath,
+		stopCh:             make(chan struct{}),
 	}
 }
 
@@ -113,12 +137,20 @@ func (cm *ConfigManager) Init() error {
 	log.V(1).Info("Final CHOP config:")
 	log.V(1).Info("\n" + cm.config.String(true))
 
+	// Start secret watcher if secret is configured
+	cm.startSecretWatcher()
+
 	return nil
 }
 
 // Config is an access wrapper
 func (cm *ConfigManager) Config() *api.OperatorConfig {
 	return cm.config
+}
+
+// ChopClient returns the chopClient for accessing ClickHouse operator custom resources
+func (cm *ConfigManager) ChopClient() *chopClientSet.Clientset {
+	return cm.chopClient
 }
 
 // getAllCRBasedConfigs reads all ClickHouseOperatorConfiguration objects in specified namespace
@@ -313,7 +345,6 @@ func (cm *ConfigManager) buildConfigFromFile(configFilePath string, optional boo
 	config.Runtime.ConfigFolderPath = filepath.Dir(config.Runtime.ConfigFilePath)
 
 	return config, nil
-
 }
 
 // buildDefaultConfig returns default OperatorConfig
@@ -446,4 +477,189 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 // Postprocess performs postprocessing of the configuration
 func (cm *ConfigManager) Postprocess() {
 	cm.config.Postprocess()
+}
+
+// startSecretWatcher initializes and starts the Secret informer to watch for changes
+func (cm *ConfigManager) startSecretWatcher() {
+	// Check if secret is configured
+	secretName := cm.config.ClickHouse.Access.Secret.Name
+	if secretName == "" {
+		log.V(1).Info("No secret configured for ClickHouse access, skipping secret watcher")
+		return
+	}
+
+	// Determine namespace
+	namespace := cm.config.ClickHouse.Access.Secret.Namespace
+	if namespace == "" {
+		if cm.HasRuntimeParam(deployment.OPERATOR_POD_NAMESPACE) {
+			namespace, _ = cm.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
+		}
+	}
+
+	if namespace == "" {
+		log.V(1).Warning("Cannot determine namespace for secret watcher, skipping")
+		return
+	}
+
+	log.V(1).Info("Starting secret watcher for secret '%s/%s'", namespace, secretName)
+
+	// Create field selector to watch only the specific secret
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", secretName).String()
+
+	// Create list/watch functions
+	listWatch := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return cm.kubeClient.CoreV1().Secrets(namespace).List(context.TODO(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return cm.kubeClient.CoreV1().Secrets(namespace).Watch(context.TODO(), options)
+		},
+	}
+
+	// Create the informer
+	cm.secretInformer = cache.NewSharedIndexInformer(
+		listWatch,
+		&corev1.Secret{},
+		time.Minute*5, // Resync period
+		cache.Indexers{},
+	)
+
+	// Add event handlers
+	cm.secretInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			secret := obj.(*corev1.Secret)
+			if secret.Name == secretName {
+				log.V(1).Info("Secret '%s/%s' added, updating configuration", namespace, secretName)
+				cm.updateSecretCredentials(secret)
+			}
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			secret := newObj.(*corev1.Secret)
+			if secret.Name == secretName {
+				log.V(1).Info("Secret '%s/%s' updated, updating configuration", namespace, secretName)
+				cm.updateSecretCredentials(secret)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			secret := obj.(*corev1.Secret)
+			if secret.Name == secretName {
+				log.V(1).Warning("Secret '%s/%s' deleted, clearing credentials", namespace, secretName)
+				cm.clearSecretCredentials()
+			}
+		},
+	})
+
+	// Start the informer
+	go cm.secretInformer.Run(cm.stopCh)
+
+	// Wait for cache to sync
+	go func() {
+		if !cache.WaitForCacheSync(cm.stopCh, cm.secretInformer.HasSynced) {
+			log.V(1).Warning("Failed to sync secret informer cache")
+		} else {
+			log.V(1).Info("Secret informer cache synced successfully")
+		}
+	}()
+}
+
+// updateSecretCredentials updates the configuration with new secret data
+func (cm *ConfigManager) updateSecretCredentials(secret *corev1.Secret) {
+	cm.secretMutex.Lock()
+	defer cm.secretMutex.Unlock()
+
+	// Clear previous error state
+	cm.config.ClickHouse.Access.Secret.Runtime.Error = ""
+	cm.config.ClickHouse.Access.Secret.Runtime.Fetched = true
+
+	// Extract username and password from secret
+	for key, value := range secret.Data {
+		switch key {
+		case "username":
+			cm.config.ClickHouse.Access.Secret.Runtime.Username = string(value)
+		case "password":
+			cm.config.ClickHouse.Access.Secret.Runtime.Password = string(value)
+		}
+	}
+
+	// Post-process the configuration to apply the new credentials
+	cm.config.Postprocess()
+
+	sha256Sum := sha256.New()
+	fmt.Fprintf(sha256Sum, "%v", dump.ForHash(secret))
+	finalHash := fmt.Sprintf("%x", sha256Sum.Sum(nil))
+
+	if cm.config.CHOPSecretHash != finalHash {
+		cm.config.CHOPSecretHash = finalHash
+		log.V(1).Info("Configuration updated with new secret credentials from '%s/%s'", secret.Namespace, secret.Name)
+		// Invoke configuration change callbacks
+
+		cm.invokeConfigChangeCallbacks()
+	}
+}
+
+// clearSecretCredentials clears the secret credentials from configuration
+func (cm *ConfigManager) clearSecretCredentials() {
+	cm.secretMutex.Lock()
+	defer cm.secretMutex.Unlock()
+
+	// Clear credentials and mark as not fetched
+	cm.config.ClickHouse.Access.Secret.Runtime.Username = ""
+	cm.config.ClickHouse.Access.Secret.Runtime.Password = ""
+	cm.config.ClickHouse.Access.Secret.Runtime.Fetched = false
+	cm.config.ClickHouse.Access.Secret.Runtime.Error = "Secret was deleted"
+	cm.config.CHOPSecretHash = "" // Clear the secret hash
+
+	// Post-process the configuration
+	cm.config.Postprocess()
+
+	log.V(1).Warning("Secret credentials cleared from configuration")
+
+	// Invoke configuration change callbacks
+	cm.invokeConfigChangeCallbacks()
+}
+
+// StopSecretWatcher stops the secret watcher
+func (cm *ConfigManager) StopSecretWatcher() {
+	if cm.stopCh != nil {
+		close(cm.stopCh)
+		log.V(1).Info("Secret watcher stopped")
+	}
+}
+
+// GetConfigWithLock returns the configuration with read lock protection
+func (cm *ConfigManager) GetConfigWithLock() *api.OperatorConfig {
+	cm.secretMutex.RLock()
+	defer cm.secretMutex.RUnlock()
+	return cm.config
+}
+
+// RegisterConfigChangeCallback registers a callback to be invoked when configuration changes
+func (cm *ConfigManager) RegisterConfigChangeCallback(callback ConfigChangeCallback) {
+	cm.callbacksMutex.Lock()
+	defer cm.callbacksMutex.Unlock()
+	cm.callbacks = append(cm.callbacks, callback)
+	log.V(1).Info("Registered configuration change callback")
+}
+
+// invokeConfigChangeCallbacks invokes all registered configuration change callbacks
+func (cm *ConfigManager) invokeConfigChangeCallbacks() {
+	cm.callbacksMutex.RLock()
+	callbacks := make([]ConfigChangeCallback, len(cm.callbacks))
+	copy(callbacks, cm.callbacks)
+	cm.callbacksMutex.RUnlock()
+
+	log.V(1).Info("Invoking %d configuration change callbacks", len(callbacks))
+	for i, callback := range callbacks {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					debug.PrintStack()
+					log.V(1).Warning("Configuration change callback %d panicked: %v", i, r)
+				}
+			}()
+			callback(cm)
+		}()
+	}
 }

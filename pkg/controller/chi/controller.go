@@ -46,6 +46,7 @@ import (
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
+	chopListers "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
@@ -79,6 +80,9 @@ type Controller struct {
 	namer       interfaces.INameManager
 	ctrlLabeler *ctrlLabeler.Labeler
 	pvcDeleter  *volume.PVCDeleter
+
+	// CHI lister for accessing all CHI resources
+	chiLister chopListers.ClickHouseInstallationLister
 }
 
 // NewController creates instance of Controller
@@ -89,7 +93,6 @@ func NewController(
 	chopInformerFactory chopInformers.SharedInformerFactory,
 	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) *Controller {
-
 	// Initializations
 	_ = chopClientSetScheme.AddToScheme(scheme.Scheme)
 
@@ -121,6 +124,7 @@ func NewController(
 		kube:        kube,
 		ctrlLabeler: ctrlLabeler.New(kube),
 		pvcDeleter:  volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
+		chiLister:   chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Lister(),
 	}
 	controller.initQueues()
 	controller.addEventHandlers(chopInformerFactory, kubeInformerFactory)
@@ -130,7 +134,7 @@ func NewController(
 
 // initQueues
 func (c *Controller) initQueues() {
-	for i := 0; i < c.getQueuesNum(); i++ {
+	for range c.getQueuesNum() {
 		c.queues = append(c.queues, c.createQueue())
 	}
 }
@@ -412,7 +416,7 @@ func (c *Controller) addEventHandlersStatefulSet(
 				return
 			}
 			log.V(3).M(statefulSet).Info("statefulSetInformer.AddFunc")
-			//controller.handleObject(obj)
+			// controller.handleObject(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			statefulSet := old.(*apps.StatefulSet)
@@ -427,7 +431,7 @@ func (c *Controller) addEventHandlersStatefulSet(
 				return
 			}
 			log.V(3).M(statefulSet).Info("statefulSetInformer.DeleteFunc")
-			//controller.handleObject(obj)
+			// controller.handleObject(obj)
 		},
 	})
 }
@@ -489,7 +493,7 @@ func (c *Controller) Run(ctx context.Context) {
 	defer utilRuntime.HandleCrash()
 	defer func() {
 		for i := range c.queues {
-			//c.queues[i].ShutDown()
+			// c.queues[i].ShutDown()
 			c.queues[i].Close()
 		}
 	}()
@@ -612,7 +616,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		enqueue = true
 	}
 	if enqueue {
-		//c.queues[index].AddRateLimited(obj)
+		// c.queues[index].AddRateLimited(obj)
 		c.queues[index].Insert(obj)
 	}
 }
@@ -672,7 +676,7 @@ func (c *Controller) updateChopConfig(old, new *api.ClickHouseOperatorConfigurat
 	log.V(2).M(new).F().Info("ResourceVersion change: %s to %s", old.GetObjectMeta().GetResourceVersion(), new.GetObjectMeta().GetResourceVersion())
 	// TODO
 	// NEED REFACTORING
-	//os.Exit(0)
+	// os.Exit(0)
 
 	return nil
 }
@@ -682,7 +686,7 @@ func (c *Controller) deleteChopConfig(chopConfig *api.ClickHouseOperatorConfigur
 	log.V(2).M(chopConfig).F().P()
 	// TODO
 	// NEED REFACTORING
-	//os.Exit(0)
+	// os.Exit(0)
 
 	return nil
 }
