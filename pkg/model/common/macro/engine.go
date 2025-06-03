@@ -70,6 +70,8 @@ func (e *Engine) Replacer() *util.Replacer {
 		return e.newReplacerCluster(t)
 	case api.IShard:
 		return e.newReplacerShard(t)
+	case api.IReplica:
+		return e.newReplacerReplica(t)
 	case api.IHost:
 		return e.newReplacerHost(t)
 	}
@@ -112,6 +114,18 @@ func (e *Engine) newReplacerShard(shard api.IShard) *util.Replacer {
 		e.Get(MacrosClusterIndex): strconv.Itoa(shard.GetRuntime().GetAddress().GetClusterIndex()),
 		e.Get(MacrosShardName):    e.namer.Name(short.ShardName, shard),
 		e.Get(MacrosShardIndex):   strconv.Itoa(shard.GetRuntime().GetAddress().GetShardIndex()),
+	})
+}
+
+// newReplacerReplica
+func (e *Engine) newReplacerReplica(replica api.IReplica) *util.Replacer {
+	return util.NewReplacer(map[string]string{
+		e.Get(MacrosNamespace):    e.namer.Name(short.Namespace, replica),
+		e.Get(MacrosCRName):       e.namer.Name(short.CRName, replica),
+		e.Get(MacrosClusterName):  e.namer.Name(short.ClusterName, replica),
+		e.Get(MacrosClusterIndex): strconv.Itoa(replica.GetRuntime().GetAddress().GetClusterIndex()),
+		e.Get(MacrosReplicaName):  e.namer.Name(short.ReplicaName, replica),
+		e.Get(MacrosReplicaIndex): strconv.Itoa(replica.GetRuntime().GetAddress().GetReplicaIndex()),
 	})
 }
 
