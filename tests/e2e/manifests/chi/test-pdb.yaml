@@ -1,0 +1,48 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-pdb"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: max-un-0
+        pdbMaxUnavailable: 0
+        layout:
+          shards:
+            - name: shard0
+              replicas:
+                - name: replica0
+      - name: max-un-1
+        pdbMaxUnavailable: 1
+        layout:
+          shards:
+            - name: shard0
+              replicas:
+                - name: replica0
+      - name: min-av-1
+        pdbMinAvailable: 1
+        layout:
+          shards:
+            - name: shard0
+              replicas:
+                - name: replica0
+      - name: min-av-2
+        pdbMinAvailable: 2
+        layout:
+          shards:
+            - name: shard0
+              replicas:
+                - name: replica0
+                - name: replica1
+      - name: both-specified
+        pdbMaxUnavailable: 1
+        pdbMinAvailable: 2
+        layout:
+          shards:
+            - name: shard0
+              replicas:
+                - name: replica0
+                - name: replica1
+                - name: replica2

@@ -27,7 +27,7 @@ import (
 
 // CreatePodDisruptionBudget creates new PodDisruptionBudget
 func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDisruptionBudget {
-	return &policy.PodDisruptionBudget{
+	pdb := &policy.PodDisruptionBudget{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "PodDisruptionBudget",
 			APIVersion: "policy/v1",
@@ -49,4 +49,14 @@ func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDis
 			},
 		},
 	}
+
+	// MinAvailable and MaxUnavailable are mutually exclusive.
+	// If both are specified, MinAvailable takes precedence.
+	if cluster.GetPDBMinAvailable() != nil && cluster.GetPDBMinAvailable().HasValue() {
+		pdb.Spec.MinAvailable = &intstr.IntOrString{
+			Type:   intstr.Int,
+			IntVal: cluster.GetPDBMinAvailable().Value(),
+		}
+	}
+	return pdb
 }

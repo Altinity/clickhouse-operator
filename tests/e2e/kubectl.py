@@ -631,4 +631,15 @@ def check_pdb(chi, clusters, ns=None, shell=None):
             assert labels["clickhouse.altinity.com/chi"] == chi
             assert labels["clickhouse.altinity.com/cluster"] == c
             assert labels["clickhouse.altinity.com/namespace"] == current().context.test_namespace
-            assert pdb["spec"]["maxUnavailable"] == clusters[c]
+
+            # Check for either maxUnavailable or minAvailable
+            if isinstance(clusters[c], dict):
+                if "maxUnavailable" in clusters[c]:
+                    assert pdb["spec"]["maxUnavailable"] == clusters[c]["maxUnavailable"]
+                elif "minAvailable" in clusters[c]:
+                    assert pdb["spec"]["minAvailable"] == clusters[c]["minAvailable"]
+                else:
+                    assert False, f"Either maxUnavailable or minAvailable should be specified for cluster {c}"
+            else:
+                # For backward compatibility, treat simple integer as maxUnavailable
+                assert pdb["spec"]["maxUnavailable"] == clusters[c]

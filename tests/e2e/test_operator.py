@@ -198,6 +198,35 @@ def test_006(self):
 
 
 @TestScenario
+@Name("test_pdb. Test PDB with maxUnavailable and minAvailable")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0"),
+)
+def test_pdb(self):
+    create_shell_namespace_clickhouse_template()
+
+    kubectl.create_and_check(
+        manifest="manifests/chi/test-pdb.yaml",
+        check={
+            "object_counts": {
+                "statefulset": 5,
+                "pod": 7,
+                "service": 6,
+            },
+            "pdb": {
+                "max-un-0": {"maxUnavailable": 0},
+                "max-un-1": {"maxUnavailable": 1},
+                "min-av-1": {"minAvailable": 1},
+                "min-av-2": {"minAvailable": 2},
+                "both-specified": {"minAvailable": 2},  # minAvailable takes precedence
+            },
+        },
+    )
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
 @Name("test_007. Test template with custom clickhouse ports")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_InterServerHttpPort("1.0"),

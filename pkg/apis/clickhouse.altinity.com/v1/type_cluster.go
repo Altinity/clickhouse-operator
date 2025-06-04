@@ -30,6 +30,7 @@ type Cluster struct {
 	Secure            *types.StringBool `json:"secure,omitempty"            yaml:"secure,omitempty"`
 	Secret            *ClusterSecret    `json:"secret,omitempty"            yaml:"secret,omitempty"`
 	PDBMaxUnavailable *types.Int32      `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
+	PDBMinAvailable   *types.Int32      `json:"pdbMinAvailable,omitempty"   yaml:"pdbMinAvailable,omitempty"`
 	Layout            *ChiClusterLayout `json:"layout,omitempty"            yaml:"layout,omitempty"`
 
 	Runtime ChiClusterRuntime `json:"-" yaml:"-"`
@@ -130,6 +131,10 @@ func (cluster *Cluster) GetRuntime() IClusterRuntime {
 
 func (cluster *Cluster) GetPDBMaxUnavailable() *types.Int32 {
 	return cluster.PDBMaxUnavailable
+}
+
+func (cluster *Cluster) GetPDBMinAvailable() *types.Int32 {
+	return cluster.PDBMinAvailable
 }
 
 // FillShardReplicaSpecified fills whether shard or replicas are explicitly specified

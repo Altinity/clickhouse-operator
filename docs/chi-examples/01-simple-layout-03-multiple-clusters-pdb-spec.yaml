@@ -11,3 +11,9 @@ spec:
         # assume pdbMaxUnavailable: 1
       - name: "max-un-2"
         pdbMaxUnavailable: 2
+      - name: "min-av-1"
+        pdbMinAvailable: 1
+      - name: "min-av-2"
+        pdbMinAvailable: 2
+      - name: "min-av-3"
+        pdbMinAvailable: 3

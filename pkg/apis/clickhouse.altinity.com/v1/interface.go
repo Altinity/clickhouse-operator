@@ -114,6 +114,7 @@ type ICluster interface {
 	GetSecure() *types.StringBool
 	GetSecret() *ClusterSecret
 	GetPDBMaxUnavailable() *types.Int32
+	GetPDBMinAvailable() *types.Int32
 
 	WalkShards(f func(index int, shard IShard) error) []error
 	WalkHosts(func(host *Host) error) []error
