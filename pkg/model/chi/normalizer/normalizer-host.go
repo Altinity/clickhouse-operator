@@ -219,9 +219,9 @@ func (n *Normalizer) normalizeHost(
 		r = replica
 	}
 	host.InheritSettingsFrom(s, r)
-	host.Settings = n.normalizeConfigurationSettings(host.Settings)
+	host.Settings = n.normalizeConfigurationSettings(host.Settings, host)
 	host.InheritFilesFrom(s, r)
-	host.Files = n.normalizeConfigurationFiles(host.Files)
+	host.Files = n.normalizeConfigurationFiles(host.Files, host)
 	host.InheritTemplatesFrom(s, r)
 
 	n.normalizeHostEnvVars()

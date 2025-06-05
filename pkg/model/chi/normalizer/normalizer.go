@@ -319,11 +319,11 @@ func (n *Normalizer) normalizeConfiguration(conf *chi.Configuration) *chi.Config
 
 // normalizeConfigurationAllSettingsBasedSections normalizes Settings-based configuration
 func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *chi.Configuration) {
-	conf.Users = n.normalizeConfigurationUsers(conf.Users)
-	conf.Profiles = n.normalizeConfigurationProfiles(conf.Profiles)
-	conf.Quotas = n.normalizeConfigurationQuotas(conf.Quotas)
-	conf.Settings = n.normalizeConfigurationSettings(conf.Settings)
-	conf.Files = n.normalizeConfigurationFiles(conf.Files)
+	conf.Users = n.normalizeConfigurationUsers(conf.Users, n.req.GetTarget())
+	conf.Profiles = n.normalizeConfigurationProfiles(conf.Profiles, n.req.GetTarget())
+	conf.Quotas = n.normalizeConfigurationQuotas(conf.Quotas, n.req.GetTarget())
+	conf.Settings = n.normalizeConfigurationSettings(conf.Settings, n.req.GetTarget())
+	conf.Files = n.normalizeConfigurationFiles(conf.Files, n.req.GetTarget())
 }
 
 // normalizeTemplates normalizes .spec.templates
@@ -586,14 +586,23 @@ func clickhouseOperatorUserMacroReplacer() *util.Replacer {
 	)
 }
 
+func (n *Normalizer) replacers(scope any, additional ...*util.Replacer) []*util.Replacer {
+	var replacers []*util.Replacer
+	replacers = append(replacers, n.macro.Scope(scope).Replacer())
+	replacers = append(replacers, additional...)
+	return replacers
+}
+
+func (n *Normalizer) settingsNormalizerOptions(scope any, additional ...*util.Replacer) *chi.SettingsNormalizerOptions {
+	return &chi.SettingsNormalizerOptions{
+		Replacers: n.replacers(scope, additional...),
+	}
+}
+
 // normalizeConfigurationUsers normalizes .spec.configuration.users
-func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings) *chi.Settings {
+func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings, scope any) *chi.Settings {
 	// Ensure and normalize target user settings
-	users = users.Ensure().Normalize(&chi.SettingsNormalizerOptions{
-		Replacers: []*util.Replacer{
-			clickhouseOperatorUserMacroReplacer(),
-		},
-	})
+	users = users.Ensure().Normalize(n.settingsNormalizerOptions(scope, clickhouseOperatorUserMacroReplacer()))
 
 	// Add special "default" user to the list of users, which is used/required for:
 	//   1. ClickHouse hosts to communicate with each other
@@ -630,31 +639,31 @@ func (n *Normalizer) removePlainPassword(user *chi.SettingsUser) {
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
-func (n *Normalizer) normalizeConfigurationProfiles(profiles *chi.Settings) *chi.Settings {
+func (n *Normalizer) normalizeConfigurationProfiles(profiles *chi.Settings, scope any) *chi.Settings {
 	if profiles == nil {
 		return nil
 	}
-	profiles.Normalize()
+	profiles.Normalize(n.settingsNormalizerOptions(scope))
 	return profiles
 }
 
 // normalizeConfigurationQuotas normalizes .spec.configuration.quotas
-func (n *Normalizer) normalizeConfigurationQuotas(quotas *chi.Settings) *chi.Settings {
+func (n *Normalizer) normalizeConfigurationQuotas(quotas *chi.Settings, scope any) *chi.Settings {
 	if quotas == nil {
 		return nil
 	}
-	quotas.Normalize()
+	quotas.Normalize(n.settingsNormalizerOptions(scope))
 	return quotas
 }
 
 const envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS"
 
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
-func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings) *chi.Settings {
+func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings, scope any) *chi.Settings {
 	if settings == nil {
 		return nil
 	}
-	settings.Normalize()
+	settings.Normalize(n.settingsNormalizerOptions(scope))
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
 		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings, false)
@@ -663,11 +672,11 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings) *chi
 }
 
 // normalizeConfigurationFiles normalizes .spec.configuration.files
-func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings) *chi.Settings {
+func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings, scope any) *chi.Settings {
 	if files == nil {
 		return nil
 	}
-	files.Normalize()
+	files.Normalize(n.settingsNormalizerOptions(scope))
 
 	files.WalkSafe(func(key string, setting *chi.Setting) {
 		subst.ReplaceSettingsFieldWithMountedFile(n.req, files, key)
@@ -702,8 +711,8 @@ func (n *Normalizer) normalizeCluster(cluster *chi.Cluster) *chi.Cluster {
 	cluster.InheritTemplatesFrom(n.req.GetTarget())
 
 	cluster.Zookeeper = n.normalizeConfigurationZookeeper(cluster.Zookeeper)
-	cluster.Settings = n.normalizeConfigurationSettings(cluster.Settings)
-	cluster.Files = n.normalizeConfigurationFiles(cluster.Files)
+	cluster.Settings = n.normalizeConfigurationSettings(cluster.Settings, cluster)
+	cluster.Files = n.normalizeConfigurationFiles(cluster.Files, cluster)
 
 	cluster.SchemaPolicy = n.normalizeClusterSchemaPolicy(cluster.SchemaPolicy)
 	cluster.PDBMaxUnavailable = n.normalizePDBMaxUnavailable(cluster.PDBMaxUnavailable)
@@ -911,9 +920,9 @@ func (n *Normalizer) normalizeShard(shard *chi.ChiShard, cluster *chi.Cluster, s
 	n.normalizeShardWeight(shard)
 	// For each shard of this normalized cluster inherit from cluster
 	shard.InheritSettingsFrom(cluster)
-	shard.Settings = n.normalizeConfigurationSettings(shard.Settings)
+	shard.Settings = n.normalizeConfigurationSettings(shard.Settings, shard)
 	shard.InheritFilesFrom(cluster)
-	shard.Files = n.normalizeConfigurationFiles(shard.Files)
+	shard.Files = n.normalizeConfigurationFiles(shard.Files, shard)
 	shard.InheritTemplatesFrom(cluster)
 	// Normalize Replicas
 	n.normalizeShardReplicasCount(shard, cluster.Layout.ReplicasCount)
@@ -927,9 +936,9 @@ func (n *Normalizer) normalizeReplica(replica *chi.ChiReplica, cluster *chi.Clus
 	n.normalizeReplicaName(replica, replicaIndex)
 	// For each replica of this normalized cluster inherit from cluster
 	replica.InheritSettingsFrom(cluster)
-	replica.Settings = n.normalizeConfigurationSettings(replica.Settings)
+	replica.Settings = n.normalizeConfigurationSettings(replica.Settings, replica)
 	replica.InheritFilesFrom(cluster)
-	replica.Files = n.normalizeConfigurationFiles(replica.Files)
+	replica.Files = n.normalizeConfigurationFiles(replica.Files, replica)
 	replica.InheritTemplatesFrom(cluster)
 	// Normalize Shards
 	n.normalizeReplicaShardsCount(replica, cluster.Layout.ShardsCount)
