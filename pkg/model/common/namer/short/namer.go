@@ -82,8 +82,7 @@ func (n *Namer) Name(what NameType, params ...any) string {
 	case ShardName:
 		return n.getNamePartShardName(params[0])
 	case ReplicaName:
-		host := params[0].(*api.Host)
-		return n.getNamePartReplicaName(host)
+		return n.getNamePartReplicaName(params[0])
 	case HostName:
 		host := params[0].(*api.Host)
 		return n.getNamePartHostName(host)
@@ -196,8 +195,17 @@ func (n *Namer) getNamePartShardName(obj interface{}) string {
 }
 
 // getNamePartReplicaName
-func (n *Namer) getNamePartReplicaName(host *api.Host) string {
-	return n.namePartReplicaName(host.GetRuntime().GetAddress().GetReplicaName())
+func (n *Namer) getNamePartReplicaName(obj interface{}) string {
+	switch obj.(type) {
+	case api.IReplica:
+		replica := obj.(api.IReplica)
+		return n.namePartReplicaName(replica.GetRuntime().GetAddress().GetReplicaName())
+	case *api.Host:
+		host := obj.(*api.Host)
+		return n.namePartShardName(host.GetRuntime().GetAddress().GetReplicaName())
+	}
+
+	return "ERROR"
 }
 
 // getNamePartHostName
