@@ -363,6 +363,8 @@ func (n *Normalizer) normalizeReconciling(reconciling *chi.Reconciling) *chi.Rec
 	if reconciling == nil {
 		reconciling = chi.NewReconciling().SetDefaults()
 	}
+
+	// Policy
 	switch strings.ToLower(reconciling.GetPolicy()) {
 	case strings.ToLower(chi.ReconcilingPolicyWait):
 		// Known value, overwrite it to ensure case-ness
@@ -374,7 +376,18 @@ func (n *Normalizer) normalizeReconciling(reconciling *chi.Reconciling) *chi.Rec
 		// Unknown value, fallback to default
 		reconciling.SetPolicy(chi.ReconcilingPolicyUnspecified)
 	}
+
+	// ConfigMapPropagationTimeout
+	// No normalization yet
+
+	// Cleanup
 	reconciling.SetCleanup(n.normalizeReconcilingCleanup(reconciling.GetCleanup()))
+
+	// Runtime
+	// No normalization yet
+	// Macros
+	// No normalization yet
+
 	return reconciling
 }
 
@@ -586,23 +599,64 @@ func clickhouseOperatorUserMacroReplacer() *util.Replacer {
 	)
 }
 
-func (n *Normalizer) replacers(scope any, additional ...*util.Replacer) []*util.Replacer {
+type replacerSection string
+
+var (
+	replacerFiles    replacerSection = "files"
+	replacerProfiles replacerSection = "profiles"
+	replacerQuotas   replacerSection = "quotas"
+	replacerSettings replacerSection = "settings"
+	replacerUsers    replacerSection = "users"
+)
+
+func (n *Normalizer) replacers(section replacerSection, scope any, additional ...*util.Replacer) []*util.Replacer {
+	scoped := false
 	var replacers []*util.Replacer
-	replacers = append(replacers, n.macro.Scope(scope).Replacer())
+	sections := n.req.GetTarget().Spec.Reconciling.Macros.Sections
+	switch section {
+	case replacerFiles:
+		if sections.Files.Enabled.IsTrue() {
+			scoped = true
+		}
+		break
+	case replacerProfiles:
+		if sections.Profiles.Enabled.IsTrue() {
+			scoped = true
+		}
+		break
+	case replacerQuotas:
+		if sections.Quotas.Enabled.IsTrue() {
+			scoped = true
+		}
+		break
+	case replacerSettings:
+		if sections.Settings.Enabled.IsTrue() {
+			scoped = true
+		}
+		break
+	case replacerUsers:
+		if sections.Users.Enabled.IsTrue() {
+			scoped = true
+		}
+		break
+	}
+	if scoped {
+		replacers = append(replacers, n.macro.Scope(scope).Replacer())
+	}
 	replacers = append(replacers, additional...)
 	return replacers
 }
 
-func (n *Normalizer) settingsNormalizerOptions(scope any, additional ...*util.Replacer) *chi.SettingsNormalizerOptions {
+func (n *Normalizer) settingsNormalizerOptions(section replacerSection, scope any, additional ...*util.Replacer) *chi.SettingsNormalizerOptions {
 	return &chi.SettingsNormalizerOptions{
-		Replacers: n.replacers(scope, additional...),
+		Replacers: n.replacers(section, scope, additional...),
 	}
 }
 
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings, scope any) *chi.Settings {
 	// Ensure and normalize target user settings
-	users = users.Ensure().Normalize(n.settingsNormalizerOptions(scope, clickhouseOperatorUserMacroReplacer()))
+	users = users.Ensure().Normalize(n.settingsNormalizerOptions(replacerUsers, scope, clickhouseOperatorUserMacroReplacer()))
 
 	// Add special "default" user to the list of users, which is used/required for:
 	//   1. ClickHouse hosts to communicate with each other
@@ -643,7 +697,7 @@ func (n *Normalizer) normalizeConfigurationProfiles(profiles *chi.Settings, scop
 	if profiles == nil {
 		return nil
 	}
-	profiles.Normalize(n.settingsNormalizerOptions(scope))
+	profiles.Normalize(n.settingsNormalizerOptions(replacerProfiles, scope))
 	return profiles
 }
 
@@ -652,7 +706,7 @@ func (n *Normalizer) normalizeConfigurationQuotas(quotas *chi.Settings, scope an
 	if quotas == nil {
 		return nil
 	}
-	quotas.Normalize(n.settingsNormalizerOptions(scope))
+	quotas.Normalize(n.settingsNormalizerOptions(replacerQuotas, scope))
 	return quotas
 }
 
@@ -663,7 +717,7 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings, scop
 	if settings == nil {
 		return nil
 	}
-	settings.Normalize(n.settingsNormalizerOptions(scope))
+	settings.Normalize(n.settingsNormalizerOptions(replacerSettings, scope))
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
 		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings, false)
@@ -676,7 +730,7 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings, scope any)
 	if files == nil {
 		return nil
 	}
-	files.Normalize(n.settingsNormalizerOptions(scope))
+	files.Normalize(n.settingsNormalizerOptions(replacerFiles, scope))
 
 	files.WalkSafe(func(key string, setting *chi.Setting) {
 		subst.ReplaceSettingsFieldWithMountedFile(n.req, files, key)
