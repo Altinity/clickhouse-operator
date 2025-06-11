@@ -104,6 +104,20 @@ spec:
       # Max percentage of concurrent shard reconciles within one cluster in progress
       reconcileShardsMaxConcurrencyPercent: 50
 
+    macros:
+      setions:
+        users:
+          enabled: yes
+        profiles:
+          enabled: yes
+        quotas:
+          enabled: yes
+        settings:
+          enabled: yes
+        files:
+          enabled: yes
+
+
   # List of templates used by a CHI
   useTemplates:
     - name: template1
