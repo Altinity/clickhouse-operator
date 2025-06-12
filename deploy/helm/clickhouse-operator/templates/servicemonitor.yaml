@@ -13,16 +13,12 @@ metadata:
 spec:
   endpoints:
     - port: clickhouse-metrics # 8888
+      {{- include "altinity-clickhouse-operator.serviceMonitorEndpointConfig" . | nindent 6 }}
     - port: operator-metrics # 9999
+      {{- include "altinity-clickhouse-operator.serviceMonitorEndpointConfig" . | nindent 6 }}
   selector:
     matchLabels:
       {{- include "altinity-clickhouse-operator.selectorLabels" . | nindent 6 }}
-  {{- with .Values.serviceMonitor.interval }}
-  interval: {{ . }}
-  {{- end }}
-  {{- with .Values.serviceMonitor.scrapeTimeout }}
-  scrapeTimeout: {{ . }}
-  {{- end }}
   {{- with .Values.serviceMonitor.relabelings }}
   relabelings:
     {{- toYaml . | nindent 8 }}

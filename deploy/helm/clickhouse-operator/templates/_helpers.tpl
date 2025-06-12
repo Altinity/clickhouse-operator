@@ -84,6 +84,18 @@ Create the name of the service account to use
 {{- end -}}
 
 {{/*
+Create common config for ServiceMonitor endpoints
+*/}}
+{{- define "altinity-clickhouse-operator.serviceMonitorEndpointConfig" -}}
+{{- with .Values.serviceMonitor.interval -}}
+interval: {{ . }}
+{{- end }}
+{{- with .Values.serviceMonitor.scrapeTimeout }}
+scrapeTimeout: {{ . }}
+{{- end }}
+{{- end -}}
+
+{{/*
 Create the tag for the docker image to use
 */}}
 {{- define "altinity-clickhouse-operator.operator.tag" -}}
