@@ -15,6 +15,7 @@
 package normalizer
 
 import (
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"sort"
 	"strings"
 
@@ -609,39 +610,47 @@ var (
 	replacerUsers    replacerSection = "users"
 )
 
-func (n *Normalizer) replacers(section replacerSection, scope any, additional ...*util.Replacer) []*util.Replacer {
+func (n *Normalizer) replacers(section replacerSection, scope any, additional ...*util.Replacer) (replacers []*util.Replacer) {
 	scoped := false
-	var replacers []*util.Replacer
 	sections := n.req.GetTarget().Spec.Reconciling.Macros.Sections
+
 	switch section {
 	case replacerFiles:
 		if sections.Files.Enabled.IsTrue() {
+			log.V(2).M(scope).F().Info("macros enabled for files")
 			scoped = true
 		}
 		break
 	case replacerProfiles:
 		if sections.Profiles.Enabled.IsTrue() {
+			log.V(2).M(scope).F().Info("macros enabled for profiles")
 			scoped = true
 		}
 		break
 	case replacerQuotas:
 		if sections.Quotas.Enabled.IsTrue() {
+			log.V(2).M(scope).F().Info("macros enabled for quotas")
 			scoped = true
 		}
 		break
 	case replacerSettings:
 		if sections.Settings.Enabled.IsTrue() {
+			log.V(2).M(scope).F().Info("macros enabled for settings")
 			scoped = true
 		}
 		break
 	case replacerUsers:
 		if sections.Users.Enabled.IsTrue() {
+			log.V(2).M(scope).F().Info("macros enabled for users")
 			scoped = true
 		}
 		break
 	}
 	if scoped {
 		replacers = append(replacers, n.macro.Scope(scope).Replacer())
+		log.V(2).M(scope).F().Info("macros enabled for section: %s", section)
+	} else {
+		log.V(2).M(scope).F().Info("no macros enabled for section: %s", section)
 	}
 	replacers = append(replacers, additional...)
 	return replacers
