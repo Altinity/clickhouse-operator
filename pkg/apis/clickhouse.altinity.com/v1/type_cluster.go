@@ -41,8 +41,8 @@ type ClusterReconcile struct {
 }
 
 type ReconcileRuntime struct {
-	ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
-	ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
+	ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber,omitempty"         yaml:"reconcileShardsThreadsNumber,omitempty"`
+	ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent,omitempty" yaml:"reconcileShardsMaxConcurrencyPercent,omitempty"`
 }
 
 func (r ReconcileRuntime) MergeFrom(from ReconcileRuntime, _type MergeType) ReconcileRuntime {
