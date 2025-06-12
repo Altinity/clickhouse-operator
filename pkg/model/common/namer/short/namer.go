@@ -172,6 +172,9 @@ func (n *Namer) getNamePartClusterName(obj interface{}) string {
 	case api.IShard:
 		shard := obj.(api.IShard)
 		return n.namePartClusterName(shard.GetRuntime().GetAddress().GetClusterName())
+	case api.IReplica:
+		replica := obj.(api.IReplica)
+		return n.namePartClusterName(replica.GetRuntime().GetAddress().GetClusterName())
 	case *api.Host:
 		host := obj.(*api.Host)
 		return n.namePartClusterName(host.GetRuntime().GetAddress().GetClusterName())
