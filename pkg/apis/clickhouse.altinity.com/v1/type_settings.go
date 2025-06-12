@@ -22,12 +22,10 @@ import (
 	"sort"
 	"strings"
 
-	"gopkg.in/d4l3k/messagediff.v1"
-	"gopkg.in/yaml.v3"
-
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/xml"
+	"gopkg.in/d4l3k/messagediff.v1"
 )
 
 // Specify returned errors for being re-used
@@ -56,6 +54,14 @@ type Settings struct {
 	// Implements 'Strategy' pattern.
 	converter SettingsName2KeyConverter `json:"-" yaml:"-" testdiff:"ignore"`
 }
+
+var (
+	// unimplemented
+	//_ yaml.Marshaler   = &Settings{}
+	//_ yaml.Unmarshaler = &Settings{}
+	_ json.Marshaler   = &Settings{}
+	_ json.Unmarshaler = &Settings{}
+)
 
 // NewSettings creates new settings
 func NewSettings() *Settings {
@@ -341,15 +347,15 @@ func (s *Settings) MarshalJSON() ([]byte, error) {
 	return s.marshal(json.Marshal)
 }
 
-// UnmarshalYAML unmarshal YAML
-func (s *Settings) UnmarshalYAML(data []byte) error {
-	return s.unmarshal(data, yaml.Unmarshal)
-}
+//// UnmarshalYAML unmarshal YAML
+//func (s *Settings) UnmarshalYAML(data []byte) error {
+//	return s.unmarshal(data, yaml.Unmarshal)
+//}
 
-// MarshalYAML marshals YAML
-func (s *Settings) MarshalYAML() ([]byte, error) {
-	return s.marshal(yaml.Marshal)
-}
+//// MarshalYAML marshals YAML
+//func (s *Settings) MarshalYAML() ([]byte, error) {
+//	return s.marshal(yaml.Marshal)
+//}
 
 // unmarshal
 func (s *Settings) unmarshal(data []byte, unmarshaller func(data []byte, v any) error) error {
@@ -373,24 +379,13 @@ func (s *Settings) unmarshal(data []byte, unmarshaller func(data []byte, v any) 
 
 	// Create entries from untyped map in result settings
 	for key, untyped := range untypedMap {
-		if scalarSetting, ok := NewSettingScalarFromAny(untyped); ok && scalarSetting.HasValue() {
-			s.SetKey(key, scalarSetting)
-			continue // for
+		if setting, err := NewSettingFromAny(untyped); err == nil {
+			s.SetKey(key, setting)
+		} else {
+			// Unknown type of entry in untyped map
+			// Should error be reported?
+			// Skip for now
 		}
-
-		if vectorSetting, ok := NewSettingVectorFromAny(untyped); ok && vectorSetting.HasValue() {
-			s.SetKey(key, vectorSetting)
-			continue // for
-		}
-
-		if srcSetting, ok := NewSettingSourceFromAny(untyped); ok && srcSetting.HasValue() {
-			s.SetKey(key, srcSetting)
-			continue // for
-		}
-
-		// Unknown type of entry in untyped map
-		// Should error be reported?
-		// Skip for now
 	}
 
 	return nil
@@ -402,7 +397,7 @@ func (s *Settings) marshal(marshaller func(v any) ([]byte, error)) ([]byte, erro
 		return marshaller(nil)
 	}
 
-	raw := make(map[string]interface{})
+	raw := make(map[string]any)
 	s.WalkKeys(func(key string, setting *Setting) {
 		raw[key] = setting.AsAny()
 	})
@@ -456,23 +451,23 @@ func (s *Settings) MergeFrom(from *Settings) *Settings {
 		return s
 	}
 
-	from.Walk(func(name string, value *Setting) {
-		s = s.Ensure().SetIfNotExists(name, value)
+	from.Walk(func(key string, setting *Setting) {
+		s = s.Ensure().SetIfNotExists(key, setting.Clone())
 	})
 
 	return s
 }
 
 // MergeFromCB merges settings from src approved by filtering callback function
-func (s *Settings) MergeFromCB(src *Settings, filter func(name string, setting *Setting) bool) *Settings {
+func (s *Settings) MergeFromCB(src *Settings, filter func(key string, setting *Setting) bool) *Settings {
 	if src.Len() == 0 {
 		return s
 	}
 
-	src.Walk(func(name string, value *Setting) {
-		if filter(name, value) {
+	src.Walk(func(key string, setting *Setting) {
+		if filter(key, setting) {
 			// Accept this setting
-			s = s.Ensure().Set(name, value)
+			s = s.Ensure().Set(key, setting.Clone())
 		}
 	})
 
