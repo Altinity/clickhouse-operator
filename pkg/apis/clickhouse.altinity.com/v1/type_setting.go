@@ -15,10 +15,9 @@
 package v1
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -55,7 +54,29 @@ const (
 )
 
 // Ensure required interface implementation
-var _ yaml.Marshaler = &Setting{}
+var (
+	// unimplemented
+	//_ yaml.Marshaler = &Setting{}
+	//_ yaml.Unmarshaler = &Setting{}
+	_ json.Marshaler   = &Setting{}
+	_ json.Unmarshaler = &Setting{}
+)
+
+func NewSettingFromAny(untyped any) (*Setting, error) {
+	if scalarSetting, ok := NewSettingScalarFromAny(untyped); ok && scalarSetting.HasValue() {
+		return scalarSetting, nil
+	}
+
+	if vectorSetting, ok := NewSettingVectorFromAny(untyped); ok && vectorSetting.HasValue() {
+		return vectorSetting, nil
+	}
+
+	if srcSetting, ok := NewSettingSourceFromAny(untyped); ok && srcSetting.HasValue() {
+		return srcSetting, nil
+	}
+
+	return nil, fmt.Errorf("unable to unmarshal setting")
+}
 
 func (s *Setting) IsEmpty() bool {
 	return s == nil
@@ -231,11 +252,6 @@ func (s *Setting) StringFull() string {
 	return s.String() + attributes
 }
 
-// MarshalYAML implements yaml.Marshaler interface
-func (s *Setting) MarshalYAML() (interface{}, error) {
-	return s.String(), nil
-}
-
 // CastToVector returns either Setting in case it is vector or newly created Setting with value casted to VectorOfStrings
 func (s *Setting) CastToVector() *Setting {
 	if s == nil {
@@ -317,4 +333,76 @@ func (s *Setting) IsEmbed() bool {
 		return false
 	}
 	return s.embed
+}
+
+// UnmarshalJSON unmarshal JSON
+func (s *Setting) UnmarshalJSON(data []byte) error {
+	return s.Unmarshal(data, json.Unmarshal)
+}
+
+// MarshalJSON marshals JSON
+func (s *Setting) MarshalJSON() ([]byte, error) {
+	return s.marshal(json.Marshal)
+}
+
+//// UnmarshalYAML unmarshal YAML
+//func (s *Setting) UnmarshalYAML(data []byte) error {
+//	return s.Unmarshal(data, yaml.Unmarshal)
+//}
+//
+//// MarshalYAML marshals YAML
+//func (s *Setting) MarshalYAML() ([]byte, error) {
+//	return s.marshal(yaml.Marshal)
+//}
+
+// unmarshal
+func (s *Setting) Unmarshal(data []byte, unmarshaller func(data []byte, v any) error) error {
+	if s == nil {
+		return fmt.Errorf("unable to unmarshal into nil")
+	}
+
+	// Prepare untyped map at first
+	var untyped any
+
+	// Provided binary data is expected to unmarshal into untyped map, because settings are map-like struct
+	if err := unmarshaller(data, &untyped); err != nil {
+		return err
+	}
+
+	// Build setting from untyped var
+	setting, err := NewSettingFromAny(untyped)
+	if err != nil {
+		return err
+	}
+
+	// Copy typed value
+	*s = *setting
+	return nil
+}
+
+// marshal
+func (s *Setting) marshal(marshaller func(v any) ([]byte, error)) ([]byte, error) {
+	return marshaller(s.AsAny())
+}
+
+func (s *Setting) Clone() *Setting {
+	if s == nil {
+		return nil
+	}
+
+	// Build json bytes
+	bytes, err := s.MarshalJSON()
+	if err != nil {
+		return nil
+	}
+
+	// Fill clone with unmarshalled value
+	clone := &Setting{}
+	err = clone.UnmarshalJSON(bytes)
+	if err != nil {
+		return nil
+	}
+
+	// Clone is ready
+	return clone
 }
