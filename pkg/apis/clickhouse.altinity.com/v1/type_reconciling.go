@@ -29,7 +29,7 @@ type Reconciling struct {
 	// Cleanup specifies cleanup behavior
 	Cleanup *Cleanup `json:"cleanup,omitempty" yaml:"cleanup,omitempty"`
 	// Runtime specifies runtime settings
-	Runtime ReconcileRuntime `json:"runtime" yaml:"runtime"`
+	Runtime ReconcileRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
 	Macros  Macros           `json:"macros,omitempty" yaml:"macros,omitempty"`
 }
 
@@ -58,15 +58,15 @@ type MacrosSections struct {
 // MergeFrom merges from specified reconciling
 func (t MacrosSections) MergeFrom(from MacrosSections, _type MergeType) MacrosSections {
 	t.Users = t.Users.MergeFrom(from.Users, _type)
-	t.Profiles = t.Users.MergeFrom(from.Profiles, _type)
-	t.Quotas = t.Users.MergeFrom(from.Quotas, _type)
-	t.Settings = t.Users.MergeFrom(from.Settings, _type)
-	t.Files = t.Users.MergeFrom(from.Files, _type)
+	t.Profiles = t.Profiles.MergeFrom(from.Profiles, _type)
+	t.Quotas = t.Quotas.MergeFrom(from.Quotas, _type)
+	t.Settings = t.Settings.MergeFrom(from.Settings, _type)
+	t.Files = t.Files.MergeFrom(from.Files, _type)
 	return t
 }
 
 type MacrosSection struct {
-	Enabled *types.StringBool
+	Enabled *types.StringBool `json:"enabled,omitempty"    yaml:"enabled,omitempty"`
 }
 
 // MergeFrom merges from specified reconciling
