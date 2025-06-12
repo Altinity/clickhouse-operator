@@ -454,7 +454,49 @@ spec:
                           minimum: 0
                           maximum: 100
                           description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
-
+                    macros:
+                      type: object
+                      description: "macros parameters"
+                      properties:
+                        setions:
+                          type: object
+                          description: "sections behaviour for macros"
+                          properties:
+                            users:
+                              description: "sections behaviour for macros on users"
+                              type: object
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            profiles:
+                              description: "sections behaviour for macros on profiles"
+                              type: object
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            quotas:
+                              description: "sections behaviour for macros on quotas"
+                              type: object
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            settings:
+                              description: "sections behaviour for macros on settings"
+                              type: object
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            files:
+                              description: "sections behaviour for macros on files"
+                              type: object
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
                 defaults:
                   type: object
                   description: |
@@ -1790,7 +1832,49 @@ spec:
                           minimum: 0
                           maximum: 100
                           description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
-
+                    macros:
+                      type: object
+                      description: "macros parameters"
+                      properties:
+                        setions:
+                          type: object
+                          description: "sections behaviour for macros"
+                          properties:
+                            users:
+                              description: "sections behaviour for macros on users"
+                              type: object
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            profiles:
+                              description: "sections behaviour for macros on profiles"
+                              type: object
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            quotas:
+                              description: "sections behaviour for macros on quotas"
+                              type: object
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            settings:
+                              description: "sections behaviour for macros on settings"
+                              type: object
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            files:
+                              description: "sections behaviour for macros on files"
+                              type: object
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
                 defaults:
                   type: object
                   description: |
