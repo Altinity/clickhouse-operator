@@ -535,13 +535,13 @@ spec:
                       type: object
                       description: "macros parameters"
                       properties:
-                        setions:
+                        sections:
                           type: object
                           description: "sections behaviour for macros"
                           properties:
                             users:
-                              description: "sections behaviour for macros on users"
                               type: object
+                              description: "sections behaviour for macros on users"
                               properties:
                                 enabled:
                                   type: string
@@ -572,8 +572,8 @@ spec:
                                     - "enabled"
                                   description: "enabled or not"
                             profiles:
-                              description: "sections behaviour for macros on profiles"
                               type: object
+                              description: "sections behaviour for macros on profiles"
                               properties:
                                 enabled:
                                   type: string
@@ -604,8 +604,8 @@ spec:
                                     - "enabled"
                                   description: "enabled or not"
                             quotas:
-                              description: "sections behaviour for macros on quotas"
                               type: object
+                              description: "sections behaviour for macros on quotas"
                               properties:
                                 enabled:
                                   type: string
@@ -636,8 +636,8 @@ spec:
                                     - "enabled"
                                   description: "enabled or not"
                             settings:
-                              description: "sections behaviour for macros on settings"
                               type: object
+                              description: "sections behaviour for macros on settings"
                               properties:
                                 enabled:
                                   type: string
@@ -668,8 +668,8 @@ spec:
                                     - "enabled"
                                   description: "enabled or not"
                             files:
-                              description: "sections behaviour for macros on files"
                               type: object
+                              description: "sections behaviour for macros on files"
                               properties:
                                 enabled:
                                   type: string
@@ -2727,13 +2727,13 @@ spec:
                       type: object
                       description: "macros parameters"
                       properties:
-                        setions:
+                        sections:
                           type: object
                           description: "sections behaviour for macros"
                           properties:
                             users:
-                              description: "sections behaviour for macros on users"
                               type: object
+                              description: "sections behaviour for macros on users"
                               properties:
                                 enabled:
                                   type: string
@@ -2764,8 +2764,8 @@ spec:
                                     - "enabled"
                                   description: "enabled or not"
                             profiles:
-                              description: "sections behaviour for macros on profiles"
                               type: object
+                              description: "sections behaviour for macros on profiles"
                               properties:
                                 enabled:
                                   type: string
@@ -2796,8 +2796,8 @@ spec:
                                     - "enabled"
                                   description: "enabled or not"
                             quotas:
-                              description: "sections behaviour for macros on quotas"
                               type: object
+                              description: "sections behaviour for macros on quotas"
                               properties:
                                 enabled:
                                   type: string
@@ -2828,8 +2828,8 @@ spec:
                                     - "enabled"
                                   description: "enabled or not"
                             settings:
-                              description: "sections behaviour for macros on settings"
                               type: object
+                              description: "sections behaviour for macros on settings"
                               properties:
                                 enabled:
                                   type: string
@@ -2860,8 +2860,8 @@ spec:
                                     - "enabled"
                                   description: "enabled or not"
                             files:
-                              description: "sections behaviour for macros on files"
                               type: object
+                              description: "sections behaviour for macros on files"
                               properties:
                                 enabled:
                                   type: string
