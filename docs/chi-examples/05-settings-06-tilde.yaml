@@ -5,7 +5,6 @@ metadata:
 spec:
   configuration:
     users:
-      # test user has 'password' specified, while admin user has 'password_sha256_hex' specified
       test/password: qwerty
       test/networks/ip:
         - "127.0.0.1/32"

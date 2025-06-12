@@ -1,0 +1,117 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: "macros"
+
+spec:
+  configuration:
+    files:
+      simple_1.file: |
+        <yandex>
+          <!-- simple_1.file goes into {common} -->
+        </yandex>
+      "{common}/common_prefixed_1.file": |
+        <yandex>
+          <!-- common_prefixed_1.file -->
+          <!-- macros
+            # 1. {chi} - ClickHouseInstallation name
+            # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+            # 3. {cluster} - cluster name
+            # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+            # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+            # 6. {shard} - shard name
+            # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
+            # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+            # 9. {replica} - replica name
+            # 10. {replicaID} - short hashed replica name (BEWARE, this is an experimental feature)
+            # 11. {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
+            # 12. {chiScopeIndex} - 0-based index of the host in the chi (BEWARE, this is an experimental feature)
+            # 13. {chiScopeCycleIndex} - 0-based index of the host's cycle in the chi-scope (BEWARE, this is an experimental feature)
+            # 14. {chiScopeCycleOffset} - 0-based offset of the host in the chi-scope cycle (BEWARE, this is an experimental feature)
+            # 15. {clusterScopeIndex} - 0-based index of the host in the cluster (BEWARE, this is an experimental feature)
+            # 16. {clusterScopeCycleIndex} - 0-based index of the host's cycle in the cluster-scope (BEWARE, this is an experimental feature)
+            # 17. {clusterScopeCycleOffset} - 0-based offset of the host in the cluster-scope cycle (BEWARE, this is an experimental feature)
+            # 18. {shardScopeIndex} - 0-based index of the host in the shard (BEWARE, this is an experimental feature)
+            # 19. {replicaScopeIndex} - 0-based index of the host in the replica (BEWARE, this is an experimental feature)
+            # 20. {clusterScopeCycleHeadPointsToPreviousCycleTail} - 0-based cluster-scope index of previous cycle tail
+          -->
+        </yandex>
+      "{users}/users_prefixed_1.file": |
+        <yandex>
+          <!-- users_prefixed_1.file -->
+          <!-- macros
+            # 1. {chi} - ClickHouseInstallation name
+            # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+            # 3. {cluster} - cluster name
+            # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+            # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+            # 6. {shard} - shard name
+            # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
+            # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+            # 9. {replica} - replica name
+            # 10. {replicaID} - short hashed replica name (BEWARE, this is an experimental feature)
+            # 11. {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
+            # 12. {chiScopeIndex} - 0-based index of the host in the chi (BEWARE, this is an experimental feature)
+            # 13. {chiScopeCycleIndex} - 0-based index of the host's cycle in the chi-scope (BEWARE, this is an experimental feature)
+            # 14. {chiScopeCycleOffset} - 0-based offset of the host in the chi-scope cycle (BEWARE, this is an experimental feature)
+            # 15. {clusterScopeIndex} - 0-based index of the host in the cluster (BEWARE, this is an experimental feature)
+            # 16. {clusterScopeCycleIndex} - 0-based index of the host's cycle in the cluster-scope (BEWARE, this is an experimental feature)
+            # 17. {clusterScopeCycleOffset} - 0-based offset of the host in the cluster-scope cycle (BEWARE, this is an experimental feature)
+            # 18. {shardScopeIndex} - 0-based index of the host in the shard (BEWARE, this is an experimental feature)
+            # 19. {replicaScopeIndex} - 0-based index of the host in the replica (BEWARE, this is an experimental feature)
+            # 20. {clusterScopeCycleHeadPointsToPreviousCycleTail} - 0-based cluster-scope index of previous cycle tail
+          -->
+        </yandex>
+      "{host}/host_prefixed_1.file": |
+        <yandex>
+          <!-- host_prefixed_1.file -->
+          <!-- macros
+            # 1. {chi} - ClickHouseInstallation name
+            # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+            # 3. {cluster} - cluster name
+            # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+            # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+            # 6. {shard} - shard name
+            # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
+            # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+            # 9. {replica} - replica name
+            # 10. {replicaID} - short hashed replica name (BEWARE, this is an experimental feature)
+            # 11. {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
+            # 12. {chiScopeIndex} - 0-based index of the host in the chi (BEWARE, this is an experimental feature)
+            # 13. {chiScopeCycleIndex} - 0-based index of the host's cycle in the chi-scope (BEWARE, this is an experimental feature)
+            # 14. {chiScopeCycleOffset} - 0-based offset of the host in the chi-scope cycle (BEWARE, this is an experimental feature)
+            # 15. {clusterScopeIndex} - 0-based index of the host in the cluster (BEWARE, this is an experimental feature)
+            # 16. {clusterScopeCycleIndex} - 0-based index of the host's cycle in the cluster-scope (BEWARE, this is an experimental feature)
+            # 17. {clusterScopeCycleOffset} - 0-based offset of the host in the cluster-scope cycle (BEWARE, this is an experimental feature)
+            # 18. {shardScopeIndex} - 0-based index of the host in the shard (BEWARE, this is an experimental feature)
+            # 19. {replicaScopeIndex} - 0-based index of the host in the replica (BEWARE, this is an experimental feature)
+            # 20. {clusterScopeCycleHeadPointsToPreviousCycleTail} - 0-based cluster-scope index of previous cycle tail
+          -->
+        </yandex>
+
+    clusters:
+      - name: "c1"
+        layout:
+          shardsCount: 2
+          replicasCount: 2
+
+  reconciling:
+    runtime:
+      reconcileShardsThreadsNumber: 10
+      reconcileShardsMaxConcurrencyPercent: 50
+    macros:
+      sections:
+        users:
+          enabled: "yes"
+        profiles:
+          enabled: "yes"
+        quotas:
+          enabled: "yes"
+        settings:
+          enabled: "yes"
+        files:
+          enabled: "yes"
+
+  defaults:
+    replicasUseFQDN: "yes"

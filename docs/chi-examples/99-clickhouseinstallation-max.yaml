@@ -105,17 +105,17 @@ spec:
       reconcileShardsMaxConcurrencyPercent: 50
 
     macros:
-      setions:
+      sections:
         users:
-          enabled: yes
+          enabled: "yes"
         profiles:
-          enabled: yes
+          enabled: "yes"
         quotas:
-          enabled: yes
+          enabled: "yes"
         settings:
-          enabled: yes
+          enabled: "yes"
         files:
-          enabled: yes
+          enabled: "yes"
 
 
   # List of templates used by a CHI
