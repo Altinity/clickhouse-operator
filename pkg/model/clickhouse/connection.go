@@ -114,7 +114,7 @@ func (c *Connection) setupTLSAdvanced() {
 	certBytes, err := base64.StdEncoding.DecodeString(certString)
 	if err != nil {
 		// No, it is not
-		c.l.V(1).F().Info("CERT is not base64-encoded err: %v", err)
+		c.l.V(1).F().Info("CERT is not Base64-encoded err: %v", err)
 		// Treat provided cert string as PEM-encoded
 		certBytes = []byte(certString)
 	}
@@ -123,10 +123,11 @@ func (c *Connection) setupTLSAdvanced() {
 	block, _ := pem.Decode(certBytes)
 	if block != nil {
 		// Yes, it is
+		c.l.V(1).F().Info("CERT is PEM-encoded")
 		certBytes = block.Bytes
 	} else {
 		// No, it is not
-		c.l.V(1).F().Info("CERT is not pem-encoded")
+		c.l.V(1).F().Info("CERT is not PEM-encoded")
 		// Treat cert string as DER-encoded
 		certBytes = []byte(certString)
 	}
