@@ -198,8 +198,10 @@ func (w *worker) findMinMaxVersions(ctx context.Context, chi *api.ClickHouseInst
 	// Create artifacts
 	chi.WalkHosts(func(host *api.Host) error {
 		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
-		version := w.getHostSoftwareVersion(ctx, host)
-		host.Runtime.Version = version
+		if !util.IsContextDone(ctx) {
+			version := w.getHostSoftwareVersion(ctx, host)
+			host.Runtime.Version = version
+		}
 		return nil
 	})
 	chi.FindMinMaxVersions()
