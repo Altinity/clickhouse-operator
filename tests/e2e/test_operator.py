@@ -5461,6 +5461,64 @@ def test_057(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
+@TestScenario
+@Name("test_058. Check ClickHouse with rootCA")
+def test_058(self): # Can be merged with test_034 potentially
+    create_shell_namespace_clickhouse_template()
+    operator_namespace = current().context.operator_namespace
+
+    with Given("Add rootCA to operator configuration"):
+        util.apply_operator_config("manifests/chopconf/test-058-chopconf.yaml")
+    out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
+    operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
+
+    with Given("test-058-root-ca secret is installed"):
+        kubectl.apply(
+            util.get_full_path("manifests/secret/test-058-secret.yaml"),
+        )
+
+    manifest = "manifests/chi/test-058-root-ca.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    with When("create the chi with secure connection"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "object_counts": {
+                    "statefulset": 1,
+                    "pod": 1,
+                    "service": 2,
+                },
+                "do_not_delete": 1,
+            }
+        )
+
+    client_pod = "test-058-root-ca-client"
+    with And(f"Start pod: {client_pod}"):
+        kubectl.apply(util.get_full_path("manifests/chi/test-058-root-ca-client.yaml"))
+        kubectl.wait_pod_status(client_pod, "Running")
+
+    with And("Confirm it can securely connect to clickhouse"):
+        creds = "--user=admin --password=password"
+        cmd = f"exec {client_pod} -- clickhouse-client -h chi-{chi}-default-0-0 --secure --port 9440 {creds} -q 'select 58'"
+        out = kubectl.launch(cmd, ok_to_fail=True)
+        assert out == "58", error()
+
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"):
+        check_metrics_monitoring(
+            operator_namespace=operator_namespace,
+            operator_pod=operator_pod,
+            expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
+        )
+
+    with Finally("I clean up"):
+        kubectl.launch(f"delete pod {client_pod}")
+        delete_test_namespace()
+
+
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):
         ns = kubectl.get("ns", name="", ns="--all-namespaces")
