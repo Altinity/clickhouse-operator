@@ -25,34 +25,34 @@ type Functions struct {
 	ShouldContinue func(context.Context, any, error) bool
 }
 
-func (p *Functions) CallGet(c context.Context) (any, error) {
+func (p *Functions) CallGet(ctx context.Context) (any, error) {
 	if p == nil {
 		return nil, nil
 	}
 	if p.Get == nil {
 		return nil, nil
 	}
-	return p.Get(c)
+	return p.Get(ctx)
 }
 
-func (p *Functions) CallIsDone(c context.Context, a any) bool {
+func (p *Functions) CallIsDone(ctx context.Context, a any) bool {
 	if p == nil {
 		return false
 	}
 	if p.IsDone == nil {
 		return false
 	}
-	return p.IsDone(c, a)
+	return p.IsDone(ctx, a)
 }
 
-func (p *Functions) CallShouldContinue(c context.Context, a any, e error) bool {
+func (p *Functions) CallShouldContinue(ctx context.Context, a any, e error) bool {
 	if p == nil {
 		return false
 	}
 	if p.ShouldContinue == nil {
 		return false
 	}
-	return p.ShouldContinue(c, a, e)
+	return p.ShouldContinue(ctx, a, e)
 }
 
 type BackgroundFunctions struct {

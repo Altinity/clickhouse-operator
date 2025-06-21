@@ -32,8 +32,8 @@ import (
 )
 
 func newOTELResource() (*otelResource.Resource, error) {
-	pod, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAME)
-	namespace, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
+	pod, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_NAME)
+	namespace, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
 	return otelResource.Merge(
 		otelResource.Default(),
 		otelResource.NewWithAttributes(

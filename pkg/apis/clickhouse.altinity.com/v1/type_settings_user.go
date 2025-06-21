@@ -26,7 +26,7 @@ func NewSettingsUser(settings *Settings, username string) *SettingsUser {
 		Settings: *settings,
 		username: username,
 	}
-	s.converter = NewSettingsName2KeyConverterPrefix(username)
+	s.Settings.SetConverter(NewSettingsName2KeyConverterPrefix(username))
 	return s
 }
 

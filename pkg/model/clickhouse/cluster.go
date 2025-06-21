@@ -161,6 +161,12 @@ func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts
 					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
 					err = conn.Exec(ctx, sqlAttach, opts)
 				}
+				if err != nil && strings.Contains(err.Error(), "Code: 57") && strings.Contains(sql, "CREATE TABLE") {
+					// WARNING: error message or code may change in newer ClickHouse versions
+					c.l.V(1).M(host).F().Info("Directory for table already exists. Trying ATTACH TABLE instead")
+					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
+					err = conn.Exec(ctx, sqlAttach, opts)
+				}
 				if err == nil || strings.Contains(err.Error(), "ALREADY_EXISTS") {
 					queries[i] = "" // Query is executed or object already exists, removing from the list
 				} else {

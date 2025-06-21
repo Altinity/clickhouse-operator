@@ -26,10 +26,9 @@ const (
 	AnnotateNewPVC      AnnotateType = "annotate new pvc"
 	AnnotateExistingPVC AnnotateType = "annotate existing pvc"
 
-	AnnotatePDB AnnotateType = "annotate pdb"
-
-	AnnotateSTS AnnotateType = "annotate STS"
-
+	AnnotatePDB         AnnotateType = "annotate pdb"
+	AnnotateSecret      AnnotateType = "annotate secret"
+	AnnotateSTS         AnnotateType = "annotate STS"
 	AnnotatePodTemplate AnnotateType = "annotate PodTemplate"
 )
 
@@ -37,4 +36,5 @@ const (
 	AnnotateConfigMapCommon      AnnotateType = "annotate cm common"
 	AnnotateConfigMapCommonUsers AnnotateType = "annotate cm common users"
 	AnnotateConfigMapHost        AnnotateType = "annotate cm host"
+	AnnotateConfigMapStorage     AnnotateType = "annotate cm starage"
 )

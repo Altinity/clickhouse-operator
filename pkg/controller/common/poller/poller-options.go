@@ -61,11 +61,38 @@ func (o *Options) FromConfig(config *api.OperatorConfig) *Options {
 	return o
 }
 
-// SetCreateTimeout sets create timeout
+// SetGetErrorTimeout sets get error timeout
 func (o *Options) SetGetErrorTimeout(timeout time.Duration) *Options {
 	if o == nil {
 		return nil
 	}
 	o.GetErrorTimeout = timeout
+	return o
+}
+
+// Merge merges options
+func (o *Options) Merge(from *Options) *Options {
+	if o == nil {
+		return nil
+	}
+	if from == nil {
+		return o
+	}
+
+	if from.StartBotheringAfterTimeout > 0 {
+		o.StartBotheringAfterTimeout = from.StartBotheringAfterTimeout
+	}
+	if from.GetErrorTimeout > 0 {
+		o.GetErrorTimeout = from.GetErrorTimeout
+	}
+	if from.Timeout > 0 {
+		o.Timeout = from.Timeout
+	}
+	if from.MainInterval > 0 {
+		o.MainInterval = from.MainInterval
+	}
+	if from.BackgroundInterval > 0 {
+		o.MainInterval = from.MainInterval
+	}
 	return o
 }

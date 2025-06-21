@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.24.3
+# OPERATOR_VERSION=0.25.1
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.3
+    clickhouse.altinity.com/chop: 0.25.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -224,6 +224,12 @@ spec:
                 endpoint:
                   type: string
                   description: "Endpoint"
+                endpoints:
+                  type: array
+                  description: "All endpoints"
+                  nullable: true
+                  items:
+                    type: string
                 generation:
                   type: integer
                   minimum: 0
@@ -239,6 +245,12 @@ spec:
                 hostsWithTablesCreated:
                   type: array
                   description: "List of hosts with tables created by the operator"
+                  nullable: true
+                  items:
+                    type: string
+                hostsWithReplicaCaughtUp:
+                  type: array
+                  description: "List of hosts with replica caught up"
                   nullable: true
                   items:
                     type: string
@@ -505,6 +517,188 @@ spec:
                                 - "Retain"
                                 - "Delete"
                               description: "Behavior policy for failed Service, `Retain` by default"
+                    runtime:
+                      type: object
+                      description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                      properties:
+                        reconcileShardsThreadsNumber:
+                          type: integer
+                          minimum: 1
+                          maximum: 65535
+                          description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
+                        reconcileShardsMaxConcurrencyPercent:
+                          type: integer
+                          minimum: 0
+                          maximum: 100
+                          description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                    macros:
+                      type: object
+                      description: "macros parameters"
+                      properties:
+                        sections:
+                          type: object
+                          description: "sections behaviour for macros"
+                          properties:
+                            users:
+                              type: object
+                              description: "sections behaviour for macros on users"
+                              properties:
+                                enabled:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "enabled or not"
+                            profiles:
+                              type: object
+                              description: "sections behaviour for macros on profiles"
+                              properties:
+                                enabled:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "enabled or not"
+                            quotas:
+                              type: object
+                              description: "sections behaviour for macros on quotas"
+                              properties:
+                                enabled:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "enabled or not"
+                            settings:
+                              type: object
+                              description: "sections behaviour for macros on settings"
+                              properties:
+                                enabled:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "enabled or not"
+                            files:
+                              type: object
+                              description: "sections behaviour for macros on files"
+                              properties:
+                                enabled:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "enabled or not"
                 defaults:
                   type: object
                   description: |
@@ -542,7 +736,7 @@ spec:
                       description: |
                         define should replicas be specified by FQDN in `<host></host>`.
                         In case of "no" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup
-                        "yes" by default
+                        "no" by default
                     distributedDDL:
                       type: object
                       description: |
@@ -592,7 +786,13 @@ spec:
                           description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                         serviceTemplate:
                           type: string
-                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                          description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                        serviceTemplates:
+                          type: array
+                          description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                          nullable: true
+                          items:
+                            type: string
                         clusterServiceTemplate:
                           type: string
                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -664,6 +864,9 @@ spec:
                                   - "Enabled"
                                   - "enabled"
                                 description: "if a secure connection to Zookeeper is required"
+                              availabilityZone:
+                                type: string
+                                description: "availability zone for Zookeeper node"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
@@ -727,7 +930,7 @@ spec:
                         any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
                         look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                        secret value will pass in `pod.spec.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
+                        secret value will pass in `pod.spec.env`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
                         it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
@@ -738,7 +941,7 @@ spec:
                         every key in this object is the file name
                         every value in this object is the file content
                         you can use `!!binary |` and base64 for binary files, see details here https://yaml.org/type/binary.html
-                        each key could contains prefix like USERS, COMMON, HOST or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
+                        each key could contains prefix like {users}, {common}, {host} or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
                         More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
 
                         any key could contains `valueFrom` with `secretKeyRef` which allow pass values from kubernetes secrets
@@ -818,6 +1021,9 @@ spec:
                                         - "Enabled"
                                         - "enabled"
                                       description: "if a secure connection to Zookeeper is required"
+                                    availabilityZone:
+                                      type: string
+                                      description: "availability zone for Zookeeper node"
                               session_timeout_ms:
                                 type: integer
                                 description: "session timeout during connect to Zookeeper"
@@ -866,7 +1072,13 @@ spec:
                                 description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                               serviceTemplate:
                                 type: string
-                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                              serviceTemplates:
+                                type: array
+                                description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                nullable: true
+                                items:
+                                  type: string
                               clusterServiceTemplate:
                                 type: string
                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -1137,7 +1349,13 @@ spec:
                                           description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                         serviceTemplate:
                                           type: string
-                                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                          description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                        serviceTemplates:
+                                          type: array
+                                          description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                          nullable: true
+                                          items:
+                                            type: string
                                         clusterServiceTemplate:
                                           type: string
                                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -1296,7 +1514,13 @@ spec:
                                                 description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                               serviceTemplate:
                                                 type: string
-                                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                                description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                              serviceTemplates:
+                                                type: array
+                                                description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                                nullable: true
+                                                items:
+                                                  type: string
                                               clusterServiceTemplate:
                                                 type: string
                                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -1359,7 +1583,13 @@ spec:
                                           description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                         serviceTemplate:
                                           type: string
-                                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                          description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                        serviceTemplates:
+                                          type: array
+                                          description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                          nullable: true
+                                          items:
+                                            type: string
                                         clusterServiceTemplate:
                                           type: string
                                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -1514,7 +1744,13 @@ spec:
                                                 description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                               serviceTemplate:
                                                 type: string
-                                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                                description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                              serviceTemplates:
+                                                type: array
+                                                description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                                nullable: true
+                                                items:
+                                                  type: string
                                               clusterServiceTemplate:
                                                 type: string
                                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -1530,6 +1766,24 @@ spec:
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
+                          reconcile:
+                            type: object
+                            description: "allow tuning reconciling process"
+                            properties:
+                              runtime:
+                                type: object
+                                description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                                properties:
+                                  reconcileShardsThreadsNumber:
+                                    type: integer
+                                    minimum: 1
+                                    maximum: 65535
+                                    description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
+                                  reconcileShardsMaxConcurrencyPercent:
+                                    type: integer
+                                    minimum: 0
+                                    maximum: 100
+                                    description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                 templates:
                   type: object
                   description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
@@ -1696,7 +1950,13 @@ spec:
                                     description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                   serviceTemplate:
                                     type: string
-                                    description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                    description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                  serviceTemplates:
+                                    type: array
+                                    description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                    nullable: true
+                                    items:
+                                      type: string
                                   clusterServiceTemplate:
                                     type: string
                                     description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -1936,14 +2196,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.24.3
+# OPERATOR_VERSION=0.25.1
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.3
+    clickhouse.altinity.com/chop: 0.25.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2156,6 +2416,12 @@ spec:
                 endpoint:
                   type: string
                   description: "Endpoint"
+                endpoints:
+                  type: array
+                  description: "All endpoints"
+                  nullable: true
+                  items:
+                    type: string
                 generation:
                   type: integer
                   minimum: 0
@@ -2171,6 +2437,12 @@ spec:
                 hostsWithTablesCreated:
                   type: array
                   description: "List of hosts with tables created by the operator"
+                  nullable: true
+                  items:
+                    type: string
+                hostsWithReplicaCaughtUp:
+                  type: array
+                  description: "List of hosts with replica caught up"
                   nullable: true
                   items:
                     type: string
@@ -2437,6 +2709,188 @@ spec:
                                 - "Retain"
                                 - "Delete"
                               description: "Behavior policy for failed Service, `Retain` by default"
+                    runtime:
+                      type: object
+                      description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                      properties:
+                        reconcileShardsThreadsNumber:
+                          type: integer
+                          minimum: 1
+                          maximum: 65535
+                          description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
+                        reconcileShardsMaxConcurrencyPercent:
+                          type: integer
+                          minimum: 0
+                          maximum: 100
+                          description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                    macros:
+                      type: object
+                      description: "macros parameters"
+                      properties:
+                        sections:
+                          type: object
+                          description: "sections behaviour for macros"
+                          properties:
+                            users:
+                              type: object
+                              description: "sections behaviour for macros on users"
+                              properties:
+                                enabled:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "enabled or not"
+                            profiles:
+                              type: object
+                              description: "sections behaviour for macros on profiles"
+                              properties:
+                                enabled:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "enabled or not"
+                            quotas:
+                              type: object
+                              description: "sections behaviour for macros on quotas"
+                              properties:
+                                enabled:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "enabled or not"
+                            settings:
+                              type: object
+                              description: "sections behaviour for macros on settings"
+                              properties:
+                                enabled:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "enabled or not"
+                            files:
+                              type: object
+                              description: "sections behaviour for macros on files"
+                              properties:
+                                enabled:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "enabled or not"
                 defaults:
                   type: object
                   description: |
@@ -2474,7 +2928,7 @@ spec:
                       description: |
                         define should replicas be specified by FQDN in `<host></host>`.
                         In case of "no" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup
-                        "yes" by default
+                        "no" by default
                     distributedDDL:
                       type: object
                       description: |
@@ -2524,7 +2978,13 @@ spec:
                           description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                         serviceTemplate:
                           type: string
-                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                          description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                        serviceTemplates:
+                          type: array
+                          description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                          nullable: true
+                          items:
+                            type: string
                         clusterServiceTemplate:
                           type: string
                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -2596,6 +3056,9 @@ spec:
                                   - "Enabled"
                                   - "enabled"
                                 description: "if a secure connection to Zookeeper is required"
+                              availabilityZone:
+                                type: string
+                                description: "availability zone for Zookeeper node"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
@@ -2659,7 +3122,7 @@ spec:
                         any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
                         look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                        secret value will pass in `pod.spec.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
+                        secret value will pass in `pod.spec.env`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
                         it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
@@ -2670,7 +3133,7 @@ spec:
                         every key in this object is the file name
                         every value in this object is the file content
                         you can use `!!binary |` and base64 for binary files, see details here https://yaml.org/type/binary.html
-                        each key could contains prefix like USERS, COMMON, HOST or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
+                        each key could contains prefix like {users}, {common}, {host} or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
                         More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
 
                         any key could contains `valueFrom` with `secretKeyRef` which allow pass values from kubernetes secrets
@@ -2750,6 +3213,9 @@ spec:
                                         - "Enabled"
                                         - "enabled"
                                       description: "if a secure connection to Zookeeper is required"
+                                    availabilityZone:
+                                      type: string
+                                      description: "availability zone for Zookeeper node"
                               session_timeout_ms:
                                 type: integer
                                 description: "session timeout during connect to Zookeeper"
@@ -2798,7 +3264,13 @@ spec:
                                 description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                               serviceTemplate:
                                 type: string
-                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                              serviceTemplates:
+                                type: array
+                                description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                nullable: true
+                                items:
+                                  type: string
                               clusterServiceTemplate:
                                 type: string
                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -3069,7 +3541,13 @@ spec:
                                           description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                         serviceTemplate:
                                           type: string
-                                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                          description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                        serviceTemplates:
+                                          type: array
+                                          description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                          nullable: true
+                                          items:
+                                            type: string
                                         clusterServiceTemplate:
                                           type: string
                                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -3228,7 +3706,13 @@ spec:
                                                 description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                               serviceTemplate:
                                                 type: string
-                                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                                description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                              serviceTemplates:
+                                                type: array
+                                                description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                                nullable: true
+                                                items:
+                                                  type: string
                                               clusterServiceTemplate:
                                                 type: string
                                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -3291,7 +3775,13 @@ spec:
                                           description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                         serviceTemplate:
                                           type: string
-                                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                          description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                        serviceTemplates:
+                                          type: array
+                                          description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                          nullable: true
+                                          items:
+                                            type: string
                                         clusterServiceTemplate:
                                           type: string
                                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -3446,7 +3936,13 @@ spec:
                                                 description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                               serviceTemplate:
                                                 type: string
-                                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                                description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                              serviceTemplates:
+                                                type: array
+                                                description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                                nullable: true
+                                                items:
+                                                  type: string
                                               clusterServiceTemplate:
                                                 type: string
                                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -3462,6 +3958,24 @@ spec:
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
+                          reconcile:
+                            type: object
+                            description: "allow tuning reconciling process"
+                            properties:
+                              runtime:
+                                type: object
+                                description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                                properties:
+                                  reconcileShardsThreadsNumber:
+                                    type: integer
+                                    minimum: 1
+                                    maximum: 65535
+                                    description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
+                                  reconcileShardsMaxConcurrencyPercent:
+                                    type: integer
+                                    minimum: 0
+                                    maximum: 100
+                                    description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                 templates:
                   type: object
                   description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
@@ -3628,7 +4142,13 @@ spec:
                                     description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                   serviceTemplate:
                                     type: string
-                                    description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                    description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                  serviceTemplates:
+                                    type: array
+                                    description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                    nullable: true
+                                    items:
+                                      type: string
                                   clusterServiceTemplate:
                                     type: string
                                     description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -3871,7 +4391,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.24.3
+    clickhouse.altinity.com/chop: 0.25.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -4001,6 +4521,7 @@ spec:
                                 items:
                                   type: object
                                   description: "setting: value pairs for configuration restart policy"
+                                  x-kubernetes-preserve-unknown-fields: true
                     access:
                       type: object
                       description: "parameters which use for connect to clickhouse from clickhouse-operator deployment"
@@ -4045,6 +4566,47 @@ spec:
                               minimum: 1
                               maximum: 600
                               description: "Timout to perform SQL query from the operator to ClickHouse instances. In seconds."
+                    addons:
+                      type: object
+                      description: "Configuration addons specifies additional settings"
+                      properties:
+                        rules:
+                          type: array
+                          description: "Array of set of rules per specified ClickHouse versions"
+                          items:
+                            type: object
+                            properties:
+                              version:
+                                type: string
+                                description: "ClickHouse version expression"
+                              spec:
+                                type: object
+                                description: "spec"
+                                properties:
+                                  configuration:
+                                    type: object
+                                    description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
+                                    properties:
+                                      users:
+                                        type: object
+                                        description: "see same section from CR spec"
+                                        x-kubernetes-preserve-unknown-fields: true
+                                      profiles:
+                                        type: object
+                                        description: "see same section from CR spec"
+                                        x-kubernetes-preserve-unknown-fields: true
+                                      quotas:
+                                        type: object
+                                        description: "see same section from CR spec"
+                                        x-kubernetes-preserve-unknown-fields: true
+                                      settings:
+                                        type: object
+                                        description: "see same section from CR spec"
+                                        x-kubernetes-preserve-unknown-fields: true
+                                      files:
+                                        type: object
+                                        description: "see same section from CR spec"
+                                        x-kubernetes-preserve-unknown-fields: true
                     metrics:
                       type: object
                       description: "parameters which use for connect to fetch metrics from clickhouse by clickhouse-operator"
@@ -4237,6 +4799,69 @@ spec:
                                 - "Enabled"
                                 - "enabled"
                               description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
+                            replicas:
+                              type: object
+                              description: "Whether the operator during reconcile procedure should wait for replicas to catch-up"
+                              properties:
+                                all:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "Whether the operator during reconcile procedure should wait for all replicas to catch-up"
+                                new:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "Whether the operator during reconcile procedure should wait for new replicas to catch-up"
+                                delay:
+                                  type: integer
+                                  description: "replication max absolute delay to consider replica is not delayed"
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
@@ -4489,14 +5114,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.24.3
+# OPERATOR_VERSION=0.25.1
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.24.3
+    clickhouse-keeper.altinity.com/chop: 0.25.1
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -4719,6 +5344,12 @@ spec:
                 endpoint:
                   type: string
                   description: "Endpoint"
+                endpoints:
+                  type: array
+                  description: "All endpoints"
+                  nullable: true
+                  items:
+                    type: string
                 generation:
                   type: integer
                   minimum: 0
@@ -4734,6 +5365,12 @@ spec:
                 hostsWithTablesCreated:
                   type: array
                   description: "List of hosts with tables created by the operator"
+                  nullable: true
+                  items:
+                    type: string
+                hostsWithReplicaCaughtUp:
+                  type: array
+                  description: "List of hosts with replica caught up"
                   nullable: true
                   items:
                     type: string
@@ -4820,8 +5457,8 @@ spec:
                   description: |
                     Suspend reconciliation of resources managed by a ClickHouse Keeper.
                     Works as the following:
-                     - When `suspend` is `true` operator stops reconciling all keeper resources.
-                     - When `suspend` is `false` or not set, operator reconciles all keeper resources.
+                     - When `suspend` is `true` operator stops reconciling all resources.
+                     - When `suspend` is `false` or not set, operator reconciles all resources.
                 namespaceDomainPattern:
                   type: string
                   description: |
@@ -4974,7 +5611,7 @@ spec:
                       description: |
                         define should replicas be specified by FQDN in `<host></host>`.
                         In case of "no" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup
-                        "yes" by default
+                        "no" by default
                     distributedDDL:
                       type: object
                       description: |
@@ -5024,7 +5661,13 @@ spec:
                           description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                         serviceTemplate:
                           type: string
-                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                          description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                        serviceTemplates:
+                          type: array
+                          description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                          nullable: true
+                          items:
+                            type: string
                         clusterServiceTemplate:
                           type: string
                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -5104,7 +5747,13 @@ spec:
                                 description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                               serviceTemplate:
                                 type: string
-                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                              serviceTemplates:
+                                type: array
+                                description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                nullable: true
+                                items:
+                                  type: string
                               clusterServiceTemplate:
                                 type: string
                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -5180,7 +5829,13 @@ spec:
                                           description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                         serviceTemplate:
                                           type: string
-                                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                          description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                        serviceTemplates:
+                                          type: array
+                                          description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                          nullable: true
+                                          items:
+                                            type: string
                                         clusterServiceTemplate:
                                           type: string
                                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -5256,7 +5911,13 @@ spec:
                                                 description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                               serviceTemplate:
                                                 type: string
-                                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                                description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                              serviceTemplates:
+                                                type: array
+                                                description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                                nullable: true
+                                                items:
+                                                  type: string
                                               clusterServiceTemplate:
                                                 type: string
                                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
@@ -5356,7 +6017,13 @@ spec:
                                     description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                   serviceTemplate:
                                     type: string
-                                    description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for one `Service` resource which will created by `clickhouse-operator` which cover all clusters in whole `chi` resource"
+                                    description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                  serviceTemplates:
+                                    type: array
+                                    description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                    nullable: true
+                                    items:
+                                      type: string
                                   clusterServiceTemplate:
                                     type: string
                                     description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"

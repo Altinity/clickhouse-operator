@@ -12,22 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v1
+package types
 
-type ObjectAddress struct {
-	Namespace string
-	Name      string
-	Key       string
+// ObjectStatus specifies object status
+type ObjectStatus string
+
+// Possible values for object status
+const (
+	ObjectStatusRequested ObjectStatus = "requested"
+	ObjectStatusModified  ObjectStatus = "modified"
+	ObjectStatusSame      ObjectStatus = "same"
+
+	ObjectStatusFound   ObjectStatus = "found"
+	ObjectStatusCreated ObjectStatus = "created"
+	ObjectStatusUnknown ObjectStatus = "unknown"
+)
+
+func (s ObjectStatus) Is(b ObjectStatus) bool {
+	return s == b
 }
 
-func (a ObjectAddress) AnyEmpty() bool {
-	return (a.Namespace == "") || (a.Name == "") || (a.Key == "")
-}
-
-func (a ObjectAddress) String() string {
-	return a.Render("/")
-}
-
-func (a ObjectAddress) Render(sep string) string {
-	return a.Namespace + sep + a.Name + sep + a.Key
+func (s ObjectStatus) String() string {
+	return string(s)
 }

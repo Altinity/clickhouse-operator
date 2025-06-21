@@ -48,16 +48,16 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.8
+              image: clickhouse/clickhouse-server:23.8
 
       - name: t2
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:23.3
+              image: clickhouse/clickhouse-server:24.3
 
       - name: t3
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:24.8

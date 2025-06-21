@@ -34,6 +34,8 @@ CH_PASSWORD_PLAIN="" \
 CH_CREDENTIALS_SECRET_NAME="clickhouse-operator" \
 CH_USERNAME_SECRET_PLAIN="clickhouse_operator" \
 CH_PASSWORD_SECRET_PLAIN="clickhouse_operator_password" \
+MANIFEST_PRINT_RBAC_NAMESPACED=yes \
+MANIFEST_PRINT_RBAC_CLUSTERED=yes \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-bundle.yaml"
 
 # Build templated installation .yaml manifest

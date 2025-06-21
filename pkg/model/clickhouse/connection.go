@@ -19,10 +19,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
+	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 
-	// go-clickhouse is explicitly required in order to setup connection to clickhouse db
-	//goch "github.com/mailru/go-clickhouse"
 	goch "github.com/mailru/go-clickhouse/v2"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -33,7 +33,7 @@ import (
 const clickHouseDriverName = "chhttp"
 
 func init() {
-	goch.RegisterTLSConfig(tlsSettings, &tls.Config{InsecureSkipVerify: true})
+	setupTLSBasic()
 }
 
 // Connection specifies clickhouse database connection object
@@ -72,20 +72,8 @@ func (c *Connection) SetLog(l log.Announcer) *Connection {
 
 // connect performs connect
 func (c *Connection) connect(ctx context.Context) {
-	// Add root CA
-	if c.params.rootCA != "" {
-		rootCAs := x509.NewCertPool()
-		if cert, err := x509.ParseCertificate([]byte(c.params.rootCA)); err != nil {
-			c.l.V(1).F().Error("unable to parse CERT specified in rootCA: %v", err)
-		} else {
-			rootCAs.AddCert(cert)
-			if err := goch.RegisterTLSConfig(tlsSettings, &tls.Config{
-				RootCAs: rootCAs,
-			}); err != nil {
-				c.l.V(1).F().Error("unable to register TLS config %v", err)
-			}
-		}
-	}
+	// ClickHouse connection may have custom TLS options specified
+	c.setupTLSAdvanced()
 
 	c.l.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
 	dbConnection, err := sql.Open(clickHouseDriverName, c.params.GetDSN())
@@ -105,6 +93,66 @@ func (c *Connection) connect(ctx context.Context) {
 	}
 
 	c.db = dbConnection
+}
+
+func setupTLSBasic() {
+	goch.RegisterTLSConfig(tlsSettings, &tls.Config{
+		InsecureSkipVerify: true,
+	})
+}
+
+func (c *Connection) setupTLSAdvanced() {
+	// Convenience wrapper
+	certString := c.params.rootCA
+
+	if certString == "" {
+		c.l.V(1).F().Info("No rootCA specified, skip TLS setup")
+		return
+	}
+
+	// Cert may be base64-encoded - decode base64
+	certBytes, err := base64.StdEncoding.DecodeString(certString)
+	if err != nil {
+		// No, it is not
+		c.l.V(1).F().Info("CERT is not Base64-encoded err: %v", err)
+		// Treat provided cert string as PEM-encoded
+		certBytes = []byte(certString)
+	}
+
+	// Cert may be PEM-encoded - decode PEM block
+	block, _ := pem.Decode(certBytes)
+	if block != nil {
+		// Yes, it is
+		c.l.V(1).F().Info("CERT is PEM-encoded")
+		certBytes = block.Bytes
+	} else {
+		// No, it is not
+		c.l.V(1).F().Info("CERT is not PEM-encoded")
+		// Treat cert string as DER-encoded
+		certBytes = []byte(certString)
+	}
+
+	// Parse DER-encoded cert
+	cert, err := x509.ParseCertificate(certBytes)
+	if err != nil {
+		c.l.V(1).F().Error("unable to parse CERT specified in rootCA err: %v", err)
+		return
+	}
+
+	// Certificates pool
+	rootCAs := x509.NewCertPool()
+	rootCAs.AddCert(cert)
+
+	// Setup TLS
+	err = goch.RegisterTLSConfig(tlsSettings, &tls.Config{
+		RootCAs: rootCAs,
+	})
+	if err != nil {
+		c.l.V(1).F().Error("unable to register TLS config err: %v", err)
+		return
+	}
+
+	c.l.V(1).F().Info("TLS setup OK - root Cert registered")
 }
 
 // ensureConnected ensures connection is set

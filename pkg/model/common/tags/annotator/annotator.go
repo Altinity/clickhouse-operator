@@ -108,6 +108,13 @@ func (a *Annotator) Annotate(what interfaces.AnnotateType, params ...any) map[st
 			return a.getClusterScope(cluster)
 		}
 
+	case interfaces.AnnotateSecret:
+		var cluster api.ICluster
+		if len(params) > 0 {
+			cluster = params[0].(api.ICluster)
+			return a.getClusterScope(cluster)
+		}
+
 	case interfaces.AnnotateSTS:
 		var host *api.Host
 		if len(params) > 0 {

@@ -3,16 +3,45 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ printf "%s-clickhouse-metrics" (include "altinity-clickhouse-operator.fullname" .) }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
   labels:
     {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
-  {{- if .Values.serviceMonitor.additionalLabels }}
+    {{- if .Values.serviceMonitor.additionalLabels }}
     {{- toYaml .Values.serviceMonitor.additionalLabels | nindent 4 }}
-  {{- end }}
+    {{- end }}
+  annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
 spec:
   endpoints:
     - port: clickhouse-metrics # 8888
+      {{- with .Values.serviceMonitor.clickhouseMetrics.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.clickhouseMetrics.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.clickhouseMetrics.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.clickhouseMetrics.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     - port: operator-metrics # 9999
+      {{- with .Values.serviceMonitor.operatorMetrics.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.operatorMetrics.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.operatorMetrics.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.operatorMetrics.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   selector:
     matchLabels:
       {{- include "altinity-clickhouse-operator.selectorLabels" . | nindent 6 }}

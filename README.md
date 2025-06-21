@@ -1,6 +1,6 @@
-# Altinity Kubernetes Operator for ClickHouse®
+# Altinity® Kubernetes Operator for ClickHouse®
 
-Altinity Kubernetes Operator for ClickHouse creates, configures and manages ClickHouse clusters running on Kubernetes.
+The Altinity Kubernetes Operator for ClickHouse creates, configures and manages ClickHouse clusters running on Kubernetes.
 
 [![Build Master](https://github.com/Altinity/clickhouse-operator/actions/workflows/build_master.yaml/badge.svg)](https://github.com/Altinity/clickhouse-operator/actions/workflows/build_master.yaml)
 [![GitHub release](https://img.shields.io/github/v/release/altinity/clickhouse-operator?include_prereleases)](https://img.shields.io/github/v/release/altinity/clickhouse-operator?include_prereleases)
@@ -24,6 +24,13 @@ Altinity Kubernetes Operator for ClickHouse creates, configures and manages Clic
 - ClickHouse cluster scaling including automatic schema propagation
 - ClickHouse version upgrades
 - Exporting ClickHouse metrics to Prometheus
+
+## Community
+
+The Altinity Kubernetes Operator for ClickHouse is a community effort sponsored by Altinity. The best way to reach us or ask questions is:
+
+* Join the [Altinity Slack](https://altinity.com/slack) - Chat with the developers and other users
+* Log an [issue on GitHub](https://github.com/Altinity/clickhouse-operator/issues) - Ask questions, log bugs and feature requests
 
 ## Requirements
 

@@ -20,6 +20,7 @@ const (
 	LabelConfigMapCommon      LabelType = "Label cm common"
 	LabelConfigMapCommonUsers LabelType = "Label cm common users"
 	LabelConfigMapHost        LabelType = "Label cm host"
+	LabelConfigMapStorage     LabelType = "Label cm storage"
 )
 
 const (
@@ -32,9 +33,8 @@ const (
 	LabelNewPVC      LabelType = "Label new pvc"
 	LabelExistingPVC LabelType = "Label existing pvc"
 
-	LabelPDB LabelType = "Label pdb"
-
-	LabelSTS LabelType = "Label STS"
-
+	LabelPDB         LabelType = "Label pdb"
+	LabelSecret      LabelType = "Label secret"
+	LabelSTS         LabelType = "Label STS"
 	LabelPodTemplate LabelType = "Label PodTemplate"
 )

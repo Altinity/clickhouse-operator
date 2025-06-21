@@ -27,26 +27,32 @@ def query(
     pwd_str = "" if pwd == "" else f"--password={pwd}"
     user_str = "" if user == "" else f"--user={user}"
 
-    if with_error:
-        return kubectl.launch(
-            f"exec {pod_name} -n {current().context.test_namespace} -c {container}"
-            f" --"
-            f" clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
-            f' --query="{sql}"'
-            f" 2>&1",
-            timeout=timeout,
-            ns=current().context.test_namespace,
-            ok_to_fail=True,
-        )
-    else:
-        return kubectl.launch(
-            f"exec {pod_name} -n {current().context.test_namespace} -c {container}"
-            f" -- "
-            f"clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
-            f'--query="{sql}"',
-            timeout=timeout,
-            ns=current().context.test_namespace,
-        )
+    for i in [1,2,3]: # re-tries for "Unknown stream id" error
+        if with_error:
+            res = kubectl.launch(
+                f"exec {pod_name} -n {current().context.test_namespace} -c {container}"
+                f" --"
+                f" clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
+                f' --query="{sql}"'
+                f" 2>&1",
+                timeout=timeout,
+                ns=current().context.test_namespace,
+                ok_to_fail=True,
+            )
+        else:
+            res = kubectl.launch(
+                f"exec {pod_name} -n {current().context.test_namespace} -c {container}"
+                f" -- "
+                f"clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
+                f'--query="{sql}"',
+                timeout=timeout,
+                ns=current().context.test_namespace,
+            )
+        if "Unknown stream id" in res:
+            print("Ignore unknown stream id error: " + res)
+            continue
+        break
+    return res
 
 
 def query_with_error(

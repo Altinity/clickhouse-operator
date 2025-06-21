@@ -72,6 +72,10 @@ type IKubePod interface {
 	Delete(ctx context.Context, namespace, name string) error
 }
 
+type IKubePodEx interface {
+	GetRestartCounters(params ...any) (map[string]int, error)
+}
+
 type IKubePVC interface {
 	Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
 	Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error)

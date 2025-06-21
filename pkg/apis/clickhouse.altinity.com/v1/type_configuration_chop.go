@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -27,6 +28,7 @@ import (
 	log "github.com/golang/glog"
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
+
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -134,6 +136,10 @@ const (
 	OnStatefulSetUpdateFailureActionIgnore = "ignore"
 )
 
+const (
+	defaultMaxReplicationDelay = 10
+)
+
 // OperatorConfig specifies operator configuration
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
@@ -181,13 +187,36 @@ type OperatorConfigRestartPolicyRuleSet map[types.Matchable]types.StringBool
 
 // OperatorConfigRestartPolicyRule specifies ClickHouse version and rules for this version
 type OperatorConfigRestartPolicyRule struct {
-	Version string
-	Rules   []OperatorConfigRestartPolicyRuleSet
+	Version string                               `json:"version" yaml:"version"`
+	Rules   []OperatorConfigRestartPolicyRuleSet `json:"rules"   yaml:"rules"`
 }
 
 // OperatorConfigRestartPolicy specifies operator's configuration changes restart policy
 type OperatorConfigRestartPolicy struct {
-	Rules []OperatorConfigRestartPolicyRule
+	Rules []OperatorConfigRestartPolicyRule `json:"rules" yaml:"rules"`
+}
+
+// OperatorConfigAddonRule specifies ClickHouse version and rules for this version
+type OperatorConfigAddonRule struct {
+	Version string     `json:"version,omitempty" yaml:"version,omitempty"`
+	Spec    *AddonSpec `json:"spec,omitempty"    yaml:"spec,omitempty"`
+}
+
+type AddonSpec struct {
+	Configuration *AddonConfiguration `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+}
+
+type AddonConfiguration struct {
+	Users    map[string]string `json:"users,omitempty"     yaml:"users,omitempty"`
+	Profiles map[string]string `json:"profiles,omitempty"  yaml:"profiles,omitempty"`
+	Quotas   map[string]string `json:"quotas,omitempty"    yaml:"quotas,omitempty"`
+	Settings map[string]string `json:"settings,omitempty"  yaml:"settings,omitempty"`
+	Files    map[string]string `json:"files,omitempty"     yaml:"files,omitempty"`
+}
+
+// OperatorConfigRestartPolicy specifies operator's configuration changes restart policy
+type OperatorConfigAddons struct {
+	Rules []OperatorConfigAddonRule `json:"rules" yaml:"rules"`
 }
 
 // OperatorConfigFile specifies File section
@@ -250,7 +279,7 @@ type OperatorConfigDefault struct {
 
 // OperatorConfigClickHouse specifies ClickHouse section
 type OperatorConfigClickHouse struct {
-	Config              OperatorConfigConfig        `json:"configuration" yaml:"configuration"`
+	Config              OperatorConfigConfig        `json:"configuration"              yaml:"configuration"`
 	ConfigRestartPolicy OperatorConfigRestartPolicy `json:"configurationRestartPolicy" yaml:"configurationRestartPolicy"`
 
 	Access struct {
@@ -289,6 +318,8 @@ type OperatorConfigClickHouse struct {
 			Query   time.Duration `json:"query"   yaml:"query"`
 		} `json:"timeouts" yaml:"timeouts"`
 	} `json:"access" yaml:"access"`
+
+	Addons OperatorConfigAddons `json:"addons" yaml:"addons"`
 
 	// Metrics used to specify how the operator fetches metrics from ClickHouse instances
 	Metrics struct {
@@ -350,9 +381,6 @@ type OperatorConfigCHIRuntime struct {
 	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
 	Templates []*ClickHouseInstallation `json:"-" yaml:"-"`
 	mutex     sync.RWMutex              `json:"-" yaml:"-"`
-
-	// ClickHouseInstallation template
-	Template *ClickHouseInstallation `json:"-" yaml:"-"`
 }
 
 // OperatorConfigReconcile specifies reconcile section
@@ -388,9 +416,16 @@ type OperatorConfigReconcileHost struct {
 
 // OperatorConfigReconcileHostWait defines reconcile host wait config
 type OperatorConfigReconcileHostWait struct {
-	Exclude *types.StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
-	Queries *types.StringBool `json:"queries,omitempty" yaml:"queries,omitempty"`
-	Include *types.StringBool `json:"include,omitempty" yaml:"include,omitempty"`
+	Exclude  *types.StringBool                        `json:"exclude,omitempty"  yaml:"exclude,omitempty"`
+	Queries  *types.StringBool                        `json:"queries,omitempty"  yaml:"queries,omitempty"`
+	Include  *types.StringBool                        `json:"include,omitempty"  yaml:"include,omitempty"`
+	Replicas *OperatorConfigReconcileHostWaitReplicas `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+}
+
+type OperatorConfigReconcileHostWaitReplicas struct {
+	All   *types.StringBool `json:"all,omitempty"   yaml:"all,omitempty"`
+	New   *types.StringBool `json:"new,omitempty"   yaml:"new,omitempty"`
+	Delay *types.Int32      `json:"delay,omitempty" yaml:"delay,omitempty"`
 }
 
 // OperatorConfigAnnotation specifies annotation section
@@ -409,24 +444,30 @@ type OperatorConfigLabel struct {
 	// Whether to append *Scope* labels to StatefulSet and Pod.
 	AppendScopeString types.StringBool `json:"appendScope" yaml:"appendScope"`
 
-	Runtime struct {
-		AppendScope bool `json:"appendScope" yaml:"appendScope"`
-	} `json:"runtime" yaml:"runtime"`
+	Runtime OperatorConfigLabelRuntime `json:"runtime" yaml:"runtime"`
+}
+
+type OperatorConfigLabelRuntime struct {
+	AppendScope bool `json:"appendScope" yaml:"appendScope"`
 }
 
 type OperatorConfigMetrics struct {
-	Labels struct {
-		Exclude []string `json:"exclude" yaml:"exclude"`
-	} `json:"labels" yaml:"labels"`
+	Labels OperatorConfigMetricsLabels `json:"labels" yaml:"labels"`
+}
+
+type OperatorConfigMetricsLabels struct {
+	Exclude []string `json:"exclude" yaml:"exclude"`
 }
 
 type OperatorConfigStatus struct {
-	Fields struct {
-		Action  *types.StringBool `json:"action,omitempty"  yaml:"action,omitempty"`
-		Actions *types.StringBool `json:"actions,omitempty" yaml:"actions,omitempty"`
-		Error   *types.StringBool `json:"error,omitempty"   yaml:"error,omitempty"`
-		Errors  *types.StringBool `json:"errors,omitempty"  yaml:"errors,omitempty"`
-	} `json:"fields" yaml:"fields"`
+	Fields OperatorConfigStatusFields `json:"fields" yaml:"fields"`
+}
+
+type OperatorConfigStatusFields struct {
+	Action  *types.StringBool `json:"action,omitempty"  yaml:"action,omitempty"`
+	Actions *types.StringBool `json:"actions,omitempty" yaml:"actions,omitempty"`
+	Error   *types.StringBool `json:"error,omitempty"   yaml:"error,omitempty"`
+	Errors  *types.StringBool `json:"errors,omitempty"  yaml:"errors,omitempty"`
 }
 
 type ConfigCRSource struct {
@@ -439,13 +480,13 @@ type OperatorConfig struct {
 	Runtime     OperatorConfigRuntime    `json:"runtime"    yaml:"runtime"`
 	Watch       OperatorConfigWatch      `json:"watch"      yaml:"watch"`
 	ClickHouse  OperatorConfigClickHouse `json:"clickhouse" yaml:"clickhouse"`
-	Keeper      OperatorConfigKeeper     `json:"keeper" yaml:"keeper"`
+	Keeper      OperatorConfigKeeper     `json:"keeper"     yaml:"keeper"`
 	Template    OperatorConfigTemplate   `json:"template"   yaml:"template"`
 	Reconcile   OperatorConfigReconcile  `json:"reconcile"  yaml:"reconcile"`
 	Annotation  OperatorConfigAnnotation `json:"annotation" yaml:"annotation"`
 	Label       OperatorConfigLabel      `json:"label"      yaml:"label"`
 	Metrics     OperatorConfigMetrics    `json:"metrics"    yaml:"metrics"`
-	Status      OperatorConfigStatus     `json:"status"    yaml:"status"`
+	Status      OperatorConfigStatus     `json:"status"     yaml:"status"`
 	StatefulSet struct {
 		// Revision history limit
 		RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`
@@ -558,20 +599,13 @@ type OperatorConfig struct {
 }
 
 // MergeFrom merges
-func (c *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) error {
+func (c *OperatorConfig) MergeFrom(from *OperatorConfig) error {
 	if from == nil {
 		return nil
 	}
 
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		if err := mergo.Merge(c, *from); err != nil {
-			return fmt.Errorf("FAIL merge config Error: %q", err)
-		}
-	case MergeTypeOverrideByNonEmptyValues:
-		if err := mergo.Merge(c, *from, mergo.WithOverride); err != nil {
-			return fmt.Errorf("FAIL merge config Error: %q", err)
-		}
+	if err := mergo.Merge(c, *from, mergo.WithAppendSlice, mergo.WithOverride); err != nil {
+		return fmt.Errorf("FAIL merge config Error: %q", err)
 	}
 
 	return nil
@@ -802,6 +836,18 @@ func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
 	}
 }
 
+func (c *OperatorConfig) normalizeSectionReconcileHost() {
+	// Timeouts
+	if c.Reconcile.Host.Wait.Replicas == nil {
+		c.Reconcile.Host.Wait.Replicas = &OperatorConfigReconcileHostWaitReplicas{}
+	}
+
+	if c.Reconcile.Host.Wait.Replicas.Delay == nil {
+		// Default update timeout in seconds
+		c.Reconcile.Host.Wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
+	}
+}
+
 func (c *OperatorConfig) normalizeSectionClickHouseConfigurationUserDefault() {
 	// Default values for ClickHouse user configuration
 	// 1. user/profile
@@ -944,8 +990,9 @@ func (c *OperatorConfig) normalize() {
 	c.normalizeSectionClickHouseMetrics()
 	c.normalizeSectionKeeperConfigurationFile()
 	c.normalizeSectionTemplate()
-	c.normalizeSectionReconcileStatefulSet()
 	c.normalizeSectionReconcileRuntime()
+	c.normalizeSectionReconcileStatefulSet()
+	c.normalizeSectionReconcileHost()
 	c.normalizeSectionLogger()
 	c.normalizeSectionLabel()
 	c.normalizeSectionStatefulSet()
@@ -1034,33 +1081,42 @@ func (c *OperatorConfig) isCHITemplateExt(file string) bool {
 	return false
 }
 
-// String returns string representation of a OperatorConfig
+// String returns string representation of an OperatorConfig
 func (c *OperatorConfig) String(hideCredentials bool) string {
 	conf := c
 	if hideCredentials {
-		conf = c.DeepCopy()
-		if conf.ClickHouse.Config.User.Default.Password != "" {
-			conf.ClickHouse.Config.User.Default.Password = PasswordReplacer
-		}
-		//conf.ClickHouse.Access.Username = UsernameReplacer
-		if conf.ClickHouse.Access.Password != "" {
-			conf.ClickHouse.Access.Password = PasswordReplacer
-		}
-		//conf.ClickHouse.Access.Secret.Runtime.Username = UsernameReplacer
-		if conf.ClickHouse.Access.Secret.Runtime.Password != "" {
-			conf.ClickHouse.Access.Secret.Runtime.Password = PasswordReplacer
-		}
-
-		// DEPRECATED
-		conf.CHConfigUserDefaultPassword = PasswordReplacer
-		conf.CHUsername = UsernameReplacer
-		conf.CHPassword = PasswordReplacer
+		conf = c.copyWithHiddenCredentials()
 	}
 	if bytes, err := yaml.Marshal(conf); err == nil {
 		return string(bytes)
 	}
+	if bytes, err := json.MarshalIndent(conf, "", "  "); err == nil {
+		return string(bytes)
+	}
 
 	return ""
+}
+
+func (c *OperatorConfig) copyWithHiddenCredentials() *OperatorConfig {
+	conf := c.DeepCopy()
+	if conf.ClickHouse.Config.User.Default.Password != "" {
+		conf.ClickHouse.Config.User.Default.Password = PasswordReplacer
+	}
+	//conf.ClickHouse.Access.Username = UsernameReplacer
+	if conf.ClickHouse.Access.Password != "" {
+		conf.ClickHouse.Access.Password = PasswordReplacer
+	}
+	//conf.ClickHouse.Access.Secret.Runtime.Username = UsernameReplacer
+	if conf.ClickHouse.Access.Secret.Runtime.Password != "" {
+		conf.ClickHouse.Access.Secret.Runtime.Password = PasswordReplacer
+	}
+
+	// DEPRECATED
+	conf.CHConfigUserDefaultPassword = PasswordReplacer
+	conf.CHUsername = UsernameReplacer
+	conf.CHPassword = PasswordReplacer
+
+	return conf
 }
 
 // IsWatchedNamespace returns whether specified namespace is in a list of watched
@@ -1271,5 +1327,4 @@ func (c *OperatorConfig) move() {
 	if c.RevisionHistoryLimit != 0 {
 		c.StatefulSet.RevisionHistoryLimit = c.RevisionHistoryLimit
 	}
-
 }

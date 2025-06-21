@@ -2,9 +2,9 @@
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.24.3
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.25.1
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.24.3
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.25.1
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -13,17 +13,18 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: {{ include "altinity-clickhouse-operator.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
   labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+  annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels: {{ include "altinity-clickhouse-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 8 }}
+      labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}
       annotations:
-        {{ toYaml .Values.podAnnotations | nindent 8 }}
+        {{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations | nindent 8 }}{{ end }}
         checksum/files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-files.yaml") . | sha256sum }}
         checksum/confd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-confd-files.yaml") . | sha256sum }}
         checksum/configd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-configd-files.yaml") . | sha256sum }}

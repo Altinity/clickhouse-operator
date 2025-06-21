@@ -42,6 +42,10 @@ func (cm *ContainerManager) GetAppContainer(statefulSet *apps.StatefulSet) (*cor
 	return cm.getContainerKeeper(statefulSet)
 }
 
+func (cm *ContainerManager) GetAppImageTag(statefulSet *apps.StatefulSet) (string, bool) {
+	return cm.getImageTagKeeper(statefulSet)
+}
+
 func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, host *chi.Host) {
 	cm.ensureContainerSpecifiedKeeper(statefulSet, host)
 }
@@ -49,8 +53,27 @@ func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, ho
 func (cm *ContainerManager) EnsureLogContainer(statefulSet *apps.StatefulSet) {
 }
 
+func (cm *ContainerManager) SetupAdditionalEnvVars(host *chi.Host, appContainer *core.Container) {
+}
+
+// getContainerKeeper
 func (cm *ContainerManager) getContainerKeeper(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.KeeperContainerName)
+}
+
+// getImageTagKeeper
+func (cm *ContainerManager) getImageTagKeeper(statefulSet *apps.StatefulSet) (string, bool) {
+	container, ok := cm.getContainerKeeper(statefulSet)
+	if !ok {
+		return "", false
+	}
+
+	tag, ok := k8s.ContainerGetImageTag(container)
+	if !ok {
+		return "", false
+	}
+
+	return tag, true
 }
 
 // ensureContainerSpecifiedKeeper

@@ -25,6 +25,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/model"
@@ -248,6 +249,8 @@ func (w *worker) discoveryAndDeleteCR(ctx context.Context, cr api.ICustomResourc
 		return nil
 	}
 
+	metrics.CHIUnregister(ctx, cr)
+
 	objs := w.c.discovery(ctx, cr)
 	if objs.NumStatefulSet() > 0 {
 		cr.WalkHosts(func(host *api.Host) error {
@@ -270,7 +273,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	defer w.a.V(2).M(chi).E().P()
 
 	var err error
-	chi, err = w.normalizer.CreateTemplated(chi, normalizer.NewOptions())
+	chi, err = w.normalizer.CreateTemplated(chi, normalizer.NewOptions[api.ClickHouseInstallation]())
 	if err != nil {
 		w.a.WithEvent(chi, a.EventActionDelete, a.EventReasonDeleteFailed).
 			WithError(chi).

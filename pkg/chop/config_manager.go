@@ -62,8 +62,8 @@ type ConfigManager struct {
 	runtimeParams map[string]string
 }
 
-// NewConfigManager creates new ConfigManager
-func NewConfigManager(
+// newConfigManager creates new ConfigManager
+func newConfigManager(
 	kubeClient *kube.Clientset,
 	chopClient *chopClientSet.Clientset,
 	initConfigFilePath string,
@@ -184,7 +184,7 @@ func (cm *ConfigManager) buildUnifiedConfig() {
 
 	// Merge all the rest CR-based configs into base config
 	for _, chOperatorConfiguration := range cm.crConfigs {
-		_ = cm.config.MergeFrom(chOperatorConfiguration, api.MergeTypeOverrideByNonEmptyValues)
+		_ = cm.config.MergeFrom(chOperatorConfiguration)
 		cm.config.Runtime.ConfigCRSources = append(cm.config.Runtime.ConfigCRSources, api.ConfigCRSource{
 			Namespace: chOperatorConfiguration.Runtime.ConfigCRNamespace,
 			Name:      chOperatorConfiguration.Runtime.ConfigCRName,

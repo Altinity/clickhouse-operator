@@ -124,14 +124,13 @@ fi
 if [[ ! -z "${MINIKUBE_PRELOAD_IMAGES}" ]]; then
     echo "pre-load images into minikube"
     IMAGES="
-    clickhouse/clickhouse-server:22.3
-    clickhouse/clickhouse-server:22.6
-    clickhouse/clickhouse-server:22.7
-    clickhouse/clickhouse-server:22.8
     clickhouse/clickhouse-server:23.3
     clickhouse/clickhouse-server:23.8
+    clickhouse/clickhouse-server:24.3
+    clickhouse/clickhouse-server:24.8
+    clickhouse/clickhouse-server:25.3
     clickhouse/clickhouse-server:latest
-    altinity/clickhouse-server:22.8.15.25.altinitystable
+    altinity/clickhouse-server:24.8.14.10459.altinitystable
     docker.io/zookeeper:3.8.4
     "
     for image in ${IMAGES}; do

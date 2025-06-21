@@ -13,6 +13,6 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:24.8.8.17
+              image: clickhouse/clickhouse-server:25.3.3.42
               imagePullPolicy: IfNotPresent
 

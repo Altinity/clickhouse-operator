@@ -78,12 +78,12 @@ func (c *Controller) OnStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	switch chop.Config().Reconcile.StatefulSet.Update.OnFailure {
 	case api.OnStatefulSetUpdateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
-		log.V(1).M(host).F().Info("abort StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
+		log.V(1).M(host).F().Info("ABORT StatefulSet: %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
 		return common.ErrCRUDAbort
 
 	case api.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
-		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
+		log.V(1).M(host).F().Info("ROLLBACK StatefulSet: %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
 		curStatefulSet, err := kubeSTS.Get(ctx, host)
 		if err != nil {
 			log.V(1).M(host).F().Warning("Unable to fetch current StatefulSet %s. err: %q", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()), err)

@@ -42,6 +42,10 @@ func (cm *ContainerManager) GetAppContainer(statefulSet *apps.StatefulSet) (*cor
 	return cm.getContainerClickHouse(statefulSet)
 }
 
+func (cm *ContainerManager) GetAppImageTag(statefulSet *apps.StatefulSet) (string, bool) {
+	return cm.getImageTagClickHouse(statefulSet)
+}
+
 func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, host *chi.Host) {
 	cm.ensureContainerSpecifiedClickHouse(statefulSet, host)
 }
@@ -50,7 +54,17 @@ func (cm *ContainerManager) EnsureLogContainer(statefulSet *apps.StatefulSet) {
 	cm.ensureContainerSpecifiedClickHouseLog(statefulSet)
 }
 
-// getContainerClickHouse(
+func (cm *ContainerManager) SetupAdditionalEnvVars(host *chi.Host, appContainer *core.Container) {
+	// Setup additional ENV VAR in case no command provided
+	if len(appContainer.Command) == 0 {
+		host.GetCR().GetRuntime().GetAttributes().AppendAdditionalEnvVarIfNotExists(core.EnvVar{
+			Name:  "CLICKHOUSE_SKIP_USER_SETUP",
+			Value: "1",
+		})
+	}
+}
+
+// getContainerClickHouse
 func (cm *ContainerManager) getContainerClickHouse(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseContainerName, 0)
 }
@@ -58,6 +72,21 @@ func (cm *ContainerManager) getContainerClickHouse(statefulSet *apps.StatefulSet
 // getContainerClickHouseLog
 func (cm *ContainerManager) getContainerClickHouseLog(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseLogContainerName)
+}
+
+// getImageTagClickHouse
+func (cm *ContainerManager) getImageTagClickHouse(statefulSet *apps.StatefulSet) (string, bool) {
+	container, ok := cm.getContainerClickHouse(statefulSet)
+	if !ok {
+		return "", false
+	}
+
+	tag, ok := k8s.ContainerGetImageTag(container)
+	if !ok {
+		return "", false
+	}
+
+	return tag, true
 }
 
 // ensureContainerSpecifiedClickHouse

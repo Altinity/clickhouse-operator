@@ -27,4 +27,4 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:24.8

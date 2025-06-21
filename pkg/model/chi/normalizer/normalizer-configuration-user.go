@@ -121,11 +121,14 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 
 	// Have plaintext password specified.
 	// Replace plaintext password with encrypted one
-	passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-	user.Set("password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
-	// And keep only one password specification - delete all the rest (if any exists)
-	user.Delete("password_double_sha1_hex")
-	user.Delete("password")
+	// Password shouldn't be used when ssl_certificate set
+	if !user.Has("ssl_certificates/common_name") {
+		passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
+		user.Set("password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+		// And keep only one password specification - delete all the rest (if any exists)
+		user.Delete("password_double_sha1_hex")
+		user.Delete("password")
+	}
 }
 
 func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.SettingsUser) {
@@ -151,7 +154,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 		}
 	case chop.Config().ClickHouse.Access.Username:
 		// User used by CHOp to access ClickHouse instances.
-		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
+		ip, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_IP)
 
 		profile = chopProfile
 		quota = ""

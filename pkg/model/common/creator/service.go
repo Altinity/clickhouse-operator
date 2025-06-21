@@ -26,7 +26,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (c *Creator) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
+func (c *Creator) CreateService(what interfaces.ServiceType, params ...any) util.Slice[*core.Service] {
 	c.sm.SetCR(c.cr)
 	c.sm.SetTagger(c.tagger)
 	return c.sm.CreateService(what, params...)

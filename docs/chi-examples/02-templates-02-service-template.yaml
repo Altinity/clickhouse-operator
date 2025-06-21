@@ -5,7 +5,10 @@ metadata:
 spec:
   defaults:
     templates:
-      serviceTemplate: svc-template
+      serviceTemplate: svc-template-1
+      serviceTemplates:
+        - svc-template-2
+        - svc-template-3
   configuration:
     settings:
       http_port: 8124
@@ -13,17 +16,45 @@ spec:
       interserver_http_port: 9010
   templates:
     serviceTemplates:
-      - name: svc-template
-        generateName: chendpoint-{chi}
+      - name: svc-template-1
+        generateName: chendpoint1-{chi}
         metadata:
           labels:
-            custom.label: "custom.value"
+            custom.label.1: "custom.label.value.1"
           annotations:
             cloud.google.com/load-balancer-type: "Internal"
             service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
             service.beta.kubernetes.io/azure-load-balancer-internal: "true"
             service.beta.kubernetes.io/openstack-internal-load-balancer: "true"
             service.beta.kubernetes.io/cce-load-balancer-internal-vpc: "true"
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: tcp
+              port: 9000
+          type: LoadBalancer
+      - name: svc-template-2
+        generateName: chendpoint2-{chi}
+        metadata:
+          labels:
+            custom.label.2: "custom.label.value.2"
+          annotations:
+            custom.annotation.2: "custom.annotation.value.2"
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: tcp
+              port: 9000
+          type: LoadBalancer
+      - name: svc-template-3
+        generateName: chendpoint3-{chi}
+        metadata:
+          labels:
+            custom.label.3: "custom.label.value.3"
+          annotations:
+            custom.annotation.3: "custom.annotation.value.3"
         spec:
           ports:
             - name: http

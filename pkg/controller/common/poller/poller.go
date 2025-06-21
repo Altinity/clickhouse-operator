@@ -27,7 +27,7 @@ import (
 type Poller interface {
 	Poll() error
 	WithOptions(opts *Options) Poller
-	WithMain(functions *Functions) Poller
+	WithFunctions(functions *Functions) Poller
 	WithBackground(backgroundFunctions *BackgroundFunctions) Poller
 }
 
@@ -35,7 +35,7 @@ type poller struct {
 	ctx        context.Context
 	name       string
 	opts       *Options
-	main       *Functions
+	functions  *Functions
 	background *BackgroundFunctions
 }
 
@@ -51,8 +51,8 @@ func (p *poller) WithOptions(opts *Options) Poller {
 	return p
 }
 
-func (p *poller) WithMain(functions *Functions) Poller {
-	p.main = functions
+func (p *poller) WithFunctions(functions *Functions) Poller {
+	p.functions = functions
 	return p
 }
 
@@ -70,17 +70,17 @@ func (p *poller) Poll() error {
 			return nil
 		}
 
-		item, err := p.main.CallGet(p.ctx)
+		item, err := p.functions.CallGet(p.ctx)
 		switch {
 		case err == nil:
 			// Object is found - process it
-			if p.main.CallIsDone(p.ctx, item) {
+			if p.functions.CallIsDone(p.ctx, item) {
 				// All is good, job is done, exit
 				log.V(1).M(p.name).F().Info("OK %s", p.name)
 				return nil
 			}
-			// Object is found, but processor function says we need to continue polling
-		case p.main.CallShouldContinue(p.ctx, item, err):
+			// Object is found, but processor function says we should continue polling
+		case p.functions.CallShouldContinue(p.ctx, item, err):
 			// Object is not found - it either failed to be created or just still not created
 			if (opts.GetErrorTimeout > 0) && (time.Since(start) >= opts.GetErrorTimeout) {
 				// No more wait for the object to be created. Consider create process as failed.
@@ -105,7 +105,7 @@ func (p *poller) Poll() error {
 
 		// Continue polling
 
-		// May be time has come to start bothers into logs?
+		// May be time has come to start bothering with log messages?
 		if time.Since(start) >= opts.StartBotheringAfterTimeout {
 			// Start bothering with log messages after some time only
 			log.V(1).M(p.name).F().Info("WAIT: %s", p.name)

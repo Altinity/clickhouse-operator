@@ -17,14 +17,12 @@ package chi
 import (
 	"context"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type migrateTableOptions struct {
@@ -62,24 +60,8 @@ func (a migrateTableOptionsArr) First() *migrateTableOptions {
 }
 
 // migrateTables
-func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*migrateTableOptions) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	if !w.shouldMigrateTables(host, opts...) {
-		w.a.V(1).
-			M(host).F().
-			Info(
-				"No need to add tables on host %d to shard %d in cluster %s",
-				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-		return nil
-	}
-
-	// Need to migrate tables
-
-	if w.shouldDropReplica(host, opts...) {
+func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrateTableOptions) error {
+	if w.shouldDropReplica(host, opts) {
 		w.a.V(1).
 			M(host).F().
 			Info(
@@ -96,16 +78,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 			"Adding tables on shard/host:%d/%d cluster:%s",
 			host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
 
-	err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host)
-	if err == nil {
-		w.a.V(1).
-			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
-			WithAction(host.GetCR()).
-			M(host).F().
-			Info("Tables added successfully on shard/host:%d/%d cluster:%s",
-				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
-		host.GetCR().IEnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
-	} else {
+	if err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host); err != nil {
 		w.a.V(1).
 			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
 			WithAction(host.GetCR()).
@@ -113,7 +86,17 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 			Error("ERROR add tables failed on shard/host:%d/%d cluster:%s err:%v",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName, err)
 	}
-	return err
+
+	w.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
+		WithAction(host.GetCR()).
+		M(host).F().
+		Info("Tables added successfully on shard/host:%d/%d cluster:%s",
+			host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
+
+	host.GetCR().IEnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
+
+	return nil
 }
 
 func (w *worker) setHasData(host *api.Host) {
@@ -128,6 +111,10 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 	switch {
 	case host.IsStopped():
 		// Stopped host is not able to receive any data, migration is inapplicable
+		return false
+
+	case host.IsTroubleshoot():
+		// Troubleshooted host is not able to receive any data, migration is inapplicable
 		return false
 
 	case o.ForceMigrate():
