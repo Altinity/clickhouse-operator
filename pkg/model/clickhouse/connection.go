@@ -146,6 +146,7 @@ func (c *Connection) setupTLSAdvanced() {
 	// Setup TLS
 	err = goch.RegisterTLSConfig(tlsSettings, &tls.Config{
 		RootCAs: rootCAs,
+		InsecureSkipVerify: true, // TODO: Make it configurable
 	})
 	if err != nil {
 		c.l.V(1).F().Error("unable to register TLS config err: %v", err)
