@@ -1,25 +1,28 @@
-apiVersion: integreatly.org/v1alpha1
-kind: GrafanaDataSource
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
 metadata:
   name: "${GRAFANA_CLICKHOUSE_DATASOURCE_NAME}"
 spec:
-  name: ${ENDPOINT}.yaml
-  datasources:
-    - name: "${GRAFANA_CLICKHOUSE_DATASOURCE_NAME}"
-      type: vertamedia-clickhouse-datasource
-      access: proxy
-      url: "${CLICKHOUSE_URL}"
-      basicAuth: false
-      basicAuthUser: "${OPERATOR_CH_USER}"
+  instanceSelector:
+    matchLabels:
+      app: grafana
+  resyncPeriod: 24h
+  datasource:
+    name: "${GRAFANA_CLICKHOUSE_DATASOURCE_NAME}"
+    type: vertamedia-clickhouse-datasource
+    access: proxy
+    url: "${CLICKHOUSE_URL}"
+    basicAuth: false
+    basicAuthUser: "${OPERATOR_CH_USER}"
+    isDefault: false
+    editable: true
+    secureJsonData:
       basicAuthPassword: "${OPERATOR_CH_PASS}"
-      isDefault: false
-      version: 1
-      editable: true
-      jsonData:
-        tlsSkipVerify: true
-        addCorsHeader: true
-        defaultDatabase: "default"
-        usePOST: true
-        useYandexCloudAuthorization: true
-        xHeaderUser: "${OPERATOR_CH_USER}"
-        xHeaderKey: "${OPERATOR_CH_PASS}"
+      xHeaderKey: "${OPERATOR_CH_PASS}"
+    jsonData:
+      tlsSkipVerify: true
+      addCorsHeader: true
+      defaultDatabase: "default"
+      usePOST: true
+      useYandexCloudAuthorization: true
+      xHeaderUser: "${OPERATOR_CH_USER}"

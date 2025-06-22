@@ -1,11 +1,18 @@
-apiVersion: integreatly.org/v1alpha1
+apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
   name: "$GRAFANA_DASHBOARD_NAME"
   labels:
     app: grafana
 spec:
+  instanceSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - grafana
   url: https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/grafana-dashboard/ClickHouse_Queries_dashboard.json
+  resyncPeriod: 24h
   # look to https://github.com/integr8ly/grafana-operator/issues/416#issuecomment-849498860, json used as fallback
   json: ""
   datasources:
