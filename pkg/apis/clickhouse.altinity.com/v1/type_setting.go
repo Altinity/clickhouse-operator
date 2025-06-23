@@ -46,6 +46,7 @@ type Setting struct {
 
 type SettingType string
 
+// List of possible setting types
 const (
 	SettingTypeUnknown SettingType = "unknown"
 	SettingTypeScalar  SettingType = "scalar"
@@ -62,6 +63,18 @@ var (
 	_ json.Unmarshaler = &Setting{}
 )
 
+// List of returned errors
+var (
+	ErrDataSourceAddressHasIncorrectFormat = fmt.Errorf("data source address has incorrect format")
+	ErrUnableToUnmarshal                   = fmt.Errorf("unable to unmarshal setting")
+	ErrUnableToUnmarshalIntoNil            = fmt.Errorf("unable to unmarshal into nil")
+)
+
+// NewSettingFromAny builds new setting from either of:
+// 1. scalar
+// 2. vector
+// 3. source
+// In case of being unable to build new setting an error is returned
 func NewSettingFromAny(untyped any) (*Setting, error) {
 	if scalarSetting, ok := NewSettingScalarFromAny(untyped); ok && scalarSetting.HasValue() {
 		return scalarSetting, nil
@@ -75,14 +88,15 @@ func NewSettingFromAny(untyped any) (*Setting, error) {
 		return srcSetting, nil
 	}
 
-	return nil, fmt.Errorf("unable to unmarshal setting")
+	return nil, ErrUnableToUnmarshal
 }
 
+// IsEmpty checks whether settings ia an empty one
 func (s *Setting) IsEmpty() bool {
 	return s == nil
 }
 
-// AsAny gets value of a setting as vector. ScalarString value is casted to vector
+// AsAny gets value of a setting as untyped
 func (s *Setting) AsAny() any {
 	if s == nil {
 		return nil
@@ -150,7 +164,7 @@ func (s *Setting) Attributes() string {
 	return a
 }
 
-// Len returns number of entries in the Setting (be it scalar or vector)
+// Len returns number of entries in the Setting (be it a scalar or a vector)
 func (s *Setting) Len() int {
 	switch s.Type() {
 	case SettingTypeScalar:
@@ -164,7 +178,7 @@ func (s *Setting) Len() int {
 	}
 }
 
-// HasValue checks whether setting has a zero-value (no value)
+// HasValue checks whether setting has non zero-value (some value)
 func (s *Setting) HasValue() bool {
 	switch s.Type() {
 	case SettingTypeScalar:
@@ -189,6 +203,8 @@ func (s *Setting) ApplyMacros(macros *util.Replacer) {
 		s.scalar = macros.Line(s.scalar)
 	case SettingTypeVector:
 		s.vector = macros.Slice(s.vector)
+	case SettingTypeSource:
+		// Unimplemented
 	}
 }
 
@@ -263,8 +279,6 @@ func (s *Setting) CastToVector() *Setting {
 	}
 	return s
 }
-
-var ErrDataSourceAddressHasIncorrectFormat = fmt.Errorf("data source address has incorrect format")
 
 // FetchDataSourceAddress fetches data source address from the setting.
 // defaultNamespace specifies default namespace to be used in case there is no namespace specified in data source address.
@@ -355,10 +369,10 @@ func (s *Setting) MarshalJSON() ([]byte, error) {
 //	return s.marshal(yaml.Marshal)
 //}
 
-// unmarshal
+// Unmarshal
 func (s *Setting) Unmarshal(data []byte, unmarshaller func(data []byte, v any) error) error {
 	if s == nil {
-		return fmt.Errorf("unable to unmarshal into nil")
+		return ErrUnableToUnmarshalIntoNil
 	}
 
 	// Prepare untyped map at first
@@ -385,6 +399,7 @@ func (s *Setting) marshal(marshaller func(v any) ([]byte, error)) ([]byte, error
 	return marshaller(s.AsAny())
 }
 
+// Clone make clone of a setting
 func (s *Setting) Clone() *Setting {
 	if s == nil {
 		return nil
