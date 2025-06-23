@@ -125,7 +125,7 @@ type ICluster interface {
 	FindShard(needle interface{}) IShard
 	FindHost(needleShard interface{}, needleHost interface{}) *Host
 
-	IsShardSpecified() bool
+	SelectSettingsSourceFrom(shard IShard, replica IReplica) any
 
 	GetRuntime() IClusterRuntime
 	GetServiceTemplate() (*ServiceTemplate, bool)
