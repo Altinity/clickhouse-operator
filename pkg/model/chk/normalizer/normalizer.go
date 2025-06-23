@@ -450,17 +450,11 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings) *chi.Setti
 	return files
 }
 
-func ensureCluster(cluster *chk.Cluster) *chk.Cluster {
-	if cluster == nil {
-		return commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*chk.Cluster)
-	} else {
-		return cluster
-	}
-}
-
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeCluster(cluster *chk.Cluster) *chk.Cluster {
-	cluster = ensureCluster(cluster)
+	cluster = cluster.Ensure(func() *chk.Cluster {
+		return commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*chk.Cluster)
+	})
 
 	// Runtime has to be prepared first
 	cluster.GetRuntime().SetCR(n.req.GetTarget())
@@ -476,10 +470,8 @@ func (n *Normalizer) normalizeCluster(cluster *chk.Cluster) *chk.Cluster {
 	cluster.Files = n.normalizeConfigurationFiles(cluster.Files)
 
 	// Ensure layout
-	if cluster.Layout == nil {
-		cluster.Layout = chk.NewChkClusterLayout()
-	}
-	cluster.FillShardReplicaSpecified()
+	cluster.Layout = cluster.Layout.Ensure()
+	cluster.FillShardsReplicasExplicitlySpecified()
 	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
 	n.ensureClusterLayoutShards(cluster.Layout)
 	n.ensureClusterLayoutReplicas(cluster.Layout)

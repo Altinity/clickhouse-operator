@@ -779,7 +779,6 @@ func (n *Normalizer) normalizeCluster(cluster *chi.Cluster) *chi.Cluster {
 	cluster.FillShardsReplicasExplicitlySpecified()
 	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
 	cluster.Reconcile = n.normalizeClusterReconcile(cluster.Reconcile)
-
 	n.ensureClusterLayoutShards(cluster.Layout)
 	n.ensureClusterLayoutReplicas(cluster.Layout)
 
