@@ -164,33 +164,33 @@ func (cluster *Cluster) GetPDBMaxUnavailable() *types.Int32 {
 	return cluster.PDBMaxUnavailable
 }
 
-// FillShardReplicaSpecified fills whether shard or replicas are explicitly specified
-func (cluster *Cluster) FillShardReplicaSpecified() {
+// FillShardsReplicasExplicitlySpecified fills whether shard or replicas are explicitly specified
+func (cluster *Cluster) FillShardsReplicasExplicitlySpecified() {
 	if len(cluster.Layout.Shards) > 0 {
-		cluster.Layout.ShardsSpecified = true
+		cluster.Layout.ShardsExplicitlySpecified = true
 	}
 	if len(cluster.Layout.Replicas) > 0 {
-		cluster.Layout.ReplicasSpecified = true
+		cluster.Layout.ReplicasExplicitlySpecified = true
 	}
 }
 
-// isShardSpecified checks whether shard is explicitly specified
-func (cluster *Cluster) isShardSpecified() bool {
-	return cluster.Layout.ShardsSpecified == true
+// isShardExplicitlySpecified checks whether shard is explicitly specified
+func (cluster *Cluster) isShardExplicitlySpecified() bool {
+	return cluster.Layout.ShardsExplicitlySpecified == true
 }
 
-// isReplicaSpecified checks whether replica is explicitly specified
-func (cluster *Cluster) isReplicaSpecified() bool {
-	return (cluster.Layout.ShardsSpecified == false) && (cluster.Layout.ReplicasSpecified == true)
+// isReplicaExplicitlySpecified checks whether replica is explicitly specified
+func (cluster *Cluster) isReplicaExplicitlySpecified() bool {
+	return !cluster.isShardExplicitlySpecified() && (cluster.Layout.ReplicasExplicitlySpecified == true)
 }
 
 // IsShardSpecified checks whether shard is explicitly specified
 func (cluster *Cluster) IsShardSpecified() bool {
-	if !cluster.isShardSpecified() && !cluster.isReplicaSpecified() {
+	if !cluster.isShardExplicitlySpecified() && !cluster.isReplicaExplicitlySpecified() {
 		return true
 	}
 
-	return cluster.isShardSpecified()
+	return cluster.isShardExplicitlySpecified()
 }
 
 // InheritZookeeperFrom inherits zookeeper config from CHI
@@ -422,6 +422,13 @@ func (cluster *Cluster) IsStopped() bool {
 	return cluster.GetCR().IsStopped()
 }
 
+func (cluster *Cluster) Ensure(create func() *Cluster) *Cluster {
+	if cluster == nil {
+		cluster = create()
+	}
+	return cluster
+}
+
 // ChiClusterLayout defines layout section of .spec.configuration.clusters
 type ChiClusterLayout struct {
 	ShardsCount   int `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
@@ -433,9 +440,9 @@ type ChiClusterLayout struct {
 
 	// Internal data
 	// Whether shards or replicas are explicitly specified as Shards []ChiShard or Replicas []ChiReplica
-	ShardsSpecified   bool        `json:"-" yaml:"-" testdiff:"ignore"`
-	ReplicasSpecified bool        `json:"-" yaml:"-" testdiff:"ignore"`
-	HostsField        *HostsField `json:"-" yaml:"-" testdiff:"ignore"`
+	ShardsExplicitlySpecified   bool        `json:"-" yaml:"-" testdiff:"ignore"`
+	ReplicasExplicitlySpecified bool        `json:"-" yaml:"-" testdiff:"ignore"`
+	HostsField                  *HostsField `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // NewChiClusterLayout creates new cluster layout
@@ -445,6 +452,13 @@ func NewChiClusterLayout() *ChiClusterLayout {
 
 func (l *ChiClusterLayout) GetReplicasCount() int {
 	return l.ReplicasCount
+}
+
+func (l *ChiClusterLayout) Ensure() *ChiClusterLayout {
+	if l == nil {
+		l = NewChiClusterLayout()
+	}
+	return l
 }
 
 // SchemaPolicy defines schema management policy - replica or shard-based
