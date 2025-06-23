@@ -127,30 +127,44 @@ func (host *Host) GetReconcileAttributes() *types.ReconcileAttributes {
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
-func (host *Host) InheritSettingsFrom(shard IShard, replica IReplica) {
+func (host *Host) InheritSettingsFrom(sources ...any) {
 	if host == nil {
 		return
 	}
-	if (shard != nil) && shard.HasSettings() {
-		host.Settings = host.Settings.MergeFrom(shard.GetSettings())
-	}
-
-	if (replica != nil) && replica.HasSettings() {
-		host.Settings = host.Settings.MergeFrom(replica.GetSettings())
+	for _, source := range sources {
+		switch typed := source.(type) {
+		case IShard:
+			shard := typed
+			if shard.HasSettings() {
+				host.Settings = host.Settings.MergeFrom(shard.GetSettings())
+			}
+		case IReplica:
+			replica := typed
+			if replica.HasSettings() {
+				host.Settings = host.Settings.MergeFrom(replica.GetSettings())
+			}
+		}
 	}
 }
 
 // InheritFilesFrom inherits files from specified shard and replica
-func (host *Host) InheritFilesFrom(shard IShard, replica IReplica) {
+func (host *Host) InheritFilesFrom(sources ...any) {
 	if host == nil {
 		return
 	}
-	if (shard != nil) && shard.HasFiles() {
-		host.Files = host.Files.MergeFrom(shard.GetFiles())
-	}
-
-	if (replica != nil) && replica.HasFiles() {
-		host.Files = host.Files.MergeFrom(replica.GetFiles())
+	for _, source := range sources {
+		switch typed := source.(type) {
+		case IShard:
+			shard := typed
+			if shard.HasFiles() {
+				host.Files = host.Files.MergeFrom(shard.GetFiles())
+			}
+		case IReplica:
+			replica := typed
+			if replica.HasFiles() {
+				host.Files = host.Files.MergeFrom(replica.GetFiles())
+			}
+		}
 	}
 }
 
