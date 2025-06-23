@@ -58,6 +58,20 @@ type PodTemplate struct {
 	Spec            core.PodSpec      `json:"spec,omitempty"            yaml:"spec,omitempty"`
 }
 
+func (s *PodTemplate) HasGenerateName() bool {
+	if s == nil {
+		return false
+	}
+	return s.GenerateName != ""
+}
+
+func (s *PodTemplate) GetGenerateName() string {
+	if s == nil {
+		return ""
+	}
+	return s.GenerateName
+}
+
 // PodTemplateZone defines pod template zone
 type PodTemplateZone struct {
 	Key    string   `json:"key,omitempty"    yaml:"key,omitempty"`
