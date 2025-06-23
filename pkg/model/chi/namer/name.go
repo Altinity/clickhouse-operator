@@ -144,9 +144,9 @@ func (n *Namer) createStatefulSetName(host *api.Host) string {
 	// PodTemplate may have personal name pattern specified
 	if template, ok := host.GetPodTemplate(); ok {
 		// PodTemplate available
-		if template.GenerateName != "" {
+		if template.HasGenerateName() {
 			// PodTemplate has explicitly specified name pattern
-			pattern = template.GenerateName
+			pattern = template.GetGenerateName()
 		}
 	}
 
