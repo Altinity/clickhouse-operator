@@ -170,19 +170,13 @@ func (n *Normalizer) normalizeHost(
 ) {
 
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
-	// Inherit from either Shard or Replica
-	var s chi.IShard
-	var r chi.IReplica
-	if cluster.IsShardSpecified() {
-		s = shard
-	} else {
-		r = replica
-	}
-	host.InheritSettingsFrom(s, r)
+	// Inherit from either Shard or Replica - use one of them as a source
+	src := cluster.SelectSettingsSourceFrom(shard, replica)
+	host.InheritSettingsFrom(src)
 	host.Settings = n.normalizeConfigurationSettings(host.Settings)
-	host.InheritFilesFrom(s, r)
+	host.InheritFilesFrom(src)
 	host.Files = n.normalizeConfigurationFiles(host.Files)
-	host.InheritTemplatesFrom(s, r)
+	host.InheritTemplatesFrom(src)
 
 	n.normalizeHostEnvVars()
 }
