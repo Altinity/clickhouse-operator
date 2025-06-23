@@ -627,7 +627,7 @@ func (s *Settings) normalizeKeys() {
 	}
 }
 
-// applyMacrosOnKeys - applies macros on keys
+// applyMacrosOnKeys - applies macros on keys. Values are kept intact
 func (s *Settings) applyMacrosOnKeys(macros *util.Replacer) {
 	if s.Len() == 0 {
 		return
@@ -655,6 +655,7 @@ func (s *Settings) applyMacrosOnKeys(macros *util.Replacer) {
 	}
 }
 
+// applyMacrosOnValues - applies macros on values. Keys are kept intact
 func (s *Settings) applyMacrosOnValues(macros *util.Replacer) {
 	s.Walk(func(name string, setting *Setting) {
 		setting.ApplyMacros(macros)
