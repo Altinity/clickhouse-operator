@@ -92,6 +92,14 @@ func (cluster *Cluster) GetName() string {
 	return cluster.Name
 }
 
+// HasName checks whether cluster has a name
+func (cluster *Cluster) HasName() bool {
+	if cluster == nil {
+		return false
+	}
+	return len(cluster.GetName()) > 0
+}
+
 func (c *Cluster) GetZookeeper() *apiChi.ZookeeperConfig {
 	return nil
 }
