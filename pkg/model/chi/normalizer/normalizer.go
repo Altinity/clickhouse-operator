@@ -748,17 +748,11 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings, scope any)
 	return files
 }
 
-func ensureCluster(cluster *chi.Cluster) *chi.Cluster {
-	if cluster == nil {
-		return commonCreator.CreateCluster(interfaces.ClusterCHIDefault).(*chi.Cluster)
-	} else {
-		return cluster
-	}
-}
-
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeCluster(cluster *chi.Cluster) *chi.Cluster {
-	cluster = ensureCluster(cluster)
+	cluster = cluster.Ensure(func() *chi.Cluster {
+		return commonCreator.CreateCluster(interfaces.ClusterCHIDefault).(*chi.Cluster)
+	})
 
 	// Runtime has to be prepared first
 	cluster.GetRuntime().SetCR(n.req.GetTarget())
@@ -781,10 +775,8 @@ func (n *Normalizer) normalizeCluster(cluster *chi.Cluster) *chi.Cluster {
 	cluster.PDBMaxUnavailable = n.normalizePDBMaxUnavailable(cluster.PDBMaxUnavailable)
 
 	// Ensure layout
-	if cluster.Layout == nil {
-		cluster.Layout = chi.NewChiClusterLayout()
-	}
-	cluster.FillShardReplicaSpecified()
+	cluster.Layout = cluster.Layout.Ensure()
+	cluster.FillShardsReplicasExplicitlySpecified()
 	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
 	cluster.Reconcile = n.normalizeClusterReconcile(cluster.Reconcile)
 
@@ -856,11 +848,6 @@ func (n *Normalizer) normalizePDBMaxUnavailable(value *types.Int32) *types.Int32
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
 func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLayout *chi.ChiClusterLayout) *chi.ChiClusterLayout {
-	// Ensure layout
-	if clusterLayout == nil {
-		clusterLayout = chi.NewChiClusterLayout()
-	}
-
 	// clusterLayout.ShardsCount
 	// and
 	// clusterLayout.ReplicasCount
