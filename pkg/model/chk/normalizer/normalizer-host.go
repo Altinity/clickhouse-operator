@@ -60,8 +60,8 @@ func (n *Normalizer) hostGetHostTemplate(host *chi.Host) *chi.HostTemplate {
 
 // hostApplyHostTemplate
 func hostApplyHostTemplate(host *chi.Host, template *chi.HostTemplate) {
-	if host.GetName() == "" {
-		host.Name = template.Spec.Name
+	if !host.HasName() {
+		host.SetName(template.Spec.Name)
 		log.V(3).M(host).F().Info("host has no name specified thus assigning name from Spec: %s", host.GetName())
 	}
 
