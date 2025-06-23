@@ -152,14 +152,17 @@ func (cluster *Cluster) GetSecure() *types.StringBool {
 	return cluster.Secure
 }
 
+// GetSecret is a getter
 func (c *Cluster) GetSecret() *ClusterSecret {
 	return c.Secret
 }
 
+// GetRuntime is a getter
 func (cluster *Cluster) GetRuntime() IClusterRuntime {
 	return &cluster.Runtime
 }
 
+// GetPDBMaxUnavailable is a getter
 func (cluster *Cluster) GetPDBMaxUnavailable() *types.Int32 {
 	return cluster.PDBMaxUnavailable
 }
@@ -185,12 +188,19 @@ func (cluster *Cluster) isReplicaExplicitlySpecified() bool {
 }
 
 // IsShardSpecified checks whether shard is explicitly specified
-func (cluster *Cluster) IsShardSpecified() bool {
+func (cluster *Cluster) isShardToBeUsedToInheritSettingsFrom() bool {
 	if !cluster.isShardExplicitlySpecified() && !cluster.isReplicaExplicitlySpecified() {
 		return true
 	}
 
 	return cluster.isShardExplicitlySpecified()
+}
+
+func (cluster *Cluster) SelectSettingsSourceFrom(shard IShard, replica IReplica) any {
+	if cluster.isShardToBeUsedToInheritSettingsFrom() {
+		return shard
+	}
+	return replica
 }
 
 // InheritZookeeperFrom inherits zookeeper config from CHI
