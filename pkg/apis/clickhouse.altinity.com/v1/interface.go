@@ -110,6 +110,7 @@ type ICluster interface {
 	IsZero() bool
 
 	GetName() string
+	HasName() bool
 	GetZookeeper() *ZookeeperConfig
 	GetSchemaPolicy() *SchemaPolicy
 	GetInsecure() *types.StringBool
