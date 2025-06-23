@@ -296,6 +296,22 @@ func (host *Host) GetName() string {
 	return host.Name
 }
 
+// HasName checks whether host has a name
+func (host *Host) HasName() bool {
+	if host == nil {
+		return false
+	}
+	return len(host.GetName()) > 0
+}
+
+// SetName is a setter
+func (host *Host) SetName(name string) {
+	if host == nil {
+		return
+	}
+	host.Name = name
+}
+
 // GetCR gets CHI
 func (host *Host) GetCR() ICustomResource {
 	return host.GetRuntime().GetCR()
