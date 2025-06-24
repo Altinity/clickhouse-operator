@@ -53,6 +53,13 @@ type Configuration struct {
 	Clusters  []*Cluster       `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
 }
 
+func (c *Configuration) Ensure() *Configuration {
+	if c == nil {
+		c = NewConfiguration()
+	}
+	return c
+}
+
 // NewConfiguration creates new Configuration objects
 func NewConfiguration() *Configuration {
 	return new(Configuration)
@@ -99,9 +106,7 @@ func (c *Configuration) MergeFrom(from *Configuration, _type MergeType) *Configu
 		return c
 	}
 
-	if c == nil {
-		c = NewConfiguration()
-	}
+	c = c.Ensure()
 
 	c.Zookeeper = c.Zookeeper.MergeFrom(from.Zookeeper, _type)
 	c.Users = c.Users.MergeFrom(from.Users)
