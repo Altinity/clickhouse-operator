@@ -21,8 +21,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 )
 
-// func getMaxNumberOfPodsPerNode
-// What is the max number of Pods allowed per Node
+// getMaxNumberOfPodsPerNode calculates the max number of Pods allowed per Node
+// Used for scope cycles calculation
 // TODO need to support multi-cluster
 func getMaxNumberOfPodsPerNode(cr ICustomResource) int {
 	maxNumberOfPodsPerNode := 0
@@ -37,6 +37,7 @@ func getMaxNumberOfPodsPerNode(cr ICustomResource) int {
 	return maxNumberOfPodsPerNode
 }
 
+// calcCRAndClusterScopeCycleSizes calculates scope cycle sizes
 func calcCRAndClusterScopeCycleSizes(cr ICustomResource, maxNumberOfPodsPerNode int) (crScopeCycleSize int, clusterScopeCycleSize int) {
 	//          1perNode   2perNode  3perNode  4perNode  5perNode
 	// sh1r1    n1   a     n1  a     n1 a      n1  a     n1  a
