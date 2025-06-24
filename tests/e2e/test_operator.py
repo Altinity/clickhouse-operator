@@ -2663,14 +2663,14 @@ def test_023(self):
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     with Given("Auto templates are deployed"):
-        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
-        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-2.yaml"))
-        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-3.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-1.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-2.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-3.yaml"))
         kubectl.apply(util.get_full_path("manifests/secret/test-023-secret.yaml"))
     with Given("Give templates some time to be applied"):
         time.sleep(15)
 
-    chit_data = yaml_manifest.get_manifest_data(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
+    chit_data = yaml_manifest.get_manifest_data(util.get_full_path("manifests/chit/test-023-auto-templates-1.yaml"))
     expected_image = chit_data["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
 
     kubectl.create_and_check(
@@ -2687,21 +2687,42 @@ def test_023(self):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "grafana-dashboard-user"
         # assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == ""
 
-    # manifests/chit/tpl-clickhouse-auto-1.yaml
-    with Then("Environment variable from a template should be populated"):
-        pod = kubectl.get_pod_spec(chi)
-        env = pod["containers"][0]["env"][0]
-        assert env["name"] == "TEST_ENV"
-        assert env["value"] == "TEST_ENV_VALUE"
+    chi_spec = kubectl.get("chi", chi)
+    print("CHI envs:")
+    for env in chi_spec["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["env"]:
+        print(env)
 
-    # manifests/chit/tpl-clickhouse-auto-2.yaml
+    chit_spec = kubectl.get("chit", "clickhouse-stable")
+    print("Template envs:")
+    for env in chit_spec["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["env"]:
+        print(env)
+
+    # manifests/chit/test-023-auto-templates-1.yaml
+    pod = kubectl.get_pod_spec(chi)
+    print("Pod envs:")
+    for env in pod["containers"][0]["env"]:
+        print(env)
+
+    def checkEnv(pos, env_name, env_value):
+        env = pod["containers"][0]["env"][pos]
+        assert env["name"] == env_name
+        assert env["value"] == env_value
+
+    with Then("Environment variables from CHI should be retained"):
+        checkEnv(0, "TEST_ENV_FROM_CHI_1", "TEST_ENV_FROM_CHI_1_VALUE")
+        checkEnv(1, "TEST_ENV_FROM_CHI_2", "TEST_ENV_FROM_CHI_2_VALUE")
+
+    with And("Environment variables from template should be populated"):
+        checkEnv(2, "TEST_ENV_FROM_TEMPLATE_1", "TEST_ENV_FROM_TEMPLATE_1_VALUE")
+
+    # manifests/chit/test-023-auto-templates-2.yaml
     with Then("Annotation from a template should be populated"):
         normalizedCompleted = kubectl.get_chi_normalizedCompleted(chi)
         assert normalizedCompleted["metadata"]["annotations"]["test"] == "test"
     with Then("Pod annotation should populated from template"):
         assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.test") == "test"
 
-    # manifests/chit/tpl-clickhouse-auto-3.yaml
+    # manifests/chit/test-023-auto-templates-3.yaml
     with Then("User from a template should be populated"):
         out = clickhouse.query_with_error(chi, "select 1", user = "grafana_dashboard_user", pwd = "grafana_dashboard_user_password")
         assert out == "1"
