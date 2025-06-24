@@ -30,8 +30,8 @@ type Cluster struct {
 	Secure            *types.StringBool `json:"secure,omitempty"            yaml:"secure,omitempty"`
 	Secret            *ClusterSecret    `json:"secret,omitempty"            yaml:"secret,omitempty"`
 	PDBMaxUnavailable *types.Int32      `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
-	Layout            *ChiClusterLayout `json:"layout,omitempty"            yaml:"layout,omitempty"`
 	Reconcile         ClusterReconcile  `json:"reconcile"                   yaml:"reconcile"`
+	Layout            *ChiClusterLayout `json:"layout,omitempty"            yaml:"layout,omitempty"`
 
 	Runtime ChiClusterRuntime `json:"-" yaml:"-"`
 }
