@@ -187,12 +187,12 @@ func (cluster *Cluster) FillShardsReplicasExplicitlySpecified() {
 
 // isShardExplicitlySpecified checks whether shard is explicitly specified
 func (cluster *Cluster) isShardExplicitlySpecified() bool {
-	return cluster.Layout.ShardsExplicitlySpecified == true
+	return cluster.Layout.ShardsExplicitlySpecified
 }
 
 // isReplicaExplicitlySpecified checks whether replica is explicitly specified
 func (cluster *Cluster) isReplicaExplicitlySpecified() bool {
-	return !cluster.isShardExplicitlySpecified() && (cluster.Layout.ReplicasExplicitlySpecified == true)
+	return cluster.Layout.ReplicasExplicitlySpecified && !cluster.isShardExplicitlySpecified()
 }
 
 // IsShardSpecified checks whether shard is explicitly specified
