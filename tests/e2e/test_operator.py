@@ -2708,12 +2708,11 @@ def test_023(self):
         assert env["name"] == env_name
         assert env["value"] == env_value
 
-    with Then("Environment variables from CHI should be retained"):
-        checkEnv(0, "TEST_ENV_FROM_CHI_1", "TEST_ENV_FROM_CHI_1_VALUE")
-        checkEnv(1, "TEST_ENV_FROM_CHI_2", "TEST_ENV_FROM_CHI_2_VALUE")
-
     with And("Environment variables from template should be populated"):
-        checkEnv(2, "TEST_ENV_FROM_TEMPLATE_1", "TEST_ENV_FROM_TEMPLATE_1_VALUE")
+        checkEnv(0, "TEST_ENV_FROM_CHIT_1", "TEST_ENV_FROM_CHIT_1_VALUE")
+    with Then("Environment variables from CHI should be retained"):
+        checkEnv(1, "TEST_ENV_FROM_CHI_1", "TEST_ENV_FROM_CHI_1_VALUE")
+        checkEnv(2, "TEST_ENV_FROM_CHI_2", "TEST_ENV_FROM_CHI_2_VALUE")
 
     # manifests/chit/test-023-auto-templates-2.yaml
     with Then("Annotation from a template should be populated"):
