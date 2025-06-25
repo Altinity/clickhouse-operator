@@ -217,8 +217,10 @@ func (c *CR) buildResources(chi *api.ClickHouseInstallation) (*api.ClickHouseIns
 			statusNormalizedCompleted: string(normalizedCompleted),
 		},
 	}
+
 	chi.Status.NormalizedCR = nil
 	chi.Status.NormalizedCRCompleted = nil
+
 	return chi, cm
 }
 
