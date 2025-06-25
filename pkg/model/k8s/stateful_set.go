@@ -21,6 +21,9 @@ import (
 
 // StatefulSetContainerGet gets container from the StatefulSet either by name or by index
 func StatefulSetContainerGet(statefulSet *apps.StatefulSet, namesOrIndexes ...any) (*core.Container, bool) {
+	if statefulSet == nil {
+		return nil, false
+	}
 	for _, nameOrIndex := range namesOrIndexes {
 		switch typed := nameOrIndex.(type) {
 		// Find by name
