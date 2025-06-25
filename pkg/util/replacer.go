@@ -14,7 +14,10 @@
 
 package util
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 type Replacer struct {
 	macroToExpansionMap map[string]string
@@ -61,6 +64,14 @@ func NewReplacerFrom(from ...*Replacer) *Replacer {
 
 	// Build new replacer from combined expansion map
 	return NewReplacer(macroToExpansionMap)
+}
+
+func (e *Replacer) String() string {
+	if e == nil {
+		return ""
+	}
+	s, _ := json.Marshal(e.macroToExpansionMap)
+	return string(s)
 }
 
 // Line expands line with macros(es)
