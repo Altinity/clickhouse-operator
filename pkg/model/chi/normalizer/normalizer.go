@@ -637,39 +637,30 @@ func (n *Normalizer) replacers(section replacerSection, scope any, additional ..
 
 	switch section {
 	case replacerFiles:
-		if sectionToggles.Files.Enabled.IsTrue() {
-			log.V(2).M(scope).F().Info("macros enabled for files")
-			shouldApplyScopeMacros = true
-		}
+		shouldApplyScopeMacros = sectionToggles.Files.Enabled.IsTrue()
+		log.V(2).M(scope).F().Info("is macros enabled for section %s: %t", section, shouldApplyScopeMacros)
 		break
 	case replacerProfiles:
-		if sectionToggles.Profiles.Enabled.IsTrue() {
-			log.V(2).M(scope).F().Info("macros enabled for profiles")
-			shouldApplyScopeMacros = true
-		}
+		shouldApplyScopeMacros = sectionToggles.Profiles.Enabled.IsTrue()
+		log.V(2).M(scope).F().Info("is macros enabled for section %s: %t", section, shouldApplyScopeMacros)
 		break
 	case replacerQuotas:
-		if sectionToggles.Quotas.Enabled.IsTrue() {
-			log.V(2).M(scope).F().Info("macros enabled for quotas")
-			shouldApplyScopeMacros = true
-		}
+		shouldApplyScopeMacros = sectionToggles.Quotas.Enabled.IsTrue()
+		log.V(2).M(scope).F().Info("is macros enabled for section %s: %t", section, shouldApplyScopeMacros)
 		break
 	case replacerSettings:
-		if sectionToggles.Settings.Enabled.IsTrue() {
-			log.V(2).M(scope).F().Info("macros enabled for settings")
-			shouldApplyScopeMacros = true
-		}
+		shouldApplyScopeMacros = sectionToggles.Settings.Enabled.IsTrue()
+		log.V(2).M(scope).F().Info("is macros enabled for section %s: %t", section, shouldApplyScopeMacros)
 		break
 	case replacerUsers:
-		if sectionToggles.Users.Enabled.IsTrue() {
-			log.V(2).M(scope).F().Info("macros enabled for users")
-			shouldApplyScopeMacros = true
-		}
+		shouldApplyScopeMacros = sectionToggles.Users.Enabled.IsTrue()
+		log.V(2).M(scope).F().Info("is macros enabled for section %s: %t", section, shouldApplyScopeMacros)
 		break
 	}
 	if shouldApplyScopeMacros {
-		replacers = append(replacers, n.macro.Scope(scope).Replacer())
-		log.V(2).M(scope).F().Info("scope macros are enabled for section: %s", section)
+		r := n.macro.Scope(scope).Replacer()
+		replacers = append(replacers, r)
+		log.V(2).M(scope).F().Info("scope macros are enabled for section: %s replacer: %s", section, r)
 	} else {
 		log.V(2).M(scope).F().Info("scope macros are not enabled macros for section: %s", section)
 	}
