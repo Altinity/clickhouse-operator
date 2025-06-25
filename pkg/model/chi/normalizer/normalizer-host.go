@@ -222,6 +222,8 @@ func (n *Normalizer) normalizeHostStage2(
 ) {
 	// Inherit from either Shard or Replica - use one of them as a source
 	src := cluster.SelectSettingsSourceFrom(shard, replica)
+	log.V(2).M(src).F().Info("will be used as source for host: %s", host.GetName())
+
 	host.InheritSettingsFrom(src)
 	host.Settings = n.normalizeConfigurationSettings(host.Settings, host)
 	host.InheritFilesFrom(src)
