@@ -72,6 +72,41 @@ func (s *PodTemplate) GetGenerateName() string {
 	return s.GenerateName
 }
 
+func (s *PodTemplate) MergeFrom(from *PodTemplate) *PodTemplate {
+	if from == nil {
+		return s
+	}
+
+	if s == nil {
+		s = new(PodTemplate)
+	}
+
+	//toSpec := &toTemplate.Spec
+	//fromSpec := &fromTemplate.Spec
+	//_ = mergo.Merge(toSpec, *fromSpec, mergo.WithGrowSlice, mergo.WithOverride, mergo.WithOverrideEmptySlice)
+
+	// Merge `to` template with `from` template
+
+	backup := s.DeepCopy()
+
+	_ = mergo.Merge(s, *from, mergo.WithSliceDeepMerge)
+
+	// Deal with env explicitly
+	for i := range backup.Spec.Containers {
+		if i >= len(from.Spec.Containers) {
+			break
+		}
+		b := &backup.Spec.Containers[i]
+		s := &s.Spec.Containers[i]
+		f := &from.Spec.Containers[i]
+		s.Env = nil
+		s.Env = append(s.Env, b.Env...)
+		s.Env = append(s.Env, f.Env...)
+	}
+
+	return s
+}
+
 // PodTemplateZone defines pod template zone
 type PodTemplateZone struct {
 	Key    string   `json:"key,omitempty"    yaml:"key,omitempty"`
@@ -238,14 +273,7 @@ func (templates *Templates) mergePodTemplates(from *Templates) {
 			if toTemplate.Name == fromTemplate.Name {
 				// Receiver already have such a template
 				sameNameFound = true
-
-				//toSpec := &toTemplate.Spec
-				//fromSpec := &fromTemplate.Spec
-				//_ = mergo.Merge(toSpec, *fromSpec, mergo.WithGrowSlice, mergo.WithOverride, mergo.WithOverrideEmptySlice)
-
-				// Merge `to` template with `from` template
-				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepMerge)
-				// Receiver `to` template is processed
+				toTemplate.MergeFrom(fromTemplate)
 				break
 			}
 		}
