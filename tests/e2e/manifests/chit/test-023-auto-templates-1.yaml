@@ -19,5 +19,5 @@ spec:
             - name: clickhouse-pod
               image: clickhouse/clickhouse-server:24.8
               env:
-                - name: TEST_ENV
-                  value: TEST_ENV_VALUE
+                - name: TEST_ENV_FROM_TEMPLATE_1
+                  value: TEST_ENV_FROM_TEMPLATE_1_VALUE
