@@ -386,27 +386,32 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 
 	// Walk over the list of ClickHouseInstallation objects and add them as watched
 	for i := range list.Items {
-		// Convenience wrapper
-		chi := &list.Items[i]
-
-		if chi.IsStopped() {
-			log.V(1).Infof("CHI %s/%s is stopped, skip it", chi.Namespace, chi.Name)
-			continue
-		}
-
-		if !chi.GetStatus().HasNormalizedCRCompleted() {
-			log.V(1).Infof("CHI %s/%s is not completed yet, skip it", chi.Namespace, chi.Name)
-			continue
-		}
-
-		log.V(1).Infof("CHI %s/%s is completed, add it", chi.Namespace, chi.Name)
-		normalizer := chiNormalizer.New(func(namespace, name string) (*core.Secret, error) {
-			return kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
-		})
-
-		normalized, _ := normalizer.CreateTemplated(chi, normalizerCommon.NewOptions[api.ClickHouseInstallation]())
-
-		watchedCHI := metrics.NewWatchedCR(normalized)
-		e.updateWatched(watchedCHI)
+		e.processDiscoveredCR(kubeClient, &list.Items[i])
 	}
+}
+
+func (e *Exporter) processDiscoveredCR(kubeClient kube.Interface, chi *api.ClickHouseInstallation) {
+	if e.shouldSkipDiscoveredCR(chi) {
+		log.V(1).Infof("Skip discovered CHI: %s/%s", chi.Namespace, chi.Name)
+		return
+	}
+
+	log.V(1).Infof("Add discovered CHI: %s/%s", chi.Namespace, chi.Name)
+	normalizer := chiNormalizer.New(func(namespace, name string) (*core.Secret, error) {
+		return kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
+	})
+
+	normalized, _ := normalizer.CreateTemplated(chi, normalizerCommon.NewOptions[api.ClickHouseInstallation]())
+
+	watchedCHI := metrics.NewWatchedCR(normalized)
+	e.updateWatched(watchedCHI)
+}
+
+func (e *Exporter) shouldSkipDiscoveredCR(chi *api.ClickHouseInstallation) bool {
+	if chi.IsStopped() {
+		log.V(1).Infof("CHI %s/%s is stopped, skip it", chi.Namespace, chi.Name)
+		return true
+	}
+
+	return false
 }
