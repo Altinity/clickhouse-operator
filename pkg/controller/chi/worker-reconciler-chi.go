@@ -83,7 +83,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	}
 
 	w.markReconcileStart(ctx, new, actionPlan)
-	w.excludeStoppedCHIFromMonitoring(new)
+	w.excludeFromMonitoring(new)
 	w.setHostStatusesPreliminary(ctx, new, actionPlan)
 
 	if err := w.reconcile(ctx, new); err != nil {
@@ -106,7 +106,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		}
 		w.clean(ctx, new)
 		w.dropReplicas(ctx, new, actionPlan)
-		w.addCHIToMonitoring(new)
+		w.addToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
 
