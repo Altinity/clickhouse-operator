@@ -31,6 +31,7 @@ import (
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -196,32 +197,51 @@ func (c *CR) statusUpdate(ctx context.Context, chi *api.ClickHouseInstallation) 
 }
 
 func (c *CR) buildResources(chi *api.ClickHouseInstallation) (*api.ClickHouseInstallation, *core.ConfigMap) {
-	var normalized, normalizedCompleted []byte
-	if chi.Status.NormalizedCR != nil {
-		normalized, _ = json.Marshal(chi.Status.NormalizedCR)
-	}
-	if chi.Status.NormalizedCRCompleted != nil {
-		normalizedCompleted, _ = json.Marshal(chi.Status.NormalizedCRCompleted)
-	}
-
+	// Build required components
+	normalized, normalizedCompleted := c.buildNormalized(chi)
 	tagger := managers.NewTagManager(managers.TagManagerTypeClickHouse, chi)
+	namespace, name := c.buildNamespaceName(chi)
+
+	// Build ConfigMap
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace:   c.buildCMNamespace(chi),
-			Name:        c.buildCMName(chi),
-			Labels:      c.macro.Scope(chi).Map(tagger.Label(interfaces.LabelConfigMapStorage)),
-			Annotations: c.macro.Scope(chi).Map(tagger.Annotate(interfaces.AnnotateConfigMapStorage)),
+			Namespace:       namespace,
+			Name:            name,
+			Labels:          c.macro.Scope(chi).Map(tagger.Label(interfaces.LabelConfigMapStorage)),
+			Annotations:     c.macro.Scope(chi).Map(tagger.Annotate(interfaces.AnnotateConfigMapStorage)),
+			OwnerReferences: creator.NewOwnerReferencer().CreateOwnerReferences(chi),
 		},
 		Data: map[string]string{
-			statusNormalized:          string(normalized),
-			statusNormalizedCompleted: string(normalizedCompleted),
+			statusNormalized:          normalized,
+			statusNormalizedCompleted: normalizedCompleted,
 		},
 	}
 
-	chi.Status.NormalizedCR = nil
-	chi.Status.NormalizedCRCompleted = nil
+	// Finalize resources
+	c.postprocessNormalized(chi)
 
 	return chi, cm
+}
+
+func (c *CR) buildNamespaceName(chi *api.ClickHouseInstallation) (string, string) {
+	return c.buildCMNamespace(chi), c.buildCMName(chi)
+}
+
+func (c *CR) buildNormalized(chi *api.ClickHouseInstallation) (normalized string, normalizedCompleted string) {
+	if chi.Status.NormalizedCR != nil {
+		bytes, _ := json.Marshal(chi.Status.NormalizedCR)
+		normalized = string(bytes)
+	}
+	if chi.Status.NormalizedCRCompleted != nil {
+		bytes, _ := json.Marshal(chi.Status.NormalizedCRCompleted)
+		normalizedCompleted = string(bytes)
+	}
+	return normalized, normalizedCompleted
+}
+
+func (c *CR) postprocessNormalized(chi *api.ClickHouseInstallation) {
+	chi.Status.NormalizedCR = nil
+	chi.Status.NormalizedCRCompleted = nil
 }
 
 func (c *CR) statusUpdateCR(ctx context.Context, chi *api.ClickHouseInstallation) error {
