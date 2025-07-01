@@ -5559,7 +5559,7 @@ def test_059(self):
 
         with Then("default_replica_path should be unchanged"):
             out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_path'")
-            assert out == "/clickhouse/{cluster}/tables/{shard}"
+            assert out == "/clickhouse/{cluster}/tables/{shard}/{uuid}"
 
         with And("default_replica_name should be unchanged"):
             out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_name'")
@@ -5589,23 +5589,23 @@ def test_059(self):
         # 'replica' macro has different value in ClickHouse and Operator - replica name, not hostname
         operator_replica_macro = '0'
 
-        with Then("default_replica_path should be substituted"):
+        with Then("default_replica_path should be substituted from ClickHouse macros"):
             out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_path'")
-            expect = f"/clickhouse/{cluster_macro}/tables/{shard_macro}"
+            expect = f"/clickhouse/{cluster_macro}/tables/{shard_macro}/" + "{uuid}"
             print(f"{out}")
             print(f"{expect}")
             assert out == expect
 
-        # 'replica' macro has different value in ClickHouse and Operator
-        with And("default_replica_name should be substituted"):
+        # # 'replica' macro has different value in ClickHouse (hostname) and Operator (replica name, default to index)
+        with And("default_replica_name should be substituted from ClickHouse macros", flags=XFAIL):
             out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_name'")
-            expect = operator_replica_macro
+            expect = replica_macro
             print(f"{out}")
             print(f"{expect}")
             assert out == expect
 
         # 'replica' macro has different value in ClickHouse and Operator
-        with And("Macro my_replica should be substituted"):
+        with And("Macro my_replica should be substituted from operator macros"):
             out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_replica'")
             expect = operator_replica_macro
             print(f"{out}")

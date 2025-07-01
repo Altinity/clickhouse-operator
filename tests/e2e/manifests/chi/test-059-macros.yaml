@@ -13,11 +13,10 @@ spec:
         layout:
           shardsCount: 2
         settings:
-          default_replica_path: /clickhouse/{cluster}/tables/{shard} # should be parsed by ClickHouse
+          default_replica_path: /clickhouse/{cluster}/tables/{shard}/{uuid} # should be parsed by ClickHouse
           default_replica_name: "{replica}" # should be parsed by ClickHouse
-          macros/my_replica: "{replica}"
+          macros/my_replica: "{replica}"  # 'replica' macro has different value in ClickHouse (hostname) and Operator (replica name, default to index)
     files:
-      # should be parsed by ClickHouse
       conf.d/custom.xml: |
          <yandex>
             <macros>
