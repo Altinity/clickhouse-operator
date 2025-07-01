@@ -1,0 +1,34 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-059-macros
+
+spec:
+  taskID: "reconcile"
+  useTemplates:
+    - name: clickhouse-version
+  reconciling:
+    macros:
+      sections:
+        settings:
+          enabled: "yes"
+        files:
+          enabled: "yes"
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 2
+    settings:
+      default_replica_path: /clickhouse/{cluster}/tables/{shard} # should be parsed by ClickHouse
+      default_replica_name: "{replica}" # should be parsed by ClickHouse
+      macros/my_replica: "{replica}"
+    files:
+      config.d/custom.xml: |
+         <yandex>
+            <macros>
+              <my_endpoint>https://s3_url/{cluster}/{shard}/</my_endpoint>
+            </macros>
+         </yandex>
+

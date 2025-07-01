@@ -1930,7 +1930,6 @@ def test_016(self):
             "do_not_delete": 1,
         },
     )
-    time.sleep(30)
 
     with Then("Custom macro 'layer' should be available"):
         out = clickhouse.query(chi, sql="select substitution from system.macros where macro='layer'")
@@ -5538,6 +5537,74 @@ def test_058(self): # Can be merged with test_034 potentially
         kubectl.launch(f"delete pod {client_pod}")
         delete_test_namespace()
 
+@TestScenario
+@Name("test_059. Test macro substitutions in settings")
+def test_059(self):
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-059-macros"
+    cluster = "default"
+    kubectl.create_and_check(
+        manifest="manifests/chi/test-059-macros.yaml",
+        check={
+            "apply_templates": {
+                current().context.clickhouse_template,
+            },
+            "pod_count": 1,
+            "do_not_delete": 1,
+        },
+    )
+
+    for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
+
+        with Then("default_replica_path should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_path'")
+            assert out == "/clickhouse/{cluster}/tables/{shard}"
+
+        with And("default_replica_name should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_name'")
+            assert out == "{replica}"
+
+        with And("Macro my_replica should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_replica'")
+            assert out == "{replica}"
+
+        with And("Macro my_endpoint should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_endpoint'")
+            assert out == "https://s3_url/{cluster}/{shard}/"
+
+    with When("Update CHI to apply macro subsctitutions"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-059-macros-2.yaml",
+            check={
+                "do_not_delete": 1,
+            },
+        )
+
+    cluster_macro = clickhouse.query(chi, sql="select substitution from system.macros where macro='cluster'")
+    shard_macro   = clickhouse.query(chi, sql="select substitution from system.macros where macro='shard'")
+    replica_macro = clickhouse.query(chi, sql="select substitution from system.macros where macro='replica'")
+
+    for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
+
+        with Then("default_replica_path should be substituted"):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_path'")
+            assert out == f"/clickhouse/{cluster_macro}/tables/{shard_macro}"
+
+        with And("default_replica_name should be substituted"):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_name'")
+            assert out == replica_macro
+
+        with And("Macro my_replica should be substituted"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_replica'")
+            assert out == replica_macro
+
+        with And("Macro my_endpoint should be substituted"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_endpoint'")
+            assert out == f"https://s3_url/{cluster}/{shard}/"
+
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):
