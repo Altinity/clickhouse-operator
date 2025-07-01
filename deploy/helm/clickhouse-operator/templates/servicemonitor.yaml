@@ -13,22 +13,36 @@ metadata:
 spec:
   endpoints:
     - port: clickhouse-metrics # 8888
+      {{- with .Values.serviceMonitor.clickhouseMetrics.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.clickhouseMetrics.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.clickhouseMetrics.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.clickhouseMetrics.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     - port: operator-metrics # 9999
+      {{- with .Values.serviceMonitor.operatorMetrics.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.operatorMetrics.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.operatorMetrics.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.operatorMetrics.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   selector:
     matchLabels:
       {{- include "altinity-clickhouse-operator.selectorLabels" . | nindent 6 }}
-  {{- with .Values.serviceMonitor.interval }}
-  interval: {{ . }}
-  {{- end }}
-  {{- with .Values.serviceMonitor.scrapeTimeout }}
-  scrapeTimeout: {{ . }}
-  {{- end }}
-  {{- with .Values.serviceMonitor.relabelings }}
-  relabelings:
-    {{- toYaml . | nindent 8 }}
-  {{- end }}
-  {{- with .Values.serviceMonitor.metricRelabelings }}
-  metricRelabelings:
-    {{- toYaml . | nindent 8 }}
-  {{- end }}
 {{- end }}

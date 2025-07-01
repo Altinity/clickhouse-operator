@@ -41,7 +41,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -129,7 +128,7 @@ func (w *worker) buildCreator(cr *api.ClickHouseInstallation) *commonCreator.Cre
 		managers.NewNameManager(managers.NameManagerTypeClickHouse),
 		managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeClickHouse),
 		namer.New(),
-		commonMacro.New(macro.List),
+		macro.New(),
 		labeler.New(cr),
 	)
 }
@@ -345,36 +344,6 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 
 	// CHI is being reconciled
 	return w.reconcileCR(ctx, old, new)
-}
-
-// excludeStoppedCHIFromMonitoring excludes stopped CHI from monitoring
-func (w *worker) excludeStoppedCHIFromMonitoring(chi *api.ClickHouseInstallation) {
-	if !chi.IsStopped() {
-		// No need to exclude non-stopped CHI
-		return
-	}
-
-	w.a.V(1).
-		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileInProgress).
-		WithAction(chi).
-		M(chi).F().
-		Info("exclude CHI from monitoring")
-	w.c.deleteWatch(chi)
-}
-
-// addCHIToMonitoring adds CHI to monitoring
-func (w *worker) addCHIToMonitoring(chi *api.ClickHouseInstallation) {
-	if chi.IsStopped() {
-		// No need to add stopped CHI
-		return
-	}
-
-	w.a.V(1).
-		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileInProgress).
-		WithAction(chi).
-		M(chi).F().
-		Info("add CHI to monitoring")
-	w.c.updateWatch(chi)
 }
 
 func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {

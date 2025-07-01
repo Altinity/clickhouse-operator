@@ -1,0 +1,105 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: "macros"
+
+spec:
+  configuration:
+    files:
+      simple_1.file: |
+        <yandex>
+          <!-- simple_1.file goes into {common} -->
+        </yandex>
+      "{common}/common_prefixed_1.file": |
+        <yandex>
+          <!-- common_prefixed_1.file -->
+          <!-- macros
+            # {chi} - ClickHouseInstallation name
+            # {cluster} - cluster name
+            # {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+            # {shard} - shard name
+            # {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+            # {replica} - replica name
+            # {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
+            # {chiScopeIndex} - 0-based index of the host in the chi (BEWARE, this is an experimental feature)
+            # {chiScopeCycleIndex} - 0-based index of the host's cycle in the chi-scope (BEWARE, this is an experimental feature)
+            # {chiScopeCycleOffset} - 0-based offset of the host in the chi-scope cycle (BEWARE, this is an experimental feature)
+            # {clusterScopeIndex} - 0-based index of the host in the cluster (BEWARE, this is an experimental feature)
+            # {clusterScopeCycleIndex} - 0-based index of the host's cycle in the cluster-scope (BEWARE, this is an experimental feature)
+            # {clusterScopeCycleOffset} - 0-based offset of the host in the cluster-scope cycle (BEWARE, this is an experimental feature)
+            # {shardScopeIndex} - 0-based index of the host in the shard (BEWARE, this is an experimental feature)
+            # {replicaScopeIndex} - 0-based index of the host in the replica (BEWARE, this is an experimental feature)
+            # {clusterScopeCycleHeadPointsToPreviousCycleTail} - 0-based cluster-scope index of previous cycle tail
+          -->
+        </yandex>
+      "{users}/users_prefixed_1.file": |
+        <yandex>
+          <!-- users_prefixed_1.file -->
+          <!-- macros
+            # {chi} - ClickHouseInstallation name
+            # {cluster} - cluster name
+            # {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+            # {shard} - shard name
+            # {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+            # {replica} - replica name
+            # {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
+            # {chiScopeIndex} - 0-based index of the host in the chi (BEWARE, this is an experimental feature)
+            # {chiScopeCycleIndex} - 0-based index of the host's cycle in the chi-scope (BEWARE, this is an experimental feature)
+            # {chiScopeCycleOffset} - 0-based offset of the host in the chi-scope cycle (BEWARE, this is an experimental feature)
+            # {clusterScopeIndex} - 0-based index of the host in the cluster (BEWARE, this is an experimental feature)
+            # {clusterScopeCycleIndex} - 0-based index of the host's cycle in the cluster-scope (BEWARE, this is an experimental feature)
+            # {clusterScopeCycleOffset} - 0-based offset of the host in the cluster-scope cycle (BEWARE, this is an experimental feature)
+            # {shardScopeIndex} - 0-based index of the host in the shard (BEWARE, this is an experimental feature)
+            # {replicaScopeIndex} - 0-based index of the host in the replica (BEWARE, this is an experimental feature)
+            # {clusterScopeCycleHeadPointsToPreviousCycleTail} - 0-based cluster-scope index of previous cycle tail
+          -->
+        </yandex>
+      "{hosts}/host_prefixed_1.file": |
+        <yandex>
+          <!-- host_prefixed_1.file -->
+          <!-- macros
+            # {chi} - ClickHouseInstallation name
+            # {cluster} - cluster name
+            # {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+            # {shard} - shard name
+            # {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+            # {replica} - replica name
+            # {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
+            # {chiScopeIndex} - 0-based index of the host in the chi (BEWARE, this is an experimental feature)
+            # {chiScopeCycleIndex} - 0-based index of the host's cycle in the chi-scope (BEWARE, this is an experimental feature)
+            # {chiScopeCycleOffset} - 0-based offset of the host in the chi-scope cycle (BEWARE, this is an experimental feature)
+            # {clusterScopeIndex} - 0-based index of the host in the cluster (BEWARE, this is an experimental feature)
+            # {clusterScopeCycleIndex} - 0-based index of the host's cycle in the cluster-scope (BEWARE, this is an experimental feature)
+            # {clusterScopeCycleOffset} - 0-based offset of the host in the cluster-scope cycle (BEWARE, this is an experimental feature)
+            # {shardScopeIndex} - 0-based index of the host in the shard (BEWARE, this is an experimental feature)
+            # {replicaScopeIndex} - 0-based index of the host in the replica (BEWARE, this is an experimental feature)
+            # {clusterScopeCycleHeadPointsToPreviousCycleTail} - 0-based cluster-scope index of previous cycle tail
+          -->
+        </yandex>
+
+    clusters:
+      - name: "c1"
+        layout:
+          shardsCount: 2
+          replicasCount: 2
+
+  reconciling:
+    runtime:
+      reconcileShardsThreadsNumber: 10
+      reconcileShardsMaxConcurrencyPercent: 50
+    macros:
+      sections:
+        users:
+          enabled: "yes"
+        profiles:
+          enabled: "yes"
+        quotas:
+          enabled: "yes"
+        settings:
+          enabled: "yes"
+        files:
+          enabled: "yes"
+
+  defaults:
+    replicasUseFQDN: "yes"

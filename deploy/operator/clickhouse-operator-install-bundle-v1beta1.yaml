@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.25.0
+# OPERATOR_VERSION=0.25.1
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -442,6 +442,49 @@ spec:
                       minimum: 0
                       maximum: 100
                       description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                macros:
+                  type: object
+                  description: "macros parameters"
+                  properties:
+                    sections:
+                      type: object
+                      description: "sections behaviour for macros"
+                      properties:
+                        users:
+                          type: object
+                          description: "sections behaviour for macros on users"
+                          properties:
+                            enabled:
+                              !!merge <<: *TypeStringBool
+                              description: "enabled or not"
+                        profiles:
+                          type: object
+                          description: "sections behaviour for macros on profiles"
+                          properties:
+                            enabled:
+                              !!merge <<: *TypeStringBool
+                              description: "enabled or not"
+                        quotas:
+                          type: object
+                          description: "sections behaviour for macros on quotas"
+                          properties:
+                            enabled:
+                              !!merge <<: *TypeStringBool
+                              description: "enabled or not"
+                        settings:
+                          type: object
+                          description: "sections behaviour for macros on settings"
+                          properties:
+                            enabled:
+                              !!merge <<: *TypeStringBool
+                              description: "enabled or not"
+                        files:
+                          type: object
+                          description: "sections behaviour for macros on files"
+                          properties:
+                            enabled:
+                              !!merge <<: *TypeStringBool
+                              description: "enabled or not"
             defaults:
               type: object
               description: |
@@ -634,7 +677,7 @@ spec:
                     every key in this object is the file name
                     every value in this object is the file content
                     you can use `!!binary |` and base64 for binary files, see details here https://yaml.org/type/binary.html
-                    each key could contains prefix like {users}, {common}, {host} or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
+                    each key could contains prefix like {common}, {users}, {hosts} or config.d, users.d, conf.d, wrong prefixes will be ignored, subfolders also will be ignored
                     More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
 
                     any key could contains `valueFrom` with `secretKeyRef` which allow pass values from kubernetes secrets
@@ -756,6 +799,24 @@ spec:
                           by specifying 0. This is a mutually exclusive setting with "minAvailable".
                         minimum: 0
                         maximum: 65535
+                      reconcile:
+                        type: object
+                        description: "allow tuning reconciling process"
+                        properties:
+                          runtime:
+                            type: object
+                            description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                            properties:
+                              reconcileShardsThreadsNumber:
+                                type: integer
+                                minimum: 1
+                                maximum: 65535
+                                description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
+                              reconcileShardsMaxConcurrencyPercent:
+                                type: integer
+                                minimum: 0
+                                maximum: 100
+                                description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                       layout:
                         type: object
                         description: |
@@ -1002,24 +1063,6 @@ spec:
                                         description: |
                                           optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                           override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
-                      reconcile:
-                        type: object
-                        description: "allow tuning reconciling process"
-                        properties:
-                          runtime:
-                            type: object
-                            description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                            properties:
-                              reconcileShardsThreadsNumber:
-                                type: integer
-                                minimum: 1
-                                maximum: 65535
-                                description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                              reconcileShardsMaxConcurrencyPercent:
-                                type: integer
-                                minimum: 0
-                                maximum: 100
-                                description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
             templates:
               type: object
               description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
@@ -1329,14 +1372,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.25.0
+# OPERATOR_VERSION=0.25.1
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1765,6 +1808,49 @@ spec:
                       minimum: 0
                       maximum: 100
                       description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                macros:
+                  type: object
+                  description: "macros parameters"
+                  properties:
+                    sections:
+                      type: object
+                      description: "sections behaviour for macros"
+                      properties:
+                        users:
+                          type: object
+                          description: "sections behaviour for macros on users"
+                          properties:
+                            enabled:
+                              !!merge <<: *TypeStringBool
+                              description: "enabled or not"
+                        profiles:
+                          type: object
+                          description: "sections behaviour for macros on profiles"
+                          properties:
+                            enabled:
+                              !!merge <<: *TypeStringBool
+                              description: "enabled or not"
+                        quotas:
+                          type: object
+                          description: "sections behaviour for macros on quotas"
+                          properties:
+                            enabled:
+                              !!merge <<: *TypeStringBool
+                              description: "enabled or not"
+                        settings:
+                          type: object
+                          description: "sections behaviour for macros on settings"
+                          properties:
+                            enabled:
+                              !!merge <<: *TypeStringBool
+                              description: "enabled or not"
+                        files:
+                          type: object
+                          description: "sections behaviour for macros on files"
+                          properties:
+                            enabled:
+                              !!merge <<: *TypeStringBool
+                              description: "enabled or not"
             defaults:
               type: object
               description: |
@@ -1957,7 +2043,7 @@ spec:
                     every key in this object is the file name
                     every value in this object is the file content
                     you can use `!!binary |` and base64 for binary files, see details here https://yaml.org/type/binary.html
-                    each key could contains prefix like {users}, {common}, {host} or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
+                    each key could contains prefix like {common}, {users}, {hosts} or config.d, users.d, conf.d, wrong prefixes will be ignored, subfolders also will be ignored
                     More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
 
                     any key could contains `valueFrom` with `secretKeyRef` which allow pass values from kubernetes secrets
@@ -2079,6 +2165,24 @@ spec:
                           by specifying 0. This is a mutually exclusive setting with "minAvailable".
                         minimum: 0
                         maximum: 65535
+                      reconcile:
+                        type: object
+                        description: "allow tuning reconciling process"
+                        properties:
+                          runtime:
+                            type: object
+                            description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                            properties:
+                              reconcileShardsThreadsNumber:
+                                type: integer
+                                minimum: 1
+                                maximum: 65535
+                                description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
+                              reconcileShardsMaxConcurrencyPercent:
+                                type: integer
+                                minimum: 0
+                                maximum: 100
+                                description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                       layout:
                         type: object
                         description: |
@@ -2325,24 +2429,6 @@ spec:
                                         description: |
                                           optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                           override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
-                      reconcile:
-                        type: object
-                        description: "allow tuning reconciling process"
-                        properties:
-                          runtime:
-                            type: object
-                            description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                            properties:
-                              reconcileShardsThreadsNumber:
-                                type: integer
-                                minimum: 1
-                                maximum: 65535
-                                description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                              reconcileShardsMaxConcurrencyPercent:
-                                type: integer
-                                minimum: 0
-                                maximum: 100
-                                description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
             templates:
               type: object
               description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
@@ -2655,7 +2741,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -3149,14 +3235,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.25.0
+# OPERATOR_VERSION=0.25.1
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.25.0
+    clickhouse-keeper.altinity.com/chop: 0.25.1
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -4027,7 +4113,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
 
 # Template Parameters:
 #
@@ -4052,7 +4138,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
 rules:
   #
   # Core API group
@@ -4261,7 +4347,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -4294,7 +4380,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
 rules:
   #
   # Core API group
@@ -4503,7 +4589,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -4525,7 +4611,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -5007,7 +5093,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 data:
 ---
@@ -5023,7 +5109,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -5117,7 +5203,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -5215,7 +5301,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -5277,7 +5363,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 data:
 ---
@@ -5293,7 +5379,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -5368,7 +5454,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 data:
   readme: |
@@ -5386,7 +5472,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 data:
 ---
@@ -5394,7 +5480,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=kube-system
 #   COMMENT=
-#   OPERATOR_VERSION=0.25.0
+#   OPERATOR_VERSION=0.25.1
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -5404,7 +5490,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -5415,9 +5501,9 @@ stringData:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.25.0
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.25.1
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.25.0
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.25.1
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -5428,7 +5514,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -5476,7 +5562,7 @@ spec:
             name: etc-keeper-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.25.0
+          image: altinity/clickhouse-operator:0.25.1
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5550,7 +5636,7 @@ spec:
             - containerPort: 9999
               name: metrics
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.25.0
+          image: altinity/metrics-exporter:0.25.1
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5640,7 +5726,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.0
+    clickhouse.altinity.com/chop: 0.25.1
     app: clickhouse-operator
 spec:
   ports:

@@ -26,7 +26,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 )
 
 const (
@@ -46,7 +45,7 @@ type ServiceManager struct {
 func NewServiceManager() *ServiceManager {
 	return &ServiceManager{
 		or:      NewOwnerReferencer(),
-		macro:   commonMacro.New(macro.List),
+		macro:   macro.New(),
 		namer:   namer.New(),
 		labeler: nil,
 	}

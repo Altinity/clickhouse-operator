@@ -27,6 +27,23 @@ type SettingSource struct {
 	ValueFrom *types.DataSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
 }
 
+// NewSettingSource makes new source Setting
+func NewSettingSource(src *SettingSource) *Setting {
+	return &Setting{
+		_type: SettingTypeSource,
+		src:   src,
+	}
+}
+
+// NewSettingSourceFromAny makes new source Setting from untyped
+func NewSettingSourceFromAny(untyped any) (*Setting, bool) {
+	if srcValue, ok := parseSettingSourceValue(untyped); ok {
+		return NewSettingSource(srcValue), true
+	}
+
+	return nil, false
+}
+
 // GetNameKey gets name and key from the secret ref
 func (s *SettingSource) GetNameKey() (string, string) {
 	if ref := s.GetSecretKeyRef(); ref != nil {
@@ -60,38 +77,6 @@ func (s *SettingSource) HasValue() bool {
 		return false
 	}
 	return s.HasSecretKeyRef()
-}
-
-// NewSettingSource makes new source Setting
-func NewSettingSource(src *SettingSource) *Setting {
-	return &Setting{
-		_type: SettingTypeSource,
-		src:   src,
-	}
-}
-
-// NewSettingSourceFromAny makes new source Setting from untyped
-func NewSettingSourceFromAny(untyped any) (*Setting, bool) {
-	if srcValue, ok := parseSettingSourceValue(untyped); ok {
-		return NewSettingSource(srcValue), true
-	}
-
-	return nil, false
-}
-
-func parseSettingSourceValue(untyped any) (*SettingSource, bool) {
-	jsonStr, err := json.Marshal(untyped)
-	if err != nil {
-		return nil, false
-	}
-
-	// Convert json string to struct
-	var settingSource SettingSource
-	if err := json.Unmarshal(jsonStr, &settingSource); err != nil {
-		return nil, false
-	}
-
-	return &settingSource, true
 }
 
 // sourceAsAny gets source value of a setting as any
@@ -138,4 +123,19 @@ func (s *Setting) HasSecretKeyRef() bool {
 	}
 
 	return s.GetSecretKeyRef() != nil
+}
+
+func parseSettingSourceValue(untyped any) (*SettingSource, bool) {
+	jsonStr, err := json.Marshal(untyped)
+	if err != nil {
+		return nil, false
+	}
+
+	// Convert json string to struct
+	var settingSource SettingSource
+	if err := json.Unmarshal(jsonStr, &settingSource); err != nil {
+		return nil, false
+	}
+
+	return &settingSource, true
 }

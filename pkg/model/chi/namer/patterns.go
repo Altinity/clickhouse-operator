@@ -16,37 +16,37 @@ package namer
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
-	macroCommon "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
+	macrosList "github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 )
 
 var patterns = types.List{
 	// patternConfigMapCommonName is a template of common settings for the CHI ConfigMap. "chi-{chi}-common-configd"
-	patternConfigMapCommonName: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-common-configd",
+	patternConfigMapCommonName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-common-configd",
 
 	// patternConfigMapCommonUsersName is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
-	patternConfigMapCommonUsersName: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-common-usersd",
+	patternConfigMapCommonUsersName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-common-usersd",
 
 	// patternConfigMapHostName is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
-	patternConfigMapHostName: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-deploy-confd-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosHostName),
+	patternConfigMapHostName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-deploy-confd-" + macrosList.Get().Get(macro.MacrosClusterName) + "-" + macrosList.Get().Get(macro.MacrosHostName),
 
 	// patternCRServiceName is a template of Custom Resource Service name. "clickhouse-{chi}"
-	patternCRServiceName: "clickhouse-" + macro.List.Get(macroCommon.MacrosCRName),
+	patternCRServiceName: "clickhouse-" + macrosList.Get().Get(macro.MacrosCRName),
 
 	// patternClusterServiceName is a template of cluster Service name. "cluster-{chi}-{cluster}"
-	patternClusterServiceName: "cluster-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName),
+	patternClusterServiceName: "cluster-" + macrosList.Get().Get(macro.MacrosCRName) + "-" + macrosList.Get().Get(macro.MacrosClusterName),
 
 	// patternShardServiceName is a template of shard Service name. "shard-{chi}-{cluster}-{shard}"
-	patternShardServiceName: "shard-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosShardName),
+	patternShardServiceName: "shard-" + macrosList.Get().Get(macro.MacrosCRName) + "-" + macrosList.Get().Get(macro.MacrosClusterName) + "-" + macrosList.Get().Get(macro.MacrosShardName),
 
 	// patternReplicaServiceName is a template of replica Service name. "shard-{chi}-{cluster}-{replica}"
-	patternReplicaServiceName: "shard-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosReplicaName),
+	patternReplicaServiceName: "shard-" + macrosList.Get().Get(macro.MacrosCRName) + "-" + macrosList.Get().Get(macro.MacrosClusterName) + "-" + macrosList.Get().Get(macro.MacrosReplicaName),
 
 	// patternStatefulSetName is a template of host StatefulSet's name. "chi-{chi}-{cluster}-{shard}-{host}"
-	patternStatefulSetName: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosHostName),
+	patternStatefulSetName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-" + macrosList.Get().Get(macro.MacrosClusterName) + "-" + macrosList.Get().Get(macro.MacrosHostName),
 
 	// patternStatefulSetServiceName is a template of host StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
-	patternStatefulSetServiceName: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosHostName),
+	patternStatefulSetServiceName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-" + macrosList.Get().Get(macro.MacrosClusterName) + "-" + macrosList.Get().Get(macro.MacrosHostName),
 }
 
 const (

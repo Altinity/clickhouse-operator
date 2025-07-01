@@ -40,7 +40,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -104,7 +103,7 @@ func (w *worker) buildCreator(cr *apiChk.ClickHouseKeeperInstallation) *commonCr
 		managers.NewNameManager(managers.NameManagerTypeKeeper),
 		managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeKeeper),
 		namer.New(),
-		commonMacro.New(macro.List),
+		macro.New(),
 		labeler.New(cr),
 	)
 }

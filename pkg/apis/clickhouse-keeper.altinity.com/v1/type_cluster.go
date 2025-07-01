@@ -92,6 +92,14 @@ func (cluster *Cluster) GetName() string {
 	return cluster.Name
 }
 
+// HasName checks whether cluster has a name
+func (cluster *Cluster) HasName() bool {
+	if cluster == nil {
+		return false
+	}
+	return len(cluster.GetName()) > 0
+}
+
 func (c *Cluster) GetZookeeper() *apiChi.ZookeeperConfig {
 	return nil
 }
@@ -110,45 +118,55 @@ func (cluster *Cluster) GetSecure() *types.StringBool {
 	return nil
 }
 
+// GetSecret is a getter
 func (c *Cluster) GetSecret() *apiChi.ClusterSecret {
 	return nil
 }
 
+// GetRuntime is a getter
 func (cluster *Cluster) GetRuntime() apiChi.IClusterRuntime {
 	return &cluster.Runtime
 }
 
+// GetPDBMaxUnavailable is a getter
 func (cluster *Cluster) GetPDBMaxUnavailable() *types.Int32 {
 	return types.NewInt32(1)
 }
 
-// FillShardReplicaSpecified fills whether shard or replicas are explicitly specified
-func (cluster *Cluster) FillShardReplicaSpecified() {
+// FillShardsReplicasExplicitlySpecified fills whether shard or replicas are explicitly specified
+func (cluster *Cluster) FillShardsReplicasExplicitlySpecified() {
 	if len(cluster.Layout.Shards) > 0 {
-		cluster.Layout.ShardsSpecified = true
+		cluster.Layout.ShardsExplicitlySpecified = true
 	}
 	if len(cluster.Layout.Replicas) > 0 {
-		cluster.Layout.ReplicasSpecified = true
+		cluster.Layout.ReplicasExplicitlySpecified = true
 	}
 }
 
-// isShardSpecified checks whether shard is explicitly specified
-func (cluster *Cluster) isShardSpecified() bool {
-	return cluster.Layout.ShardsSpecified == true
+// isShardExplicitlySpecified checks whether shard is explicitly specified
+func (cluster *Cluster) isShardExplicitlySpecified() bool {
+	return cluster.Layout.ShardsExplicitlySpecified == true
 }
 
-// isReplicaSpecified checks whether replica is explicitly specified
-func (cluster *Cluster) isReplicaSpecified() bool {
-	return (cluster.Layout.ShardsSpecified == false) && (cluster.Layout.ReplicasSpecified == true)
+// isReplicaExplicitlySpecified checks whether replica is explicitly specified
+func (cluster *Cluster) isReplicaExplicitlySpecified() bool {
+	return !cluster.isShardExplicitlySpecified() && (cluster.Layout.ReplicasExplicitlySpecified == true)
 }
 
 // IsShardSpecified checks whether shard is explicitly specified
-func (cluster *Cluster) IsShardSpecified() bool {
-	if !cluster.isShardSpecified() && !cluster.isReplicaSpecified() {
+func (cluster *Cluster) isShardToBeUsedToInheritSettingsFrom() bool {
+	if !cluster.isShardExplicitlySpecified() && !cluster.isReplicaExplicitlySpecified() {
 		return true
 	}
 
-	return cluster.isShardSpecified()
+	return cluster.isShardExplicitlySpecified()
+}
+
+func (cluster *Cluster) SelectSettingsSourceFrom(shard apiChi.IShard, replica apiChi.IReplica) any {
+	if cluster.isShardToBeUsedToInheritSettingsFrom() {
+		return shard
+	}
+	return replica
 }
 
 // InheritFilesFrom inherits files from CHI
@@ -342,6 +360,13 @@ func (cluster *Cluster) IsNonZero() bool {
 	return cluster != nil
 }
 
+func (cluster *Cluster) Ensure(create func() *Cluster) *Cluster {
+	if cluster == nil {
+		cluster = create()
+	}
+	return cluster
+}
+
 // ChkClusterLayout defines layout section of .spec.configuration.clusters
 type ChkClusterLayout struct {
 	ShardsCount   int `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
@@ -353,9 +378,9 @@ type ChkClusterLayout struct {
 
 	// Internal data
 	// Whether shards or replicas are explicitly specified as Shards []ChiShard or Replicas []ChiReplica
-	ShardsSpecified   bool               `json:"-" yaml:"-" testdiff:"ignore"`
-	ReplicasSpecified bool               `json:"-" yaml:"-" testdiff:"ignore"`
-	HostsField        *apiChi.HostsField `json:"-" yaml:"-" testdiff:"ignore"`
+	ShardsExplicitlySpecified   bool               `json:"-" yaml:"-" testdiff:"ignore"`
+	ReplicasExplicitlySpecified bool               `json:"-" yaml:"-" testdiff:"ignore"`
+	HostsField                  *apiChi.HostsField `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // NewChiClusterLayout creates new cluster layout
@@ -365,4 +390,11 @@ func NewChkClusterLayout() *ChkClusterLayout {
 
 func (l *ChkClusterLayout) GetReplicasCount() int {
 	return l.ReplicasCount
+}
+
+func (l *ChkClusterLayout) Ensure() *ChkClusterLayout {
+	if l == nil {
+		l = NewChkClusterLayout()
+	}
+	return l
 }

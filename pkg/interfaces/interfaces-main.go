@@ -49,6 +49,7 @@ type IMacro interface {
 	Scope(scope any) IMacro
 	Line(line string) string
 	Map(_map map[string]string) map[string]string
+	Replacer() *util.Replacer
 }
 
 type ILabeler interface {

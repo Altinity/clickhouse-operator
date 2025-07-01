@@ -60,8 +60,8 @@ func (n *Normalizer) hostGetHostTemplate(host *chi.Host) *chi.HostTemplate {
 
 // hostApplyHostTemplate
 func hostApplyHostTemplate(host *chi.Host, template *chi.HostTemplate) {
-	if host.GetName() == "" {
-		host.Name = template.Spec.Name
+	if !host.HasName() {
+		host.SetName(template.Spec.Name)
 		log.V(3).M(host).F().Info("host has no name specified thus assigning name from Spec: %s", host.GetName())
 	}
 
@@ -170,19 +170,13 @@ func (n *Normalizer) normalizeHost(
 ) {
 
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
-	// Inherit from either Shard or Replica
-	var s chi.IShard
-	var r chi.IReplica
-	if cluster.IsShardSpecified() {
-		s = shard
-	} else {
-		r = replica
-	}
-	host.InheritSettingsFrom(s, r)
+	// Inherit from either Shard or Replica - use one of them as a source
+	src := cluster.SelectSettingsSourceFrom(shard, replica)
+	host.InheritSettingsFrom(src)
 	host.Settings = n.normalizeConfigurationSettings(host.Settings)
-	host.InheritFilesFrom(s, r)
+	host.InheritFilesFrom(src)
 	host.Files = n.normalizeConfigurationFiles(host.Files)
-	host.InheritTemplatesFrom(s, r)
+	host.InheritTemplatesFrom(src)
 
 	n.normalizeHostEnvVars()
 }

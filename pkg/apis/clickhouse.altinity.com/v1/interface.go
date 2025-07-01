@@ -110,6 +110,7 @@ type ICluster interface {
 	IsZero() bool
 
 	GetName() string
+	HasName() bool
 	GetZookeeper() *ZookeeperConfig
 	GetSchemaPolicy() *SchemaPolicy
 	GetInsecure() *types.StringBool
@@ -125,7 +126,7 @@ type ICluster interface {
 	FindShard(needle interface{}) IShard
 	FindHost(needleShard interface{}, needleHost interface{}) *Host
 
-	IsShardSpecified() bool
+	SelectSettingsSourceFrom(shard IShard, replica IReplica) any
 
 	GetRuntime() IClusterRuntime
 	GetServiceTemplate() (*ServiceTemplate, bool)

@@ -15,7 +15,7 @@
 package announcer
 
 import (
-	"reflect"
+	"fmt"
 	"strconv"
 
 	log "github.com/golang/glog"
@@ -126,25 +126,76 @@ func (a Announcer) M(m ...interface{}) Announcer {
 		switch typed := m[0].(type) {
 		case string:
 			b.meta = typed
+			return b
 		case *api.ClickHouseInstallation:
 			if typed == nil {
 				return a
 			}
-			b.meta = typed.Namespace + "/" + typed.Name
-			if typed.GetSpecT().HasTaskID() {
-				b.meta += "/" + typed.GetSpecT().GetTaskID()
-			}
-		default:
-			if meta, ok := a.tryToFindNamespaceNameEverywhere(m[0]); ok {
-				b.meta = meta
-			} else {
+		case *api.Cluster:
+			if typed == nil {
 				return a
 			}
+		case *api.ChiShard:
+			if typed == nil {
+				return a
+			}
+		case *api.ChiReplica:
+			if typed == nil {
+				return a
+			}
+		case *api.Host:
+			if typed == nil {
+				return a
+			}
+		case *api.ClickHouseOperatorConfiguration:
+			if typed == nil {
+				return a
+			}
+		case *api.ClickHouseInstallationTemplate:
+			if typed == nil {
+				return a
+			}
+		}
+
+		switch typed := m[0].(type) {
+		case *api.ClickHouseInstallation:
+			b.meta = fmt.Sprintf("CHI:%s/%s", typed.GetNamespace(), typed.GetName())
+		case *api.Cluster:
+			b.meta = fmt.Sprintf("Cluster:%s[%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetClusterName(),
+				typed.GetRuntime().GetAddress().GetClusterIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *api.ChiShard:
+			b.meta = fmt.Sprintf("Shard:%s[%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetShardName(),
+				typed.GetRuntime().GetAddress().GetShardIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *api.ChiReplica:
+			b.meta = fmt.Sprintf("Replica:%s[%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetReplicaName(),
+				typed.GetRuntime().GetAddress().GetReplicaIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *api.Host:
+			b.meta = fmt.Sprintf("Host:%s[%d/%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetHostName(),
+				typed.GetRuntime().GetAddress().GetShardIndex(),
+				typed.GetRuntime().GetAddress().GetReplicaIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *api.ClickHouseOperatorConfiguration:
+			b.meta = fmt.Sprintf("ChopConfig:%s/%s", typed.GetNamespace(), typed.GetName())
+		case *api.ClickHouseInstallationTemplate:
+			b.meta = fmt.Sprintf("CHIT:%s/%s", typed.GetNamespace(), typed.GetName())
+		default:
+			b.meta = fmt.Sprintf("unknown")
 		}
 	case 2:
 		namespace, _ := m[0].(string)
 		name, _ := m[1].(string)
-		b.meta = namespace + "/" + name
+		b.meta = fmt.Sprintf("%s/%s", namespace, name)
 	}
 	return b
 }
@@ -258,73 +309,4 @@ func (a Announcer) prependFormat(format string) string {
 		}
 	}
 	return format
-}
-
-// tryToFindNamespaceNameEverywhere
-func (a Announcer) tryToFindNamespaceNameEverywhere(m interface{}) (string, bool) {
-	if meta, ok := a.findNamespaceName(m); ok {
-		return meta, ok
-	}
-	if meta, ok := a.findCHI(m); ok {
-		return meta, ok
-	}
-	return "", false
-}
-
-// findNamespaceName
-func (a Announcer) findNamespaceName(m interface{}) (string, bool) {
-	if m == nil {
-		return "", false
-	}
-	value := reflect.ValueOf(m)
-	if !value.IsValid() || value.IsZero() || ((value.Kind() == reflect.Ptr) && value.IsNil()) {
-		return "", false
-	}
-	var namespace, name reflect.Value
-	if value.Kind() == reflect.Ptr {
-		namespace = value.Elem().FieldByName("Namespace")
-		name = value.Elem().FieldByName("Name")
-	} else {
-		namespace = value.FieldByName("Namespace")
-		name = value.FieldByName("Name")
-	}
-	if !namespace.IsValid() {
-		return "", false
-	}
-	if !name.IsValid() {
-		return "", false
-	}
-	return namespace.String() + "/" + name.String(), true
-}
-
-// findCHI
-func (a Announcer) findCHI(m interface{}) (string, bool) {
-	if m == nil {
-		return "", false
-	}
-	value := reflect.ValueOf(m)
-	if !value.IsValid() || value.IsZero() || ((value.Kind() == reflect.Ptr) && value.IsNil()) {
-		return "", false
-	}
-	// Find CHI
-	var _chi reflect.Value
-	if value.Kind() == reflect.Ptr {
-		_chi = value.Elem().FieldByName("CHI")
-	} else {
-		_chi = value.FieldByName("CHI")
-	}
-	if !_chi.IsValid() || _chi.IsZero() || ((_chi.Kind() == reflect.Ptr) && _chi.IsNil()) {
-		return "", false
-	}
-
-	// Cast to CHI
-	chi, ok := _chi.Interface().(api.ClickHouseInstallation)
-	if !ok {
-		return "", false
-	}
-	res := chi.Namespace + "/" + chi.Name
-	if chi.GetSpecT().HasTaskID() {
-		res += "/" + chi.GetSpecT().GetTaskID()
-	}
-	return res, true
 }

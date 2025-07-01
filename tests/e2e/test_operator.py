@@ -2663,14 +2663,14 @@ def test_023(self):
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     with Given("Auto templates are deployed"):
-        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
-        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-2.yaml"))
-        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-3.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-1.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-2.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-3.yaml"))
         kubectl.apply(util.get_full_path("manifests/secret/test-023-secret.yaml"))
     with Given("Give templates some time to be applied"):
         time.sleep(15)
 
-    chit_data = yaml_manifest.get_manifest_data(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
+    chit_data = yaml_manifest.get_manifest_data(util.get_full_path("manifests/chit/test-023-auto-templates-1.yaml"))
     expected_image = chit_data["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
 
     kubectl.create_and_check(
@@ -2687,21 +2687,41 @@ def test_023(self):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "grafana-dashboard-user"
         # assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == ""
 
-    # manifests/chit/tpl-clickhouse-auto-1.yaml
-    with Then("Environment variable from a template should be populated"):
-        pod = kubectl.get_pod_spec(chi)
-        env = pod["containers"][0]["env"][0]
-        assert env["name"] == "TEST_ENV"
-        assert env["value"] == "TEST_ENV_VALUE"
+    chi_spec = kubectl.get("chi", chi)
+    print("CHI envs:")
+    for env in chi_spec["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["env"]:
+        print(env)
 
-    # manifests/chit/tpl-clickhouse-auto-2.yaml
+    chit_spec = kubectl.get("chit", "clickhouse-stable")
+    print("Template envs:")
+    for env in chit_spec["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["env"]:
+        print(env)
+
+    # manifests/chit/test-023-auto-templates-1.yaml
+    pod = kubectl.get_pod_spec(chi)
+    print("Pod envs:")
+    for env in pod["containers"][0]["env"]:
+        print(env)
+
+    def checkEnv(pos, env_name, env_value):
+        env = pod["containers"][0]["env"][pos]
+        assert env["name"] == env_name
+        assert env["value"] == env_value
+
+    with And("Environment variables from template should be populated"):
+        checkEnv(0, "TEST_ENV_FROM_CHIT_1", "TEST_ENV_FROM_CHIT_1_VALUE")
+    with Then("Environment variables from CHI should be retained"):
+        checkEnv(1, "TEST_ENV_FROM_CHI_1", "TEST_ENV_FROM_CHI_1_VALUE")
+        checkEnv(2, "TEST_ENV_FROM_CHI_2", "TEST_ENV_FROM_CHI_2_VALUE")
+
+    # manifests/chit/test-023-auto-templates-2.yaml
     with Then("Annotation from a template should be populated"):
         normalizedCompleted = kubectl.get_chi_normalizedCompleted(chi)
         assert normalizedCompleted["metadata"]["annotations"]["test"] == "test"
     with Then("Pod annotation should populated from template"):
         assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.test") == "test"
 
-    # manifests/chit/tpl-clickhouse-auto-3.yaml
+    # manifests/chit/test-023-auto-templates-3.yaml
     with Then("User from a template should be populated"):
         out = clickhouse.query_with_error(chi, "select 1", user = "grafana_dashboard_user", pwd = "grafana_dashboard_user_password")
         assert out == "1"
@@ -5460,6 +5480,64 @@ def test_057(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
+
+@TestScenario
+@Name("test_058. Check ClickHouse with rootCA")
+def test_058(self): # Can be merged with test_034 potentially
+    create_shell_namespace_clickhouse_template()
+    operator_namespace = current().context.operator_namespace
+
+    with Given("Add rootCA to operator configuration"):
+        util.apply_operator_config("manifests/chopconf/test-058-chopconf.yaml")
+    out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
+    operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
+
+    with Given("test-058-root-ca secret is installed"):
+        kubectl.apply(
+            util.get_full_path("manifests/secret/test-058-secret.yaml"),
+        )
+
+    manifest = "manifests/chi/test-058-root-ca.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    with When("create the chi with secure connection"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "object_counts": {
+                    "statefulset": 1,
+                    "pod": 1,
+                    "service": 2,
+                },
+                "do_not_delete": 1,
+            }
+        )
+
+    client_pod = "test-058-root-ca-client"
+    with And(f"Start pod: {client_pod}"):
+        kubectl.apply(util.get_full_path("manifests/chi/test-058-root-ca-client.yaml"))
+        kubectl.wait_pod_status(client_pod, "Running")
+
+    with And("Confirm it can securely connect to clickhouse"):
+        creds = "--user=admin --password=password"
+        cmd = f"exec {client_pod} -- clickhouse-client -h chi-{chi}-default-0-0 --secure --port 9440 {creds} -q 'select 58'"
+        out = kubectl.launch(cmd, ok_to_fail=True)
+        assert out == "58", error()
+
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"):
+        check_metrics_monitoring(
+            operator_namespace=operator_namespace,
+            operator_pod=operator_pod,
+            expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
+        )
+
+    with Finally("I clean up"):
+        kubectl.launch(f"delete pod {client_pod}")
+        delete_test_namespace()
+
 
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):
