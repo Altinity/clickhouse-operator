@@ -1930,7 +1930,6 @@ def test_016(self):
             "do_not_delete": 1,
         },
     )
-    time.sleep(30)
 
     with Then("Custom macro 'layer' should be available"):
         out = clickhouse.query(chi, sql="select substitution from system.macros where macro='layer'")
@@ -5536,6 +5535,91 @@ def test_058(self): # Can be merged with test_034 potentially
 
     with Finally("I clean up"):
         kubectl.launch(f"delete pod {client_pod}")
+        delete_test_namespace()
+
+@TestScenario
+@Name("test_059. Test macro substitutions in settings")
+def test_059(self):
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-059-macros"
+    cluster = "default"
+    kubectl.create_and_check(
+        manifest="manifests/chi/test-059-macros.yaml",
+        check={
+            "apply_templates": {
+                current().context.clickhouse_template,
+            },
+            "pod_count": 1,
+            "do_not_delete": 1,
+        },
+    )
+
+    for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
+
+        with Then("default_replica_path should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_path'")
+            assert out == "/clickhouse/{cluster}/tables/{shard}/{uuid}"
+
+        with And("default_replica_name should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_name'")
+            assert out == "{replica}"
+
+        with And("Macro my_replica should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_replica'")
+            assert out == "{replica}"
+
+        with And("Macro my_endpoint should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_endpoint'")
+            assert out == "https://s3_url/{cluster}/{shard}/"
+
+    with When("Update CHI to apply macro subsctitutions"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-059-macros-2.yaml",
+            check={
+                "do_not_delete": 1,
+            },
+        )
+
+    for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
+
+        cluster_macro = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='cluster'")
+        shard_macro = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='shard'")
+        replica_macro = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='replica'")
+        # 'replica' macro has different value in ClickHouse and Operator - replica name, not hostname
+        operator_replica_macro = '0'
+
+        with Then("default_replica_path should be substituted from ClickHouse macros"):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_path'")
+            expect = f"/clickhouse/{cluster_macro}/tables/{shard_macro}/" + "{uuid}"
+            print(f"{out}")
+            print(f"{expect}")
+            assert out == expect
+
+        # # 'replica' macro has different value in ClickHouse (hostname) and Operator (replica name, default to index)
+        with And("default_replica_name should be substituted from ClickHouse macros", flags=XFAIL):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_name'")
+            expect = replica_macro
+            print(f"{out}")
+            print(f"{expect}")
+            assert out == expect
+
+        # 'replica' macro has different value in ClickHouse and Operator
+        with And("Macro my_replica should be substituted from operator macros"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_replica'")
+            expect = operator_replica_macro
+            print(f"{out}")
+            print(f"{expect}")
+            assert out == expect
+
+        with And("Macro my_endpoint should be substituted"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_endpoint'")
+            expect = f"https://s3_url/{cluster_macro}/{shard_macro}/"
+            print(f"{out}")
+            print(f"{expect}")
+            assert out == expect
+
+    with Finally("I clean up"):
         delete_test_namespace()
 
 
