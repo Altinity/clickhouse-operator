@@ -37,8 +37,14 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInst
 		// No need to wait for stopped CHI
 		return
 	}
-	w.a.V(1).M(chi).F().S().Info("wait for IP addresses to be assigned to all pods")
+
+	l := w.a.V(1).M(chi)
+	l.F().S().Info("wait for IP addresses to be assigned to all pods")
+
+	// Let's limit polling time
 	start := time.Now()
+	timeout := 1 * time.Minute
+
 	w.c.poll(ctx, chi, func(c *api.ClickHouseInstallation, e error) bool {
 		// TODO fix later
 		// status IPs list can be empty
@@ -49,17 +55,19 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInst
 		// c.Status.GetPodIPs()
 		podIPs := w.c.getPodsIPs(chi)
 		if len(podIPs) >= len(c.Status.GetPods()) {
+			l.Info("all IP addresses are in place")
 			// Stop polling
-			w.a.V(1).M(c).Info("all IP addresses are in place")
 			return false
 		}
-		if time.Now().Sub(start) > 1*time.Minute {
+		if time.Now().Sub(start) > timeout {
+			l.Warning("not all IP addresses are in place but time has elapsed")
 			// Stop polling
-			w.a.V(1).M(c).Warning("not all IP addresses are in place but time has elapsed")
 			return false
 		}
+
+		l.Info("still waiting - not all IP addresses are in place yet")
+
 		// Continue polling
-		w.a.V(1).M(c).Warning("still waiting - not all IP addresses are in place yet")
 		return true
 	})
 }
