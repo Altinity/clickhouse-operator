@@ -157,7 +157,8 @@ def check_metrics_monitoring(
         port="8888",
         max_retries=7
 ):
-    with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern} {expect_metric} {expect_labels}"):
+    with Then(f"metrics-exporter /metrics endpoint result should contain"):
+        print(f"expect: '{expect_pattern}', '{expect_metric}', '{expect_labels}'")
         expected_pattern_found = False
         for i in range(1, max_retries):
             url_cmd = util.make_http_get_request("127.0.0.1", port, "/metrics")
@@ -169,7 +170,7 @@ def check_metrics_monitoring(
                 lines = [m for m in out.splitlines() if m.startswith(expect_metric)]
                 if len(lines) > 0:
                     metric = lines[0]
-                    print(metric)
+                    print(f"have: {metric}")
                     assert expect_labels in metric, error(metric)
                     return
 
