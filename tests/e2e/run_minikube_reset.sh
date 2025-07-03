@@ -3,10 +3,12 @@
 # The number of nodes to spin up.
 # Defaults to 1.
 NODES="${NODES:-"1"}"
-# --cpus='2':
 # Number of CPUs allocated to Kubernetes.
 # Use "max" to use the maximum number of CPUs.
 CPUS="${CPUS:-"max"}"
+# Amount of RAM to allocate to Kubernetes (format: <number>[<unit>], where unit = b, k, m or g).
+# Use "max" to use the maximum amount of memory.
+MEMORY="${MEMORY:-"10g"}"
 # The Kubernetes version that the minikube will use
 # Ex: v1.2.3, 'stable' for v1.23.3, 'latest' for v1.23.4-rc.0)
 KUBERNETES_VERSION="${KUBERNETES_VERSION:-"stable"}"
@@ -19,6 +21,8 @@ DOCKER_VERSION="${DOCKER_VERSION:-""}"
 echo "Reset kubernetes cluster."
 echo "k8s version: ${KUBERNETES_VERSION}"
 echo "nodes:       ${NODES}"
+echo "cpus:        ${CPUS}"
+echo "memory:      ${MEMORY}"
 echo "docker prune:${DOCKER_PRUNE}"
 
 echo "Delete cluster"
@@ -40,7 +44,7 @@ echo "docker version"
 docker version | grep Version -B1 | grep -v '\-\-'
 
 if [[ ! -z "${DOCKER_VERSION}" ]]; then
-    CUR_DOCKER_VERSION=$(docker version |grep Version|head -1|awk '{print $2}')
+    CUR_DOCKER_VERSION=$(docker version | grep Version | head -1 | awk '{print $2}')
     # Split CUR_DOCKER_VERSION by '.' and extract major version
     arrDOCKER_VERSION=(${CUR_DOCKER_VERSION//./ })
     MAJOR_VERSION=${arrDOCKER_VERSION[0]}
@@ -59,7 +63,7 @@ if [[ ! -z "${DOCKER_VERSION}" ]]; then
 fi
 echo "--------------"
 
-minikube start --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}" --cpus="${CPUS}"
+minikube start --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}" --cpus="${CPUS}" --memory="${MEMORY}"
 
 if [[ -z "${SKIP_K9S}" ]]; then
     echo "Launching k9s"
