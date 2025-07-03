@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -33,14 +34,32 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
+// ZKClient abstracts the subset of zk.Conn methods used by Connection for testability.
+type ZKClient interface {
+	Get(path string) ([]byte, *zk.Stat, error)
+	Set(path string, data []byte, version int32) (*zk.Stat, error)
+	Create(path string, data []byte, flags int32, acl []zk.ACL) (string, error)
+	Delete(path string, version int32) error
+	Exists(path string) (bool, *zk.Stat, error)
+	AddAuth(scheme string, auth []byte) error
+	Close()
+}
+
+// Assert that zk.Conn implements ZKClient
+var _ ZKClient = (*zk.Conn)(nil)
+
 type Connection struct {
 	nodes api.ZookeeperNodes
 	ConnectionParams
 	sema       *semaphore.Weighted
 	mu         sync.Mutex
-	connection *zk.Conn
+	connection ZKClient
+
+	// retryDelayFn is configurable for testing
+	retryDelayFn func(i int)
 }
 
+// NewConnection creates a new Zookeeper connection with the provided nodes and parameters.
 func NewConnection(nodes api.ZookeeperNodes, _params ...*ConnectionParams) *Connection {
 	var params *ConnectionParams
 	if len(_params) > 0 {
@@ -51,52 +70,62 @@ func NewConnection(nodes api.ZookeeperNodes, _params ...*ConnectionParams) *Conn
 		nodes:            nodes,
 		sema:             semaphore.NewWeighted(params.MaxConcurrentRequests),
 		ConnectionParams: *params,
+		retryDelayFn: func(i int) {
+			time.Sleep(time.Duration(i)*time.Second + time.Duration(rand.Int63n(int64(1*time.Second))))
+		},
 	}
 }
 
+// Get retrieves data from the specified path in Zookeeper.
 func (c *Connection) Get(ctx context.Context, path string) (data []byte, stat *zk.Stat, err error) {
-	err = c.retry(ctx, func(connection *zk.Conn) error {
+	err = c.retry(ctx, func(connection ZKClient) error {
 		data, stat, err = connection.Get(path)
 		return err
 	})
 	return
 }
 
-func (c *Connection) Exists(ctx context.Context, path string) bool {
-	exists, _, _ := c.Details(ctx, path)
-	return exists
+// Exists checks if the specified path exists in Zookeeper.
+func (c *Connection) Exists(ctx context.Context, path string) (bool, error) {
+	exists, _, err := c.Details(ctx, path)
+	return exists, err
 }
 
+// Details retrieves existence and stat information for the specified path in Zookeeper.
 func (c *Connection) Details(ctx context.Context, path string) (exists bool, stat *zk.Stat, err error) {
-	err = c.retry(ctx, func(connection *zk.Conn) error {
+	err = c.retry(ctx, func(connection ZKClient) error {
 		exists, stat, err = connection.Exists(path)
 		return err
 	})
 	return
 }
 
+// Create creates a new node at the specified path with the given value, flags, and ACL.
 func (c *Connection) Create(ctx context.Context, path string, value []byte, flags int32, acl []zk.ACL) (pathCreated string, err error) {
-	err = c.retry(ctx, func(connection *zk.Conn) error {
+	err = c.retry(ctx, func(connection ZKClient) error {
 		pathCreated, err = connection.Create(path, value, flags, acl)
 		return err
 	})
 	return
 }
 
+// Set updates the value of the node at the specified path with the given version.
 func (c *Connection) Set(ctx context.Context, path string, value []byte, version int32) (stat *zk.Stat, err error) {
-	err = c.retry(ctx, func(connection *zk.Conn) error {
+	err = c.retry(ctx, func(connection ZKClient) error {
 		stat, err = connection.Set(path, value, version)
 		return err
 	})
 	return
 }
 
+// Delete removes the node at the specified path with the given version.
 func (c *Connection) Delete(ctx context.Context, path string, version int32) error {
-	return c.retry(ctx, func(connection *zk.Conn) error {
+	return c.retry(ctx, func(connection ZKClient) error {
 		return connection.Delete(path, version)
 	})
 }
 
+// Close closes the Zookeeper connection if it exists. If the connection is nil, it does nothing.
 func (c *Connection) Close() error {
 	if c == nil {
 		return nil
@@ -109,41 +138,55 @@ func (c *Connection) Close() error {
 	return nil
 }
 
-func (c *Connection) retry(ctx context.Context, fn func(*zk.Conn) error) error {
+func (c *Connection) retry(ctx context.Context, fn func(connection ZKClient) error) error {
 	if err := c.sema.Acquire(ctx, 1); err != nil {
 		return err
 	}
 	defer c.sema.Release(1)
 
+	var errs []error
 	for i := 0; i < c.MaxRetriesNum; i++ {
 		if i > 0 {
 			// Progressive delay before each retry
-			time.Sleep(time.Duration(i)*time.Second + time.Duration(rand.Int63n(int64(1*time.Second))))
+			c.retryDelayFn(i)
 		}
 
 		connection, err := c.ensureConnection(ctx)
 		if err != nil {
+			errs = append(errs, fmt.Errorf("retry %d: connection error: %w", i+1, err))
 			continue // Retry
 		}
 
 		err = fn(connection)
+		if err == nil {
+			// Success - return nil, no need for caller to know about errors
+			return nil
+		}
+
+		// Handle specific error cases
 		if err == zk.ErrConnectionClosed {
 			c.mu.Lock()
 			if c.connection == connection {
 				c.connection = nil
 			}
 			c.mu.Unlock()
+			errs = append(errs, fmt.Errorf("retry %d: connection closed: %w", i+1, err))
 			continue // Retry
 		}
 
-		// Got result
-		return err
+		// Collect the errors
+		errs = append(errs, fmt.Errorf("retry %d: %w", i+1, err))
 	}
 
-	return fmt.Errorf("max retries number reached")
+	// All retries failed - wrap all errors
+	if len(errs) == 0 {
+		return fmt.Errorf("max retries number reached: %d", c.MaxRetriesNum)
+	}
+
+	return fmt.Errorf("all retries (%d) failed: %w", c.MaxRetriesNum, errors.Join(errs...))
 }
 
-func (c *Connection) ensureConnection(ctx context.Context) (*zk.Conn, error) {
+func (c *Connection) ensureConnection(ctx context.Context) (ZKClient, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -181,7 +224,7 @@ func (c *Connection) connectionAddAuth(ctx context.Context) {
 	}
 }
 
-func (c *Connection) connectionEventsProcessor(connection *zk.Conn, events <-chan zk.Event) {
+func (c *Connection) connectionEventsProcessor(connection ZKClient, events <-chan zk.Event) {
 	for event := range events {
 		shouldCloseConnection := false
 		switch event.State {
@@ -206,7 +249,7 @@ func (c *Connection) connectionEventsProcessor(connection *zk.Conn, events <-cha
 	}
 }
 
-func (c *Connection) dial(ctx context.Context) (*zk.Conn, <-chan zk.Event, error) {
+func (c *Connection) dial(ctx context.Context) (ZKClient, <-chan zk.Event, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.TimeoutConnect)
 	defer cancel()
 
@@ -232,7 +275,7 @@ func (c *Connection) dial(ctx context.Context) (*zk.Conn, <-chan zk.Event, error
 	}
 }
 
-func (c *Connection) connect(servers []string) (*zk.Conn, <-chan zk.Event, error) {
+func (c *Connection) connect(servers []string) (ZKClient, <-chan zk.Event, error) {
 	optionsDialer := zk.WithDialer(net.DialTimeout)
 	if c.CertFile != "" && c.KeyFile != "" {
 		if len(servers) > 1 {
