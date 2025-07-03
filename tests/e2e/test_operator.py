@@ -4865,7 +4865,7 @@ def test_050(self):
     test_labels(chi, "annotation", "exclude_this_annotation", "<none>")
 
     with Then("Check that exposed metrics do not have labels and annotations that are excluded"):
-        operator_namespace=current().context.operator_namespace
+        operator_namespace = current().context.operator_namespace
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
@@ -4876,7 +4876,7 @@ def test_050(self):
             operator_pod=operator_pod,
             expect_metric="chi_clickhouse_metric_VersionInteger",
             expect_labels=expect_labels
-            )
+        )
 
     with Finally("I clean up"):
         delete_test_namespace()
