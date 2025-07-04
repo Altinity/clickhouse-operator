@@ -5537,6 +5537,7 @@ def test_058(self): # Can be merged with test_034 potentially
         kubectl.launch(f"delete pod {client_pod}")
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_059. Test macro substitutions in settings")
 def test_059(self):
@@ -5573,7 +5574,7 @@ def test_059(self):
             out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_endpoint'")
             assert out == "https://s3_url/{cluster}/{shard}/"
 
-    with When("Update CHI to apply macro subsctitutions"):
+    with When("Update CHI to apply macro substitutions"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-059-macros-2.yaml",
             check={
