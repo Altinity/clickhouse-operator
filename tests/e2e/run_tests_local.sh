@@ -13,7 +13,7 @@ ONLY="${ONLY:-"*"}"
 MINIKUBE_RESET="${MINIKUBE_RESET:-""}"
 VERBOSITY="${VERBOSITY:-"2"}"
 # We may want run all tests to the end ignoring failed tests in the process
-ALL_TESTS="${ALL_TESTS:-""}"
+RUN_ALL_TESTS="${RUN_ALL_TESTS:-""}"
 
 # Possible options are:
 #  1. operator
@@ -161,5 +161,5 @@ OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
 OPERATOR_INSTALL="${OPERATOR_INSTALL}" \
 ONLY="${ONLY}" \
 KUBECTL_MODE="${KUBECTL_MODE}" \
-ALL_TESTS="${ALL_TESTS}" \
+RUN_ALL_TESTS="${RUN_ALL_TESTS}" \
 "${CUR_DIR}/${EXECUTABLE}"
