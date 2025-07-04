@@ -128,15 +128,14 @@ func (w *worker) buildCR(ctx context.Context, _chi *api.ClickHouseInstallation) 
 
 	chi := w.createTemplated(_chi)
 	chi.SetAncestor(w.createTemplated(_chi.GetAncestorT()))
+
 	w.newTask(chi, chi.GetAncestorT())
 	w.findMinMaxVersions(ctx, chi)
 	common.LogOldAndNew("norm stage 1:", chi.GetAncestorT(), chi)
 
-	// build appropriate template
 	templates := w.buildTemplates(chi)
 	ips := w.c.getPodsIPs(chi)
-
-	w.a.V(1).M(chi).Info("IPs of the CHI normalizer %s: len: %d %v", util.NamespacedName(chi), len(ips), ips)
+	w.a.V(1).M(chi).Info("IPs of the CHI %s: len: %d %v", util.NamespacedName(chi), len(ips), ips)
 	if len(ips) > 0 || len(templates) > 0 {
 		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
@@ -144,6 +143,7 @@ func (w *worker) buildCR(ctx context.Context, _chi *api.ClickHouseInstallation) 
 
 		chi = w.createTemplated(_chi, opts)
 		chi.SetAncestor(w.createTemplated(_chi.GetAncestorT()))
+
 		w.newTask(chi, chi.GetAncestorT())
 		w.findMinMaxVersions(ctx, chi)
 		common.LogOldAndNew("norm stage 2:", chi.GetAncestorT(), chi)
@@ -164,18 +164,29 @@ func (w *worker) buildFromMeta(ctx context.Context, obj meta.Object, searchByNam
 
 	w.newTask(chi, w.createTemplated(nil))
 	w.findMinMaxVersions(ctx, chi)
+	common.LogOldAndNew("norm stage 1:", chi.GetAncestorT(), chi)
+
 	templates := w.buildTemplates(chi)
 	ips := w.c.getPodsIPs(chi)
+	w.a.V(1).M(chi).Info("IPs of the CHI %s: len: %d %v", util.NamespacedName(chi), len(ips), ips)
 	if len(ips) > 0 || len(templates) > 0 {
 		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
 		opts.Templates = templates
+
 		chi, err = w.createTemplatedCRFromObjectMeta(obj, searchByName, opts)
 		if err != nil {
 			w.a.M(obj).F().Error("UNABLE-2 to find obj by %t %v err %v", searchByName, obj.GetLabels(), err)
 			return nil, err
 		}
+
+		w.newTask(chi, chi.GetAncestorT())
+		w.findMinMaxVersions(ctx, chi)
+		common.LogOldAndNew("norm stage 2:", chi.GetAncestorT(), chi)
 	}
+
+	w.fillCurSTS(ctx, chi)
+	w.logSWVersion(ctx, chi)
 
 	return chi, nil
 }

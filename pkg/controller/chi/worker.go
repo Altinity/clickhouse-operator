@@ -197,13 +197,7 @@ func (w *worker) createTemplated(c *api.ClickHouseInstallation, _opts ...*common
 	if len(_opts) > 0 {
 		opts = _opts[0]
 	}
-	chi, err := w.normalizer.CreateTemplated(c, opts)
-	if err != nil {
-		w.a.WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
-			WithError(chi).
-			M(chi).F().
-			Error("FAILED to normalize CR: %v", err)
-	}
+	chi, _ := w.normalizer.CreateTemplated(c, opts)
 	return chi
 }
 
@@ -553,15 +547,13 @@ func (w *worker) createTemplatedCRFromObjectMeta(
 	w.a.V(3).M(obj).S().P()
 	defer w.a.V(3).M(obj).E().P()
 
-	chi, err := w.c.GetCHIByObjectMeta(obj, searchByName)
+	_chi, err := w.c.GetCHIByObjectMeta(obj, searchByName)
 	if err != nil {
 		return nil, err
 	}
 
-	chi, err = w.normalizer.CreateTemplated(chi, options)
-	if err != nil {
-		return nil, err
-	}
+	chi := w.createTemplated(_chi, options)
+	chi.SetAncestor(w.createTemplated(_chi.GetAncestorT()))
 
 	return chi, nil
 }
