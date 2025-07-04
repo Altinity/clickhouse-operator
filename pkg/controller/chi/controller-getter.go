@@ -23,19 +23,22 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // getPodsIPs gets all pod IPs
 func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
-	log.V(3).M(obj).F().S().Info("looking for pods IPs")
-	defer log.V(3).M(obj).F().E().Info("looking for pods IPs")
+	l := log.V(3).M(obj).F()
+
+	l.S().Info("looking for pods IPs")
+	defer l.E().Info("looking for pods IPs")
 
 	for _, pod := range c.kube.Pod().GetAll(obj) {
 		if ip := pod.Status.PodIP; ip == "" {
-			log.V(3).M(pod).F().Warning("Pod NO IP address found. Pod: %s/%s", pod.Namespace, pod.Name)
+			l.Warning("Pod NO IP address found. Pod: %s", util.NamespacedName(pod))
 		} else {
 			ips = append(ips, ip)
-			log.V(3).M(pod).F().Info("Pod IP address found. Pod: %s/%s IP: %s", pod.Namespace, pod.Name, ip)
+			l.Info("Pod IP address found. Pod: %s IP: %s", util.NamespacedName(pod), ip)
 		}
 	}
 	return ips
@@ -43,15 +46,22 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 
 // GetCHIByObjectMeta gets CHI by namespaced name
 func (c *Controller) GetCHIByObjectMeta(obj meta.Object, searchByName bool) (*api.ClickHouseInstallation, error) {
-	var crName string
 	if searchByName {
-		crName = obj.GetName()
-	} else {
-		var err error
-		crName, err = chiLabeler.New(nil).GetCRNameFromObjectMeta(obj)
-		if err != nil {
-			return nil, fmt.Errorf("unable to find CR by name: '%s'. More info: %v", obj.GetName(), err)
+		cr, err := c.kube.CR().Get(controller.NewContext(), obj.GetNamespace(), obj.GetName())
+		if cr == nil {
+			return nil, err
 		}
+		return cr.(*api.ClickHouseInstallation), err
+	} else {
+		return c.GetCHIByObject(obj)
+	}
+}
+
+// GetCHIByObject gets CHI by namespaced name
+func (c *Controller) GetCHIByObject(obj meta.Object) (*api.ClickHouseInstallation, error) {
+	crName, err := chiLabeler.New(nil).GetCRNameFromObjectMeta(obj)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find CR by name: '%s'. More info: %v", obj.GetName(), err)
 	}
 
 	cr, err := c.kube.CR().Get(controller.NewContext(), obj.GetNamespace(), crName)
