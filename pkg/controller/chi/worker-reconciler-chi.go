@@ -62,15 +62,15 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	metrics.CHIReconcilesStarted(ctx, new)
 	startTime := time.Now()
 
-	old, new, _ = w.build(ctx, old, new)
+	new = w.buildCR(ctx, new)
 
-	actionPlan := action_plan.NewActionPlan(old, new)
+	actionPlan := action_plan.NewActionPlan(new.GetAncestorT(), new)
 	common.LogActionPlan(actionPlan)
 
 	switch {
 	case actionPlan.HasActionsToDo():
 		w.a.M(new).F().Info("ActionPlan has actions - continue reconcile")
-	case w.isAfterFinalizerInstalled(old, new):
+	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
 	default:
 		w.a.M(new).F().Info("ActionPlan has no actions and no need to install finalizer - nothing to do")
@@ -117,47 +117,42 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	return nil
 }
 
-func (w *worker) build(ctx context.Context, _old, _new *api.ClickHouseInstallation) (*api.ClickHouseInstallation, *api.ClickHouseInstallation, error) {
-	l := w.a.V(1).M(_new).F()
+func (w *worker) buildCR(ctx context.Context, _chi *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+	l := w.a.V(1).M(_chi).F()
 
-	old := _old
-	new := _new
-	if new.HasAncestor() {
-		l.Info("has ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(new))
-		old = new.GetAncestorT()
+	if _chi.HasAncestor() {
+		l.Info("has ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(_chi))
 	} else {
-		l.Info("has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(new))
-		old = nil
+		l.Info("has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(_chi))
 	}
 
-	old = w.createTemplated(old)
-	new = w.createTemplated(new)
-	new.SetAncestor(old)
-	w.newTask(new, old)
-	w.findMinMaxVersions(ctx, new)
-
-	common.LogOldAndNew("norm stage 1:", old, new)
+	chi := w.createTemplated(_chi)
+	chi.SetAncestor(w.createTemplated(_chi.GetAncestorT()))
+	w.newTask(chi, chi.GetAncestorT())
+	w.findMinMaxVersions(ctx, chi)
+	common.LogOldAndNew("norm stage 1:", chi.GetAncestorT(), chi)
 
 	// build appropriate template
-	templates := w.buildTemplates(new)
-	ips := w.c.getPodsIPs(new)
+	templates := w.buildTemplates(chi)
+	ips := w.c.getPodsIPs(chi)
 
-	w.a.V(1).M(new).Info("IPs of the CHI normalizer %s: len: %d %v", util.NamespacedName(new), len(ips), ips)
+	w.a.V(1).M(chi).Info("IPs of the CHI normalizer %s: len: %d %v", util.NamespacedName(chi), len(ips), ips)
 	if len(ips) > 0 || len(templates) > 0 {
 		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
 		opts.Templates = templates
-		new = w.createTemplated(_new, opts)
-		new.SetAncestor(old)
-		w.newTask(new, old)
-		w.findMinMaxVersions(ctx, new)
-		common.LogOldAndNew("norm stage 2:", old, new)
+
+		chi = w.createTemplated(_chi, opts)
+		chi.SetAncestor(w.createTemplated(_chi.GetAncestorT()))
+		w.newTask(chi, chi.GetAncestorT())
+		w.findMinMaxVersions(ctx, chi)
+		common.LogOldAndNew("norm stage 2:", chi.GetAncestorT(), chi)
 	}
 
-	w.fillCurSTS(ctx, new)
-	w.logSWVersion(ctx, new)
+	w.fillCurSTS(ctx, chi)
+	w.logSWVersion(ctx, chi)
 
-	return old, new, nil
+	return chi
 }
 
 func (w *worker) buildFromMeta(ctx context.Context, obj meta.Object, searchByName bool) (*api.ClickHouseInstallation, error) {
