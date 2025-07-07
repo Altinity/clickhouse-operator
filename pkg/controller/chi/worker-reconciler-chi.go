@@ -127,10 +127,10 @@ func (w *worker) buildCR(ctx context.Context, _chi *api.ClickHouseInstallation) 
 	ips := w.c.getPodsIPs(chi)
 	w.a.V(1).M(chi).Info("IPs of the CHI %s: len: %d %v", util.NamespacedName(chi), len(ips), ips)
 	if len(ips) > 0 || len(templates) > 0 {
+		// Rebuild CR with known list of templates and additional IPs
 		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
 		opts.Templates = templates
-
 		chi = w.createTemplatedCR(_chi, opts)
 		w.newTask(chi, chi.GetAncestorT())
 		w.findMinMaxVersions(ctx, chi)
