@@ -225,8 +225,7 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
 	w.updateFromMeta(
 		ctx,
-		new.GetObjectMeta(),
-		false,
+		new,
 		types.UpdateStatusOptions{
 			TolerateAbsence: true,
 			CopyStatusOptions: types.CopyStatusOptions{
@@ -243,11 +242,10 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 func (w *worker) updateFromMeta(
 	ctx context.Context,
 	obj meta.Object,
-	searchByName bool,
 	updateStatusOpts types.UpdateStatusOptions,
 	f func(*api.ClickHouseInstallation),
 ) error {
-	chi, _ := w.buildCRFromMeta(ctx, obj, searchByName)
+	chi, _ := w.buildCRFromObj(ctx, obj)
 
 	if f != nil {
 		f(chi)
@@ -365,7 +363,6 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 	w.updateFromMeta(
 		ctx,
 		_cr,
-		true,
 		types.UpdateStatusOptions{
 			CopyStatusOptions: types.CopyStatusOptions{
 				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
