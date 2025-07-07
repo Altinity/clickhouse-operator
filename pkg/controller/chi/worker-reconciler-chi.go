@@ -143,10 +143,10 @@ func (w *worker) buildCR(ctx context.Context, _chi *api.ClickHouseInstallation) 
 	return chi
 }
 
-func (w *worker) buildCRFromMeta(ctx context.Context, obj meta.Object, searchByName bool) (*api.ClickHouseInstallation, error) {
-	_chi, err := w.c.GetCHIByObjectMeta(obj, searchByName)
+func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*api.ClickHouseInstallation, error) {
+	_chi, err := w.c.GetCHI(obj)
 	if err != nil {
-		w.a.M(obj).F().Error("UNABLE-1 to find obj by %t %v err %v", searchByName, obj.GetLabels(), err)
+		w.a.M(obj).F().Error("UNABLE-1 to find obj by %v err %v", obj.GetLabels(), err)
 		return nil, err
 	}
 	return w.buildCR(ctx, _chi), nil
