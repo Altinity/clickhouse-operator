@@ -44,15 +44,16 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 	return ips
 }
 
-// GetCHIByObjectMeta gets CHI by namespaced name
-func (c *Controller) GetCHIByObjectMeta(obj meta.Object, searchByName bool) (*api.ClickHouseInstallation, error) {
-	if searchByName {
+// GetCHI gets CHI by any object from a CHI
+func (c *Controller) GetCHI(obj meta.Object) (*api.ClickHouseInstallation, error) {
+	switch obj.(type) {
+	case *api.ClickHouseInstallation:
 		cr, err := c.kube.CR().Get(controller.NewContext(), obj.GetNamespace(), obj.GetName())
 		if cr == nil {
 			return nil, err
 		}
 		return cr.(*api.ClickHouseInstallation), err
-	} else {
+	default:
 		return c.GetCHIByObject(obj)
 	}
 }
