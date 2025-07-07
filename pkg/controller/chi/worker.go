@@ -256,7 +256,7 @@ func (w *worker) updateFromMeta(
 	updateStatusOpts types.UpdateStatusOptions,
 	f func(*api.ClickHouseInstallation),
 ) error {
-	chi, _ := w.buildFromMeta(ctx, obj, searchByName)
+	chi, _ := w.buildCRFromMeta(ctx, obj, searchByName)
 
 	if f != nil {
 		f(chi)
@@ -538,22 +538,17 @@ func (w *worker) logHosts(cr api.ICustomResource) {
 	})
 }
 
-// createTemplatedCRFromObjectMeta
-func (w *worker) createTemplatedCRFromObjectMeta(
-	obj meta.Object,
-	searchByName bool,
-	options *commonNormalizer.Options[api.ClickHouseInstallation],
-) (*api.ClickHouseInstallation, error) {
-	w.a.V(3).M(obj).S().P()
-	defer w.a.V(3).M(obj).E().P()
+func (w *worker) createTemplatedCR(_chi *api.ClickHouseInstallation, _opts ...*commonNormalizer.Options[api.ClickHouseInstallation]) *api.ClickHouseInstallation {
+	l := w.a.V(1).M(_chi).F()
 
-	_chi, err := w.c.GetCHIByObjectMeta(obj, searchByName)
-	if err != nil {
-		return nil, err
+	if _chi.HasAncestor() {
+		l.Info("CR has an ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(_chi))
+	} else {
+		l.Info("CR has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(_chi))
 	}
 
-	chi := w.createTemplated(_chi, options)
+	chi := w.createTemplated(_chi, _opts...)
 	chi.SetAncestor(w.createTemplated(_chi.GetAncestorT()))
 
-	return chi, nil
+	return chi
 }
