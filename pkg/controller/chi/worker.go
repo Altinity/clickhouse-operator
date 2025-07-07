@@ -192,15 +192,6 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	}
 }
 
-func (w *worker) createTemplated(c *api.ClickHouseInstallation, _opts ...*commonNormalizer.Options[api.ClickHouseInstallation]) *api.ClickHouseInstallation {
-	opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
-	if len(_opts) > 0 {
-		opts = _opts[0]
-	}
-	chi, _ := w.normalizer.CreateTemplated(c, opts)
-	return chi
-}
-
 // ensureFinalizer
 func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
@@ -550,5 +541,14 @@ func (w *worker) createTemplatedCR(_chi *api.ClickHouseInstallation, _opts ...*c
 	chi := w.createTemplated(_chi, _opts...)
 	chi.SetAncestor(w.createTemplated(_chi.GetAncestorT()))
 
+	return chi
+}
+
+func (w *worker) createTemplated(c *api.ClickHouseInstallation, _opts ...*commonNormalizer.Options[api.ClickHouseInstallation]) *api.ClickHouseInstallation {
+	opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
+	if len(_opts) > 0 {
+		opts = _opts[0]
+	}
+	chi, _ := w.normalizer.CreateTemplated(c, opts)
 	return chi
 }
