@@ -642,6 +642,7 @@ def test_010(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_010_1. Test zookeeper initialization AFTER starting a cluster")
 def test_010_1(self):
@@ -770,7 +771,7 @@ def test_011_1(self):
                 print(f"users.xml: {regexp}")
                 assert regexp == "disabled"
 
-                print(f"Give ClickHouse time to recongize the config change")
+                print(f"Give ClickHouse time to recognize the config change")
                 time.sleep(30)
 
             test_default_user()
@@ -1838,8 +1839,8 @@ def test_014_1(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
-def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000"):
 
+def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000"):
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
 
@@ -1858,9 +1859,11 @@ def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000")
 
     with Then("Query from one server to another one should work"):
         for i in range(1, 10):
-            out = clickhouse.query_with_error(chi, host=f"chi-{chi}-default-0-0", port=replica1_port,
-                sql=f"SELECT count() FROM remote('chi-{chi}-default-0-1:{replica2_port}', system.one)",
-            )
+            out = clickhouse.query_with_error(
+                    chi,
+                    host=f"chi-{chi}-default-0-0",
+                    port=replica1_port,
+                    sql=f"SELECT count() FROM remote('chi-{chi}-default-0-1:{replica2_port}', system.one)")
             if "DNS_ERROR" not in out:
                 break
             print(f"DNS_ERROR. Wait for {i * 5} seconds")
@@ -1869,28 +1872,35 @@ def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000")
         assert out == "1"
 
     with And("Distributed query should work"):
-        out = clickhouse.query_with_error(chi, host=f"chi-{chi}-default-0-1", port=replica2_port,
-            sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10",
-        )
+        out = clickhouse.query_with_error(
+                chi,
+                host=f"chi-{chi}-default-0-1",
+                port=replica2_port,
+                sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
         note(f"cluster out:\n{out}")
         print(f"out: {out}")
         assert out == "2"
 
     with And("Replication should work"):
         test_version = replica1_port
-        clickhouse.query(chi,
+        clickhouse.query(
+            chi,
             "CREATE TABLE " + f"test_015_{test_version}" + " (a UInt32) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY tuple()",
             host=f"chi-{chi}-{cluster}-0-0", port = replica1_port)
-        clickhouse.query(chi,
+        clickhouse.query(
+            chi,
             "CREATE TABLE " + f"test_015_{test_version}" + " (a UInt32) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY tuple()",
             host=f"chi-{chi}-{cluster}-0-1", port = replica2_port)
-        clickhouse.query(chi,
+        clickhouse.query(
+            chi,
             f"INSERT INTO test_015_{test_version} SELECT {test_version}",
             host=f"chi-{chi}-{cluster}-0-0", port = replica1_port)
-        out = clickhouse.query(chi,
+        out = clickhouse.query(
+            chi,
             f"SELECT * FROM test_015_{test_version}",
             host=f"chi-{chi}-{cluster}-0-1", port = replica2_port)
         assert out == test_version
+
 
 @TestScenario
 @Name("test_015. hostNetwork")
@@ -3485,6 +3495,7 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
     #    with By("deleting pod"):
     #        kubectl.launch(f"delete pod {client_pod}", shell=shell)
 
+
 @TestScenario
 @Name("test_032. Test rolling update logic")
 # @Tags("NO_PARALLEL")
@@ -3932,7 +3943,7 @@ def test_036(self):
     check_data_is_recovered("reconcile-after-PV-deleted")
 
     with Finally("I clean up"):
-       delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4596,7 +4607,6 @@ def test_046(self):
             "clickhouse_operator_chi{.*chi=\"test-046-operator-metrics\".*} 1",
         ])
 
-
     with Then(f"Check clickhouse-operator exposes clickhouse_operator_chi_reconciles_* metrics"):
         check_metrics([
             "clickhouse_operator_chi_reconciles_started{.*chi=\"test-046-operator-metrics\".*} 1",
@@ -4718,7 +4728,6 @@ def test_047(self):
             f"""/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml | head -n 16 | tail -n 1'"""
             )
         assert "<weight>1</weight>" in r
-
 
     numbers = 100
     with When("I create distributed table"):
@@ -4941,7 +4950,7 @@ def test_051(self):
         assert env["name"] == "CLICKHOUSE_DATA_DIR"
         assert env["value"] == "/var/lib/clickhouse-keeper"
 
-    with Then("Wiat until Keeper connection is established"):
+    with Then("Wait until Keeper connection is established"):
         out = 0
         for i in range(1, 10):
             out = clickhouse.query_with_error(chi, "SELECT count(*) from system.zookeeper_connection")
@@ -5048,14 +5057,13 @@ def test_051_1(self):
 
         kubectl.wait_chk_status(chk, "Completed")
 
-
     with Then("CLICKHOUSE_DATA_DIR should be properly set"):
         pod = kubectl.get_pod_spec("", "chk-test-051-chk-single-0-0-0")
         env = pod["containers"][0]["env"][0]
         assert env["name"] == "CLICKHOUSE_DATA_DIR"
         assert env["value"] == "/var/lib/clickhouse-keeper"
 
-    with Then("Wiat until Keeper connection is established"):
+    with Then("Wait until Keeper connection is established"):
         out = 0
         for i in range(1, 10):
             out = clickhouse.query_with_error(chi, "SELECT count(*) from system.zookeeper_connection")
@@ -5446,6 +5454,7 @@ def test_056(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 @TestScenario
 @Name("test_057. Test reconcile concurrency settings on CHI level")
