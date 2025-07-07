@@ -253,8 +253,6 @@ func (w *worker) updateFromMeta(
 		f(chi)
 	}
 
-	// TODO unify with finalize reconcile
-	w.newTask(chi, chi.GetAncestorT())
 	w.reconcileConfigMapCommonUsers(ctx, chi)
 	w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
 
