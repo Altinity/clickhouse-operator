@@ -25,6 +25,15 @@ import (
 
 var errUnknownVersion = fmt.Errorf("unknown version")
 
+func (w *worker) getTagBasedVersion(host *api.Host) *swversion.SoftWareVersion {
+	// Fetch tag from the image
+	var tagBasedVersion *swversion.SoftWareVersion
+	if tag, tagFound := w.task.Creator().GetAppImageTag(host); tagFound {
+		tagBasedVersion = swversion.NewSoftWareVersionFromTag(tag)
+	}
+	return tagBasedVersion
+}
+
 // getHostClickHouseVersion gets host ClickHouse version
 func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host) (*swversion.SoftWareVersion, error) {
 	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
