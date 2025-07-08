@@ -15,6 +15,7 @@
 package swversion
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -152,11 +153,11 @@ func (v *SoftWareVersion) IsKnown() bool {
 	return !v.IsUnknown()
 }
 
-func (v *SoftWareVersion) SetDescription(desc string) *SoftWareVersion {
+func (v *SoftWareVersion) SetDescription(format string, args ...interface{}) *SoftWareVersion {
 	if v == nil {
 		return nil
 	}
-	v.description = desc
+	v.description = fmt.Sprintf(format, args...)
 	return v
 }
 
@@ -174,4 +175,12 @@ func (v *SoftWareVersion) Render() string {
 		return ""
 	}
 	return v.normalized + "[" + v.original + "/" + v.description + "]"
+}
+
+// GetOriginal is a getter
+func (v *SoftWareVersion) GetOriginal() string {
+	if v == nil {
+		return ""
+	}
+	return v.original
 }
