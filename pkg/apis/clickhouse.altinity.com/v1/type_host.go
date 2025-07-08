@@ -490,13 +490,22 @@ func (host *Host) IsInsecure() bool {
 	return true
 }
 
-// IsFirst checks whether the host is the first host of the whole CHI
-func (host *Host) IsFirst() bool {
+// IsFirstInCR checks whether the host is the first host of the whole CHI
+func (host *Host) IsFirstInCR() bool {
 	if host == nil {
 		return false
 	}
 
 	return host.Runtime.Address.CHIScopeIndex == 0
+}
+
+// IsFirstInCluster checks whether the host is the first host of the cluster
+func (host *Host) IsFirstInCluster() bool {
+	if host == nil {
+		return false
+	}
+
+	return host.Runtime.Address.ClusterScopeIndex == 0
 }
 
 // IsFirst checks whether the host is the last host of the whole CHI
