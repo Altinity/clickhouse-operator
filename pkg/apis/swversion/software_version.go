@@ -131,12 +131,25 @@ func (v *SoftWareVersion) Cmp(to *SoftWareVersion) int {
 // IsUnknown checks whether software version is unknown or not
 func (v *SoftWareVersion) IsUnknown() bool {
 	if v == nil {
+		// Version is unknown
 		return true
 	}
 	if len(v.normalized) == 0 {
+		// Version is unknown
 		return true
 	}
+	if v.semver == nil {
+		// Version is unknown
+		return true
+	}
+
+	// Version  known
 	return false
+}
+
+// IsKnown checks whether software version is unknown or not
+func (v *SoftWareVersion) IsKnown() bool {
+	return !v.IsUnknown()
 }
 
 func (v *SoftWareVersion) SetDescription(desc string) *SoftWareVersion {
