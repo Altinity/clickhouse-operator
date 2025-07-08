@@ -912,7 +912,7 @@ func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error
 	}
 
 	// Report host software version
-	version := w.getHostSoftwareVersion(ctx, host, &VersionOptions{})
+	version := w.getHostSoftwareVersion(ctx, host)
 	l.Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version.Render())
 	return nil
 }
