@@ -223,7 +223,7 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 
 // updateEndpoints updates endpoints
 func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
-	w.updateFromMeta(
+	w.finalizeCR(
 		ctx,
 		new,
 		types.UpdateStatusOptions{
@@ -239,7 +239,7 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 	return nil
 }
 
-func (w *worker) updateFromMeta(
+func (w *worker) finalizeCR(
 	ctx context.Context,
 	obj meta.Object,
 	updateStatusOpts types.UpdateStatusOptions,
@@ -360,7 +360,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	w.updateFromMeta(
+	w.finalizeCR(
 		ctx,
 		_cr,
 		types.UpdateStatusOptions{
