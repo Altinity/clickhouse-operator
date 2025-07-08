@@ -34,42 +34,26 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *sw
 		},
 	}
 
-	// Fetch tag from the image
-	tag, tagFound := w.task.Creator().GetAppImageTag(host)
-	var tagBasedVersion *swversion.SoftWareVersion
-	if tagFound {
-		tagBasedVersion = swversion.NewSoftWareVersionFromTag(tag)
-	}
-
-	if skip, description := opts.shouldSkip(host); skip {
-		// We know for sure no need to even try to check version from the host itself
-		// Just fall back to tag-based version
-		w.a.V(1).M(host).F().Info("Need to report version from the tag. Tag: %s Host: %s ", tag, host.GetName())
-		if tagBasedVersion != nil {
-			// Able to report version from the tag
-			return tagBasedVersion.SetDescription("parsed from tag: '" + tag + "' via " + description)
+	// Try to report tag-based version
+	if tagBasedVersion := w.getTagBasedVersion(host); tagBasedVersion.IsKnown() {
+		// Able to report version from the tag
+		return tagBasedVersion.SetDescription("parsed from the tag: '%s'", tagBasedVersion.GetOriginal())
+	} else {
+		w.a.V(1).M(host).F().Info("Unable to report version from the tag. Tag: '%s' Host: %s ", tagBasedVersion.GetOriginal(), host.GetName())
+		if tagBasedOnly, description := opts.tagBasedOnly(host); tagBasedOnly {
+			return swversion.MinVersion().SetDescription("set min version cause unable to parse from the tag: '%s' via '%s'", tagBasedVersion.GetOriginal(), description)
 		}
-		// Unable to report version from the tag - report min one
-		return swversion.MinVersion().SetDescription("set min version cause unable to parse from tag: '" + tag + "' via " + description)
+		w.a.V(1).M(host).F().Info("Fallback to host-detected version. Tag: '%s' Host: %s ", tagBasedVersion.GetOriginal(), host.GetName())
 	}
 
 	// Try to report version from the app
-
-	if version, err := w.getHostClickHouseVersion(ctx, host); err == nil {
+	if appBasedVersion, err := w.getHostClickHouseVersion(ctx, host); err == nil {
 		// Able to fetch version from the app - report version
-		return version.SetDescription("fetched from host")
+		return appBasedVersion.SetDescription("fetched from the host")
 	}
 
-	// Unable to fetch version fom the app
-	// Try to fallback to tag-based version
-
-	if tagBasedVersion != nil {
-		// Able to report version from the tag
-		return tagBasedVersion.SetDescription("parsed from tag: '" + tag + "'")
-	}
-
-	// Unable to report version from the tag - report min one
-	return swversion.MinVersion().SetDescription("min - unable to parse neither from host nor from tag: '" + tag + "'")
+	// Unable to acquire any version - report min one
+	return swversion.MinVersion().SetDescription("min - unable to acquire neither from the tag nor from the host")
 }
 
 func (w *worker) isHostSoftwareAbleToRespond(ctx context.Context, host *api.Host) error {
