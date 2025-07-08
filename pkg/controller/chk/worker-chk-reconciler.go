@@ -537,7 +537,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
 
-	if host.IsFirst() {
+	if host.IsFirstInCR() {
 		_ = w.reconcileCRServicePreliminary(ctx, host.GetCR())
 		defer w.reconcileCRServiceFinal(ctx, host.GetCR())
 	}
