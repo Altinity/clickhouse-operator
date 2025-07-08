@@ -93,7 +93,10 @@ metadata:
 data:
   env.sh: |
     #!/usr/bin/env bash
-    export DOMAIN=`hostname -d`
+    HOST=$(hostname -s)
+    FQDN=$(hostname -f)
+    DOMAIN=${FQDN#${HOST}.}
+    export DOMAIN
     export CLIENT_HOST=clickhouse-keeper
     export CLIENT_PORT=2181
     export RAFT_PORT=9444
@@ -335,6 +338,7 @@ spec:
         prometheus.io/port: '7000'
         prometheus.io/scrape: 'true'
     spec:
+      setHostnameAsFQDN: true
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
