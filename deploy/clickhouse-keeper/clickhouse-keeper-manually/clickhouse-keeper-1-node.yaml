@@ -94,7 +94,7 @@ data:
   env.sh: |
     #!/usr/bin/env bash
     HOST=$(hostname -s)
-    FQDN=$(hostname -f)
+    FQDN=$(cat /etc/hostname)
     DOMAIN=${FQDN#${HOST}.}
     export DOMAIN
     export CLIENT_HOST=clickhouse-keeper
