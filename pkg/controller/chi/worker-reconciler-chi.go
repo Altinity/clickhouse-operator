@@ -162,13 +162,14 @@ func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*a
 }
 
 func (w *worker) findMinMaxVersions(ctx context.Context, chi *api.ClickHouseInstallation) {
+	if util.IsContextDone(ctx) {
+		return
+	}
 	// Create artifacts
 	chi.WalkHosts(func(host *api.Host) error {
 		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
-		if !util.IsContextDone(ctx) {
-			version := w.getHostSoftwareVersion(ctx, host)
-			host.Runtime.Version = version
-		}
+		version := w.getHostSoftwareVersion(ctx, host)
+		host.Runtime.Version = version
 		return nil
 	})
 	chi.FindMinMaxVersions()
