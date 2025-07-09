@@ -126,6 +126,10 @@ func (v *SoftWareVersion) Matches(constraint string) bool {
 
 // Cmp compares two versions
 func (v *SoftWareVersion) Cmp(to *SoftWareVersion) int {
+	if v.IsUnknown() || to.IsUnknown() {
+		// Need both versions to compare
+		return 0
+	}
 	return v.semver.Compare(to.semver)
 }
 
