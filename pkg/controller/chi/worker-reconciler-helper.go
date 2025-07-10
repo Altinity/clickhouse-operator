@@ -43,27 +43,28 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *sw
 		if tagBasedOnly, description := opts.tagBasedOnly(host); tagBasedOnly {
 			return swversion.MinVersion().SetDescription("set min version cause unable to parse from the tag: '%s' via '%s'", tagBasedVersion.GetOriginal(), description)
 		}
-		w.a.V(1).M(host).F().Info("Fallback to host-detected version. Tag: '%s' Host: %s ", tagBasedVersion.GetOriginal(), host.GetName())
+		w.a.V(1).M(host).F().Info("Fallback to app-based version. Tag: '%s' Host: %s ", tagBasedVersion.GetOriginal(), host.GetName())
 	}
 
 	// Try to report version from the app
-	if appBasedVersion, err := w.getHostClickHouseVersion(ctx, host); err == nil {
+	if appBasedVersion := w.getHostClickHouseVersion(ctx, host); appBasedVersion.IsKnown() {
 		// Able to fetch version from the app - report version
 		return appBasedVersion.SetDescription("fetched from the host")
 	}
 
 	// Unable to acquire any version - report min one
-	return swversion.MinVersion().SetDescription("min - unable to acquire neither from the tag nor from the host")
+	return swversion.MinVersion().SetDescription("min - unable to acquire neither from the tag nor from the app")
 }
 
 func (w *worker) isHostSoftwareAbleToRespond(ctx context.Context, host *api.Host) error {
 	// Check whether the software is able to respond its version
-	version, err := w.getHostClickHouseVersion(ctx, host)
-	if err != nil {
-		w.a.V(1).M(host).F().Info("Host software is not alive - version NOT detected. Host: %s Err: %v", host.GetName(), err)
+	version := w.getHostClickHouseVersion(ctx, host)
+	if version.IsKnown() {
+		w.a.V(1).M(host).F().Info("Host software is alive - version detected. Host: %s version: %s", host.GetName(), version)
+	} else {
+		w.a.V(1).M(host).F().Info("Host software is not alive - version NOT detected. Host: %s ", host.GetName())
 	}
 
-	w.a.V(1).M(host).F().Info("Host software is alive - version detected. Host: %s version: %s", host.GetName(), version)
 	return nil
 }
 

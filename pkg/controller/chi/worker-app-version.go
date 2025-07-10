@@ -16,14 +16,10 @@ package chi
 
 import (
 	"context"
-	"fmt"
-
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 )
-
-var errUnknownVersion = fmt.Errorf("unknown version")
 
 func (w *worker) getTagBasedVersion(host *api.Host) *swversion.SoftWareVersion {
 	// Fetch tag from the image
@@ -35,20 +31,15 @@ func (w *worker) getTagBasedVersion(host *api.Host) *swversion.SoftWareVersion {
 }
 
 // getHostClickHouseVersion gets host ClickHouse version
-func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host) (*swversion.SoftWareVersion, error) {
+func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
 	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
 	if err != nil {
-		w.a.V(1).M(host).F().Warning("Failed to get ClickHouse version on host: %s", host.GetName())
-		return nil, err
+		w.a.V(1).M(host).F().Warning("Failed to get ClickHouse version on host: %s err: %v", host.GetName(), err)
+		return nil
 	}
 
 	w.a.V(1).M(host).F().Info("Get ClickHouse version on host: %s version: %s", host.GetName(), version)
-	v := swversion.NewSoftWareVersion(version)
-	if v.IsUnknown() {
-		return nil, errUnknownVersion
-	}
-
-	return v, nil
+	return swversion.NewSoftWareVersion(version)
 }
 
 func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Host) (version *swversion.SoftWareVersion, err error) {
@@ -56,9 +47,8 @@ func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Hos
 		ctx,
 		host,
 		func(_ctx context.Context, _host *api.Host) bool {
-			var e error
-			version, e = w.getHostClickHouseVersion(_ctx, _host)
-			if e == nil {
+			version = w.getHostClickHouseVersion(_ctx, _host)
+			if version.IsKnown() {
 				return true
 			}
 			w.a.V(1).M(host).F().Warning("Host is NOT alive: %s ", host.GetName())
