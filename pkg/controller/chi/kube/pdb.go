@@ -39,18 +39,22 @@ func NewPDB(kubeClient kube.Interface) *PDB {
 }
 
 func (c *PDB) Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(ctx, pdb, controller.NewCreateOptions())
 }
 
 func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *PDB) Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Update(ctx, pdb, controller.NewUpdateOptions())
 }
 
 func (c *PDB) Delete(ctx context.Context, namespace, name string) error {
+	ctx = k8sCtx(ctx)
 	c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	return poller.New(ctx, fmt.Sprintf("%s/%s", namespace, name)).
 		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
@@ -63,6 +67,7 @@ func (c *PDB) Delete(ctx context.Context, namespace, name string) error {
 }
 
 func (c *PDB) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]policy.PodDisruptionBudget, error) {
+	ctx = k8sCtx(ctx)
 	list, err := c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).List(ctx, opts)
 	if err != nil {
 		return nil, err

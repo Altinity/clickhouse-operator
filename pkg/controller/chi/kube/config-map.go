@@ -39,18 +39,22 @@ func NewConfigMap(kubeClient kube.Interface) *ConfigMap {
 }
 
 func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().ConfigMaps(cm.Namespace).Create(ctx, cm, controller.NewCreateOptions())
 }
 
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().ConfigMaps(cm.Namespace).Update(ctx, cm, controller.NewUpdateOptions())
 }
 
 func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
+	ctx = k8sCtx(ctx)
 	c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	return poller.New(ctx, fmt.Sprintf("%s/%s", namespace, name)).
 		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
@@ -63,6 +67,7 @@ func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
 }
 
 func (c *ConfigMap) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.ConfigMap, error) {
+	ctx = k8sCtx(ctx)
 	list, err := c.kubeClient.CoreV1().ConfigMaps(namespace).List(ctx, opts)
 	if err != nil {
 		return nil, err

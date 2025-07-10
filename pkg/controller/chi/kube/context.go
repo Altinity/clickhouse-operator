@@ -14,26 +14,8 @@
 
 package kube
 
-import (
-	"context"
+import "context"
 
-	core "k8s.io/api/core/v1"
-	kube "k8s.io/client-go/kubernetes"
-
-	"github.com/altinity/clickhouse-operator/pkg/controller"
-)
-
-type Event struct {
-	kubeClient kube.Interface
-}
-
-func NewEvent(kubeClient kube.Interface) *Event {
-	return &Event{
-		kubeClient: kubeClient,
-	}
-}
-
-func (c *Event) Create(ctx context.Context, event *core.Event) (*core.Event, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().Events(event.Namespace).Create(ctx, event, controller.NewCreateOptions())
+func k8sCtx(ctx context.Context) context.Context {
+	return context.Background()
 }

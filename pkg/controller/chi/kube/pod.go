@@ -65,7 +65,8 @@ func (c *Pod) Get(params ...any) (*core.Pod, error) {
 	default:
 		panic(any("incorrect number or params"))
 	}
-	return c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
+	ctx := k8sCtx(controller.NewContext())
+	return c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *Pod) GetRestartCounters(params ...any) (map[string]int, error) {
@@ -93,6 +94,7 @@ func (c *Pod) GetAll(obj any) []*core.Pod {
 }
 
 func (c *Pod) Update(ctx context.Context, pod *core.Pod) (*core.Pod, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().Pods(pod.GetNamespace()).Update(ctx, pod, controller.NewUpdateOptions())
 }
 
@@ -118,5 +120,6 @@ func (c *Pod) getPod(host *api.Host) (pods []*core.Pod) {
 }
 
 func (c *Pod) Delete(ctx context.Context, namespace, name string) error {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().Pods(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 }

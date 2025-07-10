@@ -52,6 +52,8 @@ func NewCR(chopClient chopClientSet.Interface, kubeClient kube.Interface) *CR {
 }
 
 func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResource, error) {
+	ctx = k8sCtx(ctx)
+
 	chi, err := c.getCR(ctx, namespace, name)
 	if err != nil {
 		return nil, err
@@ -65,10 +67,12 @@ func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResour
 }
 
 func (c *CR) getCR(ctx context.Context, namespace, name string) (*api.ClickHouseInstallation, error) {
+	ctx = k8sCtx(ctx)
 	return c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *CR) getCM(ctx context.Context, chi api.ICustomResource) (*core.ConfigMap, error) {
+	ctx = k8sCtx(ctx)
 	return NewConfigMap(c.kubeClient).Get(ctx, c.buildCMNamespace(chi), c.buildCMName(chi))
 }
 
@@ -99,7 +103,7 @@ func (c *CR) buildCR(chi *api.ClickHouseInstallation, cm *core.ConfigMap) *api.C
 // StatusUpdate updates CR object's Status
 func (c *CR) StatusUpdate(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return nil
 	}
 
@@ -130,7 +134,7 @@ func (c *CR) statusUpdateRetry(ctx context.Context, cr api.ICustomResource, opts
 // statusUpdateProcess updates CR object's Status
 func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", icr.GetName())
 		return nil
 	}
 
