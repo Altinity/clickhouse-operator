@@ -807,6 +807,7 @@ func (n *Normalizer) normalizeClusterStage2(cluster *chi.Cluster) *chi.Cluster {
 	cluster.Files = n.normalizeConfigurationFiles(cluster.Files, cluster)
 
 	cluster.SchemaPolicy = n.normalizeClusterSchemaPolicy(cluster.SchemaPolicy)
+	cluster.PDBManaged = n.normalizePDBManaged(cluster.PDBManaged)
 	cluster.PDBMaxUnavailable = n.normalizePDBMaxUnavailable(cluster.PDBMaxUnavailable)
 	cluster.Reconcile = n.normalizeClusterReconcile(cluster.Reconcile)
 
@@ -874,6 +875,16 @@ func (n *Normalizer) normalizeClusterSchemaPolicy(policy *chi.SchemaPolicy) *chi
 	}
 
 	return policy
+}
+
+// normalizePDBManaged normalizes PDBManaged
+func (n *Normalizer) normalizePDBManaged(pdbManaged *types.StringBool) *types.StringBool {
+	if pdbManaged.IsValid() {
+		return pdbManaged
+	}
+
+	// unknown value, fallback to true
+	return types.NewStringBool(true)
 }
 
 // normalizePDBMaxUnavailable normalizes PDBMaxUnavailable

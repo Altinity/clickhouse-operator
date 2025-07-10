@@ -14,4 +14,8 @@ yq eval -e --inplace "(select(.kind == \"Deployment\" and .metadata.name == \"cl
 yq eval -e --inplace '(select(.kind == "Deployment" and .metadata.name == "clickhouse-operator") | .spec.template.spec.containers[] | select(.name=="metrics-exporter") | .imagePullPolicy) = "IfNotPresent"' "${CUR_DIR}/clickhouse-operator-install.yaml"
 yq eval -e --inplace '(select(.kind == "Deployment" and .metadata.name == "clickhouse-operator") | .spec.template.spec.containers[] | select(.name=="metrics-exporter") | .securityContext.capabilities.add) = ["SYS_PTRACE"]' "${CUR_DIR}/clickhouse-operator-install.yaml"
 
-sed -i "s/namespace: kube-system/namespace: ${OPERATOR_NAMESPACE}/" "${CUR_DIR}/clickhouse-operator-install.yaml"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  sed -i '' "s/namespace: kube-system/namespace: ${OPERATOR_NAMESPACE}/" "${CUR_DIR}/clickhouse-operator-install.yaml"
+else
+  sed -i "s/namespace: kube-system/namespace: ${OPERATOR_NAMESPACE}/" "${CUR_DIR}/clickhouse-operator-install.yaml"
+fi

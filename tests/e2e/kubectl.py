@@ -647,13 +647,26 @@ def check_configmap(cfg_name, values, ns=None, shell=None):
 def check_pdb(chi, clusters, ns=None, shell=None):
     for c in clusters.keys():
         with Then(f"PDB is configured for cluster {c}"):
-            pdb = get("pdb", chi + "-" + c, shell=shell)
+            managementEnabled = False
+            if isinstance(clusters[c], dict):
+                managementEnabled = clusters[c].get("managementEnabled", True)
+                maxUnavailable = clusters[c].get("maxUnavailable", 1)
+            else:
+                # Treat simple integer as maxUnavailable to ensure backward compatibility.
+                maxUnavailable = clusters[c]
+
+            pdb = get("pdb", chi + "-" + c, ok_to_fail=managementEnabled==False, shell=shell)
+
+            if not managementEnabled:
+                assert pdb == ""
+                continue
+
             labels = pdb["spec"]["selector"]["matchLabels"]
             assert labels["clickhouse.altinity.com/app"] == "chop"
             assert labels["clickhouse.altinity.com/chi"] == chi
             assert labels["clickhouse.altinity.com/cluster"] == c
             assert labels["clickhouse.altinity.com/namespace"] == current().context.test_namespace
-            assert pdb["spec"]["maxUnavailable"] == clusters[c]
+            assert pdb["spec"]["maxUnavailable"] == maxUnavailable
 
 def force_reconcile(chi, taskID="reconcile", ns=None, shell=None):
     with Then(f"Trigger CHI reconcile with taskID:\"{taskID}\""):

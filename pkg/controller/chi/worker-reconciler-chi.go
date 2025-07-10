@@ -629,6 +629,10 @@ func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *api.Cluste
 }
 
 func (w *worker) reconcileClusterPodDisruptionBudget(ctx context.Context, cluster *api.Cluster) error {
+	if cluster.GetPDBManaged().IsFalse() {
+		return nil
+	}
+
 	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
 	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
 		w.task.RegistryReconciled().RegisterPDB(pdb.GetObjectMeta())
