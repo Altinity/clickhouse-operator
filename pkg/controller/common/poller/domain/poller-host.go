@@ -34,7 +34,7 @@ func PollHost(
 	_opts ...*poller.Options,
 ) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("poll host is done")
 		return nil
 	}
 

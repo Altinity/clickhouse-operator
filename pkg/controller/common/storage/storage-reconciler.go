@@ -67,6 +67,7 @@ func NewStorageReconciler(task *common.Task, namer interfaces.INameManager, pvc 
 // ReconcilePVCs reconciles all PVCs of a host
 func (w *Reconciler) ReconcilePVCs(ctx context.Context, host *api.Host, which api.WhichStatefulSet) (res ErrorDataPersistence) {
 	if util.IsContextDone(ctx) {
+		log.V(1).Info("Reconcile PVC is aborted. Host: %s ", host.GetName())
 		return nil
 	}
 
@@ -76,6 +77,7 @@ func (w *Reconciler) ReconcilePVCs(ctx context.Context, host *api.Host, which ap
 
 	host.WalkVolumeMounts(which, func(volumeMount *core.VolumeMount) {
 		if util.IsContextDone(ctx) {
+			log.V(1).Info("Reconcile PVVC is aborted. Host: %s ", host.GetName())
 			return
 		}
 		if e := w.reconcilePVCFromVolumeMount(ctx, host, volumeMount); e != nil {
@@ -256,7 +258,7 @@ func (w *Reconciler) reconcilePVC(
 	defer log.V(1).M(host).E().Info("reconcile PVC (%s/%s)", util.NamespacedName(pvc), host.GetName())
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("task is done")
 		return nil, fmt.Errorf("task is done")
 	}
 

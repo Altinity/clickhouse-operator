@@ -23,10 +23,8 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // getConfigMap gets ConfigMap either by namespaced name or by labels
@@ -78,20 +76,10 @@ func (c *Controller) getConfigMap(ctx context.Context, meta meta.Object, byNameO
 }
 
 func (c *Controller) createConfigMap(ctx context.Context, cm *core.ConfigMap) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	_, err := c.kube.ConfigMap().Create(ctx, cm)
 	return err
 }
 
 func (c *Controller) updateConfigMap(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil, nil
-	}
-
 	return c.kube.ConfigMap().Update(ctx, cm)
 }

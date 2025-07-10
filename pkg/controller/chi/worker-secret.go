@@ -19,19 +19,12 @@ import (
 
 	core "k8s.io/api/core/v1"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // reconcileSecret reconciles core.Secret
 func (w *worker) reconcileSecret(ctx context.Context, cr api.ICustomResource, secret *core.Secret) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	w.a.V(2).M(cr).S().Info(secret.Name)
 	defer w.a.V(2).M(cr).E().Info(secret.Name)
 
@@ -57,11 +50,6 @@ func (w *worker) reconcileSecret(ctx context.Context, cr api.ICustomResource, se
 
 // createSecret
 func (w *worker) createSecret(ctx context.Context, cr api.ICustomResource, secret *core.Secret) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	err := w.c.createSecret(ctx, secret)
 	if err == nil {
 		w.a.V(1).

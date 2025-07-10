@@ -47,7 +47,7 @@ func (p *StatefulSetPoller) PollHostStatefulSet(
 	backFn func(context.Context),
 ) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(11).Info("poll is aborted")
 		return nil
 	}
 

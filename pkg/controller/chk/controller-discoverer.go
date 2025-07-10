@@ -34,7 +34,7 @@ func getLabeler(cr api.ICustomResource) interfaces.ILabeler {
 
 func (c *Controller) discovery(ctx context.Context, cr api.ICustomResource) *model.Registry {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR: %s ", cr.GetName())
 		return nil
 	}
 

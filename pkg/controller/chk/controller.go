@@ -133,7 +133,7 @@ func (c *Controller) reconcile(
 
 func (c *Controller) poll(ctx context.Context, cr api.ICustomResource, f func(c *apiChk.ClickHouseKeeperInstallation, e error) bool) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Poll is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
@@ -144,7 +144,7 @@ func (c *Controller) poll(ctx context.Context, cr api.ICustomResource, f func(c 
 		if f(cur.(*apiChk.ClickHouseKeeperInstallation), err) {
 			// Continue polling
 			if util.IsContextDone(ctx) {
-				log.V(2).Info("task is done")
+				log.V(1).Info("Poll is aborted. Cr: %s ", cr.GetName())
 				return
 			}
 			time.Sleep(15 * time.Second)

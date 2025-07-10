@@ -29,11 +29,6 @@ import (
 
 // reconcileService reconciles core.Service
 func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, service, prevService *core.Service) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	w.a.V(2).M(cr).S().Info(service.GetName())
 	defer w.a.V(2).M(cr).E().Info(service.GetName())
 
@@ -83,11 +78,6 @@ func (w *worker) updateService(
 	targetService *core.Service,
 	prevService *core.Service,
 ) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	if curService.Spec.Type != targetService.Spec.Type {
 		return fmt.Errorf(
 			"just recreate the service in case of service type change '%s'=>'%s'",
@@ -218,11 +208,6 @@ func (w *worker) prepareFinalizers(curService, newService, oldService *core.Serv
 
 // createService
 func (w *worker) createService(ctx context.Context, cr chi.ICustomResource, service *core.Service) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	err := w.c.createService(ctx, service)
 	if err == nil {
 		w.a.V(1).

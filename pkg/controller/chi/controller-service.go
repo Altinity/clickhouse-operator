@@ -20,7 +20,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func (c *Controller) getService(ctx context.Context, service *core.Service) (*core.Service, error) {
@@ -39,11 +38,6 @@ func (c *Controller) updateService(ctx context.Context, service *core.Service) e
 
 // deleteServiceIfExists deletes Service in case it does not exist
 func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name string) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// Check specified service exists
 	_, err := c.kube.Service().Get(ctx, &core.Service{
 		ObjectMeta: meta.ObjectMeta{

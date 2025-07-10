@@ -195,7 +195,7 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 // ensureFinalizer
 func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR ensure fin: %s ", chi.GetName())
 		return false
 	}
 
@@ -260,7 +260,7 @@ func (w *worker) finalizeCR(
 // updateCHI sync CHI which was already created earlier
 func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Update CHI is aborted. CR: %s ", new.GetName())
 		return nil
 	}
 
@@ -287,7 +287,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	}
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted")
 		return nil
 	}
 
@@ -308,7 +308,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	}
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted")
 		return nil
 	}
 
@@ -319,7 +319,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	}
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted.")
 		return nil
 	}
 
@@ -329,7 +329,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 
 func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
@@ -354,7 +354,7 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInsta
 
 func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", _cr.GetName())
 		return
 	}
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
@@ -387,7 +387,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 
 func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *api.ClickHouseInstallation, err error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
@@ -415,10 +415,10 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *a
 
 func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
-	}
 
+	}
 	existingObjects := w.c.discovery(ctx, cr)
 	ap.WalkAdded(
 		// Walk over added clusters

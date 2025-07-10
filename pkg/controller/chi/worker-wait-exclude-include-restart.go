@@ -31,9 +31,10 @@ import (
 // waitForIPAddresses waits for all pods to get IP address assigned
 func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR polling IP: %s ", chi.GetName())
 		return
 	}
+
 	if chi.IsStopped() {
 		// No need to wait for stopped CHI
 		return
@@ -75,11 +76,6 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInst
 
 // excludeHost excludes host from ClickHouse clusters if required
 func (w *worker) excludeHost(ctx context.Context, host *api.Host) bool {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return false
-	}
-
 	log.V(1).M(host).F().S().Info("exclude host start")
 	defer log.V(1).M(host).F().E().Info("exclude host end")
 
@@ -220,33 +216,18 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 
 // excludeHostFromService
 func (w *worker) excludeHostFromService(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	_ = w.c.ctrlLabeler.DeleteReadyMarkOnPodAndService(ctx, host)
 	return nil
 }
 
 // includeHostIntoService
 func (w *worker) includeHostIntoService(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	_ = w.c.ctrlLabeler.SetReadyMarkOnPodAndService(ctx, host)
 	return nil
 }
 
 // excludeHostFromClickHouseCluster excludes host from ClickHouse configuration
 func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api.Host) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	w.a.V(1).
 		M(host).F().
 		Info("going to exclude host. Host/shard/cluster: %d/%d/%s",
@@ -267,11 +248,6 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api
 
 // includeHostIntoClickHouseCluster includes host into ClickHouse configuration
 func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api.Host) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	w.a.V(1).
 		M(host).F().
 		Info("going to include host. Host/shard/cluster: %d/%d/%s",
@@ -302,11 +278,6 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api
 
 // descendHostInClickHouseCluster
 func (w *worker) descendHostInClickHouseCluster(ctx context.Context, host *api.Host) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	w.a.V(1).
 		M(host).F().
 		Info("going to descent host. Host/shard/cluster: %d/%d/%s",
@@ -322,11 +293,6 @@ func (w *worker) descendHostInClickHouseCluster(ctx context.Context, host *api.H
 
 // ascendHostInClickHouseCluster
 func (w *worker) ascendHostInClickHouseCluster(ctx context.Context, host *api.Host) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	w.a.V(1).
 		M(host).F().
 		Info("going to ascend host. Host/shard/cluster: %d/%d/%s",

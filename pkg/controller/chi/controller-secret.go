@@ -29,13 +29,6 @@ func (c *Controller) getSecret(ctx context.Context, secret *core.Secret) (*core.
 }
 
 func (c *Controller) createSecret(ctx context.Context, secret *core.Secret) error {
-	log.V(1).M(secret).F().P()
-
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	log.V(1).Info("Create Secret %s", util.NamespacedName(secret))
 	if _, err := c.kube.Secret().Create(ctx, secret); err != nil {
 		// Unable to create StatefulSet at all
