@@ -64,18 +64,22 @@ func (c *Secret) Get(ctx context.Context, params ...any) (*core.Secret, error) {
 			namespace = typedObj.Runtime.Address.Namespace
 		}
 	}
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *Secret) Create(ctx context.Context, svc *core.Secret) (*core.Secret, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().Secrets(svc.Namespace).Create(ctx, svc, controller.NewCreateOptions())
 }
 
 func (c *Secret) Update(ctx context.Context, svc *core.Secret) (*core.Secret, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().Secrets(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
 }
 
 func (c *Secret) Delete(ctx context.Context, namespace, name string) error {
+	ctx = k8sCtx(ctx)
 	c.kubeClient.CoreV1().Secrets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	return poller.New(ctx, fmt.Sprintf("%s/%s", namespace, name)).
 		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
@@ -89,6 +93,7 @@ func (c *Secret) Delete(ctx context.Context, namespace, name string) error {
 }
 
 func (c *Secret) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.Secret, error) {
+	ctx = k8sCtx(ctx)
 	list, err := c.kubeClient.CoreV1().Secrets(namespace).List(ctx, opts)
 	if err != nil {
 		return nil, err

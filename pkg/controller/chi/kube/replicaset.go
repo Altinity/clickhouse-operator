@@ -34,9 +34,11 @@ func NewReplicaSet(kubeClient kube.Interface) *ReplicaSet {
 }
 
 func (c *ReplicaSet) Get(ctx context.Context, namespace, name string) (*apps.ReplicaSet, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.AppsV1().ReplicaSets(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *ReplicaSet) Update(ctx context.Context, replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.AppsV1().ReplicaSets(replicaSet.Namespace).Update(ctx, replicaSet, controller.NewUpdateOptions())
 }

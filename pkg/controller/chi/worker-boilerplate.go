@@ -152,7 +152,7 @@ func (w *worker) processReconcilePod(ctx context.Context, cmd *cmd_queue.Reconci
 // processItem processes one work item according to its type
 func (w *worker) processItem(ctx context.Context, item interface{}) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted")
 		return nil
 	}
 

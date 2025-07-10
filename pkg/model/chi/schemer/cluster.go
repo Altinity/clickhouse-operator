@@ -52,7 +52,7 @@ func (c *Cluster) SetClusterConnectionParams(clusterConnectionParams *clickhouse
 // queryUnzipColumns
 func (c *Cluster) queryUnzipColumns(ctx context.Context, hosts []string, sql string, columns ...*[]string) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(1).Info("ctx is done")
 		return nil
 	}
 
@@ -155,7 +155,7 @@ func (c *Cluster) QueryHost(ctx context.Context, host *api.Host, sql string, _op
 // QueryHostInt runs specified query on specified host and returns one int as a result
 func (c *Cluster) QueryHostInt(ctx context.Context, host *api.Host, sql string, _opts ...*clickhouse.QueryOptions) (int, error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(1).Info("ctx is done")
 		return 0, nil
 	}
 
@@ -174,7 +174,7 @@ func (c *Cluster) QueryHostInt(ctx context.Context, host *api.Host, sql string, 
 // QueryHostString runs specified query on specified host and returns one string as a result
 func (c *Cluster) QueryHostString(ctx context.Context, host *api.Host, sql string, _opts ...*clickhouse.QueryOptions) (string, error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(1).Info("ctx is done")
 		return "", nil
 	}
 

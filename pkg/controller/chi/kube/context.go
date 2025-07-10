@@ -12,26 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chk
+package kube
 
-import (
-	"context"
+import "context"
 
-	policy "k8s.io/api/policy/v1"
-)
-
-func (c *Controller) getPDB(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	return c.kube.PDB().Get(ctx, pdb.GetNamespace(), pdb.GetName())
-}
-
-func (c *Controller) createPDB(ctx context.Context, pdb *policy.PodDisruptionBudget) error {
-	_, err := c.kube.PDB().Create(ctx, pdb)
-
-	return err
-}
-
-func (c *Controller) updatePDB(ctx context.Context, pdb *policy.PodDisruptionBudget) error {
-	_, err := c.kube.PDB().Update(ctx, pdb)
-
-	return err
+func k8sCtx(ctx context.Context) context.Context {
+	return context.Background()
 }

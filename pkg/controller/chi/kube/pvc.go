@@ -38,22 +38,27 @@ func NewPVC(kubeClient kube.Interface) *PVC {
 }
 
 func (c *PVC) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, controller.NewCreateOptions())
 }
 
 func (c *PVC) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *PVC) Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, controller.NewUpdateOptions())
 }
 
 func (c *PVC) Delete(ctx context.Context, namespace, name string) error {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 }
 
 func (c *PVC) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.PersistentVolumeClaim, error) {
+	ctx = k8sCtx(ctx)
 	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -65,6 +70,7 @@ func (c *PVC) List(ctx context.Context, namespace string, opts meta.ListOptions)
 }
 
 func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.
 		CoreV1().
 		PersistentVolumeClaims(host.Runtime.Address.Namespace).

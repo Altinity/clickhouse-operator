@@ -34,5 +34,6 @@ func NewEvent(kubeClient kube.Interface) *Event {
 }
 
 func (c *Event) Create(ctx context.Context, event *core.Event) (*core.Event, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().Events(event.Namespace).Create(ctx, event, controller.NewCreateOptions())
 }

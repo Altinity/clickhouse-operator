@@ -642,6 +642,7 @@ def test_010(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_010_1. Test zookeeper initialization AFTER starting a cluster")
 def test_010_1(self):
@@ -770,7 +771,7 @@ def test_011_1(self):
                 print(f"users.xml: {regexp}")
                 assert regexp == "disabled"
 
-                print(f"Give ClickHouse time to recongize the config change")
+                print(f"Give ClickHouse time to recognize the config change")
                 time.sleep(30)
 
             test_default_user()
@@ -1838,8 +1839,8 @@ def test_014_1(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
-def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000"):
 
+def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000"):
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
 
@@ -1858,9 +1859,11 @@ def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000")
 
     with Then("Query from one server to another one should work"):
         for i in range(1, 10):
-            out = clickhouse.query_with_error(chi, host=f"chi-{chi}-default-0-0", port=replica1_port,
-                sql=f"SELECT count() FROM remote('chi-{chi}-default-0-1:{replica2_port}', system.one)",
-            )
+            out = clickhouse.query_with_error(
+                    chi,
+                    host=f"chi-{chi}-default-0-0",
+                    port=replica1_port,
+                    sql=f"SELECT count() FROM remote('chi-{chi}-default-0-1:{replica2_port}', system.one)")
             if "DNS_ERROR" not in out:
                 break
             print(f"DNS_ERROR. Wait for {i * 5} seconds")
@@ -1869,28 +1872,35 @@ def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000")
         assert out == "1"
 
     with And("Distributed query should work"):
-        out = clickhouse.query_with_error(chi, host=f"chi-{chi}-default-0-1", port=replica2_port,
-            sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10",
-        )
+        out = clickhouse.query_with_error(
+                chi,
+                host=f"chi-{chi}-default-0-1",
+                port=replica2_port,
+                sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
         note(f"cluster out:\n{out}")
         print(f"out: {out}")
         assert out == "2"
 
     with And("Replication should work"):
         test_version = replica1_port
-        clickhouse.query(chi,
+        clickhouse.query(
+            chi,
             "CREATE TABLE " + f"test_015_{test_version}" + " (a UInt32) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY tuple()",
             host=f"chi-{chi}-{cluster}-0-0", port = replica1_port)
-        clickhouse.query(chi,
+        clickhouse.query(
+            chi,
             "CREATE TABLE " + f"test_015_{test_version}" + " (a UInt32) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY tuple()",
             host=f"chi-{chi}-{cluster}-0-1", port = replica2_port)
-        clickhouse.query(chi,
+        clickhouse.query(
+            chi,
             f"INSERT INTO test_015_{test_version} SELECT {test_version}",
             host=f"chi-{chi}-{cluster}-0-0", port = replica1_port)
-        out = clickhouse.query(chi,
+        out = clickhouse.query(
+            chi,
             f"SELECT * FROM test_015_{test_version}",
             host=f"chi-{chi}-{cluster}-0-1", port = replica2_port)
         assert out == test_version
+
 
 @TestScenario
 @Name("test_015. hostNetwork")
@@ -1930,7 +1940,6 @@ def test_016(self):
             "do_not_delete": 1,
         },
     )
-    time.sleep(30)
 
     with Then("Custom macro 'layer' should be available"):
         out = clickhouse.query(chi, sql="select substitution from system.macros where macro='layer'")
@@ -3486,6 +3495,7 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
     #    with By("deleting pod"):
     #        kubectl.launch(f"delete pod {client_pod}", shell=shell)
 
+
 @TestScenario
 @Name("test_032. Test rolling update logic")
 # @Tags("NO_PARALLEL")
@@ -3933,7 +3943,7 @@ def test_036(self):
     check_data_is_recovered("reconcile-after-PV-deleted")
 
     with Finally("I clean up"):
-       delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4597,7 +4607,6 @@ def test_046(self):
             "clickhouse_operator_chi{.*chi=\"test-046-operator-metrics\".*} 1",
         ])
 
-
     with Then(f"Check clickhouse-operator exposes clickhouse_operator_chi_reconciles_* metrics"):
         check_metrics([
             "clickhouse_operator_chi_reconciles_started{.*chi=\"test-046-operator-metrics\".*} 1",
@@ -4719,7 +4728,6 @@ def test_047(self):
             f"""/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml | head -n 16 | tail -n 1'"""
             )
         assert "<weight>1</weight>" in r
-
 
     numbers = 100
     with When("I create distributed table"):
@@ -4866,7 +4874,7 @@ def test_050(self):
     test_labels(chi, "annotation", "exclude_this_annotation", "<none>")
 
     with Then("Check that exposed metrics do not have labels and annotations that are excluded"):
-        operator_namespace=current().context.operator_namespace
+        operator_namespace = current().context.operator_namespace
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
@@ -4877,7 +4885,7 @@ def test_050(self):
             operator_pod=operator_pod,
             expect_metric="chi_clickhouse_metric_VersionInteger",
             expect_labels=expect_labels
-            )
+        )
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -4942,7 +4950,7 @@ def test_051(self):
         assert env["name"] == "CLICKHOUSE_DATA_DIR"
         assert env["value"] == "/var/lib/clickhouse-keeper"
 
-    with Then("Wiat until Keeper connection is established"):
+    with Then("Wait until Keeper connection is established"):
         out = 0
         for i in range(1, 10):
             out = clickhouse.query_with_error(chi, "SELECT count(*) from system.zookeeper_connection")
@@ -5049,14 +5057,13 @@ def test_051_1(self):
 
         kubectl.wait_chk_status(chk, "Completed")
 
-
     with Then("CLICKHOUSE_DATA_DIR should be properly set"):
         pod = kubectl.get_pod_spec("", "chk-test-051-chk-single-0-0-0")
         env = pod["containers"][0]["env"][0]
         assert env["name"] == "CLICKHOUSE_DATA_DIR"
         assert env["value"] == "/var/lib/clickhouse-keeper"
 
-    with Then("Wiat until Keeper connection is established"):
+    with Then("Wait until Keeper connection is established"):
         out = 0
         for i in range(1, 10):
             out = clickhouse.query_with_error(chi, "SELECT count(*) from system.zookeeper_connection")
@@ -5448,6 +5455,7 @@ def test_056(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_057. Test reconcile concurrency settings on CHI level")
 def test_057(self):
@@ -5536,6 +5544,92 @@ def test_058(self): # Can be merged with test_034 potentially
 
     with Finally("I clean up"):
         kubectl.launch(f"delete pod {client_pod}")
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_059. Test macro substitutions in settings")
+def test_059(self):
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-059-macros"
+    cluster = "default"
+    kubectl.create_and_check(
+        manifest="manifests/chi/test-059-macros.yaml",
+        check={
+            "apply_templates": {
+                current().context.clickhouse_template,
+            },
+            "pod_count": 1,
+            "do_not_delete": 1,
+        },
+    )
+
+    for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
+
+        with Then("default_replica_path should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_path'")
+            assert out == "/clickhouse/{cluster}/tables/{shard}/{uuid}"
+
+        with And("default_replica_name should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_name'")
+            assert out == "{replica}"
+
+        with And("Macro my_replica should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_replica'")
+            assert out == "{replica}"
+
+        with And("Macro my_endpoint should be unchanged"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_endpoint'")
+            assert out == "https://s3_url/{cluster}/{shard}/"
+
+    with When("Update CHI to apply macro substitutions"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-059-macros-2.yaml",
+            check={
+                "do_not_delete": 1,
+            },
+        )
+
+    for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
+
+        cluster_macro = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='cluster'")
+        shard_macro = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='shard'")
+        replica_macro = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='replica'")
+        # 'replica' macro has different value in ClickHouse and Operator - replica name, not hostname
+        operator_replica_macro = '0'
+
+        with Then("default_replica_path should be substituted from ClickHouse macros"):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_path'")
+            expect = f"/clickhouse/{cluster_macro}/tables/{shard_macro}/" + "{uuid}"
+            print(f"{out}")
+            print(f"{expect}")
+            assert out == expect
+
+        # # 'replica' macro has different value in ClickHouse (hostname) and Operator (replica name, default to index)
+        with And("default_replica_name should be substituted from ClickHouse macros", flags=XFAIL):
+            out = clickhouse.query(chi, host=h, sql="select value from system.server_settings where name = 'default_replica_name'")
+            expect = replica_macro
+            print(f"{out}")
+            print(f"{expect}")
+            assert out == expect
+
+        # 'replica' macro has different value in ClickHouse and Operator
+        with And("Macro my_replica should be substituted from operator macros"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_replica'")
+            expect = operator_replica_macro
+            print(f"{out}")
+            print(f"{expect}")
+            assert out == expect
+
+        with And("Macro my_endpoint should be substituted"):
+            out = clickhouse.query(chi, host=h, sql="select substitution from system.macros where macro='my_endpoint'")
+            expect = f"https://s3_url/{cluster_macro}/{shard_macro}/"
+            print(f"{out}")
+            print(f"{expect}")
+            assert out == expect
+
+    with Finally("I clean up"):
         delete_test_namespace()
 
 

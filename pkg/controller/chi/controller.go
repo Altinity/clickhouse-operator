@@ -696,7 +696,7 @@ type patchFinalizers struct {
 // patchCHIFinalizers patch ClickHouseInstallation finalizers
 func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR patch fin: %s ", chi.GetName())
 		return nil
 	}
 
@@ -736,7 +736,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 
 func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, f func(c *api.ClickHouseInstallation, e error) bool) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. Polling CR: %s ", chi.GetName())
 		return
 	}
 
@@ -747,7 +747,7 @@ func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, 
 		if f(cur.(*api.ClickHouseInstallation), err) {
 			// Continue polling
 			if util.IsContextDone(ctx) {
-				log.V(2).Info("task is done")
+				log.V(1).Info("Reconcile is aborted. Polling CR: %s ", chi.GetName())
 				return
 			}
 			time.Sleep(15 * time.Second)
@@ -761,7 +761,7 @@ func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, 
 // installFinalizer
 func (c *Controller) installFinalizer(ctx context.Context, chi *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR install fn: %s ", chi.GetName())
 		return nil
 	}
 
@@ -789,7 +789,7 @@ func (c *Controller) installFinalizer(ctx context.Context, chi *api.ClickHouseIn
 // uninstallFinalizer
 func (c *Controller) uninstallFinalizer(ctx context.Context, chi *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR uninstall fin: %s ", chi.GetName())
 		return nil
 	}
 

@@ -75,11 +75,6 @@ func NewReconciler(
 
 // PrepareHostStatefulSetWithStatus prepares host's StatefulSet status
 func (r *Reconciler) PrepareHostStatefulSetWithStatus(ctx context.Context, host *api.Host, shutdown bool) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	r.prepareDesiredStatefulSet(host, shutdown)
 	host.GetReconcileAttributes().SetStatus(r.getStatefulSetStatus(host))
 }
@@ -136,7 +131,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	opts *ReconcileOptions,
 ) (err error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("reconcile sts is aborted. Host: %s", host.GetName())
 		return nil
 	}
 
@@ -192,7 +187,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 // recreateStatefulSet
 func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("recreate sts is aborted host: %s", host.GetName())
 		return nil
 	}
 
@@ -228,7 +223,7 @@ func (r *Reconciler) copyKubectlAnnotationsBeforeUpdate(old, new *apps.StatefulS
 // updateStatefulSet
 func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("update sts is aborted host: %s", host.GetName())
 		return nil
 	}
 
@@ -302,11 +297,6 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 
 // createStatefulSet
 func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	statefulSet := host.Runtime.DesiredStatefulSet
 
 	r.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
@@ -366,11 +356,6 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
 func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, opts *ReconcileOptions) common.ErrorCRUD {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	log.V(1).M(host).F().P()
 	statefulSet := host.Runtime.DesiredStatefulSet
 
@@ -403,12 +388,6 @@ func (r *Reconciler) doUpdateStatefulSet(
 	host *api.Host,
 ) common.ErrorCRUD {
 	log.V(2).M(host).F().P()
-
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// Apply newStatefulSet and wait for Generation to change
 	updatedStatefulSet, err := r.sts.Update(ctx, newStatefulSet)
 	if err != nil {
@@ -440,11 +419,6 @@ func (r *Reconciler) doUpdateStatefulSet(
 
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
 func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// IMPORTANT
 	// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
 	// To achieve ordered and graceful termination of the pods in the StatefulSet,

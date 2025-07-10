@@ -41,7 +41,7 @@ import (
 // reconcileCR runs reconcile cycle for a Custom Resource
 func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR before start: %s ", new.GetName())
 		return nil
 	}
 
@@ -62,23 +62,18 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	metrics.CHIReconcilesStarted(ctx, new)
 	startTime := time.Now()
 
-	old, new, _ = w.build(ctx, old, new)
+	new = w.buildCR(ctx, new)
 
-	actionPlan := action_plan.NewActionPlan(old, new)
+	actionPlan := action_plan.NewActionPlan(new.GetAncestorT(), new)
 	common.LogActionPlan(actionPlan)
 
 	switch {
 	case actionPlan.HasActionsToDo():
 		w.a.M(new).F().Info("ActionPlan has actions - continue reconcile")
-	case w.isAfterFinalizerInstalled(old, new):
+	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
 	default:
 		w.a.M(new).F().Info("ActionPlan has no actions and no need to install finalizer - nothing to do")
-		return nil
-	}
-
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -101,9 +96,10 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		// Reconcile successful
 		// Post-process added items
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("task is done")
+			log.V(1).Info("Reconcile is aborted. CR post-process: %s ", new.GetName())
 			return nil
 		}
+
 		w.clean(ctx, new)
 		w.dropReplicas(ctx, new, actionPlan)
 		w.addToMonitoring(new)
@@ -117,72 +113,39 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	return nil
 }
 
-func (w *worker) build(ctx context.Context, _old, _new *api.ClickHouseInstallation) (*api.ClickHouseInstallation, *api.ClickHouseInstallation, error) {
-	l := w.a.V(1).M(_new).F()
-
-	old := _old
-	new := _new
-	if new.HasAncestor() {
-		l.Info("has ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(new))
-		old = new.GetAncestorT()
-	} else {
-		l.Info("has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(new))
-		old = nil
-	}
-
-	old = w.createTemplated(old)
-	new = w.createTemplated(new)
-	new.SetAncestor(old)
-	w.newTask(new, old)
-	w.findMinMaxVersions(ctx, new)
-
-	common.LogOldAndNew("norm stage 1:", old, new)
-
-	// build appropriate template
-	templates := w.buildTemplates(new)
-	ips := w.c.getPodsIPs(new)
-
-	w.a.V(1).M(new).Info("IPs of the CHI normalizer %s: len: %d %v", util.NamespacedName(new), len(ips), ips)
-	if len(ips) > 0 || len(templates) > 0 {
-		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
-		opts.DefaultUserAdditionalIPs = ips
-		opts.Templates = templates
-		new = w.createTemplated(_new, opts)
-		new.SetAncestor(old)
-		w.newTask(new, old)
-		w.findMinMaxVersions(ctx, new)
-		common.LogOldAndNew("norm stage 2:", old, new)
-	}
-
-	w.fillCurSTS(ctx, new)
-	w.logSWVersion(ctx, new)
-
-	return old, new, nil
-}
-
-func (w *worker) buildFromMeta(ctx context.Context, obj meta.Object, searchByName bool) (*api.ClickHouseInstallation, error) {
-	chi, err := w.createTemplatedCRFromObjectMeta(obj, searchByName, commonNormalizer.NewOptions[api.ClickHouseInstallation]())
-	if err != nil {
-		w.a.M(obj).F().Error("UNABLE-1 to find obj by %t %v err %v", searchByName, obj.GetLabels(), err)
-		return nil, err
-	}
-
-	w.newTask(chi, w.createTemplated(nil))
+func (w *worker) buildCR(ctx context.Context, _chi *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+	chi := w.createTemplatedCR(_chi)
+	w.newTask(chi, chi.GetAncestorT())
 	w.findMinMaxVersions(ctx, chi)
+	common.LogOldAndNew("norm stage 1:", chi.GetAncestorT(), chi)
+
 	templates := w.buildTemplates(chi)
 	ips := w.c.getPodsIPs(chi)
+	w.a.V(1).M(chi).Info("IPs of the CHI %s: len: %d %v", util.NamespacedName(chi), len(ips), ips)
 	if len(ips) > 0 || len(templates) > 0 {
+		// Rebuild CR with known list of templates and additional IPs
 		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
 		opts.Templates = templates
-		chi, err = w.createTemplatedCRFromObjectMeta(obj, searchByName, opts)
-		if err != nil {
-			w.a.M(obj).F().Error("UNABLE-2 to find obj by %t %v err %v", searchByName, obj.GetLabels(), err)
-			return nil, err
-		}
+		chi = w.createTemplatedCR(_chi, opts)
+		w.newTask(chi, chi.GetAncestorT())
+		w.findMinMaxVersions(ctx, chi)
+		common.LogOldAndNew("norm stage 2:", chi.GetAncestorT(), chi)
 	}
 
-	return chi, nil
+	w.fillCurSTS(ctx, chi)
+	w.logSWVersion(ctx, chi)
+
+	return chi
+}
+
+func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*api.ClickHouseInstallation, error) {
+	_chi, err := w.c.GetCHI(obj)
+	if err != nil {
+		w.a.M(obj).F().Error("UNABLE-1 to find obj by %v err %v", obj.GetLabels(), err)
+		return nil, err
+	}
+	return w.buildCR(ctx, _chi), nil
 }
 
 func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*api.ClickHouseInstallation) {
@@ -198,10 +161,8 @@ func (w *worker) findMinMaxVersions(ctx context.Context, chi *api.ClickHouseInst
 	// Create artifacts
 	chi.WalkHosts(func(host *api.Host) error {
 		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
-		if !util.IsContextDone(ctx) {
-			version := w.getHostSoftwareVersion(ctx, host)
-			host.Runtime.Version = version
-		}
+		version := w.getHostSoftwareVersion(ctx, host)
+		host.Runtime.Version = version
 		return nil
 	})
 	chi.FindMinMaxVersions()
@@ -226,7 +187,7 @@ func (w *worker) logSWVersion(ctx context.Context, chi *api.ClickHouseInstallati
 // reconcile reconciles Custom Resource
 func (w *worker) reconcile(ctx context.Context, cr *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR: %s ", cr.GetName())
 		return nil
 	}
 
@@ -253,7 +214,7 @@ func (w *worker) reconcile(ctx context.Context, cr *api.ClickHouseInstallation) 
 // reconcileCRAuxObjectsPreliminary reconciles CR preliminary in order to ensure that ConfigMaps are in place
 func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR aux preliminary: %s ", cr.GetName())
 		return nil
 	}
 
@@ -313,7 +274,7 @@ func (w *worker) reconcileCRServiceFinal(ctx context.Context, cr api.ICustomReso
 // reconcileCRAuxObjectsFinal reconciles CR global objects
 func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHouseInstallation) (err error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR aux final: %s ", cr.GetName())
 		return nil
 	}
 
@@ -342,11 +303,6 @@ func (w *worker) reconcileConfigMapCommon(
 	cr api.ICustomResource,
 	options ...*config.FilesGeneratorOptions,
 ) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	var opts *config.FilesGeneratorOptions
 	if len(options) > 0 {
 		opts = options[0]
@@ -368,11 +324,6 @@ func (w *worker) reconcileConfigMapCommon(
 // reconcileConfigMapCommonUsers reconciles all CHI's users ConfigMap
 // ConfigMap common for all users resources in CHI
 func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, cr api.ICustomResource) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommonUsers)
 	err := w.reconcileConfigMap(ctx, cr, configMapUsers)
@@ -386,11 +337,6 @@ func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, cr api.ICust
 
 // reconcileConfigMapHost reconciles host's personal ConfigMap
 func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// ConfigMap for a host
 	configMap := w.task.Creator().CreateConfigMap(interfaces.ConfigMapHost, host)
 	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
@@ -406,11 +352,6 @@ func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) err
 
 // reconcileHostStatefulSet reconciles host's StatefulSet
 func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
@@ -551,10 +492,6 @@ func (w *worker) hostScaleDown(ctx context.Context, host *api.Host, opts *statef
 
 // reconcileHostService reconciles host's Service
 func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
 	service := w.task.Creator().CreateService(interfaces.ServiceHost, host).First()
 	if service == nil {
 		// This is not a problem, service may be omitted
@@ -575,7 +512,7 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 // reconcileCluster reconciles cluster, excluding nested shards
 func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. Cluster: %s ", cluster.GetName())
 		return nil
 	}
 
@@ -696,7 +633,7 @@ func (w *worker) reconcileShardWithHosts(ctx context.Context, shard api.IShard) 
 // reconcileShard reconciles specified shard, excluding nested replicas
 func (w *worker) reconcileShard(ctx context.Context, shard api.IShard) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. Shard: %s ", shard.GetName())
 		return nil
 	}
 
@@ -728,7 +665,7 @@ func (w *worker) reconcileShardService(ctx context.Context, shard api.IShard) er
 // reconcileHost reconciles specified ClickHouse host
 func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. Host: %s ", host.GetName())
 		return nil
 	}
 
@@ -738,7 +675,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	metrics.HostReconcilesStarted(ctx, host.GetCR())
 	startTime := time.Now()
 
-	if host.IsFirst() {
+	if host.IsFirstInCR() {
 		_ = w.reconcileCRServicePreliminary(ctx, host.GetCR())
 		defer w.reconcileCRServiceFinal(ctx, host.GetCR())
 	}
@@ -869,11 +806,6 @@ func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.
 }
 
 func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *migrateTableOptions) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	if !w.shouldMigrateTables(host, opts) {
 		w.a.V(1).
 			M(host).F().
@@ -906,11 +838,6 @@ func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *
 
 // reconcileHostInclude includes specified ClickHouse host into all activities
 func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	if !w.shouldIncludeHost(host) {
 		w.a.V(1).
 			M(host).F().
@@ -945,7 +872,7 @@ func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error
 	}
 
 	// Report host software version
-	version := w.getHostSoftwareVersion(ctx, host, &VersionOptions{})
+	version := w.getHostSoftwareVersion(ctx, host)
 	l.Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version.Render())
 	return nil
 }

@@ -37,7 +37,7 @@ import (
 
 func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile clean is aborted. CR: %s ", cr.GetName())
 		return
 	}
 
@@ -64,11 +64,6 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 
 // dropReplicas cleans Zookeeper for replicas that are properly deleted - via AP
 func (w *worker) dropReplicas(ctx context.Context, cr api.ICustomResource, ap *action_plan.ActionPlan) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	w.a.V(1).M(cr).F().S().Info("drop replicas based on AP")
 	cnt := 0
 	ap.WalkRemoved(
@@ -92,7 +87,7 @@ func (w *worker) purge(
 	reconcileFailedObjs *model.Registry,
 ) (cnt int) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Purge is aborted. CR: %s ", cr.GetName())
 		return cnt
 	}
 
@@ -245,7 +240,7 @@ func shouldPurgePDB(cr api.ICustomResource, reconcileFailedObjs *model.Registry,
 // discoveryAndDeleteCR deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
 func (w *worker) discoveryAndDeleteCR(ctx context.Context, cr api.ICustomResource) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Discovery and delete is aborted. CR: %s ", cr.GetName())
 		return nil
 	}
 
@@ -265,7 +260,7 @@ func (w *worker) discoveryAndDeleteCR(ctx context.Context, cr api.ICustomResourc
 // deleteCHIProtocol deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
 func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete CHI protocol is aborted")
 		return nil
 	}
 
@@ -321,7 +316,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	})
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete is aborted")
 		return nil
 	}
 
@@ -386,11 +381,6 @@ func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 
 // dropReplica drops replica's info from Zookeeper
 func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...*dropReplicaOptions) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	if hostToDrop == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop: %s", hostToDrop.GetName())
 		return nil
@@ -433,7 +423,7 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...
 // deleteTables
 func (w *worker) deleteTables(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete tables. Host: %s ", host.GetName())
 		return nil
 	}
 
@@ -463,7 +453,7 @@ func (w *worker) deleteTables(ctx context.Context, host *api.Host) error {
 // chi is the new CHI in which there will be no more this host
 func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation, host *api.Host) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete host is aborted. Host: %s ", host.GetName())
 		return nil
 	}
 
@@ -527,7 +517,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 // chi is the new CHI in which there will be no more this shard
 func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallation, shard *api.ChiShard) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete shard is aborted. shard: %s ", shard.GetName())
 		return nil
 	}
 
@@ -600,7 +590,7 @@ func (w *worker) deleteCluster(ctx context.Context, chi *api.ClickHouseInstallat
 // deleteCHI
 func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete CHI is aborted")
 		return false
 	}
 

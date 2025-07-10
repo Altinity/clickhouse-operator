@@ -84,7 +84,7 @@ func (s *ClusterSchemer) createTablesSQLs(
 // HostCreateTables creates tables on a new host
 func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(1).Info("ctx is done")
 		return nil
 	}
 

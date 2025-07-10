@@ -25,7 +25,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func getLabeler(cr api.ICustomResource) interfaces.ILabeler {
@@ -33,11 +32,6 @@ func getLabeler(cr api.ICustomResource) interfaces.ILabeler {
 }
 
 func (c *Controller) discovery(ctx context.Context, cr api.ICustomResource) *model.Registry {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	opts := controller.NewListOptions(getLabeler(cr).Selector(interfaces.SelectorCRScope))
 	r := model.NewRegistry()
 	c.discoveryStatefulSets(ctx, r, cr, opts)

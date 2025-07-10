@@ -15,6 +15,7 @@
 package swversion
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -125,25 +126,42 @@ func (v *SoftWareVersion) Matches(constraint string) bool {
 
 // Cmp compares two versions
 func (v *SoftWareVersion) Cmp(to *SoftWareVersion) int {
+	if v.IsUnknown() || to.IsUnknown() {
+		// Need both versions to compare
+		return 0
+	}
 	return v.semver.Compare(to.semver)
 }
 
 // IsUnknown checks whether software version is unknown or not
 func (v *SoftWareVersion) IsUnknown() bool {
 	if v == nil {
+		// Version is unknown
 		return true
 	}
 	if len(v.normalized) == 0 {
+		// Version is unknown
 		return true
 	}
+	if v.semver == nil {
+		// Version is unknown
+		return true
+	}
+
+	// Version  known
 	return false
 }
 
-func (v *SoftWareVersion) SetDescription(desc string) *SoftWareVersion {
+// IsKnown checks whether software version is unknown or not
+func (v *SoftWareVersion) IsKnown() bool {
+	return !v.IsUnknown()
+}
+
+func (v *SoftWareVersion) SetDescription(format string, args ...interface{}) *SoftWareVersion {
 	if v == nil {
 		return nil
 	}
-	v.description = desc
+	v.description = fmt.Sprintf(format, args...)
 	return v
 }
 
@@ -161,4 +179,12 @@ func (v *SoftWareVersion) Render() string {
 		return ""
 	}
 	return v.normalized + "[" + v.original + "/" + v.description + "]"
+}
+
+// GetOriginal is a getter
+func (v *SoftWareVersion) GetOriginal() string {
+	if v == nil {
+		return ""
+	}
+	return v.original
 }

@@ -69,20 +69,24 @@ func (c *STS) Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 	default:
 		panic("unexxpected number of args")
 	}
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *STS) Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, controller.NewCreateOptions())
 }
 
 // Update is an internal function, used in reconcileStatefulSet only
 func (c *STS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.AppsV1().StatefulSets(sts.Namespace).Update(ctx, sts, controller.NewUpdateOptions())
 }
 
 // Delete gracefully deletes StatefulSet through zeroing Pod's count
 func (c *STS) Delete(ctx context.Context, namespace, name string) error {
+	ctx = k8sCtx(ctx)
 	c.kubeClient.AppsV1().StatefulSets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	return poller.New(ctx, fmt.Sprintf("%s/%s", namespace, name)).
 		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
@@ -95,6 +99,7 @@ func (c *STS) Delete(ctx context.Context, namespace, name string) error {
 }
 
 func (c *STS) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]apps.StatefulSet, error) {
+	ctx = k8sCtx(ctx)
 	list, err := c.kubeClient.AppsV1().StatefulSets(namespace).List(ctx, opts)
 	if err != nil {
 		return nil, err

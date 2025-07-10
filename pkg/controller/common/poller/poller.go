@@ -66,7 +66,7 @@ func (p *poller) Poll() error {
 	start := time.Now()
 	for {
 		if util.IsContextDone(p.ctx) {
-			log.V(2).Info("task is done")
+			log.V(1).Info("poll is aborted. Host")
 			return nil
 		}
 

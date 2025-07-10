@@ -20,16 +20,10 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // deleteServiceCR
 func (c *Controller) deleteServiceCR(ctx context.Context, cr api.ICustomResource) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	if templates, ok := cr.GetRootServiceTemplates(); ok {
 		for _, template := range templates {
 			serviceName := c.namer.Name(interfaces.NameCRService, cr, template)

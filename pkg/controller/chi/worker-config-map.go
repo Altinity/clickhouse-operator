@@ -21,7 +21,6 @@ import (
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -33,11 +32,6 @@ func (w *worker) reconcileConfigMap(
 	cr api.ICustomResource,
 	configMap *core.ConfigMap,
 ) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	w.a.V(2).M(cr).S().P()
 	defer w.a.V(2).M(cr).E().P()
 
@@ -67,11 +61,6 @@ func (w *worker) reconcileConfigMap(
 
 // updateConfigMap
 func (w *worker) updateConfigMap(ctx context.Context, cr api.ICustomResource, configMap *core.ConfigMap) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	updatedConfigMap, err := w.c.updateConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
@@ -95,11 +84,6 @@ func (w *worker) updateConfigMap(ctx context.Context, cr api.ICustomResource, co
 
 // createConfigMap
 func (w *worker) createConfigMap(ctx context.Context, cr api.ICustomResource, configMap *core.ConfigMap) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	err := w.c.createConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
