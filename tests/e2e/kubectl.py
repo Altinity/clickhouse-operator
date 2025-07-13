@@ -647,7 +647,7 @@ def check_configmap(cfg_name, values, ns=None, shell=None):
 def check_pdb(chi, clusters, ns=None, shell=None):
     for c in clusters.keys():
         with Then(f"PDB is configured for cluster {c}"):
-            managementEnabled = False
+            managementEnabled = True
             if isinstance(clusters[c], dict):
                 managementEnabled = clusters[c].get("managementEnabled", True)
                 maxUnavailable = clusters[c].get("maxUnavailable", 1)

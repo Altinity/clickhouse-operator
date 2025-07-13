@@ -171,6 +171,7 @@ func (cluster *Cluster) GetRuntime() IClusterRuntime {
 	return &cluster.Runtime
 }
 
+// GetPDBManaged is a getter
 func (cluster *Cluster) GetPDBManaged() *types.StringBool {
 	return cluster.PDBManaged
 }

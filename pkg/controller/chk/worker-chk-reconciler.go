@@ -403,14 +403,22 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.Cluster) 
 
 	w.reconcileClusterSecret(ctx, cluster)
 
+	w.reconcileClusterPodDisruptionBudget(ctx, cluster)
+
+	return nil
+}
+
+func (w *worker) reconcileClusterPodDisruptionBudget(ctx context.Context, cluster *apiChk.Cluster) {
+	if cluster.GetPDBManaged().IsFalse() {
+		return
+	}
+
 	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
 	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
 		w.task.RegistryReconciled().RegisterPDB(pdb.GetObjectMeta())
 	} else {
 		w.task.RegistryFailed().RegisterPDB(pdb.GetObjectMeta())
 	}
-
-	return nil
 }
 
 func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *apiChk.Cluster) {

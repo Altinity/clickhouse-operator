@@ -5628,7 +5628,7 @@ def test_059(self):
 def test_060(self):
     create_shell_namespace_clickhouse_template()
 
-    chi = "test-001"
+    chi = "test-060"
     kubectl.create_and_check(
         manifest="manifests/chi/test-060-pdb-management-disabled.yaml",
         check={

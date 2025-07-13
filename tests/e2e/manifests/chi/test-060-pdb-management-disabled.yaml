@@ -1,11 +1,11 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test-058-pdb-management-disabled"
+  name: "test-060-pdb-management-disabled"
 spec:
   configuration:
     clusters:
       - name: single
-        pdbManaged: false
+        pdbManaged: "no"
         secret:
           auto: "yes"
