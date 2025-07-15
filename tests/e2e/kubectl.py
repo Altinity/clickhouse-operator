@@ -214,7 +214,19 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
 
 def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None):
     out = launch(f"get {kind} {name} {label} -o json", ns=ns, ok_to_fail=ok_to_fail, shell=shell)
-    return json.loads(out.strip())
+    stripped = out.strip()
+
+    if not stripped or stripped.startswith("Error"):
+        if ok_to_fail:
+            return None
+        raise ValueError(f"kubectl returned error: {stripped}")
+
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError as e:
+        if ok_to_fail:
+            return None
+        raise ValueError(f"Failed to parse JSON from: {stripped}") from e
 
 
 def get_chi_normalizedCompleted(chi, ns=None, shell=None):
@@ -647,18 +659,18 @@ def check_configmap(cfg_name, values, ns=None, shell=None):
 def check_pdb(chi, clusters, ns=None, shell=None):
     for c in clusters.keys():
         with Then(f"PDB is configured for cluster {c}"):
-            managementEnabled = True
+            is_managed = True
             if isinstance(clusters[c], dict):
-                managementEnabled = clusters[c].get("managementEnabled", True)
-                maxUnavailable = clusters[c].get("maxUnavailable", 1)
+                is_managed = clusters[c].get("is_managed", True)
+                max_unavailable = clusters[c].get("max_`unavailable`", 1)
             else:
                 # Treat simple integer as maxUnavailable to ensure backward compatibility.
-                maxUnavailable = clusters[c]
+                max_unavailable = clusters[c]
 
-            pdb = get("pdb", chi + "-" + c, ok_to_fail=managementEnabled==False, shell=shell)
+            pdb = get("pdb", chi + "-" + c, ok_to_fail=is_managed is False, shell=shell)
 
-            if not managementEnabled:
-                assert pdb == ""
+            if not is_managed:
+                assert pdb is None
                 continue
 
             labels = pdb["spec"]["selector"]["matchLabels"]
@@ -666,7 +678,7 @@ def check_pdb(chi, clusters, ns=None, shell=None):
             assert labels["clickhouse.altinity.com/chi"] == chi
             assert labels["clickhouse.altinity.com/cluster"] == c
             assert labels["clickhouse.altinity.com/namespace"] == current().context.test_namespace
-            assert pdb["spec"]["maxUnavailable"] == maxUnavailable
+            assert pdb["spec"]["maxUnavailable"] == max_unavailable
 
 def force_reconcile(chi, taskID="reconcile", ns=None, shell=None):
     with Then(f"Trigger CHI reconcile with taskID:\"{taskID}\""):

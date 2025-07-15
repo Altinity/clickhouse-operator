@@ -5628,7 +5628,7 @@ def test_059(self):
 def test_060(self):
     create_shell_namespace_clickhouse_template()
 
-    chi = "test-060"
+    chi = "test-060-pdb-management-disabled"
     kubectl.create_and_check(
         manifest="manifests/chi/test-060-pdb-management-disabled.yaml",
         check={
@@ -5638,7 +5638,7 @@ def test_060(self):
                 "service": 2,
             },
             "configmaps": 1,
-            "pdb": {"single": {"managementEnabled": False}},
+            "pdb": {"single": {"is_managed": False}},
             "do_not_delete": 1,
         },
     )
