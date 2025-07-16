@@ -61,11 +61,7 @@ type Connection struct {
 
 // NewConnection creates a new Zookeeper connection with the provided nodes and parameters.
 func NewConnection(nodes api.ZookeeperNodes, _params ...*ConnectionParams) *Connection {
-	var params *ConnectionParams
-	if len(_params) > 0 {
-		params = _params[0]
-	}
-	params = params.Normalize()
+	params := BuildConnectionParams(_params...)
 	return &Connection{
 		nodes:            nodes,
 		sema:             semaphore.NewWeighted(params.MaxConcurrentRequests),
