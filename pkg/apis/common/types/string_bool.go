@@ -206,7 +206,7 @@ func (s *StringBool) Normalize(defaultValue bool) *StringBool {
 		return s
 	}
 
-	// String value unrecognized, return default value
+	// Value is unrecognized, return default value
 	return NewStringBool(defaultValue)
 }
 
