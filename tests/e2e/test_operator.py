@@ -5632,6 +5632,36 @@ def test_059(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+@TestScenario
+@Name("test_060. pdb management disabled")
+@Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
+def test_060(self):
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-060-pdb-management-disabled"
+    kubectl.create_and_check(
+        manifest="manifests/chi/test-060-pdb-management-disabled.yaml",
+        check={
+            "object_counts": {
+                "statefulset": 1,
+                "pod": 1,
+                "service": 2,
+            },
+            "configmaps": 1,
+            "pdb": {"single": {"is_managed": False}},
+            "do_not_delete": 1,
+        },
+    )
+
+    created_objects = kubectl.get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=chi)
+    print("Created objects:")
+    for o in created_objects:
+        print(o)
+
+    kubectl.delete_chi(chi)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):

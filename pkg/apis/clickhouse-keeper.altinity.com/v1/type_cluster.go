@@ -23,10 +23,11 @@ import (
 type Cluster struct {
 	Name string `json:"name,omitempty"         yaml:"name,omitempty"`
 
-	Settings  *apiChi.Settings      `json:"settings,omitempty"          yaml:"settings,omitempty"`
-	Files     *apiChi.Settings      `json:"files,omitempty"             yaml:"files,omitempty"`
-	Templates *apiChi.TemplatesList `json:"templates,omitempty"         yaml:"templates,omitempty"`
-	Layout    *ChkClusterLayout     `json:"layout,omitempty"       yaml:"layout,omitempty"`
+	Settings   *apiChi.Settings      `json:"settings,omitempty"          yaml:"settings,omitempty"`
+	Files      *apiChi.Settings      `json:"files,omitempty"             yaml:"files,omitempty"`
+	Templates  *apiChi.TemplatesList `json:"templates,omitempty"         yaml:"templates,omitempty"`
+	Layout     *ChkClusterLayout     `json:"layout,omitempty"       yaml:"layout,omitempty"`
+	PDBManaged *types.StringBool     `json:"pdbManaged,omitempty"        yaml:"pdbManaged,omitempty"`
 
 	Runtime ChkClusterRuntime `json:"-" yaml:"-"`
 }
@@ -126,6 +127,11 @@ func (c *Cluster) GetSecret() *apiChi.ClusterSecret {
 // GetRuntime is a getter
 func (cluster *Cluster) GetRuntime() apiChi.IClusterRuntime {
 	return &cluster.Runtime
+}
+
+// GetPDBManaged is a getter
+func (cluster *Cluster) GetPDBManaged() *types.StringBool {
+	return cluster.PDBManaged
 }
 
 // GetPDBMaxUnavailable is a getter
