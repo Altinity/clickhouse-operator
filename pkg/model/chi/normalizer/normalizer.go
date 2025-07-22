@@ -878,13 +878,8 @@ func (n *Normalizer) normalizeClusterSchemaPolicy(policy *chi.SchemaPolicy) *chi
 }
 
 // normalizePDBManaged normalizes PDBManaged
-func (n *Normalizer) normalizePDBManaged(pdbManaged *types.StringBool) *types.StringBool {
-	if pdbManaged.IsValid() {
-		return pdbManaged
-	}
-
-	// unknown value, fallback to true
-	return types.NewStringBool(true)
+func (n *Normalizer) normalizePDBManaged(value *types.StringBool) *types.StringBool {
+	return value.Normalize(true)
 }
 
 // normalizePDBMaxUnavailable normalizes PDBMaxUnavailable
