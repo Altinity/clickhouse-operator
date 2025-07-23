@@ -30,6 +30,13 @@ func NewConfiguration() *Configuration {
 	return new(Configuration)
 }
 
+func (c *Configuration) Ensure() *Configuration {
+	if c == nil {
+		c = NewConfiguration()
+	}
+	return c
+}
+
 func (c *Configuration) GetUsers() *apiChi.Settings {
 	return nil
 }
@@ -62,9 +69,7 @@ func (c *Configuration) MergeFrom(from *Configuration, _type apiChi.MergeType) *
 		return c
 	}
 
-	if c == nil {
-		c = NewConfiguration()
-	}
+	c = c.Ensure()
 
 	c.Settings = c.Settings.MergeFrom(from.Settings)
 	c.Files = c.Files.MergeFrom(from.Files)
