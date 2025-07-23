@@ -51,7 +51,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	case w.isAfterFinalizerInstalled(old, new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-1")
 	case w.isGenerationTheSame(old, new):
-		w.a.M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
+		log.V(2).M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
 		return nil
 	}
 
@@ -286,6 +286,11 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 	err = w.reconcileConfigMapCommon(ctx, cr)
 	cr.GetRuntime().UnlockCommonConfig()
 
+	w.includeAllHostsIntoCluster(ctx, cr)
+	return err
+}
+
+func (w *worker) includeAllHostsIntoCluster(ctx context.Context, cr *api.ClickHouseInstallation) {
 	// Wait for all hosts to be included into cluster
 	cr.WalkHosts(func(host *api.Host) error {
 		if host.ShouldIncludeIntoCluster() {
@@ -293,8 +298,6 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 		}
 		return nil
 	})
-
-	return err
 }
 
 // reconcileConfigMapCommon reconciles common ConfigMap
