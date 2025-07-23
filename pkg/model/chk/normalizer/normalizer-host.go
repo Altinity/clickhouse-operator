@@ -159,8 +159,8 @@ func createHostsField(cluster *chk.Cluster) {
 	cluster.WalkHostsByReplicas(hostMigrationFunc)
 }
 
-// normalizeHost normalizes a host
-func (n *Normalizer) normalizeHost(
+// normalizeHostStage1 normalizes a host
+func (n *Normalizer) normalizeHostStage1(
 	host *chi.Host,
 	shard chi.IShard,
 	replica chi.IReplica,
@@ -168,10 +168,22 @@ func (n *Normalizer) normalizeHost(
 	shardIndex int,
 	replicaIndex int,
 ) {
-
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
+}
+
+// normalizeHostStage2 normalizes a host
+func (n *Normalizer) normalizeHostStage2(
+	host *chi.Host,
+	shard chi.IShard,
+	replica chi.IReplica,
+	cluster chi.ICluster,
+	shardIndex int,
+	replicaIndex int,
+) {
 	// Inherit from either Shard or Replica - use one of them as a source
 	src := cluster.SelectSettingsSourceFrom(shard, replica)
+	log.V(2).M(src).F().Info("will be used as source for host: %s", host.GetName())
+
 	host.InheritSettingsFrom(src)
 	host.Settings = n.normalizeConfigurationSettings(host.Settings)
 	host.InheritFilesFrom(src)
