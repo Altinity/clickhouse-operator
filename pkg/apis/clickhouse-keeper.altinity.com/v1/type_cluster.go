@@ -23,11 +23,12 @@ import (
 type Cluster struct {
 	Name string `json:"name,omitempty"         yaml:"name,omitempty"`
 
-	Settings   *apiChi.Settings      `json:"settings,omitempty"          yaml:"settings,omitempty"`
-	Files      *apiChi.Settings      `json:"files,omitempty"             yaml:"files,omitempty"`
-	Templates  *apiChi.TemplatesList `json:"templates,omitempty"         yaml:"templates,omitempty"`
-	Layout     *ChkClusterLayout     `json:"layout,omitempty"       yaml:"layout,omitempty"`
-	PDBManaged *types.StringBool     `json:"pdbManaged,omitempty"        yaml:"pdbManaged,omitempty"`
+	Settings          *apiChi.Settings      `json:"settings,omitempty"          yaml:"settings,omitempty"`
+	Files             *apiChi.Settings      `json:"files,omitempty"             yaml:"files,omitempty"`
+	Templates         *apiChi.TemplatesList `json:"templates,omitempty"         yaml:"templates,omitempty"`
+	Layout            *ChkClusterLayout     `json:"layout,omitempty"            yaml:"layout,omitempty"`
+	PDBManaged        *types.StringBool     `json:"pdbManaged,omitempty"        yaml:"pdbManaged,omitempty"`
+	PDBMaxUnavailable *types.Int32          `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
 
 	Runtime ChkClusterRuntime `json:"-" yaml:"-"`
 }
@@ -136,7 +137,7 @@ func (cluster *Cluster) GetPDBManaged() *types.StringBool {
 
 // GetPDBMaxUnavailable is a getter
 func (cluster *Cluster) GetPDBMaxUnavailable() *types.Int32 {
-	return types.NewInt32(1)
+	return cluster.PDBMaxUnavailable
 }
 
 // FillShardsReplicasExplicitlySpecified fills whether shard or replicas are explicitly specified
@@ -151,12 +152,12 @@ func (cluster *Cluster) FillShardsReplicasExplicitlySpecified() {
 
 // isShardExplicitlySpecified checks whether shard is explicitly specified
 func (cluster *Cluster) isShardExplicitlySpecified() bool {
-	return cluster.Layout.ShardsExplicitlySpecified == true
+	return cluster.Layout.ShardsExplicitlySpecified
 }
 
 // isReplicaExplicitlySpecified checks whether replica is explicitly specified
 func (cluster *Cluster) isReplicaExplicitlySpecified() bool {
-	return !cluster.isShardExplicitlySpecified() && (cluster.Layout.ReplicasExplicitlySpecified == true)
+	return cluster.Layout.ReplicasExplicitlySpecified && !cluster.isShardExplicitlySpecified()
 }
 
 // IsShardSpecified checks whether shard is explicitly specified
