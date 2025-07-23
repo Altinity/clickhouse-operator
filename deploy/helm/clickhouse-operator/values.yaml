@@ -21,6 +21,9 @@ operator:
   #    cpu: 100m
   #    memory: 128Mi
 
+  # operator.priorityClassName -- priority class name for the clickhouse-operator deployment, check `kubectl explain pod.spec.priorityClassName` for details
+  # @default -- ""
+  priorityClassName: ""
   # operator.env -- additional environment variables for the clickhouse-operator container in deployment
   # possible format value `[{"name": "SAMPLE", "value": "text"}]`
   env: []
