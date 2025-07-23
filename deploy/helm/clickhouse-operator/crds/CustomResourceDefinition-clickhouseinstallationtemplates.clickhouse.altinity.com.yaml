@@ -796,6 +796,15 @@ spec:
                                     required:
                                       - name
                                       - key
+                          pdbManaged:
+                            !!merge <<: *TypeStringBool
+                            description: |
+                              Specifies whether the Pod Disruption Budget (PDB) should be managed.
+                              During the next installation, if PDB management is enabled, the operator will
+                              attempt to retrieve any existing PDB. If none is found, it will create a new one
+                              and initiate a reconciliation loop. If PDB management is disabled, the existing PDB
+                              will remain intact, and the reconciliation loop will not be executed. By default,
+                              PDB management is enabled.
                           pdbMaxUnavailable:
                             type: integer
                             description: |
