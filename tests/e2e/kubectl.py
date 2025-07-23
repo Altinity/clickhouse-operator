@@ -662,7 +662,7 @@ def check_pdb(chi, clusters, ns=None, shell=None):
             is_managed = True
             if isinstance(clusters[c], dict):
                 is_managed = clusters[c].get("is_managed", True)
-                max_unavailable = clusters[c].get("max_`unavailable`", 1)
+                max_unavailable = clusters[c].get("max_unavailable", 1)
             else:
                 # Treat simple integer as maxUnavailable to ensure backward compatibility.
                 max_unavailable = clusters[c]
