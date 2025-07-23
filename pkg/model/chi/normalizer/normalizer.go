@@ -15,7 +15,6 @@
 package normalizer
 
 import (
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"sort"
 	"strings"
 
@@ -23,6 +22,7 @@ import (
 
 	core "k8s.io/api/core/v1"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
@@ -40,20 +40,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-)
-
-const (
-	// defaultReconcileShardsThreadsNumber specifies the default number of threads usable for concurrent shard reconciliation
-	// within a single cluster reconciliation. Defaults to 1, which means strictly sequential shard reconciliation.
-	defaultReconcileShardsThreadsNumber = 1
-
-	// defaultReconcileShardsMaxConcurrencyPercent specifies the maximum integer percentage of shards that may be reconciled
-	// concurrently during cluster reconciliation. This counterbalances the fact that this is an operator setting,
-	// that different clusters will have different shard counts, and that the shard concurrency capacity is specified
-	// above in terms of a number of threads to use (up to). Example: overriding to 100 means all shards may be
-	// reconciled concurrently, if the number of shard reconciliation threads is greater than or equal to the number
-	// of shards in the cluster.
-	defaultReconcileShardsMaxConcurrencyPercent = 50
 )
 
 // Normalizer specifies structures normalizer
@@ -76,7 +62,10 @@ func New(secretGet subst.SecretGetter) *Normalizer {
 }
 
 // CreateTemplated produces ready-to-use object
-func (n *Normalizer) CreateTemplated(subj *chi.ClickHouseInstallation, options *normalizer.Options[chi.ClickHouseInstallation]) (
+func (n *Normalizer) CreateTemplated(
+	subj *chi.ClickHouseInstallation,
+	options *normalizer.Options[chi.ClickHouseInstallation],
+) (
 	*chi.ClickHouseInstallation,
 	error,
 ) {
@@ -792,7 +781,6 @@ func (n *Normalizer) normalizeClusterStage1(cluster *chi.Cluster) *chi.Cluster {
 
 // normalizeClusterStage2 normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeClusterStage2(cluster *chi.Cluster) *chi.Cluster {
-	// Then we need to inherit values from the parent
 	// Inherit from .spec.configuration.zookeeper
 	cluster.InheritZookeeperFrom(n.req.GetTarget())
 	// Inherit from .spec.configuration.files
@@ -838,6 +826,7 @@ func (n *Normalizer) normalizeClusterLayout(cluster *chi.Cluster) {
 	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
 	n.ensureClusterLayoutShards(cluster.Layout)
 	n.ensureClusterLayoutReplicas(cluster.Layout)
+
 	createHostsField(cluster)
 }
 
