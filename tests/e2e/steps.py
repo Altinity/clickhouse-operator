@@ -42,6 +42,7 @@ def create_test_namespace(self, force=False):
 
     return self.context.test_namespace
 
+
 @TestStep(Finally)
 def delete_test_namespace(self):
     shell = get_shell()

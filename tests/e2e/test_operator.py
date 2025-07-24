@@ -19,9 +19,9 @@ from datetime import datetime
 
 
 @TestScenario
-@Name("test_001. 1 node")
+@Name("test_010001. 1 node")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
-def test_001(self):
+def test_010001(self):
     create_shell_namespace_clickhouse_template()
 
     chi = "test-001"
@@ -51,12 +51,12 @@ def test_001(self):
 
 
 @TestScenario
-@Name("test_002. useTemplates for pod, volume templates, and distribution")
+@Name("test_010002. useTemplates for pod, volume templates, and distribution")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_Name("1.0"),
 )
-def test_002(self):
+def test_010002(self):
     create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
@@ -80,14 +80,14 @@ def test_002(self):
 
 
 @TestScenario
-@Name("test_003. 4 nodes with custom layout definition")
+@Name("test_010003. 4 nodes with custom layout definition")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Name("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Name("1.0"),
 )
-def test_003(self):
+def test_010003(self):
     create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
@@ -106,13 +106,13 @@ def test_003(self):
 
 
 @TestScenario
-@Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
+@Name("test_010004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Name("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Spec("1.0"),
 )
-def test_004(self):
+def test_010004(self):
     create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
@@ -130,9 +130,9 @@ def test_004(self):
 
 
 @TestScenario
-@Name("test_005. Test manifest created by ACM")
+@Name("test_010005. Test manifest created by ACM")
 @Requirements(RQ_SRS_026_ClickHouseOperator_ACM("1.0"))
-def test_005(self):
+def test_010005(self):
     create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
@@ -151,9 +151,9 @@ def test_005(self):
 
 
 @TestScenario
-@Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
+@Name("test_010006. Test clickhouse version upgrade from one version to another using podTemplate change")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0"))
-def test_006(self):
+def test_010006(self):
     create_shell_namespace_clickhouse_template()
 
     old_version = "clickhouse/clickhouse-server:24.8"
@@ -193,13 +193,13 @@ def test_006(self):
 
 
 @TestScenario
-@Name("test_007. Test template with custom clickhouse ports")
+@Name("test_010007. Test template with custom clickhouse ports")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_InterServerHttpPort("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_TcpPort("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_HttpPort("1.0"),
 )
-def test_007(self):
+def test_010007(self):
     create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
@@ -380,9 +380,9 @@ def check_remote_servers(self, chi, shards, trigger_event, shell=None, cluster="
 
 
 @TestScenario
-@Name("test_008_1. Test operator restart")
+@Name("test_010008_1. Test operator restart")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0"))
-def test_008_1(self):
+def test_010008_1(self):
     create_shell_namespace_clickhouse_template()
 
     with Check("Test simple chi for operator restart"):
@@ -396,8 +396,8 @@ def test_008_1(self):
 
 
 @TestScenario
-@Name("test_008_2. Test operator restart")
-def test_008_2(self):
+@Name("test_010008_2. Test operator restart")
+def test_010008_2(self):
     create_shell_namespace_clickhouse_template()
 
     with Check("Test advanced chi for operator restart"):
@@ -411,8 +411,8 @@ def test_008_2(self):
 
 
 @TestScenario
-@Name("test_008_3. Test operator restart in the middle of reconcile")
-def test_008_3(self):
+@Name("test_010008_3. Test operator restart in the middle of reconcile")
+def test_010008_3(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-008-operator-restart-3-1.yaml"
@@ -580,10 +580,10 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
 
 
 @TestScenario
-@Name("test_009_1. Test operator upgrade")
+@Name("test_010009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_009_1(self, version_from="0.24.5", version_to=None):
+def test_010009_1(self, version_from="0.24.5", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -597,9 +597,9 @@ def test_009_1(self, version_from="0.24.5", version_to=None):
 
 
 @TestScenario
-@Name("test_009_2. Test operator upgrade")
+@Name("test_010009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_009_2(self, version_from="0.24.5", version_to=None):
+def test_010009_2(self, version_from="0.24.5", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -613,9 +613,9 @@ def test_009_2(self, version_from="0.24.5", version_to=None):
 
 
 @TestScenario
-@Name("test_010. Test zookeeper initialization")
+@Name("test_010010. Test zookeeper initialization")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper("1.0"))
-def test_010(self):
+def test_010010(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -644,8 +644,8 @@ def test_010(self):
 
 
 @TestScenario
-@Name("test_010_1. Test zookeeper initialization AFTER starting a cluster")
-def test_010_1(self):
+@Name("test_010010_1. Test zookeeper initialization AFTER starting a cluster")
+def test_010010_1(self):
     create_shell_namespace_clickhouse_template()
     chi = "test-010-zk-init"
 
@@ -686,9 +686,9 @@ def get_user_xml_from_configmap(chi, user):
 
 
 @TestScenario
-@Name("test_011_1. Test user security and network isolation")
+@Name("test_010011_1. Test user security and network isolation")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0"))
-def test_011_1(self):
+def test_010011_1(self):
     create_shell_namespace_clickhouse_template()
 
     with Given("test-011-secured-cluster-1.yaml and test-011-insecured-cluster.yaml"):
@@ -860,9 +860,9 @@ def test_011_1(self):
 
 
 @TestScenario
-@Name("test_011_2. Test default user security")
+@Name("test_010011_2. Test default user security")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0"))
-def test_011_2(self):
+def test_010011_2(self):
     create_shell_namespace_clickhouse_template()
 
     with Given("test-011-secured-default-1.yaml with password_sha256_hex for default user"):
@@ -926,9 +926,9 @@ def test_011_2(self):
 
 
 @TestScenario
-@Name("test_011_3. Test k8s secrets usage")
+@Name("test_010011_3. Test k8s secrets usage")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Secrets("1.0"))
-def test_011_3(self):
+def test_010011_3(self):
     create_shell_namespace_clickhouse_template()
 
     chi = "test-011-secrets"
@@ -1014,14 +1014,14 @@ def test_011_3(self):
 
 
 @TestScenario
-@Name("test_012. Test service templates")
+@Name("test_010012. Test service templates")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_ServiceTemplates("1.0"),
     RQ_SRS_026_ClickHouseOperator_ServiceTemplates_NameGeneration("1.0"),
     RQ_SRS_026_ClickHouseOperator_ServiceTemplates_LoadBalancer("1.0"),
     RQ_SRS_026_ClickHouseOperator_ServiceTemplates_Annotations("1.0"),
 )
-def test_012(self):
+def test_010012(self):
     create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
@@ -1098,8 +1098,8 @@ def test_012(self):
     RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingShards("1.0"),
     RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation("1.0"),
 )
-@Name("test_013_1. Automatic schema propagation for shards")
-def test_013_1(self):
+@Name("test_010013_1. Automatic schema propagation for shards")
+def test_010013_1(self):
     """Check clickhouse operator supports automatic schema propagation for shards."""
     create_shell_namespace_clickhouse_template()
 
@@ -1399,12 +1399,12 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wai
 
 
 @TestScenario
-@Name("test_014_0. Test that schema is correctly propagated on replicas")
+@Name("test_010014_0. Test that schema is correctly propagated on replicas")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_ZooKeeper("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0"),
 )
-def test_014_0(self):
+def test_010014_0(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -1751,8 +1751,8 @@ def test_014_0(self):
 
 
 @TestScenario
-@Name("test_014_1. Test replication under different configuration scenarios")
-def test_014_1(self):
+@Name("test_010014_1. Test replication under different configuration scenarios")
+def test_010014_1(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -1903,9 +1903,9 @@ def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000")
 
 
 @TestScenario
-@Name("test_015. hostNetwork")
+@Name("test_010015. hostNetwork")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_CircularReplication("1.0"))
-def test_015(self):
+def test_010015(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -1921,12 +1921,12 @@ def test_015(self):
 
 
 @TestScenario
-@Name("test_016. Test advanced settings options")
+@Name("test_010016. Test advanced settings options")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_ConfigurationFileControl_EmbeddedXML("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0"),
 )
-def test_016(self):
+def test_010016(self):
     create_shell_namespace_clickhouse_template()
 
     chi = "test-016-settings"
@@ -2094,9 +2094,9 @@ def test_016(self):
 
 
 @TestScenario
-@Name("test_017. Test deployment of multiple versions in a cluster")
+@Name("test_010017. Test deployment of multiple versions in a cluster")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_DifferentClickHouseVersionsOnReplicasAndShards("1.0"))
-def test_017(self):
+def test_010017(self):
     create_shell_namespace_clickhouse_template()
 
     pod_count = 2
@@ -2136,9 +2136,9 @@ def test_017(self):
 
 
 @TestScenario
-@Name("test_018. Test that server settings are applied before StatefulSet is started")
+@Name("test_010018. Test that server settings are applied before StatefulSet is started")
 # Obsolete, covered by test_016
-def test_018(self):
+def test_010018(self):
     create_shell_namespace_clickhouse_template()
 
     chi = "test-018-configmap"
@@ -2323,18 +2323,18 @@ def test_019(self, step=1):
 
 
 @TestScenario
-@Name("test_019_1. Test that volume is correctly retained and can be re-attached. Provisioner: StatefulSet")
+@Name("test_010019_1. Test that volume is correctly retained and can be re-attached. Provisioner: StatefulSet")
 @Requirements(RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0"))
-def test_019_1(self):
+def test_010019_1(self):
     create_shell_namespace_clickhouse_template()
 
     test_019(step=1)
 
 
 @TestScenario
-@Name("test_019_2. Test that volume is correctly retained and can be re-attached. Provisioner: Operator")
+@Name("test_010019_2. Test that volume is correctly retained and can be re-attached. Provisioner: Operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0"))
-def test_019_2(self):
+def test_010019_2(self):
     create_shell_namespace_clickhouse_template()
 
     test_019(step=2)
@@ -2385,18 +2385,18 @@ def test_020(self, step=1):
 
 
 @TestScenario
-@Name("test_020_1. Test multi-volume configuration, step=1")
+@Name("test_010020_1. Test multi-volume configuration, step=1")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0"))
-def test_020_1(self):
+def test_010020_1(self):
     create_shell_namespace_clickhouse_template()
 
     test_020(step=1)
 
 
 @TestScenario
-@Name("test_020_2. Test multi-volume configuration, step=2")
+@Name("test_010020_2. Test multi-volume configuration, step=2")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0"))
-def test_020_2(self):
+def test_010020_2(self):
     create_shell_namespace_clickhouse_template()
 
     test_020(step=2)
@@ -2614,27 +2614,27 @@ def test_021(self, step=1):
 
 
 @TestScenario
-@Name("test_021_1. Test rescaling storage. Provisioner: StatefulSet")
+@Name("test_010021_1. Test rescaling storage. Provisioner: StatefulSet")
 @Requirements(RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0"))
-def test_021_1(self):
+def test_010021_1(self):
     create_shell_namespace_clickhouse_template()
 
     test_021(step=1)
 
 
 @TestScenario
-@Name("test_021_2. Test rescaling storage. Provisioner: Operator")
+@Name("test_010021_2. Test rescaling storage. Provisioner: Operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0"))
-def test_021_2(self):
+def test_010021_2(self):
     create_shell_namespace_clickhouse_template()
 
     test_021(step=2)
 
 
 @TestScenario
-@Name("test_022. Test that chi with broken image can be deleted")
+@Name("test_010022. Test that chi with broken image can be deleted")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DeleteBroken("1.0"))
-def test_022(self):
+def test_010022(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-022-broken-image.yaml"
@@ -2663,9 +2663,9 @@ def test_022(self):
 
 
 @TestScenario
-@Name("test_023. Test auto templates")
+@Name("test_010023. Test auto templates")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templating("1.0"))
-def test_023(self):
+def test_010023(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-023-auto-templates.yaml"
@@ -2761,9 +2761,9 @@ def test_023(self):
 
 
 @TestScenario
-@Name("test_024. Test annotations for various template types")
+@Name("test_010024. Test annotations for various template types")
 @Requirements(RQ_SRS_026_ClickHouseOperator_AnnotationsInTemplates("1.0"))
-def test_024(self):
+def test_010024(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-024-template-annotations.yaml"
@@ -2862,9 +2862,9 @@ def test_024(self):
 
 
 @TestScenario
-@Name("test_025. Test that service is available during re-scaling, upgrades etc.")
+@Name("test_010025. Test that service is available during re-scaling, upgrades etc.")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingReplicas("1.0"))
-def test_025(self):
+def test_010025(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -2980,9 +2980,9 @@ def test_025(self):
 
 
 @TestScenario
-@Name("test_026. Test mixed single and multi-volume configuration in one cluster")
+@Name("test_010026. Test mixed single and multi-volume configuration in one cluster")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout("1.0"))
-def test_026(self):
+def test_010026(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -3060,9 +3060,9 @@ def test_026(self):
 
 
 @TestScenario
-@Name("test_027. Test troubleshooting mode")
+@Name("test_010027. Test troubleshooting mode")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Troubleshoot("1.0"))
-def test_027(self):
+def test_010027(self):
     # TODO: Add a case for a custom endpoint
     create_shell_namespace_clickhouse_template()
 
@@ -3112,9 +3112,9 @@ def test_027(self):
 
 
 @TestScenario
-@Name("test_028. Test restart scenarios")
+@Name("test_010028. Test restart scenarios")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0"))
-def test_028(self):
+def test_010028(self):
     create_shell_namespace_clickhouse_template()
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -3248,14 +3248,14 @@ def test_028(self):
 
 
 @TestScenario
-@Name("test_029. Test different distribution settings")
+@Name("test_010029. Test different distribution settings")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Type("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Scope("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_TopologyKey("1.0"),
 )
-def test_029(self):
+def test_010029(self):
     # TODO: this test needs to be extended in order to handle more distribution types
     create_shell_namespace_clickhouse_template()
 
@@ -3292,9 +3292,9 @@ def test_029(self):
 
 
 @TestScenario
-@Name("test_099. Test CRD deletion. Should be executed at the end")
+@Name("test_090099. Test CRD deletion. Should be executed at the end")
 @Tags("NO_PARALLEL")
-def test_099(self):
+def test_090099(self):
     create_shell_namespace_clickhouse_template()
 
     # delete existing chis if any in order to avoid side effects
@@ -3341,8 +3341,8 @@ def test_099(self):
 
 
 @TestScenario
-@Name("test_031. Test excludeFromPropagationAnnotations work")
-def test_031(self):
+@Name("test_010031. Test excludeFromPropagationAnnotations work")
+def test_010031(self):
     create_shell_namespace_clickhouse_template()
 
     chi_manifest = "manifests/chi/test-031-wo-tpl.yaml"
@@ -3497,9 +3497,9 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
 
 
 @TestScenario
-@Name("test_032. Test rolling update logic")
+@Name("test_010032. Test rolling update logic")
 # @Tags("NO_PARALLEL")
-def test_032(self):
+def test_010032(self):
     """Test rolling update logic."""
     create_shell_namespace_clickhouse_template()
 
@@ -3606,8 +3606,8 @@ def test_032(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_EnableHttps("1.0"))
-@Name("test_034. Check HTTPS support for health check")
-def test_034(self):
+@Name("test_010034. Check HTTPS support for health check")
+def test_010034(self):
     """Check ClickHouse-Operator HTTPS support by switching configuration to HTTPS using the chopconf file and
     creating a ClickHouse-Installation with HTTPS enabled and confirming the secure connectivity between them by
     monitoring the metrics endpoint on port 8888.
@@ -3766,8 +3766,8 @@ def test_034(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
-@Name("test_036. Check operator volume re-provisioning")
-def test_036(self):
+@Name("test_010036. Check operator volume re-provisioning")
+def test_010036(self):
     """Check clickhouse operator recreates volumes and schema if volume is broken."""
     create_shell_namespace_clickhouse_template()
 
@@ -3948,8 +3948,8 @@ def test_036(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_StorageManagementSwitch("1.0"))
-@Name("test_037. StorageManagement switch")
-def test_037(self):
+@Name("test_010037. StorageManagement switch")
+def test_010037(self):
     """Check clickhouse-operator supports switching storageManagement
     config option from default (StatefulSet) to Operator"""
     create_shell_namespace_clickhouse_template()
@@ -4133,8 +4133,8 @@ def test_039(self, step=0, delete_chi=0):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_0. Inter-cluster communications with no secret defined")
-def test_039_0(self):
+@Name("test_010039_0. Inter-cluster communications with no secret defined")
+def test_010039_0(self):
     create_shell_namespace_clickhouse_template()
 
     test_039(step=0)
@@ -4142,8 +4142,8 @@ def test_039_0(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_1. Inter-cluster communications with 'auto' secret")
-def test_039_1(self):
+@Name("test_010039_1. Inter-cluster communications with 'auto' secret")
+def test_010039_1(self):
     """Check clickhouse-operator support inter-cluster communications with 'auto' secret."""
     create_shell_namespace_clickhouse_template()
 
@@ -4152,8 +4152,8 @@ def test_039_1(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_2. Inter-cluster communications with plane text secret")
-def test_039_2(self):
+@Name("test_010039_2. Inter-cluster communications with plane text secret")
+def test_010039_2(self):
     """Check clickhouse-operator support inter-cluster communications with plan text secret."""
     create_shell_namespace_clickhouse_template()
 
@@ -4162,8 +4162,8 @@ def test_039_2(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_3. Inter-cluster communications with k8s secret")
-def test_039_3(self):
+@Name("test_010039_3. Inter-cluster communications with k8s secret")
+def test_010039_3(self):
     """Check clickhouse-operator support inter-cluster communications with k8s secret."""
     create_shell_namespace_clickhouse_template()
 
@@ -4172,8 +4172,8 @@ def test_039_3(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_4. Inter-cluster communications over HTTPS")
-def test_039_4(self):
+@Name("test_010039_4. Inter-cluster communications over HTTPS")
+def test_010039_4(self):
     """Check clickhouse-operator support inter-cluster communications over HTTPS."""
     create_shell_namespace_clickhouse_template()
 
@@ -4181,8 +4181,8 @@ def test_039_4(self):
 
 
 @TestScenario
-@Name("test_040. Inject a startup probe using an auto template")
-def test_040(self):
+@Name("test_010040. Inject a startup probe using an auto template")
+def test_010040(self):
 
     create_shell_namespace_clickhouse_template()
 
@@ -4219,8 +4219,8 @@ def test_040(self):
 
 
 @TestScenario
-@Name("test_041. Secure zookeeper")
-def test_041(self):
+@Name("test_010041. Secure zookeeper")
+def test_010041(self):
     """Check clickhouse operator support secure zookeeper."""
 
     create_shell_namespace_clickhouse_template()
@@ -4283,8 +4283,8 @@ def test_041(self):
 
 
 @TestScenario
-@Name("test_042. Test configuration rollback")
-def test_042(self):
+@Name("test_010042. Test configuration rollback")
+def test_010042(self):
     create_shell_namespace_clickhouse_template()
     with Given("I change operator statefullSet timeout"):
         util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
@@ -4421,8 +4421,8 @@ def test_043(self, manifest):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_logVolumeClaimTemplate("1.0"))
-@Name("test_043_0. Logs container customizing using PodTemplate")
-def test_043_0(self):
+@Name("test_010043_0. Logs container customizing using PodTemplate")
+def test_010043_0(self):
     """Check that clickhouse-operator support manual logs container customizing."""
     create_shell_namespace_clickhouse_template()
 
@@ -4431,8 +4431,8 @@ def test_043_0(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_logVolumeClaimTemplate("1.0"))
-@Name("test_043_1. Default clickhouse-log container")
-def test_043_1(self):
+@Name("test_010043_1. Default clickhouse-log container")
+def test_010043_1(self):
     """Check that clickhouse-operator sets up default logs container if it is not specified in Pod."""
     create_shell_namespace_clickhouse_template()
 
@@ -4442,8 +4442,8 @@ def test_043_1(self):
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_ReconcilingCycle("1.0"),
               RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation("1.0"))
-@Name("test_044. Schema and data propagation with slow replica")
-def test_044(self):
+@Name("test_010044. Schema and data propagation with slow replica")
+def test_010044(self):
     """Check that schema and data can be propagated on other replica if replica start takes a lot of time."""
     create_shell_namespace_clickhouse_template()
     cluster = "default"
@@ -4542,8 +4542,8 @@ def test_045(self, manifest):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Policy("1.0"))
-@Name("test_045_1. Reconcile wait queries property specified by CHI")
-def test_045_1(self):
+@Name("test_010045_1. Reconcile wait queries property specified by CHI")
+def test_010045_1(self):
     """Check that operator supports spec.reconciling.policy property in CHI that
     forces the operator not to wait for the queries to finish before restart."""
 
@@ -4554,8 +4554,8 @@ def test_045_1(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitQueries("1.0"))
-@Name("test_045_2. Reconcile wait queries property specified by clickhouse-operator config")
-def test_045_2(self):
+@Name("test_010045_2. Reconcile wait queries property specified by clickhouse-operator config")
+def test_010045_2(self):
     """Check that operator supports spec.reconcile.host.wait.queries property in clickhouse-operator config
     that forces the operator not to wait for the queries to finish before restart."""
     create_shell_namespace_clickhouse_template()
@@ -4567,8 +4567,8 @@ def test_045_2(self):
 
 
 @TestScenario
-@Name("test_046. Metrics for clickhouse-operator")
-def test_046(self):
+@Name("test_010046. Metrics for clickhouse-operator")
+def test_010046(self):
     """Check that clickhouse-operator creates metrics for reconcile and other clickhouse-operator events."""
     create_shell_namespace_clickhouse_template()
     with Given("I change operator statefullSet timeout"):
@@ -4698,8 +4698,8 @@ def test_046(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Weight("1.0"))
-@Name("test_047. Zero weighted shard")
-def test_047(self):
+@Name("test_010047. Zero weighted shard")
+def test_010047(self):
     """Check that clickhouse-operator supports specifying shard weight as 0 and
     check that data not inserted into zero-weighted shard in distributed table."""
 
@@ -4759,84 +4759,8 @@ def test_047(self):
 
 
 @TestScenario
-@Name("test_048. Clickhouse-keeper")
-@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"),
-              RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_volumeClaimTemplates("1.0"))
-def test_048(self):
-    """Check clickhouse-operator support ClickHouseKeeperInstallation with PVC in keeper manifest."""
-
-    create_shell_namespace_clickhouse_template()
-    util.require_keeper(keeper_type="chk",
-                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
-    manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
-    chi = yaml_manifest.get_name(util.get_full_path(manifest))
-    cluster = "default"
-    with Given("CHI with 2 replicas"):
-        kubectl.create_and_check(
-            manifest=manifest,
-            check={
-                "pod_count": 2,
-                "do_not_delete": 1,
-                },
-            )
-    check_replication(chi, {0,1}, 1)
-
-    with Finally("I clean up"):
-        delete_test_namespace()
-
-
-@TestScenario
-@Name("test_049. Clickhouse-keeper upgrade")
-def test_049(self):
-    """Check that clickhouse-operator support upgrading clickhouse-keeper version
-     when clickhouse-keeper defined with ClickHouseKeeperInstallation."""
-
-    create_shell_namespace_clickhouse_template()
-    util.require_keeper(keeper_type="chk",
-                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
-    manifest = f"manifests/chi/test-049-clickhouse-keeper-upgrade.yaml"
-    chi = yaml_manifest.get_name(util.get_full_path(manifest))
-    cluster = "default"
-    keeper_version_from = "24.8"
-    keeper_version_to = "24.9"
-    with Given("CHI with 2 replicas"):
-        kubectl.create_and_check(
-            manifest=manifest,
-            check={
-                "pod_count": 2,
-                "do_not_delete": 1,
-            },
-        )
-
-    check_replication(chi, {0,1}, 1)
-
-    with When(f"I check clickhouse-keeper version is {keeper_version_from}"):
-        assert keeper_version_from in \
-               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-0-0-0', '.spec.containers[0].image'), error()
-
-    with Then(f"I change keeper version to {keeper_version_to}"):
-        cmd = f"""patch chk clickhouse-keeper --type='json' --patch='[{{"op":"replace","path":"/spec/templates/podTemplates/0/spec/containers/0/image","value":"clickhouse/clickhouse-keeper:{keeper_version_to}"}}]'"""
-        kubectl.launch(cmd)
-
-    with Then("I wait CHK status 1"):
-        kubectl.wait_chk_status('clickhouse-keeper', 'InProgress')
-    with Then("I wait CHK status 2"):
-        kubectl.wait_chk_status('clickhouse-keeper', 'Completed')
-
-    with When(f"I check clickhouse-keeper version is changed to {keeper_version_to}"):
-        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-0-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
-        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-1-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
-        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-2-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
-
-    check_replication(chi, {0,1}, 2)
-
-    with Finally("I clean up"):
-        delete_test_namespace()
-
-
-@TestScenario
-@Name("test_050. Test metrics exclusion in operator config")
-def test_050(self):
+@Name("test_010050. Test metrics exclusion in operator config")
+def test_010050(self):
     create_shell_namespace_clickhouse_template()
     with Given("Operator configuration is installed"):
         util.apply_operator_config("manifests/chopconf/test-050-chopconf.yaml")
@@ -4891,281 +4815,6 @@ def test_050(self):
         delete_test_namespace()
 
 
-@TestScenario
-@Name("test_051. Test CHK upgrade from 0.23.x operator version")
-@Tags("NO_PARALLEL")
-def test_051(self):
-    with Then("Skip it. test_051_1 does a better job"):
-        return
-
-    version_from = "0.23.7"
-    version_to = current().context.operator_version # "0.24.0"
-    current().context.operator_version = version_from
-    create_shell_namespace_clickhouse_template()
-
-    chi_manifest = f"manifests/chi/test-051-chk-chop-upgrade.yaml"
-    chk_manifest = f"manifests/chk/test-051-chk-chop-upgrade.yaml"
-    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
-    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
-    cluster = "default"
-
-    with Given("Install CHK"):
-        kubectl.create_and_check(
-            manifest=chk_manifest, kind="chk",
-            check={
-                # "pod_count": 1, # do not work in 0.23.7
-                "do_not_delete": 1,
-            },
-        )
-
-    with Given("CHI with 2 replicas"):
-        kubectl.create_and_check(
-            manifest=chi_manifest,
-            check={
-                "pod_count": 2,
-                "do_not_delete": 1,
-            },
-        )
-
-    check_replication(chi, {0,1}, 1, "test_local_051")
-
-    with When(f"upgrade operator to {version_to}"):
-        util.install_operator_version(version_to)
-        time.sleep(15)
-
-        kubectl.wait_chi_status(chi, "Completed")
-        kubectl.wait_chk_status(chk, "Completed")
-
-    with Given("Trigger CHK reconcile"):
-        kubectl.create_and_check(
-            manifest="manifests/chk/test-051-chk-chop-upgrade-2.yaml", kind="chk",
-            check={
-                "pod_count": 1,
-                "do_not_delete": 1,
-            },
-        )
-    with Then("CLICKHOUSE_DATA_DIR should be properly set"):
-        pod = kubectl.get_pod_spec("", "chk-test-051-chk-single-0-0-0")
-        env = pod["containers"][0]["env"][0]
-        assert env["name"] == "CLICKHOUSE_DATA_DIR"
-        assert env["value"] == "/var/lib/clickhouse-keeper"
-
-    with Then("Wait until Keeper connection is established"):
-        out = 0
-        for i in range(1, 10):
-            out = clickhouse.query_with_error(chi, "SELECT count(*) from system.zookeeper_connection")
-            if out == "1":
-                break
-            with Then("Waiting 10 seconds"):
-                time.sleep(10)
-        assert out == "1", error()
-
-    with Then("Check if there are read-only replicas"):
-        out = clickhouse.query(chi, "SELECT count(*) from system.replicas where is_readonly")
-        if out != "0":
-            with Then("Found readonly replica. Trying to restore"):
-                for replica in [0, 1]:
-                    host=f"chi-{chi}-{cluster}-0-{replica}-0"
-                    clickhouse.query(chi, host=host, sql="system restart replica test_local_051")
-                    clickhouse.query(chi, host=host, sql="system restore replica test_local_051")
-                    with Then("Check if there are read-only replicas after restore"):
-                        out = clickhouse.query(chi, host=host, sql="SELECT count(*) from system.replicas where is_readonly")
-                        assert out == "0", error()
-
-    check_replication(chi, {0,1}, 2, "test_local_051")
-
-    with Finally("I clean up"):
-        delete_test_namespace()
-
-
-@TestScenario
-@Name("test_051_1. Test CHK upgrade from 0.23.x operator version")
-@Tags("NO_PARALLEL")
-def test_051_1(self):
-    version_from = "0.23.7"
-    version_to = current().context.operator_version # "0.24.0"
-    current().context.operator_version = version_from
-    create_shell_namespace_clickhouse_template()
-
-    chi_manifest = "manifests/chi/test-051-chk-chop-upgrade.yaml"
-    chk_manifest = "manifests/chk/test-051-chk-chop-upgrade.yaml"
-    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
-    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
-    cluster = "default"
-
-    with Given("Install CHK"):
-        kubectl.create_and_check(
-            manifest=chk_manifest, kind="chk",
-            check={
-                # "pod_count": 1, # do not work in 0.23.7
-                "do_not_delete": 1,
-            },
-        )
-
-    with Given("CHI with 2 replicas"):
-        kubectl.create_and_check(
-            manifest=chi_manifest,
-            check={
-                "pod_count": 2,
-                "do_not_delete": 1,
-            },
-        )
-
-    check_replication(chi, {0,1}, 1)
-
-    with Then("Unattach old CHK resources"):
-        kubectl.launch(f"patch sts {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
-        kubectl.launch(f"patch cm  {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
-        kubectl.launch(f"patch service {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
-        kubectl.launch(f"patch service {chk}-headless -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
-        kubectl.launch(f"label pod -lapp={chk} app-")
-        kubectl.launch(f"label sts -lapp={chk} app-")
-
-    with Then("Confirm that statefulset and pod are still running if we delete chk"):
-        kubectl.delete_kind("chk", chk)
-        assert kubectl.get_field("pod", "test-051-chk-0", ".status.phase") == "Running"
-        assert kubectl.get_count("sts", "test-051-chk") == 1
-        assert kubectl.get_count("cm",  "test-051-chk") == 1
-        assert kubectl.get_count("service", "test-051-chk") == 1
-
-    old_pvc = "both-paths-test-051-chk-0"
-    pv = kubectl.get_pv_name(old_pvc)
-    new_pvc = "default-chk-test-051-chk-single-0-0-0"
-
-    with Then("Set PV persistentVolumeReclaimPolicy to Retain"):
-        kubectl.launch(f"patch pv {pv}" + """ -p \'{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}\'""")
-
-    with Then("Delete old Keeper resources"):
-        kubectl.delete_kind("sts", "test-051-chk")
-        kubectl.delete_kind("pod", "test-051-chk-0")
-        kubectl.delete_kind("pvc", old_pvc)
-
-    with Then("Unmount PV from old PVC"):
-        kubectl.launch(f"patch pv {pv}" + """ -p \'{"spec":{"claimRef":null}}\'""")
-
-    with When(f"upgrade operator to {version_to}"):
-        util.install_operator_version(version_to)
-        time.sleep(30)
-
-        kubectl.wait_chi_status(chi, "Completed")
-
-    with Given("Re-deploy CHK, substituting PV in PVC template"):
-        volumeNamePlaceHolder = "{volumeNamePlaceHolder}"
-        manifest = util.get_full_path("manifests/chk/test-051-chk-chop-upgrade-3.yaml")
-        cmd = f"""cat {manifest} | sed "s/{volumeNamePlaceHolder}/{pv}/g" | kubectl apply -n {current().context.test_namespace} -f -"""
-        kubectl.run_shell(cmd, 300)
-
-        kubectl.wait_chk_status(chk, "Completed")
-
-    with Then("CLICKHOUSE_DATA_DIR should be properly set"):
-        pod = kubectl.get_pod_spec("", "chk-test-051-chk-single-0-0-0")
-        env = pod["containers"][0]["env"][0]
-        assert env["name"] == "CLICKHOUSE_DATA_DIR"
-        assert env["value"] == "/var/lib/clickhouse-keeper"
-
-    with Then("Wait until Keeper connection is established"):
-        out = 0
-        for i in range(1, 10):
-            out = clickhouse.query_with_error(chi, "SELECT count(*) from system.zookeeper_connection")
-            if out == "1":
-                break
-            with Then("Waiting 10 seconds"):
-                time.sleep(10)
-        assert out == "1", error()
-
-    check_replication(chi, {0,1}, 2)
-
-    with Finally("I clean up"):
-        delete_test_namespace()
-
-
-@TestScenario
-@Name("test_052. Clickhouse-keeper scale-up/scale-down")
-def test_052(self):
-    """Check that clickhouse-operator support scale-up/scale-down without service interruption"""
-
-    create_shell_namespace_clickhouse_template()
-
-    chi_manifest = "manifests/chi/test-052-keeper-rescale.yaml"
-    chk_manifest_1 = "manifests/chk/test-052-chk-rescale-1.yaml"
-    chk_manifest_3 = "manifests/chk/test-052-chk-rescale-3.yaml"
-    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
-    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest_1))
-
-    cluster = "default"
-
-    with Given("Install CHK"):
-        kubectl.create_and_check(
-            manifest=chk_manifest_1, kind="chk",
-            check={
-                "pod_count": 1,
-                "do_not_delete": 1,
-            },
-        )
-
-    with Given("CHI with 2 replicas"):
-        kubectl.create_and_check(
-            manifest=chi_manifest,
-            check={
-                "pod_count": 2,
-                "do_not_delete": 1,
-            },
-        )
-
-    check_replication(chi, {0,1}, 1)
-
-    with Given("Rescale CHK to 3 replicas"):
-        kubectl.create_and_check(
-            manifest=chk_manifest_3, kind="chk",
-            check={
-                "pod_count": 1,
-                "do_not_delete": 1,
-            },
-        )
-
-    check_replication(chi, {0,1}, 2)
-
-    with Then("Kill first pod to switch the leader"):
-        kubectl.launch(f"delete pod chk-test-052-chk-keeper-0-0-0")
-        time.sleep(10)
-
-    # with Then("Force leader to be on the first node only"):
-    #    kubectl.create_and_check(
-    #        manifest="manifests/chk/test-052-chk-rescale-1.1.yaml", kind="chk",
-    #        check={
-    #            "pod_count": 3,
-    #            "do_not_delete": 1,
-    #        },
-    #    )
-
-    # check_replication(chi, {0,1}, 3)
-
-
-    # with Then("Remove other nodes from the raft configuration"):
-    #    kubectl.create_and_check(
-    #        manifest="manifests/chk/test-052-chk-rescale-1.2.yaml", kind="chk",
-    #        check={
-    #            "do_not_delete": 1,
-    #        },
-    #    )
-
-    # check_replication(chi, {0,1}, 4)
-
-    with Then("Rescale CHK back to 1 replica"):
-        kubectl.create_and_check(
-            manifest="manifests/chk/test-052-chk-rescale-1.yaml", kind="chk",
-            check={
-                "pod_count": 1,
-                "do_not_delete": 1,
-            },
-        )
-
-    check_replication(chi, {0,1}, 5)
-
-    with Finally("I clean up"):
-        delete_test_namespace()
-
-
 def check_replication(chi, replicas, token, table = ''):
         cluster = clickhouse.query(chi, "select substitution from system.macros where macro = 'cluster'")
         if table == '':
@@ -5186,9 +4835,9 @@ def check_replication(chi, replicas, token, table = ''):
 
 
 @TestScenario
-@Name("test_053. Check that standard Kubernetes annotations are ignored if set to StatefulSet externally")
+@Name("test_010053. Check that standard Kubernetes annotations are ignored if set to StatefulSet externally")
 @Tags("NO_PARALLEL")
-def test_053(self):
+def test_010053(self):
     version_from = "0.23.7"
     version_to = current().context.operator_version
     with Given(f"clickhouse-operator from {version_from}"):
@@ -5253,9 +4902,9 @@ def test_053(self):
 
 
 @TestScenario
-@Name("test_054. Test that 'suspend' mode delays any changes until unsuspended")
+@Name("test_010054. Test that 'suspend' mode delays any changes until unsuspended")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0"))
-def test_054(self):
+def test_010054(self):
     create_shell_namespace_clickhouse_template()
     chi = yaml_manifest.get_name(util.get_full_path("manifests/chi/test-006-ch-upgrade-1.yaml"))
 
@@ -5300,8 +4949,8 @@ def test_054(self):
 
 
 @TestScenario
-@Name("test_055. Test that restart rules can be merged from CHOP configuration")
-def test_055(self):
+@Name("test_010055. Test that restart rules can be merged from CHOP configuration")
+def test_010055(self):
     create_shell_namespace_clickhouse_template()
     with Given("Operator configuration is installed"):
        util.apply_operator_config("manifests/chopconf/test-055-chopconf.yaml")
@@ -5362,8 +5011,8 @@ def test_055(self):
 
 
 @TestScenario
-@Name("test_056. Test replica delay")
-def test_056(self):
+@Name("test_010056. Test replica delay")
+def test_010056(self):
     create_shell_namespace_clickhouse_template()
     with Given("I change operator StatefulSet timeout"):
         util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
@@ -5457,8 +5106,8 @@ def test_056(self):
 
 
 @TestScenario
-@Name("test_057. Test reconcile concurrency settings on CHI level")
-def test_057(self):
+@Name("test_010057. Test reconcile concurrency settings on CHI level")
+def test_010057(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = f"manifests/chi/test-057-max-concurrency.yaml"
@@ -5491,8 +5140,8 @@ def test_057(self):
 
 
 @TestScenario
-@Name("test_058. Check ClickHouse with rootCA")
-def test_058(self): # Can be merged with test_034 potentially
+@Name("test_010058. Check ClickHouse with rootCA")
+def test_010058(self):  # Can be merged with test_034 potentially
     create_shell_namespace_clickhouse_template()
     operator_namespace = current().context.operator_namespace
 
@@ -5548,8 +5197,8 @@ def test_058(self): # Can be merged with test_034 potentially
 
 
 @TestScenario
-@Name("test_059. Test macro substitutions in settings")
-def test_059(self):
+@Name("test_010059. Test macro substitutions in settings")
+def test_010059(self):
     create_shell_namespace_clickhouse_template()
 
     chi = "test-059-macros"
@@ -5632,10 +5281,11 @@ def test_059(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
-@Name("test_060. pdb management disabled")
+@Name("test_010060. pdb management disabled")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
-def test_060(self):
+def test_010060(self):
     create_shell_namespace_clickhouse_template()
 
     chi = "test-060-pdb-management-disabled"
@@ -5662,6 +5312,363 @@ def test_060(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
+
+#
+# Keeper tests section
+#
+
+
+@TestScenario
+@Name("test_020001. Clickhouse-keeper")
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"),
+              RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_volumeClaimTemplates("1.0"))
+def test_020001(self):
+    """Check clickhouse-operator support ClickHouseKeeperInstallation with PVC in keeper manifest."""
+
+    create_shell_namespace_clickhouse_template()
+    util.require_keeper(keeper_type="chk",
+                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
+    manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
+    with Given("CHI with 2 replicas"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+                },
+            )
+    check_replication(chi, {0, 1}, 1)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_020002. Clickhouse-keeper upgrade")
+def test_020002(self):
+    """Check that clickhouse-operator support upgrading clickhouse-keeper version
+     when clickhouse-keeper defined with ClickHouseKeeperInstallation."""
+
+    create_shell_namespace_clickhouse_template()
+    util.require_keeper(keeper_type="chk",
+                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
+    manifest = f"manifests/chi/test-049-clickhouse-keeper-upgrade.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
+    keeper_version_from = "24.8"
+    keeper_version_to = "24.9"
+    with Given("CHI with 2 replicas"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    check_replication(chi, {0, 1}, 1)
+
+    with When(f"I check clickhouse-keeper version is {keeper_version_from}"):
+        assert keeper_version_from in \
+               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-0-0-0', '.spec.containers[0].image'), error()
+
+    with Then(f"I change keeper version to {keeper_version_to}"):
+        cmd = f"""patch chk clickhouse-keeper --type='json' --patch='[{{"op":"replace","path":"/spec/templates/podTemplates/0/spec/containers/0/image","value":"clickhouse/clickhouse-keeper:{keeper_version_to}"}}]'"""
+        kubectl.launch(cmd)
+
+    with Then("I wait CHK status 1"):
+        kubectl.wait_chk_status('clickhouse-keeper', 'InProgress')
+    with Then("I wait CHK status 2"):
+        kubectl.wait_chk_status('clickhouse-keeper', 'Completed')
+
+    with When(f"I check clickhouse-keeper version is changed to {keeper_version_to}"):
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-0-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-1-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
+        kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-2-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
+
+    check_replication(chi, {0, 1}, 2)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_020003. Test CHK upgrade from 0.23.x operator version")
+@Tags("NO_PARALLEL")
+def test_020003(self):
+    with Then("Skip it. test_051_1 does a better job"):
+        return
+
+    version_from = "0.23.7"
+    version_to = current().context.operator_version # "0.24.0"
+    current().context.operator_version = version_from
+    create_shell_namespace_clickhouse_template()
+
+    chi_manifest = f"manifests/chi/test-051-chk-chop-upgrade.yaml"
+    chk_manifest = f"manifests/chk/test-051-chk-chop-upgrade.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
+    cluster = "default"
+
+    with Given("Install CHK"):
+        kubectl.create_and_check(
+            manifest=chk_manifest, kind="chk",
+            check={
+                # "pod_count": 1, # do not work in 0.23.7
+                "do_not_delete": 1,
+            },
+        )
+
+    with Given("CHI with 2 replicas"):
+        kubectl.create_and_check(
+            manifest=chi_manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    check_replication(chi, {0, 1}, 1, "test_local_051")
+
+    with When(f"upgrade operator to {version_to}"):
+        util.install_operator_version(version_to)
+        time.sleep(15)
+
+        kubectl.wait_chi_status(chi, "Completed")
+        kubectl.wait_chk_status(chk, "Completed")
+
+    with Given("Trigger CHK reconcile"):
+        kubectl.create_and_check(
+            manifest="manifests/chk/test-051-chk-chop-upgrade-2.yaml", kind="chk",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+    with Then("CLICKHOUSE_DATA_DIR should be properly set"):
+        pod = kubectl.get_pod_spec("", "chk-test-051-chk-single-0-0-0")
+        env = pod["containers"][0]["env"][0]
+        assert env["name"] == "CLICKHOUSE_DATA_DIR"
+        assert env["value"] == "/var/lib/clickhouse-keeper"
+
+    with Then("Wait until Keeper connection is established"):
+        out = 0
+        for i in range(1, 10):
+            out = clickhouse.query_with_error(chi, "SELECT count(*) from system.zookeeper_connection")
+            if out == "1":
+                break
+            with Then("Waiting 10 seconds"):
+                time.sleep(10)
+        assert out == "1", error()
+
+    with Then("Check if there are read-only replicas"):
+        out = clickhouse.query(chi, "SELECT count(*) from system.replicas where is_readonly")
+        if out != "0":
+            with Then("Found readonly replica. Trying to restore"):
+                for replica in [0, 1]:
+                    host=f"chi-{chi}-{cluster}-0-{replica}-0"
+                    clickhouse.query(chi, host=host, sql="system restart replica test_local_051")
+                    clickhouse.query(chi, host=host, sql="system restore replica test_local_051")
+                    with Then("Check if there are read-only replicas after restore"):
+                        out = clickhouse.query(chi, host=host, sql="SELECT count(*) from system.replicas where is_readonly")
+                        assert out == "0", error()
+
+    check_replication(chi, {0, 1}, 2, "test_local_051")
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_020003_1. Test CHK upgrade from 0.23.x operator version")
+@Tags("NO_PARALLEL")
+def test_020003_1(self):
+    version_from = "0.23.7"
+    version_to = current().context.operator_version # "0.24.0"
+    current().context.operator_version = version_from
+    create_shell_namespace_clickhouse_template()
+
+    chi_manifest = "manifests/chi/test-051-chk-chop-upgrade.yaml"
+    chk_manifest = "manifests/chk/test-051-chk-chop-upgrade.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
+    cluster = "default"
+
+    with Given("Install CHK"):
+        kubectl.create_and_check(
+            manifest=chk_manifest, kind="chk",
+            check={
+                # "pod_count": 1, # do not work in 0.23.7
+                "do_not_delete": 1,
+            },
+        )
+
+    with Given("CHI with 2 replicas"):
+        kubectl.create_and_check(
+            manifest=chi_manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    check_replication(chi, {0, 1}, 1)
+
+    with Then("Unattach old CHK resources"):
+        kubectl.launch(f"patch sts {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"patch cm  {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"patch service {chk} -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"patch service {chk}-headless -p " + """\'{"metadata":{"ownerReferences":null}}\'""")
+        kubectl.launch(f"label pod -lapp={chk} app-")
+        kubectl.launch(f"label sts -lapp={chk} app-")
+
+    with Then("Confirm that statefulset and pod are still running if we delete chk"):
+        kubectl.delete_kind("chk", chk)
+        assert kubectl.get_field("pod", "test-051-chk-0", ".status.phase") == "Running"
+        assert kubectl.get_count("sts", "test-051-chk") == 1
+        assert kubectl.get_count("cm",  "test-051-chk") == 1
+        assert kubectl.get_count("service", "test-051-chk") == 1
+
+    old_pvc = "both-paths-test-051-chk-0"
+    pv = kubectl.get_pv_name(old_pvc)
+    new_pvc = "default-chk-test-051-chk-single-0-0-0"
+
+    with Then("Set PV persistentVolumeReclaimPolicy to Retain"):
+        kubectl.launch(f"patch pv {pv}" + """ -p \'{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}\'""")
+
+    with Then("Delete old Keeper resources"):
+        kubectl.delete_kind("sts", "test-051-chk")
+        kubectl.delete_kind("pod", "test-051-chk-0")
+        kubectl.delete_kind("pvc", old_pvc)
+
+    with Then("Unmount PV from old PVC"):
+        kubectl.launch(f"patch pv {pv}" + """ -p \'{"spec":{"claimRef":null}}\'""")
+
+    with When(f"upgrade operator to {version_to}"):
+        util.install_operator_version(version_to)
+        time.sleep(30)
+
+        kubectl.wait_chi_status(chi, "Completed")
+
+    with Given("Re-deploy CHK, substituting PV in PVC template"):
+        volumeNamePlaceHolder = "{volumeNamePlaceHolder}"
+        manifest = util.get_full_path("manifests/chk/test-051-chk-chop-upgrade-3.yaml")
+        cmd = f"""cat {manifest} | sed "s/{volumeNamePlaceHolder}/{pv}/g" | kubectl apply -n {current().context.test_namespace} -f -"""
+        kubectl.run_shell(cmd, 300)
+
+        kubectl.wait_chk_status(chk, "Completed")
+
+    with Then("CLICKHOUSE_DATA_DIR should be properly set"):
+        pod = kubectl.get_pod_spec("", "chk-test-051-chk-single-0-0-0")
+        env = pod["containers"][0]["env"][0]
+        assert env["name"] == "CLICKHOUSE_DATA_DIR"
+        assert env["value"] == "/var/lib/clickhouse-keeper"
+
+    with Then("Wait until Keeper connection is established"):
+        out = 0
+        for i in range(1, 10):
+            out = clickhouse.query_with_error(chi, "SELECT count(*) from system.zookeeper_connection")
+            if out == "1":
+                break
+            with Then("Waiting 10 seconds"):
+                time.sleep(10)
+        assert out == "1", error()
+
+    check_replication(chi, {0, 1}, 2)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_020004. Clickhouse-keeper scale-up/scale-down")
+def test_020004(self):
+    """Check that clickhouse-operator support scale-up/scale-down without service interruption"""
+
+    create_shell_namespace_clickhouse_template()
+
+    chi_manifest = "manifests/chi/test-052-keeper-rescale.yaml"
+    chk_manifest_1 = "manifests/chk/test-052-chk-rescale-1.yaml"
+    chk_manifest_3 = "manifests/chk/test-052-chk-rescale-3.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest_1))
+
+    cluster = "default"
+
+    with Given("Install CHK"):
+        kubectl.create_and_check(
+            manifest=chk_manifest_1, kind="chk",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Given("CHI with 2 replicas"):
+        kubectl.create_and_check(
+            manifest=chi_manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    check_replication(chi, {0, 1}, 1)
+
+    with Given("Rescale CHK to 3 replicas"):
+        kubectl.create_and_check(
+            manifest=chk_manifest_3, kind="chk",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    check_replication(chi, {0, 1}, 2)
+
+    with Then("Kill first pod to switch the leader"):
+        kubectl.launch(f"delete pod chk-test-052-chk-keeper-0-0-0")
+        time.sleep(10)
+
+    # with Then("Force leader to be on the first node only"):
+    #    kubectl.create_and_check(
+    #        manifest="manifests/chk/test-052-chk-rescale-1.1.yaml", kind="chk",
+    #        check={
+    #            "pod_count": 3,
+    #            "do_not_delete": 1,
+    #        },
+    #    )
+
+    # check_replication(chi, {0,1}, 3)
+
+
+    # with Then("Remove other nodes from the raft configuration"):
+    #    kubectl.create_and_check(
+    #        manifest="manifests/chk/test-052-chk-rescale-1.2.yaml", kind="chk",
+    #        check={
+    #            "do_not_delete": 1,
+    #        },
+    #    )
+
+    # check_replication(chi, {0,1}, 4)
+
+    with Then("Rescale CHK back to 1 replica"):
+        kubectl.create_and_check(
+            manifest="manifests/chk/test-052-chk-rescale-1.yaml", kind="chk",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    check_replication(chi, {0, 1}, 5)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
 
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):
