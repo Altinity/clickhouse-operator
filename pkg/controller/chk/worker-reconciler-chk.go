@@ -25,7 +25,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
@@ -48,9 +47,6 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		return nil
 	}
 
-	w.a.M(new).S().P()
-	defer w.a.M(new).E().P()
-
 	if new.HasAncestor() {
 		log.V(2).M(new).F().Info("has ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(new))
 		old = new.GetAncestorT()
@@ -66,6 +62,9 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		log.V(2).M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
 		return nil
 	}
+
+	w.a.M(new).S().P()
+	defer w.a.M(new).E().P()
 
 	log.V(2).M(new).F().Info("Normalized OLD: %s", util.NamespaceNameString(new))
 	old = w.normalize(old)
@@ -314,9 +313,10 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 		// First stage of RollingUpdate completed.
 	}
 
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
+
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. Reconcile StatefulSet", host.GetName())
-	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
 	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, true, opts)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
@@ -495,6 +495,7 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*apiChk.C
 			return err
 		}
 	}
+	w.a.V(1).Info("Finished successfully rest of shards on workers: %d", workersNum)
 	return nil
 }
 
@@ -555,7 +556,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
 	}
-	if err := w.reconcileHostBootstrap(ctx, host); err != nil {
+	if err := w.reconcileHostIncludeIntoAllActivities(ctx, host); err != nil {
 		return err
 	}
 
@@ -597,11 +598,11 @@ func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error
 // reconcileHostMain reconciles specified ClickHouse host
 func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	var (
-		reconcileStatefulSetOpts *statefulset.ReconcileOptions
+		stsReconcileOpts *statefulset.ReconcileOptions
 	)
 
 	//if !host.IsLast() {
-	//	reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetDoNotWait()
+	//	stsReconcileOpts = stsReconcileOpts.SetDoNotWait()
 	//}
 
 	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
@@ -611,43 +612,41 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		return err
 	}
 
-	w.a.V(1).
-		M(host).F().
-		Info("Reconcile PVCs and check possible data loss for host: %s", host.GetName())
+	w.a.V(1).M(host).F().Info("Reconcile PVCs and data loss for host: %s", host.GetName())
+
+	// In case data loss detected we may need to specify additional reconcile options
 	if storage.ErrIsDataLoss(
 		storage.NewStorageReconciler(
 			w.task,
 			w.c.namer,
-			storage.NewStoragePVC(kube.NewPVC(w.c.Client)),
+			storage.NewStoragePVC(w.c.kube.Storage()),
 		).ReconcilePVCs(ctx, host, api.DesiredStatefulSet),
 	) {
-		// In case of data loss detection on existing volumes, we need to:
-		// 1. recreate StatefulSet
-		// 2. run tables migration again
-		reconcileStatefulSetOpts = reconcileStatefulSetOpts.SetForceRecreate()
+		stsReconcileOpts = stsReconcileOpts.SetForceRecreate()
 		w.a.V(1).
 			M(host).F().
-			Info("Data loss detected for host: %s. Will do force migrate", host.GetName())
+			Info("Data loss detected for host: %s.", host.GetName())
 	}
 
 	_ = w.reconcileHostService(ctx, host)
 
-	if err := w.reconcileHostStatefulSet(ctx, host, reconcileStatefulSetOpts); err != nil {
+	if err := w.reconcileHostStatefulSet(ctx, host, stsReconcileOpts); err != nil {
 		w.a.V(1).
 			M(host).F().
-			Warning("Reconcile Host interrupted with an error 3. Host: %s Err: %v", host.GetName(), err)
+			Warning("Reconcile Host Main interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
-	// Polish all new volumes that operator has to create
+
+	// Polish all new volumes that the operator has to create
 	_ = storage.NewStorageReconciler(
 		w.task,
 		w.c.namer,
-		storage.NewStoragePVC(kube.NewPVC(w.c.Client)),
+		storage.NewStoragePVC(w.c.kube.Storage()),
 	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
-
 	// _ = w.reconcileHostService(ctx, host)
+	w.reconcileHostMainDomain(ctx, host)
 
-	return w.reconcileHostMainDomain(ctx, host)
+	return nil
 }
 
 func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host) error {
@@ -665,9 +664,11 @@ func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host) er
 	return nil
 }
 
-// reconcileHostBootstrap reconciles specified ClickHouse host
-func (w *worker) reconcileHostBootstrap(ctx context.Context, host *api.Host) error {
-	if err := w.includeHost(ctx, host); err != nil {
+// reconcileHostIncludeIntoAllActivities includes specified ClickHouse host into all activities
+func (w *worker) reconcileHostIncludeIntoAllActivities(ctx context.Context, host *api.Host) error {
+	// Include host back into all activities - such as cluster, service, etc
+	err := w.includeHost(ctx, host)
+	if err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
