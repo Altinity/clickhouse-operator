@@ -233,6 +233,10 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
 	}
 
+	return w.reconcileCRAuxObjectsPreliminaryDomain(ctx, cr)
+}
+
+func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr *api.ClickHouseInstallation) error {
 	return nil
 }
 
@@ -700,7 +704,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
 	}
-	if err := w.reconcileHostInclude(ctx, host); err != nil {
+	if err := w.reconcileHostIncludeIntoAllActivities(ctx, host); err != nil {
 		return err
 	}
 
@@ -796,7 +800,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		return err
 	}
 
-	// Polish all new volumes that operator has to create
+	// Polish all new volumes that the operator has to create
 	_ = w.reconcileHostPVCs(ctx, host)
 	_ = w.reconcileHostService(ctx, host)
 	_ = w.reconcileHostTables(ctx, host, migrateTableOpts)
@@ -843,8 +847,8 @@ func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *
 	return w.migrateTables(ctx, host, opts)
 }
 
-// reconcileHostInclude includes specified ClickHouse host into all activities
-func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error {
+// reconcileHostIncludeIntoAllActivities includes specified ClickHouse host into all activities
+func (w *worker) reconcileHostIncludeIntoAllActivities(ctx context.Context, host *api.Host) error {
 	if !w.shouldIncludeHost(host) {
 		w.a.V(1).
 			M(host).F().
