@@ -357,6 +357,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 		log.V(1).Info("Reconcile is aborted. cr: %s ", _cr.GetName())
 		return
 	}
+
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CHI object
@@ -417,8 +418,8 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHo
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
-
 	}
+
 	existingObjects := w.c.discovery(ctx, cr)
 	ap.WalkAdded(
 		// Walk over added clusters
