@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -32,6 +34,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
+	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -113,6 +116,72 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	}
 
 	return nil
+}
+
+func (w *worker) buildCR(ctx context.Context, _chk *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
+	chk := w.createTemplatedCR(_chk)
+	w.newTask(chk, chk.GetAncestorT())
+	w.findMinMaxVersions(ctx, chk)
+	common.LogOldAndNew("norm stage 1:", chk.GetAncestorT(), chk)
+
+	templates := w.buildTemplates(chk)
+	ips := w.c.getPodsIPs(chk)
+	w.a.V(1).M(chk).Info("IPs of the CHI %s: len: %d %v", util.NamespacedName(chk), len(ips), ips)
+	if len(ips) > 0 || len(templates) > 0 {
+		// Rebuild CR with known list of templates and additional IPs
+		opts := commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()
+		opts.DefaultUserAdditionalIPs = ips
+		opts.Templates = templates
+		chk = w.createTemplatedCR(_chk, opts)
+		w.newTask(chk, chk.GetAncestorT())
+		w.findMinMaxVersions(ctx, chk)
+		common.LogOldAndNew("norm stage 2:", chk.GetAncestorT(), chk)
+	}
+
+	w.fillCurSTS(ctx, chk)
+	w.logSWVersion(ctx, chk)
+
+	return chk
+}
+
+func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
+	_chk, err := w.c.GetCHK(obj)
+	if err != nil {
+		w.a.M(obj).F().Error("UNABLE-1 to find obj by %v err %v", obj.GetLabels(), err)
+		return nil, err
+	}
+	return w.buildCR(ctx, _chk), nil
+}
+
+func (w *worker) buildTemplates(chi *apiChk.ClickHouseKeeperInstallation) (templates []*apiChk.ClickHouseKeeperInstallation) {
+	return templates
+}
+
+func (w *worker) findMinMaxVersions(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) {
+	// Create artifacts
+	//	chk.WalkHosts(func(host *api.Host) error {
+	//		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+	//		version := w.getHostSoftwareVersion(ctx, host)
+	//		host.Runtime.Version = version
+	//		return nil
+	//	})
+	//	chk.FindMinMaxVersions()
+}
+
+func (w *worker) fillCurSTS(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) {
+	//chk.WalkHosts(func(host *api.Host) error {
+	//	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+	//	return nil
+	//})
+}
+
+func (w *worker) logSWVersion(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) {
+	//l := w.a.V(1).F()
+	//chk.WalkHosts(func(host *api.Host) error {
+	//	l.M(host).Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
+	//	return nil
+	//})
+	//l.M(chk).Info("CR software versions [min, max]: %s %s", chk.GetMinVersion().Render(), chk.GetMaxVersion().Render())
 }
 
 // reconcile reconciles Custom Resource
@@ -238,6 +307,7 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *apiChk.Clic
 }
 
 func (w *worker) includeAllHostsIntoCluster(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+	// Not appropriate
 }
 
 // reconcileConfigMapCommon reconciles common ConfigMap
@@ -336,10 +406,6 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	}
 
 	return err
-}
-
-func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) string {
-	return "undefined"
 }
 
 // reconcileHostService reconciles host's Service

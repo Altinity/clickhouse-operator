@@ -23,22 +23,53 @@ import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // getPodsIPs gets all pod IPs
 func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
-	log.V(3).M(obj).F().S().Info("looking for pods IPs")
-	defer log.V(3).M(obj).F().E().Info("looking for pods IPs")
+	l := log.V(3).M(obj).F()
+
+	l.S().Info("looking for pods IPs")
+	defer l.E().Info("looking for pods IPs")
 
 	for _, pod := range c.kube.Pod().GetAll(obj) {
 		if ip := pod.Status.PodIP; ip == "" {
-			log.V(3).M(pod).F().Warning("Pod NO IP address found. Pod: %s/%s", pod.Namespace, pod.Name)
+			l.Warning("Pod NO IP address found. Pod: %s", util.NamespacedName(pod))
 		} else {
 			ips = append(ips, ip)
-			log.V(3).M(pod).F().Info("Pod IP address found. Pod: %s/%s IP: %s", pod.Namespace, pod.Name, ip)
+			l.Info("Pod IP address found. Pod: %s IP: %s", util.NamespacedName(pod), ip)
 		}
 	}
 	return ips
+}
+
+// GetCHK gets CHK by any object from a CHK
+func (c *Controller) GetCHK(obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
+	switch obj.(type) {
+	case *apiChk.ClickHouseKeeperInstallation:
+		cr, err := c.kube.CR().Get(controller.NewContext(), obj.GetNamespace(), obj.GetName())
+		if cr == nil {
+			return nil, err
+		}
+		return cr.(*apiChk.ClickHouseKeeperInstallation), err
+	default:
+		return c.GetCHKByObject(obj)
+	}
+}
+
+// GetCHKByObject gets CHK by namespaced name
+func (c *Controller) GetCHKByObject(obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
+	crName, err := chkLabeler.New(nil).GetCRNameFromObjectMeta(obj)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find CR by name: '%s'. More info: %v", obj.GetName(), err)
+	}
+
+	cr, err := c.kube.CR().Get(controller.NewContext(), obj.GetNamespace(), crName)
+	if cr == nil {
+		return nil, err
+	}
+	return cr.(*apiChk.ClickHouseKeeperInstallation), err
 }
 
 // GetCHIByObjectMeta gets CHI by namespaced name

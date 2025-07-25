@@ -389,6 +389,30 @@ func (w *worker) logHosts(cr api.ICustomResource) {
 	})
 }
 
+func (w *worker) createTemplatedCR(_chk *apiChk.ClickHouseKeeperInstallation, _opts ...*commonNormalizer.Options[apiChk.ClickHouseKeeperInstallation]) *apiChk.ClickHouseKeeperInstallation {
+	l := w.a.V(1).M(_chk).F()
+
+	if _chk.HasAncestor() {
+		l.Info("CR has an ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(_chk))
+	} else {
+		l.Info("CR has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(_chk))
+	}
+
+	chk := w.createTemplated(_chk, _opts...)
+	chk.SetAncestor(w.createTemplated(_chk.GetAncestorT()))
+
+	return chk
+}
+
+func (w *worker) createTemplated(c *apiChk.ClickHouseKeeperInstallation, _opts ...*commonNormalizer.Options[apiChk.ClickHouseKeeperInstallation]) *apiChk.ClickHouseKeeperInstallation {
+	opts := commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()
+	if len(_opts) > 0 {
+		opts = _opts[0]
+	}
+	chk, _ := w.normalizer.CreateTemplated(c, opts)
+	return chk
+}
+
 // getRaftGeneratorOptions build base set of RaftOptions
 func (w *worker) getRaftGeneratorOptions() *commonConfig.HostSelector {
 	// Raft specifies to exclude:
