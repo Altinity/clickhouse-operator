@@ -16,6 +16,7 @@ package chk
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
@@ -24,4 +25,15 @@ import (
 func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
 	// Unable to acquire any version - report min one
 	return swversion.MaxVersion().SetDescription("so far so")
+}
+
+func (w *worker) reconcileShardsAndHostsFetchOpts(ctx context.Context) *common.ReconcileShardsAndHostsOptions {
+	// Try to fetch options
+	if opts, ok := ctx.Value(common.ReconcileShardsAndHostsOptionsCtxKey).(*common.ReconcileShardsAndHostsOptions); ok {
+		w.a.V(1).Info("found ReconcileShardsAndHostsOptionsCtxKey")
+		return opts
+	} else {
+		w.a.V(1).Info("not found ReconcileShardsAndHostsOptionsCtxKey, use empty opts")
+		return &common.ReconcileShardsAndHostsOptions{}
+	}
 }
