@@ -157,31 +157,31 @@ func (w *worker) buildTemplates(chi *apiChk.ClickHouseKeeperInstallation) (templ
 	return templates
 }
 
-func (w *worker) findMinMaxVersions(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) {
+func (w *worker) findMinMaxVersions(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
 	// Create artifacts
-	//	chk.WalkHosts(func(host *api.Host) error {
-	//		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
-	//		version := w.getHostSoftwareVersion(ctx, host)
-	//		host.Runtime.Version = version
-	//		return nil
-	//	})
-	//	chk.FindMinMaxVersions()
+	cr.WalkHosts(func(host *api.Host) error {
+		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+		version := w.getHostSoftwareVersion(ctx, host)
+		host.Runtime.Version = version
+		return nil
+	})
+	cr.FindMinMaxVersions()
 }
 
-func (w *worker) fillCurSTS(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) {
-	//chk.WalkHosts(func(host *api.Host) error {
-	//	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
-	//	return nil
-	//})
+func (w *worker) fillCurSTS(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+	cr.WalkHosts(func(host *api.Host) error {
+		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+		return nil
+	})
 }
 
-func (w *worker) logSWVersion(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) {
-	//l := w.a.V(1).F()
-	//chk.WalkHosts(func(host *api.Host) error {
-	//	l.M(host).Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
-	//	return nil
-	//})
-	//l.M(chk).Info("CR software versions [min, max]: %s %s", chk.GetMinVersion().Render(), chk.GetMaxVersion().Render())
+func (w *worker) logSWVersion(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+	l := w.a.V(1).F()
+	cr.WalkHosts(func(host *api.Host) error {
+		l.M(host).Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
+		return nil
+	})
+	l.M(cr).Info("CR software versions [min, max]: %s %s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
 }
 
 // reconcile reconciles Custom Resource
@@ -496,14 +496,7 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*apiChk.C
 	log.V(1).F().S().Info("reconcileShardsAndHosts start")
 	defer log.V(1).F().E().Info("reconcileShardsAndHosts end")
 
-	// Try to fetch options
-	opts, ok := ctx.Value(common.ReconcileShardsAndHostsOptionsCtxKey).(*common.ReconcileShardsAndHostsOptions)
-	if ok {
-		w.a.V(1).Info("found ReconcileShardsAndHostsOptionsCtxKey")
-	} else {
-		w.a.V(1).Info("not found ReconcileShardsAndHostsOptionsCtxKey, use empty opts")
-		opts = &common.ReconcileShardsAndHostsOptions{}
-	}
+	opts := w.reconcileShardsAndHostsFetchOpts(ctx)
 
 	// Which shard to start concurrent processing with
 	var startShard int

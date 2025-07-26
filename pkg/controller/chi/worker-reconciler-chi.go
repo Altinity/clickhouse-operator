@@ -157,31 +157,31 @@ func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*a
 	return templates
 }
 
-func (w *worker) findMinMaxVersions(ctx context.Context, chi *api.ClickHouseInstallation) {
+func (w *worker) findMinMaxVersions(ctx context.Context, cr *api.ClickHouseInstallation) {
 	// Create artifacts
-	chi.WalkHosts(func(host *api.Host) error {
+	cr.WalkHosts(func(host *api.Host) error {
 		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
 		version := w.getHostSoftwareVersion(ctx, host)
 		host.Runtime.Version = version
 		return nil
 	})
-	chi.FindMinMaxVersions()
+	cr.FindMinMaxVersions()
 }
 
-func (w *worker) fillCurSTS(ctx context.Context, chi *api.ClickHouseInstallation) {
-	chi.WalkHosts(func(host *api.Host) error {
+func (w *worker) fillCurSTS(ctx context.Context, cr *api.ClickHouseInstallation) {
+	cr.WalkHosts(func(host *api.Host) error {
 		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
 		return nil
 	})
 }
 
-func (w *worker) logSWVersion(ctx context.Context, chi *api.ClickHouseInstallation) {
+func (w *worker) logSWVersion(ctx context.Context, cr *api.ClickHouseInstallation) {
 	l := w.a.V(1).F()
-	chi.WalkHosts(func(host *api.Host) error {
+	cr.WalkHosts(func(host *api.Host) error {
 		l.M(host).Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
 		return nil
 	})
-	l.M(chi).Info("CR software versions [min, max]: %s %s", chi.GetMinVersion().Render(), chi.GetMaxVersion().Render())
+	l.M(cr).Info("CR software versions [min, max]: %s %s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
 }
 
 // reconcile reconciles Custom Resource
