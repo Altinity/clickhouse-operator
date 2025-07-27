@@ -45,11 +45,6 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		return nil
 	}
 
-	if new.Spec.Suspend.Value() {
-		log.V(2).M(new).F().Info("CR is suspended, skip reconcile")
-		return nil
-	}
-
 	if new.HasAncestor() {
 		log.V(2).M(new).F().Info("has ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(new))
 		old = new.GetAncestorT()
@@ -99,6 +94,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 			WithError(new).
 			M(new).F().
 			Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
+		err = common.ErrCRUDAbort
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 		if errors.Is(err, common.ErrCRUDAbort) {
 		}
@@ -674,14 +670,8 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	w.a.V(1).M(host).F().Info("Reconcile PVCs and data loss for host: %s", host.GetName())
 
 	// In case data loss detected we may need to specify additional reconcile options
-	if storage.ErrIsDataLoss(
-		storage.NewStorageReconciler(
-			w.task,
-			w.c.namer,
-			storage.NewStoragePVC(w.c.kube.Storage()),
-		).ReconcilePVCs(ctx, host, api.DesiredStatefulSet),
-	) {
-		stsReconcileOpts = stsReconcileOpts.SetForceRecreate()
+	if storage.ErrIsDataLoss(w.reconcileHostPVCs(ctx, host)) {
+		stsReconcileOpts = w.hostPVCsDataLossDetected(host)
 		w.a.V(1).
 			M(host).F().
 			Info("Data loss detected for host: %s.", host.GetName())
@@ -697,15 +687,19 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	}
 
 	// Polish all new volumes that the operator has to create
-	_ = storage.NewStorageReconciler(
-		w.task,
-		w.c.namer,
-		storage.NewStoragePVC(w.c.kube.Storage()),
-	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+	_ = w.reconcileHostPVCs(ctx, host)
 	// _ = w.reconcileHostService(ctx, host)
 	w.reconcileHostMainDomain(ctx, host)
 
 	return nil
+}
+
+func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {
+	return storage.NewStorageReconciler(
+		w.task,
+		w.c.namer,
+		storage.NewStoragePVC(w.c.kube.Storage()),
+	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 }
 
 func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host) error {

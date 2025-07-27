@@ -17,6 +17,7 @@ package chk
 import (
 	"context"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
@@ -36,4 +37,15 @@ func (w *worker) reconcileShardsAndHostsFetchOpts(ctx context.Context) *common.R
 		w.a.V(1).Info("not found ReconcileShardsAndHostsOptionsCtxKey, use empty opts")
 		return &common.ReconcileShardsAndHostsOptions{}
 	}
+}
+
+func (w *worker) hostPVCsDataLossDetected(host *api.Host) *statefulset.ReconcileOptions {
+	w.a.V(1).
+		M(host).F().
+		Info("Data loss detected for host: %s. Will do force data recovery", host.GetName())
+
+	// In case of data loss detection on existing volumes, we need to:
+	// 1. recreate StatefulSet
+	// 2. run tables migration again
+	return statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
 }

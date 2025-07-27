@@ -72,6 +72,11 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	c.new()
 	w := c.newWorker()
 
+	if new.Spec.Suspend.Value() {
+		log.V(2).M(new).F().Info("CR is suspended, skip reconcile")
+		return ctrl.Result{}, nil
+	}
+
 	w.reconcileCR(context.TODO(), nil, new)
 
 	return ctrl.Result{}, nil
