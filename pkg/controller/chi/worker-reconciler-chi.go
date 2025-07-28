@@ -73,7 +73,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
 	default:
-		w.a.M(new).F().Info("ActionPlan has no actions and no need to install finalizer - nothing to do")
+		w.a.M(new).F().Info("ActionPlan has no actions - abort reconcile")
 		return nil
 	}
 

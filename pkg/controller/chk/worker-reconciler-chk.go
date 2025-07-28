@@ -80,7 +80,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	case actionPlan.HasActionsToDo():
 		w.a.M(new).F().Info("ActionPlan has actions - continue reconcile")
 	default:
-		w.a.M(new).F().Info("ActionPlan has no actions and no need to install finalizer - nothing to do")
+		w.a.M(new).F().Info("ActionPlan has no actions - abort reconcile")
 		return nil
 	}
 
