@@ -15,12 +15,10 @@
 package action_plan
 
 import (
-	"gopkg.in/d4l3k/messagediff.v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
-
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"gopkg.in/d4l3k/messagediff.v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ActionPlan is an action plan with list of differences between two CHIs
@@ -92,7 +90,7 @@ func NewActionPlan(old, new api.ICustomResource) *ActionPlan {
 		ap.attributesEqual = true
 	}
 
-	if (new != nil) && strings.HasPrefix(new.GetSpec().GetTaskID(), "auto") {
+	if (new != nil) && new.GetSpec().GetTaskID().IsAutoId() {
 		ap.skipTaskID = true
 	}
 
