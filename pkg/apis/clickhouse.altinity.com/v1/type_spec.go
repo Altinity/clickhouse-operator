@@ -20,7 +20,7 @@ import (
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	TaskID                 *types.String     `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	TaskID                 *types.Id         `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
 	Stop                   *types.StringBool `json:"stop,omitempty"                   yaml:"stop,omitempty"`
 	Restart                *types.String     `json:"restart,omitempty"                yaml:"restart,omitempty"`
 	Troubleshoot           *types.StringBool `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
@@ -39,15 +39,15 @@ func (spec *ChiSpec) HasTaskID() bool {
 	if spec == nil {
 		return false
 	}
-	return len(spec.TaskID.Value()) > 0
+	return spec.TaskID.HasValue()
 }
 
 // GetTaskID gets task id as a string
-func (spec *ChiSpec) GetTaskID() string {
+func (spec *ChiSpec) GetTaskID() *types.Id {
 	if spec == nil {
-		return ""
+		return nil
 	}
-	return spec.TaskID.Value()
+	return spec.TaskID
 }
 
 func (spec *ChiSpec) GetStop() *types.StringBool {

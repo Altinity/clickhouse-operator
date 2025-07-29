@@ -21,7 +21,7 @@ import (
 
 // ChkSpec defines spec section of ClickHouseKeeper resource
 type ChkSpec struct {
-	TaskID                 *types.String       `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	TaskID                 *types.Id           `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
 	NamespaceDomainPattern *types.String       `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Suspend                *types.StringBool   `json:"suspend,omitempty"                yaml:"suspend,omitempty"`
 	Reconciling            *apiChi.Reconciling `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
@@ -35,15 +35,15 @@ func (spec *ChkSpec) HasTaskID() bool {
 	if spec == nil {
 		return false
 	}
-	return len(spec.TaskID.Value()) > 0
+	return spec.TaskID.HasValue()
 }
 
 // GetTaskID gets task id as a string
-func (spec *ChkSpec) GetTaskID() string {
+func (spec *ChkSpec) GetTaskID() *types.Id {
 	if spec == nil {
-		return ""
+		return nil
 	}
-	return spec.TaskID.Value()
+	return spec.TaskID
 }
 
 func (spec *ChkSpec) GetNamespaceDomainPattern() *types.String {
