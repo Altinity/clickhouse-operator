@@ -218,7 +218,7 @@ func (n *Normalizer) normalizeTaskID(taskID *types.String) *types.String {
 		return taskID
 	}
 
-	return types.NewString(uuid.New().String())
+	return types.NewString("auto-" + uuid.New().String())
 }
 
 // normalizeStop normalizes .spec.stop

@@ -205,7 +205,7 @@ func (n *Normalizer) normalizeTaskID(taskID *types.String) *types.String {
 		return taskID
 	}
 
-	return types.NewString(uuid.New().String())
+	return types.NewString("auto-" + uuid.New().String())
 }
 
 func isNamespaceDomainPatternValid(namespaceDomainPattern *types.String) bool {
