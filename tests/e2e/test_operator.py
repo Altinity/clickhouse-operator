@@ -1840,7 +1840,7 @@ def test_010014_1(self):
         delete_test_namespace()
 
 
-def check_host_network(manifest, replica1_port = "9000", replica2_port = "9000"):
+def check_host_network(manifest, replica1_port="9000", replica2_port="9000"):
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
 
@@ -2312,7 +2312,7 @@ def test_019(self, step=1):
 
     with When("Delete chi"):
         kubectl.delete_chi(chi, ok_undeleted=True)
-        with Then("One PVC should be left because relcaim policy was unset when removing a replica"):
+        with Then("One PVC should be left because reclaim policy was unset when removing a replica"):
             assert kubectl.get_count("pvc", chi=chi) == 1
         with Then("Cleanup PVCs"):
             for pvc in kubectl.get_obj_names(chi, "pvc"):
@@ -3454,8 +3454,8 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
             f"{errors} queries have failed. " +
             f"incomplete results runs: {partial_runs} " +
             f"error runs: {error_runs}"
-        ):
-            assert errors == 0, error()
+            ):
+        assert errors == 0, error()
 
     # with Finally("I clean up"): # can not cleanup, since threads may join already and shell may be unavailable
     #    with By("deleting pod"):
@@ -4731,15 +4731,15 @@ def test_010047(self):
 
     numbers = 100
     with When("I create distributed table"):
-        for shard in (0,1):
+        for shard in (0, 1):
             clickhouse.query(
                 chi,
                 "CREATE TABLE test_local_047 (a UInt32) Engine = MergeTree PARTITION BY tuple() ORDER BY a",
-                host = f"chi-{chi}-{cluster}-{shard}-0-0")
+                host=f"chi-{chi}-{cluster}-{shard}-0-0")
             clickhouse.query(
                 chi,
                 "CREATE TABLE test_distr_047 AS test_local_047 Engine = Distributed('default', default, test_local_047, a%2)",
-                host = f"chi-{chi}-{cluster}-{shard}-0-0")
+                host=f"chi-{chi}-{cluster}-{shard}-0-0")
 
     with And("I insert data in the distributed table"):
         clickhouse.query(chi, f"INSERT INTO test_distr_047 select * from numbers({numbers})")
