@@ -285,7 +285,7 @@ func (in *ChkSpec) DeepCopyInto(out *ChkSpec) {
 	*out = *in
 	if in.TaskID != nil {
 		in, out := &in.TaskID, &out.TaskID
-		*out = new(types.String)
+		*out = new(types.Id)
 		**out = **in
 	}
 	if in.NamespaceDomainPattern != nil {
@@ -412,6 +412,14 @@ func (in *ClickHouseKeeperInstallationRuntime) DeepCopyInto(out *ClickHouseKeepe
 		(*in).DeepCopyInto(*out)
 	}
 	out.commonConfigMutex = in.commonConfigMutex
+	if in.MinVersion != nil {
+		in, out := &in.MinVersion, &out.MinVersion
+		*out = (*in).DeepCopy()
+	}
+	if in.MaxVersion != nil {
+		in, out := &in.MaxVersion, &out.MaxVersion
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 
@@ -447,6 +455,16 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 		in, out := &in.Layout, &out.Layout
 		*out = new(ChkClusterLayout)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.PDBManaged != nil {
+		in, out := &in.PDBManaged, &out.PDBManaged
+		*out = new(types.StringBool)
+		**out = **in
+	}
+	if in.PDBMaxUnavailable != nil {
+		in, out := &in.PDBMaxUnavailable, &out.PDBMaxUnavailable
+		*out = new(types.Int32)
+		**out = **in
 	}
 	in.Runtime.DeepCopyInto(&out.Runtime)
 	return
