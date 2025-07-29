@@ -53,3 +53,8 @@ func (id *Id) String() string {
 func (id *Id) IsAutoId() bool {
 	return strings.HasPrefix(id.Value(), autoPrefix)
 }
+
+// MergeFrom merges value from another variable
+func (id *Id) MergeFrom(from *Id) *Id {
+	return (*Id)((*String)(id).MergeFrom((*String)(from)))
+}
