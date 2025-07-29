@@ -17,8 +17,6 @@ package normalizer
 import (
 	"strings"
 
-	"github.com/google/uuid"
-
 	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -200,12 +198,12 @@ func (n *Normalizer) endpoints() []string {
 }
 
 // normalizeTaskID normalizes .spec.taskID
-func (n *Normalizer) normalizeTaskID(taskID *types.String) *types.String {
-	if len(taskID.Value()) > 0 {
+func (n *Normalizer) normalizeTaskID(taskID *types.Id) *types.Id {
+	if taskID.HasValue() {
 		return taskID
 	}
 
-	return types.NewString("auto-" + uuid.New().String())
+	return types.NewAutoId()
 }
 
 func isNamespaceDomainPatternValid(namespaceDomainPattern *types.String) bool {

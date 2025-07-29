@@ -18,8 +18,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/google/uuid"
-
 	core "k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -213,12 +211,12 @@ func (n *Normalizer) endpoints() []string {
 }
 
 // normalizeTaskID normalizes .spec.taskID
-func (n *Normalizer) normalizeTaskID(taskID *types.String) *types.String {
-	if len(taskID.Value()) > 0 {
+func (n *Normalizer) normalizeTaskID(taskID *types.Id) *types.Id {
+	if taskID.HasValue() {
 		return taskID
 	}
 
-	return types.NewString("auto-" + uuid.New().String())
+	return types.NewAutoId()
 }
 
 // normalizeStop normalizes .spec.stop
