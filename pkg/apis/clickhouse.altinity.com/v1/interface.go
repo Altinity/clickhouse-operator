@@ -67,6 +67,7 @@ type ICRSpec interface {
 	GetNamespaceDomainPattern() *types.String
 	GetDefaults() *Defaults
 	GetConfiguration() IConfiguration
+	GetTaskID() string
 }
 
 type IConfiguration interface {
