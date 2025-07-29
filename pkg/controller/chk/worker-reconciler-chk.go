@@ -45,35 +45,14 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		return nil
 	}
 
-	if new.HasAncestor() {
-		log.V(2).M(new).F().Info("has ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(new))
-		old = new.GetAncestorT()
-	} else {
-		log.V(2).M(new).F().Info("has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(new))
-		old = nil
-	}
-
 	common.LogOldAndNew("non-normalized yet (native)", old, new)
-
-	switch {
-	case w.isGenerationTheSame(old, new):
-		log.V(2).M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
-		return nil
-	}
 
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
-	log.V(2).M(new).F().Info("Normalized OLD: %s", util.NamespaceNameString(new))
-	old = w.normalize(old)
+	new = w.buildCR(ctx, new)
 
-	log.V(2).M(new).F().Info("Normalized NEW: %s", util.NamespaceNameString(new))
-	new = w.normalize(new)
-
-	new.SetAncestor(old)
-	common.LogOldAndNew("normalized", old, new)
-
-	actionPlan := action_plan.NewActionPlan(old, new)
+	actionPlan := action_plan.NewActionPlan(new.GetAncestorT(), new)
 	common.LogActionPlan(actionPlan)
 
 	switch {
@@ -84,7 +63,6 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		return nil
 	}
 
-	w.newTask(new, old)
 	w.markReconcileStart(ctx, new, actionPlan)
 	w.setHostStatusesPreliminary(ctx, new, actionPlan)
 
@@ -114,39 +92,39 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	return nil
 }
 
-func (w *worker) buildCR(ctx context.Context, _chk *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	chk := w.createTemplatedCR(_chk)
-	w.newTask(chk, chk.GetAncestorT())
-	w.findMinMaxVersions(ctx, chk)
-	common.LogOldAndNew("norm stage 1:", chk.GetAncestorT(), chk)
+func (w *worker) buildCR(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
+	cr := w.createTemplatedCR(_cr)
+	w.newTask(cr, cr.GetAncestorT())
+	w.findMinMaxVersions(ctx, cr)
+	common.LogOldAndNew("norm stage 1:", cr.GetAncestorT(), cr)
 
-	templates := w.buildTemplates(chk)
-	ips := w.c.getPodsIPs(chk)
-	w.a.V(1).M(chk).Info("IPs of the CHI %s: len: %d %v", util.NamespacedName(chk), len(ips), ips)
+	templates := w.buildTemplates(cr)
+	ips := w.c.getPodsIPs(cr)
+	w.a.V(1).M(cr).Info("IPs of the CR %s: len: %d %v", util.NamespacedName(cr), len(ips), ips)
 	if len(ips) > 0 || len(templates) > 0 {
 		// Rebuild CR with known list of templates and additional IPs
 		opts := commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
 		opts.Templates = templates
-		chk = w.createTemplatedCR(_chk, opts)
-		w.newTask(chk, chk.GetAncestorT())
-		w.findMinMaxVersions(ctx, chk)
-		common.LogOldAndNew("norm stage 2:", chk.GetAncestorT(), chk)
+		cr = w.createTemplatedCR(_cr, opts)
+		w.newTask(cr, cr.GetAncestorT())
+		w.findMinMaxVersions(ctx, cr)
+		common.LogOldAndNew("norm stage 2:", cr.GetAncestorT(), cr)
 	}
 
-	w.fillCurSTS(ctx, chk)
-	w.logSWVersion(ctx, chk)
+	w.fillCurSTS(ctx, cr)
+	w.logSWVersion(ctx, cr)
 
-	return chk
+	return cr
 }
 
 func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
-	_chk, err := w.c.GetCHK(obj)
+	_cr, err := w.c.GetCHK(obj)
 	if err != nil {
 		w.a.M(obj).F().Error("UNABLE-1 to find obj by %v err %v", obj.GetLabels(), err)
 		return nil, err
 	}
-	return w.buildCR(ctx, _chk), nil
+	return w.buildCR(ctx, _cr), nil
 }
 
 func (w *worker) buildTemplates(chi *apiChk.ClickHouseKeeperInstallation) (templates []*apiChk.ClickHouseKeeperInstallation) {

@@ -113,39 +113,39 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	return nil
 }
 
-func (w *worker) buildCR(ctx context.Context, _chi *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	chi := w.createTemplatedCR(_chi)
-	w.newTask(chi, chi.GetAncestorT())
-	w.findMinMaxVersions(ctx, chi)
-	common.LogOldAndNew("norm stage 1:", chi.GetAncestorT(), chi)
+func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+	cr := w.createTemplatedCR(_cr)
+	w.newTask(cr, cr.GetAncestorT())
+	w.findMinMaxVersions(ctx, cr)
+	common.LogOldAndNew("norm stage 1:", cr.GetAncestorT(), cr)
 
-	templates := w.buildTemplates(chi)
-	ips := w.c.getPodsIPs(chi)
-	w.a.V(1).M(chi).Info("IPs of the CHI %s: len: %d %v", util.NamespacedName(chi), len(ips), ips)
+	templates := w.buildTemplates(cr)
+	ips := w.c.getPodsIPs(cr)
+	w.a.V(1).M(cr).Info("IPs of the CR %s: len: %d %v", util.NamespacedName(cr), len(ips), ips)
 	if len(ips) > 0 || len(templates) > 0 {
 		// Rebuild CR with known list of templates and additional IPs
 		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
 		opts.Templates = templates
-		chi = w.createTemplatedCR(_chi, opts)
-		w.newTask(chi, chi.GetAncestorT())
-		w.findMinMaxVersions(ctx, chi)
-		common.LogOldAndNew("norm stage 2:", chi.GetAncestorT(), chi)
+		cr = w.createTemplatedCR(_cr, opts)
+		w.newTask(cr, cr.GetAncestorT())
+		w.findMinMaxVersions(ctx, cr)
+		common.LogOldAndNew("norm stage 2:", cr.GetAncestorT(), cr)
 	}
 
-	w.fillCurSTS(ctx, chi)
-	w.logSWVersion(ctx, chi)
+	w.fillCurSTS(ctx, cr)
+	w.logSWVersion(ctx, cr)
 
-	return chi
+	return cr
 }
 
 func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*api.ClickHouseInstallation, error) {
-	_chi, err := w.c.GetCHI(obj)
+	_cr, err := w.c.GetCHI(obj)
 	if err != nil {
 		w.a.M(obj).F().Error("UNABLE-1 to find obj by %v err %v", obj.GetLabels(), err)
 		return nil, err
 	}
-	return w.buildCR(ctx, _chi), nil
+	return w.buildCR(ctx, _cr), nil
 }
 
 func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*api.ClickHouseInstallation) {
