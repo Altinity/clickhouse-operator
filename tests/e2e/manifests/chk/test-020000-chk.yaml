@@ -1,0 +1,52 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020000-chk
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+      volumeClaimTemplate: default
+      serviceTemplate: service-template
+      replicaServiceTemplate: replica-template
+  configuration:
+    clusters:
+      - name: keeper
+        pdbMaxUnavailable: 0
+        layout:
+          replicasCount: 1
+    settings:
+      keeper_server/tcp_port: "2181"
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: IfNotPresent
+              image: "clickhouse/clickhouse-keeper:25.3"
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+    serviceTemplates:
+      - name: service-template
+        generateName: "keeper-{chk}-service"
+        spec:
+          ports:
+            - name: keeper
+              port: 2181
+          type: ClusterIP
+          clusterIP: None
+      - name: replica-template
+        generateName: "keeper-{chk}-{replica}"
+        spec:
+          ports:
+            - name: keeper
+              port: 2181
+          type: ClusterIP
+          clusterIP: None
