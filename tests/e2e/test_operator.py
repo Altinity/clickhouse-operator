@@ -1039,16 +1039,10 @@ def test_010012(self):
         kubectl.check_service("service-test-012", "LoadBalancer")
     with And("There should be a service for shard 0"):
         kubectl.check_service("service-test-012-0-0", "ClusterIP")
-        with Then("clusterIP should be set"):
-            assert kubectl.get_field("service", "service-test-012-0-0", ".spec.clusterIP") != "None"
     with And("There should be a service for shard 1"):
         kubectl.check_service("service-test-012-1-0", "ClusterIP")
-        with Then("clusterIP should be set"):
-            assert kubectl.get_field("service", "service-test-012-1-0", ".spec.clusterIP") != "None"
     with And("There should be a service for default cluster"):
         kubectl.check_service("service-default", "ClusterIP")
-        with Then("clusterIP should be set"):
-            assert kubectl.get_field("service", "service-default", ".spec.clusterIP") != "None"
 
     node_port = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
     service_test_012_created = kubectl.get_field("service", "service-test-012", ".metadata.creationTimestamp")
@@ -1071,12 +1065,7 @@ def test_010012(self):
             kubectl.check_service("service-default", "LoadBalancer")
 
         with And("Service for shard 0 change to headless one"):
-            kubectl.check_service("service-test-012-0-0", "ClusterIP")
-            with Then("clusterIP should be None"):
-                clusterIP = kubectl.get_field("service", "service-test-012-0-0", ".spec.clusterIP")
-                if clusterIP != "None":
-                    print(f"ERROR: clusterIP should be None but it is: {clusterIP}")
-                assert clusterIP == "None"
+            kubectl.check_service("service-test-012-0-0", "ClusterIP", headless = True)
 
         with And("Service should not be re-created if type has not been changed"):
             assert service_test_012_created == kubectl.get_field("service", "service-test-012", ".metadata.creationTimestamp")
@@ -1084,10 +1073,8 @@ def test_010012(self):
         with And("Service should be re-created if type has been changed"):
             assert service_default_created != kubectl.get_field("service", "service-default", ".metadata.creationTimestamp")
 
-        with And("Additional internal service should be created"):
-            kubectl.check_service("service-test-012-internal", "ClusterIP")
-            with Then("clusterIP should be None"):
-                assert kubectl.get_field("service", "service-test-012-internal", ".spec.clusterIP") == "None"
+        with And("Additional internal headless service should be created"):
+            kubectl.check_service("service-test-012-internal", "ClusterIP", headless = True)
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -5318,6 +5305,40 @@ def test_010060(self):
 # Keeper tests section
 #
 
+@TestScenario
+@Name("test_020000. Test Basic CHK functions")
+def test_020000(self):
+    create_shell_namespace_clickhouse_template()
+
+    chk_manifest = "manifests/chk/test-020000-chk.yaml"
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
+
+    with Given("Install CHK"):
+        kubectl.create_and_check(
+            manifest=chk_manifest, kind="chk",
+            check={
+                "pod_count": 1,
+                "pdb": {"keeper": 0},
+                "do_not_delete": 1
+            }
+        )
+
+    created_objects = kubectl.get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=chk)
+    print("Created objects:")
+    for o in created_objects:
+        print(o)
+
+    with And("There should be a service for cluster a cluster"):
+        kubectl.check_service(f"keeper-{chk}-service", "ClusterIP", headless = True)
+
+    with And("There should be a service for first replica"):
+        kubectl.check_service(f"keeper-{chk}-0", "ClusterIP", headless = True)
+
+    with And("There should be a PVC"):
+        assert kubectl.get_count("pvc", label = f"-l clickhouse-keeper.altinity.com/chk={chk}") == 1
+
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 @TestScenario
 @Name("test_020001. Clickhouse-keeper")

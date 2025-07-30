@@ -206,7 +206,7 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
         check_configmaps(chi_name, ns=ns, shell=shell)
 
     if "pdb" in check:
-        check_pdb(chi_name, check["pdb"], ns=ns, shell=shell)
+        check_pdb(chi_name, kind, check["pdb"], ns=ns, shell=shell)
 
     if "do_not_delete" not in check:
         delete_chi(chi_name, ns=ns, shell=shell)
@@ -619,11 +619,23 @@ def check_pod_antiaffinity(
         assert pod_spec["affinity"]["podAntiAffinity"] == expected
 
 
-def check_service(service_name, service_type, ns=None, shell=None):
+def check_service(service_name, service_type, headless = False, ns=None, shell=None):
     with When(f"{service_name} is available"):
         service = get("service", service_name, ns=ns, shell=shell)
+
         with Then(f"Service type is {service_type}"):
             assert service["spec"]["type"] == service_type
+
+        if service_type == "ClusterIP":
+            clusterIP = service["spec"]["clusterIP"]
+            if headless:
+                with Then("clusterIP should be None"):
+                    if clusterIP != "None":
+                        print(f"ERROR: clusterIP should be None but it is: {clusterIP}")
+                    assert clusterIP == "None"
+            else:
+                with Then("clusterIP should be set"):
+                    assert clusterIP != "None"
 
 
 def check_configmaps(chi_name, ns=None, shell=None):
@@ -656,7 +668,14 @@ def check_configmap(cfg_name, values, ns=None, shell=None):
             assert v in cfm["data"], error()
 
 
-def check_pdb(chi, clusters, ns=None, shell=None):
+def check_pdb(chi, kind, clusters, ns=None, shell=None):
+    if kind == "chi":
+        label = "clickhouse.altinity.com"
+    elif kind == "chk":
+        label = "clickhouse-keeper.altinity.com"
+    else:
+        error("Unknown kind:" + kind)
+
     for c in clusters.keys():
         with Then(f"PDB is configured for cluster {c}"):
             is_managed = True
@@ -674,10 +693,13 @@ def check_pdb(chi, clusters, ns=None, shell=None):
                 continue
 
             labels = pdb["spec"]["selector"]["matchLabels"]
-            assert labels["clickhouse.altinity.com/app"] == "chop"
-            assert labels["clickhouse.altinity.com/chi"] == chi
-            assert labels["clickhouse.altinity.com/cluster"] == c
-            assert labels["clickhouse.altinity.com/namespace"] == current().context.test_namespace
+            assert labels[f"{label}/app"] == "chop"
+            if kind == "chi":
+                assert labels[f"{label}/chi"] == chi
+            else:
+                assert labels[f"{label}/chk"] == chi
+            assert labels[f"{label}/cluster"] == c
+            assert labels[f"{label}/namespace"] == current().context.test_namespace
             assert pdb["spec"]["maxUnavailable"] == max_unavailable
 
 def force_reconcile(chi, taskID="reconcile", ns=None, shell=None):
