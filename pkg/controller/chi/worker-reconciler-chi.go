@@ -142,7 +142,7 @@ func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *
 func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*api.ClickHouseInstallation, error) {
 	_cr, err := w.c.GetCHI(obj)
 	if err != nil {
-		w.a.M(obj).F().Error("UNABLE-1 to find obj by %v err %v", obj.GetLabels(), err)
+		w.a.M(obj).F().Error("UNABLE-1 to find obj by labels: %v err: %v", obj.GetLabels(), err)
 		return nil, err
 	}
 	return w.buildCR(ctx, _cr), nil
