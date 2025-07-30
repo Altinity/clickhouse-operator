@@ -44,25 +44,27 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 	return ips
 }
 
-// GetCHK gets CHK by any object from a CHK
+// GetCHK gets CR by any object that is either a CR itself or has labels referencing a CR
 func (c *Controller) GetCHK(obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
 	switch obj.(type) {
 	case *apiChk.ClickHouseKeeperInstallation:
+		// Object is a CR itself. Try to find it directly by namespace+name pair
 		cr, err := c.kube.CR().Get(controller.NewContext(), obj.GetNamespace(), obj.GetName())
 		if cr == nil {
 			return nil, err
 		}
 		return cr.(*apiChk.ClickHouseKeeperInstallation), err
 	default:
+		// Object is not a CR itself. Try to find it by labels referencing owner CR
 		return c.GetCHKByObject(obj)
 	}
 }
 
-// GetCHKByObject gets CHK by namespaced name
+// GetCHKByObject gets CR by labels
 func (c *Controller) GetCHKByObject(obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
 	crName, err := chkLabeler.New(nil).GetCRNameFromObjectMeta(obj)
 	if err != nil {
-		return nil, fmt.Errorf("unable to find CR by name: '%s'. More info: %v", obj.GetName(), err)
+		return nil, fmt.Errorf("unable to find CR name in labels provided by the object: '%s'. err: %v", util.NamespacedName(obj), err)
 	}
 
 	cr, err := c.kube.CR().Get(controller.NewContext(), obj.GetNamespace(), crName)

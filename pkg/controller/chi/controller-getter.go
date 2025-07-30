@@ -60,7 +60,7 @@ func (c *Controller) GetCHI(obj meta.Object) (*api.ClickHouseInstallation, error
 	}
 }
 
-// GetCHIByObject gets CHI by labels
+// GetCHIByObject gets CR by labels
 func (c *Controller) GetCHIByObject(obj meta.Object) (*api.ClickHouseInstallation, error) {
 	crName, err := chiLabeler.New(nil).GetCRNameFromObjectMeta(obj)
 	if err != nil {

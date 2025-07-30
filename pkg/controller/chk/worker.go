@@ -168,18 +168,6 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	}
 }
 
-// normalize
-func (w *worker) normalize(c *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	chk, err := normalizer.New().CreateTemplated(c, commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]())
-	if err != nil {
-		w.a.WithEvent(chk, a.EventActionReconcile, a.EventReasonReconcileFailed).
-			WithError(chk).
-			M(chk).F().
-			Error("FAILED to normalize CR 1: %v", err)
-	}
-	return chk
-}
-
 func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
