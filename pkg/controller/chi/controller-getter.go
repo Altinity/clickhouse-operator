@@ -44,25 +44,27 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 	return ips
 }
 
-// GetCHI gets CHI by any object from a CHI
+// GetCHI gets CR by any object that is either a CR itself or has labels referencing a CR
 func (c *Controller) GetCHI(obj meta.Object) (*api.ClickHouseInstallation, error) {
 	switch obj.(type) {
 	case *api.ClickHouseInstallation:
+		// Object is a CR itself. Try to find it directly by namespace+name pair
 		cr, err := c.kube.CR().Get(controller.NewContext(), obj.GetNamespace(), obj.GetName())
 		if cr == nil {
 			return nil, err
 		}
 		return cr.(*api.ClickHouseInstallation), err
 	default:
+		// Object is not a CR itself. Try to find it by labels referencing owner CR
 		return c.GetCHIByObject(obj)
 	}
 }
 
-// GetCHIByObject gets CHI by namespaced name
+// GetCHIByObject gets CHI by labels
 func (c *Controller) GetCHIByObject(obj meta.Object) (*api.ClickHouseInstallation, error) {
 	crName, err := chiLabeler.New(nil).GetCRNameFromObjectMeta(obj)
 	if err != nil {
-		return nil, fmt.Errorf("unable to find CR by name: '%s'. More info: %v", obj.GetName(), err)
+		return nil, fmt.Errorf("unable to find CR name in labels provided by the object: '%s'. err: %v", util.NamespacedName(obj), err)
 	}
 
 	cr, err := c.kube.CR().Get(controller.NewContext(), obj.GetNamespace(), crName)
