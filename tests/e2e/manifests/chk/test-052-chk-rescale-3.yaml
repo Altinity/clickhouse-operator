@@ -14,7 +14,7 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:24.10"
+              image: "clickhouse/clickhouse-keeper:25.3"
     volumeClaimTemplates:
       - name: default
         spec:

@@ -91,8 +91,7 @@ def delete_chi(chi, ns=None, wait=True, ok_undeleted = False, ok_to_fail=False, 
             not_deleted_objects_ext = get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=chi, ns=ns, shell=shell)
             if len(not_deleted_objects) > 0 or len(not_deleted_objects_ext) > 0:
                 print("WARNING: some objects were not deleted:")
-                for o in not_deleted_objects_ext:
-                    print(o)
+                print(*not_deleted_objects_ext, sep='\n')
 
             assert ok_undeleted or cnt == 0
 

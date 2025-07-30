@@ -1,20 +1,15 @@
 apiVersion: "clickhouse-keeper.altinity.com/v1"
 kind: "ClickHouseKeeperInstallation"
 metadata:
-  name: test-052-chk
+  name: test-020001
 spec:
   defaults:
     templates:
-      podTemplate: default
       volumeClaimTemplate: default
-  templates:
-    podTemplates:
+  configuration:
+    clusters:
       - name: default
-        spec:
-          containers:
-            - name: clickhouse-keeper
-              imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:25.3"
+  templates:
     volumeClaimTemplates:
       - name: default
         spec:
@@ -23,8 +18,3 @@ spec:
           resources:
             requests:
               storage: 1Gi
-  configuration:
-    clusters:
-      - name: keeper
-        layout:
-          replicasCount: 1

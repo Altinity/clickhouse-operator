@@ -41,8 +41,7 @@ def test_010001(self):
 
     created_objects = kubectl.get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=chi)
     print("Created objects:")
-    for o in created_objects:
-        print(o)
+    print(*created_objects, sep='\n')
 
     kubectl.delete_chi(chi)
 
@@ -5323,9 +5322,9 @@ def test_020000(self):
             }
         )
 
-    created_objects = kubectl.get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=chk)
+    chk_objects = kubectl.get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=chk)
     print("Created objects:")
-    for o in created_objects:
+    for o in chk_objects:
         print(o)
 
     with And("There should be a service for cluster a cluster"):
@@ -5337,14 +5336,55 @@ def test_020000(self):
     with And("There should be a PVC"):
         assert kubectl.get_count("pvc", label = f"-l clickhouse-keeper.altinity.com/chk={chk}") == 1
 
+    kubectl.delete_chk(chk)
+
     with Finally("I clean up"):
         delete_test_namespace()
 
 @TestScenario
-@Name("test_020001. Clickhouse-keeper")
+@Name("test_020001. Test that Kubernetes objects between CHI and CHK does not overlap")
+def test_020001(self):
+    create_shell_namespace_clickhouse_template()
+
+    objects = {}
+    for ch_kind in ('chi', 'chk'):
+        manifest = f"manifests/chk/test-020001-{ch_kind}.yaml"
+        ch_name = "test-020001"
+
+        with Given(f"Install {ch_kind}"):
+            kubectl.create_and_check(
+                manifest=manifest, kind=ch_kind,
+                check={
+                    "pod_count": 1,
+                    "do_not_delete": 1
+                    }
+                )
+
+        with Then("Collect created objects"):
+            objects[ch_kind] = kubectl.get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=ch_name)
+            print(*objects[ch_kind], sep='\n')
+
+        if ch_kind == 'chi':
+            kubectl.delete_chi(ch_name)
+        else:
+            kubectl.delete_chk(ch_name)
+
+    with Then("There should not objects with overallped names"):
+        overlap = list(set(objects['chi']) & set(objects['chk']))
+        if len(overlap)>0:
+            print("Overlapped objects:")
+            print(*overlap, sep='\n')
+
+        assert len(overlap) == 0
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+@TestScenario
+@Name("test_020002. Test CHI with CHK")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"),
               RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_volumeClaimTemplates("1.0"))
-def test_020001(self):
+def test_020002(self):
     """Check clickhouse-operator support ClickHouseKeeperInstallation with PVC in keeper manifest."""
 
     create_shell_namespace_clickhouse_template()
@@ -5368,8 +5408,8 @@ def test_020001(self):
 
 
 @TestScenario
-@Name("test_020002. Clickhouse-keeper upgrade")
-def test_020002(self):
+@Name("test_020003. Clickhouse-keeper upgrade")
+def test_020003(self):
     """Check that clickhouse-operator support upgrading clickhouse-keeper version
      when clickhouse-keeper defined with ClickHouseKeeperInstallation."""
 
@@ -5417,9 +5457,9 @@ def test_020002(self):
 
 
 @TestScenario
-@Name("test_020003. Test CHK upgrade from 0.23.x operator version")
+@Name("test_020004. Test CHK upgrade from 0.23.x operator version")
 @Tags("NO_PARALLEL")
-def test_020003(self):
+def test_020004(self):
     with Then("Skip it. test_051_1 does a better job"):
         return
 
@@ -5504,9 +5544,9 @@ def test_020003(self):
 
 
 @TestScenario
-@Name("test_020003_1. Test CHK upgrade from 0.23.x operator version")
+@Name("test_020004_1. Test CHK upgrade from 0.23.x operator version")
 @Tags("NO_PARALLEL")
-def test_020003_1(self):
+def test_020004_1(self):
     version_from = "0.23.7"
     version_to = current().context.operator_version # "0.24.0"
     current().context.operator_version = version_from
@@ -5605,8 +5645,8 @@ def test_020003_1(self):
 
 
 @TestScenario
-@Name("test_020004. Clickhouse-keeper scale-up/scale-down")
-def test_020004(self):
+@Name("test_020005. Clickhouse-keeper scale-up/scale-down")
+def test_020005(self):
     """Check that clickhouse-operator support scale-up/scale-down without service interruption"""
 
     create_shell_namespace_clickhouse_template()
