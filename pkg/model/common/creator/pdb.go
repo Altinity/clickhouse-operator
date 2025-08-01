@@ -15,8 +15,6 @@
 package creator
 
 import (
-	"fmt"
-
 	policy "k8s.io/api/policy/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -33,7 +31,7 @@ func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDis
 			APIVersion: "policy/v1",
 		},
 		ObjectMeta: meta.ObjectMeta{
-			Name:            fmt.Sprintf("%s-%s", cluster.GetRuntime().GetAddress().GetCRName(), cluster.GetRuntime().GetAddress().GetClusterName()),
+			Name:            c.nm.Name(interfaces.NameClusterPDB, cluster),
 			Namespace:       c.cr.GetNamespace(),
 			Labels:          c.macro.Scope(c.cr).Map(c.tagger.Label(interfaces.LabelPDB, cluster)),
 			Annotations:     c.macro.Scope(c.cr).Map(c.tagger.Annotate(interfaces.AnnotatePDB, cluster)),
