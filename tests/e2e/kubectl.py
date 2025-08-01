@@ -80,7 +80,8 @@ def delete_chi(chi, ns=None, wait=True, ok_undeleted = False, ok_to_fail=False, 
             {
                 "statefulset": 0,
                 "pod": 0,
-                "service": 0                },
+                "service": 0
+            },
             ns,
             shell=shell
         )
@@ -94,6 +95,7 @@ def delete_chi(chi, ns=None, wait=True, ok_undeleted = False, ok_to_fail=False, 
                 print(*not_deleted_objects_ext, sep='\n')
 
             assert ok_undeleted or cnt == 0
+
 
 def delete_chk(chk, ns=None, wait=True, ok_to_fail=False, shell=None):
     delete_kind("chk", chk, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
@@ -404,6 +406,7 @@ def get_chi_status(chi, ns=None):
 def wait_pod_status(pod, status, shell=None, ns=None):
     wait_field("pod", pod, ".status.phase", status, ns, shell=shell)
 
+
 def get_pod_status(pod, shell=None, ns=None):
     return get_field("pod", pod, ".status.phase", ns, shell=shell)
 
@@ -523,12 +526,14 @@ def get_pod_image(chi_name, pod_name="", ns=None, shell=None):
 def get_pod_names(chi_name, ns=None, shell=None):
     return get_obj_names(chi_name, "pods", ns, shell)
 
+
 def get_obj_names(chi_name, obj_type="pods", ns=None, shell=None):
     obj_names = launch(
         f"get {obj_type} -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
         ns=ns,
     ).splitlines()
     return obj_names[1:]
+
 
 def get_obj_names_grepped(obj_type="pods", grep = '', ns=None, shell=None):
     obj_names = launch(
@@ -685,7 +690,7 @@ def check_pdb(chi, kind, clusters, ns=None, shell=None):
                 # Treat simple integer as maxUnavailable to ensure backward compatibility.
                 max_unavailable = clusters[c]
 
-            pdb = get("pdb", chi + "-" + c, ok_to_fail=is_managed is False, shell=shell)
+            pdb = get("pdb", kind + "-" + chi + "-" + c, ok_to_fail=is_managed is False, shell=shell)
 
             if not is_managed:
                 assert pdb is None
@@ -700,6 +705,7 @@ def check_pdb(chi, kind, clusters, ns=None, shell=None):
             assert labels[f"{label}/cluster"] == c
             assert labels[f"{label}/namespace"] == current().context.test_namespace
             assert pdb["spec"]["maxUnavailable"] == max_unavailable
+
 
 def force_reconcile(chi, taskID="reconcile", ns=None, shell=None):
     with Then(f"Trigger CHI reconcile with taskID:\"{taskID}\""):
