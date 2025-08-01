@@ -307,3 +307,12 @@ func (n *Namer) createPVCName(host *api.Host, volumeMountName string) string {
 func (n *Namer) createPVCNameByVolumeClaimTemplate(host *api.Host, volumeClaimTemplate *api.VolumeClaimTemplate) string {
 	return n.createPVCName(host, volumeClaimTemplate.Name)
 }
+
+// createClusterPDBName creates a name of a cluster-scope PDB
+func (n *Namer) createClusterPDBName(cluster api.ICluster) string {
+	// Start with default name pattern
+	pattern := patterns.Get(patternClusterPDBName)
+
+	// Create PDB name based on name pattern available
+	return n.macro.Scope(cluster).Line(pattern)
+}
