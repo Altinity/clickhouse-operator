@@ -40,4 +40,5 @@ const (
 	NamePod                          NameType = "NamePod"
 	NamePVCNameByVolumeClaimTemplate NameType = "NamePVCNameByVolumeClaimTemplate"
 	NameClusterAutoSecret            NameType = "NameClusterAutoSecret"
+	NameClusterPDB                   NameType = "NameClusterPDB"
 )
