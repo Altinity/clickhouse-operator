@@ -47,11 +47,12 @@ func GetPVCReclaimPolicy(host *api.Host, template *api.VolumeClaimTemplate) api.
 func GetPVCProvisioner(host *api.Host, template *api.VolumeClaimTemplate) api.PVCProvisioner {
 	// Order by priority
 
-	// VolumeClaimTemplate.PVCProvisioner, in case specified
+	// Own PVCProvisioner from the template (VolumeClaimTemplate.PVCProvisioner) has top priority, in case specified
 	if template.PVCProvisioner != api.PVCProvisionerUnspecified {
 		return template.PVCProvisioner
 	}
 
+	// Then try PVCProvisioner from the CR, in case specified
 	if host.GetCR().GetSpec().GetDefaults().StorageManagement.PVCProvisioner != api.PVCProvisionerUnspecified {
 		return host.GetCR().GetSpec().GetDefaults().StorageManagement.PVCProvisioner
 	}
