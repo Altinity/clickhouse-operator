@@ -21,7 +21,7 @@ import (
 
 // VolumeClaimTemplate defines PersistentVolumeClaim Template
 type VolumeClaimTemplate struct {
-	Name string `json:"name"                    yaml:"name"`
+	Name string `json:"name" yaml:"name"`
 	StorageManagement
 	ObjectMeta meta.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
 	Spec       core.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
