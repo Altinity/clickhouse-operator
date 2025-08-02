@@ -38,6 +38,7 @@ type ErrorDataPersistence error
 var (
 	ErrPVCWithLostPVDeleted ErrorDataPersistence = errors.New("pvc with lost pv deleted")
 	ErrPVCIsLost            ErrorDataPersistence = errors.New("pvc is lost")
+	ErrPVCIsMissed          ErrorDataPersistence = errors.New("pvc is missed")
 )
 
 func ErrIsDataLoss(err error) bool {
@@ -45,6 +46,14 @@ func ErrIsDataLoss(err error) bool {
 	case ErrPVCWithLostPVDeleted:
 		return true
 	case ErrPVCIsLost:
+		return true
+	}
+	return false
+}
+
+func ErrIsVolumeMissed(err error) bool {
+	switch err {
+	case ErrPVCIsMissed:
 		return true
 	}
 	return false
@@ -77,7 +86,7 @@ func (w *Reconciler) ReconcilePVCs(ctx context.Context, host *api.Host, which ap
 
 	host.WalkVolumeMounts(which, func(volumeMount *core.VolumeMount) {
 		if util.IsContextDone(ctx) {
-			log.V(1).Info("Reconcile PVVC is aborted. Host: %s ", host.GetName())
+			log.V(1).Info("Reconcile PVC is aborted. Host: %s ", host.GetName())
 			return
 		}
 		if e := w.reconcilePVCFromVolumeMount(ctx, host, volumeMount); e != nil {
@@ -97,31 +106,39 @@ func (w *Reconciler) reconcilePVCFromVolumeMount(
 ) (
 	reconcileError ErrorDataPersistence,
 ) {
-	// Which PVC are we going to reconcile
-	pvc, volumeClaimTemplate, isModelCreated, err := w.fetchPVC(ctx, host, volumeMount)
-	if err != nil {
-		// Unable to fetch or model PVC correctly.
-		// May be volume is not built from VolumeClaimTemplate, it may be reference to ConfigMap
+	// Try to find VolumeClaimTemplate that is referenced by provided VolumeMount
+	volumeClaimTemplate, found := volume.GetVolumeClaimTemplate(host, volumeMount)
+	if !found {
+		// No this VolumeMount is not a reference to VolumeClaimTemplate,
+		// it may be a reference to, for example, ConfigMap to be mounted into Pod
+		// Nothing to do here, we are looking for VolumeClaimTemplate(s)
 		return nil
 	}
 
-	// PVC available. Either fetched or not found and model created (from templates)
+	// Who is in charge of the PVC creation - the operator or the StatefulSet?
+	shouldCHOPCreatePVC := volume.OperatorShouldCreatePVC(host, volumeClaimTemplate)
 
-	pvcName := "pvc-name-unknown-pvc-not-exist"
-	namespace := host.Runtime.Address.Namespace
+	// Name of the PVC to be used by a VolumeClaimTemplate within a Host
+	pvcNamespace := host.Runtime.Address.Namespace
+	pvcName := w.namer.Name(interfaces.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate)
 
-	if pvc != nil {
-		pvcName = pvc.Name
+	// Which PVC are we going to reconcile
+	pvc, chopCreated, err := w.fetchOrCreatePVC(ctx, host, pvcNamespace, pvcName, volumeMount.Name, shouldCHOPCreatePVC, &volumeClaimTemplate.Spec)
+	if err != nil {
+		// Unable to fetch or create PVC correctly.
+		return nil
 	}
 
-	log.V(2).M(host).S().Info("reconcile volumeMount (%s/%s/%s/%s)", namespace, host.GetName(), volumeMount.Name, pvcName)
-	defer log.V(2).M(host).E().Info("reconcile volumeMount (%s/%s/%s/%s)", namespace, host.GetName(), volumeMount.Name, pvcName)
+	// Beware PVC may be nil here still - in case it is managed by sts and not fetched
+
+	log.V(2).M(host).S().Info("reconcile volumeMount (%s/%s/%s/%s)", pvcNamespace, host.GetName(), volumeMount.Name, pvcName)
+	defer log.V(2).M(host).E().Info("reconcile volumeMount (%s/%s/%s/%s)", pvcNamespace, host.GetName(), volumeMount.Name, pvcName)
 
 	// Check scenario 1 - no PVC available
 	// Such a PVC should be re-created
-	if w.isLostPVC(pvc, isModelCreated, host) {
+	if w.isLostPVC(pvc, chopCreated, host) {
 		// Looks like data loss detected
-		log.V(1).M(host).Warning("PVC is either newly added to the host or was lost earlier (%s/%s/%s/%s)", namespace, host.GetName(), volumeMount.Name, pvcName)
+		log.V(1).M(host).Warning("PVC is either newly added to the host or was lost earlier (%s/%s/%s/%s)", pvcNamespace, host.GetName(), volumeMount.Name, pvcName)
 		reconcileError = ErrPVCIsLost
 	}
 
@@ -131,22 +148,23 @@ func (w *Reconciler) reconcilePVCFromVolumeMount(
 		// This PVC has no PV available
 		// Looks like data loss detected
 		w.deletePVC(ctx, pvc)
-		log.V(1).M(host).Info("deleted PVC with lost PV (%s/%s/%s/%s)", namespace, host.GetName(), volumeMount.Name, pvcName)
+		log.V(1).M(host).Info("deleted PVC with lost PV (%s/%s/%s/%s)", pvcNamespace, host.GetName(), volumeMount.Name, pvcName)
 
 		// Refresh PVC model. Since PVC is just deleted refreshed model may not be fetched from the k8s,
 		// but can be provided by the operator still
-		pvc, volumeClaimTemplate, _, _ = w.fetchPVC(ctx, host, volumeMount)
+		pvc, _, _ = w.fetchOrCreatePVC(ctx, host, pvcNamespace, pvcName, volumeMount.Name, shouldCHOPCreatePVC, &volumeClaimTemplate.Spec)
 		reconcileError = ErrPVCWithLostPVDeleted
 	}
 
-	// In any case - be PVC available or not - need to reconcile it
+	if pvc == nil {
+		log.M(host).F().Error("Unable to reconcile nil PVC: %s/%s", pvcNamespace, pvcName)
+		reconcileError = ErrPVCIsMissed
+		return reconcileError
+	}
 
-	switch pvcReconciled, err := w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate); err {
-	case errNilPVC:
-		log.M(host).F().Error("Unable to reconcile nil PVC: %s/%s", namespace, pvcName)
-	case nil:
+	if pvcReconciled, err := w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate); err == nil {
 		w.task.RegistryReconciled().RegisterPVC(pvcReconciled.GetObjectMeta())
-	default:
+	} else {
 		w.task.RegistryFailed().RegisterPVC(pvc.GetObjectMeta())
 		log.M(host).F().Error("Unable to reconcile PVC: %s err: %v", util.NamespacedName(pvc), err)
 	}
@@ -155,7 +173,66 @@ func (w *Reconciler) reconcilePVCFromVolumeMount(
 	return reconcileError
 }
 
-func (w *Reconciler) isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bool, host *api.Host) bool {
+func (w *Reconciler) fetchOrCreatePVC(
+	ctx context.Context,
+	host *api.Host,
+	namespace, name string,
+	volumeMountName string,
+	operatorInCharge bool,
+	pvcSpec *core.PersistentVolumeClaimSpec,
+) (
+	pvc *core.PersistentVolumeClaim,
+	created bool,
+	err error,
+) {
+	// Try to fetch existing PVC (if any)
+	pvc, err = w.pvc.Get(ctx, namespace, name)
+
+	switch {
+	// PVC fetched - all is good
+	case err == nil:
+		// Existing PVC found, all is good
+		// Nothing more to do here
+		log.V(2).M(host).Info("PVC (%s/%s/%s/%s) found", namespace, host.GetName(), volumeMountName, name)
+		return pvc, false, nil
+
+	// PVC not fetched - and it does not exist
+	case apiErrors.IsNotFound(err):
+		// We have NotFound error - PVC not found - it does not exist
+		// This is not an error per se, means PVC is not created (yet)?
+		log.V(1).M(host).Info(
+			"PVC (%s/%s/%s/%s) not found - operator should create the model: %t",
+			namespace, host.GetName(), volumeMountName, name, operatorInCharge,
+		)
+		if operatorInCharge {
+			// PVC is not available and the operator is in charge of the PVC
+			// Create PVC model.
+			log.V(1).M(host).Info(
+				"PVC (%s/%s/%s/%s) model provided by the operator",
+				namespace, host.GetName(), volumeMountName, name,
+			)
+			pvc = w.task.Creator().CreatePVC(name, namespace, host, pvcSpec)
+			return pvc, true, nil
+		} else {
+			// PVC is not available and the operator is not in charge of the PVC
+			// Do nothing
+			log.V(1).M(host).Info(
+				"PVC (%s/%s/%s/%s) not found and model will not be provided by the operator - expecting STS to provide PVC",
+				namespace, host.GetName(), volumeMountName, name,
+			)
+			return nil, false, nil
+		}
+
+	// PVC not fetched - and we have some strange error
+	default:
+		// In case of any non-NotFound API error - unable to proceed
+		log.M(host).F().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, name, err)
+		return nil, false, err
+	}
+}
+
+func (w *Reconciler) isLostPVC(pvc *core.PersistentVolumeClaim, chopCreated bool, host *api.Host) bool {
+	// In case host has no data - there is no data to loose
 	if !host.HasData() {
 		// No data to loose
 		return false
@@ -169,7 +246,7 @@ func (w *Reconciler) isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bo
 		return true
 	}
 
-	if isJustCreated {
+	if chopCreated {
 		// PVC was just created by the operator, not fetched
 		// Lost PVC
 		return true
@@ -187,61 +264,6 @@ func (w *Reconciler) isLostPV(pvc *core.PersistentVolumeClaim) bool {
 	return pvc.Status.Phase == core.ClaimLost
 }
 
-func (w *Reconciler) fetchPVC(
-	ctx context.Context,
-	host *api.Host,
-	volumeMount *core.VolumeMount,
-) (
-	pvc *core.PersistentVolumeClaim,
-	vct *api.VolumeClaimTemplate,
-	isModelCreated bool,
-	err error,
-) {
-	namespace := host.Runtime.Address.Namespace
-
-	volumeClaimTemplate, ok := volume.GetVolumeClaimTemplate(host, volumeMount)
-	if !ok {
-		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
-		return nil, nil, false, fmt.Errorf("unable to find VolumeClaimTemplate from volume mount")
-	}
-	pvcName := w.namer.Name(interfaces.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate)
-
-	// We have a VolumeClaimTemplate for this VolumeMount
-	// Treat it as persistent storage mount
-
-	_pvc, e := w.pvc.Get(ctx, namespace, pvcName)
-	if e == nil {
-		log.V(2).M(host).Info("PVC (%s/%s/%s/%s) found", namespace, host.GetName(), volumeMount.Name, pvcName)
-		return _pvc, volumeClaimTemplate, false, nil
-	}
-
-	// We have an error. PVC not fetched
-
-	if !apiErrors.IsNotFound(e) {
-		// In case of any non-NotFound API error - unable to proceed
-		log.M(host).F().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, e)
-		return nil, nil, false, e
-	}
-
-	// We have NotFound error - PVC not found
-	// This is not an error per se, means PVC is not created (yet)?
-	log.V(2).M(host).Info("PVC (%s/%s/%s/%s) not found", namespace, host.GetName(), volumeMount.Name, pvcName)
-
-	if volume.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
-		// Operator is in charge of PVCs
-		// Create PVC model.
-		pvc = w.task.Creator().CreatePVC(pvcName, namespace, host, &volumeClaimTemplate.Spec)
-		log.V(1).M(host).Info("PVC (%s/%s/%s/%s) model provided by the operator", namespace, host.GetName(), volumeMount.Name, pvcName)
-		return pvc, volumeClaimTemplate, true, nil
-	}
-
-	// PVC is not available and the operator is not expected to create PVC
-	log.V(1).M(host).Info("PVC (%s/%s/%s/%s) not found and model will not be provided by the operator", namespace, host.GetName(), volumeMount.Name, pvcName)
-	return nil, volumeClaimTemplate, false, nil
-}
-
-var errNilPVC = fmt.Errorf("nil PVC, nothing to reconcile")
-
 // reconcilePVC reconciles specified PVC
 func (w *Reconciler) reconcilePVC(
 	ctx context.Context,
@@ -249,11 +271,6 @@ func (w *Reconciler) reconcilePVC(
 	host *api.Host,
 	template *api.VolumeClaimTemplate,
 ) (*core.PersistentVolumeClaim, error) {
-	if pvc == nil {
-		log.V(2).M(host).F().Info("nil PVC, nothing to reconcile")
-		return nil, errNilPVC
-	}
-
 	log.V(1).M(host).S().Info("reconcile PVC (%s/%s)", util.NamespacedName(pvc), host.GetName())
 	defer log.V(1).M(host).E().Info("reconcile PVC (%s/%s)", util.NamespacedName(pvc), host.GetName())
 
