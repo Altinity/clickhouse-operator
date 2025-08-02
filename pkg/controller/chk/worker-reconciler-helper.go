@@ -16,6 +16,7 @@ package chk
 
 import (
 	"context"
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 
@@ -26,6 +27,11 @@ import (
 func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
 	// Unable to acquire any version - report min one
 	return swversion.MaxVersion().SetDescription("so far so")
+}
+
+// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
+func (w *worker) getReconcileShardsWorkersNum(shards []*apiChk.ChkShard, opts *common.ReconcileShardsAndHostsOptions) int {
+	return 1
 }
 
 func (w *worker) reconcileShardsAndHostsFetchOpts(ctx context.Context) *common.ReconcileShardsAndHostsOptions {
@@ -39,7 +45,7 @@ func (w *worker) reconcileShardsAndHostsFetchOpts(ctx context.Context) *common.R
 	}
 }
 
-func (w *worker) hostPVCsDataLossDetected(host *api.Host) *statefulset.ReconcileOptions {
+func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) *statefulset.ReconcileOptions {
 	w.a.V(1).
 		M(host).F().
 		Info("Data loss detected for host: %s. Will do force data recovery", host.GetName())
@@ -47,5 +53,6 @@ func (w *worker) hostPVCsDataLossDetected(host *api.Host) *statefulset.Reconcile
 	// In case of data loss detection on existing volumes, we need to:
 	// 1. recreate StatefulSet
 	// 2. run tables migration again
-	return statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
+	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
+	return stsReconcileOpts
 }

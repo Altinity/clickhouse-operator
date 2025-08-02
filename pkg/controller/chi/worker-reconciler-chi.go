@@ -811,7 +811,8 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	// Polish all new volumes that the operator has to create
 	_ = w.reconcileHostPVCs(ctx, host)
 	_ = w.reconcileHostService(ctx, host)
-	_ = w.reconcileHostTables(ctx, host, migrateTableOpts)
+
+	_ = w.reconcileHostMainDomain(ctx, host, migrateTableOpts)
 
 	return nil
 }
@@ -822,6 +823,10 @@ func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.
 		w.c.namer,
 		storage.NewStoragePVC(w.c.kube.Storage()),
 	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+}
+
+func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, migrateTableOpts *migrateTableOptions) error {
+	return w.reconcileHostTables(ctx, host, migrateTableOpts)
 }
 
 func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *migrateTableOptions) error {

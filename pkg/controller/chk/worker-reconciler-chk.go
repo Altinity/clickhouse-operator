@@ -455,11 +455,6 @@ func (w *worker) reconcileClusterPodDisruptionBudget(ctx context.Context, cluste
 	return nil
 }
 
-// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
-func (w *worker) getReconcileShardsWorkersNum(shards []*apiChk.ChkShard, opts *common.ReconcileShardsAndHostsOptions) int {
-	return 1
-}
-
 // reconcileShardsAndHosts reconciles shards and hosts of each shard
 func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*apiChk.ChkShard) error {
 	// Sanity check - has to have shard(s)
@@ -649,7 +644,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 
 	// In case data loss detected we may need to specify additional reconcile options
 	if storage.ErrIsDataLoss(w.reconcileHostPVCs(ctx, host)) {
-		stsReconcileOpts = w.hostPVCsDataLossDetected(host)
+		stsReconcileOpts = w.hostPVCsDataLossDetectedOptions(host)
 		w.a.V(1).
 			M(host).F().
 			Info("Data loss detected for host: %s.", host.GetName())
@@ -667,7 +662,8 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	// Polish all new volumes that the operator has to create
 	_ = w.reconcileHostPVCs(ctx, host)
 	// _ = w.reconcileHostService(ctx, host)
-	w.reconcileHostMainDomain(ctx, host)
+
+	_ = w.reconcileHostMainDomain(ctx, host)
 
 	return nil
 }
