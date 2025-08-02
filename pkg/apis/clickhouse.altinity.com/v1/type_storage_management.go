@@ -47,10 +47,10 @@ func (storageManagement *StorageManagement) MergeFrom(from *StorageManagement, _
 
 // mergeFromFillEmptyValues fills empty values
 func (storageManagement *StorageManagement) mergeFromFillEmptyValues(from *StorageManagement) *StorageManagement {
-	if storageManagement.PVCProvisioner == PVCProvisionerUnspecified {
+	if storageManagement.PVCProvisioner.IsUnspecified() {
 		storageManagement.PVCProvisioner = from.PVCProvisioner
 	}
-	if storageManagement.PVCReclaimPolicy == PVCReclaimPolicyUnspecified {
+	if storageManagement.PVCReclaimPolicy.IsUnspecified() {
 		storageManagement.PVCReclaimPolicy = from.PVCReclaimPolicy
 	}
 	return storageManagement
@@ -58,10 +58,10 @@ func (storageManagement *StorageManagement) mergeFromFillEmptyValues(from *Stora
 
 // mergeFromOverwriteByNonEmptyValues overwrites by non-empty values
 func (storageManagement *StorageManagement) mergeFromOverwriteByNonEmptyValues(from *StorageManagement) *StorageManagement {
-	if from.PVCProvisioner != PVCProvisionerUnspecified {
+	if from.PVCProvisioner.IsSpecified() {
 		storageManagement.PVCProvisioner = from.PVCProvisioner
 	}
-	if from.PVCReclaimPolicy != PVCReclaimPolicyUnspecified {
+	if from.PVCReclaimPolicy.IsSpecified() {
 		storageManagement.PVCReclaimPolicy = from.PVCReclaimPolicy
 	}
 	return storageManagement
