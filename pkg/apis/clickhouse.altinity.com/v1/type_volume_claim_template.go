@@ -54,6 +54,16 @@ func (v PVCProvisioner) IsValid() bool {
 	return false
 }
 
+// IsUnspecified checks whether PVCProvisioner is unspecified
+func (v PVCProvisioner) IsUnspecified() bool {
+	return v == PVCProvisionerUnspecified
+}
+
+// IsSpecified checks whether PVCProvisioner is specified
+func (v PVCProvisioner) IsSpecified() bool {
+	return v.IsValid() && !v.IsUnspecified()
+}
+
 // String returns string value for PVCProvisioner
 func (v PVCProvisioner) String() string {
 	return string(v)
@@ -84,6 +94,16 @@ func (v PVCReclaimPolicy) IsValid() bool {
 		return true
 	}
 	return false
+}
+
+// IsUnspecified checks whether PVCReclaimPolicy is unspecified
+func (v PVCReclaimPolicy) IsUnspecified() bool {
+	return v == PVCReclaimPolicyUnspecified
+}
+
+// IsSpecified checks whether PVCReclaimPolicy is specified
+func (v PVCReclaimPolicy) IsSpecified() bool {
+	return v.IsValid() && !v.IsUnspecified()
 }
 
 // String returns string value for PVCReclaimPolicy
