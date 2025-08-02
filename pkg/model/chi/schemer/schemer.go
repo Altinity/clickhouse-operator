@@ -132,12 +132,12 @@ func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *api.Host) bo
 	inside := false
 	sql := s.sqlHostInCluster(host.Runtime.Address.ClusterName)
 	res, err := s.QueryHostString(ctx, host, sql)
-	if err == nil && res == "1" {
-		log.V(1).M(host).F().Info("The host %s is inside the cluster", host.GetName())
-		inside = true
-	} else {
+	if err == nil && res == "0" {
 		log.V(1).M(host).F().Info("The host %s is outside of the cluster", host.GetName())
 		inside = false
+	} else {
+		log.V(1).M(host).F().Info("The host %s is inside the cluster", host.GetName())
+		inside = true
 	}
 	return inside
 }
