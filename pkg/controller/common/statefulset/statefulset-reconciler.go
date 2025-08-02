@@ -167,7 +167,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	switch {
 	case opts.IsForceRecreate():
 		// Force recreate prevails over all other requests
-		r.recreateStatefulSet(ctx, host, register, opts)
+		_ = r.recreateStatefulSet(ctx, host, register, opts)
 	default:
 		// We have (or had in the past) StatefulSet - try to update|recreate it
 		err = r.updateStatefulSet(ctx, host, register, opts)
