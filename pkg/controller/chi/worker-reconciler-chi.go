@@ -792,11 +792,12 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		w.a.V(1).
 			M(host).F().
 			Info("Data loss detected for host: %s.", host.GetName())
-	//case storage.ErrIsVolumeMissed(err):
-	//	stsReconcileOpts, migrateTableOpts = w.hostPVCsDataVolumeMissedDetectedOptions(host)
-	//	w.a.V(1).
-	//		M(host).F().
-	//		Info("Data volume missed detected for host: %s.", host.GetName())
+	case storage.ErrIsVolumeMissed(err):
+		// stsReconcileOpts, migrateTableOpts = w.hostPVCsDataVolumeMissedDetectedOptions(host)
+		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataLossDetectedOptions(host)
+		w.a.V(1).
+			M(host).F().
+			Info("Data volume missed detected for host: %s.", host.GetName())
 	}
 
 	if err := w.reconcileHostStatefulSet(ctx, host, stsReconcileOpts); err != nil {
