@@ -620,6 +620,7 @@ func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
 	w.includeHostIntoRaftCluster(ctx, host)
+
 	return nil
 }
 
@@ -639,6 +640,8 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Warning("Reconcile Host Main interrupted with an error 1. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
+
+	w.setHasData(host)
 
 	w.a.V(1).M(host).F().Info("Reconcile PVCs and data loss for host: %s", host.GetName())
 
@@ -661,7 +664,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 
 	// Polish all new volumes that the operator has to create
 	_ = w.reconcileHostPVCs(ctx, host)
-	// _ = w.reconcileHostService(ctx, host)
+	//_ = w.reconcileHostService(ctx, host)
 
 	_ = w.reconcileHostMainDomain(ctx, host)
 

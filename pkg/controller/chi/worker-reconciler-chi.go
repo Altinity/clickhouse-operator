@@ -738,23 +738,6 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 // reconcileHostPrepare reconciles specified ClickHouse host
 func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error {
-	// Check whether ClickHouse is running and accessible and what version is available
-
-	// alz 18.12.2024: Host may be down or not accessible, so no reason to wait
-	//	if version, err := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true}); err == nil {
-	//		w.a.V(1).
-	//			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
-	//			WithAction(host.GetCR()).
-	//			M(host).F().
-	//			Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
-	//	} else {
-	//		w.a.V(1).
-	//			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
-	//			WithAction(host.GetCR()).
-	//			M(host).F().
-	//			Warning("Reconcile Host start. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
-	//	}
-
 	if w.excludeHost(ctx, host) {
 		// Need to wait to complete queries only in case host is excluded from the cluster
 		// In case host is not excluded from the cluster queries would continue to be started on the host
@@ -800,6 +783,8 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Info("Data volume missed detected for host: %s.", host.GetName())
 	}
 
+	_ = w.reconcileHostService(ctx, host)
+
 	if err := w.reconcileHostStatefulSet(ctx, host, stsReconcileOpts); err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
@@ -810,7 +795,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 
 	// Polish all new volumes that the operator has to create
 	_ = w.reconcileHostPVCs(ctx, host)
-	_ = w.reconcileHostService(ctx, host)
+	//_ = w.reconcileHostService(ctx, host)
 
 	_ = w.reconcileHostMainDomain(ctx, host, migrateTableOpts)
 
