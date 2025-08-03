@@ -44,8 +44,8 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 	return ips
 }
 
-// GetCHK gets CR by any object that is either a CR itself or has labels referencing a CR
-func (c *Controller) GetCHK(obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
+// GetCR gets CR by any object that is either a CR itself or has labels referencing a CR
+func (c *Controller) GetCR(obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
 	switch obj.(type) {
 	case *apiChk.ClickHouseKeeperInstallation:
 		// Object is a CR itself. Try to find it directly by namespace+name pair
@@ -56,12 +56,12 @@ func (c *Controller) GetCHK(obj meta.Object) (*apiChk.ClickHouseKeeperInstallati
 		return cr.(*apiChk.ClickHouseKeeperInstallation), err
 	default:
 		// Object is not a CR itself. Try to find it by labels referencing owner CR
-		return c.GetCHKByObject(obj)
+		return c.getCRByObject(obj)
 	}
 }
 
-// GetCHKByObject gets CR by labels
-func (c *Controller) GetCHKByObject(obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
+// getCRByObject gets CR by labels
+func (c *Controller) getCRByObject(obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
 	crName, err := chkLabeler.New(nil).GetCRNameFromObjectMeta(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unable to find CR name in labels provided by the object: '%s'. err: %v", util.NamespacedName(obj), err)

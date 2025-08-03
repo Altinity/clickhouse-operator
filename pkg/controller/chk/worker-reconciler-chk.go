@@ -119,9 +119,9 @@ func (w *worker) buildCR(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstal
 }
 
 func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
-	_cr, err := w.c.GetCHK(obj)
+	_cr, err := w.c.GetCR(obj)
 	if err != nil {
-		w.a.M(obj).F().Error("UNABLE-1 to find obj by %v err %v", obj.GetLabels(), err)
+		w.a.M(obj).F().Error("UNABLE-1 to find obj by labels: %v err: %v", obj.GetLabels(), err)
 		return nil, err
 	}
 	return w.buildCR(ctx, _cr), nil
