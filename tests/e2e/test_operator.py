@@ -1777,7 +1777,7 @@ def test_010014_1(self):
                     host=f"chi-{chi}-{cluster}-0-{replica}",
                 )
             # Give some time for replication to catch up
-            time.sleep(30)
+            time.sleep(10)
 
             with Then("Data is replicated"):
                 for replica in replicas:
@@ -4813,6 +4813,8 @@ def check_replication(chi, replicas, token, table = ''):
 
         with And("I insert data in the replicated table"):
             clickhouse.query(chi, f"INSERT INTO {table} select {token}", timeout=300)
+             # Give some time for replication to catch up
+            time.sleep(10)
 
         with Then("Check replicated table has data on both nodes"):
             for replica in replicas:
