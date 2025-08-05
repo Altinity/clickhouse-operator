@@ -136,7 +136,7 @@ spec:
                   resource: limits.memory
           ports:
             - containerPort: 9999
-              name: metrics
+              name: operator-metrics
 
         - name: metrics-exporter
           image: ${METRICS_EXPORTER_IMAGE}
@@ -212,4 +212,4 @@ spec:
                   resource: limits.memory
           ports:
             - containerPort: 8888
-              name: metrics
+              name: clickhouse-metrics

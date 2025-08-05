@@ -5669,7 +5669,7 @@ spec:
                   resource: limits.memory
           ports:
             - containerPort: 9999
-              name: metrics
+              name: operator-metrics
         - name: metrics-exporter
           image: altinity/metrics-exporter:0.25.3
           imagePullPolicy: Always
@@ -5743,7 +5743,7 @@ spec:
                   resource: limits.memory
           ports:
             - containerPort: 8888
-              name: metrics
+              name: clickhouse-metrics
 ---
 # Template Parameters:
 #

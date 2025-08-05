@@ -139,7 +139,7 @@ spec:
             {{ with .Values.operator.env }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 9999
-              name: metrics
+              name: operator-metrics
           resources: {{ toYaml .Values.operator.resources | nindent 12 }}
           securityContext: {{ toYaml .Values.operator.containerSecurityContext | nindent 12 }}
 {{ if .Values.metrics.enabled }}
@@ -217,7 +217,7 @@ spec:
             {{ with .Values.metrics.env }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 8888
-              name: metrics
+              name: clickhouse-metrics
           resources: {{ toYaml .Values.metrics.resources | nindent 12 }}
           securityContext: {{ toYaml .Values.metrics.containerSecurityContext | nindent 12 }}
 {{ end }}

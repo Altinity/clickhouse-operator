@@ -5493,7 +5493,7 @@ spec:
                   resource: limits.memory
           ports:
             - containerPort: 9999
-              name: metrics
+              name: operator-metrics
 
         - name: metrics-exporter
           image: altinity/metrics-exporter:0.25.3
