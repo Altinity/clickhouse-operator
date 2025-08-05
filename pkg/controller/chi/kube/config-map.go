@@ -23,6 +23,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
@@ -53,13 +54,23 @@ func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.Confi
 	return c.kubeClient.CoreV1().ConfigMaps(cm.Namespace).Update(ctx, cm, controller.NewUpdateOptions())
 }
 
-func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
+func (c *ConfigMap) Remove(ctx context.Context, namespace, name string) error {
 	ctx = k8sCtx(ctx)
-	c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, controller.NewDeleteOptions())
-	return poller.New(ctx, fmt.Sprintf("%s/%s", namespace, name)).
+	return c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+}
+
+func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
+	item := "ConfigMap"
+	return poller.New(ctx, fmt.Sprintf("delete %s: %s/%s", item, namespace, name)).
 		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
 		WithFunctions(&poller.Functions{
 			IsDone: func(_ctx context.Context, _ any) bool {
+				if err := c.Remove(ctx, namespace, name); err != nil {
+					if !errors.IsNotFound(err) {
+						log.V(1).Warning("Error deleting %s: %s/%s err: %v ", item, namespace, name, err)
+					}
+				}
+
 				_, err := c.Get(ctx, namespace, name)
 				return errors.IsNotFound(err)
 			},
