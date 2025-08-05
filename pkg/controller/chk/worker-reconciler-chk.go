@@ -634,10 +634,11 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	//	stsReconcileOpts = stsReconcileOpts.SetDoNotWait()
 	//}
 
+	// Reconcile ConfigMap
 	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
 		w.a.V(1).
 			M(host).F().
-			Warning("Reconcile Host Main interrupted with an error 1. Host: %s Err: %v", host.GetName(), err)
+			Warning("Reconcile Host Main - unable to reconcile ConfigMap. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
@@ -645,28 +646,50 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 
 	w.a.V(1).M(host).F().Info("Reconcile PVCs and data loss for host: %s", host.GetName())
 
-	// In case data loss detected we may need to specify additional reconcile options
-	if storage.ErrIsDataLoss(w.reconcileHostPVCs(ctx, host)) {
+	// In case data loss or volumes missing detected we may need to specify additional reconcile options
+	err := w.reconcileHostPVCs(ctx, host)
+	switch {
+	case storage.ErrIsDataLoss(err):
 		stsReconcileOpts = w.hostPVCsDataLossDetectedOptions(host)
 		w.a.V(1).
 			M(host).F().
 			Info("Data loss detected for host: %s.", host.GetName())
+	case storage.ErrIsVolumeMissed(err):
+		// stsReconcileOpts, migrateTableOpts = w.hostPVCsDataVolumeMissedDetectedOptions(host)
+		stsReconcileOpts = w.hostPVCsDataLossDetectedOptions(host)
+		w.a.V(1).
+			M(host).F().
+			Info("Data volume missed detected for host: %s.", host.GetName())
 	}
 
-	_ = w.reconcileHostService(ctx, host)
+	// Reconcile Service
+	if err := w.reconcileHostService(ctx, host); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to reconcile Service. Host: %s Err: %v", host.GetName(), err)
+	}
 
+	// Reconcile StatefulSet
 	if err := w.reconcileHostStatefulSet(ctx, host, stsReconcileOpts); err != nil {
 		w.a.V(1).
 			M(host).F().
-			Warning("Reconcile Host Main interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
+			Warning("Reconcile Host Main - unable to reconcile StatefulSet. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
 	// Polish all new volumes that the operator has to create
-	_ = w.reconcileHostPVCs(ctx, host)
-	//_ = w.reconcileHostService(ctx, host)
+	if err := w.reconcileHostPVCs(ctx, host); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to reconcile PVC. Host: %s Err: %v", host.GetName(), err)
+	}
 
-	_ = w.reconcileHostMainDomain(ctx, host)
+	// Finalize main reconcile with domain activities
+	if err := w.reconcileHostMainDomain(ctx, host); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to reconcile domain reconcile. Host: %s Err: %v", host.GetName(), err)
+	}
 
 	return nil
 }
