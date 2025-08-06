@@ -93,6 +93,12 @@ func keeperPredicate() predicate.Funcs {
 				return false
 			}
 
+			// Check if namespace should be watched (includes deny list check)
+			if !chop.Config().IsWatchedNamespace(obj.Namespace) {
+				logger.V(2).Info("chkInformer: skip event, namespace is not watched or is in deny list", "namespace", obj.Namespace)
+				return false
+			}
+
 			if obj.Spec.Suspend.Value() {
 				return false
 			}
@@ -104,6 +110,12 @@ func keeperPredicate() predicate.Funcs {
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			obj, ok := e.ObjectNew.(*api.ClickHouseKeeperInstallation)
 			if !ok {
+				return false
+			}
+
+			// Check if namespace should be watched (includes deny list check)
+			if !chop.Config().IsWatchedNamespace(obj.Namespace) {
+				logger.V(2).Info("chkInformer: skip event, namespace is not watched or is in deny list", "namespace", obj.Namespace)
 				return false
 			}
 
