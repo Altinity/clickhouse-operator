@@ -61,7 +61,11 @@ func (p *PathManager) Ensure(path string) {
 	subPath := ""
 	for _, folder := range pathParts {
 		subPath += "/" + folder
-		if p.Connection.Exists(ctx, subPath) {
+		if ok, err := p.Connection.Exists(ctx, subPath); !ok {
+			if err != nil {
+				log.Warning("received error while checking zk path: %s err: %v", subPath, err)
+			}
+		} else {
 			log.Info("zk path already exists: %s", subPath)
 			continue // for
 		}

@@ -67,6 +67,7 @@ type ICRSpec interface {
 	GetNamespaceDomainPattern() *types.String
 	GetDefaults() *Defaults
 	GetConfiguration() IConfiguration
+	GetTaskID() *types.Id
 }
 
 type IConfiguration interface {
@@ -116,6 +117,7 @@ type ICluster interface {
 	GetInsecure() *types.StringBool
 	GetSecure() *types.StringBool
 	GetSecret() *ClusterSecret
+	GetPDBManaged() *types.StringBool
 	GetPDBMaxUnavailable() *types.Int32
 
 	WalkShards(f func(index int, shard IShard) error) []error

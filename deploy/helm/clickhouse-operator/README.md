@@ -1,6 +1,6 @@
 # altinity-clickhouse-operator
 
-![Version: 0.25.2](https://img.shields.io/badge/Version-0.25.2-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.25.2](https://img.shields.io/badge/AppVersion-0.25.2-informational?style=flat-square)
+![Version: 0.25.3](https://img.shields.io/badge/Version-0.25.3-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.25.3](https://img.shields.io/badge/AppVersion-0.25.3-informational?style=flat-square)
 
 Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
 
@@ -52,6 +52,7 @@ For upgrade please install CRDs separately:
 | operator.image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
 | operator.image.repository | string | `"altinity/clickhouse-operator"` | image repository |
 | operator.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
+| operator.priorityClassName | string | "" | priority class name for the clickhouse-operator deployment, check `kubectl explain pod.spec.priorityClassName` for details |
 | operator.resources | object | `{}` | custom resource configuration, check `kubectl explain pod.spec.containers.resources` for details |
 | podAnnotations | object | check the `values.yaml` file | annotations to add to the clickhouse-operator pod, check `kubectl explain pod.spec.annotations` for details |
 | podLabels | object | `{}` | labels to add to the clickhouse-operator pod |

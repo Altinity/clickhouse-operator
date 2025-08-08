@@ -29,6 +29,7 @@ type Cluster struct {
 	Insecure          *types.StringBool `json:"insecure,omitempty"          yaml:"insecure,omitempty"`
 	Secure            *types.StringBool `json:"secure,omitempty"            yaml:"secure,omitempty"`
 	Secret            *ClusterSecret    `json:"secret,omitempty"            yaml:"secret,omitempty"`
+	PDBManaged        *types.StringBool `json:"pdbManaged,omitempty"        yaml:"pdbManaged,omitempty"`
 	PDBMaxUnavailable *types.Int32      `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
 	Reconcile         ClusterReconcile  `json:"reconcile"                   yaml:"reconcile"`
 	Layout            *ChiClusterLayout `json:"layout,omitempty"            yaml:"layout,omitempty"`
@@ -168,6 +169,11 @@ func (c *Cluster) GetSecret() *ClusterSecret {
 // GetRuntime is a getter
 func (cluster *Cluster) GetRuntime() IClusterRuntime {
 	return &cluster.Runtime
+}
+
+// GetPDBManaged is a getter
+func (cluster *Cluster) GetPDBManaged() *types.StringBool {
+	return cluster.PDBManaged
 }
 
 // GetPDBMaxUnavailable is a getter

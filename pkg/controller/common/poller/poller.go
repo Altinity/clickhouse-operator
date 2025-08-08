@@ -72,24 +72,29 @@ func (p *poller) Poll() error {
 
 		item, err := p.functions.CallGet(p.ctx)
 		switch {
+
+		// Object is found - process it
 		case err == nil:
-			// Object is found - process it
 			if p.functions.CallIsDone(p.ctx, item) {
 				// All is good, job is done, exit
 				log.V(1).M(p.name).F().Info("OK %s", p.name)
 				return nil
 			}
 			// Object is found, but processor function says we should continue polling
+			// exit switch
+
+		// Object is not found - it either failed to be created or just still not created
 		case p.functions.CallShouldContinue(p.ctx, item, err):
-			// Object is not found - it either failed to be created or just still not created
 			if (opts.GetErrorTimeout > 0) && (time.Since(start) >= opts.GetErrorTimeout) {
 				// No more wait for the object to be created. Consider create process as failed.
 				log.V(1).M(p.name).F().Error("Poller.Get() FAILED because item is not available and get timeout reached for: %s. Abort", p.name)
 				return err
 			}
 			// Error has happened but we should continue
+			// exit switch
+
+		// Error has happened and we should not continue, abort polling
 		default:
-			// Error has happened and we should not continue, abort polling
 			log.M(p.name).F().Error("Poller.Get() FAILED for: %s", p.name)
 			return err
 		}

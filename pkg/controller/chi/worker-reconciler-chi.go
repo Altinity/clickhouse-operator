@@ -51,7 +51,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	case w.isAfterFinalizerInstalled(old, new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-1")
 	case w.isGenerationTheSame(old, new):
-		w.a.M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
+		log.V(2).M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
 		return nil
 	}
 
@@ -73,7 +73,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
 	default:
-		w.a.M(new).F().Info("ActionPlan has no actions and no need to install finalizer - nothing to do")
+		w.a.M(new).F().Info("ActionPlan has no actions - abort reconcile")
 		return nil
 	}
 
@@ -113,39 +113,39 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	return nil
 }
 
-func (w *worker) buildCR(ctx context.Context, _chi *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	chi := w.createTemplatedCR(_chi)
-	w.newTask(chi, chi.GetAncestorT())
-	w.findMinMaxVersions(ctx, chi)
-	common.LogOldAndNew("norm stage 1:", chi.GetAncestorT(), chi)
+func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+	cr := w.createTemplatedCR(_cr)
+	w.newTask(cr, cr.GetAncestorT())
+	w.findMinMaxVersions(ctx, cr)
+	common.LogOldAndNew("norm stage 1:", cr.GetAncestorT(), cr)
 
-	templates := w.buildTemplates(chi)
-	ips := w.c.getPodsIPs(chi)
-	w.a.V(1).M(chi).Info("IPs of the CHI %s: len: %d %v", util.NamespacedName(chi), len(ips), ips)
+	templates := w.buildTemplates(cr)
+	ips := w.c.getPodsIPs(cr)
+	w.a.V(1).M(cr).Info("IPs of the CR %s: len: %d %v", util.NamespacedName(cr), len(ips), ips)
 	if len(ips) > 0 || len(templates) > 0 {
 		// Rebuild CR with known list of templates and additional IPs
 		opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
 		opts.Templates = templates
-		chi = w.createTemplatedCR(_chi, opts)
-		w.newTask(chi, chi.GetAncestorT())
-		w.findMinMaxVersions(ctx, chi)
-		common.LogOldAndNew("norm stage 2:", chi.GetAncestorT(), chi)
+		cr = w.createTemplatedCR(_cr, opts)
+		w.newTask(cr, cr.GetAncestorT())
+		w.findMinMaxVersions(ctx, cr)
+		common.LogOldAndNew("norm stage 2:", cr.GetAncestorT(), cr)
 	}
 
-	w.fillCurSTS(ctx, chi)
-	w.logSWVersion(ctx, chi)
+	w.fillCurSTS(ctx, cr)
+	w.logSWVersion(ctx, cr)
 
-	return chi
+	return cr
 }
 
 func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*api.ClickHouseInstallation, error) {
-	_chi, err := w.c.GetCHI(obj)
+	_cr, err := w.c.GetCR(obj)
 	if err != nil {
-		w.a.M(obj).F().Error("UNABLE-1 to find obj by %v err %v", obj.GetLabels(), err)
+		w.a.M(obj).F().Error("UNABLE-1 to find obj by labels: %v err: %v", obj.GetLabels(), err)
 		return nil, err
 	}
-	return w.buildCR(ctx, _chi), nil
+	return w.buildCR(ctx, _cr), nil
 }
 
 func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*api.ClickHouseInstallation) {
@@ -157,31 +157,31 @@ func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*a
 	return templates
 }
 
-func (w *worker) findMinMaxVersions(ctx context.Context, chi *api.ClickHouseInstallation) {
+func (w *worker) findMinMaxVersions(ctx context.Context, cr *api.ClickHouseInstallation) {
 	// Create artifacts
-	chi.WalkHosts(func(host *api.Host) error {
+	cr.WalkHosts(func(host *api.Host) error {
 		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
 		version := w.getHostSoftwareVersion(ctx, host)
 		host.Runtime.Version = version
 		return nil
 	})
-	chi.FindMinMaxVersions()
+	cr.FindMinMaxVersions()
 }
 
-func (w *worker) fillCurSTS(ctx context.Context, chi *api.ClickHouseInstallation) {
-	chi.WalkHosts(func(host *api.Host) error {
+func (w *worker) fillCurSTS(ctx context.Context, cr *api.ClickHouseInstallation) {
+	cr.WalkHosts(func(host *api.Host) error {
 		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
 		return nil
 	})
 }
 
-func (w *worker) logSWVersion(ctx context.Context, chi *api.ClickHouseInstallation) {
+func (w *worker) logSWVersion(ctx context.Context, cr *api.ClickHouseInstallation) {
 	l := w.a.V(1).F()
-	chi.WalkHosts(func(host *api.Host) error {
+	cr.WalkHosts(func(host *api.Host) error {
 		l.M(host).Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
 		return nil
 	})
-	l.M(chi).Info("CR software versions [min, max]: %s %s", chi.GetMinVersion().Render(), chi.GetMaxVersion().Render())
+	l.M(cr).Info("CR software versions [min, max]: %s %s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
 }
 
 // reconcile reconciles Custom Resource
@@ -233,6 +233,10 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
 	}
 
+	return w.reconcileCRAuxObjectsPreliminaryDomain(ctx, cr)
+}
+
+func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr *api.ClickHouseInstallation) error {
 	return nil
 }
 
@@ -286,6 +290,11 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 	err = w.reconcileConfigMapCommon(ctx, cr)
 	cr.GetRuntime().UnlockCommonConfig()
 
+	w.includeAllHostsIntoCluster(ctx, cr)
+	return err
+}
+
+func (w *worker) includeAllHostsIntoCluster(ctx context.Context, cr *api.ClickHouseInstallation) {
 	// Wait for all hosts to be included into cluster
 	cr.WalkHosts(func(host *api.Host) error {
 		if host.ShouldIncludeIntoCluster() {
@@ -293,8 +302,6 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 		}
 		return nil
 	})
-
-	return err
 }
 
 // reconcileConfigMapCommon reconciles common ConfigMap
@@ -566,6 +573,10 @@ func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *api.Cluste
 }
 
 func (w *worker) reconcileClusterPodDisruptionBudget(ctx context.Context, cluster *api.Cluster) error {
+	if cluster.GetPDBManaged().IsFalse() {
+		return nil
+	}
+
 	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
 	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
 		w.task.RegistryReconciled().RegisterPDB(pdb.GetObjectMeta())
@@ -693,7 +704,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
 	}
-	if err := w.reconcileHostInclude(ctx, host); err != nil {
+	if err := w.reconcileHostIncludeIntoAllActivities(ctx, host); err != nil {
 		return err
 	}
 
@@ -727,23 +738,6 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 // reconcileHostPrepare reconciles specified ClickHouse host
 func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error {
-	// Check whether ClickHouse is running and accessible and what version is available
-
-	// alz 18.12.2024: Host may be down or not accessible, so no reason to wait
-	//	if version, err := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true}); err == nil {
-	//		w.a.V(1).
-	//			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
-	//			WithAction(host.GetCR()).
-	//			M(host).F().
-	//			Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
-	//	} else {
-	//		w.a.V(1).
-	//			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileStarted).
-	//			WithAction(host.GetCR()).
-	//			M(host).F().
-	//			Warning("Reconcile Host start. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
-	//	}
-
 	if w.excludeHost(ctx, host) {
 		// Need to wait to complete queries only in case host is excluded from the cluster
 		// In case host is not excluded from the cluster queries would continue to be started on the host
@@ -761,11 +755,12 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		migrateTableOpts *migrateTableOptions
 	)
 
+	// Reconcile ConfigMap
 	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
-			Warning("Reconcile Host Main interrupted with an error 1. Host: %s Err: %v", host.GetName(), err)
+			Warning("Reconcile Host Main - unable to reconcile ConfigMap. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
@@ -773,26 +768,51 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 
 	w.a.V(1).M(host).F().Info("Reconcile PVCs and data loss for host: %s", host.GetName())
 
-	// In case data loss detected we may need to specify additional reconcile options
-	if storage.ErrIsDataLoss(w.reconcileHostPVCs(ctx, host)) {
-		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataLossDetected(host)
+	// In case data loss or volumes missing detected we may need to specify additional reconcile options
+	err := w.reconcileHostPVCs(ctx, host)
+	switch {
+	case storage.ErrIsDataLoss(err):
+		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataLossDetectedOptions(host)
 		w.a.V(1).
 			M(host).F().
 			Info("Data loss detected for host: %s.", host.GetName())
+	case storage.ErrIsVolumeMissed(err):
+		// stsReconcileOpts, migrateTableOpts = w.hostPVCsDataVolumeMissedDetectedOptions(host)
+		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataLossDetectedOptions(host)
+		w.a.V(1).
+			M(host).F().
+			Info("Data volume missed detected for host: %s.", host.GetName())
 	}
 
+	// Reconcile Service
+	if err := w.reconcileHostService(ctx, host); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to reconcile Service. Host: %s Err: %v", host.GetName(), err)
+	}
+
+	// Reconcile StatefulSet
 	if err := w.reconcileHostStatefulSet(ctx, host, stsReconcileOpts); err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
-			Warning("Reconcile Host Main interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
+			Warning("Reconcile Host Main - unable to reconcile StatefulSet. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
-	// Polish all new volumes that operator has to create
-	_ = w.reconcileHostPVCs(ctx, host)
-	_ = w.reconcileHostService(ctx, host)
-	_ = w.reconcileHostTables(ctx, host, migrateTableOpts)
+	// Polish all new volumes that the operator has to create
+	if err := w.reconcileHostPVCs(ctx, host); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to reconcile PVC. Host: %s Err: %v", host.GetName(), err)
+	}
+
+	// Finalize main reconcile with domain activities
+	if err := w.reconcileHostMainDomain(ctx, host, migrateTableOpts); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to reconcile domain reconcile. Host: %s Err: %v", host.GetName(), err)
+	}
 
 	return nil
 }
@@ -803,6 +823,10 @@ func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.
 		w.c.namer,
 		storage.NewStoragePVC(w.c.kube.Storage()),
 	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+}
+
+func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, migrateTableOpts *migrateTableOptions) error {
+	return w.reconcileHostTables(ctx, host, migrateTableOpts)
 }
 
 func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *migrateTableOptions) error {
@@ -836,8 +860,8 @@ func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *
 	return w.migrateTables(ctx, host, opts)
 }
 
-// reconcileHostInclude includes specified ClickHouse host into all activities
-func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error {
+// reconcileHostIncludeIntoAllActivities includes specified ClickHouse host into all activities
+func (w *worker) reconcileHostIncludeIntoAllActivities(ctx context.Context, host *api.Host) error {
 	if !w.shouldIncludeHost(host) {
 		w.a.V(1).
 			M(host).F().
@@ -874,5 +898,6 @@ func (w *worker) reconcileHostInclude(ctx context.Context, host *api.Host) error
 	// Report host software version
 	version := w.getHostSoftwareVersion(ctx, host)
 	l.Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version.Render())
+
 	return nil
 }

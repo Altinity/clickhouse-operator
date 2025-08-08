@@ -186,7 +186,7 @@ func (w *worker) runConcurrentlyInBatches(ctx context.Context, workersNum int, s
 	return nil
 }
 
-func (w *worker) hostPVCsDataLossDetected(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {
+func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {
 	w.a.V(1).
 		M(host).F().
 		Info("Data loss detected for host: %s. Will do force data recovery", host.GetName())
@@ -194,8 +194,23 @@ func (w *worker) hostPVCsDataLossDetected(host *api.Host) (*statefulset.Reconcil
 	// In case of data loss detection on existing volumes, we need to:
 	// 1. recreate StatefulSet
 	// 2. run tables migration again
-	return statefulset.NewReconcileStatefulSetOptions().SetForceRecreate(), &migrateTableOptions{
+
+	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
+	migrateTableOpts := &migrateTableOptions{
 		forceMigrate: true,
 		dropReplica:  true,
 	}
+	return stsReconcileOpts, migrateTableOpts
+}
+
+func (w *worker) hostPVCsDataVolumeMissedDetectedOptions(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {
+	w.a.V(1).
+		M(host).F().
+		Info("Data volume missed detected for host: %s. Will do force volume creation", host.GetName())
+
+	// In case of data volume missed detection, we need to:
+	// 1. recreate StatefulSet
+
+	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
+	return stsReconcileOpts, nil
 }

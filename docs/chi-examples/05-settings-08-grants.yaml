@@ -7,10 +7,10 @@ spec:
     users:
       myuser/profile: readonly
       myuser/grants/query:
-      # you can't combine `allow_databases` with `GRANT ... canarydb.*`
       - "GRANT SELECT,INSERT,ALTER,CREATE,DROP,TRUNCATE,OPTIMIZE,SHOW,dictGet,REMOTE ON *.*"
-      myuser/allow_databases/database:
-        - "canarydb"
+      # you can't combine `allow_databases` with `GRANT ... canarydb.*`
+      # myuser/allow_databases/database:
+      #  - "canarydb"
       myuser2/profile: default
       myuser2/grants/query:
         - "GRANT limited_role"

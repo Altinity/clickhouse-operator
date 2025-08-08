@@ -21,7 +21,6 @@ import (
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -29,11 +28,6 @@ import (
 
 // reconcileService reconciles core.Service
 func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, service, prevService *core.Service) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	w.a.V(2).M(cr).S().Info(service.GetName())
 	defer w.a.V(2).M(cr).E().Info(service.GetName())
 
@@ -47,11 +41,10 @@ func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, s
 	}
 
 	if err != nil {
+		// The Service is either not found or not updated. Try to recreate it
 		if apiErrors.IsNotFound(err) {
-			// The Service is either not found or not updated. Try to recreate it
 			w.a.V(1).M(cr).F().Info("Service: %s not found. err: %v", util.NamespaceNameString(service), err)
 		} else {
-			// The Service is either not found or not updated. Try to recreate it
 			w.a.WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateFailed).
 				WithAction(cr).
 				WithError(cr).
@@ -84,15 +77,11 @@ func (w *worker) updateService(
 	targetService *core.Service,
 	prevService *core.Service,
 ) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	if curService.Spec.Type != targetService.Spec.Type {
 		return fmt.Errorf(
 			"just recreate the service in case of service type change '%s'=>'%s'",
-			curService.Spec.Type, targetService.Spec.Type)
+			curService.Spec.Type, targetService.Spec.Type,
+		)
 	}
 
 	// Updating a Service is a complicated business
@@ -172,7 +161,7 @@ func (w *worker) updateService(
 	newService.SetFinalizers(w.prepareFinalizers(curService, newService, ensureService(prevService)))
 
 	//
-	// And only now we are ready to actually update the service with new version of the service
+	// And only now we are ready to actually update the service with the new version of the service
 	//
 
 	err := w.c.updateService(ctx, newService)
@@ -210,11 +199,6 @@ func (w *worker) prepareFinalizers(curService, newService, oldService *core.Serv
 
 // createService
 func (w *worker) createService(ctx context.Context, cr chi.ICustomResource, service *core.Service) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	err := w.c.createService(ctx, service)
 	if err == nil {
 		w.a.V(1).

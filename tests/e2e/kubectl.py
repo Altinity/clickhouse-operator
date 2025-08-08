@@ -80,7 +80,8 @@ def delete_chi(chi, ns=None, wait=True, ok_undeleted = False, ok_to_fail=False, 
             {
                 "statefulset": 0,
                 "pod": 0,
-                "service": 0                },
+                "service": 0
+            },
             ns,
             shell=shell
         )
@@ -91,10 +92,10 @@ def delete_chi(chi, ns=None, wait=True, ok_undeleted = False, ok_to_fail=False, 
             not_deleted_objects_ext = get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=chi, ns=ns, shell=shell)
             if len(not_deleted_objects) > 0 or len(not_deleted_objects_ext) > 0:
                 print("WARNING: some objects were not deleted:")
-                for o in not_deleted_objects_ext:
-                    print(o)
+                print(*not_deleted_objects_ext, sep='\n')
 
             assert ok_undeleted or cnt == 0
+
 
 def delete_chk(chk, ns=None, wait=True, ok_to_fail=False, shell=None):
     delete_kind("chk", chk, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
@@ -206,7 +207,7 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
         check_configmaps(chi_name, ns=ns, shell=shell)
 
     if "pdb" in check:
-        check_pdb(chi_name, check["pdb"], ns=ns, shell=shell)
+        check_pdb(chi_name, kind, check["pdb"], ns=ns, shell=shell)
 
     if "do_not_delete" not in check:
         delete_chi(chi_name, ns=ns, shell=shell)
@@ -214,7 +215,19 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
 
 def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None):
     out = launch(f"get {kind} {name} {label} -o json", ns=ns, ok_to_fail=ok_to_fail, shell=shell)
-    return json.loads(out.strip())
+    stripped = out.strip()
+
+    if not stripped or stripped.startswith("Error"):
+        if ok_to_fail:
+            return None
+        raise ValueError(f"kubectl returned error: {stripped}")
+
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError as e:
+        if ok_to_fail:
+            return None
+        raise ValueError(f"Failed to parse JSON from: {stripped}") from e
 
 
 def get_chi_normalizedCompleted(chi, ns=None, shell=None):
@@ -393,6 +406,7 @@ def get_chi_status(chi, ns=None):
 def wait_pod_status(pod, status, shell=None, ns=None):
     wait_field("pod", pod, ".status.phase", status, ns, shell=shell)
 
+
 def get_pod_status(pod, shell=None, ns=None):
     return get_field("pod", pod, ".status.phase", ns, shell=shell)
 
@@ -512,12 +526,14 @@ def get_pod_image(chi_name, pod_name="", ns=None, shell=None):
 def get_pod_names(chi_name, ns=None, shell=None):
     return get_obj_names(chi_name, "pods", ns, shell)
 
+
 def get_obj_names(chi_name, obj_type="pods", ns=None, shell=None):
     obj_names = launch(
         f"get {obj_type} -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
         ns=ns,
     ).splitlines()
     return obj_names[1:]
+
 
 def get_obj_names_grepped(obj_type="pods", grep = '', ns=None, shell=None):
     obj_names = launch(
@@ -607,11 +623,23 @@ def check_pod_antiaffinity(
         assert pod_spec["affinity"]["podAntiAffinity"] == expected
 
 
-def check_service(service_name, service_type, ns=None, shell=None):
+def check_service(service_name, service_type, headless = False, ns=None, shell=None):
     with When(f"{service_name} is available"):
         service = get("service", service_name, ns=ns, shell=shell)
+
         with Then(f"Service type is {service_type}"):
             assert service["spec"]["type"] == service_type
+
+        if service_type == "ClusterIP":
+            clusterIP = service["spec"]["clusterIP"]
+            if headless:
+                with Then("clusterIP should be None"):
+                    if clusterIP != "None":
+                        print(f"ERROR: clusterIP should be None but it is: {clusterIP}")
+                    assert clusterIP == "None"
+            else:
+                with Then("clusterIP should be set"):
+                    assert clusterIP != "None"
 
 
 def check_configmaps(chi_name, ns=None, shell=None):
@@ -644,16 +672,40 @@ def check_configmap(cfg_name, values, ns=None, shell=None):
             assert v in cfm["data"], error()
 
 
-def check_pdb(chi, clusters, ns=None, shell=None):
+def check_pdb(chi, kind, clusters, ns=None, shell=None):
+    if kind == "chi":
+        label = "clickhouse.altinity.com"
+    elif kind == "chk":
+        label = "clickhouse-keeper.altinity.com"
+    else:
+        error("Unknown kind:" + kind)
+
     for c in clusters.keys():
         with Then(f"PDB is configured for cluster {c}"):
-            pdb = get("pdb", chi + "-" + c, shell=shell)
+            is_managed = True
+            if isinstance(clusters[c], dict):
+                is_managed = clusters[c].get("is_managed", True)
+                max_unavailable = clusters[c].get("max_unavailable", 1)
+            else:
+                # Treat simple integer as maxUnavailable to ensure backward compatibility.
+                max_unavailable = clusters[c]
+
+            pdb = get("pdb", kind + "-" + chi + "-" + c, ok_to_fail=is_managed is False, shell=shell)
+
+            if not is_managed:
+                assert pdb is None
+                continue
+
             labels = pdb["spec"]["selector"]["matchLabels"]
-            assert labels["clickhouse.altinity.com/app"] == "chop"
-            assert labels["clickhouse.altinity.com/chi"] == chi
-            assert labels["clickhouse.altinity.com/cluster"] == c
-            assert labels["clickhouse.altinity.com/namespace"] == current().context.test_namespace
-            assert pdb["spec"]["maxUnavailable"] == clusters[c]
+            assert labels[f"{label}/app"] == "chop"
+            if kind == "chi":
+                assert labels[f"{label}/chi"] == chi
+            else:
+                assert labels[f"{label}/chk"] == chi
+            assert labels[f"{label}/cluster"] == c
+            assert labels[f"{label}/namespace"] == current().context.test_namespace
+            assert pdb["spec"]["maxUnavailable"] == max_unavailable
+
 
 def force_reconcile(chi, taskID="reconcile", ns=None, shell=None):
     with Then(f"Trigger CHI reconcile with taskID:\"{taskID}\""):

@@ -29,14 +29,6 @@ func (s *String) From(value string) *String {
 	return NewString(value)
 }
 
-// String casts to a string
-func (s *String) String() string {
-	if s == nil {
-		return ""
-	}
-	return s.Value()
-}
-
 // HasValue checks whether value is specified
 func (s *String) HasValue() bool {
 	return s != nil
@@ -51,9 +43,22 @@ func (s *String) Value() string {
 	return string(*s)
 }
 
+// String casts to a string
+func (s *String) String() string {
+	return s.Value()
+}
+
 // IsValid checks whether var has a proper value
 func (s *String) IsValid() bool {
 	return s.HasValue()
+}
+
+// Len calculates len of the string
+func (s *String) Len() int {
+	if s == nil {
+		return 0
+	}
+	return len(s.String())
 }
 
 // Normalize normalizes value with fallback to defaultValue in case initial value is incorrect

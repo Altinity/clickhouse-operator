@@ -28,6 +28,13 @@ jobs:
       - name: Package Chart
         run: cr package deploy/helm/clickhouse-operator
 
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Login to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Get Release Assets
         id: get_assets
         run: |
@@ -55,10 +62,12 @@ jobs:
             -H "Content-Type: application/gzip" \
             -T "${CHART_PATH}" \
             "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${{ github.event.release.id }}/assets?name=$(basename ${CHART_PATH})"
+
       - name: Configure Git
         run: |
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
       - name: Release Chart
         run: |
           git remote add httpsorigin "https://github.com/${GITHUB_REPOSITORY}.git"
@@ -71,3 +80,8 @@ jobs:
             --index-path=index.yaml \
             --remote=httpsorigin \
             --push
+
+      - name: Push Helm Chart to OCI Registry
+        run: |
+          CHART_PATH=$(ls .cr-release-packages/altinity-clickhouse-operator-*.tgz)
+          helm push "${CHART_PATH}" oci://ghcr.io/altinity/clickhouse-operator-helm-chart

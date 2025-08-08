@@ -53,16 +53,16 @@ type Configuration struct {
 	Clusters  []*Cluster       `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
 }
 
+// NewConfiguration creates new Configuration objects
+func NewConfiguration() *Configuration {
+	return new(Configuration)
+}
+
 func (c *Configuration) Ensure() *Configuration {
 	if c == nil {
 		c = NewConfiguration()
 	}
 	return c
-}
-
-// NewConfiguration creates new Configuration objects
-func NewConfiguration() *Configuration {
-	return new(Configuration)
 }
 
 func (c *Configuration) GetUsers() *Settings {

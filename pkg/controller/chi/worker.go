@@ -222,10 +222,10 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 }
 
 // updateEndpoints updates endpoints
-func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
-	w.finalizeCR(
+func (w *worker) updateEndpoints(ctx context.Context, ep *core.Endpoints) error {
+	_ = w.finalizeCR(
 		ctx,
-		new,
+		ep,
 		types.UpdateStatusOptions{
 			TolerateAbsence: true,
 			CopyStatusOptions: types.CopyStatusOptions{
@@ -245,14 +245,18 @@ func (w *worker) finalizeCR(
 	updateStatusOpts types.UpdateStatusOptions,
 	f func(*api.ClickHouseInstallation),
 ) error {
-	chi, _ := w.buildCRFromObj(ctx, obj)
+	chi, err := w.buildCRFromObj(ctx, obj)
+	if err != nil {
+		log.V(1).Error("Unable to finalize CR: %s err: %v", util.NamespacedName(obj), err)
+		return err
+	}
 
 	if f != nil {
 		f(chi)
 	}
 
-	w.reconcileConfigMapCommonUsers(ctx, chi)
-	w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
+	_ = w.reconcileConfigMapCommonUsers(ctx, chi)
+	_ = w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
 
 	return nil
 }
@@ -357,10 +361,11 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 		log.V(1).Info("Reconcile is aborted. cr: %s ", _cr.GetName())
 		return
 	}
+
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	w.finalizeCR(
+	_ = w.finalizeCR(
 		ctx,
 		_cr,
 		types.UpdateStatusOptions{
@@ -417,8 +422,8 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHo
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
-
 	}
+
 	existingObjects := w.c.discovery(ctx, cr)
 	ap.WalkAdded(
 		// Walk over added clusters

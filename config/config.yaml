@@ -276,8 +276,8 @@ template:
   chi:
     # CHI template updates handling policy
     # Possible policy values:
-    #   - ReadOnStart. Accept CHIT updates on the operators start only.
-    #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+    #   - ReadOnStart. Accept CHIT updates on the operator's start only.
+    #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
     policy: ApplyOnNextReconcile
 
     # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
@@ -288,7 +288,7 @@ template:
     # CHK template updates handling policy
     # Possible policy values:
     #   - ReadOnStart. Accept CHIT updates on the operators start only.
-    #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+    #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
     policy: ApplyOnNextReconcile
 
     # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.

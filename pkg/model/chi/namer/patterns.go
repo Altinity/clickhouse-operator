@@ -47,6 +47,9 @@ var patterns = types.List{
 
 	// patternStatefulSetServiceName is a template of host StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
 	patternStatefulSetServiceName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-" + macrosList.Get().Get(macro.MacrosClusterName) + "-" + macrosList.Get().Get(macro.MacrosHostName),
+
+	// patternClusterPDBName is a template of cluster scope PDB. "chi-{chi}-{cluster}"
+	patternClusterPDBName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-" + macrosList.Get().Get(macro.MacrosClusterName),
 }
 
 const (

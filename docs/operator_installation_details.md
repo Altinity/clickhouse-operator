@@ -64,7 +64,7 @@ helm install clickhouse-operator clickhouse-operator/altinity-clickhouse-operato
 ```
 upgrade
 ```bash
-helm repo upgrade clickhouse-operator
+helm repo update clickhouse-operator
 helm upgrade clickhouse-operator clickhouse-operator/altinity-clickhouse-operator
 ```
 

@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.25.2
+# OPERATOR_VERSION=0.25.3
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -791,6 +791,15 @@ spec:
                                 required:
                                   - name
                                   - key
+                      pdbManaged:
+                        !!merge <<: *TypeStringBool
+                        description: |
+                          Specifies whether the Pod Disruption Budget (PDB) should be managed.
+                          During the next installation, if PDB management is enabled, the operator will
+                          attempt to retrieve any existing PDB. If none is found, it will create a new one
+                          and initiate a reconciliation loop. If PDB management is disabled, the existing PDB
+                          will remain intact, and the reconciliation loop will not be executed. By default,
+                          PDB management is enabled.
                       pdbMaxUnavailable:
                         type: integer
                         description: |
@@ -1372,14 +1381,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.25.2
+# OPERATOR_VERSION=0.25.3
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2157,6 +2166,15 @@ spec:
                                 required:
                                   - name
                                   - key
+                      pdbManaged:
+                        !!merge <<: *TypeStringBool
+                        description: |
+                          Specifies whether the Pod Disruption Budget (PDB) should be managed.
+                          During the next installation, if PDB management is enabled, the operator will
+                          attempt to retrieve any existing PDB. If none is found, it will create a new one
+                          and initiate a reconciliation loop. If PDB management is disabled, the existing PDB
+                          will remain intact, and the reconciliation loop will not be executed. By default,
+                          PDB management is enabled.
                       pdbMaxUnavailable:
                         type: integer
                         description: |
@@ -2741,7 +2759,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -3235,14 +3253,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.25.2
+# OPERATOR_VERSION=0.25.3
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.25.2
+    clickhouse-keeper.altinity.com/chop: 0.25.3
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -3762,6 +3780,23 @@ spec:
                             description: |
                               optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                               override top-level `chi.spec.configuration.files`
+                          pdbManaged:
+                            !!merge <<: *TypeStringBool
+                            description: |
+                              Specifies whether the Pod Disruption Budget (PDB) should be managed.
+                              During the next installation, if PDB management is enabled, the operator will
+                              attempt to retrieve any existing PDB. If none is found, it will create a new one
+                              and initiate a reconciliation loop. If PDB management is disabled, the existing PDB
+                              will remain intact, and the reconciliation loop will not be executed. By default,
+                              PDB management is enabled.
+                          pdbMaxUnavailable:
+                            type: integer
+                            description: |
+                              Pod eviction is allowed if at most "pdbMaxUnavailable" pods are unavailable after the eviction,
+                              i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions
+                              by specifying 0. This is a mutually exclusive setting with "minAvailable".
+                            minimum: 0
+                            maximum: 65535
                           templates:
                             !!merge <<: *TypeTemplateNames
                             description: |
@@ -4113,7 +4148,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
 
 # Template Parameters:
 #
@@ -4138,7 +4173,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
 rules:
   #
   # Core API group
@@ -4347,7 +4382,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -4369,7 +4404,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -4651,8 +4686,8 @@ data:
       chi:
         # CHI template updates handling policy
         # Possible policy values:
-        #   - ReadOnStart. Accept CHIT updates on the operators start only.
-        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+        #   - ReadOnStart. Accept CHIT updates on the operator's start only.
+        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
         policy: ApplyOnNextReconcile
 
         # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
@@ -4663,7 +4698,7 @@ data:
         # CHK template updates handling policy
         # Possible policy values:
         #   - ReadOnStart. Accept CHIT updates on the operators start only.
-        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
         policy: ApplyOnNextReconcile
 
         # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
@@ -4851,7 +4886,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 data:
 ---
@@ -4867,7 +4902,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -4961,7 +4996,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -5059,7 +5094,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -5121,7 +5156,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 data:
 ---
@@ -5137,7 +5172,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -5212,7 +5247,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 data:
   readme: |
@@ -5230,7 +5265,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 data:
 ---
@@ -5238,7 +5273,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=${OPERATOR_NAMESPACE}
 #   COMMENT=
-#   OPERATOR_VERSION=0.25.2
+#   OPERATOR_VERSION=0.25.3
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -5248,7 +5283,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -5272,7 +5307,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -5392,7 +5427,7 @@ spec:
                   resource: limits.memory
           ports:
             - containerPort: 9999
-              name: metrics
+              name: op-metrics
         - name: metrics-exporter
           image: ${METRICS_EXPORTER_IMAGE}
           imagePullPolicy: ${METRICS_EXPORTER_IMAGE_PULL_POLICY}
@@ -5466,7 +5501,7 @@ spec:
                   resource: limits.memory
           ports:
             - containerPort: 8888
-              name: metrics
+              name: ch-metrics
 ---
 # Template Parameters:
 #
@@ -5484,13 +5519,13 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.2
+    clickhouse.altinity.com/chop: 0.25.3
     app: clickhouse-operator
 spec:
   ports:
     - port: 8888
-      name: clickhouse-metrics
+      name: ch-metrics
     - port: 9999
-      name: operator-metrics
+      name: op-metrics
   selector:
     app: clickhouse-operator

@@ -36,6 +36,14 @@ type ConnectionParams struct {
 	AuthFile string
 }
 
+func BuildConnectionParams(_params ...*ConnectionParams) *ConnectionParams {
+	var params *ConnectionParams
+	if len(_params) > 0 {
+		params = _params[0]
+	}
+	return params.Normalize()
+}
+
 func (p *ConnectionParams) Normalize() *ConnectionParams {
 	if p == nil {
 		// Overwrite nil pointer with struct to be returned

@@ -123,7 +123,7 @@ func (l *Labeler) IsCHOPGeneratedObject(meta meta.Object) bool {
 func (l *Labeler) GetCRNameFromObjectMeta(meta meta.Object) (string, error) {
 	labels := meta.GetLabels()
 	if !util.MapHasKeys(labels, l.Get(LabelCRName)) {
-		return "", fmt.Errorf("can not find %s label in meta", l.Get(LabelCRName))
+		return "", fmt.Errorf("unable to find in meta.labels required label: '%s'", l.Get(LabelCRName))
 	}
 	return labels[l.Get(LabelCRName)], nil
 }
@@ -132,7 +132,7 @@ func (l *Labeler) GetCRNameFromObjectMeta(meta meta.Object) (string, error) {
 func (l *Labeler) GetClusterNameFromObjectMeta(meta meta.Object) (string, error) {
 	labels := meta.GetLabels()
 	if !util.MapHasKeys(labels, l.Get(LabelClusterName)) {
-		return "", fmt.Errorf("can not find %s label in meta", l.Get(LabelClusterName))
+		return "", fmt.Errorf("unable to find in meta.labels required label: '%s'", l.Get(LabelClusterName))
 	}
 	return labels[l.Get(LabelClusterName)], nil
 }

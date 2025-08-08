@@ -2,9 +2,9 @@
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.25.2
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.25.3
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.25.2
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.25.3
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -139,7 +139,7 @@ spec:
             {{ with .Values.operator.env }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 9999
-              name: metrics
+              name: op-metrics
           resources: {{ toYaml .Values.operator.resources | nindent 12 }}
           securityContext: {{ toYaml .Values.operator.containerSecurityContext | nindent 12 }}
 {{ if .Values.metrics.enabled }}
@@ -217,11 +217,12 @@ spec:
             {{ with .Values.metrics.env }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 8888
-              name: metrics
+              name: ch-metrics
           resources: {{ toYaml .Values.metrics.resources | nindent 12 }}
           securityContext: {{ toYaml .Values.metrics.containerSecurityContext | nindent 12 }}
 {{ end }}
       imagePullSecrets: {{ toYaml .Values.imagePullSecrets | nindent 8 }}
+      {{- if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName | quote }}{{- end }}
       nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
       affinity: {{ toYaml .Values.affinity | nindent 8 }}
       tolerations: {{ toYaml .Values.tolerations | nindent 8 }}

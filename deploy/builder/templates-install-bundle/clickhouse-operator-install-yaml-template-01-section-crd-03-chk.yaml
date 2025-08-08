@@ -528,6 +528,23 @@ spec:
                             description: |
                               optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                               override top-level `chi.spec.configuration.files`
+                          pdbManaged:
+                            <<: *TypeStringBool
+                            description: |
+                              Specifies whether the Pod Disruption Budget (PDB) should be managed.
+                              During the next installation, if PDB management is enabled, the operator will
+                              attempt to retrieve any existing PDB. If none is found, it will create a new one
+                              and initiate a reconciliation loop. If PDB management is disabled, the existing PDB
+                              will remain intact, and the reconciliation loop will not be executed. By default,
+                              PDB management is enabled.
+                          pdbMaxUnavailable:
+                            type: integer
+                            description: |
+                              Pod eviction is allowed if at most "pdbMaxUnavailable" pods are unavailable after the eviction,
+                              i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions
+                              by specifying 0. This is a mutually exclusive setting with "minAvailable".
+                            minimum: 0
+                            maximum: 65535
                           templates:
                             <<: *TypeTemplateNames
                             description: |

@@ -93,6 +93,9 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 		host := params[0].(*api.Host)
 		volumeClaimTemplate := params[1].(*api.VolumeClaimTemplate)
 		return n.createPVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
+	case interfaces.NameClusterPDB:
+		cluster := params[0].(api.ICluster)
+		return n.createClusterPDBName(cluster)
 
 	default:
 		return n.commonNamer.Name(what, params...)

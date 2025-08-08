@@ -41,4 +41,7 @@ const (
 
 	// patternStatefulSetServiceName is a template of host StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
 	patternStatefulSetServiceName = "service chk- + macro.MacrosCRName + - + macro.MacrosClusterName + - + macro.MacrosHostName"
+
+	// patternClusterPDBName is a template of cluster scope PDB. "chi-{chi}-{cluster}"
+	patternClusterPDBName = "pdb chk- + macrosList.Get().Get(macro.MacrosCRName) + - + macrosList.Get().Get(macro.MacrosClusterName)"
 )

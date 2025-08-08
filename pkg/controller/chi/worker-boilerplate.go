@@ -117,7 +117,7 @@ func (w *worker) processReconcileChopConfig(cmd *cmd_queue.ReconcileChopConfig) 
 func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *cmd_queue.ReconcileEndpoints) error {
 	switch cmd.Cmd {
 	case cmd_queue.ReconcileUpdate:
-		return w.updateEndpoints(ctx, cmd.Old, cmd.New)
+		return w.updateEndpoints(ctx, cmd.New)
 	}
 
 	// Unknown item type, don't know what to do with it
