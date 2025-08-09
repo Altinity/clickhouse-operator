@@ -12,7 +12,7 @@ metadata:
   annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
 spec:
   endpoints:
-    - port: clickhouse-metrics # 8888
+    - port: ch-metrics # 8888
       {{- with .Values.serviceMonitor.clickhouseMetrics.interval }}
       interval: {{ . }}
       {{- end }}
@@ -27,7 +27,7 @@ spec:
       metricRelabelings:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-    - port: operator-metrics # 9999
+    - port: op-metrics # 9999
       {{- with .Values.serviceMonitor.operatorMetrics.interval }}
       interval: {{ . }}
       {{- end }}
