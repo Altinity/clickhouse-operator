@@ -15,7 +15,7 @@ spec:
     matchLabels:
       clickhouse.altinity.com/app: chop
   podMetricsEndpoints:
-    - port: "metrics"
+    - port: "ch-metrics"
 ---
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
