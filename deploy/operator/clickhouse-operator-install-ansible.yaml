@@ -5569,7 +5569,7 @@ spec:
                   resource: limits.memory
           ports:
             - containerPort: 8888
-              name: clickhouse-metrics
+              name: ch-metrics
 ---
 # Template Parameters:
 #
