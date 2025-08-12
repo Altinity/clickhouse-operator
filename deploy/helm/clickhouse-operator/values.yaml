@@ -3,6 +3,9 @@ namespaceOverride: ""
 commonLabels: {}
 # commonAnnotations -- set of annotations that will be applied to all the resources for the operator
 commonAnnotations: {}
+deployment:
+  strategy:
+    type: Recreate
 operator:
   image:
     # operator.image.repository -- image repository

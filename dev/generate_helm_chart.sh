@@ -190,6 +190,7 @@ function update_deployment_resource() {
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
   yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
   yq e -i '.spec.selector.matchLabels |= "{{ include \"altinity-clickhouse-operator.selectorLabels\" . | nindent 6 }}"' "${file}"
+  yq e -i '.spec.strategy |= "{{ toYaml .Values.deployment.strategy | nindent 4 }}"' "${file}"
 
   readonly annotations=$(yq e '.spec.template.metadata.annotations' "${file}")
   a_data="${annotations}" yq e -i '.podAnnotations |= env(a_data)' "${values_yaml}"
