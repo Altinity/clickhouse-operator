@@ -18,6 +18,7 @@ metadata:
   annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
 spec:
   replicas: 1
+  strategy: {{ toYaml .Values.deployment.strategy | nindent 4 }}
   selector:
     matchLabels: {{ include "altinity-clickhouse-operator.selectorLabels" . | nindent 6 }}
   template:
