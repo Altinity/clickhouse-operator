@@ -35,6 +35,7 @@ For upgrade please install CRDs separately:
 | dashboards.annotations | object | `{}` | annotations to add to a secret with dashboards |
 | dashboards.enabled | bool | `false` | provision grafana dashboards as configMaps (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-8.3.4/charts/grafana/values.yaml#L778 ) |
 | dashboards.grafana_folder | string | `"clickhouse"` |  |
+| deployment.strategy.type | string | `"Recreate"` |  |
 | fullnameOverride | string | `""` | full name of the chart. |
 | imagePullSecrets | list | `[]` | image pull secret for private images in clickhouse-operator pod possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |
 | metrics.containerSecurityContext | object | `{}` |  |

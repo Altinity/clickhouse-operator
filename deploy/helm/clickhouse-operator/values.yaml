@@ -4,6 +4,7 @@ commonLabels: {}
 # commonAnnotations -- set of annotations that will be applied to all the resources for the operator
 commonAnnotations: {}
 deployment:
+  # look details in `kubectl explain deployment.spec.strategy`
   strategy:
     type: Recreate
 operator:
