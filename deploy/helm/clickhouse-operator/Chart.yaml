@@ -1,5 +1,5 @@
 apiVersion: v2
-name: altinity-clickhouse-operator
+name: clickhouse-operator
 description: |-
   Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
 
