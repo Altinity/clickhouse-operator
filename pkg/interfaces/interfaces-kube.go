@@ -41,8 +41,8 @@ type IKube interface {
 }
 
 type IKubeConfigMap interface {
-	Create(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error)
 	Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error)
+	Create(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error)
 	Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error)
 	Delete(ctx context.Context, namespace, name string) error
 	List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.ConfigMap, error)
@@ -58,27 +58,27 @@ type IKubeEvent interface {
 }
 
 type IKubePDB interface {
-	Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
 	Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error)
+	Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
 	Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
 	Delete(ctx context.Context, namespace, name string) error
 	List(ctx context.Context, namespace string, opts meta.ListOptions) ([]policy.PodDisruptionBudget, error)
 }
 
 type IKubePod interface {
-	Get(params ...any) (*core.Pod, error)
-	GetAll(obj any) []*core.Pod
+	Get(ctx context.Context, params ...any) (*core.Pod, error)
+	GetAll(ctx context.Context, obj any) []*core.Pod
 	Update(ctx context.Context, pod *core.Pod) (*core.Pod, error)
 	Delete(ctx context.Context, namespace, name string) error
 }
 
 type IKubePodEx interface {
-	GetRestartCounters(params ...any) (map[string]int, error)
+	GetRestartCounters(ctx context.Context, params ...any) (map[string]int, error)
 }
 
 type IKubePVC interface {
-	Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
 	Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error)
+	Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
 	Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
 	Delete(ctx context.Context, namespace, name string) error
 	List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.PersistentVolumeClaim, error)
@@ -116,6 +116,7 @@ type IKubeService interface {
 }
 
 type IKubeSTS interface {
+	GetAny(ctx context.Context, params ...any) (any, error)
 	Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 	Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error)
 	Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error)

@@ -24,26 +24,28 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type StatefulSetPoller struct {
-	kubeSTS interfaces.IKubeSTS
+type getter interface {
+	GetAny(ctx context.Context, params ...any) (any, error)
 }
 
-func NewStatefulSetPoller(kube interfaces.IKube) *StatefulSetPoller {
-	return &StatefulSetPoller{
-		kubeSTS: kube.STS(),
+type HostK8SObjectPoller struct {
+	getter getter
+}
+
+func NewHostK8SObjectPoller(getter getter) *HostK8SObjectPoller {
+	return &HostK8SObjectPoller{
+		getter: getter,
 	}
 }
 
-// pollHostStatefulSet polls host's StatefulSet
-func (p *StatefulSetPoller) PollHostStatefulSet(
+// Poll polls host's k8s object
+func (p *HostK8SObjectPoller) Poll(
 	ctx context.Context,
 	host *api.Host,
 	isDoneFn func(context.Context, *apps.StatefulSet) bool,
-	backFn func(context.Context),
 	_opts ...*poller.Options,
 ) error {
 	if util.IsContextDone(ctx) {
@@ -55,7 +57,7 @@ func (p *StatefulSetPoller) PollHostStatefulSet(
 	opts := poller.NewOptionsFromConfig(_opts...)
 	functions := &poller.Functions{
 		Get: func(_ctx context.Context) (any, error) {
-			return p.kubeSTS.Get(ctx, host)
+			return p.getter.GetAny(ctx, host)
 		},
 		IsDone: func(_ctx context.Context, a any) bool {
 			return isDoneFn(_ctx, a.(*apps.StatefulSet))
@@ -63,7 +65,6 @@ func (p *StatefulSetPoller) PollHostStatefulSet(
 		ShouldContinueOnGetError: func(_ctx context.Context, _ any, e error) bool {
 			return apiErrors.IsNotFound(e)
 		},
-		//		Background: backFn,
 	}
 
 	return poller.New(ctx, caption).

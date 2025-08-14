@@ -119,7 +119,7 @@ func (l *Labeler) LabelMyObjectsTree(ctx context.Context) error {
 }
 
 func (l *Labeler) labelPod(ctx context.Context, namespace, name string) (*core.Pod, error) {
-	pod, err := l.pod.Get(namespace, name)
+	pod, err := l.pod.Get(ctx, namespace, name)
 	if err != nil {
 		log.V(1).M(namespace, name).F().Error("ERROR get Pod %s/%s %v", namespace, name, err)
 		return nil, err
@@ -250,7 +250,7 @@ func (l *Labeler) addLabels(labels map[string]string) map[string]string {
 
 // appendLabelReadyOnPod appends Label "Ready" to the pod of the specified host
 func (l *Labeler) appendLabelReadyOnPod(ctx context.Context, host *api.Host) error {
-	pod, err := l.pod.Get(host)
+	pod, err := l.pod.Get(ctx, host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 		return err
@@ -273,7 +273,7 @@ func (l *Labeler) deleteLabelReadyOnPod(ctx context.Context, host *api.Host) err
 	if host == nil {
 		return nil
 	}
-	pod, err := l.pod.Get(host)
+	pod, err := l.pod.Get(ctx, host)
 	if apiErrors.IsNotFound(err) {
 		// Pod may be missing in case, say, StatefulSet has 0 pods because CHI is stopped
 		// This is not an error, after all

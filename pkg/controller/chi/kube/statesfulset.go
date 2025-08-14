@@ -73,6 +73,10 @@ func (c *STS) Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
+func (c *STS) GetAny(ctx context.Context, params ...any) (any, error) {
+	return c.Get(ctx, params...)
+}
+
 func (c *STS) Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
 	ctx = k8sCtx(ctx)
 	return c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, controller.NewCreateOptions())

@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"context"
 	"fmt"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,13 +28,13 @@ import (
 )
 
 // getPodsIPs gets all pod IPs
-func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
+func (c *Controller) getPodsIPs(ctx context.Context, obj interface{}) (ips []string) {
 	l := log.V(3).M(obj).F()
 
 	l.S().Info("looking for pods IPs")
 	defer l.E().Info("looking for pods IPs")
 
-	for _, pod := range c.kube.Pod().GetAll(obj) {
+	for _, pod := range c.kube.Pod().GetAll(ctx, obj) {
 		if ip := pod.Status.PodIP; ip == "" {
 			l.Warning("Pod NO IP address found. Pod: %s", util.NamespacedName(pod))
 		} else {

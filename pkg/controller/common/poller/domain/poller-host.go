@@ -30,11 +30,11 @@ import (
 func PollHost(
 	ctx context.Context,
 	host *api.Host,
-	isDoneFn func(ctx context.Context, host *api.Host) bool,
+	isDoneFn func(context.Context, *api.Host) bool,
 	_opts ...*poller.Options,
 ) error {
 	if util.IsContextDone(ctx) {
-		log.V(1).Info("poll host is done")
+		log.V(1).Info("poll is aborted")
 		return nil
 	}
 

@@ -21,7 +21,6 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
@@ -31,22 +30,22 @@ type readyMarkDeleter interface {
 
 // HostStatefulSetPoller enriches StatefulSet poller with host capabilities
 type HostStatefulSetPoller struct {
-	*StatefulSetPoller
+	*HostK8SObjectPoller
 	readyMarkDeleter
 }
 
 // NewHostStatefulSetPoller creates new HostStatefulSetPoller from StatefulSet poller
-func NewHostStatefulSetPoller(poller *StatefulSetPoller, kube interfaces.IKube, readyMarkDeleter readyMarkDeleter) *HostStatefulSetPoller {
+func NewHostStatefulSetPoller(poller *HostK8SObjectPoller, readyMarkDeleter readyMarkDeleter) *HostStatefulSetPoller {
 	return &HostStatefulSetPoller{
-		StatefulSetPoller: poller,
-		readyMarkDeleter:  readyMarkDeleter,
+		HostK8SObjectPoller: poller,
+		readyMarkDeleter:    readyMarkDeleter,
 	}
 }
 
 // WaitHostStatefulSetReady polls host's StatefulSet until it is ready
 func (p *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error {
 	log.V(2).F().Info("Wait for StatefulSet to reach target generation")
-	err := p.StatefulSetPoller.PollHostStatefulSet(
+	err := p.HostK8SObjectPoller.Poll(
 		ctx,
 		host,
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
@@ -56,9 +55,6 @@ func (p *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, ho
 			_ = p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
 			return k8s.IsStatefulSetReconcileCompleted(sts)
 		},
-		func(_ctx context.Context) {
-			p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
-		},
 	)
 	if err != nil {
 		log.V(1).F().Warning("FAILED wait for StatefulSet to reach generation")
@@ -66,15 +62,12 @@ func (p *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, ho
 	}
 
 	log.V(2).F().Info("Wait StatefulSet to reach ready status")
-	err = p.StatefulSetPoller.PollHostStatefulSet(
+	err = p.HostK8SObjectPoller.Poll(
 		ctx,
 		host,
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
 			_ = p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
 			return k8s.IsStatefulSetReady(sts)
-		},
-		func(_ctx context.Context) {
-			p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
 		},
 	)
 	if err != nil {

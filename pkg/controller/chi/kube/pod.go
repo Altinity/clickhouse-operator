@@ -42,7 +42,7 @@ func NewPod(kubeClient kube.Interface, namer interfaces.INameManager) *Pod {
 // Get gets a pod. Accepted types:
 //  1. *apps.StatefulSet
 //  2. *chop.Host
-func (c *Pod) Get(params ...any) (*core.Pod, error) {
+func (c *Pod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
 	var name, namespace string
 	switch len(params) {
 	case 2:
@@ -65,12 +65,12 @@ func (c *Pod) Get(params ...any) (*core.Pod, error) {
 	default:
 		panic(any("incorrect number or params"))
 	}
-	ctx := k8sCtx(controller.NewContext())
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
-func (c *Pod) GetRestartCounters(params ...any) (map[string]int, error) {
-	pod, err := c.Get(params...)
+func (c *Pod) GetRestartCounters(ctx context.Context, params ...any) (map[string]int, error) {
+	pod, err := c.Get(ctx, params...)
 	if err != nil {
 		return nil, err
 	}
@@ -78,16 +78,16 @@ func (c *Pod) GetRestartCounters(params ...any) (map[string]int, error) {
 }
 
 // GetAll gets all pods for provided entity
-func (c *Pod) GetAll(obj any) []*core.Pod {
+func (c *Pod) GetAll(ctx context.Context, obj any) []*core.Pod {
 	switch typed := obj.(type) {
 	case api.ICustomResource:
-		return c.getPods(typed)
+		return c.getPods(ctx, typed)
 	case api.ICluster:
-		return c.getPods(typed)
+		return c.getPods(ctx, typed)
 	case api.IShard:
-		return c.getPods(typed)
+		return c.getPods(ctx, typed)
 	case *api.Host:
-		return c.getPod(typed)
+		return c.getPod(ctx, typed)
 	default:
 		panic(any("unknown type"))
 	}
@@ -103,17 +103,17 @@ type IWalkHosts interface {
 }
 
 // getPods gets all pods of an entity
-func (c *Pod) getPods(walker IWalkHosts) (pods []*core.Pod) {
+func (c *Pod) getPods(ctx context.Context, walker IWalkHosts) (pods []*core.Pod) {
 	walker.WalkHosts(func(host *api.Host) error {
-		pods = append(pods, c.getPod(host)...)
+		pods = append(pods, c.getPod(ctx, host)...)
 		return nil
 	})
 	return pods
 }
 
 // getPod gets all pods of an entity
-func (c *Pod) getPod(host *api.Host) (pods []*core.Pod) {
-	if pod, err := c.Get(host); err == nil {
+func (c *Pod) getPod(ctx context.Context, host *api.Host) (pods []*core.Pod) {
+	if pod, err := c.Get(ctx, host); err == nil {
 		pods = append(pods, pod)
 	}
 	return pods
