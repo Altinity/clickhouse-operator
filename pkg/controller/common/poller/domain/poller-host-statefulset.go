@@ -32,34 +32,32 @@ type readyMarkDeleter interface {
 // HostStatefulSetPoller enriches StatefulSet poller with host capabilities
 type HostStatefulSetPoller struct {
 	*StatefulSetPoller
-	interfaces.IKubeSTS
 	readyMarkDeleter
 }
 
 // NewHostStatefulSetPoller creates new HostStatefulSetPoller from StatefulSet poller
-func NewHostStatefulSetPoller(poller *StatefulSetPoller, kube interfaces.IKube, labeler readyMarkDeleter) *HostStatefulSetPoller {
+func NewHostStatefulSetPoller(poller *StatefulSetPoller, kube interfaces.IKube, readyMarkDeleter readyMarkDeleter) *HostStatefulSetPoller {
 	return &HostStatefulSetPoller{
 		StatefulSetPoller: poller,
-		IKubeSTS:          kube.STS(),
-		readyMarkDeleter:  labeler,
+		readyMarkDeleter:  readyMarkDeleter,
 	}
 }
 
 // WaitHostStatefulSetReady polls host's StatefulSet until it is ready
 func (p *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error {
-	log.V(2).F().Info("Wait for StatefulSet to reach generation")
-	err := p.PollHostStatefulSet(
+	log.V(2).F().Info("Wait for StatefulSet to reach target generation")
+	err := p.StatefulSetPoller.PollHostStatefulSet(
 		ctx,
 		host,
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
 			if sts == nil {
 				return false
 			}
-			p.deleteReadyMark(_ctx, host)
-			return k8s.IsStatefulSetGeneration(sts, sts.Generation)
+			_ = p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
+			return k8s.IsStatefulSetReconcileCompleted(sts)
 		},
 		func(_ctx context.Context) {
-			p.deleteReadyMark(_ctx, host)
+			p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
 		},
 	)
 	if err != nil {
@@ -68,15 +66,15 @@ func (p *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, ho
 	}
 
 	log.V(2).F().Info("Wait StatefulSet to reach ready status")
-	err = p.PollHostStatefulSet(
+	err = p.StatefulSetPoller.PollHostStatefulSet(
 		ctx,
 		host,
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
-			p.deleteReadyMark(_ctx, host)
+			_ = p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
 			return k8s.IsStatefulSetReady(sts)
 		},
 		func(_ctx context.Context) {
-			p.deleteReadyMark(_ctx, host)
+			p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
 		},
 	)
 	if err != nil {
@@ -85,55 +83,4 @@ func (p *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, ho
 	}
 
 	return nil
-}
-
-//// waitHostNotReady polls host's StatefulSet for not exists or not ready
-//func (c *HostStatefulSetPoller) WaitHostNotReady(ctx context.Context, host *api.Host) error {
-//	err := c.PollHostStatefulSet(
-//		ctx,
-//		host,
-//		// Since we are waiting for host to be nopt readylet's assyme that it should exist already
-//		// and thus let's set GetErrorTimeout to zero, since we are not expecting getter function
-//		// to return any errors
-//		poller.NewPollerOptions().
-//			FromConfig(chop.Config()).
-//			SetGetErrorTimeout(0),
-//		func(_ context.Context, sts *apps.StatefulSet) bool {
-//			return k8s.IsStatefulSetNotReady(sts)
-//		},
-//		nil,
-//	)
-//	if apiErrors.IsNotFound(err) {
-//		err = nil
-//	}
-//
-//	return err
-//}
-
-//// WaitHostStatefulSetDeleted polls host's StatefulSet until it is not available
-//func (p *HostStatefulSetPoller) WaitHostStatefulSetDeleted(host *api.Host) {
-//	for {
-//		// TODO
-//		// Probably there would be better way to wait until k8s reported StatefulSet deleted
-//		if _, err := p.IKubeSTS.Get(context.TODO(), host); err == nil {
-//			log.V(2).Info("cache NOT yet synced")
-//			time.Sleep(15 * time.Second)
-//		} else {
-//			log.V(1).Info("cache synced")
-//			return
-//		}
-//	}
-//}
-
-func (p *HostStatefulSetPoller) deleteReadyMark(ctx context.Context, host *api.Host) {
-	if p == nil {
-		return
-	}
-	if p.readyMarkDeleter == nil {
-		log.V(3).F().Info("no mark deleter specified")
-		return
-	}
-
-	log.V(3).F().Info("Has mark deleter specified")
-	_ = p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(ctx, host)
 }

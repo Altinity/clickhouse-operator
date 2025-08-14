@@ -19,6 +19,7 @@ import (
 	"time"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
 const (
@@ -38,6 +39,14 @@ type Options struct {
 // NewOptions creates new poll options
 func NewOptions() *Options {
 	return &Options{}
+}
+
+func NewOptionsFromConfig(extraOpts ...*Options) *Options {
+	opts := NewOptions().FromConfig(chop.Config())
+	for _, opt := range extraOpts {
+		opts = opts.Merge(opt)
+	}
+	return opts
 }
 
 // Ensure ensures poll options do exist

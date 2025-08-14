@@ -21,9 +21,9 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // PollHost polls host
@@ -38,16 +38,19 @@ func PollHost(
 		return nil
 	}
 
-	opts := poller.NewOptions().FromConfig(chop.Config())
-	for _, opt := range _opts {
-		opts = opts.Merge(opt)
-	}
+	caption := fmt.Sprintf("%s/%s", host.Runtime.Address.Namespace, host.Runtime.Address.HostName)
+	opts := poller.NewOptionsFromConfig(_opts...)
 	functions := &poller.Functions{
+		Get: func(_ctx context.Context) (any, error) {
+			return nil, nil
+		},
 		IsDone: func(_ctx context.Context, _ any) bool {
 			return isDoneFn(_ctx, host)
 		},
+		ShouldContinueOnGetError: func(_ctx context.Context, _ any, e error) bool {
+			return apiErrors.IsNotFound(e)
+		},
 	}
-	caption := fmt.Sprintf("%s/%s", host.Runtime.Address.Namespace, host.Runtime.Address.HostName)
 
 	return poller.New(ctx, caption).
 		WithOptions(opts).

@@ -73,9 +73,9 @@ func (w *worker) isPodOK(ctx context.Context, host *api.Host) bool {
 	return false
 }
 
-func (w *worker) isPodRestarted(ctx context.Context, host *api.Host, start map[string]int) bool {
-	cur, _ := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
-	return !util.MapsAreTheSame(start, cur)
+func (w *worker) isPodRestarted(ctx context.Context, host *api.Host, initialRestartCounters map[string]int) bool {
+	curRestartCounters, _ := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
+	return !util.MapsAreTheSame(initialRestartCounters, curRestartCounters)
 }
 
 func (w *worker) doesHostHaveNoRunningQueries(ctx context.Context, host *api.Host) bool {

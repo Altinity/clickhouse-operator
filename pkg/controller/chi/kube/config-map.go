@@ -24,7 +24,6 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 )
@@ -62,7 +61,7 @@ func (c *ConfigMap) Remove(ctx context.Context, namespace, name string) error {
 func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
 	item := "ConfigMap"
 	return poller.New(ctx, fmt.Sprintf("delete %s: %s/%s", item, namespace, name)).
-		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
+		WithOptions(poller.NewOptionsFromConfig()).
 		WithFunctions(&poller.Functions{
 			IsDone: func(_ctx context.Context, _ any) bool {
 				if err := c.Remove(ctx, namespace, name); err != nil {

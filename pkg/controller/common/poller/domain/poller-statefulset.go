@@ -23,7 +23,6 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -45,32 +44,30 @@ func (p *StatefulSetPoller) PollHostStatefulSet(
 	host *api.Host,
 	isDoneFn func(context.Context, *apps.StatefulSet) bool,
 	backFn func(context.Context),
+	_opts ...*poller.Options,
 ) error {
 	if util.IsContextDone(ctx) {
-		log.V(11).Info("poll is aborted")
+		log.V(1).Info("poll is aborted")
 		return nil
 	}
 
-	return poller.New(
-		ctx,
-		fmt.Sprintf("%s/%s", host.Runtime.Address.Namespace, host.Runtime.Address.StatefulSet),
-	).WithOptions(
-		poller.NewOptions().FromConfig(chop.Config()),
-	).WithFunctions(
-		&poller.Functions{
-			Get: func(_ctx context.Context) (any, error) {
-				return p.kubeSTS.Get(ctx, host)
-			},
-			IsDone: func(_ctx context.Context, a any) bool {
-				return isDoneFn(_ctx, a.(*apps.StatefulSet))
-			},
-			ShouldContinue: func(_ctx context.Context, _ any, e error) bool {
-				return apiErrors.IsNotFound(e)
-			},
+	caption := fmt.Sprintf("%s/%s", host.Runtime.Address.Namespace, host.Runtime.Address.HostName)
+	opts := poller.NewOptionsFromConfig(_opts...)
+	functions := &poller.Functions{
+		Get: func(_ctx context.Context) (any, error) {
+			return p.kubeSTS.Get(ctx, host)
 		},
-	).WithBackground(
-		&poller.BackgroundFunctions{
-			F: backFn,
+		IsDone: func(_ctx context.Context, a any) bool {
+			return isDoneFn(_ctx, a.(*apps.StatefulSet))
 		},
-	).Poll()
+		ShouldContinueOnGetError: func(_ctx context.Context, _ any, e error) bool {
+			return apiErrors.IsNotFound(e)
+		},
+		//		Background: backFn,
+	}
+
+	return poller.New(ctx, caption).
+		WithOptions(opts).
+		WithFunctions(functions).
+		Poll()
 }

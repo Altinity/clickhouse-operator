@@ -410,7 +410,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	w.a.V(1).M(host).F().Info("Host software restart start. Host: %s", host.GetName())
 
 	// Get restart counters - they'll be used to check restart success
-	restarts, err := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
+	restartCounters, err := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 1. Host: %s err: %v", host.GetName(), err)
 		return err
@@ -425,7 +425,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	w.a.V(1).M(host).F().Info("Host software shutdown ok. Host: %s", host.GetName())
 
 	// Wait for restart counters to change
-	err = w.waitHostRestart(ctx, host, restarts)
+	err = w.waitHostRestart(ctx, host, restartCounters)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 3. Host: %s err: %v", host.GetName(), err)
 		return err

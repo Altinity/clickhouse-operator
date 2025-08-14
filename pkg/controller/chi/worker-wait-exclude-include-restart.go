@@ -509,9 +509,9 @@ func (w *worker) waitHostHasNoReplicationDelay(ctx context.Context, host *api.Ho
 }
 
 // waitHostRestart
-func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, start map[string]int) error {
+func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, restartCounters map[string]int) error {
 	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
-		return w.isPodRestarted(ctx, host, start)
+		return w.isPodRestarted(ctx, host, restartCounters)
 	})
 }
 

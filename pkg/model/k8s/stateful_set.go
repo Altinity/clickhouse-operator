@@ -49,16 +49,14 @@ func StatefulSetContainerGet(statefulSet *apps.StatefulSet, namesOrIndexes ...an
 	return nil, false
 }
 
-// IsStatefulSetGeneration returns whether StatefulSet has requested generation or not
-func IsStatefulSetGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
+// IsStatefulSetReconcileCompleted returns whether StatefulSet reconcile completed
+func IsStatefulSetReconcileCompleted(statefulSet *apps.StatefulSet) bool {
 	if statefulSet == nil {
 		return false
 	}
 
-	// StatefulSet has .spec generation we are looking for
-	return (statefulSet.Generation == generation) &&
-		// and this .spec generation is being applied to replicas - it is observed right now
-		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
+	// the .spec generation is being applied to replicas - it is observed right now
+	return (statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
 		// and all replicas are of expected generation
 		(statefulSet.Status.CurrentReplicas == *statefulSet.Spec.Replicas) &&
 		// and all replicas are updated - meaning rolling update completed over all replicas
