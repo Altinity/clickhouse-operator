@@ -23,7 +23,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // PollHost polls host
@@ -46,9 +45,6 @@ func PollHost(
 		},
 		IsDone: func(_ctx context.Context, _ any) bool {
 			return isDoneFn(_ctx, host)
-		},
-		ShouldContinueOnGetError: func(_ctx context.Context, _ any, e error) bool {
-			return apiErrors.IsNotFound(e)
 		},
 	}
 
