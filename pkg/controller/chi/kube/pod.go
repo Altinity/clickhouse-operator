@@ -74,7 +74,7 @@ func (c *Pod) GetRestartCounters(ctx context.Context, params ...any) (map[string
 	if err != nil {
 		return nil, err
 	}
-	return k8s.PodRestartCountersGet(pod), nil
+	return k8s.PodContainersRestartCountsGet(pod), nil
 }
 
 // GetAll gets all pods for provided entity

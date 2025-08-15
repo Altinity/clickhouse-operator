@@ -116,7 +116,6 @@ type IKubeService interface {
 }
 
 type IKubeSTS interface {
-	GetAny(ctx context.Context, params ...any) (any, error)
 	Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 	Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error)
 	Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error)

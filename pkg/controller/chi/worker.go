@@ -138,7 +138,7 @@ func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
-		domain.NewHostStatefulSetPoller(domain.NewHostK8SObjectPoller(w.c.kube.STS()), w.c.ctrlLabeler),
+		domain.NewHostStatefulSetPoller(domain.NewHostObjectPoller(w.c.kube.STS()), w.c.ctrlLabeler),
 		w.c.namer,
 		labeler.New(new),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),

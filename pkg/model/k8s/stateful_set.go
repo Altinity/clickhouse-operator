@@ -132,14 +132,12 @@ func StatefulSetAppendPersistentVolumeClaims(statefulSet *apps.StatefulSet, pvcs
 func StatefulSetAppendVolumeMountsInAllContainers(statefulSet *apps.StatefulSet, volumeMounts ...core.VolumeMount) {
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have VolumeMounts mounted as Volumes
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		// Convenience wrapper
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
+	StatefulSetWalkContainers(statefulSet, func(container *core.Container) {
 		ContainerAppendVolumeMounts(
 			container,
 			volumeMounts...,
 		)
-	}
+	})
 }
 
 func StatefulSetWalkContainers(statefulSet *apps.StatefulSet, f func(*core.Container)) {
@@ -152,10 +150,6 @@ func StatefulSetWalkContainers(statefulSet *apps.StatefulSet, f func(*core.Conta
 
 func StatefulSetWalkVolumeMounts(statefulSet *apps.StatefulSet, f func(*core.VolumeMount)) {
 	StatefulSetWalkContainers(statefulSet, func(container *core.Container) {
-		for j := range container.VolumeMounts {
-			// Convenience wrapper
-			volumeMount := &container.VolumeMounts[j]
-			f(volumeMount)
-		}
+		ContainerWalkVolumeMounts(container, f)
 	})
 }

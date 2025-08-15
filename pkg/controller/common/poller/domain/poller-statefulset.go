@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 
-	apps "k8s.io/api/apps/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -27,25 +26,25 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type getter interface {
-	GetAny(ctx context.Context, params ...any) (any, error)
+type polledObjectGetter[TypeToGet any] interface {
+	Get(ctx context.Context, params ...any) (*TypeToGet, error)
 }
 
-type HostK8SObjectPoller struct {
-	getter getter
+type HostObjectPoller[TypeToPoll any] struct {
+	getter polledObjectGetter[TypeToPoll]
 }
 
-func NewHostK8SObjectPoller(getter getter) *HostK8SObjectPoller {
-	return &HostK8SObjectPoller{
+func NewHostObjectPoller[TypeToPoll any](getter polledObjectGetter[TypeToPoll]) *HostObjectPoller[TypeToPoll] {
+	return &HostObjectPoller[TypeToPoll]{
 		getter: getter,
 	}
 }
 
-// Poll polls host's k8s object
-func (p *HostK8SObjectPoller) Poll(
+// Poll polls host's object
+func (p *HostObjectPoller[TypeToPoll]) Poll(
 	ctx context.Context,
 	host *api.Host,
-	isDoneFn func(context.Context, *apps.StatefulSet) bool,
+	isDoneFn func(context.Context, *TypeToPoll) bool,
 	_opts ...*poller.Options,
 ) error {
 	if util.IsContextDone(ctx) {
@@ -57,10 +56,10 @@ func (p *HostK8SObjectPoller) Poll(
 	opts := poller.NewOptionsFromConfig(_opts...)
 	functions := &poller.Functions{
 		Get: func(_ctx context.Context) (any, error) {
-			return p.getter.GetAny(ctx, host)
+			return p.getter.Get(ctx, host)
 		},
 		IsDone: func(_ctx context.Context, a any) bool {
-			return isDoneFn(_ctx, a.(*apps.StatefulSet))
+			return isDoneFn(_ctx, a.(*TypeToPoll))
 		},
 		ShouldContinueOnGetError: func(_ctx context.Context, _ any, e error) bool {
 			return apiErrors.IsNotFound(e)

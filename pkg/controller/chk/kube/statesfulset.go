@@ -69,10 +69,6 @@ func (c *STS) Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 	return c.get(ctx, namespace, name)
 }
 
-func (c *STS) GetAny(ctx context.Context, params ...any) (any, error) {
-	return c.Get(ctx, params...)
-}
-
 func (c *STS) get(ctx context.Context, namespace, name string) (*apps.StatefulSet, error) {
 	sts := &apps.StatefulSet{}
 	err := c.kubeClient.Get(ctx, types.NamespacedName{
