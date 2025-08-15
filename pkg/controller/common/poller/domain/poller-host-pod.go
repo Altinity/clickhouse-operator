@@ -29,19 +29,19 @@ type readyMarkDeleter interface {
 	DeleteReadyMarkOnPodAndService(ctx context.Context, host *api.Host) error
 }
 
-type HostPodPoller struct {
+type HostObjectsPoller struct {
 	stsPoller        *HostObjectPoller[apps.StatefulSet]
 	podPoller        *HostObjectPoller[core.Pod]
 	readyMarkDeleter readyMarkDeleter
 }
 
-// NewHostPodPoller creates new HostPodPoller
-func NewHostPodPoller(
+// NewHostObjectsPoller creates new HostObjectsPoller
+func NewHostObjectsPoller(
 	stsPoller *HostObjectPoller[apps.StatefulSet],
 	podPoller *HostObjectPoller[core.Pod],
 	readyMarkDeleter readyMarkDeleter,
-) *HostPodPoller {
-	return &HostPodPoller{
+) *HostObjectsPoller {
+	return &HostObjectsPoller{
 		stsPoller:        stsPoller,
 		podPoller:        podPoller,
 		readyMarkDeleter: readyMarkDeleter,
@@ -49,7 +49,7 @@ func NewHostPodPoller(
 }
 
 // WaitHostStatefulSetReady polls host's StatefulSet until it is ready
-func (p *HostPodPoller) WaitHostPodStarted(ctx context.Context, host *api.Host) error {
+func (p *HostObjectsPoller) WaitHostPodStarted(ctx context.Context, host *api.Host) error {
 	log.V(2).F().Info("Wait for StatefulSet to reach target generation")
 	err := p.stsPoller.Poll(
 		ctx,
@@ -85,7 +85,7 @@ func (p *HostPodPoller) WaitHostPodStarted(ctx context.Context, host *api.Host) 
 }
 
 // WaitHostStatefulSetReady polls host's StatefulSet until it is ready
-func (p *HostPodPoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error {
+func (p *HostObjectsPoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error {
 	log.V(2).F().Info("Wait for StatefulSet to reach target generation")
 	err := p.stsPoller.Poll(
 		ctx,
