@@ -200,7 +200,7 @@ function update_deployment_resource() {
   yq e -i '.spec.template.metadata.annotations += {"{{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations | nindent 8 }}{{ end }}": null}' "${file}"
   yq e -i '.spec.template.spec.imagePullSecrets |= "{{ toYaml .Values.imagePullSecrets | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.serviceAccountName |= "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}"' "${file}"
-  yq e -i '.spec.template.spec += {"{{- if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName | quote }}{{- end }}": null}' "${file}"
+  yq e -i '.spec.template.spec += {"{{ if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName | quote }}{{ end }}": null}' "${file}"
   yq e -i '.spec.template.spec.nodeSelector |= "{{ toYaml .Values.nodeSelector | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.affinity |= "{{ toYaml .Values.affinity | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.tolerations |= "{{ toYaml .Values.tolerations | nindent 8 }}"' "${file}"
@@ -233,7 +233,7 @@ function update_deployment_resource() {
   yq e -i '.spec.template.spec.containers[1].env += ["{{ with .Values.metrics.env }}{{ toYaml . | nindent 12 }}{{ end }}"]' "${file}"
 
   perl -pi -e "s/'{{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations \| nindent 8 }}{{ end }}': null/{{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations \| nindent 8 }}{{ end }}/g" "${file}"
-  perl -pi -e "s/'{{- if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName \| quote }}{{- end }}': null/{{- if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName | quote }}{{- end }}/g" "${file}"
+  perl -pi -e "s/'{{ if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName \| quote }}{{ end }}': null/{{ if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName | quote }}{{ end }}/g" "${file}"
   perl -pi -e "s/- '{{ with .Values.operator.env }}{{ toYaml . \| nindent 12 }}{{ end }}'/{{ with .Values.operator.env }}{{ toYaml . \| nindent 12 }}{{ end }}/g" "${file}"
   perl -pi -e "s/- '{{ with .Values.metrics.env }}{{ toYaml . \| nindent 12 }}{{ end }}'/{{ with .Values.metrics.env }}{{ toYaml . \| nindent 12 }}{{ end }}/g" "${file}"
   perl -pi -e 's/(\s+\- name: metrics-exporter)/{{ if .Values.metrics.enabled }}\n$1/g' "${file}"
