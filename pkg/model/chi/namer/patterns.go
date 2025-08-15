@@ -55,7 +55,7 @@ var patterns = types.List{
 const (
 	// patternPodName is a name of a Pod within StatefulSet. In our setup each StatefulSet has only 1 pod,
 	// so all pods would have '-0' suffix after StatefulSet name
-	// Ex.: StatefulSetName-0
+	// Ex.: <StatefulSetName>-0
 	patternPodName = "%s-0"
 )
 

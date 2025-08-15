@@ -30,29 +30,29 @@ type readyMarkDeleter interface {
 
 // HostStatefulSetPoller enriches StatefulSet poller with host capabilities
 type HostStatefulSetPoller struct {
-	poller  *HostObjectPoller[apps.StatefulSet]
-	deleter readyMarkDeleter
+	stsPoller        *HostObjectPoller[apps.StatefulSet]
+	readyMarkDeleter readyMarkDeleter
 }
 
 // NewHostStatefulSetPoller creates new HostStatefulSetPoller from StatefulSet poller
-func NewHostStatefulSetPoller(poller *HostObjectPoller[apps.StatefulSet], readyMarkDeleter readyMarkDeleter) *HostStatefulSetPoller {
+func NewHostStatefulSetPoller(stsPoller *HostObjectPoller[apps.StatefulSet], readyMarkDeleter readyMarkDeleter) *HostStatefulSetPoller {
 	return &HostStatefulSetPoller{
-		poller:  poller,
-		deleter: readyMarkDeleter,
+		stsPoller:        stsPoller,
+		readyMarkDeleter: readyMarkDeleter,
 	}
 }
 
 // WaitHostStatefulSetReady polls host's StatefulSet until it is ready
 func (p *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error {
 	log.V(2).F().Info("Wait for StatefulSet to reach target generation")
-	err := p.poller.Poll(
+	err := p.stsPoller.Poll(
 		ctx,
 		host,
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
 			if sts == nil {
 				return false
 			}
-			_ = p.deleter.DeleteReadyMarkOnPodAndService(_ctx, host)
+			_ = p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
 			return k8s.IsStatefulSetReconcileCompleted(sts)
 		},
 	)
@@ -62,11 +62,11 @@ func (p *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, ho
 	}
 
 	log.V(2).F().Info("Wait StatefulSet to reach ready status")
-	err = p.poller.Poll(
+	err = p.stsPoller.Poll(
 		ctx,
 		host,
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
-			_ = p.deleter.DeleteReadyMarkOnPodAndService(_ctx, host)
+			_ = p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
 			return k8s.IsStatefulSetReady(sts)
 		},
 	)
