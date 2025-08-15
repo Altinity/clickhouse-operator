@@ -28,6 +28,7 @@ import (
 
 type IHostObjectsPoller interface {
 	WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error
+	WaitHostPodStarted(ctx context.Context, host *api.Host) error
 }
 
 type fallback interface {
