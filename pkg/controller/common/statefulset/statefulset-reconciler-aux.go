@@ -26,7 +26,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type IHostStatefulSetPoller interface {
+type IHostObjectsPoller interface {
 	WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error
 }
 

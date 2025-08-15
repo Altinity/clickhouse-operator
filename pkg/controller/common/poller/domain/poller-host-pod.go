@@ -25,6 +25,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
+type readyMarkDeleter interface {
+	DeleteReadyMarkOnPodAndService(ctx context.Context, host *api.Host) error
+}
+
 type HostPodPoller struct {
 	stsPoller        *HostObjectPoller[apps.StatefulSet]
 	podPoller        *HostObjectPoller[core.Pod]
@@ -74,6 +78,42 @@ func (p *HostPodPoller) WaitHostPodStarted(ctx context.Context, host *api.Host) 
 	)
 	if err != nil {
 		log.V(1).F().Warning("FAILED wait Pod to reach started status")
+		return err
+	}
+
+	return nil
+}
+
+// WaitHostStatefulSetReady polls host's StatefulSet until it is ready
+func (p *HostPodPoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error {
+	log.V(2).F().Info("Wait for StatefulSet to reach target generation")
+	err := p.stsPoller.Poll(
+		ctx,
+		host,
+		func(_ctx context.Context, sts *apps.StatefulSet) bool {
+			if sts == nil {
+				return false
+			}
+			_ = p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
+			return k8s.IsStatefulSetReconcileCompleted(sts)
+		},
+	)
+	if err != nil {
+		log.V(1).F().Warning("FAILED wait for StatefulSet to reach generation")
+		return err
+	}
+
+	log.V(2).F().Info("Wait StatefulSet to reach ready status")
+	err = p.stsPoller.Poll(
+		ctx,
+		host,
+		func(_ctx context.Context, sts *apps.StatefulSet) bool {
+			_ = p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
+			return k8s.IsStatefulSetReady(sts)
+		},
+	)
+	if err != nil {
+		log.V(1).F().Warning("FAILED wait StatefulSet to reach ready status")
 		return err
 	}
 

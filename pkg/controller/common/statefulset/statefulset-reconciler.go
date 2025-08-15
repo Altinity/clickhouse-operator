@@ -36,10 +36,10 @@ type Reconciler struct {
 	a    a.Announcer
 	task *common.Task
 
-	hostSTSPoller IHostStatefulSetPoller
-	namer         interfaces.INameManager
-	labeler       interfaces.ILabeler
-	storage       *storage.Reconciler
+	hostObjectsPoller IHostObjectsPoller
+	namer             interfaces.INameManager
+	labeler           interfaces.ILabeler
+	storage           *storage.Reconciler
 
 	cr  interfaces.IKubeCR
 	sts interfaces.IKubeSTS
@@ -50,7 +50,7 @@ type Reconciler struct {
 func NewReconciler(
 	a a.Announcer,
 	task *common.Task,
-	hostSTSPoller IHostStatefulSetPoller,
+	hostObjectsPoller IHostObjectsPoller,
 	namer interfaces.INameManager,
 	labeler interfaces.ILabeler,
 	storage *storage.Reconciler,
@@ -61,10 +61,10 @@ func NewReconciler(
 		a:    a,
 		task: task,
 
-		hostSTSPoller: hostSTSPoller,
-		namer:         namer,
-		labeler:       labeler,
-		storage:       storage,
+		hostObjectsPoller: hostObjectsPoller,
+		namer:             namer,
+		labeler:           labeler,
+		storage:           storage,
 
 		cr:  kube.CR(),
 		sts: kube.STS(),
@@ -370,7 +370,7 @@ func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, op
 		log.V(1).M(host).F().Info("Will NOT wait for StatefulSet to be ready, consider it is created successfully")
 	} else {
 		// StatefulSet created, wait until host is ready
-		if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
+		if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
 			log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
 			return r.fallback.OnStatefulSetCreateFailed(ctx, host)
 		}
@@ -408,7 +408,7 @@ func (r *Reconciler) doUpdateStatefulSet(
 
 	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
+	if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet update FAILED - wait for ready StatefulSet failed. err: %v", err)
 		return r.fallback.OnStatefulSetUpdateFailed(ctx, oldStatefulSet, host, r.sts)
 	}
@@ -450,7 +450,7 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 	}
 
 	// Wait until StatefulSet scales down to 0 pods count.
-	_ = r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host)
+	_ = r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host)
 
 	// And now delete empty StatefulSet
 	if err := r.sts.Delete(ctx, namespace, name); err == nil {
