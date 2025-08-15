@@ -48,6 +48,8 @@ const (
 	WATCH_NAMESPACE = "WATCH_NAMESPACE"
 	// WATCH_NAMESPACES and WATCH_NAMESPACE specifies what namespaces to watch
 	WATCH_NAMESPACES = "WATCH_NAMESPACES"
+	// NAMESPACES_DENY_LIST specifies namespaces that should be excluded from reconciliation
+	NAMESPACES_DENY_LIST = "NAMESPACES_DENY_LIST"
 
 	// CHOP_CONFIG path to clickhouse operator configuration file
 	CHOP_CONFIG = "CHOP_CONFIG"

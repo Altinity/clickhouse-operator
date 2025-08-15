@@ -169,6 +169,8 @@ type OperatorConfigRuntime struct {
 type OperatorConfigWatch struct {
 	// Namespaces where operator watches for events
 	Namespaces []string `json:"namespaces" yaml:"namespaces"`
+	// NamespacesDenyList specifies namespaces that should be excluded from reconciliation
+	NamespacesDenyList []string `json:"namespacesDenyList" yaml:"namespacesDenyList"`
 }
 
 // OperatorConfigConfig specifies Config section
@@ -1018,6 +1020,19 @@ func (c *OperatorConfig) applyEnvVarParams() {
 			}
 		}
 	}
+
+	if denyList := os.Getenv(deployment.NAMESPACES_DENY_LIST); len(denyList) > 0 {
+		// We have NAMESPACES_DENY_LIST explicitly specified
+		namespaces := strings.FieldsFunc(denyList, func(r rune) bool {
+			return r == ':' || r == ','
+		})
+		c.Watch.NamespacesDenyList = []string{}
+		for i := range namespaces {
+			if len(namespaces[i]) > 0 {
+				c.Watch.NamespacesDenyList = append(c.Watch.NamespacesDenyList, namespaces[i])
+			}
+		}
+	}
 }
 
 // applyDefaultWatchNamespace applies default watch namespace in case none specified earlier
@@ -1122,7 +1137,12 @@ func (c *OperatorConfig) copyWithHiddenCredentials() *OperatorConfig {
 // IsWatchedNamespace returns whether specified namespace is in a list of watched
 // TODO unify with GetInformerNamespace
 func (c *OperatorConfig) IsWatchedNamespace(namespace string) bool {
-	// In case no namespaces specified - watch all namespaces
+	// First check if namespace is in deny list
+	if len(c.Watch.NamespacesDenyList) > 0 && util.InArrayWithRegexp(namespace, c.Watch.NamespacesDenyList) {
+		return false
+	}
+
+	// In case no namespaces specified - watch all namespaces (except those in deny list)
 	if len(c.Watch.Namespaces) == 0 {
 		return true
 	}
