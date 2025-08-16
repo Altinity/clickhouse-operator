@@ -165,7 +165,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	}
 
 	switch {
-	case opts.IsForceRecreate():
+	case opts.ForceRecreate():
 		// Force recreate prevails over all other requests
 		_ = r.recreateStatefulSet(ctx, host, register, opts)
 	default:
@@ -252,7 +252,7 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 
 	action := common.ErrCRUDRecreate
 	if k8s.IsStatefulSetReady(curStatefulSet) {
-		action = r.doUpdateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
+		action = r.doUpdateStatefulSet(ctx, curStatefulSet, newStatefulSet, host, opts)
 	}
 
 	switch action {
@@ -365,18 +365,34 @@ func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, op
 		return common.ErrCRUDRecreate
 	}
 
-	if opts.IsDoNotWait() {
-		// StatefulSet created, do not wait until host is ready, go by
-		log.V(1).M(host).F().Info("Will NOT wait for StatefulSet to be ready, consider it is created successfully")
-	} else {
-		// StatefulSet created, wait until host is ready
-		if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
-			log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
-			return r.fallback.OnStatefulSetCreateFailed(ctx, host)
-		}
-		log.V(2).M(host).F().Info("Target generation reached, StatefulSet created successfully")
+	// StatefulSet created, wait until host is running
+	if err := r.waitHostStatefulSetToRun(ctx, host, opts); err != nil {
+		log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
+		return r.fallback.OnStatefulSetCreateFailed(ctx, host)
 	}
 
+	return nil
+}
+
+func (r *Reconciler) waitHostStatefulSetToRun(ctx context.Context, host *api.Host, opts *ReconcileOptions) error {
+	switch {
+	case opts.WaitUntilReady():
+		log.V(1).M(host).F().Info("Wait host sts ready. Host: %s", host.GetName())
+		if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
+			log.V(1).M(host).F().Error("Host sts wait failed. host: %s err: %v", host.GetName(), err)
+			return err
+		}
+		log.V(1).M(host).F().Info("Host sts ready. Host: %s", host.GetName())
+	case opts.WaitUntilStarted():
+		log.V(1).M(host).F().Info("Wait host pod started. Host: %s", host.GetName())
+		if err := r.hostObjectsPoller.WaitHostPodStarted(ctx, host); err != nil {
+			log.V(1).M(host).F().Error("Host pod wait failed. host: %s err: %v", host.GetName(), err)
+			return err
+		}
+		log.V(1).M(host).F().Info("Host pod started. Host: %s", host.GetName())
+	default:
+		log.V(1).M(host).F().Warning("Host is not waiting sts at all. Host: %s", host.GetName())
+	}
 	return nil
 }
 
@@ -386,6 +402,7 @@ func (r *Reconciler) doUpdateStatefulSet(
 	oldStatefulSet *apps.StatefulSet,
 	newStatefulSet *apps.StatefulSet,
 	host *api.Host,
+	opts *ReconcileOptions,
 ) common.ErrorCRUD {
 	log.V(2).M(host).F().P()
 	// Apply newStatefulSet and wait for Generation to change
@@ -408,7 +425,7 @@ func (r *Reconciler) doUpdateStatefulSet(
 
 	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
+	if err := r.waitHostStatefulSetToRun(ctx, host, opts); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet update FAILED - wait for ready StatefulSet failed. err: %v", err)
 		return r.fallback.OnStatefulSetUpdateFailed(ctx, oldStatefulSet, host, r.sts)
 	}
