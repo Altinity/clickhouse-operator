@@ -15,8 +15,8 @@
 package statefulset
 
 type ReconcileOptions struct {
-	forceRecreate bool
-	doNotWait     bool
+	forceRecreate    bool
+	waitUntilStarted bool
 }
 
 func NewReconcileStatefulSetOptions() *ReconcileOptions {
@@ -30,30 +30,40 @@ func (o *ReconcileOptions) Ensure() *ReconcileOptions {
 	return o
 }
 
+func (o *ReconcileOptions) SetWaitUntilStarted() *ReconcileOptions {
+	o = o.Ensure()
+	o.waitUntilStarted = true
+	return o
+}
+
+func (o *ReconcileOptions) WaitUntilStarted() bool {
+	if o == nil {
+		return false
+	}
+	return o.waitUntilStarted
+}
+
+func (o *ReconcileOptions) SetWaitUntilReady() *ReconcileOptions {
+	o = o.Ensure()
+	o.waitUntilStarted = false
+	return o
+}
+
+func (o *ReconcileOptions) WaitUntilReady() bool {
+	return !o.WaitUntilStarted()
+}
+
 func (o *ReconcileOptions) SetForceRecreate() *ReconcileOptions {
 	o = o.Ensure()
 	o.forceRecreate = true
 	return o
 }
 
-func (o *ReconcileOptions) IsForceRecreate() bool {
+func (o *ReconcileOptions) ForceRecreate() bool {
 	if o == nil {
 		return false
 	}
 	return o.forceRecreate
-}
-
-func (o *ReconcileOptions) SetDoNotWait() *ReconcileOptions {
-	o = o.Ensure()
-	o.doNotWait = true
-	return o
-}
-
-func (o *ReconcileOptions) IsDoNotWait() bool {
-	if o == nil {
-		return false
-	}
-	return o.doNotWait
 }
 
 type ReconcileOptionsSet []*ReconcileOptions
