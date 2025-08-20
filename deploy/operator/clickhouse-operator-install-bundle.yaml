@@ -5065,14 +5065,21 @@ data:
         #   - to be excluded from a ClickHouse cluster
         #   - to complete all running queries
         #   - to be included into a ClickHouse cluster
-        # respectfully before moving forward
+        # respectfully before moving forward with host reconcile
         wait:
           exclude: true
           queries: true
           include: false
+          # The operator during reconcile procedure should wait for replicas to catch-up
+          # replication delay a.k.a replication lag for the following replicas
           replicas:
+            # All replicas (new and known earlier) are explicitly requested to wait for replication to catch-up
             all: no
+            # New replicas only are requested to wait for replication to catch-up
             new: yes
+            # Replication catch-up is considered as completed as soon as replication delay
+            # a.k.a replication lag - calculated as MAX(absolute_delay) FROM system.replicas
+            # is within this specified delay (in seconds)
             delay: 10
     
     ################################################
