@@ -365,8 +365,8 @@ func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, op
 		return common.ErrCRUDRecreate
 	}
 
-	// StatefulSet created, wait until host is running
-	if err := r.waitHostStatefulSetToRun(ctx, host, opts); err != nil {
+	// StatefulSet created, wait until host is launched
+	if err := r.waitHostStatefulSetToLaunch(ctx, host, opts); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
 		return r.fallback.OnStatefulSetCreateFailed(ctx, host)
 	}
@@ -374,25 +374,38 @@ func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, op
 	return nil
 }
 
-func (r *Reconciler) waitHostStatefulSetToRun(ctx context.Context, host *api.Host, opts *ReconcileOptions) error {
-	switch {
-	case opts.WaitUntilReady():
-		log.V(1).M(host).F().Info("Wait host sts ready. Host: %s", host.GetName())
-		if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
-			log.V(1).M(host).F().Error("Host sts wait failed. host: %s err: %v", host.GetName(), err)
-			return err
-		}
-		log.V(1).M(host).F().Info("Host sts ready. Host: %s", host.GetName())
-	case opts.WaitUntilStarted():
+func (r *Reconciler) waitHostStatefulSetToLaunch(ctx context.Context, host *api.Host, opts *ReconcileOptions) error {
+	// Whether StatefulSet has launched successfully
+	launched := false
+
+	// Start with waiting for startup probe
+	if opts.WaitUntilStarted() {
 		log.V(1).M(host).F().Info("Wait host pod started. Host: %s", host.GetName())
 		if err := r.hostObjectsPoller.WaitHostPodStarted(ctx, host); err != nil {
 			log.V(1).M(host).F().Error("Host pod wait failed. host: %s err: %v", host.GetName(), err)
 			return err
 		}
 		log.V(1).M(host).F().Info("Host pod started. Host: %s", host.GetName())
-	default:
-		log.V(1).M(host).F().Warning("Host is not waiting sts at all. Host: %s", host.GetName())
+		launched = true
 	}
+
+	// Continue with waiting for ready probe
+	if opts.WaitUntilReady() {
+		log.V(1).M(host).F().Info("Wait host sts ready. Host: %s", host.GetName())
+		if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
+			log.V(1).M(host).F().Error("Host sts wait failed. host: %s err: %v", host.GetName(), err)
+			return err
+		}
+		log.V(1).M(host).F().Info("Host sts ready. Host: %s", host.GetName())
+		launched = true
+	}
+
+	if launched {
+		log.V(1).M(host).F().Info("Host launched. Host: %s", host.GetName())
+	} else {
+		log.V(1).M(host).F().Warning("Host is not properly launched - no waiting sts at all. Host: %s", host.GetName())
+	}
+
 	return nil
 }
 
@@ -425,7 +438,8 @@ func (r *Reconciler) doUpdateStatefulSet(
 
 	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := r.waitHostStatefulSetToRun(ctx, host, opts); err != nil {
+	// StatefulSet updated, wait until host is launched
+	if err := r.waitHostStatefulSetToLaunch(ctx, host, opts); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet update FAILED - wait for ready StatefulSet failed. err: %v", err)
 		return r.fallback.OnStatefulSetUpdateFailed(ctx, oldStatefulSet, host, r.sts)
 	}
