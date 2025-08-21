@@ -15,9 +15,10 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"strings"
 	"time"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // Reconciling defines reconciling specification
@@ -31,6 +32,8 @@ type Reconciling struct {
 	// Runtime specifies runtime settings
 	Runtime ReconcileRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
 	Macros  Macros           `json:"macros,omitempty" yaml:"macros,omitempty"`
+
+	Host ReconcileHost `json:"host" yaml:"host"`
 }
 
 type Macros struct {
