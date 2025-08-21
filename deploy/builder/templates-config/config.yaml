@@ -362,8 +362,8 @@ reconcile:
         all: no
         # New replicas only are requested to wait for replication to catch-up
         new: yes
-        # Replication catch-up is considered as completed as soon as replication delay
-        # a.k.a replication lag - calculated as MAX(absolute_delay) FROM system.replicas
+        # Replication catch-up is considered to be completed as soon as replication delay
+        # a.k.a replication lag - calculated as "MAX(absolute_delay) FROM system.replicas"
         # is within this specified delay (in seconds)
         delay: 10
 
