@@ -406,26 +406,51 @@ type OperatorConfigReconcile struct {
 		} `json:"update" yaml:"update"`
 	} `json:"statefulSet" yaml:"statefulSet"`
 
-	Host OperatorConfigReconcileHost `json:"host" yaml:"host"`
+	Host ReconcileHost `json:"host" yaml:"host"`
 }
 
-// OperatorConfigReconcileHost defines reconcile host config
-type OperatorConfigReconcileHost struct {
-	Wait OperatorConfigReconcileHostWait `json:"wait" yaml:"wait"`
+// ReconcileHost defines reconcile host config
+type ReconcileHost struct {
+	Wait ReconcileHostWait `json:"wait" yaml:"wait"`
 }
 
-// OperatorConfigReconcileHostWait defines reconcile host wait config
-type OperatorConfigReconcileHostWait struct {
-	Exclude  *types.StringBool                        `json:"exclude,omitempty"  yaml:"exclude,omitempty"`
-	Queries  *types.StringBool                        `json:"queries,omitempty"  yaml:"queries,omitempty"`
-	Include  *types.StringBool                        `json:"include,omitempty"  yaml:"include,omitempty"`
-	Replicas *OperatorConfigReconcileHostWaitReplicas `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+func (host ReconcileHost) Normalize() ReconcileHost {
+	if host.Wait.Replicas == nil {
+		host.Wait.Replicas = &ReconcileHostWaitReplicas{}
+	}
+
+	if host.Wait.Replicas.Delay == nil {
+		// Default update timeout in seconds
+		host.Wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
+	}
+
+	if host.Wait.Probes == nil {
+		// Default value
+		host.Wait.Probes = &ReconcileHostWaitProbes{
+			Ready: types.NewStringBool(true),
+		}
+	}
+	return host
 }
 
-type OperatorConfigReconcileHostWaitReplicas struct {
+// ReconcileHostWait defines reconcile host wait config
+type ReconcileHostWait struct {
+	Exclude  *types.StringBool          `json:"exclude,omitempty"  yaml:"exclude,omitempty"`
+	Queries  *types.StringBool          `json:"queries,omitempty"  yaml:"queries,omitempty"`
+	Include  *types.StringBool          `json:"include,omitempty"  yaml:"include,omitempty"`
+	Replicas *ReconcileHostWaitReplicas `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+	Probes   *ReconcileHostWaitProbes   `json:"probes,omitempty"   yaml:"probes,omitempty"`
+}
+
+type ReconcileHostWaitReplicas struct {
 	All   *types.StringBool `json:"all,omitempty"   yaml:"all,omitempty"`
 	New   *types.StringBool `json:"new,omitempty"   yaml:"new,omitempty"`
 	Delay *types.Int32      `json:"delay,omitempty" yaml:"delay,omitempty"`
+}
+
+type ReconcileHostWaitProbes struct {
+	Startup *types.StringBool `json:"startup,omitempty" yaml:"startup,omitempty"`
+	Ready   *types.StringBool `json:"ready,omitempty"   yaml:"ready,omitempty"`
 }
 
 // OperatorConfigAnnotation specifies annotation section
@@ -837,15 +862,7 @@ func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
 }
 
 func (c *OperatorConfig) normalizeSectionReconcileHost() {
-	// Timeouts
-	if c.Reconcile.Host.Wait.Replicas == nil {
-		c.Reconcile.Host.Wait.Replicas = &OperatorConfigReconcileHostWaitReplicas{}
-	}
-
-	if c.Reconcile.Host.Wait.Replicas.Delay == nil {
-		// Default update timeout in seconds
-		c.Reconcile.Host.Wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
-	}
+	c.Reconcile.Host = c.Reconcile.Host.Normalize()
 }
 
 func (c *OperatorConfig) normalizeSectionClickHouseConfigurationUserDefault() {
