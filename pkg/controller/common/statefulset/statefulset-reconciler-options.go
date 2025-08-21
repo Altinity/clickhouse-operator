@@ -17,6 +17,7 @@ package statefulset
 type ReconcileOptions struct {
 	forceRecreate    bool
 	waitUntilStarted bool
+	waitUntilReady   bool
 }
 
 func NewReconcileStatefulSetOptions() *ReconcileOptions {
@@ -45,12 +46,15 @@ func (o *ReconcileOptions) WaitUntilStarted() bool {
 
 func (o *ReconcileOptions) SetWaitUntilReady() *ReconcileOptions {
 	o = o.Ensure()
-	o.waitUntilStarted = false
+	o.waitUntilReady = true
 	return o
 }
 
 func (o *ReconcileOptions) WaitUntilReady() bool {
-	return !o.WaitUntilStarted()
+	if o == nil {
+		return false
+	}
+	return o.waitUntilReady
 }
 
 func (o *ReconcileOptions) SetForceRecreate() *ReconcileOptions {
