@@ -2661,6 +2661,7 @@ def test_010023(self):
         kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-1.yaml"))
         kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-2.yaml"))
         kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-3.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-4.yaml"))
         kubectl.apply(util.get_full_path("manifests/secret/test-023-secret.yaml"))
     with Given("Give templates some time to be applied"):
         time.sleep(15)
@@ -2680,6 +2681,7 @@ def test_010023(self):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[1].name") == "extension-annotations"
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "grafana-dashboard-user"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[3].name") == "set-labels"
         # assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == ""
 
     chi_spec = kubectl.get("chi", chi)
@@ -2720,6 +2722,12 @@ def test_010023(self):
     with Then("User from a template should be populated"):
         out = clickhouse.query_with_error(chi, "select 1", user = "grafana_dashboard_user", pwd = "grafana_dashboard_user_password")
         assert out == "1"
+
+    with Then("Label from a template should be populated"):
+        normalizedCompleted = kubectl.get_chi_normalizedCompleted(chi)
+        assert normalizedCompleted["metadata"]["labels"]["my-label"] == "test"
+    with Then("Pod label should populated from template"):
+        assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.labels.my-label") == "test"
 
     with Given("Two selector templates are deployed"):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-selector-1.yaml"))
