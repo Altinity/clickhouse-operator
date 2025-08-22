@@ -433,6 +433,11 @@ func (host ReconcileHost) Normalize() ReconcileHost {
 	return host
 }
 
+func (host ReconcileHost) MergeFrom(from ReconcileHost) ReconcileHost {
+	host.Wait = host.Wait.MergeFrom(from.Wait)
+	return host
+}
+
 // ReconcileHostWait defines reconcile host wait config
 type ReconcileHostWait struct {
 	Exclude  *types.StringBool          `json:"exclude,omitempty"  yaml:"exclude,omitempty"`
@@ -442,15 +447,68 @@ type ReconcileHostWait struct {
 	Probes   *ReconcileHostWaitProbes   `json:"probes,omitempty"   yaml:"probes,omitempty"`
 }
 
+func (wait ReconcileHostWait) MergeFrom(from ReconcileHostWait) ReconcileHostWait {
+	wait.Exclude = wait.Exclude.MergeFrom(from.Exclude)
+	wait.Queries = wait.Queries.MergeFrom(from.Queries)
+	wait.Include = wait.Include.MergeFrom(from.Include)
+	wait.Replicas = wait.Replicas.MergeFrom(from.Replicas)
+	wait.Probes = wait.Probes.MergeFrom(from.Probes)
+
+	return wait
+}
+
 type ReconcileHostWaitReplicas struct {
 	All   *types.StringBool `json:"all,omitempty"   yaml:"all,omitempty"`
 	New   *types.StringBool `json:"new,omitempty"   yaml:"new,omitempty"`
 	Delay *types.Int32      `json:"delay,omitempty" yaml:"delay,omitempty"`
 }
 
+func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas) *ReconcileHostWaitReplicas {
+	if from == nil {
+		// Nothing to merge from, keep original value
+		return r
+	}
+
+	// From now on we have `from` specified
+
+	if r == nil {
+		// Recipient is not specified, just use `from` value
+		return from
+	}
+
+	// Both recipient and `from` are specified, need to walk over fields
+
+	r.All = r.All.MergeFrom(from.All)
+	r.New = r.New.MergeFrom(from.New)
+	r.Delay = r.Delay.MergeFrom(from.Delay)
+
+	return r
+}
+
 type ReconcileHostWaitProbes struct {
 	Startup *types.StringBool `json:"startup,omitempty" yaml:"startup,omitempty"`
 	Ready   *types.StringBool `json:"ready,omitempty"   yaml:"ready,omitempty"`
+}
+
+func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *ReconcileHostWaitProbes {
+	if from == nil {
+		// Nothing to merge from, keep original value
+		return p
+	}
+
+	// From now on we have `from` specified
+
+	if p == nil {
+		// Recipient is not specified, just use `from` value
+		return from
+	}
+
+	// Both recipient and `from` are specified, need to walk over fields
+
+	p.Startup = p.Startup.MergeFrom(from.Startup)
+	p.Ready = p.Ready.MergeFrom(from.Ready)
+
+	return p
 }
 
 // OperatorConfigAnnotation specifies annotation section
