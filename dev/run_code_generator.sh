@@ -58,6 +58,8 @@ bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
     -o "${GENERATOR_ROOT}" \
     --go-header-file "${SRC_ROOT}/hack/boilerplate.go.txt"
 
+    #TODO need to add generator for clickhuose-backup.altinity.com:v1
+
 echo "Copy generated sources into: ${PKG_ROOT}"
 cp -r "${GENERATOR_ROOT}/${REPO}/pkg/"* "${PKG_ROOT}"
 

@@ -1,0 +1,133 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: clickhousebackups.clickhouse-backup.altinity.com
+spec:
+  group: clickhouse-backup.altinity.com
+  names:
+    kind: ClickHouseBackup
+    listKind: ClickHouseBackupList
+    plural: clickhousebackups
+    shortNames:
+      - chb
+    singular: clickhousebackup
+  scope: Namespaced
+  versions:
+    - additionalPrinterColumns:
+        - jsonPath: .status.state
+          name: Status
+          type: string
+        - jsonPath: .status.message
+          name: Message
+          type: string
+        - jsonPath: .metadata.creationTimestamp
+          name: Age
+          type: date
+      name: v1
+      schema:
+        openAPIV3Schema:
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              properties:
+                ClickhouseInstallation:
+                  description: ClickhouseInstallation represents the CHI (ClickHouseInstallation)
+                    that a backup is tied to
+                  properties:
+                    cluster:
+                      description: ClickhouseCluster represents a single cluster inside
+                        a CHI
+                      properties:
+                        name:
+                          type: string
+                      type: object
+                    name:
+                      type: string
+                  type: object
+                backup:
+                  properties:
+                    dbTable:
+                      properties:
+                        blackList:
+                          items:
+                            type: string
+                          type: array
+                        whiteList:
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    s3:
+                      properties:
+                        destinationPath:
+                          type: string
+                        endpointURL:
+                          type: string
+                        s3Credentials:
+                          properties:
+                            accessKeyId:
+                              properties:
+                                key:
+                                  type: string
+                                name:
+                                  type: string
+                              type: object
+                            secretAccessKey:
+                              properties:
+                                key:
+                                  type: string
+                                name:
+                                  type: string
+                              type: object
+                          type: object
+                      type: object
+                  type: object
+                method:
+                  type: string
+                pluginConfiguration:
+                  properties:
+                    name:
+                      type: string
+                  type: object
+              type: object
+            status:
+              properties:
+                backupId:
+                  type: string
+                backupName:
+                  type: string
+                message:
+                  type: string
+                startedAt:
+                  format: date-time
+                  type: string
+                state:
+                  type: string
+                stoppedAt:
+                  format: date-time
+                  type: string
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}

@@ -70,6 +70,20 @@ func (c *CHOp) Config() *api.OperatorConfig {
 	return c.ConfigManager.Config()
 }
 
+func (c *CHOp) KubeClient() *kube.Clientset {
+	if c == nil {
+		return nil
+	}
+	return c.ConfigManager.KubeClient()
+}
+
+func (c *CHOp) ChopClient() *chopclientset.Clientset {
+	if c == nil {
+		return nil
+	}
+	return c.ConfigManager.ChopClient()
+}
+
 // GetRuntimeParam returns operator runtime parameter by name
 func (c *CHOp) GetRuntimeParam(name string) (string, bool) {
 	if c == nil {
