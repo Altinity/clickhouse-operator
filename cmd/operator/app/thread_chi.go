@@ -63,6 +63,13 @@ func initClickHouse(ctx context.Context) {
 	log.V(1).F().Info("Config parsed:")
 	log.Info("\n" + chop.Config().String(true))
 
+	// Log namespace deny list configuration
+	if len(chop.Config().Watch.NamespacesDenyList) > 0 {
+		log.Info("Namespace deny list configured: %v - these namespaces will NOT be reconciled", chop.Config().Watch.NamespacesDenyList)
+	} else {
+		log.V(1).Info("No namespace deny list configured - all watched namespaces will be reconciled")
+	}
+
 	// Create Informers
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
