@@ -699,6 +699,231 @@ spec:
                                     - "Enabled"
                                     - "enabled"
                                   description: "enabled or not"
+                    host:
+                      type: object
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+                      properties:
+                        wait:
+                          type: object
+                          properties:
+                            exclude:
+                              type: string
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be excluded from a ClickHouse cluster"
+                              enum:
+                                # List StringBoolXXX constants from model
+                                - ""
+                                - "0"
+                                - "1"
+                                - "False"
+                                - "false"
+                                - "True"
+                                - "true"
+                                - "No"
+                                - "no"
+                                - "Yes"
+                                - "yes"
+                                - "Off"
+                                - "off"
+                                - "On"
+                                - "on"
+                                - "Disable"
+                                - "disable"
+                                - "Enable"
+                                - "enable"
+                                - "Disabled"
+                                - "disabled"
+                                - "Enabled"
+                                - "enabled"
+                            queries:
+                              type: string
+                              enum:
+                                # List StringBoolXXX constants from model
+                                - ""
+                                - "0"
+                                - "1"
+                                - "False"
+                                - "false"
+                                - "True"
+                                - "true"
+                                - "No"
+                                - "no"
+                                - "Yes"
+                                - "yes"
+                                - "Off"
+                                - "off"
+                                - "On"
+                                - "on"
+                                - "Disable"
+                                - "disable"
+                                - "Enable"
+                                - "enable"
+                                - "Disabled"
+                                - "disabled"
+                                - "Enabled"
+                                - "enabled"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
+                            include:
+                              type: string
+                              enum:
+                                # List StringBoolXXX constants from model
+                                - ""
+                                - "0"
+                                - "1"
+                                - "False"
+                                - "false"
+                                - "True"
+                                - "true"
+                                - "No"
+                                - "no"
+                                - "Yes"
+                                - "yes"
+                                - "Off"
+                                - "off"
+                                - "On"
+                                - "on"
+                                - "Disable"
+                                - "disable"
+                                - "Enable"
+                                - "enable"
+                                - "Disabled"
+                                - "disabled"
+                                - "Enabled"
+                                - "enabled"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
+                            replicas:
+                              type: object
+                              description: "Whether the operator during reconcile procedure should wait for replicas to catch-up"
+                              properties:
+                                all:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "Whether the operator during reconcile procedure should wait for all replicas to catch-up"
+                                new:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "Whether the operator during reconcile procedure should wait for new replicas to catch-up"
+                                delay:
+                                  type: integer
+                                  description: "replication max absolute delay to consider replica is not delayed"
+                            probes:
+                              type: object
+                              description: "What probes the operator should wait during host launch procedure"
+                              properties:
+                                startup:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for startup probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to do not wait.
+                                ready:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for ready probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to wait.
                 defaults:
                   type: object
                   description: |
@@ -2925,6 +3150,231 @@ spec:
                                     - "Enabled"
                                     - "enabled"
                                   description: "enabled or not"
+                    host:
+                      type: object
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+                      properties:
+                        wait:
+                          type: object
+                          properties:
+                            exclude:
+                              type: string
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be excluded from a ClickHouse cluster"
+                              enum:
+                                # List StringBoolXXX constants from model
+                                - ""
+                                - "0"
+                                - "1"
+                                - "False"
+                                - "false"
+                                - "True"
+                                - "true"
+                                - "No"
+                                - "no"
+                                - "Yes"
+                                - "yes"
+                                - "Off"
+                                - "off"
+                                - "On"
+                                - "on"
+                                - "Disable"
+                                - "disable"
+                                - "Enable"
+                                - "enable"
+                                - "Disabled"
+                                - "disabled"
+                                - "Enabled"
+                                - "enabled"
+                            queries:
+                              type: string
+                              enum:
+                                # List StringBoolXXX constants from model
+                                - ""
+                                - "0"
+                                - "1"
+                                - "False"
+                                - "false"
+                                - "True"
+                                - "true"
+                                - "No"
+                                - "no"
+                                - "Yes"
+                                - "yes"
+                                - "Off"
+                                - "off"
+                                - "On"
+                                - "on"
+                                - "Disable"
+                                - "disable"
+                                - "Enable"
+                                - "enable"
+                                - "Disabled"
+                                - "disabled"
+                                - "Enabled"
+                                - "enabled"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
+                            include:
+                              type: string
+                              enum:
+                                # List StringBoolXXX constants from model
+                                - ""
+                                - "0"
+                                - "1"
+                                - "False"
+                                - "false"
+                                - "True"
+                                - "true"
+                                - "No"
+                                - "no"
+                                - "Yes"
+                                - "yes"
+                                - "Off"
+                                - "off"
+                                - "On"
+                                - "on"
+                                - "Disable"
+                                - "disable"
+                                - "Enable"
+                                - "enable"
+                                - "Disabled"
+                                - "disabled"
+                                - "Enabled"
+                                - "enabled"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
+                            replicas:
+                              type: object
+                              description: "Whether the operator during reconcile procedure should wait for replicas to catch-up"
+                              properties:
+                                all:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "Whether the operator during reconcile procedure should wait for all replicas to catch-up"
+                                new:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: "Whether the operator during reconcile procedure should wait for new replicas to catch-up"
+                                delay:
+                                  type: integer
+                                  description: "replication max absolute delay to consider replica is not delayed"
+                            probes:
+                              type: object
+                              description: "What probes the operator should wait during host launch procedure"
+                              properties:
+                                startup:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for startup probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to do not wait.
+                                ready:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for ready probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to wait.
                 defaults:
                   type: object
                   description: |
@@ -4964,7 +5414,7 @@ spec:
                                   description: |
                                     Whether the operator during host launch procedure should wait for startup probe to succeed.
                                     In case probe is unspecified wait is assumed to be completed successfully.
-                                    Default value - do not wait.
+                                    Default option value is to do not wait.
                                 ready:
                                   type: string
                                   enum:
@@ -4995,7 +5445,7 @@ spec:
                                   description: |
                                     Whether the operator during host launch procedure should wait for ready probe to succeed.
                                     In case probe is unspecified wait is assumed to be completed successfully.
-                                    Default value - wait.
+                                    Default option value is to wait.
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
