@@ -327,7 +327,6 @@ spec:
                           - to complete all running queries
                           - to be included into a ClickHouse cluster
                         respectfully before moving forward
-
                       properties:
                         wait:
                           type: object
