@@ -28,13 +28,6 @@ jobs:
       - name: Package Chart
         run: cr package deploy/helm/clickhouse-operator
 
-      - name: Install Helm
-        run: |
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-      - name: Login to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
-
       - name: Get Release Assets
         id: get_assets
         run: |
@@ -62,13 +55,38 @@ jobs:
             -H "Content-Type: application/gzip" \
             -T "${CHART_PATH}" \
             "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${{ github.event.release.id }}/assets?name=$(basename ${CHART_PATH})"
-
+      - name: Validate Helm Repository Configuration
+        run: |
+          if [ -z "${{ secrets.HELM_GITHUB_TOKEN }}" ]; then
+            echo "ERROR: HELM_GITHUB_TOKEN secret is not set or is empty"
+            echo "Please add HELM_GITHUB_TOKEN to repository secrets with write access to the helm repository"
+            exit 1
+          fi
+          
+          if [ -z "${{ vars.HELM_GITHUB_REPOSITORY }}" ]; then
+            echo "ERROR: HELM_GITHUB_REPOSITORY variable is not set or is empty"
+            echo "Please add HELM_GITHUB_REPOSITORY to repository variables (Settings -> Secrets and variables -> Actions -> Variables)"
+            exit 1
+          fi
+          
+          echo "Configuration validated:"
+          echo "  HELM_GITHUB_REPOSITORY: ${{ vars.HELM_GITHUB_REPOSITORY }}"
+          echo "  HELM_GITHUB_TOKEN: [SET]"
+          
+      - name: Upload Release Artifacts to Helm Repo
+        run: |
+          cr upload \
+            --git-repo=${{ vars.HELM_GITHUB_REPOSITORY }} \
+            --owner=${GITHUB_REPOSITORY_OWNER} \
+            --release-name-template=${{ github.event.release.name }} \
+            --token=${{ secrets.HELM_GITHUB_TOKEN }} \
+            --package-path=.cr-release-packages \
+            --skip-existing
       - name: Configure Git
         run: |
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
-      - name: Release Chart
+      - name: Release Chart to Operator Repo
         run: |
           git remote add httpsorigin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch httpsorigin
@@ -80,8 +98,86 @@ jobs:
             --index-path=index.yaml \
             --remote=httpsorigin \
             --push
-
-      - name: Push Helm Chart to OCI Registry
+      - name: Release Chart to Helm Repo
         run: |
-          CHART_PATH=$(ls .cr-release-packages/altinity-clickhouse-operator-*.tgz)
-          helm push "${CHART_PATH}" oci://ghcr.io/altinity/clickhouse-operator-helm-chart
+          # Validate configuration before attempting to push
+          if [ -z "${{ vars.HELM_GITHUB_REPOSITORY }}" ]; then
+            echo "ERROR: HELM_GITHUB_REPOSITORY variable is not set or is empty"
+            echo "This step requires HELM_GITHUB_REPOSITORY to be set in repository variables"
+            echo "Go to: Settings -> Secrets and variables -> Actions -> Variables"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.HELM_GITHUB_TOKEN }}" ]; then
+            echo "ERROR: HELM_GITHUB_TOKEN secret is not set or is empty"
+            echo "This step requires HELM_GITHUB_TOKEN with write access to: ${GITHUB_REPOSITORY_OWNER}/${{ vars.HELM_GITHUB_REPOSITORY }}"
+            echo "Go to: Settings -> Secrets and variables -> Actions -> Secrets"
+            exit 1
+          fi
+          
+          echo "Attempting to push to helm repository: ${GITHUB_REPOSITORY_OWNER}/${{ vars.HELM_GITHUB_REPOSITORY }}"
+          
+          # Test token authentication
+          echo "Testing token authentication..."
+          TOKEN_USER=$(curl -sS -H "Authorization: token ${{ secrets.HELM_GITHUB_TOKEN }}" https://api.github.com/user | jq -r '.login')
+          echo "Token authenticated as user: ${TOKEN_USER}"
+          
+          # Save current directory
+          WORK_DIR=$(pwd)
+          
+          # Create a temporary directory for helm repo operations
+          TEMP_DIR=$(mktemp -d)
+          cd "$TEMP_DIR"
+          
+          # Clone the helm repository WITHOUT token in URL to avoid masking issues
+          echo "Cloning helm repository to temporary directory..."
+          git clone https://github.com/${GITHUB_REPOSITORY_OWNER}/${{ vars.HELM_GITHUB_REPOSITORY }}.git helm-repo || {
+            echo "ERROR: Failed to clone helm repository"
+            echo "Please verify:"
+            echo "  1. Repository exists: ${GITHUB_REPOSITORY_OWNER}/${{ vars.HELM_GITHUB_REPOSITORY }}"
+            exit 1
+          }
+          
+          cd helm-repo
+          
+          # Configure git credentials for push
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git config user.name "$GITHUB_ACTOR"
+          
+          # Set up authentication using git credential helper
+          git config credential.helper "store --file=.git/credentials"
+          echo "https://x-access-token:${{ secrets.HELM_GITHUB_TOKEN }}@github.com" > .git/credentials
+          
+          # Now use cr index from within the helm repo to avoid history conflicts
+          echo "Generating index.yaml within helm repository context..."
+          
+          # Copy the package to a local directory within helm repo
+          mkdir -p .cr-release-packages
+          cp "$WORK_DIR"/.cr-release-packages/*.tgz .cr-release-packages/ || {
+            echo "ERROR: No chart packages found in .cr-release-packages"
+            exit 1
+          }
+          
+          # Generate index with cr (this will handle the gh-pages branch automatically)
+          cr index \
+            --git-repo=${{ vars.HELM_GITHUB_REPOSITORY }} \
+            --owner=${GITHUB_REPOSITORY_OWNER} \
+            --release-name-template=${{ github.event.release.name }} \
+            --token=${{ secrets.HELM_GITHUB_TOKEN }} \
+            --package-path=.cr-release-packages \
+            --index-path=index.yaml \
+            --push || {
+            echo "ERROR: Failed to generate or push index to helm repository"
+            echo "Debug: Current directory is $(pwd)"
+            echo "Debug: Git remotes:"
+            git remote -v
+            echo "Debug: Git status:"
+            git status
+            exit 1
+          }
+          
+          echo "Successfully updated helm repository index"
+          
+          # Cleanup
+          cd /
+          rm -rf "$TEMP_DIR"
