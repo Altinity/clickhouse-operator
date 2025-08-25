@@ -380,7 +380,7 @@ spec:
                                   type: integer
                                   description: "replication max absolute delay to consider replica is not delayed"
                             probes:
-                              type: objects
+                              type: object
                               description: "What probes the operator should wait during host launch procedure"
                               properties:
                                 startup:
