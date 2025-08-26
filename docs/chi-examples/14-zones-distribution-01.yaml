@@ -19,7 +19,7 @@ spec:
         podDistribution:
           - type: ClickHouseAntiAffinity
             scope: ClickHouseInstallation
-      - name: clickhouse-in-zone-us-east-1f
+      - name: clickhouse-in-zone-us-east-1c
         zone:
           values:
             - "us-east-1c"
