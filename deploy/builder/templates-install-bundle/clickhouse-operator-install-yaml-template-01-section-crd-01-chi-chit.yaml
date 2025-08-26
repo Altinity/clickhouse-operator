@@ -502,34 +502,8 @@ spec:
                         wait:
                           type: object
                           properties:
-                            exclude:  &TypeStringBool
-                              type: string
-                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be excluded from a ClickHouse cluster"
-                              enum:
-                                # List StringBoolXXX constants from model
-                                - ""
-                                - "0"
-                                - "1"
-                                - "False"
-                                - "false"
-                                - "True"
-                                - "true"
-                                - "No"
-                                - "no"
-                                - "Yes"
-                                - "yes"
-                                - "Off"
-                                - "off"
-                                - "On"
-                                - "on"
-                                - "Disable"
-                                - "disable"
-                                - "Enable"
-                                - "enable"
-                                - "Disabled"
-                                - "disabled"
-                                - "Enabled"
-                                - "enabled"
+                            exclude:
+                              <<: *TypeStringBool
                             queries:
                               <<: *TypeStringBool
                               description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
