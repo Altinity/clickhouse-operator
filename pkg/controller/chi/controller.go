@@ -18,6 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -25,6 +27,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeTypes "k8s.io/apimachinery/pkg/types"
@@ -306,9 +309,11 @@ func checkIP(path *messagediff.Path, iValue interface{}) bool {
 	return false
 }
 
-func updated(old, new *core.Endpoints) bool {
+func isUpdatedEndpoints(old, new *core.Endpoints) bool {
 	oldSubsets := normalizeEndpoints(old).Subsets
 	newSubsets := normalizeEndpoints(new).Subsets
+
+	log.V(1).M(new).F().Info("Check whether is updated Endpoints. %s/%s", new.Namespace, new.Name)
 
 	diff, equal := messagediff.DeepDiff(oldSubsets[0].Addresses, newSubsets[0].Addresses)
 	if equal {
@@ -342,7 +347,32 @@ func updated(old, new *core.Endpoints) bool {
 	return false
 }
 
-func (c *Controller) addEventHandlersEndpoint(
+func isUpdatedEndpointSlice(old, new *discovery.EndpointSlice) bool {
+	log.V(1).M(new).F().Info("Check whether is updated EndpointSlice. %s/%s Transition: '%s'=>'%s'", new.Namespace, new.Name, buildComparableEndpointAddresses(old), buildComparableEndpointAddresses(new))
+	return buildComparableEndpointAddresses(old) != buildComparableEndpointAddresses(new)
+}
+
+func buildComparableEndpointAddresses(epSlice *discovery.EndpointSlice) string {
+	return strings.Join(fetchUniqueReadyAddresses(epSlice), ",")
+}
+
+func fetchUniqueReadyAddresses(epSlice *discovery.EndpointSlice) (res []string) {
+	if epSlice == nil {
+		return nil
+	}
+	for _, ep := range epSlice.Endpoints {
+		if (ep.Conditions.Ready != nil) && (*ep.Conditions.Ready == false) {
+			// Skip not-ready address
+			continue
+		}
+		res = append(res, ep.Addresses...)
+	}
+	sort.Strings(res)
+
+	return util.Unique(res)
+}
+
+func (c *Controller) addEventHandlersEndpoints(
 	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) {
 	kubeInformerFactory.Core().V1().Endpoints().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -360,7 +390,7 @@ func (c *Controller) addEventHandlersEndpoint(
 				return
 			}
 			log.V(3).M(newEndpoints).Info("endpointsInformer.UpdateFunc")
-			if updated(oldEndpoints, newEndpoints) {
+			if isUpdatedEndpoints(oldEndpoints, newEndpoints) {
 				c.enqueueObject(cmd_queue.NewReconcileEndpoints(cmd_queue.ReconcileUpdate, oldEndpoints, newEndpoints))
 			}
 		},
@@ -370,6 +400,38 @@ func (c *Controller) addEventHandlersEndpoint(
 				return
 			}
 			log.V(3).M(endpoints).Info("endpointsInformer.DeleteFunc")
+		},
+	})
+}
+
+func (c *Controller) addEventHandlersEndpointSlice(
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
+) {
+	kubeInformerFactory.Discovery().V1().EndpointSlices().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			endpointSlice := obj.(*discovery.EndpointSlice)
+			if !c.isTrackedObject(&endpointSlice.ObjectMeta) {
+				return
+			}
+			log.V(3).M(endpointSlice).Info("endpointSliceInformer.AddFunc")
+		},
+		UpdateFunc: func(old, new interface{}) {
+			oldEndpointSlice := old.(*discovery.EndpointSlice)
+			newEndpointSlice := new.(*discovery.EndpointSlice)
+			if !c.isTrackedObject(&oldEndpointSlice.ObjectMeta) {
+				return
+			}
+			log.V(3).M(newEndpointSlice).Info("endpointSliceInformer.UpdateFunc")
+			if isUpdatedEndpointSlice(oldEndpointSlice, newEndpointSlice) {
+				c.enqueueObject(cmd_queue.NewReconcileEndpointSlice(cmd_queue.ReconcileUpdate, oldEndpointSlice, newEndpointSlice))
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			endpointSlice := obj.(*discovery.EndpointSlice)
+			if !c.isTrackedObject(&endpointSlice.ObjectMeta) {
+				return
+			}
+			log.V(3).M(endpointSlice).Info("endpointSliceInformer.DeleteFunc")
 		},
 	})
 }
@@ -473,7 +535,8 @@ func (c *Controller) addEventHandlers(
 	c.addEventHandlersCHIT(chopInformerFactory)
 	c.addEventHandlersChopConfig(chopInformerFactory)
 	c.addEventHandlersService(kubeInformerFactory)
-	c.addEventHandlersEndpoint(kubeInformerFactory)
+	//c.addEventHandlersEndpoints(kubeInformerFactory)
+	c.addEventHandlersEndpointSlice(kubeInformerFactory)
 	c.addEventHandlersConfigMap(kubeInformerFactory)
 	c.addEventHandlersStatefulSet(kubeInformerFactory)
 	c.addEventHandlersPod(kubeInformerFactory)
@@ -606,6 +669,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		*cmd_queue.ReconcileCHIT,
 		*cmd_queue.ReconcileChopConfig,
 		*cmd_queue.ReconcileEndpoints,
+		*cmd_queue.ReconcileEndpointSlice,
 		*cmd_queue.ReconcilePod:
 		variants := api.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)
