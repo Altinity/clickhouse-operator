@@ -44,7 +44,7 @@ const (
 	priorityReconcileCHIT          int = 5
 	priorityReconcileChopConfig    int = 3
 	priorityReconcileEndpoints     int = 15
-	priorityReconcileEndpointSlice int = 16
+	priorityReconcileEndpointSlice int = 15
 )
 
 // ReconcileCHI specifies reconcile request queue item
