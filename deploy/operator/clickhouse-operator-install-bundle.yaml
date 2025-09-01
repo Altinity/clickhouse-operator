@@ -4443,6 +4443,19 @@ rules:
       - delete
 
   #
+  # discovery.* resources
+  #
+
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+    verbs:
+      - get
+      - list
+      - watch
+
+  #
   # apiextensions
   #
 
@@ -4694,6 +4707,19 @@ rules:
       - watch
       - create
       - delete
+
+  #
+  # discovery.* resources
+  #
+
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+    verbs:
+      - get
+      - list
+      - watch
 
   #
   # apiextensions
