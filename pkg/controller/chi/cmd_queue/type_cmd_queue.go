@@ -15,8 +15,10 @@
 package cmd_queue
 
 import (
-	"github.com/altinity/queue"
 	core "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
+
+	"github.com/altinity/queue"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
@@ -38,10 +40,11 @@ func (i PriorityQueueItem) Priority() int {
 }
 
 const (
-	priorityReconcileCHI        int = 10
-	priorityReconcileCHIT       int = 5
-	priorityReconcileChopConfig int = 3
-	priorityReconcileEndpoints  int = 15
+	priorityReconcileCHI           int = 10
+	priorityReconcileCHIT          int = 5
+	priorityReconcileChopConfig    int = 3
+	priorityReconcileEndpoints     int = 15
+	priorityReconcileEndpointSlice int = 16
 )
 
 // ReconcileCHI specifies reconcile request queue item
@@ -194,6 +197,39 @@ func NewReconcileEndpoints(cmd string, old, new *core.Endpoints) *ReconcileEndpo
 	}
 }
 
+// ReconcileEndpointSlice specifies endpointSlice
+type ReconcileEndpointSlice struct {
+	PriorityQueueItem
+	Cmd string
+	Old *discovery.EndpointSlice
+	New *discovery.EndpointSlice
+}
+
+var _ queue.PriorityQueueItem = &ReconcileEndpointSlice{}
+
+// Handle returns handle of the queue item
+func (r ReconcileEndpointSlice) Handle() queue.T {
+	if r.New != nil {
+		return "ReconcileEndpointSlice" + ":" + r.New.Namespace + "/" + r.New.Name
+	}
+	if r.Old != nil {
+		return "ReconcileEndpointSlice" + ":" + r.Old.Namespace + "/" + r.Old.Name
+	}
+	return ""
+}
+
+// NewReconcileEndpointSlice creates new reconcile endpointSlice queue item
+func NewReconcileEndpointSlice(cmd string, old, new *discovery.EndpointSlice) *ReconcileEndpointSlice {
+	return &ReconcileEndpointSlice{
+		PriorityQueueItem: PriorityQueueItem{
+			priority: priorityReconcileEndpointSlice,
+		},
+		Cmd: cmd,
+		Old: old,
+		New: new,
+	}
+}
+
 // ReconcilePod specifies pod reconcile
 type ReconcilePod struct {
 	PriorityQueueItem
@@ -202,7 +238,7 @@ type ReconcilePod struct {
 	New *core.Pod
 }
 
-var _ queue.PriorityQueueItem = &ReconcileEndpoints{}
+var _ queue.PriorityQueueItem = &ReconcilePod{}
 
 // Handle returns handle of the queue item
 func (r ReconcilePod) Handle() queue.T {
