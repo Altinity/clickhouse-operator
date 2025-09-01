@@ -222,10 +222,10 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 }
 
 // updateEndpoints updates endpoints
-func (w *worker) updateEndpoints(ctx context.Context, ep *core.Endpoints) error {
+func (w *worker) updateEndpoints(ctx context.Context, m meta.Object) error {
 	_ = w.finalizeCR(
 		ctx,
-		ep,
+		m,
 		types.UpdateStatusOptions{
 			TolerateAbsence: true,
 			CopyStatusOptions: types.CopyStatusOptions{
