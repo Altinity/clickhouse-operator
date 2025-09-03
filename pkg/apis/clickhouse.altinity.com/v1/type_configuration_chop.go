@@ -168,7 +168,11 @@ type OperatorConfigRuntime struct {
 // OperatorConfigWatch specifies watch section
 type OperatorConfigWatch struct {
 	// Namespaces where operator watches for events
-	Namespaces []string `json:"namespaces" yaml:"namespaces"`
+	OperatorConfigWatchNamespaces `json:",inline" yaml:",inline"`
+}
+
+type OperatorConfigWatchNamespaces struct {
+	Namespaces *types.Strings `json:"namespaces" yaml:"namespaces`
 }
 
 // OperatorConfigConfig specifies Config section
@@ -1078,7 +1082,7 @@ func (c *OperatorConfig) normalize() {
 func (c *OperatorConfig) applyEnvVarParams() {
 	if ns := os.Getenv(deployment.WATCH_NAMESPACE); len(ns) > 0 {
 		// We have WATCH_NAMESPACE explicitly specified
-		c.Watch.Namespaces = []string{ns}
+		c.Watch.OperatorConfigWatchNamespaces.Namespaces = types.NewStrings([]string{ns})
 	}
 
 	if nss := os.Getenv(deployment.WATCH_NAMESPACES); len(nss) > 0 {
@@ -1086,10 +1090,10 @@ func (c *OperatorConfig) applyEnvVarParams() {
 		namespaces := strings.FieldsFunc(nss, func(r rune) bool {
 			return r == ':' || r == ','
 		})
-		c.Watch.Namespaces = []string{}
+		c.Watch.OperatorConfigWatchNamespaces.Namespaces = types.NewStrings([]string{})
 		for i := range namespaces {
 			if len(namespaces[i]) > 0 {
-				c.Watch.Namespaces = append(c.Watch.Namespaces, namespaces[i])
+				c.Watch.OperatorConfigWatchNamespaces.Namespaces = c.Watch.OperatorConfigWatchNamespaces.Namespaces.Append(namespaces[i])
 			}
 		}
 	}
@@ -1104,7 +1108,7 @@ func (c *OperatorConfig) applyDefaultWatchNamespace() {
 	// 2. Operator runs in other (non kube-system) namespace - assume this is local installation, watch this namespace only
 	// Watch in own namespace only in case no other specified earlier
 
-	if len(c.Watch.Namespaces) > 0 {
+	if c.Watch.OperatorConfigWatchNamespaces.Namespaces.HasValue() {
 		// We have namespace(s) specified already
 		return
 	}
@@ -1116,9 +1120,9 @@ func (c *OperatorConfig) applyDefaultWatchNamespace() {
 		// Do nothing, we already have len(config.WatchNamespaces) == 0
 	} else {
 		// Operator is running is explicit namespace. Watch in it
-		c.Watch.Namespaces = []string{
+		c.Watch.OperatorConfigWatchNamespaces.Namespaces = types.NewStrings([]string{
 			c.Runtime.Namespace,
-		}
+		})
 	}
 }
 
@@ -1198,11 +1202,11 @@ func (c *OperatorConfig) copyWithHiddenCredentials() *OperatorConfig {
 // TODO unify with GetInformerNamespace
 func (c *OperatorConfig) IsWatchedNamespace(namespace string) bool {
 	// In case no namespaces specified - watch all namespaces
-	if len(c.Watch.Namespaces) == 0 {
+	if !c.Watch.OperatorConfigWatchNamespaces.Namespaces.HasValue() {
 		return true
 	}
 
-	return util.InArrayWithRegexp(namespace, c.Watch.Namespaces)
+	return util.InArrayWithRegexp(namespace, c.Watch.OperatorConfigWatchNamespaces.Namespaces.Value())
 }
 
 // GetInformerNamespace is a TODO stub
@@ -1216,7 +1220,7 @@ func (c *OperatorConfig) IsWatchedNamespace(namespace string) bool {
 func (c *OperatorConfig) GetInformerNamespace() string {
 	// Namespace where informers would watch notifications from
 	namespace := meta.NamespaceAll
-	if len(c.Watch.Namespaces) == 1 {
+	if c.Watch.OperatorConfigWatchNamespaces.Namespaces.Len() == 1 {
 		// We have exactly one watch namespace specified
 		// This scenario is implemented in go-client
 		// In any other case, just keep metav1.NamespaceAll
@@ -1224,8 +1228,8 @@ func (c *OperatorConfig) GetInformerNamespace() string {
 		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
 		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
 		var labelRegexp = regexp.MustCompile("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
-		if labelRegexp.MatchString(c.Watch.Namespaces[0]) {
-			namespace = c.Watch.Namespaces[0]
+		if labelRegexp.MatchString(c.Watch.OperatorConfigWatchNamespaces.Namespaces.First()) {
+			namespace = c.Watch.OperatorConfigWatchNamespaces.Namespaces.First()
 		}
 	}
 
@@ -1257,7 +1261,7 @@ func (c *OperatorConfig) GetRevisionHistoryLimit() *int32 {
 func (c *OperatorConfig) move() {
 	// WatchNamespaces where operator watches for events
 	if len(c.WatchNamespaces) > 0 {
-		c.Watch.Namespaces = c.WatchNamespaces
+		c.Watch.OperatorConfigWatchNamespaces.Namespaces = types.NewStrings(c.WatchNamespaces)
 	}
 
 	if c.CHCommonConfigsPath != "" {
