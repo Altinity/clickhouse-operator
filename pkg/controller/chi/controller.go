@@ -173,7 +173,7 @@ func (c *Controller) addEventHandlersCHI(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chi := obj.(*api.ClickHouseInstallation)
-			if !chop.Config().IsWatchedNamespace(chi.Namespace) {
+			if !chop.Config().IsNamespaceWatched(chi.Namespace) {
 				return
 			}
 			log.V(3).M(chi).Info("chiInformer.DeleteFunc")
@@ -188,7 +188,7 @@ func (c *Controller) addEventHandlersCHIT(
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chit := obj.(*api.ClickHouseInstallationTemplate)
-			if !chop.Config().IsWatchedNamespace(chit.Namespace) {
+			if !chop.Config().IsNamespaceWatched(chit.Namespace) {
 				return
 			}
 			log.V(3).M(chit).Info("chitInformer.AddFunc")
@@ -197,7 +197,7 @@ func (c *Controller) addEventHandlersCHIT(
 		UpdateFunc: func(old, new interface{}) {
 			oldChit := old.(*api.ClickHouseInstallationTemplate)
 			newChit := new.(*api.ClickHouseInstallationTemplate)
-			if !chop.Config().IsWatchedNamespace(newChit.Namespace) {
+			if !chop.Config().IsNamespaceWatched(newChit.Namespace) {
 				return
 			}
 			log.V(3).M(newChit).Info("chitInformer.UpdateFunc")
@@ -205,7 +205,7 @@ func (c *Controller) addEventHandlersCHIT(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chit := obj.(*api.ClickHouseInstallationTemplate)
-			if !chop.Config().IsWatchedNamespace(chit.Namespace) {
+			if !chop.Config().IsNamespaceWatched(chit.Namespace) {
 				return
 			}
 			log.V(3).M(chit).Info("chitInformer.DeleteFunc")
@@ -220,7 +220,7 @@ func (c *Controller) addEventHandlersChopConfig(
 	chopInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chopConfig := obj.(*api.ClickHouseOperatorConfiguration)
-			if !chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
+			if !chop.Config().IsNamespaceWatched(chopConfig.Namespace) {
 				return
 			}
 			log.V(3).M(chopConfig).Info("chopInformer.AddFunc")
@@ -229,7 +229,7 @@ func (c *Controller) addEventHandlersChopConfig(
 		UpdateFunc: func(old, new interface{}) {
 			newChopConfig := new.(*api.ClickHouseOperatorConfiguration)
 			oldChopConfig := old.(*api.ClickHouseOperatorConfiguration)
-			if !chop.Config().IsWatchedNamespace(newChopConfig.Namespace) {
+			if !chop.Config().IsNamespaceWatched(newChopConfig.Namespace) {
 				return
 			}
 			log.V(3).M(newChopConfig).Info("chopInformer.UpdateFunc")
@@ -237,7 +237,7 @@ func (c *Controller) addEventHandlersChopConfig(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chopConfig := obj.(*api.ClickHouseOperatorConfiguration)
-			if !chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
+			if !chop.Config().IsNamespaceWatched(chopConfig.Namespace) {
 				return
 			}
 			log.V(3).M(chopConfig).Info("chopInformer.DeleteFunc")
@@ -544,7 +544,7 @@ func (c *Controller) addEventHandlers(
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(meta meta.Object) bool {
-	return chop.Config().IsWatchedNamespace(meta.GetNamespace()) && chiLabeler.New(nil).IsCHOPGeneratedObject(meta)
+	return chop.Config().IsNamespaceWatched(meta.GetNamespace()) && chiLabeler.New(nil).IsCHOPGeneratedObject(meta)
 }
 
 // Run syncs caches, starts workers
@@ -920,7 +920,7 @@ func (c *Controller) handleObject(obj interface{}) {
 }
 
 func shouldEnqueue(chi *api.ClickHouseInstallation) bool {
-	if !chop.Config().IsWatchedNamespace(chi.Namespace) {
+	if !chop.Config().IsNamespaceWatched(chi.Namespace) {
 		return false
 	}
 
