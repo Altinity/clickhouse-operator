@@ -40,6 +40,20 @@ func (s *Strings) HasValue() bool {
 	return s.IsValid() && (s.Len() > 0)
 }
 
+func (s *Strings) Has(needle string) bool {
+	if !s.HasValue() {
+		return false
+	}
+	return util.InArray(needle, s.Value())
+}
+
+func (s *Strings) Match(needle string) bool {
+	if !s.HasValue() {
+		return false
+	}
+	return util.MatchArrayOfRegexps(needle, s.Value())
+}
+
 // Value returns value
 func (s *Strings) Value() []string {
 	if s.IsValid() {
