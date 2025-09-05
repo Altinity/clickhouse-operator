@@ -94,7 +94,7 @@ func keeperPredicate() predicate.Funcs {
 			}
 
 			// Check if namespace should be watched (includes deny list check)
-			if !chop.Config().IsWatchedNamespace(obj.Namespace) {
+			if !chop.Config().IsNamespaceWatched(obj.Namespace) {
 				logger.V(2).Info("chkInformer: skip event, namespace is not watched or is in deny list", "namespace", obj.Namespace)
 				return false
 			}
@@ -114,7 +114,7 @@ func keeperPredicate() predicate.Funcs {
 			}
 
 			// Check if namespace should be watched (includes deny list check)
-			if !chop.Config().IsWatchedNamespace(obj.Namespace) {
+			if !chop.Config().IsNamespaceWatched(obj.Namespace) {
 				logger.V(2).Info("chkInformer: skip event, namespace is not watched or is in deny list", "namespace", obj.Namespace)
 				return false
 			}
