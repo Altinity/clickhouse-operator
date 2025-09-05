@@ -168,12 +168,36 @@ type OperatorConfigRuntime struct {
 // OperatorConfigWatch specifies watch section
 type OperatorConfigWatch struct {
 	// Namespaces where operator watches for events
-	OperatorConfigWatchNamespaces `json:",inline" yaml:",inline"`
+	Namespaces OperatorConfigWatchNamespaces `json:"namespaces" yaml:"namespaces"`
 }
 
 type OperatorConfigWatchNamespaces struct {
-	Include *types.Strings `json:"namespaces" yaml:"namespaces`
+	Include *types.Strings `json:"include" yaml:"include`
 	Exclude *types.Strings `json:"exclude" yaml:"exclude`
+}
+
+func (n *OperatorConfigWatchNamespaces) UnmarshalJSON(data []byte) error {
+	type OperatorConfigWatchNamespaces2 OperatorConfigWatchNamespaces
+	var namespaces OperatorConfigWatchNamespaces2
+	if err := json.Unmarshal(data, &namespaces); err == nil {
+		s := OperatorConfigWatchNamespaces{
+			Include: namespaces.Include,
+			Exclude: namespaces.Exclude,
+		}
+		*n = s
+		return nil
+	}
+
+	var sl []string
+	if err := json.Unmarshal(data, &sl); err == nil {
+		s := OperatorConfigWatchNamespaces{
+			Include: types.NewStrings(sl),
+		}
+		*n = s
+		return nil
+	}
+
+	return fmt.Errorf("unable to OperatorConfigWatchNamespaces.UnmarshalJSON()")
 }
 
 // OperatorConfigConfig specifies Config section
@@ -1083,7 +1107,7 @@ func (c *OperatorConfig) normalize() {
 func (c *OperatorConfig) applyEnvVarParams() {
 	if ns := os.Getenv(deployment.WATCH_NAMESPACE); len(ns) > 0 {
 		// We have WATCH_NAMESPACE explicitly specified
-		c.Watch.OperatorConfigWatchNamespaces.Include = types.NewStrings([]string{ns})
+		c.Watch.Namespaces.Include = types.NewStrings([]string{ns})
 	}
 
 	if nss := os.Getenv(deployment.WATCH_NAMESPACES); len(nss) > 0 {
@@ -1091,7 +1115,7 @@ func (c *OperatorConfig) applyEnvVarParams() {
 		namespaces := strings.FieldsFunc(nss, func(r rune) bool {
 			return r == ':' || r == ','
 		})
-		c.Watch.OperatorConfigWatchNamespaces.Include = types.NewStrings(namespaces)
+		c.Watch.Namespaces.Include = types.NewStrings(namespaces)
 	}
 }
 
@@ -1104,7 +1128,7 @@ func (c *OperatorConfig) applyDefaultWatchNamespace() {
 	// 2. Operator runs in other (non kube-system) namespace - assume this is local installation, watch this namespace only
 	// Main idea is to watch in own namespace only in case no other specified explicitly and non-global deploy (not in 'kube-system')
 
-	if c.Watch.OperatorConfigWatchNamespaces.Include.HasValue() {
+	if c.Watch.Namespaces.Include.HasValue() {
 		// We have namespace(s) explicitly specified already, all is good
 		return
 	}
@@ -1116,7 +1140,7 @@ func (c *OperatorConfig) applyDefaultWatchNamespace() {
 		// Do nothing, we already have len(config.WatchNamespaces) == 0
 	} else {
 		// Operator is running inside a namespace. Watch in it
-		c.Watch.OperatorConfigWatchNamespaces.Include = types.NewStrings([]string{
+		c.Watch.Namespaces.Include = types.NewStrings([]string{
 			c.Runtime.Namespace,
 		})
 	}
@@ -1203,11 +1227,11 @@ func (c *OperatorConfig) IsNamespaceWatched(namespace string) bool {
 func (c *OperatorConfig) isNamespaceIncluded(namespace string) bool {
 	switch {
 	// In case no included namespaces specified - consider all namespaces included
-	case !c.Watch.OperatorConfigWatchNamespaces.Include.HasValue():
+	case !c.Watch.Namespaces.Include.HasValue():
 		return true
 
 	// In case matches any included namespaces regexp specified - consider it included
-	case c.Watch.OperatorConfigWatchNamespaces.Include.Match(namespace):
+	case c.Watch.Namespaces.Include.Match(namespace):
 		return true
 
 	// No match to explicitly specified set of namespace regexp - not included
@@ -1219,11 +1243,11 @@ func (c *OperatorConfig) isNamespaceIncluded(namespace string) bool {
 func (c *OperatorConfig) isNamespaceExcluded(namespace string) bool {
 	switch {
 	// In case no excluded namespaces specified - consider not excluded
-	case !c.Watch.OperatorConfigWatchNamespaces.Exclude.HasValue():
+	case !c.Watch.Namespaces.Exclude.HasValue():
 		return false
 
 	// In case matches any excluded namespaces regexp specified - consider it excluded
-	case c.Watch.OperatorConfigWatchNamespaces.Exclude.Match(namespace):
+	case c.Watch.Namespaces.Exclude.Match(namespace):
 		return true
 
 	// No match to explicitly specified set of namespace regexp - not excluded
@@ -1244,7 +1268,7 @@ func (c *OperatorConfig) GetInformerNamespace() string {
 	// Namespace where informers would watch notifications from
 	namespace := meta.NamespaceAll
 
-	if c.Watch.OperatorConfigWatchNamespaces.Include.Len() == 1 {
+	if c.Watch.Namespaces.Include.Len() == 1 {
 		// We have exactly one watch namespace specified
 		// This scenario is implemented in go-client
 		// In any other case, just keep metav1.NamespaceAll
@@ -1252,8 +1276,8 @@ func (c *OperatorConfig) GetInformerNamespace() string {
 		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
 		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
 		var labelRegexp = regexp.MustCompile("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
-		if labelRegexp.MatchString(c.Watch.OperatorConfigWatchNamespaces.Include.First()) {
-			namespace = c.Watch.OperatorConfigWatchNamespaces.Include.First()
+		if labelRegexp.MatchString(c.Watch.Namespaces.Include.First()) {
+			namespace = c.Watch.Namespaces.Include.First()
 		}
 	}
 
@@ -1285,7 +1309,7 @@ func (c *OperatorConfig) GetRevisionHistoryLimit() *int32 {
 func (c *OperatorConfig) move() {
 	// WatchNamespaces where operator watches for events
 	if len(c.WatchNamespaces) > 0 {
-		c.Watch.OperatorConfigWatchNamespaces.Include = types.NewStrings(c.WatchNamespaces)
+		c.Watch.Namespaces.Include = types.NewStrings(c.WatchNamespaces)
 	}
 
 	if c.CHCommonConfigsPath != "" {
