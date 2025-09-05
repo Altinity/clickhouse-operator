@@ -87,7 +87,7 @@ else
 fi
 
 # Append VERSION and RELEASE
-DOCKER_CMD="${DOCKER_CMD} --build-arg VERSION=${VERSION:-dev}"
+DOCKER_CMD="${DOCKER_CMD} --build-arg VERSION=${VERSION:-dev} --build-arg GO_VERSION=${GO_VERSION}"
 
 # Append GC flags if present
 if [[ ! -z "${GCFLAGS}" ]]; then
