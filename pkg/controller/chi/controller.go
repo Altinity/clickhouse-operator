@@ -189,6 +189,7 @@ func (c *Controller) addEventHandlersCHIT(
 		AddFunc: func(obj interface{}) {
 			chit := obj.(*api.ClickHouseInstallationTemplate)
 			if !chop.Config().IsNamespaceWatched(chit.Namespace) {
+				log.V(2).M(chit).Info("chitInformer: skip event, namespace '%s' is not watched or is in deny list", chit.Namespace)
 				return
 			}
 			log.V(3).M(chit).Info("chitInformer.AddFunc")
@@ -221,6 +222,7 @@ func (c *Controller) addEventHandlersChopConfig(
 		AddFunc: func(obj interface{}) {
 			chopConfig := obj.(*api.ClickHouseOperatorConfiguration)
 			if !chop.Config().IsNamespaceWatched(chopConfig.Namespace) {
+				log.V(2).M(chopConfig).Info("chopInformer: skip event, namespace '%s' is not watched or is in deny list", chopConfig.Namespace)
 				return
 			}
 			log.V(3).M(chopConfig).Info("chopInformer.AddFunc")
@@ -921,6 +923,7 @@ func (c *Controller) handleObject(obj interface{}) {
 
 func shouldEnqueue(chi *api.ClickHouseInstallation) bool {
 	if !chop.Config().IsNamespaceWatched(chi.Namespace) {
+		log.V(2).M(chi).Info("chiInformer: skip enqueue, namespace '%s' is not watched or is in deny list", chi.Namespace)
 		return false
 	}
 

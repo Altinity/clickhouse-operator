@@ -1117,6 +1117,19 @@ func (c *OperatorConfig) applyEnvVarParams() {
 		})
 		c.Watch.Namespaces.Include = types.NewStrings(namespaces)
 	}
+
+	if denyList := os.Getenv(deployment.NAMESPACES_DENY_LIST); len(denyList) > 0 {
+		// We have NAMESPACES_DENY_LIST explicitly specified
+		namespaces := strings.FieldsFunc(denyList, func(r rune) bool {
+			return r == ':' || r == ','
+		})
+		c.Watch.NamespacesDenyList = []string{}
+		for i := range namespaces {
+			if len(namespaces[i]) > 0 {
+				c.Watch.NamespacesDenyList = append(c.Watch.NamespacesDenyList, namespaces[i])
+			}
+		}
+	}
 }
 
 // applyDefaultWatchNamespace applies default watch namespace in case none specified earlier
