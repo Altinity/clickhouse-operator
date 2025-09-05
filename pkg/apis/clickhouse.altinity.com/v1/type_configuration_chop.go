@@ -1112,24 +1112,30 @@ func (c *OperatorConfig) applyEnvVarParams() {
 
 	if nss := os.Getenv(deployment.WATCH_NAMESPACES); len(nss) > 0 {
 		// We have WATCH_NAMESPACES explicitly specified
-		namespaces := strings.FieldsFunc(nss, func(r rune) bool {
-			return r == ':' || r == ','
-		})
-		c.Watch.Namespaces.Include = types.NewStrings(namespaces)
-	}
-
-	if denyList := os.Getenv(deployment.NAMESPACES_DENY_LIST); len(denyList) > 0 {
-		// We have NAMESPACES_DENY_LIST explicitly specified
-		namespaces := strings.FieldsFunc(denyList, func(r rune) bool {
-			return r == ':' || r == ','
-		})
-		c.Watch.NamespacesDenyList = []string{}
-		for i := range namespaces {
-			if len(namespaces[i]) > 0 {
-				c.Watch.NamespacesDenyList = append(c.Watch.NamespacesDenyList, namespaces[i])
-			}
+		if namespaces := c.splitNamespaces(nss); len(namespaces) > 0 {
+			c.Watch.Namespaces.Include = types.NewStrings(namespaces)
 		}
 	}
+
+	if nss := os.Getenv(deployment.WATCH_NAMESPACES_EXCLUDE); len(nss) > 0 {
+		// We have WATCH_NAMESPACES_EXCLUDE explicitly specified
+		if namespaces := c.splitNamespaces(nss); len(namespaces) > 0 {
+			c.Watch.Namespaces.Exclude = types.NewStrings(namespaces)
+		}
+	}
+}
+
+func (c *OperatorConfig) splitNamespaces(combined string) (namespaces []string) {
+	candidates := strings.FieldsFunc(combined, func(r rune) bool {
+		return r == ':' || r == ','
+	})
+	for _, str := range candidates {
+		candidate := strings.TrimSpace(str)
+		if len(candidate) > 0 {
+			namespaces = append(namespaces, candidate)
+		}
+	}
+	return namespaces
 }
 
 // applyDefaultWatchNamespace applies default watch namespace in case none specified earlier
