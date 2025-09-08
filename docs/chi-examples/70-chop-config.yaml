@@ -10,9 +10,12 @@ spec:
   ################################################
   watch:
     # List of namespaces where clickhouse-operator watches for events.
-    # Concurrently running operators should watch on different namespaces
-    #namespaces: ["dev", "test"]
-    namespaces: []
+    # Concurrently running operators should watch on different namespaces.
+    # IMPORTANT
+    # Regexp is applicable.
+    namespaces:
+      include: []
+      exclude: []
 
   clickhouse:
     configuration:
