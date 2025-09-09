@@ -822,7 +822,7 @@ func prepareStsReconcileOptsWaitSection(host *api.Host, opts *statefulset.Reconc
 	if host.GetCR().GetReconciling().Host.Wait.Probes.Startup.IsTrue() {
 		opts = opts.SetWaitUntilStarted()
 	}
-	if host.GetCR().GetReconciling().Host.Wait.Probes.Ready.IsTrue() {
+	if host.GetCR().GetReconciling().Host.Wait.Probes.Readiness.IsTrue() {
 		opts = opts.SetWaitUntilReady()
 	}
 	return opts
