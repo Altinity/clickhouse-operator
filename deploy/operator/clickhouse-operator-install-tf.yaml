@@ -3266,10 +3266,10 @@ spec:
                                     Whether the operator during host launch procedure should wait for startup probe to succeed.
                                     In case probe is unspecified wait is assumed to be completed successfully.
                                     Default option value is to do not wait.
-                                ready:
+                                readiness:
                                   <<: *TypeStringBool
                                   description: |
-                                    Whether the operator during host launch procedure should wait for ready probe to succeed.
+                                    Whether the operator during host launch procedure should wait for readiness probe to succeed.
                                     In case probe is unspecified wait is assumed to be completed successfully.
                                     Default option value is to wait.
                 annotation:
@@ -4961,7 +4961,7 @@ data:
             delay: 10
           probes:
             startup: no
-            ready: yes
+            readiness: yes
     
     ################################################
     ##
