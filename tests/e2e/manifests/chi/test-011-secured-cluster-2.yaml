@@ -37,7 +37,7 @@ spec:
       user4/access_management: 1
 
       # clickhouse_operator password should be accepted and encrypted
-      clickhuse_operator/password: operator_secret
+      clickhouse_operator/password: operator_secret
     clusters:
     - name: default
       layout:
