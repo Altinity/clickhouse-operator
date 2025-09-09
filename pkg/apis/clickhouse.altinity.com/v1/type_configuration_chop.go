@@ -456,7 +456,7 @@ func (host ReconcileHost) Normalize() ReconcileHost {
 	if host.Wait.Probes == nil {
 		// Default value
 		host.Wait.Probes = &ReconcileHostWaitProbes{
-			Ready: types.NewStringBool(true),
+			Readiness: types.NewStringBool(true),
 		}
 	}
 	return host
@@ -515,8 +515,8 @@ func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas) *
 }
 
 type ReconcileHostWaitProbes struct {
-	Startup *types.StringBool `json:"startup,omitempty" yaml:"startup,omitempty"`
-	Ready   *types.StringBool `json:"ready,omitempty"   yaml:"ready,omitempty"`
+	Startup   *types.StringBool `json:"startup,omitempty"   yaml:"startup,omitempty"`
+	Readiness *types.StringBool `json:"readiness,omitempty" yaml:"readiness,omitempty"`
 }
 
 func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *ReconcileHostWaitProbes {
@@ -535,7 +535,7 @@ func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *Reco
 	// Both recipient and `from` are specified, need to walk over fields
 
 	p.Startup = p.Startup.MergeFrom(from.Startup)
-	p.Ready = p.Ready.MergeFrom(from.Ready)
+	p.Readiness = p.Readiness.MergeFrom(from.Readiness)
 
 	return p
 }
