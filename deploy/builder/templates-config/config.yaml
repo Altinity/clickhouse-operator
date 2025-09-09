@@ -367,7 +367,7 @@ reconcile:
         delay: 10
       probes:
         startup: no
-        ready: yes
+        readiness: yes
 
 ################################################
 ##
