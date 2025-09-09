@@ -15,19 +15,23 @@
 package v1
 
 import (
-	"gopkg.in/d4l3k/messagediff.v1"
 	"strings"
+
+	"gopkg.in/d4l3k/messagediff.v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // ZookeeperConfig defines zookeeper section of .spec.configuration
 // Refers to
-// https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper
+// https://clickhouse.com/docs/operations/server-configuration-parameters/settings#zookeeper
 type ZookeeperConfig struct {
-	Nodes              ZookeeperNodes `json:"nodes,omitempty"                yaml:"nodes,omitempty"`
-	SessionTimeoutMs   int            `json:"session_timeout_ms,omitempty"   yaml:"session_timeout_ms,omitempty"`
-	OperationTimeoutMs int            `json:"operation_timeout_ms,omitempty" yaml:"operation_timeout_ms,omitempty"`
-	Root               string         `json:"root,omitempty"                 yaml:"root,omitempty"`
-	Identity           string         `json:"identity,omitempty"             yaml:"identity,omitempty"`
+	Nodes              ZookeeperNodes    `json:"nodes,omitempty"                yaml:"nodes,omitempty"`
+	SessionTimeoutMs   int               `json:"session_timeout_ms,omitempty"   yaml:"session_timeout_ms,omitempty"`
+	OperationTimeoutMs int               `json:"operation_timeout_ms,omitempty" yaml:"operation_timeout_ms,omitempty"`
+	Root               string            `json:"root,omitempty"                 yaml:"root,omitempty"`
+	Identity           string            `json:"identity,omitempty"             yaml:"identity,omitempty"`
+	UseCompression     *types.StringBool `json:"use_compression,omitempty"      yaml:"use_compression,omitempty"`
 }
 
 type ZookeeperNodes []ZookeeperNode
@@ -114,6 +118,7 @@ func (zkc *ZookeeperConfig) MergeFrom(from *ZookeeperConfig, _type MergeType) *Z
 	if from.Identity != "" {
 		zkc.Identity = from.Identity
 	}
+	zkc.UseCompression = zkc.UseCompression.MergeFrom(from.UseCompression)
 
 	return zkc
 }
