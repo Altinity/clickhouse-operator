@@ -2203,8 +2203,8 @@ func (in *ReconcileHostWaitProbes) DeepCopyInto(out *ReconcileHostWaitProbes) {
 		*out = new(types.StringBool)
 		**out = **in
 	}
-	if in.Ready != nil {
-		in, out := &in.Ready, &out.Ready
+	if in.Readiness != nil {
+		in, out := &in.Readiness, &out.Readiness
 		*out = new(types.StringBool)
 		**out = **in
 	}
