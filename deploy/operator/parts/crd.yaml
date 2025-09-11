@@ -1108,6 +1108,34 @@ spec:
                         identity:
                           type: string
                           description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
+                        use_compression:
+                          type: string
+                          enum:
+                            # List StringBoolXXX constants from model
+                            - ""
+                            - "0"
+                            - "1"
+                            - "False"
+                            - "false"
+                            - "True"
+                            - "true"
+                            - "No"
+                            - "no"
+                            - "Yes"
+                            - "yes"
+                            - "Off"
+                            - "off"
+                            - "On"
+                            - "on"
+                            - "Disable"
+                            - "disable"
+                            - "Enable"
+                            - "enable"
+                            - "Disabled"
+                            - "disabled"
+                            - "Enabled"
+                            - "enabled"
+                          description: "Enables compression in Keeper protocol if set to true"
                     users:
                       type: object
                       description: |
@@ -1265,6 +1293,34 @@ spec:
                               identity:
                                 type: string
                                 description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
+                              use_compression:
+                                type: string
+                                enum:
+                                  # List StringBoolXXX constants from model
+                                  - ""
+                                  - "0"
+                                  - "1"
+                                  - "False"
+                                  - "false"
+                                  - "True"
+                                  - "true"
+                                  - "No"
+                                  - "no"
+                                  - "Yes"
+                                  - "yes"
+                                  - "Off"
+                                  - "off"
+                                  - "On"
+                                  - "on"
+                                  - "Disable"
+                                  - "disable"
+                                  - "Enable"
+                                  - "enable"
+                                  - "Disabled"
+                                  - "disabled"
+                                  - "Enabled"
+                                  - "enabled"
+                                description: "Enables compression in Keeper protocol if set to true"
                             description: |
                               optional, allows configure <yandex><zookeeper>..</zookeeper></yandex> section in each `Pod` only in current ClickHouse cluster, during generate `ConfigMap` which will mounted in `/etc/clickhouse-server/config.d/`
                               override top-level `chi.spec.configuration.zookeeper` settings
@@ -3563,6 +3619,34 @@ spec:
                         identity:
                           type: string
                           description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
+                        use_compression:
+                          type: string
+                          enum:
+                            # List StringBoolXXX constants from model
+                            - ""
+                            - "0"
+                            - "1"
+                            - "False"
+                            - "false"
+                            - "True"
+                            - "true"
+                            - "No"
+                            - "no"
+                            - "Yes"
+                            - "yes"
+                            - "Off"
+                            - "off"
+                            - "On"
+                            - "on"
+                            - "Disable"
+                            - "disable"
+                            - "Enable"
+                            - "enable"
+                            - "Disabled"
+                            - "disabled"
+                            - "Enabled"
+                            - "enabled"
+                          description: "Enables compression in Keeper protocol if set to true"
                     users:
                       type: object
                       description: |
@@ -3720,6 +3804,34 @@ spec:
                               identity:
                                 type: string
                                 description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
+                              use_compression:
+                                type: string
+                                enum:
+                                  # List StringBoolXXX constants from model
+                                  - ""
+                                  - "0"
+                                  - "1"
+                                  - "False"
+                                  - "false"
+                                  - "True"
+                                  - "true"
+                                  - "No"
+                                  - "no"
+                                  - "Yes"
+                                  - "yes"
+                                  - "Off"
+                                  - "off"
+                                  - "On"
+                                  - "on"
+                                  - "Disable"
+                                  - "disable"
+                                  - "Enable"
+                                  - "enable"
+                                  - "Disabled"
+                                  - "disabled"
+                                  - "Enabled"
+                                  - "enabled"
+                                description: "Enables compression in Keeper protocol if set to true"
                             description: |
                               optional, allows configure <yandex><zookeeper>..</zookeeper></yandex> section in each `Pod` only in current ClickHouse cluster, during generate `ConfigMap` which will mounted in `/etc/clickhouse-server/config.d/`
                               override top-level `chi.spec.configuration.zookeeper` settings
