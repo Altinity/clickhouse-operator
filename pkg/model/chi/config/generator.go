@@ -166,8 +166,8 @@ func (c *Generator) getHostZookeeper(host *chi.Host) string {
 	}
 
 	// Append use_compression
-	if zk.UseCompression != nil && zk.UseCompression.IsValid() {
-		util.Iline(b, 8, "<use_compression>%s</use_compression>", zk.UseCompression.String())
+	if zk.UseCompression.IsValid() {
+		util.Iline(b, 8, "<use_compression>%s</use_compression>", zk.UseCompression)
 	}
 
 	// </zookeeper>
