@@ -2807,6 +2807,11 @@ func (in *ZookeeperConfig) DeepCopyInto(out *ZookeeperConfig) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.UseCompression != nil {
+		in, out := &in.UseCompression, &out.UseCompression
+		*out = new(types.StringBool)
+		**out = **in
+	}
 	return
 }
 
