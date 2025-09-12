@@ -971,20 +971,30 @@ def test_010011_3(self):
             user5_password_env = ""
             sasl_username_env = ""
             sasl_password_env = ""
+            custom0_env = ""
+            custom1_env = ""
             for e in envs:
                 if "valueFrom" in e:
+                    print(e["name"])
                     if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_USERNAME":
                         sasl_username_env = e["name"]
                     if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_PASSWORD":
                         sasl_password_env = e["name"]
                     if e["valueFrom"]["secretKeyRef"]["key"] == "pwduser5":
                         user5_password_env = e["name"]
+                    if e["valueFrom"]["secretKeyRef"]["key"] == "custom0":
+                        custom0_env = e["name"]
+                    if e["valueFrom"]["secretKeyRef"]["key"] == "custom1":
+                        custom1_env = e["name"]
 
             with By("Secrets are properly propagated to env variables"):
-                print(f"Found env variables: {sasl_username_env} {sasl_password_env} {user5_password_env}")
                 assert sasl_username_env != ""
                 assert sasl_password_env != ""
                 assert user5_password_env != ""
+
+            with By("Secrets are properly propagated to env variables for long settings names", flags=XFAIL):
+                assert custom0_env != ""
+                assert custom1_env != ""
 
             with By("Secrets are properly referenced from settings.xml"):
                 cfm = kubectl.get("configmap", f"chi-{chi}-common-configd")
@@ -997,7 +1007,6 @@ def test_010011_3(self):
                 users_xml = cfm["data"]["chop-generated-users.xml"]
                 env_matches = [from_env.strip() for from_env in users_xml.splitlines() if "from_env" in from_env]
                 print(f"Found env substitutions: {env_matches}")
-                time.sleep(5)
                 assert f"password from_env=\"{user5_password_env}\"" in users_xml
 
         kubectl.delete_chi(chi)
