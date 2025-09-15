@@ -75,6 +75,11 @@ function main() {
     echo "WARNING"
     echo "helm-docs is not available, skip docs generation"
   fi
+
+  if [[ "0" == $(helm plugin list | grep -c schema) ]]; then
+    helm plugin install https://github.com/losisin/helm-values-schema-json.git
+  fi
+  helm schema --use-helm-docs -f "${values_yaml}" --output "${chart_path}/values.schema.json"
 }
 
 function process() {

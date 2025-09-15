@@ -1,0 +1,895 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "additionalResources": {
+            "description": "list of additional resources to create (processed via `tpl` function), useful for create ClickHouse clusters together with clickhouse-operator. check `kubectl explain chi` for details",
+            "type": "array"
+        },
+        "affinity": {
+            "description": "affinity for scheduler pod assignment, check `kubectl explain pod.spec.affinity` for details",
+            "type": "object"
+        },
+        "commonAnnotations": {
+            "description": "set of annotations that will be applied to all the resources for the operator",
+            "type": "object"
+        },
+        "commonLabels": {
+            "description": "set of labels that will be applied to all the resources for the operator",
+            "type": "object"
+        },
+        "configs": {
+            "description": "clickhouse operator configs",
+            "type": "object",
+            "properties": {
+                "confdFiles": {
+                    "type": "string"
+                },
+                "configdFiles": {
+                    "type": "object",
+                    "properties": {
+                        "01-clickhouse-01-listen.xml": {
+                            "type": "string"
+                        },
+                        "01-clickhouse-02-logger.xml": {
+                            "type": "string"
+                        },
+                        "01-clickhouse-03-query_log.xml": {
+                            "type": "string"
+                        },
+                        "01-clickhouse-04-part_log.xml": {
+                            "type": "string"
+                        },
+                        "01-clickhouse-05-trace_log.xml": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "files": {
+                    "type": "object",
+                    "properties": {
+                        "config.yaml": {
+                            "type": "object",
+                            "properties": {
+                                "annotation": {
+                                    "type": "object",
+                                    "properties": {
+                                        "exclude": {
+                                            "type": "array"
+                                        },
+                                        "include": {
+                                            "type": "array"
+                                        }
+                                    }
+                                },
+                                "clickhouse": {
+                                    "type": "object",
+                                    "properties": {
+                                        "access": {
+                                            "type": "object",
+                                            "properties": {
+                                                "password": {
+                                                    "type": "string"
+                                                },
+                                                "port": {
+                                                    "type": "integer"
+                                                },
+                                                "rootCA": {
+                                                    "type": "string"
+                                                },
+                                                "scheme": {
+                                                    "type": "string"
+                                                },
+                                                "secret": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name": {
+                                                            "type": "string"
+                                                        },
+                                                        "namespace": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                },
+                                                "timeouts": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "connect": {
+                                                            "type": "integer"
+                                                        },
+                                                        "query": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                },
+                                                "username": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        },
+                                        "addons": {
+                                            "type": "object",
+                                            "properties": {
+                                                "rules": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "spec": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "configuration": {
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                            "files": {
+                                                                                "type": "null"
+                                                                            },
+                                                                            "profiles": {
+                                                                                "type": "object",
+                                                                                "properties": {
+                                                                                    "clickhouse_operator/format_display_secrets_in_show_and_select": {
+                                                                                        "type": "integer"
+                                                                                    }
+                                                                                }
+                                                                            },
+                                                                            "quotas": {
+                                                                                "type": "null"
+                                                                            },
+                                                                            "settings": {
+                                                                                "type": "object",
+                                                                                "properties": {
+                                                                                    "display_secrets_in_show_and_select": {
+                                                                                        "type": "integer"
+                                                                                    }
+                                                                                }
+                                                                            },
+                                                                            "users": {
+                                                                                "type": "null",
+                                                                                "properties": {
+                                                                                    "{clickhouseOperatorUser}/access_management": {
+                                                                                        "type": "integer"
+                                                                                    },
+                                                                                    "{clickhouseOperatorUser}/named_collection_control": {
+                                                                                        "type": "integer"
+                                                                                    },
+                                                                                    "{clickhouseOperatorUser}/show_named_collections": {
+                                                                                        "type": "integer"
+                                                                                    },
+                                                                                    "{clickhouseOperatorUser}/show_named_collections_secrets": {
+                                                                                        "type": "integer"
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            },
+                                                            "version": {
+                                                                "type": "string"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "configuration": {
+                                            "type": "object",
+                                            "properties": {
+                                                "file": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "path": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "common": {
+                                                                    "type": "string"
+                                                                },
+                                                                "host": {
+                                                                    "type": "string"
+                                                                },
+                                                                "user": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                "network": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "hostRegexpTemplate": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                },
+                                                "user": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "default": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "networksIP": {
+                                                                    "type": "array",
+                                                                    "items": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "password": {
+                                                                    "type": "string"
+                                                                },
+                                                                "profile": {
+                                                                    "type": "string"
+                                                                },
+                                                                "quota": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "configurationRestartPolicy": {
+                                            "type": "object",
+                                            "properties": {
+                                                "rules": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "rules": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "object",
+                                                                    "properties": {
+                                                                        "files/*.xml": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "files/config.d/*.xml": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "files/config.d/*dict*.xml": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "files/config.d/*no_restart*": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "profiles/default/background_*_pool_size": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "profiles/default/max_*_for_server": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/*": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/access_control_path": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/dictionaries_config": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/display_secrets_in_show_and_select": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/logger": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/logger/*": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/macros/*": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/max_*_to_drop": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/max_concurrent_queries": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/max_server_memory_*": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/models_config": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/remote_servers/*": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/user_defined_executable_functions_config": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "settings/user_directories/*": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "zookeeper/*": {
+                                                                            "type": "string"
+                                                                        }
+                                                                    }
+                                                                }
+                                                            },
+                                                            "version": {
+                                                                "type": "string"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "metrics": {
+                                            "type": "object",
+                                            "properties": {
+                                                "timeouts": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "collect": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "keeper": {
+                                    "type": "object",
+                                    "properties": {
+                                        "configuration": {
+                                            "type": "object",
+                                            "properties": {
+                                                "file": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "path": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "common": {
+                                                                    "type": "string"
+                                                                },
+                                                                "host": {
+                                                                    "type": "string"
+                                                                },
+                                                                "user": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "label": {
+                                    "type": "object",
+                                    "properties": {
+                                        "appendScope": {
+                                            "type": "string"
+                                        },
+                                        "exclude": {
+                                            "type": "array"
+                                        },
+                                        "include": {
+                                            "type": "array"
+                                        }
+                                    }
+                                },
+                                "logger": {
+                                    "type": "object",
+                                    "properties": {
+                                        "alsologtostderr": {
+                                            "type": "string"
+                                        },
+                                        "log_backtrace_at": {
+                                            "type": "string"
+                                        },
+                                        "logtostderr": {
+                                            "type": "string"
+                                        },
+                                        "stderrthreshold": {
+                                            "type": "string"
+                                        },
+                                        "v": {
+                                            "type": "string"
+                                        },
+                                        "vmodule": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "metrics": {
+                                    "type": "object",
+                                    "properties": {
+                                        "labels": {
+                                            "type": "object",
+                                            "properties": {
+                                                "exclude": {
+                                                    "type": "array"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "pod": {
+                                    "type": "object",
+                                    "properties": {
+                                        "terminationGracePeriod": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "reconcile": {
+                                    "type": "object",
+                                    "properties": {
+                                        "host": {
+                                            "type": "object",
+                                            "properties": {
+                                                "wait": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "exclude": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "include": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "probes": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "readiness": {
+                                                                    "type": "string"
+                                                                },
+                                                                "startup": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        },
+                                                        "queries": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "replicas": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "all": {
+                                                                    "type": "string"
+                                                                },
+                                                                "delay": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "new": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "runtime": {
+                                            "type": "object",
+                                            "properties": {
+                                                "reconcileCHIsThreadsNumber": {
+                                                    "type": "integer"
+                                                },
+                                                "reconcileShardsMaxConcurrencyPercent": {
+                                                    "type": "integer"
+                                                },
+                                                "reconcileShardsThreadsNumber": {
+                                                    "type": "integer"
+                                                }
+                                            }
+                                        },
+                                        "statefulSet": {
+                                            "type": "object",
+                                            "properties": {
+                                                "create": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "onFailure": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                },
+                                                "update": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "onFailure": {
+                                                            "type": "string"
+                                                        },
+                                                        "pollInterval": {
+                                                            "type": "integer"
+                                                        },
+                                                        "timeout": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "statefulSet": {
+                                    "type": "object",
+                                    "properties": {
+                                        "revisionHistoryLimit": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "status": {
+                                    "type": "object",
+                                    "properties": {
+                                        "fields": {
+                                            "type": "object",
+                                            "properties": {
+                                                "action": {
+                                                    "type": "boolean"
+                                                },
+                                                "actions": {
+                                                    "type": "boolean"
+                                                },
+                                                "error": {
+                                                    "type": "boolean"
+                                                },
+                                                "errors": {
+                                                    "type": "boolean"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "template": {
+                                    "type": "object",
+                                    "properties": {
+                                        "chi": {
+                                            "type": "object",
+                                            "properties": {
+                                                "path": {
+                                                    "type": "string"
+                                                },
+                                                "policy": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        },
+                                        "chk": {
+                                            "type": "object",
+                                            "properties": {
+                                                "path": {
+                                                    "type": "string"
+                                                },
+                                                "policy": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "watch": {
+                                    "type": "object",
+                                    "properties": {
+                                        "namespaces": {
+                                            "type": "array"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "keeperConfdFiles": {
+                    "type": "string"
+                },
+                "keeperConfigdFiles": {
+                    "type": "object",
+                    "properties": {
+                        "01-keeper-01-default-config.xml": {
+                            "type": "string"
+                        },
+                        "01-keeper-02-readiness.xml": {
+                            "type": "string"
+                        },
+                        "01-keeper-03-enable-reconfig.xml": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "keeperTemplatesdFiles": {
+                    "type": "object",
+                    "properties": {
+                        "readme": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "keeperUsersdFiles": {
+                    "type": "string"
+                },
+                "templatesdFiles": {
+                    "type": "object",
+                    "properties": {
+                        "001-templates.json.example": {
+                            "type": "string"
+                        },
+                        "default-pod-template.yaml.example": {
+                            "type": "string"
+                        },
+                        "default-storage-template.yaml.example": {
+                            "type": "string"
+                        },
+                        "readme": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "usersdFiles": {
+                    "type": "object",
+                    "properties": {
+                        "01-clickhouse-operator-profile.xml": {
+                            "type": "string"
+                        },
+                        "02-clickhouse-default-profile.xml": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "dashboards": {
+            "type": "object",
+            "properties": {
+                "additionalLabels": {
+                    "description": "labels to add to a secret with dashboards",
+                    "type": "object",
+                    "properties": {
+                        "grafana_dashboard": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "annotations": {
+                    "description": "annotations to add to a secret with dashboards",
+                    "type": "object"
+                },
+                "enabled": {
+                    "description": "provision grafana dashboards as configMaps (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-8.3.4/charts/grafana/values.yaml#L778 )",
+                    "type": "boolean"
+                },
+                "grafana_folder": {
+                    "type": "string"
+                }
+            }
+        },
+        "deployment": {
+            "type": "object",
+            "properties": {
+                "strategy": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "fullnameOverride": {
+            "description": "full name of the chart.",
+            "type": "string"
+        },
+        "imagePullSecrets": {
+            "description": "image pull secret for private images in clickhouse-operator pod possible value format `[{\"name\":\"your-secret-name\"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details",
+            "type": "array"
+        },
+        "metrics": {
+            "type": "object",
+            "properties": {
+                "containerSecurityContext": {
+                    "type": "object"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "env": {
+                    "description": "additional environment variables for the deployment of metrics-exporter containers possible format value `[{\"name\": \"SAMPLE\", \"value\": \"text\"}]`",
+                    "type": "array"
+                },
+                "image": {
+                    "type": "object",
+                    "properties": {
+                        "pullPolicy": {
+                            "description": "image pull policy",
+                            "type": "string"
+                        },
+                        "repository": {
+                            "description": "image repository",
+                            "type": "string"
+                        },
+                        "tag": {
+                            "description": "image tag (chart's appVersion value will be used if not set)",
+                            "type": "string"
+                        }
+                    }
+                },
+                "resources": {
+                    "description": "custom resource configuration",
+                    "type": "object"
+                }
+            }
+        },
+        "nameOverride": {
+            "description": "override name of the chart",
+            "type": "string"
+        },
+        "namespaceOverride": {
+            "type": "string"
+        },
+        "nodeSelector": {
+            "description": "node for scheduler pod assignment, check `kubectl explain pod.spec.nodeSelector` for details",
+            "type": "object"
+        },
+        "operator": {
+            "type": "object",
+            "properties": {
+                "containerSecurityContext": {
+                    "type": "object"
+                },
+                "env": {
+                    "description": "additional environment variables for the clickhouse-operator container in deployment possible format value `[{\"name\": \"SAMPLE\", \"value\": \"text\"}]`",
+                    "type": "array"
+                },
+                "image": {
+                    "type": "object",
+                    "properties": {
+                        "pullPolicy": {
+                            "description": "image pull policy",
+                            "type": "string"
+                        },
+                        "repository": {
+                            "description": "image repository",
+                            "type": "string"
+                        },
+                        "tag": {
+                            "description": "image tag (chart's appVersion value will be used if not set)",
+                            "type": "string"
+                        }
+                    }
+                },
+                "priorityClassName": {
+                    "description": "priority class name for the clickhouse-operator deployment, check `kubectl explain pod.spec.priorityClassName` for details",
+                    "type": "string"
+                },
+                "resources": {
+                    "description": "custom resource configuration, check `kubectl explain pod.spec.containers.resources` for details",
+                    "type": "object"
+                }
+            }
+        },
+        "podAnnotations": {
+            "description": "annotations to add to the clickhouse-operator pod, check `kubectl explain pod.spec.annotations` for details",
+            "type": "object",
+            "properties": {
+                "clickhouse-operator-metrics/port": {
+                    "type": "string"
+                },
+                "clickhouse-operator-metrics/scrape": {
+                    "type": "string"
+                },
+                "prometheus.io/port": {
+                    "type": "string"
+                },
+                "prometheus.io/scrape": {
+                    "type": "string"
+                }
+            }
+        },
+        "podLabels": {
+            "description": "labels to add to the clickhouse-operator pod",
+            "type": "object"
+        },
+        "podSecurityContext": {
+            "type": "object"
+        },
+        "rbac": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "description": "specifies whether rbac resources should be created",
+                    "type": "boolean"
+                },
+                "namespaceScoped": {
+                    "description": "specifies whether to create roles and rolebindings at the cluster level or namespace level",
+                    "type": "boolean"
+                }
+            }
+        },
+        "secret": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "description": "create a secret with operator credentials",
+                    "type": "boolean"
+                },
+                "password": {
+                    "description": "operator credentials password",
+                    "type": "string"
+                },
+                "username": {
+                    "description": "operator credentials username",
+                    "type": "string"
+                }
+            }
+        },
+        "serviceAccount": {
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "description": "annotations to add to the service account",
+                    "type": "object"
+                },
+                "create": {
+                    "description": "specifies whether a service account should be created",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "the name of the service account to use; if not set and create is true, a name is generated using the fullname template",
+                    "type": "null"
+                }
+            }
+        },
+        "serviceMonitor": {
+            "type": "object",
+            "properties": {
+                "additionalLabels": {
+                    "description": "additional labels for service monitor",
+                    "type": "object"
+                },
+                "clickhouseMetrics": {
+                    "type": "object",
+                    "properties": {
+                        "interval": {
+                            "type": "string"
+                        },
+                        "metricRelabelings": {
+                            "type": "array"
+                        },
+                        "relabelings": {
+                            "type": "array"
+                        },
+                        "scrapeTimeout": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "enabled": {
+                    "description": "ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) In serviceMonitor will be created two endpoints ch-metrics on port 8888 and op-metrics # 9999. Ypu can specify interval, scrapeTimeout, relabelings, metricRelabelings for each endpoint below",
+                    "type": "boolean"
+                },
+                "operatorMetrics": {
+                    "type": "object",
+                    "properties": {
+                        "interval": {
+                            "type": "string"
+                        },
+                        "metricRelabelings": {
+                            "type": "array"
+                        },
+                        "relabelings": {
+                            "type": "array"
+                        },
+                        "scrapeTimeout": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "tolerations": {
+            "description": "tolerations for scheduler pod assignment, check `kubectl explain pod.spec.tolerations` for details",
+            "type": "array"
+        },
+        "topologySpreadConstraints": {
+            "type": "array"
+        }
+    }
+}
