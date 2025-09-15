@@ -25,7 +25,6 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -65,10 +64,10 @@ func (c *STS) Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 			name = c.namer.Name(interfaces.NameStatefulSet, obj)
 			namespace = typedObj.Runtime.Address.Namespace
 		default:
-			panic("unknown type")
+			panic(any("unknown type"))
 		}
 	default:
-		panic("unexpected number of args")
+		panic(any("unexpected number of args"))
 	}
 	ctx = k8sCtx(ctx)
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, controller.NewGetOptions())
@@ -94,7 +93,7 @@ func (c *STS) Remove(ctx context.Context, namespace, name string) error {
 func (c *STS) Delete(ctx context.Context, namespace, name string) error {
 	item := "StatefulSet"
 	return poller.New(ctx, fmt.Sprintf("delete %s: %s/%s", item, namespace, name)).
-		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
+		WithOptions(poller.NewOptionsFromConfig()).
 		WithFunctions(&poller.Functions{
 			IsDone: func(_ctx context.Context, _ any) bool {
 				if err := c.Remove(ctx, namespace, name); err != nil {

@@ -971,20 +971,30 @@ def test_010011_3(self):
             user5_password_env = ""
             sasl_username_env = ""
             sasl_password_env = ""
+            custom0_env = ""
+            custom1_env = ""
             for e in envs:
                 if "valueFrom" in e:
+                    print(e["name"])
                     if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_USERNAME":
                         sasl_username_env = e["name"]
                     if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_PASSWORD":
                         sasl_password_env = e["name"]
                     if e["valueFrom"]["secretKeyRef"]["key"] == "pwduser5":
                         user5_password_env = e["name"]
+                    if e["valueFrom"]["secretKeyRef"]["key"] == "custom0":
+                        custom0_env = e["name"]
+                    if e["valueFrom"]["secretKeyRef"]["key"] == "custom1":
+                        custom1_env = e["name"]
 
             with By("Secrets are properly propagated to env variables"):
-                print(f"Found env variables: {sasl_username_env} {sasl_password_env} {user5_password_env}")
                 assert sasl_username_env != ""
                 assert sasl_password_env != ""
                 assert user5_password_env != ""
+
+            with By("Secrets are properly propagated to env variables for long settings names", flags=XFAIL):
+                assert custom0_env != ""
+                assert custom1_env != ""
 
             with By("Secrets are properly referenced from settings.xml"):
                 cfm = kubectl.get("configmap", f"chi-{chi}-common-configd")
@@ -997,7 +1007,6 @@ def test_010011_3(self):
                 users_xml = cfm["data"]["chop-generated-users.xml"]
                 env_matches = [from_env.strip() for from_env in users_xml.splitlines() if "from_env" in from_env]
                 print(f"Found env substitutions: {env_matches}")
-                time.sleep(5)
                 assert f"password from_env=\"{user5_password_env}\"" in users_xml
 
         kubectl.delete_chi(chi)
@@ -2661,6 +2670,7 @@ def test_010023(self):
         kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-1.yaml"))
         kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-2.yaml"))
         kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-3.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/test-023-auto-templates-4.yaml"))
         kubectl.apply(util.get_full_path("manifests/secret/test-023-secret.yaml"))
     with Given("Give templates some time to be applied"):
         time.sleep(15)
@@ -2680,6 +2690,7 @@ def test_010023(self):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[1].name") == "extension-annotations"
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "grafana-dashboard-user"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[3].name") == "set-labels"
         # assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == ""
 
     chi_spec = kubectl.get("chi", chi)
@@ -2720,6 +2731,12 @@ def test_010023(self):
     with Then("User from a template should be populated"):
         out = clickhouse.query_with_error(chi, "select 1", user = "grafana_dashboard_user", pwd = "grafana_dashboard_user_password")
         assert out == "1"
+
+    with Then("Label from a template should be populated"):
+        normalizedCompleted = kubectl.get_chi_normalizedCompleted(chi)
+        assert normalizedCompleted["metadata"]["labels"]["my-label"] == "test"
+    with Then("Pod label should populated from template"):
+        assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.labels.my-label") == "test"
 
     with Given("Two selector templates are deployed"):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-selector-1.yaml"))

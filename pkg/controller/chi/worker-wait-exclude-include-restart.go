@@ -55,7 +55,7 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInst
 		//	cur.EnsureStatus().SetPodIPs(podIPs)
 		// and here
 		// c.Status.GetPodIPs()
-		podIPs := w.c.getPodsIPs(chi)
+		podIPs := w.c.getPodsIPs(ctx, chi)
 		if len(podIPs) >= len(c.Status.GetPods()) {
 			l.Info("all IP addresses are in place")
 			// Stop polling
@@ -79,7 +79,7 @@ func (w *worker) excludeHost(ctx context.Context, host *api.Host) bool {
 	log.V(1).M(host).F().S().Info("exclude host start")
 	defer log.V(1).M(host).F().E().Info("exclude host end")
 
-	if !w.shouldExcludeHost(host) {
+	if !w.shouldExcludeHost(ctx, host) {
 		w.a.V(1).
 			M(host).F().
 			Info("No need to exclude host from cluster. Host/shard/cluster: %d/%d/%s",
@@ -158,17 +158,18 @@ func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 		return true
 
 	case chop.Config().Reconcile.Host.Wait.Replicas.New.IsTrue():
-		// New replicas are explicitly requested to wait for replication to catch-up.
-
+		// New replicas have personal catch-up requirements
 		if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusCreated) {
 			w.a.V(1).
 				M(host).F().
-				Info("This is a new host replica - need to catch-up")
+				Info("New replicas are explicitly requested to wait for replication to catch-up and this is a new host replica ")
 			return true
 		}
 
-		// This is not a new replica, it may have incomplete replication catch-up job still
+		// This is not a new replica.
+		// But this replica may have incomplete replication catch-up job still
 
+		// Whether replication is listed as caught-up earlier
 		if host.HasListedReplicaCaughtUp(w.c.namer.Name(interfaces.NameFQDN, host)) {
 			w.a.V(1).
 				M(host).F().
@@ -176,6 +177,7 @@ func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 			return false
 		}
 
+		// Host was seen before, but replication is not listed as caught-up, need to finish the replication
 		w.a.V(1).
 			M(host).F().
 			Info("Host replica has never reached caught-up status, need to wait for replication to commence")
@@ -348,7 +350,7 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error 
 }
 
 // shouldExcludeHost determines whether host to be excluded from cluster before reconciling
-func (w *worker) shouldExcludeHost(host *api.Host) bool {
+func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 	switch {
 	case host.IsStopped():
 		w.a.V(1).
@@ -371,7 +373,7 @@ func (w *worker) shouldExcludeHost(host *api.Host) bool {
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
 
-	case w.shouldForceRestartHost(host):
+	case w.shouldForceRestartHost(ctx, host):
 		w.a.V(1).
 			M(host).F().
 			Info("Host should be restarted, need to exclude. Host/shard/cluster: %d/%d/%s",
@@ -509,9 +511,9 @@ func (w *worker) waitHostHasNoReplicationDelay(ctx context.Context, host *api.Ho
 }
 
 // waitHostRestart
-func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, start map[string]int) error {
+func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, restartCounters map[string]int) error {
 	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
-		return w.isPodRestarted(ctx, host, start)
+		return w.isPodRestarted(ctx, host, restartCounters)
 	})
 }
 

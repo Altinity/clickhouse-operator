@@ -386,7 +386,15 @@ func (n *Normalizer) normalizeReconciling(reconciling *chi.Reconciling) *chi.Rec
 	// Macros
 	// No normalization yet
 
+	reconciling.Host = n.normalizeReconcilingHost(reconciling.Host)
+
 	return reconciling
+}
+
+func (n *Normalizer) normalizeReconcilingHost(rh chi.ReconcileHost) chi.ReconcileHost {
+	rh = rh.Normalize()
+	rh = rh.MergeFrom(chop.Config().Reconcile.Host)
+	return rh
 }
 
 func (n *Normalizer) normalizeReconcilingCleanup(cleanup *chi.Cleanup) *chi.Cleanup {

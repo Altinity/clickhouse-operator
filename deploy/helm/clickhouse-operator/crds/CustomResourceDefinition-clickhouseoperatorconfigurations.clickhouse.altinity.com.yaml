@@ -7,7 +7,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -53,10 +53,9 @@ spec:
                   description: "Parameters for watch kubernetes resources which used by clickhouse-operator deployment"
                   properties:
                     namespaces:
-                      type: array
+                      type: object
                       description: "List of namespaces where clickhouse-operator watches for events."
-                      items:
-                        type: string
+                      x-kubernetes-preserve-unknown-fields: true
                 clickhouse:
                   type: object
                   description: "Clickhouse related parameters used by clickhouse-operator"
@@ -378,6 +377,22 @@ spec:
                                 delay:
                                   type: integer
                                   description: "replication max absolute delay to consider replica is not delayed"
+                            probes:
+                              type: object
+                              description: "What probes the operator should wait during host launch procedure"
+                              properties:
+                                startup:
+                                  !!merge <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for startup probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to do not wait.
+                                readiness:
+                                  !!merge <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for readiness probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to wait.
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"

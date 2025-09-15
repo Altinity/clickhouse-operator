@@ -17,12 +17,12 @@ package k8s
 import core "k8s.io/api/core/v1"
 
 // CreateVolumeForPVC returns core.Volume object with specified name
-func CreateVolumeForPVC(name, claimName string) core.Volume {
+func CreateVolumeForPVC(volumeName, pvcName string) core.Volume {
 	return core.Volume{
-		Name: name,
+		Name: volumeName,
 		VolumeSource: core.VolumeSource{
 			PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-				ClaimName: claimName,
+				ClaimName: pvcName,
 				ReadOnly:  false,
 			},
 		},
@@ -30,14 +30,14 @@ func CreateVolumeForPVC(name, claimName string) core.Volume {
 }
 
 // CreateVolumeForConfigMap returns core.Volume object with defined name
-func CreateVolumeForConfigMap(name string) core.Volume {
+func CreateVolumeForConfigMap(volumeName string) core.Volume {
 	var defaultMode int32 = 0644
 	return core.Volume{
-		Name: name,
+		Name: volumeName,
 		VolumeSource: core.VolumeSource{
 			ConfigMap: &core.ConfigMapVolumeSource{
 				LocalObjectReference: core.LocalObjectReference{
-					Name: name,
+					Name: volumeName,
 				},
 				DefaultMode: &defaultMode,
 			},

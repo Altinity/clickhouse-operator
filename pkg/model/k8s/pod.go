@@ -18,7 +18,8 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-func PodRestartCountersGet(pod *core.Pod) map[string]int {
+// Maps container name => restarts count
+func PodContainersRestartCountsGet(pod *core.Pod) map[string]int {
 	if pod == nil {
 		return nil
 	}
@@ -58,16 +59,16 @@ func PodHasNotReadyContainers(pod *core.Pod) bool {
 }
 
 func PodHasAllContainersStarted(pod *core.Pod) bool {
-	allStarted := true
+	allContainersStarted := true
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		if (containerStatus.Started != nil) && (*containerStatus.Started) {
 			// Current container is started. no changes in all status
 		} else {
 			// Current container is NOT started
-			allStarted = false
+			allContainersStarted = false
 		}
 	}
-	return allStarted
+	return allContainersStarted
 }
 
 func PodHasNotStartedContainers(pod *core.Pod) bool {

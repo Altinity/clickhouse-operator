@@ -3910,7 +3910,7 @@ spec:
 ###### RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Name
 version: 1.0
 
-[ClickHouse Operator] SHALL support specifying custom host name for each `clickhuse-server`
+[ClickHouse Operator] SHALL support specifying custom host name for each `clickhouse-server`
 using `.spec.templates.hostTemplates[].spec.name` [string] type property
 with the minimum length of `1` and maximum length of `15` matching
 `"^[a-zA-Z0-9-]{0,15}$"` pattern.

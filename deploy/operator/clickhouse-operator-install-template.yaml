@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.25.3
+# OPERATOR_VERSION=0.25.4
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -490,6 +490,55 @@ spec:
                                 enabled:
                                   <<: *TypeStringBool
                                   description: "enabled or not"
+                    host:
+                      type: object
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+                      properties:
+                        wait:
+                          type: object
+                          properties:
+                            exclude:
+                              <<: *TypeStringBool
+                            queries:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
+                            include:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
+                            replicas:
+                              type: object
+                              description: "Whether the operator during reconcile procedure should wait for replicas to catch-up"
+                              properties:
+                                all:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for all replicas to catch-up"
+                                new:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for new replicas to catch-up"
+                                delay:
+                                  type: integer
+                                  description: "replication max absolute delay to consider replica is not delayed"
+                            probes:
+                              type: object
+                              description: "What probes the operator should wait during host launch procedure"
+                              properties:
+                                startup:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for startup probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to do not wait.
+                                ready:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for ready probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to wait.
                 defaults:
                   type: object
                   description: |
@@ -620,6 +669,9 @@ spec:
                         identity:
                           type: string
                           description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
+                        use_compression:
+                          !!merge <<: *TypeStringBool
+                          description: "Enables compression in Keeper protocol if set to true"
                     users:
                       type: object
                       description: |
@@ -1120,7 +1172,7 @@ spec:
                             properties:
                               name:
                                 type: string
-                                description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
+                                description: "by default, hostname will generate, but this allows define custom name for each `clickhouse-server`"
                                 minLength: 1
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
@@ -1376,7 +1428,7 @@ spec:
                         description: "name of `ClickHouseInstallationTemplate` (chit) resource"
                       namespace:
                         type: string
-                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clichouse-operator`"
+                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clickhouse-operator`"
                       useType:
                         type: string
                         description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit`"
@@ -1391,14 +1443,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.25.3
+# OPERATOR_VERSION=0.25.4
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1877,6 +1929,55 @@ spec:
                                 enabled:
                                   <<: *TypeStringBool
                                   description: "enabled or not"
+                    host:
+                      type: object
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+                      properties:
+                        wait:
+                          type: object
+                          properties:
+                            exclude:
+                              <<: *TypeStringBool
+                            queries:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
+                            include:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
+                            replicas:
+                              type: object
+                              description: "Whether the operator during reconcile procedure should wait for replicas to catch-up"
+                              properties:
+                                all:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for all replicas to catch-up"
+                                new:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for new replicas to catch-up"
+                                delay:
+                                  type: integer
+                                  description: "replication max absolute delay to consider replica is not delayed"
+                            probes:
+                              type: object
+                              description: "What probes the operator should wait during host launch procedure"
+                              properties:
+                                startup:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for startup probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to do not wait.
+                                ready:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for ready probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to wait.
                 defaults:
                   type: object
                   description: |
@@ -2007,6 +2108,9 @@ spec:
                         identity:
                           type: string
                           description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
+                        use_compression:
+                          !!merge <<: *TypeStringBool
+                          description: "Enables compression in Keeper protocol if set to true"
                     users:
                       type: object
                       description: |
@@ -2507,7 +2611,7 @@ spec:
                             properties:
                               name:
                                 type: string
-                                description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
+                                description: "by default, hostname will generate, but this allows define custom name for each `clickhouse-server`"
                                 minLength: 1
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
@@ -2763,7 +2867,7 @@ spec:
                         description: "name of `ClickHouseInstallationTemplate` (chit) resource"
                       namespace:
                         type: string
-                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clichouse-operator`"
+                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clickhouse-operator`"
                       useType:
                         type: string
                         description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit`"
@@ -2781,7 +2885,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2827,10 +2931,9 @@ spec:
                   description: "Parameters for watch kubernetes resources which used by clickhouse-operator deployment"
                   properties:
                     namespaces:
-                      type: array
+                      type: object
                       description: "List of namespaces where clickhouse-operator watches for events."
-                      items:
-                        type: string
+                      x-kubernetes-preserve-unknown-fields: true
                 clickhouse:
                   type: object
                   description: "Clickhouse related parameters used by clickhouse-operator"
@@ -3101,7 +3204,6 @@ spec:
                           - to complete all running queries
                           - to be included into a ClickHouse cluster
                         respectfully before moving forward
-
                       properties:
                         wait:
                           type: object
@@ -3153,6 +3255,22 @@ spec:
                                 delay:
                                   type: integer
                                   description: "replication max absolute delay to consider replica is not delayed"
+                            probes:
+                              type: object
+                              description: "What probes the operator should wait during host launch procedure"
+                              properties:
+                                startup:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for startup probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to do not wait.
+                                readiness:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for readiness probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to wait.
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
@@ -3285,14 +3403,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.25.3
+# OPERATOR_VERSION=0.25.4
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.25.3
+    clickhouse-keeper.altinity.com/chop: 0.25.4
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -3961,7 +4079,7 @@ spec:
                             properties:
                               name:
                                 type: string
-                                description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
+                                description: "by default, hostname will generate, but this allows define custom name for each `clickhouse-server`"
                                 minLength: 1
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
@@ -4183,7 +4301,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
 ---
 # Template Parameters:
 #
@@ -4209,7 +4327,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
 rules:
 
   #
@@ -4330,6 +4448,19 @@ rules:
       - delete
 
   #
+  # discovery.* resources
+  #
+
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+    verbs:
+      - get
+      - list
+      - watch
+
+  #
   # apiextensions
   #
 
@@ -4428,7 +4559,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -4450,7 +4581,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -4479,7 +4610,6 @@ data:
       # Concurrently running operators should watch on different namespaces.
       # IMPORTANT
       # Regexp is applicable.
-      #namespaces: ["dev", "test"]
       namespaces: []
     
     clickhouse:
@@ -4812,15 +4942,31 @@ data:
         #   - to be excluded from a ClickHouse cluster
         #   - to complete all running queries
         #   - to be included into a ClickHouse cluster
-        # respectfully before moving forward
+        # respectfully before moving forward with host reconcile
         wait:
           exclude: true
           queries: true
           include: false
+          # The operator during reconcile procedure should wait for replicas to catch-up
+          # replication delay a.k.a replication lag for the following replicas
           replicas:
+            # All replicas (new and known earlier) are explicitly requested to wait for replication to catch-up
             all: no
+            # New replicas only are requested to wait for replication to catch-up
             new: yes
+            # Replication catch-up is considered to be completed as soon as replication delay
+            # a.k.a replication lag - calculated as "MAX(absolute_delay) FROM system.replicas"
+            # is within this specified delay (in seconds)
             delay: 10
+          probes:
+            # Whether the operator during host launch procedure should wait for startup probe to succeed.
+            # In case probe is unspecified wait is assumed to be completed successfully.
+            # Default option value is to do not wait.
+            startup: no
+            # Whether the operator during host launch procedure should wait for readiness probe to succeed.
+            # In case probe is unspecified wait is assumed to be completed successfully.
+            # Default option value is to wait.
+            readiness: yes
     
     ################################################
     ##
@@ -4933,7 +5079,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 data:
 ---
@@ -4949,7 +5095,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -5048,7 +5194,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -5148,7 +5294,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -5211,7 +5357,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 data:
 ---
@@ -5227,7 +5373,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -5305,7 +5451,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 data:
   readme: |
@@ -5323,7 +5469,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 data:
 ---
@@ -5331,7 +5477,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=${OPERATOR_NAMESPACE}
 #   COMMENT=
-#   OPERATOR_VERSION=0.25.3
+#   OPERATOR_VERSION=0.25.4
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -5341,7 +5487,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -5365,7 +5511,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -5580,7 +5726,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
     app: clickhouse-operator
 spec:
   ports:

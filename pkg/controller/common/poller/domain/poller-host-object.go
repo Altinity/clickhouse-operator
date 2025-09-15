@@ -1,5 +1,4 @@
 // Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
-// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,17 +18,33 @@ import (
 	"context"
 	"fmt"
 
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// PollHost polls host
-func PollHost(
+type polledObjectGetter[TypeToGet any] interface {
+	Get(ctx context.Context, params ...any) (*TypeToGet, error)
+}
+
+type HostObjectPoller[TypeToPoll any] struct {
+	getter polledObjectGetter[TypeToPoll]
+}
+
+func NewHostObjectPoller[TypeToPoll any](getter polledObjectGetter[TypeToPoll]) *HostObjectPoller[TypeToPoll] {
+	return &HostObjectPoller[TypeToPoll]{
+		getter: getter,
+	}
+}
+
+// Poll polls host's object
+func (p *HostObjectPoller[TypeToPoll]) Poll(
 	ctx context.Context,
 	host *api.Host,
-	isDoneFn func(context.Context, *api.Host) bool,
+	isDoneFn func(context.Context, *TypeToPoll) bool,
 	_opts ...*poller.Options,
 ) error {
 	if util.IsContextDone(ctx) {
@@ -41,10 +56,13 @@ func PollHost(
 	opts := poller.NewOptionsFromConfig(_opts...)
 	functions := &poller.Functions{
 		Get: func(_ctx context.Context) (any, error) {
-			return nil, nil
+			return p.getter.Get(ctx, host)
 		},
-		IsDone: func(_ctx context.Context, _ any) bool {
-			return isDoneFn(_ctx, host)
+		IsDone: func(_ctx context.Context, a any) bool {
+			return isDoneFn(_ctx, a.(*TypeToPoll))
+		},
+		ShouldContinueOnGetError: func(_ctx context.Context, _ any, e error) bool {
+			return apiErrors.IsNotFound(e)
 		},
 	}
 

@@ -113,8 +113,7 @@ func (w *worker) newTask(new, old *apiChk.ClickHouseKeeperInstallation) {
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
-		//poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.labeler),
-		domain.NewHostStatefulSetPoller(domain.NewStatefulSetPoller(w.c.kube), w.c.kube, nil),
+		domain.NewHostObjectsPoller(domain.NewHostObjectPoller(w.c.kube.STS()), domain.NewHostObjectPoller(w.c.kube.Pod()), nil),
 		w.c.namer,
 		labeler.New(new),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
@@ -124,7 +123,7 @@ func (w *worker) newTask(new, old *apiChk.ClickHouseKeeperInstallation) {
 }
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
-func (w *worker) shouldForceRestartHost(host *api.Host) bool {
+func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) bool {
 	switch {
 	case host.HasAncestor() && host.GetAncestor().IsStopped():
 		w.a.V(1).M(host).F().Info("Host ancestor is stopped, no restart applicable. Host: %s", host.GetName())
@@ -158,7 +157,7 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 
-	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(host):
+	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host):
 		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
 		return true
 
@@ -204,7 +203,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 	// Update CHI object
 	if chi, err := w.createCRFromObjectMeta(_cr, true, commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CR-2 %s", chi.Name)
-		ips := w.c.getPodsIPs(chi)
+		ips := w.c.getPodsIPs(ctx, chi)
 		w.a.V(1).M(chi).Info("IPs of the CR-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
 		opts := commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()
 		opts.DefaultUserAdditionalIPs = ips

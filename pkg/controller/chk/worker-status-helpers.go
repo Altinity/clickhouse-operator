@@ -15,13 +15,15 @@
 package chk
 
 import (
+	"context"
+
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
-func (w *worker) isPodCrushed(host *api.Host) bool {
-	if pod, err := w.c.kube.Pod().Get(host); err == nil {
+func (w *worker) isPodCrushed(ctx context.Context, host *api.Host) bool {
+	if pod, err := w.c.kube.Pod().Get(ctx, host); err == nil {
 		return k8s.PodHasCrushedContainers(pod)
 	}
 	return true

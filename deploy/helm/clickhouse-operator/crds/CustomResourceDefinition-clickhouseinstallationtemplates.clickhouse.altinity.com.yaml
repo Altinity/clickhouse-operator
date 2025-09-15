@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.25.3
+# OPERATOR_VERSION=0.25.4
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.3
+    clickhouse.altinity.com/chop: 0.25.4
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -490,6 +490,55 @@ spec:
                                 enabled:
                                   !!merge <<: *TypeStringBool
                                   description: "enabled or not"
+                    host:
+                      type: object
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+                      properties:
+                        wait:
+                          type: object
+                          properties:
+                            exclude:
+                              !!merge <<: *TypeStringBool
+                            queries:
+                              !!merge <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
+                            include:
+                              !!merge <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
+                            replicas:
+                              type: object
+                              description: "Whether the operator during reconcile procedure should wait for replicas to catch-up"
+                              properties:
+                                all:
+                                  !!merge <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for all replicas to catch-up"
+                                new:
+                                  !!merge <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for new replicas to catch-up"
+                                delay:
+                                  type: integer
+                                  description: "replication max absolute delay to consider replica is not delayed"
+                            probes:
+                              type: object
+                              description: "What probes the operator should wait during host launch procedure"
+                              properties:
+                                startup:
+                                  !!merge <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for startup probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to do not wait.
+                                ready:
+                                  !!merge <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for ready probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to wait.
                 defaults:
                   type: object
                   description: |
@@ -620,6 +669,9 @@ spec:
                         identity:
                           type: string
                           description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
+                        use_compression:
+                          !!merge <<: *TypeStringBool
+                          description: "Enables compression in Keeper protocol if set to true"
                     users:
                       type: object
                       description: |
@@ -1117,7 +1169,7 @@ spec:
                             properties:
                               name:
                                 type: string
-                                description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
+                                description: "by default, hostname will generate, but this allows define custom name for each `clickhouse-server`"
                                 minLength: 1
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
@@ -1371,7 +1423,7 @@ spec:
                         description: "name of `ClickHouseInstallationTemplate` (chit) resource"
                       namespace:
                         type: string
-                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clichouse-operator`"
+                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clickhouse-operator`"
                       useType:
                         type: string
                         description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit`"
