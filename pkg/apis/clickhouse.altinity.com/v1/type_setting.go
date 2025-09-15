@@ -291,6 +291,8 @@ func (s *Setting) FetchDataSourceAddress(defaultNamespace string, parseScalarStr
 		}
 	case SettingTypeSource:
 		// Fetch k8s address of the field from the source ref
+		// 1. The name of the secret to select from. Namespace is expected to be provided externally
+		// 2. The key of the secret to select from.
 		name, key := s.GetNameKey()
 		return types.ObjectAddress{
 			Namespace: defaultNamespace,

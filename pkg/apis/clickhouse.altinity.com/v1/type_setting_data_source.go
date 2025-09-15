@@ -45,6 +45,8 @@ func NewSettingSourceFromAny(untyped any) (*Setting, bool) {
 }
 
 // GetNameKey gets name and key from the secret ref
+// 1. The name of the secret to select from. Namespace is expected to be provided externally
+// 2. The key of the secret to select from.
 func (s *SettingSource) GetNameKey() (string, string) {
 	if ref := s.GetSecretKeyRef(); ref != nil {
 		return ref.Name, ref.Key
@@ -94,6 +96,8 @@ func (s *Setting) IsSource() bool {
 }
 
 // GetNameKey gets name and key of source setting
+// 1. The name of the secret to select from. Namespace is expected to be provided externally
+// 2. The key of the secret to select from.
 func (s *Setting) GetNameKey() (string, string) {
 	if ref := s.GetSecretKeyRef(); ref != nil {
 		return ref.Name, ref.Key
