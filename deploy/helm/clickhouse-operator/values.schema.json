@@ -23,7 +23,7 @@
             "type": "object",
             "properties": {
                 "confdFiles": {
-                    "type": "string"
+                    "type": ["string", "null"]
                 },
                 "configdFiles": {
                     "type": "object",
@@ -578,7 +578,7 @@
                     }
                 },
                 "keeperConfdFiles": {
-                    "type": "string"
+                    "type": ["string", "null"]
                 },
                 "keeperConfigdFiles": {
                     "type": "object",
@@ -595,41 +595,41 @@
                     }
                 },
                 "keeperTemplatesdFiles": {
-                    "type": "object",
+                    "type": ["object", "null"],
                     "properties": {
                         "readme": {
-                            "type": "string"
+                            "type": ["string", "null"]
                         }
                     }
                 },
                 "keeperUsersdFiles": {
-                    "type": "string"
+                    "type": ["string", "null"]
                 },
                 "templatesdFiles": {
-                    "type": "object",
+                    "type": ["object", "null"],
                     "properties": {
                         "001-templates.json.example": {
-                            "type": "string"
+                            "type": ["string", "null"]
                         },
                         "default-pod-template.yaml.example": {
-                            "type": "string"
+                            "type": ["string", "null"]
                         },
                         "default-storage-template.yaml.example": {
-                            "type": "string"
+                            "type": ["string", "null"]
                         },
                         "readme": {
-                            "type": "string"
+                            "type": ["string", "null"]
                         }
                     }
                 },
                 "usersdFiles": {
-                    "type": "object",
+                    "type": ["object", "null"],
                     "properties": {
                         "01-clickhouse-operator-profile.xml": {
-                            "type": "string"
+                            "type": ["string", "null"]
                         },
                         "02-clickhouse-default-profile.xml": {
-                            "type": "string"
+                            "type": ["string", "null"]
                         }
                     }
                 }
