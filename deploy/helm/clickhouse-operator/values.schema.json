@@ -125,7 +125,7 @@
                                                                                 "type": "null"
                                                                             },
                                                                             "profiles": {
-                                                                                "type": "object",
+                                                                                "type": ["object", "null"],
                                                                                 "properties": {
                                                                                     "clickhouse_operator/format_display_secrets_in_show_and_select": {
                                                                                         "type": "integer"
@@ -133,10 +133,10 @@
                                                                                 }
                                                                             },
                                                                             "quotas": {
-                                                                                "type": "null"
+                                                                                "type": ["object", "null"]
                                                                             },
                                                                             "settings": {
-                                                                                "type": "object",
+                                                                                "type": ["object", "null"],
                                                                                 "properties": {
                                                                                     "display_secrets_in_show_and_select": {
                                                                                         "type": "integer"
@@ -144,7 +144,7 @@
                                                                                 }
                                                                             },
                                                                             "users": {
-                                                                                "type": "null",
+                                                                                "type": ["object", "null"],
                                                                                 "properties": {
                                                                                     "{clickhouseOperatorUser}/access_management": {
                                                                                         "type": "integer"
