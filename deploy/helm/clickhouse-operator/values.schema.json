@@ -437,10 +437,10 @@
                                                             "type": "object",
                                                             "properties": {
                                                                 "readiness": {
-                                                                    "type": "string"
+                                                                    "type": "boolean"
                                                                 },
                                                                 "startup": {
-                                                                    "type": "string"
+                                                                    "type": "boolean"
                                                                 }
                                                             }
                                                         },
@@ -451,13 +451,13 @@
                                                             "type": "object",
                                                             "properties": {
                                                                 "all": {
-                                                                    "type": "string"
+                                                                    "type": "boolean"
                                                                 },
                                                                 "delay": {
                                                                     "type": "integer"
                                                                 },
                                                                 "new": {
-                                                                    "type": "string"
+                                                                    "type": "boolean"
                                                                 }
                                                             }
                                                         }
