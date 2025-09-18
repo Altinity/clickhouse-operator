@@ -156,7 +156,7 @@ func (n *Normalizer) normalizeSpec() {
 	n.req.GetTarget().GetSpecT().Troubleshoot = n.normalizeTroubleshoot(n.req.GetTarget().GetSpecT().Troubleshoot)
 	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
 	n.req.GetTarget().GetSpecT().Templating = n.normalizeTemplating(n.req.GetTarget().GetSpecT().Templating)
-	n.req.GetTarget().GetSpecT().Reconciling = n.normalizeReconciling(n.req.GetTarget().GetSpecT().Reconciling)
+	n.req.GetTarget().GetSpecT().Reconcile = n.normalizeReconcile(n.req.GetTarget().GetSpecT().Reconcile)
 	n.req.GetTarget().GetSpecT().Defaults = n.normalizeDefaults(n.req.GetTarget().GetSpecT().Defaults)
 	n.normalizeConfiguration()
 	n.req.GetTarget().GetSpecT().Templates = n.normalizeTemplates(n.req.GetTarget().GetSpecT().Templates)
@@ -356,10 +356,10 @@ func (n *Normalizer) normalizeTemplating(templating *chi.ChiTemplating) *chi.Chi
 	return templating
 }
 
-// normalizeReconciling normalizes .spec.reconciling
-func (n *Normalizer) normalizeReconciling(reconciling *chi.Reconciling) *chi.Reconciling {
+// normalizeReconcile normalizes .spec.reconciling
+func (n *Normalizer) normalizeReconcile(reconciling *chi.ChiReconcile) *chi.ChiReconcile {
 	if reconciling == nil {
-		reconciling = chi.NewReconciling().SetDefaults()
+		reconciling = chi.NewChiReconcile().SetDefaults()
 	}
 
 	// Policy
@@ -379,25 +379,25 @@ func (n *Normalizer) normalizeReconciling(reconciling *chi.Reconciling) *chi.Rec
 	// No normalization yet
 
 	// Cleanup
-	reconciling.SetCleanup(n.normalizeReconcilingCleanup(reconciling.GetCleanup()))
+	reconciling.SetCleanup(n.normalizeReconcileCleanup(reconciling.GetCleanup()))
 
 	// Runtime
 	// No normalization yet
 	// Macros
 	// No normalization yet
 
-	reconciling.Host = n.normalizeReconcilingHost(reconciling.Host)
+	reconciling.Host = n.normalizeReconcileHost(reconciling.Host)
 
 	return reconciling
 }
 
-func (n *Normalizer) normalizeReconcilingHost(rh chi.ReconcileHost) chi.ReconcileHost {
+func (n *Normalizer) normalizeReconcileHost(rh chi.ReconcileHost) chi.ReconcileHost {
 	rh = rh.Normalize()
 	rh = rh.MergeFrom(chop.Config().Reconcile.Host)
 	return rh
 }
 
-func (n *Normalizer) normalizeReconcilingCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
+func (n *Normalizer) normalizeReconcileCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
 	if cleanup == nil {
 		cleanup = chi.NewCleanup()
 	}
@@ -628,7 +628,7 @@ func (n *Normalizer) replacers(section replacerSection, scope any, additional ..
 	// Should scope macros be applied - depends on whether macros are enabled in the section
 	shouldApplyScopeMacros := false
 	// Shortcut to macros enabled/disabled toggles
-	sectionToggles := n.req.GetTarget().Spec.Reconciling.Macros.Sections
+	sectionToggles := n.req.GetTarget().Spec.Reconcile.Macros.Sections
 
 	switch section {
 	case replacerFiles:
