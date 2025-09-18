@@ -17,65 +17,23 @@ package v1
 import (
 	"strings"
 	"time"
-
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // Reconciling defines reconciling specification
 type Reconciling struct {
 	// About to be DEPRECATED
 	Policy string `json:"policy,omitempty" yaml:"policy,omitempty"`
+
 	// ConfigMapPropagationTimeout specifies timeout for ConfigMap to propagate
 	ConfigMapPropagationTimeout int `json:"configMapPropagationTimeout,omitempty" yaml:"configMapPropagationTimeout,omitempty"`
 	// Cleanup specifies cleanup behavior
 	Cleanup *Cleanup `json:"cleanup,omitempty" yaml:"cleanup,omitempty"`
+	// Macros specifies macros application rules
+	Macros ReconcileMacros `json:"macros,omitempty" yaml:"macros,omitempty"`
+
 	// Runtime specifies runtime settings
 	Runtime ReconcileRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
-	Macros  Macros           `json:"macros,omitempty" yaml:"macros,omitempty"`
-
-	Host ReconcileHost `json:"host" yaml:"host"`
-}
-
-type Macros struct {
-	Sections MacrosSections `json:"sections,omitempty" yaml:"sections,omitempty"`
-}
-
-func newMacros() *Macros {
-	return new(Macros)
-}
-
-// MergeFrom merges from specified reconciling
-func (t Macros) MergeFrom(from Macros, _type MergeType) Macros {
-	t.Sections = t.Sections.MergeFrom(from.Sections, _type)
-	return t
-}
-
-type MacrosSections struct {
-	Users    MacrosSection `json:"users,omitempty"    yaml:"users,omitempty"`
-	Profiles MacrosSection `json:"profiles,omitempty" yaml:"profiles,omitempty"`
-	Quotas   MacrosSection `json:"quotas,omitempty"   yaml:"quotas,omitempty"`
-	Settings MacrosSection `json:"settings,omitempty" yaml:"settings,omitempty"`
-	Files    MacrosSection `json:"files,omitempty"    yaml:"files,omitempty"`
-}
-
-// MergeFrom merges from specified reconciling
-func (t MacrosSections) MergeFrom(from MacrosSections, _type MergeType) MacrosSections {
-	t.Users = t.Users.MergeFrom(from.Users, _type)
-	t.Profiles = t.Profiles.MergeFrom(from.Profiles, _type)
-	t.Quotas = t.Quotas.MergeFrom(from.Quotas, _type)
-	t.Settings = t.Settings.MergeFrom(from.Settings, _type)
-	t.Files = t.Files.MergeFrom(from.Files, _type)
-	return t
-}
-
-type MacrosSection struct {
-	Enabled *types.StringBool `json:"enabled,omitempty"    yaml:"enabled,omitempty"`
-}
-
-// MergeFrom merges from specified reconciling
-func (t MacrosSection) MergeFrom(from MacrosSection, _type MergeType) MacrosSection {
-	t.Enabled = t.Enabled.MergeFrom(from.Enabled)
-	return t
+	Host    ReconcileHost    `json:"host" yaml:"host"`
 }
 
 // NewReconciling creates new reconciling
