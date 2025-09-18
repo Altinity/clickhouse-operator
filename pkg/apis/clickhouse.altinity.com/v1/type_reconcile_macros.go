@@ -22,7 +22,7 @@ type ReconcileMacros struct {
 	Sections MacrosSections `json:"sections,omitempty" yaml:"sections,omitempty"`
 }
 
-// MergeFrom merges from specified reconciling
+// MergeFrom merges from specified reconcile
 func (t ReconcileMacros) MergeFrom(from ReconcileMacros, _type MergeType) ReconcileMacros {
 	t.Sections = t.Sections.MergeFrom(from.Sections, _type)
 	return t
@@ -36,7 +36,7 @@ type MacrosSections struct {
 	Files    MacrosSection `json:"files,omitempty"    yaml:"files,omitempty"`
 }
 
-// MergeFrom merges from specified reconciling
+// MergeFrom merges from specified macros
 func (t MacrosSections) MergeFrom(from MacrosSections, _type MergeType) MacrosSections {
 	t.Users = t.Users.MergeFrom(from.Users, _type)
 	t.Profiles = t.Profiles.MergeFrom(from.Profiles, _type)
@@ -50,7 +50,7 @@ type MacrosSection struct {
 	Enabled *types.StringBool `json:"enabled,omitempty"    yaml:"enabled,omitempty"`
 }
 
-// MergeFrom merges from specified reconciling
+// MergeFrom merges from specified macros
 func (t MacrosSection) MergeFrom(from MacrosSection, _type MergeType) MacrosSection {
 	t.Enabled = t.Enabled.MergeFrom(from.Enabled)
 	return t

@@ -21,13 +21,13 @@ import (
 
 // ChkSpec defines spec section of ClickHouseKeeper resource
 type ChkSpec struct {
-	TaskID                 *types.Id           `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
-	NamespaceDomainPattern *types.String       `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
-	Suspend                *types.StringBool   `json:"suspend,omitempty"                yaml:"suspend,omitempty"`
-	Reconciling            *apiChi.Reconciling `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
-	Defaults               *apiChi.Defaults    `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
-	Configuration          *Configuration      `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
-	Templates              *apiChi.Templates   `json:"templates,omitempty"              yaml:"templates,omitempty"`
+	TaskID                 *types.Id            `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	NamespaceDomainPattern *types.String        `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
+	Suspend                *types.StringBool    `json:"suspend,omitempty"                yaml:"suspend,omitempty"`
+	Reconcile              *apiChi.ChiReconcile `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Defaults               *apiChi.Defaults     `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
+	Configuration          *Configuration       `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+	Templates              *apiChi.Templates    `json:"templates,omitempty"              yaml:"templates,omitempty"`
 }
 
 // HasTaskID checks whether task id is specified
@@ -107,7 +107,7 @@ func (spec *ChkSpec) MergeFrom(from *ChkSpec, _type apiChi.MergeType) {
 		}
 	}
 
-	spec.Reconciling = spec.Reconciling.MergeFrom(from.Reconciling, _type)
+	spec.Reconcile = spec.Reconcile.MergeFrom(from.Reconcile, _type)
 	spec.Defaults = spec.Defaults.MergeFrom(from.Defaults, _type)
 	spec.Configuration = spec.Configuration.MergeFrom(from.Configuration, _type)
 	spec.Templates = spec.Templates.MergeFrom(from.Templates, _type)

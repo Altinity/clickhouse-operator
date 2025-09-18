@@ -19,8 +19,8 @@ import (
 	"time"
 )
 
-// Reconciling defines reconciling specification
-type Reconciling struct {
+// ChiReconcile defines reconcile specification
+type ChiReconcile struct {
 	// About to be DEPRECATED
 	Policy string `json:"policy,omitempty" yaml:"policy,omitempty"`
 
@@ -36,19 +36,23 @@ type Reconciling struct {
 	Host    ReconcileHost    `json:"host" yaml:"host"`
 }
 
-// NewReconciling creates new reconciling
-func NewReconciling() *Reconciling {
-	return new(Reconciling)
+type ClusterReconcile struct {
+	Runtime ReconcileRuntime `json:"runtime" yaml:"runtime"`
 }
 
-// MergeFrom merges from specified reconciling
-func (t *Reconciling) MergeFrom(from *Reconciling, _type MergeType) *Reconciling {
+// NewChiReconcile creates new reconcile
+func NewChiReconcile() *ChiReconcile {
+	return new(ChiReconcile)
+}
+
+// MergeFrom merges from specified reconcile
+func (t *ChiReconcile) MergeFrom(from *ChiReconcile, _type MergeType) *ChiReconcile {
 	if from == nil {
 		return t
 	}
 
 	if t == nil {
-		t = NewReconciling()
+		t = NewChiReconcile()
 	}
 
 	switch _type {
@@ -77,8 +81,8 @@ func (t *Reconciling) MergeFrom(from *Reconciling, _type MergeType) *Reconciling
 	return t
 }
 
-// SetDefaults set default values for reconciling
-func (t *Reconciling) SetDefaults() *Reconciling {
+// SetDefaults set default values for reconcile
+func (t *ChiReconcile) SetDefaults() *ChiReconcile {
 	if t == nil {
 		return nil
 	}
@@ -89,7 +93,7 @@ func (t *Reconciling) SetDefaults() *Reconciling {
 }
 
 // GetPolicy gets policy
-func (t *Reconciling) GetPolicy() string {
+func (t *ChiReconcile) GetPolicy() string {
 	if t == nil {
 		return ""
 	}
@@ -97,19 +101,19 @@ func (t *Reconciling) GetPolicy() string {
 }
 
 // SetPolicy sets policy
-func (t *Reconciling) SetPolicy(p string) {
+func (t *ChiReconcile) SetPolicy(p string) {
 	if t == nil {
 		return
 	}
 	t.Policy = p
 }
 
-func (t *Reconciling) HasConfigMapPropagationTimeout() bool {
+func (t *ChiReconcile) HasConfigMapPropagationTimeout() bool {
 	return t.GetConfigMapPropagationTimeout() > 0
 }
 
 // GetConfigMapPropagationTimeout gets config map propagation timeout
-func (t *Reconciling) GetConfigMapPropagationTimeout() int {
+func (t *ChiReconcile) GetConfigMapPropagationTimeout() int {
 	if t == nil {
 		return 0
 	}
@@ -117,7 +121,7 @@ func (t *Reconciling) GetConfigMapPropagationTimeout() int {
 }
 
 // SetConfigMapPropagationTimeout sets config map propagation timeout
-func (t *Reconciling) SetConfigMapPropagationTimeout(timeout int) {
+func (t *ChiReconcile) SetConfigMapPropagationTimeout(timeout int) {
 	if t == nil {
 		return
 	}
@@ -125,7 +129,7 @@ func (t *Reconciling) SetConfigMapPropagationTimeout(timeout int) {
 }
 
 // GetConfigMapPropagationTimeoutDuration gets config map propagation timeout duration
-func (t *Reconciling) GetConfigMapPropagationTimeoutDuration() time.Duration {
+func (t *ChiReconcile) GetConfigMapPropagationTimeoutDuration() time.Duration {
 	if t == nil {
 		return 0
 	}
@@ -140,17 +144,17 @@ const (
 )
 
 // IsReconcilingPolicyWait checks whether reconcile policy is "wait"
-func (t *Reconciling) IsReconcilingPolicyWait() bool {
+func (t *ChiReconcile) IsReconcilingPolicyWait() bool {
 	return strings.ToLower(t.GetPolicy()) == ReconcilingPolicyWait
 }
 
 // IsReconcilingPolicyNoWait checks whether reconcile policy is "no wait"
-func (t *Reconciling) IsReconcilingPolicyNoWait() bool {
+func (t *ChiReconcile) IsReconcilingPolicyNoWait() bool {
 	return strings.ToLower(t.GetPolicy()) == ReconcilingPolicyNoWait
 }
 
 // GetCleanup gets cleanup
-func (t *Reconciling) GetCleanup() *Cleanup {
+func (t *ChiReconcile) GetCleanup() *Cleanup {
 	if t == nil {
 		return nil
 	}
@@ -158,7 +162,7 @@ func (t *Reconciling) GetCleanup() *Cleanup {
 }
 
 // GetCleanup gets cleanup
-func (t *Reconciling) SetCleanup(cleanup *Cleanup) {
+func (t *ChiReconcile) SetCleanup(cleanup *Cleanup) {
 	if t == nil {
 		return
 	}
