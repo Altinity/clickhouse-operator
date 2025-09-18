@@ -60,7 +60,7 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chk *apiChk.ClickHouseK
 	})
 }
 
-// shouldIncludeHost determines whether host to be included into cluster after reconciling
+// shouldIncludeHost determines whether host to be included into cluster after reconcile
 func (w *worker) shouldIncludeHost(host *api.Host) bool {
 	switch {
 	case host.IsStopped():
