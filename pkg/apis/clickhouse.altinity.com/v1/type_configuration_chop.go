@@ -414,14 +414,7 @@ type OperatorConfigCHIRuntime struct {
 
 // OperatorConfigReconcile specifies reconcile section
 type OperatorConfigReconcile struct {
-	Runtime struct {
-		ReconcileCHIsThreadsNumber           int `json:"reconcileCHIsThreadsNumber"           yaml:"reconcileCHIsThreadsNumber"`
-		ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
-		ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
-
-		// DEPRECATED, is replaced with reconcileCHIsThreadsNumber
-		ThreadsNumber int `json:"threadsNumber" yaml:"threadsNumber"`
-	} `json:"runtime" yaml:"runtime"`
+	Runtime OperatorConfigReconcileRuntime `json:"runtime" yaml:"runtime"`
 
 	StatefulSet struct {
 		Create struct {
@@ -438,33 +431,28 @@ type OperatorConfigReconcile struct {
 	Host ReconcileHost `json:"host" yaml:"host"`
 }
 
+type OperatorConfigReconcileRuntime struct {
+	ReconcileCHIsThreadsNumber           int `json:"reconcileCHIsThreadsNumber"           yaml:"reconcileCHIsThreadsNumber"`
+	ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
+	ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
+
+	// DEPRECATED, is replaced with reconcileCHIsThreadsNumber
+	ThreadsNumber int `json:"threadsNumber" yaml:"threadsNumber"`
+}
+
 // ReconcileHost defines reconcile host config
 type ReconcileHost struct {
 	Wait ReconcileHostWait `json:"wait" yaml:"wait"`
 }
 
-func (host ReconcileHost) Normalize() ReconcileHost {
-	if host.Wait.Replicas == nil {
-		host.Wait.Replicas = &ReconcileHostWaitReplicas{}
-	}
-
-	if host.Wait.Replicas.Delay == nil {
-		// Default update timeout in seconds
-		host.Wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
-	}
-
-	if host.Wait.Probes == nil {
-		// Default value
-		host.Wait.Probes = &ReconcileHostWaitProbes{
-			Readiness: types.NewStringBool(true),
-		}
-	}
-	return host
+func (rh ReconcileHost) Normalize() ReconcileHost {
+	rh.Wait = rh.Wait.Normalize()
+	return rh
 }
 
-func (host ReconcileHost) MergeFrom(from ReconcileHost) ReconcileHost {
-	host.Wait = host.Wait.MergeFrom(from.Wait)
-	return host
+func (rh ReconcileHost) MergeFrom(from ReconcileHost) ReconcileHost {
+	rh.Wait = rh.Wait.MergeFrom(from.Wait)
+	return rh
 }
 
 // ReconcileHostWait defines reconcile host wait config
@@ -474,6 +462,26 @@ type ReconcileHostWait struct {
 	Include  *types.StringBool          `json:"include,omitempty"  yaml:"include,omitempty"`
 	Replicas *ReconcileHostWaitReplicas `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 	Probes   *ReconcileHostWaitProbes   `json:"probes,omitempty"   yaml:"probes,omitempty"`
+}
+
+func (wait ReconcileHostWait) Normalize() ReconcileHostWait {
+	if wait.Replicas == nil {
+		wait.Replicas = &ReconcileHostWaitReplicas{}
+	}
+
+	if wait.Replicas.Delay == nil {
+		// Default update timeout in seconds
+		wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
+	}
+
+	if wait.Probes == nil {
+		// Default value
+		wait.Probes = &ReconcileHostWaitProbes{
+			Readiness: types.NewStringBool(true),
+		}
+	}
+
+	return wait
 }
 
 func (wait ReconcileHostWait) MergeFrom(from ReconcileHostWait) ReconcileHostWait {
