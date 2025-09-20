@@ -466,6 +466,7 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 		*out = new(types.Int32)
 		**out = **in
 	}
+	in.Reconcile.DeepCopyInto(&out.Reconcile)
 	in.Runtime.DeepCopyInto(&out.Runtime)
 	return
 }
