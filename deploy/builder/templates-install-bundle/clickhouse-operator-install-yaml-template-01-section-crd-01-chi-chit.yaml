@@ -433,20 +433,6 @@ spec:
                             service:
                               <<: *TypeObjectsCleanup
                               description: "Behavior policy for failed Service, `Retain` by default"
-                    runtime:
-                      type: object
-                      description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                      properties:
-                        reconcileShardsThreadsNumber:
-                          type: integer
-                          minimum: 1
-                          maximum: 65535
-                          description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                        reconcileShardsMaxConcurrencyPercent:
-                          type: integer
-                          minimum: 0
-                          maximum: 100
-                          description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                     macros:
                       type: object
                       description: "macros parameters"
@@ -490,7 +476,21 @@ spec:
                                 enabled:
                                   <<: *TypeStringBool
                                   description: "enabled or not"
-                    host:
+                    runtime: &TypeReconcileRuntime
+                      type: object
+                      description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                      properties:
+                        reconcileShardsThreadsNumber:
+                          type: integer
+                          minimum: 1
+                          maximum: 65535
+                          description: "The maximum number of cluster shards that may be reconciled in parallel, 1 by default"
+                        reconcileShardsMaxConcurrencyPercent:
+                          type: integer
+                          minimum: 0
+                          maximum: 100
+                          description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                    host: &TypeReconcileHost
                       type: object
                       description: |
                         Whether the operator during reconcile procedure should wait for a ClickHouse host:
@@ -873,19 +873,9 @@ spec:
                             description: "allow tuning reconciling process"
                             properties:
                               runtime:
-                                type: object
-                                description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                                properties:
-                                  reconcileShardsThreadsNumber:
-                                    type: integer
-                                    minimum: 1
-                                    maximum: 65535
-                                    description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                                  reconcileShardsMaxConcurrencyPercent:
-                                    type: integer
-                                    minimum: 0
-                                    maximum: 100
-                                    description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                                <<: *TypeReconcileRuntime
+                              host:
+                                <<: *TypeReconcileHost
                           layout:
                             type: object
                             description: |
