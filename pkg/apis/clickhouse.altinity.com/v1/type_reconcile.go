@@ -38,6 +38,7 @@ type ChiReconcile struct {
 
 type ClusterReconcile struct {
 	Runtime ReconcileRuntime `json:"runtime" yaml:"runtime"`
+	Host    ReconcileHost    `json:"host" yaml:"host"`
 }
 
 // NewChiReconcile creates new reconcile
@@ -46,94 +47,94 @@ func NewChiReconcile() *ChiReconcile {
 }
 
 // MergeFrom merges from specified reconcile
-func (t *ChiReconcile) MergeFrom(from *ChiReconcile, _type MergeType) *ChiReconcile {
+func (r *ChiReconcile) MergeFrom(from *ChiReconcile, _type MergeType) *ChiReconcile {
 	if from == nil {
-		return t
+		return r
 	}
 
-	if t == nil {
-		t = NewChiReconcile()
+	if r == nil {
+		r = NewChiReconcile()
 	}
 
 	switch _type {
 	case MergeTypeFillEmptyValues:
-		if t.Policy == "" {
-			t.Policy = from.Policy
+		if r.Policy == "" {
+			r.Policy = from.Policy
 		}
-		if t.ConfigMapPropagationTimeout == 0 {
-			t.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
+		if r.ConfigMapPropagationTimeout == 0 {
+			r.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
 		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.Policy != "" {
 			// Override by non-empty values only
-			t.Policy = from.Policy
+			r.Policy = from.Policy
 		}
 		if from.ConfigMapPropagationTimeout != 0 {
 			// Override by non-empty values only
-			t.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
+			r.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
 		}
 	}
 
-	t.Cleanup = t.Cleanup.MergeFrom(from.Cleanup, _type)
-	t.Runtime = t.Runtime.MergeFrom(from.Runtime, _type)
-	t.Macros = t.Macros.MergeFrom(from.Macros, _type)
+	r.Cleanup = r.Cleanup.MergeFrom(from.Cleanup, _type)
+	r.Runtime = r.Runtime.MergeFrom(from.Runtime, _type)
+	r.Macros = r.Macros.MergeFrom(from.Macros, _type)
 
-	return t
+	return r
 }
 
 // SetDefaults set default values for reconcile
-func (t *ChiReconcile) SetDefaults() *ChiReconcile {
-	if t == nil {
+func (r *ChiReconcile) SetDefaults() *ChiReconcile {
+	if r == nil {
 		return nil
 	}
-	t.Policy = ReconcilingPolicyUnspecified
-	t.ConfigMapPropagationTimeout = 10
-	t.Cleanup = NewCleanup().SetDefaults()
-	return t
+	r.Policy = ReconcilingPolicyUnspecified
+	r.ConfigMapPropagationTimeout = 10
+	r.Cleanup = NewCleanup().SetDefaults()
+	return r
 }
 
 // GetPolicy gets policy
-func (t *ChiReconcile) GetPolicy() string {
-	if t == nil {
+func (r *ChiReconcile) GetPolicy() string {
+	if r == nil {
 		return ""
 	}
-	return t.Policy
+	return r.Policy
 }
 
 // SetPolicy sets policy
-func (t *ChiReconcile) SetPolicy(p string) {
-	if t == nil {
+func (r *ChiReconcile) SetPolicy(p string) {
+	if r == nil {
 		return
 	}
-	t.Policy = p
+	r.Policy = p
 }
 
-func (t *ChiReconcile) HasConfigMapPropagationTimeout() bool {
-	return t.GetConfigMapPropagationTimeout() > 0
+func (r *ChiReconcile) HasConfigMapPropagationTimeout() bool {
+	return r.GetConfigMapPropagationTimeout() > 0
 }
 
 // GetConfigMapPropagationTimeout gets config map propagation timeout
-func (t *ChiReconcile) GetConfigMapPropagationTimeout() int {
-	if t == nil {
+func (r *ChiReconcile) GetConfigMapPropagationTimeout() int {
+	if r == nil {
 		return 0
 	}
-	return t.ConfigMapPropagationTimeout
+	return r.ConfigMapPropagationTimeout
 }
 
 // SetConfigMapPropagationTimeout sets config map propagation timeout
-func (t *ChiReconcile) SetConfigMapPropagationTimeout(timeout int) {
-	if t == nil {
+func (r *ChiReconcile) SetConfigMapPropagationTimeout(timeout int) {
+	if r == nil {
 		return
 	}
-	t.ConfigMapPropagationTimeout = timeout
+	r.ConfigMapPropagationTimeout = timeout
 }
 
 // GetConfigMapPropagationTimeoutDuration gets config map propagation timeout duration
-func (t *ChiReconcile) GetConfigMapPropagationTimeoutDuration() time.Duration {
-	if t == nil {
+func (r *ChiReconcile) GetConfigMapPropagationTimeoutDuration() time.Duration {
+	if r == nil {
 		return 0
 	}
-	return time.Duration(t.GetConfigMapPropagationTimeout()) * time.Second
+	return time.Duration(r.GetConfigMapPropagationTimeout()) * time.Second
 }
 
 // Possible reconcile policy values
@@ -144,27 +145,44 @@ const (
 )
 
 // IsReconcilingPolicyWait checks whether reconcile policy is "wait"
-func (t *ChiReconcile) IsReconcilingPolicyWait() bool {
-	return strings.ToLower(t.GetPolicy()) == ReconcilingPolicyWait
+func (r *ChiReconcile) IsReconcilingPolicyWait() bool {
+	return strings.ToLower(r.GetPolicy()) == ReconcilingPolicyWait
 }
 
 // IsReconcilingPolicyNoWait checks whether reconcile policy is "no wait"
-func (t *ChiReconcile) IsReconcilingPolicyNoWait() bool {
-	return strings.ToLower(t.GetPolicy()) == ReconcilingPolicyNoWait
+func (r *ChiReconcile) IsReconcilingPolicyNoWait() bool {
+	return strings.ToLower(r.GetPolicy()) == ReconcilingPolicyNoWait
 }
 
 // GetCleanup gets cleanup
-func (t *ChiReconcile) GetCleanup() *Cleanup {
-	if t == nil {
+func (r *ChiReconcile) GetCleanup() *Cleanup {
+	if r == nil {
 		return nil
 	}
-	return t.Cleanup
+	return r.Cleanup
 }
 
 // GetCleanup gets cleanup
-func (t *ChiReconcile) SetCleanup(cleanup *Cleanup) {
-	if t == nil {
+func (r *ChiReconcile) SetCleanup(cleanup *Cleanup) {
+	if r == nil {
 		return
 	}
-	t.Cleanup = cleanup
+	r.Cleanup = cleanup
+}
+
+func (r *ChiReconcile) InheritRuntimeFrom(from OperatorConfigReconcileRuntime) {
+	if r == nil {
+		return
+	}
+
+	if r.Runtime.ReconcileShardsThreadsNumber == 0 {
+		r.Runtime.ReconcileShardsThreadsNumber = from.ReconcileShardsThreadsNumber
+	}
+	if r.Runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		r.Runtime.ReconcileShardsMaxConcurrencyPercent = from.ReconcileShardsMaxConcurrencyPercent
+	}
+}
+
+func (r *ChiReconcile) InheritHostFrom(from ReconcileHost) {
+	r.Host = r.Host.MergeFrom(from)
 }
