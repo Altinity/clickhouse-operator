@@ -131,6 +131,7 @@ type ICluster interface {
 	SelectSettingsSourceFrom(shard IShard, replica IReplica) any
 
 	GetRuntime() IClusterRuntime
+	GetReconcile() ClusterReconcile
 	GetServiceTemplate() (*ServiceTemplate, bool)
 	GetAncestor() ICluster
 }
