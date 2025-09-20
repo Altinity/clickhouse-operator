@@ -135,11 +135,6 @@ func (c *Cluster) GetSecret() *ClusterSecret {
 	return c.Secret
 }
 
-// GetRuntime is a getter
-func (cluster *Cluster) GetRuntime() IClusterRuntime {
-	return &cluster.Runtime
-}
-
 // GetPDBManaged is a getter
 func (cluster *Cluster) GetPDBManaged() *types.StringBool {
 	return cluster.PDBManaged
@@ -148,6 +143,16 @@ func (cluster *Cluster) GetPDBManaged() *types.StringBool {
 // GetPDBMaxUnavailable is a getter
 func (cluster *Cluster) GetPDBMaxUnavailable() *types.Int32 {
 	return cluster.PDBMaxUnavailable
+}
+
+// GetReconcile is a getter
+func (cluster *Cluster) GetReconcile() ClusterReconcile {
+	return cluster.Reconcile
+}
+
+// GetRuntime is a getter
+func (cluster *Cluster) GetRuntime() IClusterRuntime {
+	return &cluster.Runtime
 }
 
 // FillShardsReplicasExplicitlySpecified fills whether shard or replicas are explicitly specified
@@ -223,12 +228,13 @@ func (cluster *Cluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 	})
 }
 
-// InheritReconcileFrom inherits reconcile runtime from CHI
-func (cluster *Cluster) InheritReconcileFrom(chi *ClickHouseInstallation) {
+// InheritClusterReconcileFrom inherits reconcile runtime from CHI
+func (cluster *Cluster) InheritClusterReconcileFrom(chi *ClickHouseInstallation) {
 	if chi.Spec.Reconcile == nil {
 		return
 	}
 	cluster.Reconcile.Runtime = cluster.Reconcile.Runtime.MergeFrom(chi.Spec.Reconcile.Runtime, MergeTypeFillEmptyValues)
+	cluster.Reconcile.Host = cluster.Reconcile.Host.MergeFrom(chi.Spec.Reconcile.Host)
 }
 
 // InheritTemplatesFrom inherits templates from CHI
