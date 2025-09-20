@@ -358,6 +358,7 @@ func (n *Normalizer) normalizeTemplating(templating *chi.ChiTemplating) *chi.Chi
 
 // normalizeReconcile normalizes .spec.reconciling
 func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiReconcile {
+	// Ensure reconcile is in place
 	if reconcile == nil {
 		reconcile = chi.NewChiReconcile().SetDefaults()
 	}

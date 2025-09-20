@@ -33,12 +33,15 @@ type ChiReconcile struct {
 
 	// Runtime specifies runtime settings
 	Runtime ReconcileRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
-	Host    ReconcileHost    `json:"host" yaml:"host"`
+	// Host specifies host-lever reconcile settings
+	Host ReconcileHost `json:"host" yaml:"host"`
 }
 
 type ClusterReconcile struct {
+	// Runtime specifies runtime settings
 	Runtime ReconcileRuntime `json:"runtime" yaml:"runtime"`
-	Host    ReconcileHost    `json:"host" yaml:"host"`
+	// Host specifies host-lever reconcile settings
+	Host ReconcileHost `json:"host" yaml:"host"`
 }
 
 // NewChiReconcile creates new reconcile
