@@ -357,43 +357,57 @@ func (n *Normalizer) normalizeTemplating(templating *chi.ChiTemplating) *chi.Chi
 }
 
 // normalizeReconcile normalizes .spec.reconciling
-func (n *Normalizer) normalizeReconcile(reconciling *chi.ChiReconcile) *chi.ChiReconcile {
-	if reconciling == nil {
-		reconciling = chi.NewChiReconcile().SetDefaults()
+func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiReconcile {
+	if reconcile == nil {
+		reconcile = chi.NewChiReconcile().SetDefaults()
 	}
 
 	// Policy
-	switch strings.ToLower(reconciling.GetPolicy()) {
+	switch strings.ToLower(reconcile.GetPolicy()) {
 	case strings.ToLower(chi.ReconcilingPolicyWait):
 		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(chi.ReconcilingPolicyWait)
+		reconcile.SetPolicy(chi.ReconcilingPolicyWait)
 	case strings.ToLower(chi.ReconcilingPolicyNoWait):
 		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(chi.ReconcilingPolicyNoWait)
+		reconcile.SetPolicy(chi.ReconcilingPolicyNoWait)
 	default:
 		// Unknown value, fallback to default
-		reconciling.SetPolicy(chi.ReconcilingPolicyUnspecified)
+		reconcile.SetPolicy(chi.ReconcilingPolicyUnspecified)
 	}
 
 	// ConfigMapPropagationTimeout
 	// No normalization yet
 
 	// Cleanup
-	reconciling.SetCleanup(n.normalizeReconcileCleanup(reconciling.GetCleanup()))
+	reconcile.SetCleanup(n.normalizeReconcileCleanup(reconcile.GetCleanup()))
 
-	// Runtime
-	// No normalization yet
 	// Macros
 	// No normalization yet
 
-	reconciling.Host = n.normalizeReconcileHost(reconciling.Host)
+	// Inherit from chop Config
+	reconcile.InheritRuntimeFrom(chop.Config().Reconcile.Runtime)
+	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
 
-	return reconciling
+	// Inherit from chop Config
+	reconcile.InheritHostFrom(chop.Config().Reconcile.Host)
+	reconcile.Host = n.normalizeReconcileHost(reconcile.Host)
+
+	return reconcile
+}
+
+func (n *Normalizer) normalizeReconcileRuntime(runtime chi.ReconcileRuntime) chi.ReconcileRuntime {
+	if runtime.ReconcileShardsThreadsNumber == 0 {
+		runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
+	}
+	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
+	}
+	return runtime
 }
 
 func (n *Normalizer) normalizeReconcileHost(rh chi.ReconcileHost) chi.ReconcileHost {
+	// Normalize
 	rh = rh.Normalize()
-	rh = rh.MergeFrom(chop.Config().Reconcile.Host)
 	return rh
 }
 
@@ -792,7 +806,7 @@ func (n *Normalizer) normalizeClusterStage2(cluster *chi.Cluster) *chi.Cluster {
 	// Inherit from .spec.configuration.files
 	cluster.InheritFilesFrom(n.req.GetTarget())
 	// Inherit from .spec.reconciling
-	cluster.InheritReconcileFrom(n.req.GetTarget())
+	cluster.InheritClusterReconcileFrom(n.req.GetTarget())
 	// Inherit from .spec.defaults
 	cluster.InheritTemplatesFrom(n.req.GetTarget())
 
@@ -957,23 +971,8 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 
 func (n *Normalizer) normalizeClusterReconcile(reconcile chi.ClusterReconcile) chi.ClusterReconcile {
 	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
+	reconcile.Host = n.normalizeReconcileHost(reconcile.Host)
 	return reconcile
-}
-
-func (n *Normalizer) normalizeReconcileRuntime(runtime chi.ReconcileRuntime) chi.ReconcileRuntime {
-	if runtime.ReconcileShardsThreadsNumber == 0 {
-		runtime.ReconcileShardsThreadsNumber = chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber
-	}
-	if runtime.ReconcileShardsThreadsNumber == 0 {
-		runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
-	}
-	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
-		runtime.ReconcileShardsMaxConcurrencyPercent = chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent
-	}
-	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
-		runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
-	}
-	return runtime
 }
 
 // ensureClusterLayoutShards ensures slice layout.Shards is in place
