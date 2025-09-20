@@ -819,10 +819,10 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 }
 
 func prepareStsReconcileOptsWaitSection(host *api.Host, opts *statefulset.ReconcileOptions) *statefulset.ReconcileOptions {
-	if host.GetCR().GetReconcile().Host.Wait.Probes.Startup.IsTrue() {
+	if host.GetCluster().GetReconcile().Host.Wait.Probes.Startup.IsTrue() {
 		opts = opts.SetWaitUntilStarted()
 	}
-	if host.GetCR().GetReconcile().Host.Wait.Probes.Readiness.IsTrue() {
+	if host.GetCluster().GetReconcile().Host.Wait.Probes.Readiness.IsTrue() {
 		opts = opts.SetWaitUntilReady()
 	}
 	return opts
