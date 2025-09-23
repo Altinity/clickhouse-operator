@@ -4196,7 +4196,7 @@ def test_010040(self):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-startup-probe.yaml"))
 
     kubectl.create_and_check(
-        manifest="manifests/chi/test-005-acm.yaml",
+        manifest = manifest,
         check={
             "pod_count": 1,
             "pod_volumes": {
@@ -4216,6 +4216,36 @@ def test_010040(self):
         out = clickhouse.query(chi, "select uptime()")
         print(f"clickhouse uptime: {out}")
         assert int(out) > 120
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+@TestScenario
+@Name("test_010040_1. Inject a startup probe using a reconcile setting")
+def test_010040_1(self):
+
+    create_shell_namespace_clickhouse_template()
+
+    manifest = "manifests/chi/test-040-startup-probe.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+
+    kubectl.create_and_check(
+        manifest=manifest,
+        check={
+            "pod_count": 1,
+        },
+    )
+
+    with Then("Startup probe should be defined"):
+        assert "startupProbe" in kubectl.get_pod_spec(chi)["containers"][0]
+
+    with Then("uptime() should be less than 120 seconds as defined by a readiness probe"):
+        out = clickhouse.query(chi, "select uptime()")
+        print(f"clickhouse uptime: {out}")
+        assert int(out) < 120
+
+    with Then("Pod shoud be not ready"):
+         assert "ready" != kubectl.get_pod_spec(chi)["status"]["containerStatuses"][0]
 
     with Finally("I clean up"):
         delete_test_namespace()
