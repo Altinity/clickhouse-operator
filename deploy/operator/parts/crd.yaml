@@ -897,7 +897,7 @@ spec:
                                     Whether the operator during host launch procedure should wait for startup probe to succeed.
                                     In case probe is unspecified wait is assumed to be completed successfully.
                                     Default option value is to do not wait.
-                                ready:
+                                readiness:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
@@ -1774,7 +1774,7 @@ spec:
                                               Whether the operator during host launch procedure should wait for startup probe to succeed.
                                               In case probe is unspecified wait is assumed to be completed successfully.
                                               Default option value is to do not wait.
-                                          ready:
+                                          readiness:
                                             type: string
                                             enum:
                                               # List StringBoolXXX constants from model
@@ -3637,7 +3637,7 @@ spec:
                                     Whether the operator during host launch procedure should wait for startup probe to succeed.
                                     In case probe is unspecified wait is assumed to be completed successfully.
                                     Default option value is to do not wait.
-                                ready:
+                                readiness:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
@@ -4514,7 +4514,7 @@ spec:
                                               Whether the operator during host launch procedure should wait for startup probe to succeed.
                                               In case probe is unspecified wait is assumed to be completed successfully.
                                               Default option value is to do not wait.
-                                          ready:
+                                          readiness:
                                             type: string
                                             enum:
                                               # List StringBoolXXX constants from model
