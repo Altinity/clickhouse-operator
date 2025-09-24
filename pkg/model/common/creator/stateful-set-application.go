@@ -105,7 +105,7 @@ func (c *Creator) stsEnsureAppContainerProbesSpecified(statefulSet *apps.Statefu
 	}
 
 	if container.StartupProbe == nil {
-		if host.GetCluster().GetReconcile().Host.Wait.Probes.Startup.IsTrue() {
+		if host.GetCluster().GetReconcile().Host.Wait.Probes.GetStartup().IsTrue() {
 			container.StartupProbe = c.pm.CreateProbe(interfaces.ProbeDefaultStartup, host)
 		}
 	}

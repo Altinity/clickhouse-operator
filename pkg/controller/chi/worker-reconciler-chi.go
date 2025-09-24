@@ -819,13 +819,13 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 }
 
 func (w *worker) prepareStsReconcileOptsWaitSection(host *api.Host, opts *statefulset.ReconcileOptions) *statefulset.ReconcileOptions {
-	if host.GetCluster().GetReconcile().Host.Wait.Probes.Startup.IsTrue() {
+	if host.GetCluster().GetReconcile().Host.Wait.Probes.GetStartup().IsTrue() {
 		opts = opts.SetWaitUntilStarted()
 		w.a.V(1).
 			M(host).F().
 			Warning("Setting option SetWaitUntilStarted ")
 	}
-	if host.GetCluster().GetReconcile().Host.Wait.Probes.Readiness.IsTrue() {
+	if host.GetCluster().GetReconcile().Host.Wait.Probes.GetReadiness().IsTrue() {
 		opts = opts.SetWaitUntilReady()
 		w.a.V(1).
 			M(host).F().

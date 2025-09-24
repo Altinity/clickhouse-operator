@@ -527,6 +527,20 @@ type ReconcileHostWaitProbes struct {
 	Readiness *types.StringBool `json:"readiness,omitempty" yaml:"readiness,omitempty"`
 }
 
+func (p *ReconcileHostWaitProbes) GetStartup() *types.StringBool {
+	if p == nil {
+		return nil
+	}
+	return p.Startup
+}
+
+func (p *ReconcileHostWaitProbes) GetReadiness() *types.StringBool {
+	if p == nil {
+		return nil
+	}
+	return p.Readiness
+}
+
 func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *ReconcileHostWaitProbes {
 	if from == nil {
 		// Nothing to merge from, keep original value
