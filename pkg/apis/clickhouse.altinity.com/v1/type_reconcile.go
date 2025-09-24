@@ -79,8 +79,9 @@ func (r *ChiReconcile) MergeFrom(from *ChiReconcile, _type MergeType) *ChiReconc
 	}
 
 	r.Cleanup = r.Cleanup.MergeFrom(from.Cleanup, _type)
-	r.Runtime = r.Runtime.MergeFrom(from.Runtime, _type)
 	r.Macros = r.Macros.MergeFrom(from.Macros, _type)
+	r.Runtime = r.Runtime.MergeFrom(from.Runtime, _type)
+	r.Host = r.Host.MergeFrom(from.Host)
 
 	return r
 }
