@@ -371,7 +371,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	}
 
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
-	opts = prepareStsReconcileOptsWaitSection(host, opts)
+	opts = w.prepareStsReconcileOptsWaitSection(host, opts)
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. Reconcile StatefulSet", host.GetName())
@@ -818,12 +818,18 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	return nil
 }
 
-func prepareStsReconcileOptsWaitSection(host *api.Host, opts *statefulset.ReconcileOptions) *statefulset.ReconcileOptions {
+func (w *worker) prepareStsReconcileOptsWaitSection(host *api.Host, opts *statefulset.ReconcileOptions) *statefulset.ReconcileOptions {
 	if host.GetCluster().GetReconcile().Host.Wait.Probes.Startup.IsTrue() {
 		opts = opts.SetWaitUntilStarted()
+		w.a.V(1).
+			M(host).F().
+			Warning("Setting option SetWaitUntilStarted ")
 	}
 	if host.GetCluster().GetReconcile().Host.Wait.Probes.Readiness.IsTrue() {
 		opts = opts.SetWaitUntilReady()
+		w.a.V(1).
+			M(host).F().
+			Warning("Setting option SetWaitUntilReady")
 	}
 	return opts
 }
