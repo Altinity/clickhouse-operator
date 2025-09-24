@@ -81,6 +81,7 @@ func (p *HostObjectsPoller) WaitHostPodStarted(ctx context.Context, host *api.Ho
 		return err
 	}
 
+	log.V(2).F().Info("Wait Pod to reach started status completed OK")
 	return nil
 }
 
@@ -117,5 +118,6 @@ func (p *HostObjectsPoller) WaitHostStatefulSetReady(ctx context.Context, host *
 		return err
 	}
 
+	log.V(2).F().Info("Wait StatefulSet to reach ready status completed OK")
 	return nil
 }
