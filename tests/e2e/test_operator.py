@@ -4220,6 +4220,7 @@ def test_010040(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_010040_1. Inject a startup probe using a reconcile setting")
 def test_010040_1(self):
@@ -4233,6 +4234,7 @@ def test_010040_1(self):
         manifest=manifest,
         check={
             "pod_count": 1,
+            "do_not_delete": 1,
         },
     )
 
@@ -4244,8 +4246,10 @@ def test_010040_1(self):
         print(f"clickhouse uptime: {out}")
         assert int(out) < 120
 
-    with Then("Pod shoud be not ready"):
-         assert "ready" != kubectl.get_pod_spec(chi)["status"]["containerStatuses"][0]
+    with Then("Pod should be not ready"):
+        ready = kubectl.get_pod_status(chi)["containerStatuses"][0]["ready"]
+        print(f"ready: {ready}")
+        assert ready is not True
 
     with Finally("I clean up"):
         delete_test_namespace()

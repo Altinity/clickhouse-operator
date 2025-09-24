@@ -512,6 +512,14 @@ def get_pod_spec(chi_name, pod_name="", ns=None, shell=None):
         pod = get("pod", pod_name, ns=ns, shell=shell)
     return pod["spec"]
 
+def get_pod_status(chi_name, pod_name="", ns=None, shell=None):
+    label = f"-l clickhouse.altinity.com/chi={chi_name}"
+    if pod_name == "":
+        pod = get("pod", "", ns=ns, label=label, shell=shell)["items"][0]
+    else:
+        pod = get("pod", pod_name, ns=ns, shell=shell)
+    return pod["status"]
+
 
 def get_clickhouse_start(chi_name, ns=None, shell=None):
     pod_name = get_pod_names(chi_name, ns=ns, shell=shell)[0]
