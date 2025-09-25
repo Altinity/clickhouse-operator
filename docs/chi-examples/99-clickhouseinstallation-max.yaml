@@ -58,7 +58,7 @@ spec:
     # autoPurge: "yes"
 
   # Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side
-  reconciling:
+  reconcile:
     # DISCUSSED TO BE DEPRECATED
     # Syntax sugar
     # Overrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config
