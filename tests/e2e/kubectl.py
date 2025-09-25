@@ -410,9 +410,11 @@ def wait_pod_status(pod, status, shell=None, ns=None):
 def get_pod_status(pod, shell=None, ns=None):
     return get_field("pod", pod, ".status.phase", ns, shell=shell)
 
+def wait_container_status(pod, status, shell=None, ns=None):
+    wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns, shell=shell)
 
-def wait_container_status(pod, status, ns=None):
-    wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns)
+def get_container_status(pod, shell=None, ns=None):
+    return get_field("pod", pod, ".status.containerStatuses[0]", ns, shell=shell)
 
 
 def wait_field(
@@ -512,7 +514,7 @@ def get_pod_spec(chi_name, pod_name="", ns=None, shell=None):
         pod = get("pod", pod_name, ns=ns, shell=shell)
     return pod["spec"]
 
-def get_pod_status(chi_name, pod_name="", ns=None, shell=None):
+def get_pod_status_full(chi_name, pod_name="", ns=None, shell=None):
     label = f"-l clickhouse.altinity.com/chi={chi_name}"
     if pod_name == "":
         pod = get("pod", "", ns=ns, label=label, shell=shell)["items"][0]

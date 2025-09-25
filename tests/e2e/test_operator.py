@@ -4247,7 +4247,7 @@ def test_010040_1(self):
         assert int(out) < 120
 
     with Then("Pod should be not ready"):
-        ready = kubectl.get_pod_status(chi)["containerStatuses"][0]["ready"]
+        ready = kubectl.get_pod_status_full(chi)["containerStatuses"][0]["ready"]
         print(f"ready: {ready}")
         assert ready is not True
 
@@ -5165,7 +5165,7 @@ def test_010057(self):
             },
         )
 
-    with When("Last first shard is Running"):
+    with When("First shard is Running"):
         kubectl.wait_pod_status(f"chi-{chi}-{cluster}-0-0-0", "Running")
         with Then("Other shards are running or being created"):
             for shard in [1,2,3]:
