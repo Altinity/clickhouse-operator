@@ -416,6 +416,11 @@ func (in *ChiSpec) DeepCopyInto(out *ChiSpec) {
 		*out = new(ChiTemplating)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Reconciling != nil {
+		in, out := &in.Reconciling, &out.Reconciling
+		*out = new(ChiReconcile)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Reconcile != nil {
 		in, out := &in.Reconcile, &out.Reconcile
 		*out = new(ChiReconcile)

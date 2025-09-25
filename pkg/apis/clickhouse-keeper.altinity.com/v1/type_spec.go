@@ -24,7 +24,8 @@ type ChkSpec struct {
 	TaskID                 *types.Id            `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
 	NamespaceDomainPattern *types.String        `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Suspend                *types.StringBool    `json:"suspend,omitempty"                yaml:"suspend,omitempty"`
-	Reconcile              *apiChi.ChiReconcile `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Reconciling            *apiChi.ChiReconcile `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Reconcile              *apiChi.ChiReconcile `json:"reconcile,omitempty"              yaml:"reconcile,omitempty"`
 	Defaults               *apiChi.Defaults     `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
 	Configuration          *Configuration       `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates              *apiChi.Templates    `json:"templates,omitempty"              yaml:"templates,omitempty"`

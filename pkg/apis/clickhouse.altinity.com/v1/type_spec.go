@@ -27,7 +27,8 @@ type ChiSpec struct {
 	Suspend                *types.StringBool `json:"suspend,omitempty"                yaml:"suspend,omitempty"`
 	NamespaceDomainPattern *types.String     `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating    `json:"templating,omitempty"             yaml:"templating,omitempty"`
-	Reconcile              *ChiReconcile     `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Reconciling            *ChiReconcile     `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Reconcile              *ChiReconcile     `json:"reconcile,omitempty"              yaml:"reconcile,omitempty"`
 	Defaults               *Defaults         `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
 	Configuration          *Configuration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates              *Templates        `json:"templates,omitempty"              yaml:"templates,omitempty"`
