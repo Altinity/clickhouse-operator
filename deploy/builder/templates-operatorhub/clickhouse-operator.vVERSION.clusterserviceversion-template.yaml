@@ -1216,11 +1216,11 @@ spec:
   installModes:
     - supported: true
       type: OwnNamespace
-    - supported: false
+    - supported: true
       type: SingleNamespace
-    - supported: false
+    - supported: true
       type: MultiNamespace
-    - supported: false
+    - supported: true
       type: AllNamespaces
 
   install:
