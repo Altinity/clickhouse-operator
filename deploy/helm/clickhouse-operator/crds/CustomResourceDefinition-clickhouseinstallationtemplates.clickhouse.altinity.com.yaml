@@ -358,9 +358,9 @@ spec:
                       description: "Optional, defines selector for ClickHouseInstallation(s) to be templated with ClickhouseInstallationTemplate"
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
-                reconciling:
+                reconciling: &TypeReconcile
                   type: object
-                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+                  description: "[OBSOLETED] Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                   # nullable: true
                   properties:
                     policy:
@@ -539,6 +539,9 @@ spec:
                                     Whether the operator during host launch procedure should wait for ready probe to succeed.
                                     In case probe is unspecified wait is assumed to be completed successfully.
                                     Default option value is to wait.
+                reconcile:
+                  !!merge <<: *TypeReconcile
+                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                 defaults:
                   type: object
                   description: |
