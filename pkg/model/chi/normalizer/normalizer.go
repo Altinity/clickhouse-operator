@@ -109,6 +109,7 @@ func (n *Normalizer) applyExternalCRTemplatesOnTarget(templateRefSrc crTemplates
 }
 
 func (n *Normalizer) applyCROnTarget(cr *chi.ClickHouseInstallation) {
+	n.migrateReconcilingBackwardCompatibility(cr)
 	n.req.GetTarget().MergeFrom(cr, chi.MergeTypeOverrideByNonEmptyValues)
 }
 
@@ -156,6 +157,7 @@ func (n *Normalizer) normalizeSpec() {
 	n.req.GetTarget().GetSpecT().Troubleshoot = n.normalizeTroubleshoot(n.req.GetTarget().GetSpecT().Troubleshoot)
 	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
 	n.req.GetTarget().GetSpecT().Templating = n.normalizeTemplating(n.req.GetTarget().GetSpecT().Templating)
+	n.normalizeReconciling()
 	n.req.GetTarget().GetSpecT().Reconcile = n.normalizeReconcile(n.req.GetTarget().GetSpecT().Reconcile)
 	n.req.GetTarget().GetSpecT().Defaults = n.normalizeDefaults(n.req.GetTarget().GetSpecT().Defaults)
 	n.normalizeConfiguration()
@@ -356,6 +358,25 @@ func (n *Normalizer) normalizeTemplating(templating *chi.ChiTemplating) *chi.Chi
 	return templating
 }
 
+func (n *Normalizer) migrateReconcilingBackwardCompatibility(cr *chi.ClickHouseInstallation) {
+	if cr == nil {
+		return
+	}
+	// Prefer to use Reconciling
+	if cr.Spec.Reconciling != nil {
+		cr.Spec.Reconcile = cr.Spec.Reconciling
+		cr.Spec.Reconciling = nil
+	}
+}
+
+func (n *Normalizer) normalizeReconciling() {
+	// Prefer to use Reconciling
+	if n.req.GetTarget().GetSpecT().Reconciling != nil {
+		n.req.GetTarget().GetSpecT().Reconcile = n.req.GetTarget().GetSpecT().Reconciling
+		n.req.GetTarget().GetSpecT().Reconciling = nil
+	}
+}
+
 // normalizeReconcile normalizes .spec.reconciling
 func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiReconcile {
 	// Ensure reconcile is in place
@@ -385,10 +406,12 @@ func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiRec
 	// Macros
 	// No normalization yet
 
+	// Runtime
 	// Inherit from chop Config
 	reconcile.InheritRuntimeFrom(chop.Config().Reconcile.Runtime)
 	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
 
+	// Host
 	// Inherit from chop Config
 	reconcile.InheritHostFrom(chop.Config().Reconcile.Host)
 	reconcile.Host = n.normalizeReconcileHost(reconcile.Host)
