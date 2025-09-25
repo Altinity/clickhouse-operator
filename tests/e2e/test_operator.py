@@ -4241,6 +4241,9 @@ def test_010040_1(self):
     with Then("Startup probe should be defined"):
         assert "startupProbe" in kubectl.get_pod_spec(chi)["containers"][0]
 
+    with Then("Readiness probe should be defined"):
+        assert "readinessProbe" in kubectl.get_pod_spec(chi)["containers"][0]
+
     with Then("uptime() should be less than 120 seconds as defined by a readiness probe"):
         out = clickhouse.query(chi, "select uptime()")
         print(f"clickhouse uptime: {out}")
