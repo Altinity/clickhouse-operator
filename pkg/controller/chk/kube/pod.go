@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
@@ -43,7 +42,7 @@ func NewPod(kubeClient client.Client, namer interfaces.INameManager) *Pod {
 // Get gets pod. Accepted types:
 //  1. *apps.StatefulSet
 //  2. *chop.Host
-func (c *Pod) Get(params ...any) (*core.Pod, error) {
+func (c *Pod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
 	var name, namespace string
 	switch len(params) {
 	case 2:
@@ -67,7 +66,7 @@ func (c *Pod) Get(params ...any) (*core.Pod, error) {
 		panic(any("incorrect number or params"))
 	}
 	pod := &core.Pod{}
-	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kubeClient.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, pod)
@@ -75,16 +74,16 @@ func (c *Pod) Get(params ...any) (*core.Pod, error) {
 }
 
 // GetAll gets all pods for provided entity
-func (c *Pod) GetAll(obj any) []*core.Pod {
+func (c *Pod) GetAll(ctx context.Context, obj any) []*core.Pod {
 	switch typed := obj.(type) {
 	case api.ICustomResource:
-		return c.getPodsOfCR(typed)
+		return c.getPodsOfCR(ctx, typed)
 	case api.ICluster:
-		return c.getPodsOfCluster(typed)
+		return c.getPodsOfCluster(ctx, typed)
 	case api.IShard:
-		return c.getPodsOfShard(typed)
+		return c.getPodsOfShard(ctx, typed)
 	case *api.Host:
-		if pod, err := c.Get(typed); err == nil {
+		if pod, err := c.Get(ctx, typed); err == nil {
 			return []*core.Pod{
 				pod,
 			}
@@ -101,9 +100,9 @@ func (c *Pod) Update(ctx context.Context, pod *core.Pod) (*core.Pod, error) {
 }
 
 // getPodsOfCluster gets all pods in a cluster
-func (c *Pod) getPodsOfCluster(cluster api.ICluster) (pods []*core.Pod) {
+func (c *Pod) getPodsOfCluster(ctx context.Context, cluster api.ICluster) (pods []*core.Pod) {
 	cluster.WalkHosts(func(host *api.Host) error {
-		if pod, err := c.Get(host); err == nil {
+		if pod, err := c.Get(ctx, host); err == nil {
 			pods = append(pods, pod)
 		}
 		return nil
@@ -112,9 +111,9 @@ func (c *Pod) getPodsOfCluster(cluster api.ICluster) (pods []*core.Pod) {
 }
 
 // getPodsOfShard gets all pods in a shard
-func (c *Pod) getPodsOfShard(shard api.IShard) (pods []*core.Pod) {
+func (c *Pod) getPodsOfShard(ctx context.Context, shard api.IShard) (pods []*core.Pod) {
 	shard.WalkHosts(func(host *api.Host) error {
-		if pod, err := c.Get(host); err == nil {
+		if pod, err := c.Get(ctx, host); err == nil {
 			pods = append(pods, pod)
 		}
 		return nil
@@ -123,9 +122,9 @@ func (c *Pod) getPodsOfShard(shard api.IShard) (pods []*core.Pod) {
 }
 
 // getPodsOfCR gets all pods in a CHI
-func (c *Pod) getPodsOfCR(cr api.ICustomResource) (pods []*core.Pod) {
+func (c *Pod) getPodsOfCR(ctx context.Context, cr api.ICustomResource) (pods []*core.Pod) {
 	cr.WalkHosts(func(host *api.Host) error {
-		if pod, err := c.Get(host); err == nil {
+		if pod, err := c.Get(ctx, host); err == nil {
 			pods = append(pods, pod)
 		}
 		return nil

@@ -58,7 +58,7 @@ spec:
     # autoPurge: "yes"
 
   # Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side
-  reconciling:
+  reconcile:
     # DISCUSSED TO BE DEPRECATED
     # Syntax sugar
     # Overrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config
@@ -103,6 +103,37 @@ spec:
       reconcileShardsThreadsNumber: 5
       # Max percentage of concurrent shard reconciles within one cluster in progress
       reconcileShardsMaxConcurrencyPercent: 50
+
+    host:
+      # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+      #   - to be excluded from a ClickHouse cluster
+      #   - to complete all running queries
+      #   - to be included into a ClickHouse cluster
+      # respectfully before moving forward with host reconcile
+      wait:
+        exclude: true
+        queries: true
+        include: false
+        # The operator during reconcile procedure should wait for replicas to catch-up
+        # replication delay a.k.a replication lag for the following replicas
+        replicas:
+          # All replicas (new and known earlier) are explicitly requested to wait for replication to catch-up
+          all: no
+          # New replicas only are requested to wait for replication to catch-up
+          new: yes
+          # Replication catch-up is considered to be completed as soon as replication delay
+          # a.k.a replication lag - calculated as "MAX(absolute_delay) FROM system.replicas"
+          # is within this specified delay (in seconds)
+          delay: 10
+        probes:
+          # Whether the operator during host launch procedure should wait for startup probe to succeed.
+          # In case probe is unspecified wait is assumed to be completed successfully.
+          # Default option value is to do not wait.
+          startup: no
+          # Whether the operator during host launch procedure should wait for readiness probe to succeed.
+          # In case probe is unspecified wait is assumed to be completed successfully.
+          # Default option value is to wait.
+          readiness: yes
 
     macros:
       sections:
@@ -240,12 +271,43 @@ spec:
           shardsCount: 3
           replicasCount: 2
         reconcile:
-          #  Overwrites reconcile.runtime from the operator's config
+          # Optional, overwrites reconcile.runtime from the operator's config
           runtime:
             # Max number of concurrent shard reconciles within one cluster in progress
             reconcileShardsThreadsNumber: 5
             # Max percentage of concurrent shard reconciles within one cluster in progress
             reconcileShardsMaxConcurrencyPercent: 50
+
+          host:
+            # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+            #   - to be excluded from a ClickHouse cluster
+            #   - to complete all running queries
+            #   - to be included into a ClickHouse cluster
+            # respectfully before moving forward with host reconcile
+            wait:
+              exclude: true
+              queries: true
+              include: false
+              # The operator during reconcile procedure should wait for replicas to catch-up
+              # replication delay a.k.a replication lag for the following replicas
+              replicas:
+                # All replicas (new and known earlier) are explicitly requested to wait for replication to catch-up
+                all: no
+                # New replicas only are requested to wait for replication to catch-up
+                new: yes
+                # Replication catch-up is considered to be completed as soon as replication delay
+                # a.k.a replication lag - calculated as "MAX(absolute_delay) FROM system.replicas"
+                # is within this specified delay (in seconds)
+                delay: 10
+              probes:
+                # Whether the operator during host launch procedure should wait for startup probe to succeed.
+                # In case probe is unspecified wait is assumed to be completed successfully.
+                # Default option value is to do not wait.
+                startup: no
+                # Whether the operator during host launch procedure should wait for readiness probe to succeed.
+                # In case probe is unspecified wait is assumed to be completed successfully.
+                # Default option value is to wait.
+                readiness: yes
 
       - name: shards-only
         templates:

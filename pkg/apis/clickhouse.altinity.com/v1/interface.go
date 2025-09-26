@@ -31,7 +31,7 @@ type ICustomResource interface {
 	GetSpec() ICRSpec
 	GetRuntime() ICustomResourceRuntime
 	GetRootServiceTemplates() ([]*ServiceTemplate, bool)
-	GetReconciling() *Reconciling
+	GetReconcile() *ChiReconcile
 
 	WalkClusters(f func(cluster ICluster) error) []error
 	WalkHosts(func(host *Host) error) []error
@@ -131,6 +131,7 @@ type ICluster interface {
 	SelectSettingsSourceFrom(shard IShard, replica IReplica) any
 
 	GetRuntime() IClusterRuntime
+	GetReconcile() ClusterReconcile
 	GetServiceTemplate() (*ServiceTemplate, bool)
 	GetAncestor() ICluster
 }

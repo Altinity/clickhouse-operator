@@ -1,0 +1,50 @@
+apiVersion: "clickhouse.altinity.com/v1"
+
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-040-startup-probe
+
+spec:
+  reconcile:
+    host:
+      wait:
+        probes:
+          startup: "yes"
+          readiness: "no"
+  defaults:
+    templates:
+      podTemplate: not-ready-replica
+  configuration:
+    clusters:
+      - name: default
+  templates:
+    podTemplates:
+      - name: not-ready-replica
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:24.8
+              # startupProbe:
+              #   httpGet:
+              #     path: /ping
+              #     port: 8123
+              #     scheme: HTTP
+              #   initialDelaySeconds: 10
+              #   periodSeconds: 3
+              #   successThreshold: 1
+              #   failureThreshold: 10
+              readinessProbe:
+                httpGet:
+                  path: "/?query=select%20throwIf(uptime()<120)"
+                  port: 8123
+                  scheme: HTTP
+                  httpHeaders:
+                  - name: X-ClickHouse-User
+                    value: probe
+                  - name: X-ClickHouse-Key
+                    value: probe
+                initialDelaySeconds: 5
+                timeoutSeconds: 5
+                failureThreshold: 5
+

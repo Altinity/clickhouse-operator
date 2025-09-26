@@ -464,12 +464,12 @@ func (cr *ClickHouseInstallation) IsTroubleshoot() bool {
 	return cr.GetSpecT().GetTroubleshoot().Value()
 }
 
-// GetReconciling gets reconciling spec
-func (cr *ClickHouseInstallation) GetReconciling() *Reconciling {
+// GetReconcile gets reconcile spec
+func (cr *ClickHouseInstallation) GetReconcile() *ChiReconcile {
 	if cr == nil {
 		return nil
 	}
-	return cr.GetSpecT().Reconciling
+	return cr.GetSpecT().Reconcile
 }
 
 // Copy makes copy of a CHI, filtering fields according to specified CopyOptions

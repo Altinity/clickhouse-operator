@@ -28,15 +28,13 @@ type Poller interface {
 	Poll() error
 	WithOptions(opts *Options) Poller
 	WithFunctions(functions *Functions) Poller
-	WithBackground(backgroundFunctions *BackgroundFunctions) Poller
 }
 
 type poller struct {
-	ctx        context.Context
-	name       string
-	opts       *Options
-	functions  *Functions
-	background *BackgroundFunctions
+	ctx       context.Context
+	name      string
+	opts      *Options
+	functions *Functions
 }
 
 func New(ctx context.Context, name string) Poller {
@@ -56,13 +54,15 @@ func (p *poller) WithFunctions(functions *Functions) Poller {
 	return p
 }
 
-func (p *poller) WithBackground(backgroundFunctions *BackgroundFunctions) Poller {
-	p.background = backgroundFunctions
-	return p
+func (p *poller) preparePoll() {
+	p.opts = p.opts.Ensure()
+	if p.ctx == nil {
+		p.ctx = context.Background()
+	}
 }
 
 func (p *poller) Poll() error {
-	opts := p.opts.Ensure()
+	p.preparePoll()
 	start := time.Now()
 	for {
 		if util.IsContextDone(p.ctx) {
@@ -73,7 +73,7 @@ func (p *poller) Poll() error {
 		item, err := p.functions.CallGet(p.ctx)
 		switch {
 
-		// Object is found - process it
+		// Object is found or getter function is not specified
 		case err == nil:
 			if p.functions.CallIsDone(p.ctx, item) {
 				// All is good, job is done, exit
@@ -83,14 +83,15 @@ func (p *poller) Poll() error {
 			// Object is found, but processor function says we should continue polling
 			// exit switch
 
-		// Object is not found - it either failed to be created or just still not created
+		// Object is not found - it is either failed to be created or just still not created yet
 		case p.functions.CallShouldContinue(p.ctx, item, err):
-			if (opts.GetErrorTimeout > 0) && (time.Since(start) >= opts.GetErrorTimeout) {
+			// Error has happened but we should continue
+			if (p.opts.GetErrorTimeout > 0) && (time.Since(start) >= p.opts.GetErrorTimeout) {
 				// No more wait for the object to be created. Consider create process as failed.
 				log.V(1).M(p.name).F().Error("Poller.Get() FAILED because item is not available and get timeout reached for: %s. Abort", p.name)
 				return err
 			}
-			// Error has happened but we should continue
+			// Timeout not reached, we should continue
 			// exit switch
 
 		// Error has happened and we should not continue, abort polling
@@ -102,7 +103,7 @@ func (p *poller) Poll() error {
 		// Continue polling
 
 		// May be time has come to abort polling?
-		if time.Since(start) >= opts.Timeout {
+		if time.Since(start) >= p.opts.Timeout {
 			// Timeout reached, no good result available, time to abort
 			log.V(1).M(p.name).F().Info("poll(%s) - TIMEOUT reached", p.name)
 			return fmt.Errorf("poll(%s) - wait timeout", p.name)
@@ -111,44 +112,41 @@ func (p *poller) Poll() error {
 		// Continue polling
 
 		// May be time has come to start bothering with log messages?
-		if time.Since(start) >= opts.StartBotheringAfterTimeout {
+		if time.Since(start) >= p.opts.StartBotheringAfterTimeout {
 			// Start bothering with log messages after some time only
 			log.V(1).M(p.name).F().Info("WAIT: %s", p.name)
 		}
 
 		// Wait some more time and launch background process(es)
 		log.V(2).M(p.name).F().Info("poll iteration")
-		sleepAndRunBackgroundProcess(p.ctx, opts, p.background)
+		p.sleepAndRunBackgroundProcess()
 	} // for
 }
 
-func sleepAndRunBackgroundProcess(ctx context.Context, opts *Options, background *BackgroundFunctions) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
+func (p *poller) sleepAndRunBackgroundProcess() {
 	switch {
-	case opts.BackgroundInterval > 0:
-		mainIntervalTimeout := time.After(opts.MainInterval)
-		backgroundIntervalTimeout := time.After(opts.BackgroundInterval)
+	case p.opts.BackgroundInterval > 0:
+		mainIntervalTimeout := time.After(p.opts.MainInterval)
+		backgroundIntervalTimeout := time.After(p.opts.BackgroundInterval)
 		for {
 			select {
-			case <-ctx.Done():
+			case <-p.ctx.Done():
 				// Context is done, nothing to do here more
 				return
+
 			case <-mainIntervalTimeout:
 				// Timeout reached, nothing to do here more
 				return
+
 			case <-backgroundIntervalTimeout:
 				// Function interval reached, time to call the func
-				if background != nil {
-					if background.F != nil {
-						background.F(ctx)
-					}
-				}
-				backgroundIntervalTimeout = time.After(opts.BackgroundInterval)
+				p.functions.CallBackground(p.ctx)
+				// Reload timeout
+				backgroundIntervalTimeout = time.After(p.opts.BackgroundInterval)
+				// continue for loop
 			}
 		}
 	default:
-		util.WaitContextDoneOrTimeout(ctx, opts.MainInterval)
+		util.WaitContextDoneOrTimeout(p.ctx, p.opts.MainInterval)
 	}
 }

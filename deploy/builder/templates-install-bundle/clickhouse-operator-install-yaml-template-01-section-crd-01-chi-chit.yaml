@@ -358,9 +358,9 @@ spec:
                       description: "Optional, defines selector for ClickHouseInstallation(s) to be templated with ClickhouseInstallationTemplate"
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
-                reconciling:
+                reconciling: &TypeReconcile
                   type: object
-                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+                  description: "[OBSOLETED] Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                   # nullable: true
                   properties:
                     policy:
@@ -433,20 +433,6 @@ spec:
                             service:
                               <<: *TypeObjectsCleanup
                               description: "Behavior policy for failed Service, `Retain` by default"
-                    runtime:
-                      type: object
-                      description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                      properties:
-                        reconcileShardsThreadsNumber:
-                          type: integer
-                          minimum: 1
-                          maximum: 65535
-                          description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                        reconcileShardsMaxConcurrencyPercent:
-                          type: integer
-                          minimum: 0
-                          maximum: 100
-                          description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                     macros:
                       type: object
                       description: "macros parameters"
@@ -490,6 +476,72 @@ spec:
                                 enabled:
                                   <<: *TypeStringBool
                                   description: "enabled or not"
+                    runtime: &TypeReconcileRuntime
+                      type: object
+                      description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                      properties:
+                        reconcileShardsThreadsNumber:
+                          type: integer
+                          minimum: 1
+                          maximum: 65535
+                          description: "The maximum number of cluster shards that may be reconciled in parallel, 1 by default"
+                        reconcileShardsMaxConcurrencyPercent:
+                          type: integer
+                          minimum: 0
+                          maximum: 100
+                          description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                    host: &TypeReconcileHost
+                      type: object
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+                      properties:
+                        wait:
+                          type: object
+                          properties:
+                            exclude:
+                              <<: *TypeStringBool
+                            queries:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
+                            include:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
+                            replicas:
+                              type: object
+                              description: "Whether the operator during reconcile procedure should wait for replicas to catch-up"
+                              properties:
+                                all:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for all replicas to catch-up"
+                                new:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for new replicas to catch-up"
+                                delay:
+                                  type: integer
+                                  description: "replication max absolute delay to consider replica is not delayed"
+                            probes:
+                              type: object
+                              description: "What probes the operator should wait during host launch procedure"
+                              properties:
+                                startup:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for startup probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to do not wait.
+                                readiness:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for ready probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to wait.
+                reconcile:
+                  <<: *TypeReconcile
+                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                 defaults:
                   type: object
                   description: |
@@ -620,6 +672,9 @@ spec:
                         identity:
                           type: string
                           description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
+                        use_compression:
+                          !!merge <<: *TypeStringBool
+                          description: "Enables compression in Keeper protocol if set to true"
                     users:
                       type: object
                       description: |
@@ -821,19 +876,9 @@ spec:
                             description: "allow tuning reconciling process"
                             properties:
                               runtime:
-                                type: object
-                                description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                                properties:
-                                  reconcileShardsThreadsNumber:
-                                    type: integer
-                                    minimum: 1
-                                    maximum: 65535
-                                    description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                                  reconcileShardsMaxConcurrencyPercent:
-                                    type: integer
-                                    minimum: 0
-                                    maximum: 100
-                                    description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                                <<: *TypeReconcileRuntime
+                              host:
+                                <<: *TypeReconcileHost
                           layout:
                             type: object
                             description: |
@@ -1120,7 +1165,7 @@ spec:
                             properties:
                               name:
                                 type: string
-                                description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
+                                description: "by default, hostname will generate, but this allows define custom name for each `clickhouse-server`"
                                 minLength: 1
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
@@ -1376,7 +1421,7 @@ spec:
                         description: "name of `ClickHouseInstallationTemplate` (chit) resource"
                       namespace:
                         type: string
-                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clichouse-operator`"
+                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clickhouse-operator`"
                       useType:
                         type: string
                         description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit`"

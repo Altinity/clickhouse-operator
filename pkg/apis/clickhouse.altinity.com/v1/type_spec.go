@@ -27,7 +27,8 @@ type ChiSpec struct {
 	Suspend                *types.StringBool `json:"suspend,omitempty"                yaml:"suspend,omitempty"`
 	NamespaceDomainPattern *types.String     `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating    `json:"templating,omitempty"             yaml:"templating,omitempty"`
-	Reconciling            *Reconciling      `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Reconciling            *ChiReconcile     `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Reconcile              *ChiReconcile     `json:"reconcile,omitempty"              yaml:"reconcile,omitempty"`
 	Defaults               *Defaults         `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
 	Configuration          *Configuration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates              *Templates        `json:"templates,omitempty"              yaml:"templates,omitempty"`
@@ -162,7 +163,7 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	}
 
 	spec.Templating = spec.Templating.MergeFrom(from.Templating, _type)
-	spec.Reconciling = spec.Reconciling.MergeFrom(from.Reconciling, _type)
+	spec.Reconcile = spec.Reconcile.MergeFrom(from.Reconcile, _type)
 	spec.Defaults = spec.Defaults.MergeFrom(from.Defaults, _type)
 	spec.Configuration = spec.Configuration.MergeFrom(from.Configuration, _type)
 	spec.Templates = spec.Templates.MergeFrom(from.Templates, _type)

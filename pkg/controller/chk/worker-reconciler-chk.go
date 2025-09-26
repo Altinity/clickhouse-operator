@@ -99,7 +99,7 @@ func (w *worker) buildCR(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstal
 	common.LogOldAndNew("norm stage 1:", cr.GetAncestorT(), cr)
 
 	templates := w.buildTemplates(cr)
-	ips := w.c.getPodsIPs(cr)
+	ips := w.c.getPodsIPs(ctx, cr)
 	w.a.V(1).M(cr).Info("IPs of the CR %s: len: %d %v", util.NamespacedName(cr), len(ips), ips)
 	if len(ips) > 0 || len(templates) > 0 {
 		// Rebuild CR with known list of templates and additional IPs
@@ -348,7 +348,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), version)
 	// In case we have to force-restart host
 	// We'll do it via replicas: 0 in StatefulSet.
-	if w.shouldForceRestartHost(host) {
+	if w.shouldForceRestartHost(ctx, host) {
 		w.a.V(1).M(host).F().Info("Reconcile host: %s. Shutting host down due to force restart", host.GetName())
 		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.stsReconciler.ReconcileStatefulSet(ctx, host, false, opts)

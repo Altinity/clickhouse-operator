@@ -138,7 +138,7 @@ func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
-		domain.NewHostStatefulSetPoller(domain.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.ctrlLabeler),
+		domain.NewHostObjectsPoller(domain.NewHostObjectPoller(w.c.kube.STS()), domain.NewHostObjectPoller(w.c.kube.Pod()), w.c.ctrlLabeler),
 		w.c.namer,
 		labeler.New(new),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
@@ -148,7 +148,7 @@ func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
 }
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
-func (w *worker) shouldForceRestartHost(host *api.Host) bool {
+func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) bool {
 	switch {
 	case host.HasAncestor() && host.GetAncestor().IsStopped():
 		w.a.V(1).M(host).F().Info("Host ancestor is stopped, no restart applicable. Host: %s", host.GetName())
@@ -182,7 +182,7 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 
-	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(host):
+	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host):
 		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
 		return true
 
@@ -222,10 +222,10 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 }
 
 // updateEndpoints updates endpoints
-func (w *worker) updateEndpoints(ctx context.Context, ep *core.Endpoints) error {
+func (w *worker) updateEndpoints(ctx context.Context, m meta.Object) error {
 	_ = w.finalizeCR(
 		ctx,
-		ep,
+		m,
 		types.UpdateStatusOptions{
 			TolerateAbsence: true,
 			CopyStatusOptions: types.CopyStatusOptions{

@@ -109,6 +109,7 @@ func (n *Normalizer) applyExternalCRTemplatesOnTarget(templateRefSrc crTemplates
 }
 
 func (n *Normalizer) applyCROnTarget(cr *chi.ClickHouseInstallation) {
+	n.migrateReconcilingBackwardCompatibility(cr)
 	n.req.GetTarget().MergeFrom(cr, chi.MergeTypeOverrideByNonEmptyValues)
 }
 
@@ -156,7 +157,8 @@ func (n *Normalizer) normalizeSpec() {
 	n.req.GetTarget().GetSpecT().Troubleshoot = n.normalizeTroubleshoot(n.req.GetTarget().GetSpecT().Troubleshoot)
 	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
 	n.req.GetTarget().GetSpecT().Templating = n.normalizeTemplating(n.req.GetTarget().GetSpecT().Templating)
-	n.req.GetTarget().GetSpecT().Reconciling = n.normalizeReconciling(n.req.GetTarget().GetSpecT().Reconciling)
+	n.normalizeReconciling()
+	n.req.GetTarget().GetSpecT().Reconcile = n.normalizeReconcile(n.req.GetTarget().GetSpecT().Reconcile)
 	n.req.GetTarget().GetSpecT().Defaults = n.normalizeDefaults(n.req.GetTarget().GetSpecT().Defaults)
 	n.normalizeConfiguration()
 	n.req.GetTarget().GetSpecT().Templates = n.normalizeTemplates(n.req.GetTarget().GetSpecT().Templates)
@@ -356,40 +358,84 @@ func (n *Normalizer) normalizeTemplating(templating *chi.ChiTemplating) *chi.Chi
 	return templating
 }
 
-// normalizeReconciling normalizes .spec.reconciling
-func (n *Normalizer) normalizeReconciling(reconciling *chi.Reconciling) *chi.Reconciling {
-	if reconciling == nil {
-		reconciling = chi.NewReconciling().SetDefaults()
+func (n *Normalizer) migrateReconcilingBackwardCompatibility(cr *chi.ClickHouseInstallation) {
+	if cr == nil {
+		return
+	}
+	// Prefer to use Reconciling
+	if cr.Spec.Reconciling != nil {
+		cr.Spec.Reconcile = cr.Spec.Reconciling
+		cr.Spec.Reconciling = nil
+	}
+}
+
+func (n *Normalizer) normalizeReconciling() {
+	// Prefer to use Reconciling
+	if n.req.GetTarget().GetSpecT().Reconciling != nil {
+		n.req.GetTarget().GetSpecT().Reconcile = n.req.GetTarget().GetSpecT().Reconciling
+		n.req.GetTarget().GetSpecT().Reconciling = nil
+	}
+}
+
+// normalizeReconcile normalizes .spec.reconciling
+func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiReconcile {
+	// Ensure reconcile is in place
+	if reconcile == nil {
+		reconcile = chi.NewChiReconcile().SetDefaults()
 	}
 
 	// Policy
-	switch strings.ToLower(reconciling.GetPolicy()) {
+	switch strings.ToLower(reconcile.GetPolicy()) {
 	case strings.ToLower(chi.ReconcilingPolicyWait):
 		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(chi.ReconcilingPolicyWait)
+		reconcile.SetPolicy(chi.ReconcilingPolicyWait)
 	case strings.ToLower(chi.ReconcilingPolicyNoWait):
 		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(chi.ReconcilingPolicyNoWait)
+		reconcile.SetPolicy(chi.ReconcilingPolicyNoWait)
 	default:
 		// Unknown value, fallback to default
-		reconciling.SetPolicy(chi.ReconcilingPolicyUnspecified)
+		reconcile.SetPolicy(chi.ReconcilingPolicyUnspecified)
 	}
 
 	// ConfigMapPropagationTimeout
 	// No normalization yet
 
 	// Cleanup
-	reconciling.SetCleanup(n.normalizeReconcilingCleanup(reconciling.GetCleanup()))
+	reconcile.SetCleanup(n.normalizeReconcileCleanup(reconcile.GetCleanup()))
 
-	// Runtime
-	// No normalization yet
 	// Macros
 	// No normalization yet
 
-	return reconciling
+	// Runtime
+	// Inherit from chop Config
+	reconcile.InheritRuntimeFrom(chop.Config().Reconcile.Runtime)
+	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
+
+	// Host
+	// Inherit from chop Config
+	reconcile.InheritHostFrom(chop.Config().Reconcile.Host)
+	reconcile.Host = n.normalizeReconcileHost(reconcile.Host)
+
+	return reconcile
 }
 
-func (n *Normalizer) normalizeReconcilingCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
+func (n *Normalizer) normalizeReconcileRuntime(runtime chi.ReconcileRuntime) chi.ReconcileRuntime {
+	if runtime.ReconcileShardsThreadsNumber == 0 {
+		runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
+	}
+	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
+	}
+	return runtime
+}
+
+func (n *Normalizer) normalizeReconcileHost(rh chi.ReconcileHost) chi.ReconcileHost {
+	// Normalize
+	rh = rh.Normalize()
+	return rh
+}
+
+func (n *Normalizer) normalizeReconcileCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
 	if cleanup == nil {
 		cleanup = chi.NewCleanup()
 	}
@@ -620,7 +666,7 @@ func (n *Normalizer) replacers(section replacerSection, scope any, additional ..
 	// Should scope macros be applied - depends on whether macros are enabled in the section
 	shouldApplyScopeMacros := false
 	// Shortcut to macros enabled/disabled toggles
-	sectionToggles := n.req.GetTarget().Spec.Reconciling.Macros.Sections
+	sectionToggles := n.req.GetTarget().Spec.Reconcile.Macros.Sections
 
 	switch section {
 	case replacerFiles:
@@ -784,7 +830,7 @@ func (n *Normalizer) normalizeClusterStage2(cluster *chi.Cluster) *chi.Cluster {
 	// Inherit from .spec.configuration.files
 	cluster.InheritFilesFrom(n.req.GetTarget())
 	// Inherit from .spec.reconciling
-	cluster.InheritReconcileFrom(n.req.GetTarget())
+	cluster.InheritClusterReconcileFrom(n.req.GetTarget())
 	// Inherit from .spec.defaults
 	cluster.InheritTemplatesFrom(n.req.GetTarget())
 
@@ -949,23 +995,8 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 
 func (n *Normalizer) normalizeClusterReconcile(reconcile chi.ClusterReconcile) chi.ClusterReconcile {
 	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
+	reconcile.Host = n.normalizeReconcileHost(reconcile.Host)
 	return reconcile
-}
-
-func (n *Normalizer) normalizeReconcileRuntime(runtime chi.ReconcileRuntime) chi.ReconcileRuntime {
-	if runtime.ReconcileShardsThreadsNumber == 0 {
-		runtime.ReconcileShardsThreadsNumber = chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber
-	}
-	if runtime.ReconcileShardsThreadsNumber == 0 {
-		runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
-	}
-	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
-		runtime.ReconcileShardsMaxConcurrencyPercent = chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent
-	}
-	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
-		runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
-	}
-	return runtime
 }
 
 // ensureClusterLayoutShards ensures slice layout.Shards is in place

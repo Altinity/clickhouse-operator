@@ -15,39 +15,61 @@
 package util
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"regexp"
 	"strings"
 )
 
-const shellEnvVarNameMaxLength int = 63
+const shellEnvVarNameBaseMaxLength int = 63
+const shellEnvVarNameFullMaxLength int = 127
 
 var shellEnvVarNameRegexp = regexp.MustCompile("^[A-Z]([_A-Z0-9]*[A-Z0-9])?$")
 var shellEnvVarNameStartRegexp = regexp.MustCompile("^[A-Z]")
 var shellEnvVarNameNotAllowedCharsRegexp = regexp.MustCompile("[^_A-Z0-9]")
 var shellEnvVarNameReplaceCharsRegexp = regexp.MustCompile("[/]")
 
-func BuildShellEnvVarName(str string) (string, bool) {
+func BuildShellEnvVarName(str string) (name string, ok bool) {
+	// Do not touch original value
+	name = str
+
 	// Must be uppercase
-	str = strings.ToUpper(str)
+	name = strings.ToUpper(name)
+
 	// First char must comply to start regexp
-	for len(str) > 0 {
-		if shellEnvVarNameStartRegexp.MatchString(str) {
+	// Cut the first char until it is reasonable
+	for len(name) > 0 {
+		if shellEnvVarNameStartRegexp.MatchString(name) {
 			break
 		} else {
-			str = str[1:]
+			name = name[1:]
 		}
 	}
+
 	// Replace replaceable chars
-	str = shellEnvVarNameReplaceCharsRegexp.ReplaceAllString(str, "_")
+	name = shellEnvVarNameReplaceCharsRegexp.ReplaceAllString(name, "_")
 	// Remove not allowed chars
-	str = shellEnvVarNameNotAllowedCharsRegexp.ReplaceAllString(str, "")
+	name = shellEnvVarNameNotAllowedCharsRegexp.ReplaceAllString(name, "")
+
 	// Must have limited length
-	if len(str) > shellEnvVarNameMaxLength {
-		str = str[0:shellEnvVarNameMaxLength]
+	suffix := ""
+	if len(name) > shellEnvVarNameBaseMaxLength {
+		// Cut the name
+		name = name[0:shellEnvVarNameBaseMaxLength]
+		// Prepare fixed length suffix out of original string
+		hash := md5.Sum([]byte(str))
+		suffix = "_" + strings.ToUpper(hex.EncodeToString(hash[:]))
 	}
 
-	if IsShellEnvVarName(str) {
-		return str, true
+	// Ensure no trailing underscores
+	name = strings.TrimRight(name, "_")
+
+	// Append suffix to keep name uniqueness
+	name += suffix
+
+	// It still has to be a valid env ma,e after all
+	if IsShellEnvVarName(name) {
+		return name, true
 	}
 
 	return "", false
@@ -55,7 +77,7 @@ func BuildShellEnvVarName(str string) (string, bool) {
 
 // IsShellEnvVarName tests for a string that conforms to the definition of a shell ENV VAR name
 func IsShellEnvVarName(value string) bool {
-	if len(value) > shellEnvVarNameMaxLength {
+	if len(value) > shellEnvVarNameFullMaxLength {
 		return false
 	}
 	if !shellEnvVarNameRegexp.MatchString(value) {

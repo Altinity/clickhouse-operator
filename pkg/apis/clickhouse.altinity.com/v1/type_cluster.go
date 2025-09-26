@@ -37,37 +37,6 @@ type Cluster struct {
 	Runtime ChiClusterRuntime `json:"-" yaml:"-"`
 }
 
-type ClusterReconcile struct {
-	Runtime ReconcileRuntime `json:"runtime" yaml:"runtime"`
-}
-
-type ReconcileRuntime struct {
-	ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber,omitempty"         yaml:"reconcileShardsThreadsNumber,omitempty"`
-	ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent,omitempty" yaml:"reconcileShardsMaxConcurrencyPercent,omitempty"`
-}
-
-func (r ReconcileRuntime) MergeFrom(from ReconcileRuntime, _type MergeType) ReconcileRuntime {
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		if r.ReconcileShardsThreadsNumber == 0 {
-			r.ReconcileShardsThreadsNumber = from.ReconcileShardsThreadsNumber
-		}
-		if r.ReconcileShardsMaxConcurrencyPercent == 0 {
-			r.ReconcileShardsMaxConcurrencyPercent = from.ReconcileShardsMaxConcurrencyPercent
-		}
-	case MergeTypeOverrideByNonEmptyValues:
-		if from.ReconcileShardsThreadsNumber != 0 {
-			// Override by non-empty values only
-			r.ReconcileShardsThreadsNumber = from.ReconcileShardsThreadsNumber
-		}
-		if from.ReconcileShardsMaxConcurrencyPercent != 0 {
-			// Override by non-empty values only
-			r.ReconcileShardsMaxConcurrencyPercent = from.ReconcileShardsMaxConcurrencyPercent
-		}
-	}
-	return r
-}
-
 type ChiClusterRuntime struct {
 	Address ChiClusterAddress       `json:"-" yaml:"-"`
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
@@ -166,11 +135,6 @@ func (c *Cluster) GetSecret() *ClusterSecret {
 	return c.Secret
 }
 
-// GetRuntime is a getter
-func (cluster *Cluster) GetRuntime() IClusterRuntime {
-	return &cluster.Runtime
-}
-
 // GetPDBManaged is a getter
 func (cluster *Cluster) GetPDBManaged() *types.StringBool {
 	return cluster.PDBManaged
@@ -179,6 +143,16 @@ func (cluster *Cluster) GetPDBManaged() *types.StringBool {
 // GetPDBMaxUnavailable is a getter
 func (cluster *Cluster) GetPDBMaxUnavailable() *types.Int32 {
 	return cluster.PDBMaxUnavailable
+}
+
+// GetReconcile is a getter
+func (cluster *Cluster) GetReconcile() ClusterReconcile {
+	return cluster.Reconcile
+}
+
+// GetRuntime is a getter
+func (cluster *Cluster) GetRuntime() IClusterRuntime {
+	return &cluster.Runtime
 }
 
 // FillShardsReplicasExplicitlySpecified fills whether shard or replicas are explicitly specified
@@ -254,12 +228,13 @@ func (cluster *Cluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 	})
 }
 
-// InheritReconcileFrom inherits reconcile runtime from CHI
-func (cluster *Cluster) InheritReconcileFrom(chi *ClickHouseInstallation) {
-	if chi.Spec.Reconciling == nil {
+// InheritClusterReconcileFrom inherits reconcile runtime from CHI
+func (cluster *Cluster) InheritClusterReconcileFrom(chi *ClickHouseInstallation) {
+	if chi.Spec.Reconcile == nil {
 		return
 	}
-	cluster.Reconcile.Runtime = cluster.Reconcile.Runtime.MergeFrom(chi.Spec.Reconciling.Runtime, MergeTypeFillEmptyValues)
+	cluster.Reconcile.Runtime = cluster.Reconcile.Runtime.MergeFrom(chi.Spec.Reconcile.Runtime, MergeTypeFillEmptyValues)
+	cluster.Reconcile.Host = cluster.Reconcile.Host.MergeFrom(chi.Spec.Reconcile.Host)
 }
 
 // InheritTemplatesFrom inherits templates from CHI

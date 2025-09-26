@@ -120,7 +120,7 @@ func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *
 	common.LogOldAndNew("norm stage 1:", cr.GetAncestorT(), cr)
 
 	templates := w.buildTemplates(cr)
-	ips := w.c.getPodsIPs(cr)
+	ips := w.c.getPodsIPs(ctx, cr)
 	w.a.V(1).M(cr).Info("IPs of the CR %s: len: %d %v", util.NamespacedName(cr), len(ips), ips)
 	if len(ips) > 0 || len(templates) > 0 {
 		// Rebuild CR with known list of templates and additional IPs
@@ -365,12 +365,13 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. App version: %s", host.GetName(), host.Runtime.Version.Render())
 
 	// Start with force-restart host
-	if w.shouldForceRestartHost(host) {
+	if w.shouldForceRestartHost(ctx, host) {
 		w.a.V(1).M(host).F().Info("Reconcile host STS force restart: %s", host.GetName())
 		_ = w.hostForceRestart(ctx, host, opts)
 	}
 
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+	opts = w.prepareStsReconcileOptsWaitSection(host, opts)
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. Reconcile StatefulSet", host.GetName())
@@ -410,7 +411,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	w.a.V(1).M(host).F().Info("Host software restart start. Host: %s", host.GetName())
 
 	// Get restart counters - they'll be used to check restart success
-	restarts, err := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
+	restartCounters, err := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 1. Host: %s err: %v", host.GetName(), err)
 		return err
@@ -425,7 +426,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	w.a.V(1).M(host).F().Info("Host software shutdown ok. Host: %s", host.GetName())
 
 	// Wait for restart counters to change
-	err = w.waitHostRestart(ctx, host, restarts)
+	err = w.waitHostRestart(ctx, host, restartCounters)
 	if err != nil {
 		w.a.V(1).M(host).F().Info("Host software restart abort 3. Host: %s err: %v", host.GetName(), err)
 		return err
@@ -465,7 +466,7 @@ func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error 
 	w.a.V(1).M(host).F().Info("Host software version ok. Host: %s ", host.GetName())
 
 	// However, some containers within the pod may still have flapping problems and be in CrashLoopBackOff
-	if w.isPodCrushed(host) {
+	if w.isPodCrushed(ctx, host) {
 		w.a.V(1).M(host).F().Info("Host software restart abort 8. Host: %s is crushed", host.GetName())
 		return fmt.Errorf("host is crushed")
 	}
@@ -815,6 +816,22 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	}
 
 	return nil
+}
+
+func (w *worker) prepareStsReconcileOptsWaitSection(host *api.Host, opts *statefulset.ReconcileOptions) *statefulset.ReconcileOptions {
+	if host.GetCluster().GetReconcile().Host.Wait.Probes.GetStartup().IsTrue() {
+		opts = opts.SetWaitUntilStarted()
+		w.a.V(1).
+			M(host).F().
+			Warning("Setting option SetWaitUntilStarted ")
+	}
+	if host.GetCluster().GetReconcile().Host.Wait.Probes.GetReadiness().IsTrue() {
+		opts = opts.SetWaitUntilReady()
+		w.a.V(1).
+			M(host).F().
+			Warning("Setting option SetWaitUntilReady")
+	}
+	return opts
 }
 
 func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {

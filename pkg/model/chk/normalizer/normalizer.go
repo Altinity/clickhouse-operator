@@ -101,6 +101,7 @@ func (n *Normalizer) applyExternalCRTemplatesOnTarget(templateRefSrc crTemplates
 }
 
 func (n *Normalizer) applyCROnTarget(cr *chk.ClickHouseKeeperInstallation) {
+	n.migrateReconcilingBackwardCompatibility(cr)
 	n.req.GetTarget().MergeFrom(cr, chi.MergeTypeOverrideByNonEmptyValues)
 }
 
@@ -143,7 +144,8 @@ func (n *Normalizer) normalizeSpec() {
 	// Walk over Spec datatype fields
 	n.req.GetTarget().GetSpecT().TaskID = n.normalizeTaskID(n.req.GetTarget().GetSpecT().TaskID)
 	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
-	n.req.GetTarget().GetSpecT().Reconciling = n.normalizeReconciling(n.req.GetTarget().GetSpecT().Reconciling)
+	n.normalizeReconciling()
+	n.req.GetTarget().GetSpecT().Reconcile = n.normalizeReconcile(n.req.GetTarget().GetSpecT().Reconcile)
 	n.req.GetTarget().GetSpecT().Defaults = n.normalizeDefaults(n.req.GetTarget().GetSpecT().Defaults)
 	n.normalizeConfiguration()
 	n.req.GetTarget().GetSpecT().Templates = n.normalizeTemplates(n.req.GetTarget().GetSpecT().Templates)
@@ -286,40 +288,63 @@ func (n *Normalizer) normalizeTemplates(templates *chi.Templates) *chi.Templates
 	return templates
 }
 
-// normalizeReconciling normalizes .spec.reconciling
-func (n *Normalizer) normalizeReconciling(reconciling *chi.Reconciling) *chi.Reconciling {
-	if reconciling == nil {
-		reconciling = chi.NewReconciling().SetDefaults()
+func (n *Normalizer) migrateReconcilingBackwardCompatibility(cr *chk.ClickHouseKeeperInstallation) {
+	if cr == nil {
+		return
+	}
+	// Prefer to use Reconciling
+	if cr.Spec.Reconciling != nil {
+		cr.Spec.Reconcile = cr.Spec.Reconciling
+		cr.Spec.Reconciling = nil
+	}
+}
+
+func (n *Normalizer) normalizeReconciling() {
+	// Prefer to use Reconciling
+	if n.req.GetTarget().GetSpecT().Reconciling != nil {
+		n.req.GetTarget().GetSpecT().Reconcile = n.req.GetTarget().GetSpecT().Reconciling
+		n.req.GetTarget().GetSpecT().Reconciling = nil
+	}
+}
+
+// normalizeReconcile normalizes .spec.reconciling
+func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiReconcile {
+	// Ensure reconcile is in place
+	if reconcile == nil {
+		reconcile = chi.NewChiReconcile().SetDefaults()
 	}
 
 	// Policy
-	switch strings.ToLower(reconciling.GetPolicy()) {
+	switch strings.ToLower(reconcile.GetPolicy()) {
 	case strings.ToLower(chi.ReconcilingPolicyWait):
 		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(chi.ReconcilingPolicyWait)
+		reconcile.SetPolicy(chi.ReconcilingPolicyWait)
 	case strings.ToLower(chi.ReconcilingPolicyNoWait):
 		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(chi.ReconcilingPolicyNoWait)
+		reconcile.SetPolicy(chi.ReconcilingPolicyNoWait)
 	default:
 		// Unknown value, fallback to default
-		reconciling.SetPolicy(chi.ReconcilingPolicyUnspecified)
+		reconcile.SetPolicy(chi.ReconcilingPolicyUnspecified)
 	}
 
 	// ConfigMapPropagationTimeout
 	// No normalization yet
 
 	// Cleanup
-	reconciling.SetCleanup(n.normalizeReconcilingCleanup(reconciling.GetCleanup()))
+	reconcile.SetCleanup(n.normalizeReconcileCleanup(reconcile.GetCleanup()))
 
-	// Runtime
-	// No normalization yet
 	// Macros
 	// No normalization yet
 
-	return reconciling
+	// Runtime
+	// No normalization yet
+
+	// Host
+	// No normalization yet
+	return reconcile
 }
 
-func (n *Normalizer) normalizeReconcilingCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
+func (n *Normalizer) normalizeReconcileCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
 	if cleanup == nil {
 		cleanup = chi.NewCleanup()
 	}
