@@ -6,7 +6,7 @@ metadata:
   name: test-040-startup-probe
 
 spec:
-  reconciling:
+  reconcile:
     host:
       wait:
         probes:
