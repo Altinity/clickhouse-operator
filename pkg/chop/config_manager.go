@@ -161,7 +161,7 @@ func (cm *ConfigManager) getAllCRBasedConfigs(namespace string) {
 
 				cm.crConfigs = append(cm.crConfigs, &chOperatorConfiguration.Spec)
 
-				log.V(1).F().Error("Append ClickHouseOperatorConfigurations '%s/%s'.", namespace, name)
+				log.V(1).F().Info("Append ClickHouseOperatorConfigurations '%s/%s'.", namespace, name)
 				continue
 			}
 		}

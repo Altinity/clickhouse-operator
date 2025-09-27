@@ -891,8 +891,8 @@ func (w *worker) reconcileHostIncludeIntoAllActivities(ctx context.Context, host
 		l.Info("Reconcile Host completed. Host is stopped: %s", host.GetName())
 		return nil
 	case host.IsTroubleshoot():
-		return nil
 		l.Info("Reconcile Host completed. Host is in troubleshoot mode: %s", host.GetName())
+		return nil
 	}
 
 	// Report host software version
