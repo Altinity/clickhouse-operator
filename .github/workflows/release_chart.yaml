@@ -44,7 +44,7 @@ jobs:
         if: steps.get_assets.outputs.asset_id != ''
         run: |
           curl -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          "https://api.github.com/repos/${{ github.repository }}
+          "https://api.github.com/repos/${{ github.repository }}/releases/${{ github.event.release.id }}/assets/${{ steps.get_assets.outputs.asset_id }}"
 
       - name: Upload Release Artifacts
         run: |
