@@ -61,7 +61,7 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInst
 			// Stop polling
 			return false
 		}
-		if time.Now().Sub(start) > timeout {
+		if time.Since(start) > timeout {
 			l.Warning("not all IP addresses are in place but time has elapsed")
 			// Stop polling
 			return false

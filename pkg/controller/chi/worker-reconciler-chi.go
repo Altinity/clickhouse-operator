@@ -107,7 +107,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
 
 		metrics.CHIReconcilesCompleted(ctx, new)
-		metrics.CHIReconcilesTimings(ctx, new, time.Now().Sub(startTime).Seconds())
+		metrics.CHIReconcilesTimings(ctx, new, time.Since(startTime).Seconds())
 	}
 
 	return nil
@@ -731,7 +731,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	})
 
 	metrics.HostReconcilesCompleted(ctx, host.GetCR())
-	metrics.HostReconcilesTimings(ctx, host.GetCR(), time.Now().Sub(startTime).Seconds())
+	metrics.HostReconcilesTimings(ctx, host.GetCR(), time.Since(startTime).Seconds())
 
 	return nil
 }
