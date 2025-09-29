@@ -49,7 +49,7 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chk *apiChk.ClickHouseK
 			w.a.V(1).M(c).Info("all IP addresses are in place")
 			return false
 		}
-		if time.Now().Sub(start) > 1*time.Minute {
+		if time.Since(start) > 1*time.Minute {
 			// Stop polling
 			w.a.V(1).M(c).Warning("not all IP addresses are in place but time has elapsed")
 			return false
