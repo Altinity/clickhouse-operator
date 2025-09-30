@@ -57,8 +57,8 @@ func (c *Creator) CreatePVC(
 	return &persistentVolumeClaim
 }
 
-// AdjustPVC prepares PVC - labels and annotations
-func (c *Creator) AdjustPVC(
+// TagPVC prepares PVC - labels and annotations
+func (c *Creator) TagPVC(
 	pvc *core.PersistentVolumeClaim,
 	host *api.Host,
 	template *api.VolumeClaimTemplate,
