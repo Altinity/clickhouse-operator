@@ -106,6 +106,10 @@ func (w *Reconciler) reconcilePVCFromVolumeMount(
 ) (
 	reconcileError ErrorDataPersistence,
 ) {
+	//
+	// Preliminary action - get or create PVC
+	//
+
 	// Try to find VolumeClaimTemplate that is referenced by provided VolumeMount
 	volumeClaimTemplate, found := volume.GetVolumeClaimTemplate(host, volumeMount)
 	if !found {
@@ -161,6 +165,11 @@ func (w *Reconciler) reconcilePVCFromVolumeMount(
 		reconcileError = ErrPVCIsMissed
 		return reconcileError
 	}
+
+	//
+	// Main action
+	// Reconcile PVC - either existent before or just created
+	//
 
 	if pvcReconciled, err := w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate); err == nil {
 		w.task.RegistryReconciled().RegisterPVC(pvcReconciled.GetObjectMeta())
@@ -280,7 +289,7 @@ func (w *Reconciler) reconcilePVC(
 	}
 
 	model.VolumeClaimTemplateApplyResourcesRequestsOnPVC(template, pvc)
-	pvc = w.task.Creator().AdjustPVC(pvc, host, template)
+	pvc = w.task.Creator().TagPVC(pvc, host, template)
 	return w.pvc.UpdateOrCreate(ctx, pvc)
 }
 
