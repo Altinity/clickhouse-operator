@@ -178,6 +178,8 @@ function update_service_resource() {
   yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
   yq e -i '.spec.selector |= "{{ include \"altinity-clickhouse-operator.selectorLabels\" . | nindent 4 }}"' "${file}"
 
+  perl -pi -e 's/(\s+- port: 8888)/{{ if .Values.metrics.enabled }}\n$1/g' "${file}"
+  perl -pi -e 's/(name: ch-metrics)/$1\n{{ end }}/g' "${file}"
   perl -pi -e "s/'//g" "${file}"
 }
 
