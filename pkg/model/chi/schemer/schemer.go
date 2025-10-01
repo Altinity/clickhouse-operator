@@ -84,7 +84,7 @@ func (s *ClusterSchemer) createTablesSQLs(
 // HostCreateTables creates tables on a new host
 func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(1).Info("ctx is done")
 		return nil
 	}
 
@@ -132,12 +132,12 @@ func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *api.Host) bo
 	inside := false
 	sql := s.sqlHostInCluster(host.Runtime.Address.ClusterName)
 	res, err := s.QueryHostString(ctx, host, sql)
-	if err == nil && res == "1" {
-		log.V(1).M(host).F().Info("The host %s is inside the cluster", host.GetName())
-		inside = true
-	} else {
+	if err == nil && res == "0" {
 		log.V(1).M(host).F().Info("The host %s is outside of the cluster", host.GetName())
 		inside = false
+	} else {
+		log.V(1).M(host).F().Info("The host %s is inside the cluster", host.GetName())
+		inside = true
 	}
 	return inside
 }
@@ -150,6 +150,11 @@ func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *api.Hos
 // HostClickHouseVersion returns ClickHouse version on the host
 func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *api.Host) (string, error) {
 	return s.QueryHostString(ctx, host, s.sqlVersion())
+}
+
+// HostMaxReplicaDelay returns max replica delay on the host
+func (s *ClusterSchemer) HostMaxReplicaDelay(ctx context.Context, host *api.Host) (int, error) {
+	return s.QueryHostInt(ctx, host, s.sqlMaxReplicaDelay())
 }
 
 // HostShutdown shutdown a host

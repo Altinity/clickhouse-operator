@@ -18,9 +18,6 @@ import (
 	"context"
 
 	policy "k8s.io/api/policy/v1"
-
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func (c *Controller) getPDB(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
@@ -28,22 +25,12 @@ func (c *Controller) getPDB(ctx context.Context, pdb *policy.PodDisruptionBudget
 }
 
 func (c *Controller) createPDB(ctx context.Context, pdb *policy.PodDisruptionBudget) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	_, err := c.kube.PDB().Create(ctx, pdb)
 
 	return err
 }
 
 func (c *Controller) updatePDB(ctx context.Context, pdb *policy.PodDisruptionBudget) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	_, err := c.kube.PDB().Update(ctx, pdb)
 
 	return err

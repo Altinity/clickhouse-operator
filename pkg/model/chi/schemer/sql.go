@@ -27,6 +27,17 @@ import (
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 const createTableDBEngines = `'Ordinary','Atomic','Memory','Lazy'`
 
+func (s *ClusterSchemer) sqlMaxReplicaDelay() string {
+	sql := heredoc.Docf(`
+		SELECT
+			MAX(absolute_delay)
+		FROM
+			system.replicas
+		`,
+	)
+	return sql
+}
+
 // sqlDropTable returns set of 'DROP TABLE ...' SQLs
 func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
@@ -137,13 +148,13 @@ func (s *ClusterSchemer) sqlCreateTableDistributed(cluster string) string {
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
 			SELECT
-				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS database,
-				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
+				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS e_database,
+				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS e_name,
 				t.create_table_query,
 				1 AS order
 			FROM
 				clusterAllReplicas('%s', system.tables) tables
-				LEFT JOIN
+			LEFT JOIN
 				(
 					SELECT
 						DISTINCT database,
@@ -153,7 +164,7 @@ func (s *ClusterSchemer) sqlCreateTableDistributed(cluster string) string {
 						clusterAllReplicas('%s', system.tables)
 					SETTINGS skip_unavailable_shards = 1, show_table_uuid_in_table_create_query_if_not_nil=1
 				) t
-				USING (database, name)
+				ON (t.database = e_database and  t.name = e_name)
 			WHERE
 				engine = 'Distributed' AND t.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1

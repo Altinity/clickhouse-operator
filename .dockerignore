@@ -1,12 +1,16 @@
+dev/bin/
+dev/log/
 docs/
 hack/
 tests/
+tmp/
 .devspace/
-.vagrant/
 .idea/
+.vagrant/
 
 devspace.yaml
 Vagrantfile
+
 
 config/config-dev.yaml
 config/secret.yaml

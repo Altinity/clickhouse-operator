@@ -2,7 +2,9 @@
 # ===== Builder =====
 # ===================
 
-FROM --platform=${BUILDPLATFORM} golang:1.23 AS builder
+ARG GO_VERSION
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION:-latest} AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -34,7 +36,7 @@ RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter bash -xe ./dev/go_build_metrics_e
 # ===================
 # == Delve builder ==
 # ===================
-FROM --platform=${BUILDPLATFORM} golang:1.23 AS delve-builder
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION:-latest} AS delve-builder
 RUN CGO_ENABLED=0 GO111MODULE=on GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
     go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest && \
     rm -rf /root/.cache/go-build/ /go/pkg/mod/

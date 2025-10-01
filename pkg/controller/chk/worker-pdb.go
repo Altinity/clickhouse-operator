@@ -25,16 +25,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-//func (w *worker) reconcilePDB	(chk *apiChk.ClickHouseKeeperInstallation) error {
-//	return w.c.reconcile(
-//		chk,
-//		&policy.PodDisruptionBudget{},
-//		creator.CreatePodDisruptionBudget(chk),
-//		"PodDisruptionBudget",
-//		nil,
-//	)
-//}
-
 // reconcilePDB reconciles PodDisruptionBudget
 func (w *worker) reconcilePDB(ctx context.Context, cluster apiChi.ICluster, pdb *policy.PodDisruptionBudget) error {
 	cur, err := w.c.getPDB(ctx, pdb)

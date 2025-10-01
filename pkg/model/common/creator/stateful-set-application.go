@@ -67,18 +67,33 @@ func (c *Creator) stsAppContainerSetupEnvVars(statefulSet *apps.StatefulSet, hos
 		return
 	}
 
-	log.V(2).F().Info("going to merge additional vars len()=%d", len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
-	log.V(2).F().Info("container env vars len()=%d", len(container.Env))
-	container.Env = util.MergeEnvVars(container.Env, host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()...)
-	log.V(2).F().Info("container env vars len()=%d", len(container.Env))
+	c.setupAdditionalEnvVars(host, container)
+	c.applyAdditionalEnvVars(host, container)
+	c.logEnvVars(host, container)
+}
 
-	log.V(2).F().Info("additional env vars for host: %s num: %d", host.GetName(), len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
+func (c *Creator) setupAdditionalEnvVars(host *api.Host, container *core.Container) {
+	c.cm.SetupAdditionalEnvVars(host, container)
+}
+
+func (c *Creator) applyAdditionalEnvVars(host *api.Host, container *core.Container) {
+	l := log.V(2).F().Info
+	l("going to merge additional vars len()=%d", len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
+	l("container env vars len()=%d", len(container.Env))
+
+	container.Env = util.MergeEnvVars(container.Env, host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()...)
+	l("container env vars len()=%d", len(container.Env))
+}
+
+func (c *Creator) logEnvVars(host *api.Host, container *core.Container) {
+	l := log.V(2).F().Info
+	l("additional env vars for host: %s num: %d", host.GetName(), len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
 	for _, envVar := range host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars() {
-		log.V(2).F().Info("additional env var for host: %s name: %s", host.GetName(), envVar.Name)
+		l("additional env var for host: %s name: %s", host.GetName(), envVar.Name)
 	}
-	log.V(2).F().Info("env vars for host: %s num: %d", host.GetName(), len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
+	l("env vars for host: %s num: %d", host.GetName(), len(host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
 	for _, envVar := range container.Env {
-		log.V(2).F().Info("env var for host: %s name: %s", host.GetName(), envVar.Name)
+		l("env var for host: %s name: %s", host.GetName(), envVar.Name)
 	}
 }
 
@@ -89,6 +104,11 @@ func (c *Creator) stsEnsureAppContainerProbesSpecified(statefulSet *apps.Statefu
 		return
 	}
 
+	if container.StartupProbe == nil {
+		if host.GetCluster().GetReconcile().Host.Wait.Probes.GetStartup().IsTrue() {
+			container.StartupProbe = c.pm.CreateProbe(interfaces.ProbeDefaultStartup, host)
+		}
+	}
 	if container.LivenessProbe == nil {
 		container.LivenessProbe = c.pm.CreateProbe(interfaces.ProbeDefaultLiveness, host)
 	}
@@ -119,7 +139,7 @@ func (c *Creator) stsSetupHostAliases(statefulSet *apps.StatefulSet, host *api.H
 
 // stsAppContainerSetupTroubleshootingMode
 func (c *Creator) stsAppContainerSetupTroubleshootingMode(statefulSet *apps.StatefulSet, host *api.Host) {
-	if !host.GetCR().IsTroubleshoot() {
+	if !host.IsTroubleshoot() {
 		// We are not troubleshooting
 		return
 	}
@@ -165,6 +185,10 @@ func (c *Creator) stsSetupLogContainer(statefulSet *apps.StatefulSet, host *api.
 // stsGetAppContainer is a unification wrapper
 func (c *Creator) stsGetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return c.cm.GetAppContainer(statefulSet)
+}
+
+func (c *Creator) GetAppImageTag(host *api.Host) (string, bool) {
+	return c.cm.GetAppImageTag(host.Runtime.DesiredStatefulSet)
 }
 
 // stsEnsureAppContainerNamedPortsSpecified

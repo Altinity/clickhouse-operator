@@ -24,7 +24,7 @@ import (
 
 // LogCR writes a CR into the log
 func LogCR(name string, cr api.ICustomResource) {
-	log.V(1).M(cr).Info(
+	log.V(2).M(cr).Info(
 		"logCR %s start--------------------------------------------:\n%s\nlogCR %s end--------------------------------------------",
 		name,
 		name,
@@ -34,7 +34,7 @@ func LogCR(name string, cr api.ICustomResource) {
 
 // LogActionPlan logs action plan
 func LogActionPlan(ap *action_plan.ActionPlan) {
-	log.Info(
+	log.V(1).Info(
 		"ActionPlan start---------------------------------------------:\n%s\nActionPlan end---------------------------------------------",
 		ap,
 	)

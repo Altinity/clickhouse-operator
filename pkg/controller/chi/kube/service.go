@@ -23,8 +23,8 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -64,23 +64,37 @@ func (c *Service) Get(ctx context.Context, params ...any) (*core.Service, error)
 			namespace = typedObj.Runtime.Address.Namespace
 		}
 	}
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().Services(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *Service) Create(ctx context.Context, svc *core.Service) (*core.Service, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().Services(svc.Namespace).Create(ctx, svc, controller.NewCreateOptions())
 }
 
 func (c *Service) Update(ctx context.Context, svc *core.Service) (*core.Service, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
 }
 
+func (c *Service) Remove(ctx context.Context, namespace, name string) error {
+	ctx = k8sCtx(ctx)
+	return c.kubeClient.CoreV1().Services(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+}
+
 func (c *Service) Delete(ctx context.Context, namespace, name string) error {
-	c.kubeClient.CoreV1().Services(namespace).Delete(ctx, name, controller.NewDeleteOptions())
-	return poller.New(ctx, fmt.Sprintf("%s/%s", namespace, name)).
-		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
-		WithMain(&poller.Functions{
+	item := "Service"
+	return poller.New(ctx, fmt.Sprintf("delete %s: %s/%s", item, namespace, name)).
+		WithOptions(poller.NewOptionsFromConfig()).
+		WithFunctions(&poller.Functions{
 			IsDone: func(_ctx context.Context, _ any) bool {
+				if err := c.Remove(ctx, namespace, name); err != nil {
+					if !errors.IsNotFound(err) {
+						log.V(1).Warning("Error deleting %s: %s/%s err: %v ", item, namespace, name, err)
+					}
+				}
+
 				_, err := c.Get(ctx, namespace, name)
 				return errors.IsNotFound(err)
 			},
@@ -88,6 +102,7 @@ func (c *Service) Delete(ctx context.Context, namespace, name string) error {
 }
 
 func (c *Service) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.Service, error) {
+	ctx = k8sCtx(ctx)
 	list, err := c.kubeClient.CoreV1().Services(namespace).List(ctx, opts)
 	if err != nil {
 		return nil, err

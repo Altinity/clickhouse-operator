@@ -31,6 +31,8 @@ func NewProbeManager() *ProbeManager {
 
 func (m *ProbeManager) CreateProbe(what interfaces.ProbeType, host *api.Host) *core.Probe {
 	switch what {
+	case interfaces.ProbeDefaultStartup:
+		return m.createDefaultLivenessProbe(host)
 	case interfaces.ProbeDefaultLiveness:
 		return m.createDefaultLivenessProbe(host)
 	case interfaces.ProbeDefaultReadiness:

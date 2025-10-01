@@ -17,7 +17,6 @@ package statefulset
 import (
 	"context"
 	"strings"
-	"time"
 
 	apps "k8s.io/api/apps/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,10 +36,10 @@ type Reconciler struct {
 	a    a.Announcer
 	task *common.Task
 
-	hostSTSPoller IHostStatefulSetPoller
-	namer         interfaces.INameManager
-	labeler       interfaces.ILabeler
-	storage       *storage.Reconciler
+	hostObjectsPoller IHostObjectsPoller
+	namer             interfaces.INameManager
+	labeler           interfaces.ILabeler
+	storage           *storage.Reconciler
 
 	cr  interfaces.IKubeCR
 	sts interfaces.IKubeSTS
@@ -51,7 +50,7 @@ type Reconciler struct {
 func NewReconciler(
 	a a.Announcer,
 	task *common.Task,
-	hostSTSPoller IHostStatefulSetPoller,
+	hostObjectsPoller IHostObjectsPoller,
 	namer interfaces.INameManager,
 	labeler interfaces.ILabeler,
 	storage *storage.Reconciler,
@@ -62,10 +61,10 @@ func NewReconciler(
 		a:    a,
 		task: task,
 
-		hostSTSPoller: hostSTSPoller,
-		namer:         namer,
-		labeler:       labeler,
-		storage:       storage,
+		hostObjectsPoller: hostObjectsPoller,
+		namer:             namer,
+		labeler:           labeler,
+		storage:           storage,
 
 		cr:  kube.CR(),
 		sts: kube.STS(),
@@ -76,11 +75,6 @@ func NewReconciler(
 
 // PrepareHostStatefulSetWithStatus prepares host's StatefulSet status
 func (r *Reconciler) PrepareHostStatefulSetWithStatus(ctx context.Context, host *api.Host, shutdown bool) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	r.prepareDesiredStatefulSet(host, shutdown)
 	host.GetReconcileAttributes().SetStatus(r.getStatefulSetStatus(host))
 }
@@ -91,7 +85,7 @@ func (r *Reconciler) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
 }
 
 // getStatefulSetStatus gets StatefulSet status
-func (r *Reconciler) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
+func (r *Reconciler) getStatefulSetStatus(host *api.Host) types.ObjectStatus {
 	new := host.Runtime.DesiredStatefulSet
 	r.a.V(2).M(new).S().Info(util.NamespaceNameString(new))
 	defer r.a.V(2).M(new).E().Info(util.NamespaceNameString(new))
@@ -104,24 +98,28 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 
 	cur, err := r.sts.Get(context.TODO(), new)
 	switch {
-	case cur != nil:
+	case (err == nil) && (cur != nil):
+		// StatefulSet is found
 		r.a.V(1).M(new).Info("Have StatefulSet available, try to perform label-based comparison for sts: %s", util.NamespaceNameString(new))
 		return common.GetObjectStatusFromMetas(r.labeler, cur, new)
 
 	case apiErrors.IsNotFound(err):
 		// StatefulSet is not found at the moment.
-		// However, it may be just deleted
+		// It is either new or - however - it may be just deleted
 		r.a.V(1).M(new).Info("No cur StatefulSet available and the reason is - not found. Either new one or a deleted sts: %s", util.NamespaceNameString(new))
 		if host.HasAncestor() {
 			r.a.V(1).M(new).Warning("No cur StatefulSet available but host has an ancestor. Found deleted sts. for: %s", util.NamespaceNameString(new))
-			return api.ObjectStatusModified
+			return types.ObjectStatusModified
 		}
 		r.a.V(1).M(new).Info("No cur StatefulSet available and it is not found and is a new one. New sts: %s", util.NamespaceNameString(new))
-		return api.ObjectStatusNew
+		return types.ObjectStatusRequested
 
 	default:
+		// Other error
 		r.a.V(1).M(new).Warning("Have no StatefulSet available, nor it is not found. sts: %s err: %v", util.NamespaceNameString(new), err)
-		return api.ObjectStatusUnknown
+		r.a.V(2).M(new).Info("host sts cur: %s", cur)
+		r.a.V(2).M(new).Info("host sts err: %s", err)
+		return types.ObjectStatusUnknown
 	}
 }
 
@@ -133,7 +131,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	opts *ReconcileOptions,
 ) (err error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("reconcile sts is aborted. Host: %s", host.GetName())
 		return nil
 	}
 
@@ -142,7 +140,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	r.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet))
 	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet))
 
-	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) {
 		r.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
 		if register {
 			host.GetCR().IEnsureStatus().HostUnchanged()
@@ -161,15 +159,15 @@ func (r *Reconciler) ReconcileStatefulSet(
 	host.Runtime.CurStatefulSet, err = r.sts.Get(ctx, newStatefulSet)
 
 	// Report diff to trace
-	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusModified {
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusModified) {
 		r.a.V(1).M(host).F().Info("Need to reconcile MODIFIED StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
 		common.DumpStatefulSetDiff(host, host.Runtime.CurStatefulSet, newStatefulSet)
 	}
 
 	switch {
-	case opts.IsForceRecreate():
+	case opts.ForceRecreate():
 		// Force recreate prevails over all other requests
-		r.recreateStatefulSet(ctx, host, register, opts)
+		_ = r.recreateStatefulSet(ctx, host, register, opts)
 	default:
 		// We have (or had in the past) StatefulSet - try to update|recreate it
 		err = r.updateStatefulSet(ctx, host, register, opts)
@@ -189,7 +187,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 // recreateStatefulSet
 func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("recreate sts is aborted host: %s", host.GetName())
 		return nil
 	}
 
@@ -225,7 +223,7 @@ func (r *Reconciler) copyKubectlAnnotationsBeforeUpdate(old, new *apps.StatefulS
 // updateStatefulSet
 func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("update sts is aborted host: %s", host.GetName())
 		return nil
 	}
 
@@ -247,14 +245,14 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 		M(host).F().
 		Info("Update StatefulSet(%s) - started", util.NamespaceNameString(newStatefulSet))
 
-	if r.waitForConfigMapPropagation(ctx, host) {
+	if r.task.WaitForConfigMapPropagation(ctx, host) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
 	action := common.ErrCRUDRecreate
 	if k8s.IsStatefulSetReady(curStatefulSet) {
-		action = r.doUpdateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
+		action = r.doUpdateStatefulSet(ctx, curStatefulSet, newStatefulSet, host, opts)
 	}
 
 	switch action {
@@ -299,11 +297,6 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 
 // createStatefulSet
 func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	statefulSet := host.Runtime.DesiredStatefulSet
 
 	r.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
@@ -361,75 +354,56 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 	return nil
 }
 
-// waitForConfigMapPropagation
-func (r *Reconciler) waitForConfigMapPropagation(ctx context.Context, host *api.Host) bool {
-	// No need to wait for ConfigMap propagation on stopped host
-	if host.IsStopped() {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - host is stopped")
-		return false
-	}
-
-	// No need to wait on unchanged ConfigMap
-	if r.task.CmUpdate().IsZero() {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - no changes in ConfigMap")
-		return false
-	}
-
-	// What timeout is expected to be enough for ConfigMap propagation?
-	// In case timeout is not specified, no need to wait
-	if !host.GetCR().GetReconciling().HasConfigMapPropagationTimeout() {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable due to missing timeout value")
-		return false
-	}
-
-	timeout := host.GetCR().GetReconciling().GetConfigMapPropagationTimeoutDuration()
-
-	// How much time has elapsed since last ConfigMap update?
-	// May be there is no need to wait already
-	elapsed := time.Now().Sub(r.task.CmUpdate())
-	if elapsed >= timeout {
-		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. [elapsed/timeout: %s/%s]", elapsed, timeout)
-		return false
-	}
-
-	// Looks like we need to wait for Configmap propagation, after all
-	wait := timeout - elapsed
-	r.a.V(1).M(host).F().Info("Going to wait for ConfigMap propagation for: %s [elapsed/timeout: %s/%s]", wait, elapsed, timeout)
-	if util.WaitContextDoneOrTimeout(ctx, wait) {
-		log.V(2).Info("task is done")
-		return true
-	}
-
-	r.a.V(1).M(host).F().Info("Wait completed for: %s  of timeout: %s]", wait, timeout)
-	return false
-}
-
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
 func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, opts *ReconcileOptions) common.ErrorCRUD {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	log.V(1).M(host).F().P()
 	statefulSet := host.Runtime.DesiredStatefulSet
 
-	log.V(1).Info("Create StatefulSet %s", util.NamespaceNameString(statefulSet))
+	log.V(1).Info("Create StatefulSet: %s", util.NamespaceNameString(statefulSet))
 	if _, err := r.sts.Create(ctx, statefulSet); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet create failed. err: %v", err)
 		return common.ErrCRUDRecreate
 	}
 
-	if opts.IsDoNotWait() {
-		// StatefulSet created, do not wait until host is ready, go by
-		log.V(1).M(host).F().Info("Will NOT wait for StatefulSet to be ready, consider it is created successfully")
-	} else {
-		// StatefulSet created, wait until host is ready
-		if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
-			log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
-			return r.fallback.OnStatefulSetCreateFailed(ctx, host)
+	// StatefulSet created, wait until host is launched
+	if err := r.waitHostStatefulSetToLaunch(ctx, host, opts); err != nil {
+		log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
+		return r.fallback.OnStatefulSetCreateFailed(ctx, host)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) waitHostStatefulSetToLaunch(ctx context.Context, host *api.Host, opts *ReconcileOptions) error {
+	// Whether StatefulSet has launched successfully
+	launched := false
+
+	// Start with waiting for startup probe
+	if opts.WaitUntilStarted() {
+		log.V(1).M(host).F().Info("Wait host pod started. Host: %s", host.GetName())
+		if err := r.hostObjectsPoller.WaitHostPodStarted(ctx, host); err != nil {
+			log.V(1).M(host).F().Error("Host pod wait failed. host: %s err: %v", host.GetName(), err)
+			return err
 		}
-		log.V(2).M(host).F().Info("Target generation reached, StatefulSet created successfully")
+		log.V(1).M(host).F().Info("Host pod started. Host: %s", host.GetName())
+		launched = true
+	}
+
+	// Continue with waiting for ready probe
+	if opts.WaitUntilReady() {
+		log.V(1).M(host).F().Info("Wait host sts ready. Host: %s", host.GetName())
+		if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
+			log.V(1).M(host).F().Error("Host sts wait failed. host: %s err: %v", host.GetName(), err)
+			return err
+		}
+		log.V(1).M(host).F().Info("Host sts ready. Host: %s", host.GetName())
+		launched = true
+	}
+
+	if launched {
+		log.V(1).M(host).F().Info("Host launched. Host: %s", host.GetName())
+	} else {
+		log.V(1).M(host).F().Warning("Host is not properly launched - no waiting sts at all. Host: %s", host.GetName())
 	}
 
 	return nil
@@ -441,14 +415,9 @@ func (r *Reconciler) doUpdateStatefulSet(
 	oldStatefulSet *apps.StatefulSet,
 	newStatefulSet *apps.StatefulSet,
 	host *api.Host,
+	opts *ReconcileOptions,
 ) common.ErrorCRUD {
 	log.V(2).M(host).F().P()
-
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// Apply newStatefulSet and wait for Generation to change
 	updatedStatefulSet, err := r.sts.Update(ctx, newStatefulSet)
 	if err != nil {
@@ -469,8 +438,9 @@ func (r *Reconciler) doUpdateStatefulSet(
 
 	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
-		log.V(1).M(host).F().Error("StatefulSet update wait failed. err: %v", err)
+	// StatefulSet updated, wait until host is launched
+	if err := r.waitHostStatefulSetToLaunch(ctx, host, opts); err != nil {
+		log.V(1).M(host).F().Error("StatefulSet update FAILED - wait for ready StatefulSet failed. err: %v", err)
 		return r.fallback.OnStatefulSetUpdateFailed(ctx, oldStatefulSet, host, r.sts)
 	}
 
@@ -480,11 +450,6 @@ func (r *Reconciler) doUpdateStatefulSet(
 
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
 func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// IMPORTANT
 	// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
 	// To achieve ordered and graceful termination of the pods in the StatefulSet,
@@ -516,7 +481,7 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 	}
 
 	// Wait until StatefulSet scales down to 0 pods count.
-	_ = r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host)
+	_ = r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host)
 
 	// And now delete empty StatefulSet
 	if err := r.sts.Delete(ctx, namespace, name); err == nil {

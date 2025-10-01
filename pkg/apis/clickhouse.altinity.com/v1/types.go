@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"sync"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,8 +47,10 @@ type ClickHouseInstallation struct {
 }
 
 type ClickHouseInstallationRuntime struct {
-	attributes        *ComparableAttributes `json:"-" yaml:"-"`
-	commonConfigMutex sync.Mutex            `json:"-" yaml:"-"`
+	attributes        *ComparableAttributes      `json:"-" yaml:"-"`
+	commonConfigMutex sync.Mutex                 `json:"-" yaml:"-"`
+	MinVersion        *swversion.SoftWareVersion `json:"-" yaml:"-"`
+	MaxVersion        *swversion.SoftWareVersion `json:"-" yaml:"-"`
 }
 
 func newClickHouseInstallationRuntime() *ClickHouseInstallationRuntime {
@@ -66,6 +69,20 @@ func (runtime *ClickHouseInstallationRuntime) LockCommonConfig() {
 
 func (runtime *ClickHouseInstallationRuntime) UnlockCommonConfig() {
 	runtime.commonConfigMutex.Unlock()
+}
+
+func (runtime *ClickHouseInstallationRuntime) HasReferenceSoftwareVersion() bool {
+	if runtime == nil {
+		return false
+	}
+	return runtime.MinVersion != nil
+}
+
+func (runtime *ClickHouseInstallationRuntime) GetReferenceSoftwareVersion() *swversion.SoftWareVersion {
+	if runtime.HasReferenceSoftwareVersion() {
+		return runtime.MinVersion
+	}
+	return nil
 }
 
 // +genclient

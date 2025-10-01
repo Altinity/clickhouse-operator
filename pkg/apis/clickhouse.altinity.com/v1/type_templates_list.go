@@ -14,16 +14,19 @@
 
 package v1
 
+import "github.com/altinity/clickhouse-operator/pkg/util"
+
 // TemplatesList defines references to .spec.templates to be used
 type TemplatesList struct {
-	HostTemplate            string `json:"hostTemplate,omitempty"            yaml:"hostTemplate,omitempty"`
-	PodTemplate             string `json:"podTemplate,omitempty"             yaml:"podTemplate,omitempty"`
-	DataVolumeClaimTemplate string `json:"dataVolumeClaimTemplate,omitempty" yaml:"dataVolumeClaimTemplate,omitempty"`
-	LogVolumeClaimTemplate  string `json:"logVolumeClaimTemplate,omitempty"  yaml:"logVolumeClaimTemplate,omitempty"`
-	ServiceTemplate         string `json:"serviceTemplate,omitempty"         yaml:"serviceTemplate,omitempty"`
-	ClusterServiceTemplate  string `json:"clusterServiceTemplate,omitempty"  yaml:"clusterServiceTemplate,omitempty"`
-	ShardServiceTemplate    string `json:"shardServiceTemplate,omitempty"    yaml:"shardServiceTemplate,omitempty"`
-	ReplicaServiceTemplate  string `json:"replicaServiceTemplate,omitempty"  yaml:"replicaServiceTemplate,omitempty"`
+	HostTemplate            string   `json:"hostTemplate,omitempty"            yaml:"hostTemplate,omitempty"`
+	PodTemplate             string   `json:"podTemplate,omitempty"             yaml:"podTemplate,omitempty"`
+	DataVolumeClaimTemplate string   `json:"dataVolumeClaimTemplate,omitempty" yaml:"dataVolumeClaimTemplate,omitempty"`
+	LogVolumeClaimTemplate  string   `json:"logVolumeClaimTemplate,omitempty"  yaml:"logVolumeClaimTemplate,omitempty"`
+	ServiceTemplate         string   `json:"serviceTemplate,omitempty"         yaml:"serviceTemplate,omitempty"`
+	ServiceTemplates        []string `json:"serviceTemplates,omitempty"        yaml:"serviceTemplates,omitempty"`
+	ClusterServiceTemplate  string   `json:"clusterServiceTemplate,omitempty"  yaml:"clusterServiceTemplate,omitempty"`
+	ShardServiceTemplate    string   `json:"shardServiceTemplate,omitempty"    yaml:"shardServiceTemplate,omitempty"`
+	ReplicaServiceTemplate  string   `json:"replicaServiceTemplate,omitempty"  yaml:"replicaServiceTemplate,omitempty"`
 
 	// VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate
 	// !!! DEPRECATED !!!
@@ -107,12 +110,54 @@ func (tl *TemplatesList) HasServiceTemplate() bool {
 	return len(tl.ServiceTemplate) > 0
 }
 
+// HasServiceTemplates checks whether service template is specified
+func (tl *TemplatesList) HasServiceTemplates() bool {
+	if tl == nil {
+		return false
+	}
+	return len(tl.ServiceTemplates) > 0
+}
+
+// HasAnyServiceTemplate checks whether any service template is specified
+func (tl *TemplatesList) HasAnyServiceTemplate() bool {
+	if tl == nil {
+		return false
+	}
+	return tl.HasServiceTemplate() || tl.HasServiceTemplates()
+}
+
 // GetServiceTemplate gets service template
 func (tl *TemplatesList) GetServiceTemplate() string {
 	if tl == nil {
 		return ""
 	}
 	return tl.ServiceTemplate
+}
+
+// GetServiceTemplates gets service templates
+func (tl *TemplatesList) GetServiceTemplates() []string {
+	if tl == nil {
+		return nil
+	}
+	return tl.ServiceTemplates
+}
+
+// GetAllServiceTemplates gets all service templates
+func (tl *TemplatesList) GetAllServiceTemplates() []string {
+	if tl == nil {
+		return nil
+	}
+	var res []string
+	if tl.HasServiceTemplate() {
+		res = util.MergeStringArrays(res, []string{tl.GetServiceTemplate()})
+	}
+	if tl.HasServiceTemplates() {
+		res = util.MergeStringArrays(res, tl.GetServiceTemplates())
+	}
+	if len(res) > 0 {
+		return res
+	}
+	return nil
 }
 
 // HasClusterServiceTemplate checks whether cluster service template is specified
@@ -213,6 +258,7 @@ func (tl *TemplatesList) mergeFromFillEmptyValues(from *TemplatesList) *Template
 	if tl.ServiceTemplate == "" {
 		tl.ServiceTemplate = from.ServiceTemplate
 	}
+	tl.ServiceTemplates = util.MergeStringArrays(tl.ServiceTemplates, from.ServiceTemplates)
 	if tl.ClusterServiceTemplate == "" {
 		tl.ClusterServiceTemplate = from.ClusterServiceTemplate
 	}
@@ -245,6 +291,7 @@ func (tl *TemplatesList) mergeFromOverwriteByNonEmptyValues(from *TemplatesList)
 	if from.ServiceTemplate != "" {
 		tl.ServiceTemplate = from.ServiceTemplate
 	}
+	tl.ServiceTemplates = util.MergeStringArrays(tl.ServiceTemplates, from.ServiceTemplates)
 	if from.ClusterServiceTemplate != "" {
 		tl.ClusterServiceTemplate = from.ClusterServiceTemplate
 	}

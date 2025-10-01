@@ -12,6 +12,9 @@ OPERATOR_INSTALL="${OPERATOR_INSTALL:-"yes"}"
 ONLY="${ONLY:-"*"}"
 MINIKUBE_RESET="${MINIKUBE_RESET:-""}"
 VERBOSITY="${VERBOSITY:-"2"}"
+# We may want run all tests to the end ignoring failed tests in the process
+RUN_ALL_TESTS="${RUN_ALL_TESTS:-""}"
+
 # Possible options are:
 #  1. operator
 #  2. keeper
@@ -128,8 +131,9 @@ if [[ ! -z "${MINIKUBE_PRELOAD_IMAGES}" ]]; then
     clickhouse/clickhouse-server:23.8
     clickhouse/clickhouse-server:24.3
     clickhouse/clickhouse-server:24.8
+    clickhouse/clickhouse-server:25.3
     clickhouse/clickhouse-server:latest
-    altinity/clickhouse-server:23.8.16.42.altinitystable
+    altinity/clickhouse-server:24.8.14.10459.altinitystable
     docker.io/zookeeper:3.8.4
     "
     for image in ${IMAGES}; do
@@ -157,4 +161,5 @@ OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
 OPERATOR_INSTALL="${OPERATOR_INSTALL}" \
 ONLY="${ONLY}" \
 KUBECTL_MODE="${KUBECTL_MODE}" \
+RUN_ALL_TESTS="${RUN_ALL_TESTS}" \
 "${CUR_DIR}/${EXECUTABLE}"

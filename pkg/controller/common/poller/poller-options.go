@@ -19,6 +19,7 @@ import (
 	"time"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
 const (
@@ -38,6 +39,14 @@ type Options struct {
 // NewOptions creates new poll options
 func NewOptions() *Options {
 	return &Options{}
+}
+
+func NewOptionsFromConfig(extraOpts ...*Options) *Options {
+	opts := NewOptions().FromConfig(chop.Config())
+	for _, opt := range extraOpts {
+		opts = opts.Merge(opt)
+	}
+	return opts
 }
 
 // Ensure ensures poll options do exist
@@ -67,5 +76,32 @@ func (o *Options) SetGetErrorTimeout(timeout time.Duration) *Options {
 		return nil
 	}
 	o.GetErrorTimeout = timeout
+	return o
+}
+
+// Merge merges options
+func (o *Options) Merge(from *Options) *Options {
+	if o == nil {
+		return nil
+	}
+	if from == nil {
+		return o
+	}
+
+	if from.StartBotheringAfterTimeout > 0 {
+		o.StartBotheringAfterTimeout = from.StartBotheringAfterTimeout
+	}
+	if from.GetErrorTimeout > 0 {
+		o.GetErrorTimeout = from.GetErrorTimeout
+	}
+	if from.Timeout > 0 {
+		o.Timeout = from.Timeout
+	}
+	if from.MainInterval > 0 {
+		o.MainInterval = from.MainInterval
+	}
+	if from.BackgroundInterval > 0 {
+		o.MainInterval = from.MainInterval
+	}
 	return o
 }

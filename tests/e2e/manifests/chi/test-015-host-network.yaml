@@ -10,6 +10,10 @@ spec:
       podTemplate: pod-distribution
 
   configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
     clusters:
       - name: default
         layout:
@@ -36,12 +40,11 @@ spec:
     podTemplates:
       - name: pod-distribution
         # podDistribution:
-        #  - type: CircularReplication
+        # - type: CircularReplication
         spec:
           hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
           containers:
             - name: clickhouse-pod
               image: clickhouse/clickhouse-server:24.8
 
-
-          # dnsPolicy: ClusterFirstWithHostNet

@@ -44,7 +44,7 @@ func (s *ClusterSchemer) shouldCreateDistributedObjects(host *api.Host) bool {
 // That includes all distributed tables, corresponding local tables and databases, if necessary
 func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(1).Info("ctx is done")
 		return nil, nil, nil
 	}
 

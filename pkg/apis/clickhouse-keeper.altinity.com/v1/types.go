@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"sync"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,8 @@ type ClickHouseKeeperInstallation struct {
 type ClickHouseKeeperInstallationRuntime struct {
 	attributes        *apiChi.ComparableAttributes `json:"-" yaml:"-"`
 	commonConfigMutex sync.Mutex                   `json:"-" yaml:"-"`
+	MinVersion        *swversion.SoftWareVersion   `json:"-" yaml:"-"`
+	MaxVersion        *swversion.SoftWareVersion   `json:"-" yaml:"-"`
 }
 
 func newClickHouseKeeperInstallationRuntime() *ClickHouseKeeperInstallationRuntime {

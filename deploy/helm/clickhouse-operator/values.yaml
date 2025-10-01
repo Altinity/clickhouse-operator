@@ -1,3 +1,12 @@
+namespaceOverride: ""
+# commonLabels -- set of labels that will be applied to all the resources for the operator
+commonLabels: {}
+# commonAnnotations -- set of annotations that will be applied to all the resources for the operator
+commonAnnotations: {}
+deployment:
+  # look details in `kubectl explain deployment.spec.strategy`
+  strategy:
+    type: Recreate
 operator:
   image:
     # operator.image.repository -- image repository
@@ -16,6 +25,9 @@ operator:
   #    cpu: 100m
   #    memory: 128Mi
 
+  # operator.priorityClassName -- priority class name for the clickhouse-operator deployment, check `kubectl explain pod.spec.priorityClassName` for details
+  # @default -- ""
+  priorityClassName: ""
   # operator.env -- additional environment variables for the clickhouse-operator container in deployment
   # possible format value `[{"name": "SAMPLE", "value": "text"}]`
   env: []
@@ -66,8 +78,10 @@ serviceAccount:
   # serviceAccount.name -- the name of the service account to use; if not set and create is true, a name is generated using the fullname template
   name:
 rbac:
-  # rbac.create -- specifies whether cluster roles and cluster role bindings should be created
+  # rbac.create -- specifies whether rbac resources should be created
   create: true
+  # rbac.namespaceScoped -- specifies whether to create roles and rolebindings at the cluster level or namespace level
+  namespaceScoped: false
 secret:
   # secret.create -- create a secret with operator credentials
   create: true
@@ -87,17 +101,28 @@ podSecurityContext: {}
 topologySpreadConstraints: []
 serviceMonitor:
   # serviceMonitor.enabled -- ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator)
+  # In serviceMonitor will be created two endpoints ch-metrics on port 8888 and op-metrics # 9999. Ypu can specify interval, scrapeTimeout, relabelings, metricRelabelings for each endpoint below
   enabled: false
   # serviceMonitor.additionalLabels -- additional labels for service monitor
   additionalLabels: {}
-  # serviceMonitor.interval --
-  interval: 30s
-  # serviceMonitor.scrapeTimeout -- Prometheus ServiceMonitor scrapeTimeout. If empty, Prometheus uses the global scrape timeout unless it is less than the target's scrape interval value in which the latter is used.
-  scrapeTimeout: ""
-  # serviceMonitor.relabelings -- Prometheus [RelabelConfigs] to apply to samples before scraping
-  relabelings: []
-  # serviceMonitor.metricRelabelings -- Prometheus [MetricRelabelConfigs] to apply to samples before ingestio
-  metricRelabelings: []
+  clickhouseMetrics:
+    # serviceMonitor.interval for ch-metrics endpoint --
+    interval: 30s
+    # serviceMonitor.scrapeTimeout for ch-metrics endpoint -- Prometheus ServiceMonitor scrapeTimeout. If empty, Prometheus uses the global scrape timeout unless it is less than the target's scrape interval value in which the latter is used.
+    scrapeTimeout: ""
+    # serviceMonitor.relabelings for ch-metrics endpoint -- Prometheus [RelabelConfigs] to apply to samples before scraping
+    relabelings: []
+    # serviceMonitor.metricRelabelings for ch-metrics endpoint -- Prometheus [MetricRelabelConfigs] to apply to samples before ingestio
+    metricRelabelings: []
+  operatorMetrics:
+    # serviceMonitor.interval for op-metrics endpoint --
+    interval: 30s
+    # serviceMonitor.scrapeTimeout for op-metrics endpoint -- Prometheus ServiceMonitor scrapeTimeout. If empty, Prometheus uses the global scrape timeout unless it is less than the target's scrape interval value in which the latter is used.
+    scrapeTimeout: ""
+    # serviceMonitor.relabelings for op-metrics endpoint -- Prometheus [RelabelConfigs] to apply to samples before scraping
+    relabelings: []
+    # serviceMonitor.metricRelabelings  for op-metrics endpoint -- Prometheus [MetricRelabelConfigs] to apply to samples before ingestio
+    metricRelabelings: []
 # configs -- clickhouse operator configs
 # @default -- check the `values.yaml` file for the config content (auto-generated from latest operator release)
 configs:
@@ -208,7 +233,6 @@ configs:
         # Concurrently running operators should watch on different namespaces.
         # IMPORTANT
         # Regexp is applicable.
-        #namespaces: ["dev", "test"]
         namespaces: []
       clickhouse:
         configuration:
@@ -298,10 +322,13 @@ configs:
                 - settings/macros/*: "no"
                 - settings/remote_servers/*: "no"
                 - settings/user_directories/*: "no"
+                # these settings should not lead to pod restarts
+                - settings/display_secrets_in_show_and_select: "no"
                 - zookeeper/*: "yes"
                 - files/*.xml: "yes"
                 - files/config.d/*.xml: "yes"
                 - files/config.d/*dict*.xml: "no"
+                - files/config.d/*no_restart*: "no"
                 # exceptions in default profile
                 - profiles/default/background_*_pool_size: "yes"
                 - profiles/default/max_*_for_server: "yes"
@@ -349,6 +376,56 @@ configs:
             connect: 1
             # Timout to perform SQL query from the operator to ClickHouse instances. In seconds.
             query: 4
+        ################################################
+        ##
+        ## Addons specifies additional configuration sections
+        ## Should it be called something like "templates"?
+        ##
+        ################################################
+        addons:
+          rules:
+            - version: "*"
+              spec:
+                configuration:
+                  users:
+                  profiles:
+                  quotas:
+                  settings:
+                  files:
+            - version: ">= 23.3"
+              spec:
+                configuration:
+                  ###
+                  ### users.d is global while description depends on CH version which may vary on per-host basis
+                  ### In case of global-ness this may be better to implement via auto-templates
+                  ###
+                  ### As a solution, this may be applied on the whole cluster based on any of its hosts
+                  ###
+                  ### What to do when host is just created? CH version is not known prior to CH started and user config is required before CH started.
+                  ### We do not have any info about the cluster on initial creation
+                  ###
+                  users:
+                    "{clickhouseOperatorUser}/access_management": 1
+                    "{clickhouseOperatorUser}/named_collection_control": 1
+                    "{clickhouseOperatorUser}/show_named_collections": 1
+                    "{clickhouseOperatorUser}/show_named_collections_secrets": 1
+                  profiles:
+                  quotas:
+                  settings:
+                  files:
+            - version: ">= 23.5"
+              spec:
+                configuration:
+                  users:
+                  profiles:
+                    clickhouse_operator/format_display_secrets_in_show_and_select: 1
+                  quotas:
+                  settings:
+                    ##
+                    ## this may be added on per-host basis into host's conf.d folder
+                    ##
+                    display_secrets_in_show_and_select: 1
+                  files:
         #################################################
         ##
         ## Metrics collection
@@ -390,8 +467,8 @@ configs:
         chi:
           # CHI template updates handling policy
           # Possible policy values:
-          #   - ReadOnStart. Accept CHIT updates on the operators start only.
-          #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+          #   - ReadOnStart. Accept CHIT updates on the operator's start only.
+          #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
           policy: ApplyOnNextReconcile
           # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
           # Templates are added to the list of all templates and used when CHI is reconciled.
@@ -401,7 +478,7 @@ configs:
           # CHK template updates handling policy
           # Possible policy values:
           #   - ReadOnStart. Accept CHIT updates on the operators start only.
-          #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+          #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
           policy: ApplyOnNextReconcile
           # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
           # Templates are added to the list of all templates and used when CHI is reconciled.
@@ -425,9 +502,9 @@ configs:
           #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
           # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
 
-          # Max number of concurrent shard reconciles within one CHI in progress
+          # Max number of concurrent shard reconciles within one cluster in progress
           reconcileShardsThreadsNumber: 5
-          # Max percentage of concurrent shard reconciles within one CHI in progress
+          # Max percentage of concurrent shard reconciles within one cluster in progress
           reconcileShardsMaxConcurrencyPercent: 50
         # Reconcile StatefulSet scenario
         statefulSet:
@@ -463,11 +540,31 @@ configs:
           #   - to be excluded from a ClickHouse cluster
           #   - to complete all running queries
           #   - to be included into a ClickHouse cluster
-          # respectfully before moving forward
+          # respectfully before moving forward with host reconcile
           wait:
             exclude: true
             queries: true
             include: false
+            # The operator during reconcile procedure should wait for replicas to catch-up
+            # replication delay a.k.a replication lag for the following replicas
+            replicas:
+              # All replicas (new and known earlier) are explicitly requested to wait for replication to catch-up
+              all: no
+              # New replicas only are requested to wait for replication to catch-up
+              new: yes
+              # Replication catch-up is considered to be completed as soon as replication delay
+              # a.k.a replication lag - calculated as "MAX(absolute_delay) FROM system.replicas"
+              # is within this specified delay (in seconds)
+              delay: 10
+            probes:
+              # Whether the operator during host launch procedure should wait for startup probe to succeed.
+              # In case probe is unspecified wait is assumed to be completed successfully.
+              # Default option value is to do not wait.
+              startup: no
+              # Whether the operator during host launch procedure should wait for readiness probe to succeed.
+              # In case probe is unspecified wait is assumed to be completed successfully.
+              # Default option value is to wait.
+              readiness: yes
       ################################################
       ##
       ## Annotations management section
@@ -763,13 +860,13 @@ additionalResources: []
 #    kind: ConfigMap
 #    metadata:
 #      name: {{ include "altinity-clickhouse-operator.fullname" . }}-cm
-#      namespace: {{ .Release.Namespace }}
+#      namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
 #  - |
 #     apiVersion: v1
 #     kind: Secret
 #     metadata:
 #       name: {{ include "altinity-clickhouse-operator.fullname" . }}-s
-#       namespace: {{ .Release.Namespace }}
+#       namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
 #     stringData:
 #       mykey: my-value
 #  - |
@@ -777,7 +874,7 @@ additionalResources: []
 #     kind: ClickHouseInstallation
 #     metadata:
 #       name: {{ include "altinity-clickhouse-operator.fullname" . }}-chi
-#       namespace: {{ .Release.Namespace }}
+#       namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
 #     spec:
 #       configuration:
 #         clusters:

@@ -31,8 +31,8 @@ import (
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
-	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -47,11 +47,13 @@ func NewCR(chopClient chopClientSet.Interface, kubeClient kube.Interface) *CR {
 	return &CR{
 		chopClient: chopClient,
 		kubeClient: kubeClient,
-		macro:      commonMacro.New(macro.List),
+		macro:      macro.New(),
 	}
 }
 
 func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResource, error) {
+	ctx = k8sCtx(ctx)
+
 	chi, err := c.getCR(ctx, namespace, name)
 	if err != nil {
 		return nil, err
@@ -65,10 +67,12 @@ func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResour
 }
 
 func (c *CR) getCR(ctx context.Context, namespace, name string) (*api.ClickHouseInstallation, error) {
+	ctx = k8sCtx(ctx)
 	return c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *CR) getCM(ctx context.Context, chi api.ICustomResource) (*core.ConfigMap, error) {
+	ctx = k8sCtx(ctx)
 	return NewConfigMap(c.kubeClient).Get(ctx, c.buildCMNamespace(chi), c.buildCMName(chi))
 }
 
@@ -99,7 +103,7 @@ func (c *CR) buildCR(chi *api.ClickHouseInstallation, cm *core.ConfigMap) *api.C
 // StatusUpdate updates CR object's Status
 func (c *CR) StatusUpdate(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return nil
 	}
 
@@ -130,7 +134,7 @@ func (c *CR) statusUpdateRetry(ctx context.Context, cr api.ICustomResource, opts
 // statusUpdateProcess updates CR object's Status
 func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", icr.GetName())
 		return nil
 	}
 
@@ -197,30 +201,51 @@ func (c *CR) statusUpdate(ctx context.Context, chi *api.ClickHouseInstallation) 
 }
 
 func (c *CR) buildResources(chi *api.ClickHouseInstallation) (*api.ClickHouseInstallation, *core.ConfigMap) {
-	var normalized, normalizedCompleted []byte
-	if chi.Status.NormalizedCR != nil {
-		normalized, _ = json.Marshal(chi.Status.NormalizedCR)
-	}
-	if chi.Status.NormalizedCRCompleted != nil {
-		normalizedCompleted, _ = json.Marshal(chi.Status.NormalizedCRCompleted)
-	}
-
+	// Build required components
+	normalized, normalizedCompleted := c.buildNormalized(chi)
 	tagger := managers.NewTagManager(managers.TagManagerTypeClickHouse, chi)
+	namespace, name := c.buildNamespaceName(chi)
+
+	// Build ConfigMap
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace:   c.buildCMNamespace(chi),
-			Name:        c.buildCMName(chi),
-			Labels:      c.macro.Scope(chi).Map(tagger.Label(interfaces.LabelConfigMapStorage)),
-			Annotations: c.macro.Scope(chi).Map(tagger.Annotate(interfaces.AnnotateConfigMapStorage)),
+			Namespace:       namespace,
+			Name:            name,
+			Labels:          c.macro.Scope(chi).Map(tagger.Label(interfaces.LabelConfigMapStorage)),
+			Annotations:     c.macro.Scope(chi).Map(tagger.Annotate(interfaces.AnnotateConfigMapStorage)),
+			OwnerReferences: creator.NewOwnerReferencer().CreateOwnerReferences(chi),
 		},
 		Data: map[string]string{
-			statusNormalized:          string(normalized),
-			statusNormalizedCompleted: string(normalizedCompleted),
+			statusNormalized:          normalized,
+			statusNormalizedCompleted: normalizedCompleted,
 		},
 	}
+
+	// Finalize resources
+	c.postprocessNormalized(chi)
+
+	return chi, cm
+}
+
+func (c *CR) buildNamespaceName(chi *api.ClickHouseInstallation) (string, string) {
+	return c.buildCMNamespace(chi), c.buildCMName(chi)
+}
+
+func (c *CR) buildNormalized(chi *api.ClickHouseInstallation) (normalized string, normalizedCompleted string) {
+	if chi.Status.NormalizedCR != nil {
+		bytes, _ := json.Marshal(chi.Status.NormalizedCR)
+		normalized = string(bytes)
+	}
+	if chi.Status.NormalizedCRCompleted != nil {
+		bytes, _ := json.Marshal(chi.Status.NormalizedCRCompleted)
+		normalizedCompleted = string(bytes)
+	}
+	return normalized, normalizedCompleted
+}
+
+func (c *CR) postprocessNormalized(chi *api.ClickHouseInstallation) {
 	chi.Status.NormalizedCR = nil
 	chi.Status.NormalizedCRCompleted = nil
-	return chi, cm
 }
 
 func (c *CR) statusUpdateCR(ctx context.Context, chi *api.ClickHouseInstallation) error {

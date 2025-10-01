@@ -1,0 +1,208 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-cert
+type: Opaque
+stringData:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDETCCAfmgAwIBAgIUU3gzeBiW1NUIwfI3WXP+5Mqt9d4wDQYJKoZIhvcNAQEL
+    BQAwGDEWMBQGA1UEAwwNQ2xpY2tIb3VzZSBDQTAeFw0yNTA2MDYxMjAwMjhaFw0z
+    NTA2MDQxMjAwMjhaMBgxFjAUBgNVBAMMDUNsaWNrSG91c2UgQ0EwggEiMA0GCSqG
+    SIb3DQEBAQUAA4IBDwAwggEKAoIBAQDJTN0iu/lvMwTDdygT+h/yXXjZwYJB1aDR
+    oItEWUoc1KfcKFkzk2I3hAbUWzcT3ErhmS1KNBc015MvXTnbTgpItt5xA2lmD39K
+    6bEG8SZ6MFs/RLR2TxYfQw8SNB87//OBHmNrgWK3l4ugFLS8JknZSufxgKUcHaeR
+    2twByCZREPPJFCfo2SAqytBlAHNd9llX7dPj9xgMd1Y7N+hvRF0OJRI5OOjSQtaU
+    ZBuNJJ+kE+oqg5trntGITENO6zxkHZnE6BMDfJ/txrbn6b2sRO5KFcdYsj1fJF0c
+    Z/aGHXLD7F5/Td9RizexzHmvJZX33xaFwzcrdHzWQMDbOKoqZ3/ZAgMBAAGjUzBR
+    MB0GA1UdDgQWBBSYojLVahNEb7YowNC1FYwVBpIZNTAfBgNVHSMEGDAWgBSYojLV
+    ahNEb7YowNC1FYwVBpIZNTAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUA
+    A4IBAQAZv34opKnIcbGXP/ctb/ioHdUqwAwFPw9O1ybjSYka+cQIAzeADaY0ASSs
+    mn8AuT+tgXgBsUXGB7egwx0VHKfsI7xQorS7RG8c8+2oC+kKqN+TFXsFAQQnqudk
+    qU7YhpT2FF2KC2mb2LedUHyBPaK/nKkG6M+G0MREUSXhArr/XUodkfdJqK/t+u9u
+    O5fLDQaXEYoO2Gm8C2ViNz3vW0w+PRBMzzLcCW9AobLXimI0oFLJP1Caf2y9Raci
+    dRoEvdP6i8mtmZSWPxdNlbGj9CLlOE93b+iOfV/qFXFjRNsdp3SCjrslxF/g0MFD
+    yXkW7KPPI4E/HUGoGHztgc7mPm/g
+    -----END CERTIFICATE-----
+  tls.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDCTCCAfGgAwIBAgIURnafS7B8qMu95XtrLOY/hZpIZkUwDQYJKoZIhvcNAQEL
+    BQAwGDEWMBQGA1UEAwwNQ2xpY2tIb3VzZSBDQTAeFw0yNTA2MDYxMjAxMzhaFw0y
+    NjA2MDYxMjAxMzhaMCExHzAdBgNVBAMMFmNsaWNraG91c2UtY2xpZW50LWNlcnQw
+    ggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCSzqDqE22Kl8RK3HXylImf
+    r2osUbTkKcqjj+U3ui648qUfcNyrkQsG/Z11wejHwvU9zk/6/6eaL2uziLURhz5q
+    2ydSnIUE2QvA9bzsmnSIpq2ZgxTuSTQ7oxN772PcpNN2bmlDuNVFJqntOr+nUJXR
+    FIL3lXSr54oDuhI3AEmLbD7fcjLFjZyCSl2t3TdWjDSpUa3eAR7aa8vdalI5A+u8
+    GfLgA/wDhZD0GhI8MMftl2MBqMSpjPG8YdB56Lzx/4bHTi+slkrOYzkzT0mVB18g
+    XctFRa7tuEQphl9Afmaw2dtyBxLIZBb6rBKOj39Nq53JAKJL+Ht060vEh9fUVlXr
+    AgMBAAGjQjBAMB0GA1UdDgQWBBRMNQx+de3kszmaCpz2ha1apUOlNzAfBgNVHSME
+    GDAWgBSYojLVahNEb7YowNC1FYwVBpIZNTANBgkqhkiG9w0BAQsFAAOCAQEABfoy
+    aQQ+hjEhz47l78iTxNH+gT9NcHEcswF5qXoUXa27uX/0CM5pdeVfzM74tXjIhrQC
+    Xf2tWvZGgPseRTUHk7E+AqyJPGMqQsPGDO56mrXMQatMqMT8yfhROVs8NV8tUu+C
+    cR49CXouei5WzzEYdKxU2FakzdsxFIbOnl7PJp8Oht263ITZ9EpXGfwFzl/uPmij
+    M6Wy4WHJTHlnbZjXYJ4UwfiDnLmfdZG0GCd/xd0WPTeRZKuKzbrr6sLJvfctrBOH
+    K5HKfa6vZE2rqrXN7qqdiOKS59Ac7mC5eUy6Ow5TLQf8mJfK4efVGS7E4Y5xiDdi
+    /QDal8Ep+/iprqwEng==
+    -----END CERTIFICATE-----
+  tls.key: |
+    -----BEGIN PRIVATE KEY-----
+    MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCSzqDqE22Kl8RK
+    3HXylImfr2osUbTkKcqjj+U3ui648qUfcNyrkQsG/Z11wejHwvU9zk/6/6eaL2uz
+    iLURhz5q2ydSnIUE2QvA9bzsmnSIpq2ZgxTuSTQ7oxN772PcpNN2bmlDuNVFJqnt
+    Or+nUJXRFIL3lXSr54oDuhI3AEmLbD7fcjLFjZyCSl2t3TdWjDSpUa3eAR7aa8vd
+    alI5A+u8GfLgA/wDhZD0GhI8MMftl2MBqMSpjPG8YdB56Lzx/4bHTi+slkrOYzkz
+    T0mVB18gXctFRa7tuEQphl9Afmaw2dtyBxLIZBb6rBKOj39Nq53JAKJL+Ht060vE
+    h9fUVlXrAgMBAAECggEALCFh/MtXR+ykTI6mBARDtJVh+K2dD2NCr1U/pbdZeS4z
+    ldZy9z30Dydo0G+4XmhMGUauAzkbtD0iBoeHSpwZlryHPw2e7Nyj7F7SaltpwXQ9
+    RiLBxXmK8oxsfHpzTe3cRUMecIWc0pszRIU+/Hg8eOvODMfIGS7SbZlfBVqYQQkV
+    vMeCRrLj81IHah2lyRujR9HoJXDY3xBj2EYEMasV81vJj3D60JnBxoC98zt9sx5N
+    2aR6p9c6piRU0jvLhDb0SlXy65qsDDIA5oyR7fk2HVTiO5xXBfI6zKVmRTdAEd9/
+    bGLwJHaWg9Cvb4znC/Mz4ickVnOLIvWrfc4A5i9s9QKBgQDOPFvWQ5E+3TdzWj+5
+    k2365ZuTC3XjP8LNF7IMB6/UVv7j+o6ym6wPp0iNhWdLC5MG9ytThPGVVH92hZx8
+    35h1UTM6Z6xSO8Pf3mVBtHQuyActCsXfxU2R/7+UmBJwwBYlCpMFcbFrHxYPVGSI
+    5qv1q0wJNVpOfomHjNdXMeOn3QKBgQC2Ozs57tU2DdYpnWrM9f4uszz+33/kF9wS
+    Vw9F/tCaonM4l871h/BYPYK08ZucfaWQezoRT2meJ1PJxZz+1Rgw4o/DXogWVQOx
+    JFjmovI+P6y02H46h0skUoMSRq6/zAIneLmV9xFWVB8JjxvtL0FOvA6oO3qEb3zP
+    EX+YPJ48ZwKBgQDFpeL9vVN9w9RYoK1h1IEaauJmUh1w5LJ0i7j+/n7sKVOueXo4
+    giir9834k1ki+ry1eDv1lvtP+eMOW45VvpQGGwPVfXYQeWaHLkQsbBzMmLcH28M3
+    aYel3ExmxDcoB28xoKi2FvfJiclCd8bBzRAQKVJ9oLwjbfGwDrJxxkY/oQKBgQCW
+    KmcazUGrImnJryuULF3CM/dee+RSnIrAHje60UkrNBTInOhxkgyvWji8TKCTq0Jk
+    tfbaztrU9clo6sv9frJJjlkzgFGaPYImVjJgFASU4Tm7aO9T4as9CjVyOQbFjCJ2
+    Tlh4SLljrzxIT0KPCDLD49ocLa8/NPPfWqcPV1x5nwKBgDUQcT5b3RMJoLrj9e1+
+    QuOqY51P9mrUAVLWNLNbFv+HVn/lHgDrKmHeeE4XprX2yyszhxcmsAUYaMwgbc9H
+    Zb86eFsZywoX3W0ej9Elf4UMEKuW0Cm12mZPYhSzmRV+IEeTmj4hPRFWy4NN6TxV
+    7Sqg81GZ5qAVVBbsfkZzpFty
+    -----END PRIVATE KEY-----
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: secure-ssl-with-ssl-client-auth
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:latest
+              imagePullPolicy: IfNotPresent
+  configuration:
+    clusters:
+      - name: cluster1
+        secure: "yes"
+    users:
+      # password shouldn't be specified in case of SSL auth
+      user1/ssl_certificates/common_name: clickhouse-client-cert
+      user1/networks/ip: "::/0"
+    settings:
+      # tcp_port: 9000 # keep for localhost
+      tcp_port_secure: 9440
+      https_port: 8443
+    files:
+      openssl.xml: |
+        <clickhouse>
+          <openSSL>
+            <server>
+              <loadDefaultCAFile>false</loadDefaultCAFile>
+              <caConfig>/etc/clickhouse-server/secrets.d/ca.crt/clickhouse-cert/ca.crt</caConfig>
+              <certificateFile>/etc/clickhouse-server/secrets.d/server.crt/clickhouse-cert/tls.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/secrets.d/server.key/clickhouse-cert/tls.key</privateKeyFile>
+              <cacheSessions>true</cacheSessions>
+              <verificationMode>strict</verificationMode>
+              <preferServerCiphers>true</preferServerCiphers>
+            </server>
+          </openSSL>
+        </clickhouse>
+      openssl_client.xml: |
+        <clickhouse>
+          <openSSL>
+            <client>
+              <loadDefaultCAFile>false</loadDefaultCAFile>
+              <caConfig>/etc/clickhouse-server/secrets.d/ca.crt/clickhouse-cert/ca.crt</caConfig>
+              <certificateFile>/etc/clickhouse-server/secrets.d/server.crt/clickhouse-cert/tls.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/secrets.d/server.key/clickhouse-cert/tls.key</privateKeyFile>
+              <cacheSessions>true</cacheSessions>
+              <verificationMode>strict</verificationMode>
+              <invalidCertificateHandler>
+                <name>RejectCertificateHandler</name>
+              </invalidCertificateHandler>
+            </client>
+          </openSSL>
+        </clickhouse>
+      ca.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-cert
+            key: ca.crt
+      server.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-cert
+            key: tls.crt
+      server.key:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-cert
+            key: tls.key
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "secure-ssl-client-config"
+data:
+  config.xml: |
+    <config>
+        <openSSL>
+            <client>
+                <loadDefaultCAFile>false</loadDefaultCAFile>
+                <caConfig>/etc/clickhouse-client/secrets.d/ca.crt/clickhouse-cert/ca.crt</caConfig>
+                <certificateFile>/etc/clickhouse-client/certs/tls.crt</certificateFile>
+                <privateKeyFile>/etc/clickhouse-client/certs/tls.key</privateKeyFile>
+                <verificationMode>strict</verificationMode>
+                <invalidCertificateHandler>
+                    <name>RejectCertificateHandler</name>
+                </invalidCertificateHandler>
+            </client>
+        </openSSL>
+      <port>9440</port>
+      <secure>1</secure>
+    </config>
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "secure-ssl-client"
+spec:
+  containers:
+    - name: clickhouse-client
+      image: clickhouse/clickhouse-server:latest
+      command: [ "/bin/sh", "-c", "sleep 3600" ]
+      volumeMounts:
+        - name: config
+          mountPath: "/etc/clickhouse-client/"
+        - name: certs
+          mountPath: "/etc/clickhouse-client/certs/"
+  volumes:
+    - name: config
+      configMap:
+        name: secure-ssl-client-config
+        items:
+          - key: config.xml
+            path: config.xml
+    - name: certs
+      configMap:
+        name: clickhouse-cert
+
+# Use separate client certificate in production
+# These commands will help to create certs bundle (use ca.crt, tls.crt, tls.key):
+#    openssl genrsa -out ca.key 2048
+#    openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "/CN=ClickHouse CA"
+#    openssl genrsa -out tls.key 2048
+#    openssl req -new -key tls.key -out tls.csr -subj "/CN=clickhouse-client-cert"
+#    openssl x509 -req -in tls.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out tls.crt -days 365 -sha256
+# Run on client
+# kubectl -n dev exec secure-ssl-client -- clickhouse-client -h chi-secure-ssl-cluster1-0-0 --secure --port 9440 --user=user1 -q 'select 1000'

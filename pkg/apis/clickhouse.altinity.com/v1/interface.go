@@ -30,8 +30,8 @@ type ICustomResource interface {
 	GetSpecA() any
 	GetSpec() ICRSpec
 	GetRuntime() ICustomResourceRuntime
-	GetRootServiceTemplate() (*ServiceTemplate, bool)
-	GetReconciling() *Reconciling
+	GetRootServiceTemplates() ([]*ServiceTemplate, bool)
+	GetReconcile() *ChiReconcile
 
 	WalkClusters(f func(cluster ICluster) error) []error
 	WalkHosts(func(host *Host) error) []error
@@ -67,6 +67,7 @@ type ICRSpec interface {
 	GetNamespaceDomainPattern() *types.String
 	GetDefaults() *Defaults
 	GetConfiguration() IConfiguration
+	GetTaskID() *types.Id
 }
 
 type IConfiguration interface {
@@ -92,7 +93,9 @@ type IStatus interface {
 	GetHostsCompletedCount() int
 	GetHostsAddedCount() int
 	GetHostsWithTablesCreated() []string
+	GetHostsWithReplicaCaughtUp() []string
 	PushHostTablesCreated(host string)
+	PushHostReplicaCaughtUp(host string)
 
 	HasNormalizedCRCompleted() bool
 
@@ -108,11 +111,13 @@ type ICluster interface {
 	IsZero() bool
 
 	GetName() string
+	HasName() bool
 	GetZookeeper() *ZookeeperConfig
 	GetSchemaPolicy() *SchemaPolicy
 	GetInsecure() *types.StringBool
 	GetSecure() *types.StringBool
 	GetSecret() *ClusterSecret
+	GetPDBManaged() *types.StringBool
 	GetPDBMaxUnavailable() *types.Int32
 
 	WalkShards(f func(index int, shard IShard) error) []error
@@ -123,9 +128,10 @@ type ICluster interface {
 	FindShard(needle interface{}) IShard
 	FindHost(needleShard interface{}, needleHost interface{}) *Host
 
-	IsShardSpecified() bool
+	SelectSettingsSourceFrom(shard IShard, replica IReplica) any
 
 	GetRuntime() IClusterRuntime
+	GetReconcile() ClusterReconcile
 	GetServiceTemplate() (*ServiceTemplate, bool)
 	GetAncestor() ICluster
 }
@@ -271,3 +277,8 @@ type WalkHostsAddressFn func(
 	host IHost,
 	address *types.HostScopeAddress,
 ) error
+
+type IGenerateName interface {
+	HasGenerateName() bool
+	GetGenerateName() string
+}

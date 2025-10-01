@@ -21,6 +21,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type IConfigMapManager interface {
@@ -48,6 +49,7 @@ type IMacro interface {
 	Scope(scope any) IMacro
 	Line(line string) string
 	Map(_map map[string]string) map[string]string
+	Replacer() *util.Replacer
 }
 
 type ILabeler interface {
@@ -72,8 +74,10 @@ type IVolumeManager interface {
 type IContainerManager interface {
 	NewDefaultAppContainer(host *api.Host) core.Container
 	GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool)
+	GetAppImageTag(statefulSet *apps.StatefulSet) (string, bool)
 	EnsureAppContainer(statefulSet *apps.StatefulSet, host *api.Host)
 	EnsureLogContainer(statefulSet *apps.StatefulSet)
+	SetupAdditionalEnvVars(host *api.Host, container *core.Container)
 }
 
 type IProbeManager interface {
@@ -81,7 +85,7 @@ type IProbeManager interface {
 }
 
 type IServiceManager interface {
-	CreateService(what ServiceType, params ...any) *core.Service
+	CreateService(what ServiceType, params ...any) util.Slice[*core.Service]
 	SetCR(cr api.ICustomResource)
 	SetTagger(tagger ITagger)
 }
@@ -100,9 +104,10 @@ type ICreator interface {
 		host *api.Host,
 		template *api.VolumeClaimTemplate,
 	) *core.PersistentVolumeClaim
-	CreateClusterSecret(name string) *core.Secret
-	CreateService(what ServiceType, params ...any) *core.Service
+	CreateClusterSecret(cluster api.ICluster) *core.Secret
+	CreateService(what ServiceType, params ...any) util.Slice[*core.Service]
 	CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet
+	GetAppImageTag(host *api.Host) (string, bool)
 }
 
 type IEventEmitter interface {

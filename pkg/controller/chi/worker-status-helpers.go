@@ -20,6 +20,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -37,44 +38,44 @@ func (w *worker) isJustStarted() bool {
 	return time.Since(w.start) < timeToStart
 }
 
-func (w *worker) isPodCrushed(host *api.Host) bool {
-	if pod, err := w.c.kube.Pod().Get(host); err == nil {
+func (w *worker) isPodCrushed(ctx context.Context, host *api.Host) bool {
+	if pod, err := w.c.kube.Pod().Get(ctx, host); err == nil {
 		return k8s.PodHasCrushedContainers(pod)
 	}
 	return true
 }
 
 func (w *worker) isPodReady(ctx context.Context, host *api.Host) bool {
-	if pod, err := w.c.kube.Pod().Get(host); err == nil {
+	if pod, err := w.c.kube.Pod().Get(ctx, host); err == nil {
 		return !k8s.PodHasNotReadyContainers(pod)
 	}
 	return false
 }
 
 func (w *worker) isPodStarted(ctx context.Context, host *api.Host) bool {
-	if pod, err := w.c.kube.Pod().Get(host); err == nil {
+	if pod, err := w.c.kube.Pod().Get(ctx, host); err == nil {
 		return k8s.PodHasAllContainersStarted(pod)
 	}
 	return false
 }
 
 func (w *worker) isPodRunning(ctx context.Context, host *api.Host) bool {
-	if pod, err := w.c.kube.Pod().Get(host); err == nil {
+	if pod, err := w.c.kube.Pod().Get(ctx, host); err == nil {
 		return k8s.PodPhaseIsRunning(pod)
 	}
 	return false
 }
 
 func (w *worker) isPodOK(ctx context.Context, host *api.Host) bool {
-	if pod, err := w.c.kube.Pod().Get(host); err == nil {
+	if pod, err := w.c.kube.Pod().Get(ctx, host); err == nil {
 		return k8s.IsPodOK(pod)
 	}
 	return false
 }
 
-func (w *worker) isPodRestarted(ctx context.Context, host *api.Host, start map[string]int) bool {
-	cur, _ := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(host)
-	return !util.MapsAreTheSame(start, cur)
+func (w *worker) isPodRestarted(ctx context.Context, host *api.Host, initialRestartCounters map[string]int) bool {
+	curRestartCounters, _ := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(ctx, host)
+	return !util.MapsAreTheSame(initialRestartCounters, curRestartCounters)
 }
 
 func (w *worker) doesHostHaveNoRunningQueries(ctx context.Context, host *api.Host) bool {
@@ -82,9 +83,15 @@ func (w *worker) doesHostHaveNoRunningQueries(ctx context.Context, host *api.Hos
 	return n <= 1
 }
 
+func (w *worker) doesHostHaveNoReplicationDelay(ctx context.Context, host *api.Host) bool {
+	delay, _ := w.ensureClusterSchemer(host).HostMaxReplicaDelay(ctx, host)
+	log.V(1).Info("replication lag %d host: %s", delay, host.GetName())
+	return delay <= chop.Config().Reconcile.Host.Wait.Replicas.Delay.IntValue()
+}
+
 // isCHIProcessedOnTheSameIP checks whether it is just a restart of the operator on the same IP
 func (w *worker) isCHIProcessedOnTheSameIP(chi *api.ClickHouseInstallation) bool {
-	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
+	ip, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_IP)
 	operatorIpIsTheSame := ip == chi.Status.GetCHOpIP()
 	log.V(1).Info("Operator IPs to process CHI: %s. Previous: %s Cur: %s", chi.Name, chi.Status.GetCHOpIP(), ip)
 
@@ -163,7 +170,7 @@ func (w *worker) isAfterFinalizerInstalled(old, new *api.ClickHouseInstallation)
 	return w.isGenerationTheSame(old, new) && finalizerIsInstalled
 }
 
-// isGenerationTheSame checks whether old ans new CHI have the same generation
+// isGenerationTheSame checks whether old and new CHI have the same generation
 func (w *worker) isGenerationTheSame(old, new *api.ClickHouseInstallation) bool {
 	if !w.areUsableOldAndNew(old, new) {
 		return false
@@ -178,8 +185,8 @@ func (w *worker) getRemoteServersGeneratorOptions() *commonConfig.HostSelector {
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
-		api.NewHostReconcileAttributes().
-			SetAdd().
+		types.NewReconcileAttributes().
+			SetStatus(types.ObjectStatusRequested).
 			SetExclude(),
 	)
 }

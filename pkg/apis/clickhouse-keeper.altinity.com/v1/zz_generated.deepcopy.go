@@ -124,7 +124,7 @@ func (in *ChkReplica) DeepCopyInto(out *ChkReplica) {
 	if in.Templates != nil {
 		in, out := &in.Templates, &out.Templates
 		*out = new(clickhousealtinitycomv1.TemplatesList)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Hosts != nil {
 		in, out := &in.Hosts, &out.Hosts
@@ -215,7 +215,7 @@ func (in *ChkShard) DeepCopyInto(out *ChkShard) {
 	if in.Templates != nil {
 		in, out := &in.Templates, &out.Templates
 		*out = new(clickhousealtinitycomv1.TemplatesList)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Hosts != nil {
 		in, out := &in.Hosts, &out.Hosts
@@ -285,7 +285,7 @@ func (in *ChkSpec) DeepCopyInto(out *ChkSpec) {
 	*out = *in
 	if in.TaskID != nil {
 		in, out := &in.TaskID, &out.TaskID
-		*out = new(types.String)
+		*out = new(types.Id)
 		**out = **in
 	}
 	if in.NamespaceDomainPattern != nil {
@@ -300,7 +300,12 @@ func (in *ChkSpec) DeepCopyInto(out *ChkSpec) {
 	}
 	if in.Reconciling != nil {
 		in, out := &in.Reconciling, &out.Reconciling
-		*out = new(clickhousealtinitycomv1.Reconciling)
+		*out = new(clickhousealtinitycomv1.ChiReconcile)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Reconcile != nil {
+		in, out := &in.Reconcile, &out.Reconcile
+		*out = new(clickhousealtinitycomv1.ChiReconcile)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Defaults != nil {
@@ -412,6 +417,14 @@ func (in *ClickHouseKeeperInstallationRuntime) DeepCopyInto(out *ClickHouseKeepe
 		(*in).DeepCopyInto(*out)
 	}
 	out.commonConfigMutex = in.commonConfigMutex
+	if in.MinVersion != nil {
+		in, out := &in.MinVersion, &out.MinVersion
+		*out = (*in).DeepCopy()
+	}
+	if in.MaxVersion != nil {
+		in, out := &in.MaxVersion, &out.MaxVersion
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 
@@ -441,13 +454,24 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 	if in.Templates != nil {
 		in, out := &in.Templates, &out.Templates
 		*out = new(clickhousealtinitycomv1.TemplatesList)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Layout != nil {
 		in, out := &in.Layout, &out.Layout
 		*out = new(ChkClusterLayout)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.PDBManaged != nil {
+		in, out := &in.PDBManaged, &out.PDBManaged
+		*out = new(types.StringBool)
+		**out = **in
+	}
+	if in.PDBMaxUnavailable != nil {
+		in, out := &in.PDBMaxUnavailable, &out.PDBMaxUnavailable
+		*out = new(types.Int32)
+		**out = **in
+	}
+	in.Reconcile.DeepCopyInto(&out.Reconcile)
 	in.Runtime.DeepCopyInto(&out.Runtime)
 	return
 }
@@ -512,6 +536,11 @@ func (in *FillStatusParams) DeepCopyInto(out *FillStatusParams) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Endpoints != nil {
+		in, out := &in.Endpoints, &out.Endpoints
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.NormalizedCR != nil {
 		in, out := &in.NormalizedCR, &out.NormalizedCR
 		*out = new(ClickHouseKeeperInstallation)
@@ -568,6 +597,11 @@ func (in *Status) DeepCopyInto(out *Status) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Endpoints != nil {
+		in, out := &in.Endpoints, &out.Endpoints
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.NormalizedCR != nil {
 		in, out := &in.NormalizedCR, &out.NormalizedCR
 		*out = new(ClickHouseKeeperInstallation)
@@ -580,6 +614,11 @@ func (in *Status) DeepCopyInto(out *Status) {
 	}
 	if in.HostsWithTablesCreated != nil {
 		in, out := &in.HostsWithTablesCreated, &out.HostsWithTablesCreated
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.HostsWithReplicaCaughtUp != nil {
+		in, out := &in.HostsWithReplicaCaughtUp, &out.HostsWithReplicaCaughtUp
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

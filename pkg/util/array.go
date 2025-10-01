@@ -31,11 +31,11 @@ func InArray(needle string, haystack []string) bool {
 	return false
 }
 
-// InArrayWithRegexp checks whether the needle can be matched by haystack
-func InArrayWithRegexp(needle string, haystack []string) bool {
-	for _, item := range haystack {
-		matched, _ := regexp.MatchString(item, needle)
-		if item == needle || matched {
+// MatchArrayOfRegexps checks whether the needle can be matched by haystack
+func MatchArrayOfRegexps(needle string, haystack []string) bool {
+	for _, pattern := range haystack {
+		matched, _ := regexp.MatchString(pattern, needle)
+		if pattern == needle || matched {
 			return true
 		}
 	}
@@ -176,4 +176,29 @@ func ConcatSlices[T any](slices [][]T) []T {
 	}
 
 	return result
+}
+
+// SliceDistinct returns distinct slice
+func SliceDistinct[T comparable](slice []T) (distinct []T) {
+	m := make(map[T]struct{}, len(slice))
+	for _, i := range slice {
+		if _, ok := m[i]; !ok {
+			m[i] = struct{}{}
+			distinct = append(distinct, i)
+		}
+	}
+
+	return distinct
+}
+
+func SlicesIntersect[T comparable](a, b []T) (intersection []T) {
+	bDistinct := SliceDistinct(b)
+	for _, i := range SliceDistinct(a) {
+		for _, j := range bDistinct {
+			if i == j {
+				intersection = append(intersection, i)
+			}
+		}
+	}
+	return intersection
 }

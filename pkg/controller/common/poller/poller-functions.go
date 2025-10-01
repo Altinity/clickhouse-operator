@@ -20,9 +20,10 @@ import (
 )
 
 type Functions struct {
-	Get            func(context.Context) (any, error)
-	IsDone         func(context.Context, any) bool
-	ShouldContinue func(context.Context, any, error) bool
+	Get                      func(context.Context) (any, error)
+	IsDone                   func(context.Context, any) bool
+	ShouldContinueOnGetError func(context.Context, any, error) bool
+	Background               func(context.Context)
 }
 
 func (p *Functions) CallGet(ctx context.Context) (any, error) {
@@ -49,12 +50,18 @@ func (p *Functions) CallShouldContinue(ctx context.Context, a any, e error) bool
 	if p == nil {
 		return false
 	}
-	if p.ShouldContinue == nil {
+	if p.ShouldContinueOnGetError == nil {
 		return false
 	}
-	return p.ShouldContinue(ctx, a, e)
+	return p.ShouldContinueOnGetError(ctx, a, e)
 }
 
-type BackgroundFunctions struct {
-	F func(context.Context)
+func (p *Functions) CallBackground(ctx context.Context) {
+	if p == nil {
+		return
+	}
+	if p.Background == nil {
+		return
+	}
+	p.Background(ctx)
 }

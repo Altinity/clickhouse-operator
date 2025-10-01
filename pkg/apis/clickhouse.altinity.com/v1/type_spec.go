@@ -20,14 +20,15 @@ import (
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	TaskID                 *types.String     `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	TaskID                 *types.Id         `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
 	Stop                   *types.StringBool `json:"stop,omitempty"                   yaml:"stop,omitempty"`
 	Restart                *types.String     `json:"restart,omitempty"                yaml:"restart,omitempty"`
 	Troubleshoot           *types.StringBool `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
 	Suspend                *types.StringBool `json:"suspend,omitempty"                yaml:"suspend,omitempty"`
 	NamespaceDomainPattern *types.String     `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating    `json:"templating,omitempty"             yaml:"templating,omitempty"`
-	Reconciling            *Reconciling      `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Reconciling            *ChiReconcile     `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Reconcile              *ChiReconcile     `json:"reconcile,omitempty"              yaml:"reconcile,omitempty"`
 	Defaults               *Defaults         `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
 	Configuration          *Configuration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates              *Templates        `json:"templates,omitempty"              yaml:"templates,omitempty"`
@@ -39,15 +40,15 @@ func (spec *ChiSpec) HasTaskID() bool {
 	if spec == nil {
 		return false
 	}
-	return len(spec.TaskID.Value()) > 0
+	return spec.TaskID.HasValue()
 }
 
 // GetTaskID gets task id as a string
-func (spec *ChiSpec) GetTaskID() string {
+func (spec *ChiSpec) GetTaskID() *types.Id {
 	if spec == nil {
-		return ""
+		return nil
 	}
-	return spec.TaskID.Value()
+	return spec.TaskID
 }
 
 func (spec *ChiSpec) GetStop() *types.StringBool {
@@ -162,7 +163,7 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	}
 
 	spec.Templating = spec.Templating.MergeFrom(from.Templating, _type)
-	spec.Reconciling = spec.Reconciling.MergeFrom(from.Reconciling, _type)
+	spec.Reconcile = spec.Reconcile.MergeFrom(from.Reconcile, _type)
 	spec.Defaults = spec.Defaults.MergeFrom(from.Defaults, _type)
 	spec.Configuration = spec.Configuration.MergeFrom(from.Configuration, _type)
 	spec.Templates = spec.Templates.MergeFrom(from.Templates, _type)

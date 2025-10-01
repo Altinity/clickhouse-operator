@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
@@ -165,7 +166,7 @@ func (cr *ClickHouseKeeperInstallation) GetUsedTemplates() []*apiChi.TemplateRef
 }
 
 // FillStatus fills .Status
-func (cr *ClickHouseKeeperInstallation) FillStatus(endpoint string, pods, fqdns []string, ip string) {
+func (cr *ClickHouseKeeperInstallation) FillStatus(endpoints util.Slice[string], pods, fqdns []string, ip string) {
 	cr.EnsureStatus().Fill(&FillStatusParams{
 		CHOpIP:              ip,
 		ClustersCount:       cr.ClustersCount(),
@@ -180,7 +181,8 @@ func (cr *ClickHouseKeeperInstallation) FillStatus(endpoint string, pods, fqdns 
 		HostsDeletedCount:   0,
 		Pods:                pods,
 		FQDNs:               fqdns,
-		Endpoint:            endpoint,
+		Endpoint:            endpoints.First(),
+		Endpoints:           append([]string{}, endpoints...),
 		NormalizedCR: cr.Copy(types.CopyCROptions{
 			SkipStatus:        true,
 			SkipManagedFields: true,
@@ -291,16 +293,26 @@ func (cr *ClickHouseKeeperInstallation) HostsCount() int {
 	return count
 }
 
-// HostsCountAttributes counts hosts by attributes
-func (cr *ClickHouseKeeperInstallation) HostsCountAttributes(a *apiChi.HostReconcileAttributes) int {
+// HostsWithAttributesCount counts hosts by attributes
+func (cr *ClickHouseKeeperInstallation) HostsWithAttributesCount(a *types.ReconcileAttributes) int {
 	count := 0
 	cr.WalkHosts(func(host *apiChi.Host) error {
-		if host.GetReconcileAttributes().Any(a) {
+		if host.GetReconcileAttributes().HasIntersectionWith(a) {
 			count++
 		}
 		return nil
 	})
 	return count
+}
+
+// GetHostsAttributesCounters
+func (cr *ClickHouseKeeperInstallation) GetHostsAttributesCounters() *types.ReconcileAttributesCounters {
+	counters := types.NewReconcileAttributesCounters()
+	cr.WalkHosts(func(host *apiChi.Host) error {
+		counters.Add(host.GetReconcileAttributes())
+		return nil
+	})
+	return counters
 }
 
 // GetHostTemplate gets HostTemplate by name
@@ -348,13 +360,29 @@ func (cr *ClickHouseKeeperInstallation) GetServiceTemplate(name string) (*apiChi
 	return cr.GetSpecT().GetTemplates().GetServiceTemplatesIndex().Get(name), true
 }
 
-// GetRootServiceTemplate gets ServiceTemplate of a CHI
-func (cr *ClickHouseKeeperInstallation) GetRootServiceTemplate() (*apiChi.ServiceTemplate, bool) {
-	if !cr.GetSpecT().GetDefaults().Templates.HasServiceTemplate() {
+// GetServiceTemplates gets ServiceTemplates by name
+func (cr *ClickHouseKeeperInstallation) GetServiceTemplates(names ...string) ([]*apiChi.ServiceTemplate, bool) {
+	if len(names) == 0 {
 		return nil, false
 	}
-	name := cr.GetSpecT().GetDefaults().Templates.GetServiceTemplate()
-	return cr.GetServiceTemplate(name)
+	var res []*apiChi.ServiceTemplate
+	for _, name := range names {
+		if cr.GetSpecT().GetTemplates().GetServiceTemplatesIndex().Has(name) {
+			res = append(res, cr.GetSpecT().GetTemplates().GetServiceTemplatesIndex().Get(name))
+		}
+	}
+	if len(res) == len(names) {
+		return res, true
+	}
+	return nil, false
+}
+
+// GetRootServiceTemplates gets service templates of a CR
+func (cr *ClickHouseKeeperInstallation) GetRootServiceTemplates() ([]*apiChi.ServiceTemplate, bool) {
+	if !cr.GetSpecT().GetDefaults().Templates.HasAnyServiceTemplate() {
+		return nil, false
+	}
+	return cr.GetServiceTemplates(cr.GetSpecT().GetDefaults().Templates.GetAllServiceTemplates()...)
 }
 
 // MatchNamespace matches namespace
@@ -393,7 +421,7 @@ func (cr *ClickHouseKeeperInstallation) IsAuto() bool {
 	return false
 }
 
-// IsStopped checks whether CHI is stopped
+// IsStopped checks whether CR is stopped
 func (cr *ClickHouseKeeperInstallation) IsStopped() bool {
 	return false
 }
@@ -408,12 +436,12 @@ func (cr *ClickHouseKeeperInstallation) IsTroubleshoot() bool {
 	return false
 }
 
-// GetReconciling gets reconciling spec
-func (cr *ClickHouseKeeperInstallation) GetReconciling() *apiChi.Reconciling {
+// GetReconcile gets reconcile spec
+func (cr *ClickHouseKeeperInstallation) GetReconcile() *apiChi.ChiReconcile {
 	if cr == nil {
 		return nil
 	}
-	return cr.GetSpecT().Reconciling
+	return cr.GetSpecT().Reconcile
 }
 
 // Copy makes copy of a CHI, filtering fields according to specified CopyOptions
@@ -662,4 +690,26 @@ func (cr *ClickHouseKeeperInstallation) IsNonZero() bool {
 
 func (cr *ClickHouseKeeperInstallation) NamespaceName() (string, string) {
 	return util.NamespaceName(cr)
+}
+
+func (cr *ClickHouseKeeperInstallation) FindMinMaxVersions() {
+	cr.runtime.MinVersion = swversion.MaxVersion()
+	cr.runtime.MaxVersion = swversion.MinVersion()
+	cr.WalkHosts(func(host *apiChi.Host) error {
+		if host.Runtime.Version.Cmp(cr.runtime.MinVersion) < 0 {
+			cr.runtime.MinVersion = host.Runtime.Version
+		}
+		if host.Runtime.Version.Cmp(cr.runtime.MaxVersion) > 0 {
+			cr.runtime.MaxVersion = host.Runtime.Version
+		}
+		return nil
+	})
+}
+
+func (cr *ClickHouseKeeperInstallation) GetMinVersion() *swversion.SoftWareVersion {
+	return cr.runtime.MinVersion
+}
+
+func (cr *ClickHouseKeeperInstallation) GetMaxVersion() *swversion.SoftWareVersion {
+	return cr.runtime.MaxVersion
 }

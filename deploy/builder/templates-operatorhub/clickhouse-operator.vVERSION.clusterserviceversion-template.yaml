@@ -9,7 +9,7 @@ metadata:
     containerImage: docker.io/altinity/clickhouse-operator:${OPERATOR_VERSION}
     createdAt: '${OPERATOR_RELEASE_DATE}'
     support: Altinity Ltd. https://altinity.com
-    description: ClickHouse Operator manages full lifecycle of ClickHouse clusters.
+    description: The Altinity® Kubernetes Operator for ClickHouse® manages the full lifecycle of ClickHouse clusters.
     repository: https://github.com/altinity/clickhouse-operator
     certified: 'false'
     alm-examples: |-
@@ -24,7 +24,7 @@ spec:
       name: Altinity
   provider:
     name: Altinity
-  displayName: Altinity Operator for ClickHouse
+  displayName: Altinity® Kubernetes Operator for ClickHouse®
   keywords:
     - "clickhouse"
     - "database"
@@ -1216,11 +1216,11 @@ spec:
   installModes:
     - supported: true
       type: OwnNamespace
-    - supported: false
+    - supported: true
       type: SingleNamespace
-    - supported: false
+    - supported: true
       type: MultiNamespace
-    - supported: false
+    - supported: true
       type: AllNamespaces
 
   install:

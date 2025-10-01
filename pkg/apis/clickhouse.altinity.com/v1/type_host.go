@@ -15,10 +15,10 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -61,7 +61,7 @@ type HostRuntime struct {
 	// Internal data
 	Address             HostAddress                `json:"-" yaml:"-"`
 	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
-	reconcileAttributes *HostReconcileAttributes   `json:"-" yaml:"-" testdiff:"ignore"`
+	reconcileAttributes *types.ReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
 	replicas            *types.Int32               `json:"-" yaml:"-"`
 	hasData             bool                       `json:"-" yaml:"-"`
 
@@ -116,41 +116,55 @@ func (host *Host) SetTemplates(tl *TemplatesList) {
 }
 
 // GetReconcileAttributes is an ensurer getter
-func (host *Host) GetReconcileAttributes() *HostReconcileAttributes {
+func (host *Host) GetReconcileAttributes() *types.ReconcileAttributes {
 	if host == nil {
 		return nil
 	}
 	if host.Runtime.reconcileAttributes == nil {
-		host.Runtime.reconcileAttributes = NewHostReconcileAttributes()
+		host.Runtime.reconcileAttributes = types.NewReconcileAttributes()
 	}
 	return host.Runtime.reconcileAttributes
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
-func (host *Host) InheritSettingsFrom(shard IShard, replica IReplica) {
+func (host *Host) InheritSettingsFrom(sources ...any) {
 	if host == nil {
 		return
 	}
-	if (shard != nil) && shard.HasSettings() {
-		host.Settings = host.Settings.MergeFrom(shard.GetSettings())
-	}
-
-	if (replica != nil) && replica.HasSettings() {
-		host.Settings = host.Settings.MergeFrom(replica.GetSettings())
+	for _, source := range sources {
+		switch typed := source.(type) {
+		case IShard:
+			shard := typed
+			if shard.HasSettings() {
+				host.Settings = host.Settings.MergeFrom(shard.GetSettings())
+			}
+		case IReplica:
+			replica := typed
+			if replica.HasSettings() {
+				host.Settings = host.Settings.MergeFrom(replica.GetSettings())
+			}
+		}
 	}
 }
 
 // InheritFilesFrom inherits files from specified shard and replica
-func (host *Host) InheritFilesFrom(shard IShard, replica IReplica) {
+func (host *Host) InheritFilesFrom(sources ...any) {
 	if host == nil {
 		return
 	}
-	if (shard != nil) && shard.HasFiles() {
-		host.Files = host.Files.MergeFrom(shard.GetFiles())
-	}
-
-	if (replica != nil) && replica.HasFiles() {
-		host.Files = host.Files.MergeFrom(replica.GetFiles())
+	for _, source := range sources {
+		switch typed := source.(type) {
+		case IShard:
+			shard := typed
+			if shard.HasFiles() {
+				host.Files = host.Files.MergeFrom(shard.GetFiles())
+			}
+		case IReplica:
+			replica := typed
+			if replica.HasFiles() {
+				host.Files = host.Files.MergeFrom(replica.GetFiles())
+			}
+		}
 	}
 }
 
@@ -282,6 +296,22 @@ func (host *Host) GetName() string {
 	return host.Name
 }
 
+// HasName checks whether host has a name
+func (host *Host) HasName() bool {
+	if host == nil {
+		return false
+	}
+	return len(host.GetName()) > 0
+}
+
+// SetName is a setter
+func (host *Host) SetName(name string) {
+	if host == nil {
+		return
+	}
+	host.Name = name
+}
+
 // GetCR gets CHI
 func (host *Host) GetCR() ICustomResource {
 	return host.GetRuntime().GetCR()
@@ -343,6 +373,11 @@ func (host *Host) WalkVolumeClaimTemplates(f func(template *VolumeClaimTemplate)
 // IsStopped checks whether host is stopped
 func (host *Host) IsStopped() bool {
 	return host.GetCR().IsStopped()
+}
+
+// IsTroubleshoot checks whether host is in troubleshoot
+func (host *Host) IsTroubleshoot() bool {
+	return host.GetCR().IsTroubleshoot()
 }
 
 // IsInNewCluster checks whether host is in a new cluster
@@ -455,13 +490,22 @@ func (host *Host) IsInsecure() bool {
 	return true
 }
 
-// IsFirst checks whether the host is the first host of the whole CHI
-func (host *Host) IsFirst() bool {
+// IsFirstInCR checks whether the host is the first host of the whole CHI
+func (host *Host) IsFirstInCR() bool {
 	if host == nil {
 		return false
 	}
 
 	return host.Runtime.Address.CHIScopeIndex == 0
+}
+
+// IsFirstInCluster checks whether the host is the first host of the cluster
+func (host *Host) IsFirstInCluster() bool {
+	if host == nil {
+		return false
+	}
+
+	return host.Runtime.Address.ClusterScopeIndex == 0
 }
 
 // IsFirst checks whether the host is the last host of the whole CHI
@@ -572,6 +616,13 @@ func (host *Host) AppendSpecifiedPortsToContainer(container *core.Container) {
 			// Do not abort, continue iterating
 			return false
 		},
+	)
+}
+
+func (host *Host) HasListedReplicaCaughtUp(name string) bool {
+	return util.InArray(
+		name,
+		host.GetCR().IEnsureStatus().GetHostsWithReplicaCaughtUp(),
 	)
 }
 

@@ -21,7 +21,6 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -30,18 +29,27 @@ import (
 func PollHost(
 	ctx context.Context,
 	host *api.Host,
-	isDoneFn func(ctx context.Context, host *api.Host) bool,
+	isDoneFn func(context.Context, *api.Host) bool,
+	_opts ...*poller.Options,
 ) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("poll is aborted")
 		return nil
 	}
 
-	return poller.New(ctx, fmt.Sprintf("%s/%s", host.Runtime.Address.Namespace, host.Runtime.Address.HostName)).
-		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
-		WithMain(&poller.Functions{
-			IsDone: func(_ctx context.Context, _ any) bool {
-				return isDoneFn(_ctx, host)
-			},
-		}).Poll()
+	caption := fmt.Sprintf("%s/%s", host.Runtime.Address.Namespace, host.Runtime.Address.HostName)
+	opts := poller.NewOptionsFromConfig(_opts...)
+	functions := &poller.Functions{
+		Get: func(_ctx context.Context) (any, error) {
+			return nil, nil
+		},
+		IsDone: func(_ctx context.Context, _ any) bool {
+			return isDoneFn(_ctx, host)
+		},
+	}
+
+	return poller.New(ctx, caption).
+		WithOptions(opts).
+		WithFunctions(functions).
+		Poll()
 }

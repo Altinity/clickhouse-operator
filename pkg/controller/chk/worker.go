@@ -40,7 +40,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -104,7 +103,7 @@ func (w *worker) buildCreator(cr *apiChk.ClickHouseKeeperInstallation) *commonCr
 		managers.NewNameManager(managers.NameManagerTypeKeeper),
 		managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeKeeper),
 		namer.New(),
-		commonMacro.New(macro.List),
+		macro.New(),
 		labeler.New(cr),
 	)
 }
@@ -114,8 +113,7 @@ func (w *worker) newTask(new, old *apiChk.ClickHouseKeeperInstallation) {
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
-		//poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.labeler),
-		domain.NewHostStatefulSetPoller(domain.NewStatefulSetPoller(w.c.kube), w.c.kube, nil),
+		domain.NewHostObjectsPoller(domain.NewHostObjectPoller(w.c.kube.STS()), domain.NewHostObjectPoller(w.c.kube.Pod()), nil),
 		w.c.namer,
 		labeler.New(new),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
@@ -125,86 +123,53 @@ func (w *worker) newTask(new, old *apiChk.ClickHouseKeeperInstallation) {
 }
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
-func (w *worker) shouldForceRestartHost(host *api.Host) bool {
-	// RollingUpdate purpose is to always shut the host down.
-	// It is such an interesting policy.
-	if host.GetCR().IsRollingUpdate() {
-		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
-		return true
-	}
+func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) bool {
+	switch {
+	case host.HasAncestor() && host.GetAncestor().IsStopped():
+		w.a.V(1).M(host).F().Info("Host ancestor is stopped, no restart applicable. Host: %s", host.GetName())
+		return false
 
-	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusNew {
+	case host.HasAncestor() && host.GetAncestor().IsTroubleshoot():
+		w.a.V(1).M(host).F().Info("Host ancestor is in troubleshoot, no restart applicable. Host: %s", host.GetName())
+		return false
+
+	case host.IsStopped():
+		w.a.V(1).M(host).F().Info("Host is stopped, no restart applicable. Host: %s", host.GetName())
+		return false
+
+	case host.IsTroubleshoot():
+		w.a.V(1).M(host).F().Info("Host is in troubleshoot, no restart applicable. Host: %s", host.GetName())
+		return false
+
+	case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested):
 		w.a.V(1).M(host).F().Info("Host is new, no restart applicable. Host: %s", host.GetName())
 		return false
-	}
 
-	if (host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame) && !host.HasAncestor() {
-		w.a.V(1).M(host).F().Info("Host already exists, but has no ancestor, no restart applicable. Host: %s", host.GetName())
+	case !host.HasAncestor():
+		w.a.V(1).M(host).F().Info("Host has no ancestor, no restart applicable. Host: %s", host.GetName())
 		return false
-	}
 
-	// For some configuration changes we have to force restart host
-	if model.IsConfigurationChangeRequiresReboot(host) {
+	case host.GetCR().IsRollingUpdate():
+		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
+		return true
+
+	case model.IsConfigurationChangeRequiresReboot(host):
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
-	}
 
-	podIsCrushed := false
-	// pod.Status.ContainerStatuses[0].State.Waiting.Reason
-	if pod, err := w.c.kube.Pod().Get(host); err == nil {
-		if len(pod.Status.ContainerStatuses) > 0 {
-			if pod.Status.ContainerStatuses[0].State.Waiting != nil {
-				if pod.Status.ContainerStatuses[0].State.Waiting.Reason == "CrashLoopBackOff" {
-					podIsCrushed = true
-				}
-			}
-		}
-	}
-
-	if host.Runtime.Version.IsUnknown() && podIsCrushed {
+	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host):
 		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
 		return true
-	}
 
-	w.a.V(1).M(host).F().Info("Host restart is not required. Host: %s", host.GetName())
-	return false
-}
-
-// normalize
-func (w *worker) normalize(c *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	chk, err := normalizer.New().CreateTemplated(c, commonNormalizer.NewOptions())
-	if err != nil {
-		w.a.WithEvent(chk, a.EventActionReconcile, a.EventReasonReconcileFailed).
-			WithError(chk).
-			M(chk).F().
-			Error("FAILED to normalize CR 1: %v", err)
-	}
-	return chk
-}
-
-// areUsableOldAndNew checks whether there are old and new usable
-func (w *worker) areUsableOldAndNew(old, new *apiChk.ClickHouseKeeperInstallation) bool {
-	if old == nil {
+	default:
+		w.a.V(1).M(host).F().Info("Host force restart is not required. Host: %s", host.GetName())
 		return false
 	}
-	if new == nil {
-		return false
-	}
-	return true
-}
-
-// isGenerationTheSame checks whether old ans new CHI have the same generation
-func (w *worker) isGenerationTheSame(old, new *apiChk.ClickHouseKeeperInstallation) bool {
-	if !w.areUsableOldAndNew(old, new) {
-		return false
-	}
-
-	return old.GetGeneration() == new.GetGeneration()
 }
 
 func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
@@ -227,22 +192,22 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKe
 	w.a.V(2).M(cr).F().Info("action plan\n%s\n", ap.String())
 }
 
-func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chk *apiChk.ClickHouseKeeperInstallation) {
+func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstallation) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", _cr.GetName())
 		return
 	}
 
-	w.a.V(1).M(_chk).F().S().Info("finalize reconcile")
+	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	if chi, err := w.createCRFromObjectMeta(_chk, true, commonNormalizer.NewOptions()); err == nil {
+	if chi, err := w.createCRFromObjectMeta(_cr, true, commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CR-2 %s", chi.Name)
-		ips := w.c.getPodsIPs(chi)
+		ips := w.c.getPodsIPs(ctx, chi)
 		w.a.V(1).M(chi).Info("IPs of the CR-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := commonNormalizer.NewOptions()
+		opts := commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()
 		opts.DefaultUserAdditionalIPs = ips
-		if chi, err := w.createCRFromObjectMeta(_chk, true, opts); err == nil {
+		if chi, err := w.createCRFromObjectMeta(_cr, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
 			chi.SetAncestor(chi.GetTarget())
 			chi.SetTarget(nil)
@@ -258,33 +223,33 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chk *ap
 				},
 			})
 		} else {
-			w.a.M(_chk).F().Error("internal unable to find CR by %v err: %v", _chk.GetLabels(), err)
+			w.a.M(_cr).F().Error("internal unable to find CR by %v err: %v", _cr.GetLabels(), err)
 		}
 	} else {
-		w.a.M(_chk).F().Error("external unable to find CR by %v err %v", _chk.GetLabels(), err)
+		w.a.M(_cr).F().Error("external unable to find CR by %v err %v", _cr.GetLabels(), err)
 	}
 
 	w.a.V(1).
-		WithEvent(_chk, a.EventActionReconcile, a.EventReasonReconcileCompleted).
-		WithAction(_chk).
-		WithActions(_chk).
-		M(_chk).F().
-		Info("reconcile completed successfully, task id: %s", _chk.GetSpecT().GetTaskID())
+		WithEvent(_cr, a.EventActionReconcile, a.EventReasonReconcileCompleted).
+		WithAction(_cr).
+		WithActions(_cr).
+		M(_cr).F().
+		Info("reconcile completed successfully, task id: %s", _cr.GetSpecT().GetTaskID())
 }
 
-func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation, err error) {
+func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, err error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
 	switch {
 	case err == nil:
-		chk.EnsureStatus().ReconcileComplete()
+		cr.EnsureStatus().ReconcileComplete()
 	case errors.Is(err, common.ErrCRUDAbort):
-		chk.EnsureStatus().ReconcileAbort()
+		cr.EnsureStatus().ReconcileAbort()
 	}
-	w.c.updateCRObjectStatus(ctx, chk, types.UpdateStatusOptions{
+	w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
 				FieldGroupMain: true,
@@ -293,27 +258,27 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chk *
 	})
 
 	w.a.V(1).
-		WithEvent(chk, a.EventActionReconcile, a.EventReasonReconcileFailed).
-		WithAction(chk).
-		WithActions(chk).
-		M(chk).F().
-		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chk.GetSpecT().GetTaskID())
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+		WithAction(cr).
+		WithActions(cr).
+		M(cr).F().
+		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", cr.GetSpecT().GetTaskID())
 }
 
-func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation, ap *action_plan.ActionPlan) {
+func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
-	existingObjects := w.c.discovery(ctx, chk)
+	existingObjects := w.c.discovery(ctx, cr)
 	ap.WalkAdded(
 		// Walk over added clusters
 		func(cluster api.ICluster) {
-			w.a.V(1).M(chk).Info("Walking over AP added clusters. Cluster: %s", cluster.GetName())
+			w.a.V(1).M(cr).Info("Walking over AP added clusters. Cluster: %s", cluster.GetName())
 
 			cluster.WalkHosts(func(host *api.Host) error {
-				w.a.V(1).M(chk).Info("Walking over hosts in added clusters. Cluster: %s Host: %s", cluster.GetName(), host.GetName())
+				w.a.V(1).M(cr).Info("Walking over hosts in added clusters. Cluster: %s Host: %s", cluster.GetName(), host.GetName())
 
 				// Name of the StatefulSet for this host
 				name := w.c.namer.Name(interfaces.NameStatefulSet, host)
@@ -321,7 +286,7 @@ func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 				found := false
 
 				existingObjects.WalkStatefulSet(func(meta meta.Object) {
-					w.a.V(3).M(chk).Info("Walking over existing sts list. sts: %s", util.NamespacedName(meta))
+					w.a.V(3).M(cr).Info("Walking over existing sts list. sts: %s", util.NamespacedName(meta))
 					if name == meta.GetName() {
 						// StatefulSet of this host already exist
 						found = true
@@ -329,14 +294,14 @@ func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 				})
 
 				if found {
-					// StatefulSet of this host already exist, we can't ADD it for sure
+					// StatefulSet of this host already exist, we can't name it a NEW one for sure
 					// It looks like FOUND is the most correct approach
-					w.a.V(1).M(chk).Info("Add host as FOUND via cluster. Host was found as sts. Host: %s", host.GetName())
-					host.GetReconcileAttributes().SetFound()
+					w.a.V(1).M(cr).Info("Add host as FOUND via cluster. Host was found as sts. Host: %s", host.GetName())
+					host.GetReconcileAttributes().SetStatus(types.ObjectStatusFound)
 				} else {
-					// StatefulSet of this host does not exist, looks like we need to ADD it
-					w.a.V(1).M(chk).Info("Add host as ADD via cluster. Host was not found as sts. Host: %s", host.GetName())
-					host.GetReconcileAttributes().SetAdd()
+					// StatefulSet of this host does not exist, looks like we can name it as a NEW one
+					w.a.V(1).M(cr).Info("Add host as NEW via cluster. Host was not found as sts. Host: %s", host.GetName())
+					host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
 				}
 
 				return nil
@@ -344,72 +309,95 @@ func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 		},
 		// Walk over added shards
 		func(shard api.IShard) {
-			w.a.V(1).M(chk).Info("Walking over AP added shards. Shard: %s", shard.GetName())
+			w.a.V(1).M(cr).Info("Walking over AP added shards. Shard: %s", shard.GetName())
 			// Mark all hosts of the shard as newly added
 			shard.WalkHosts(func(host *api.Host) error {
-				w.a.V(1).M(chk).Info("Add host as ADD via shard. Shard: %s Host: %s", shard.GetName(), host.GetName())
-				host.GetReconcileAttributes().SetAdd()
+				w.a.V(1).M(cr).Info("Add host as NEW via shard. Shard: %s Host: %s", shard.GetName(), host.GetName())
+				host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
 				return nil
 			})
 		},
 		// Walk over added hosts
 		func(host *api.Host) {
-			w.a.V(1).M(chk).Info("Walking over AP added hosts. Host: %s", host.GetName())
-			w.a.V(1).M(chk).Info("Add host as ADD via host. Host: %s", host.GetName())
-			host.GetReconcileAttributes().SetAdd()
+			w.a.V(1).M(cr).Info("Walking over AP added hosts. Host: %s", host.GetName())
+			w.a.V(1).M(cr).Info("Add host as NEW via host. Host: %s", host.GetName())
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
 		},
 	)
 
 	ap.WalkModified(
 		func(cluster api.ICluster) {
-			w.a.V(1).M(chk).Info("Walking over AP modified clusters. Cluster: %s", cluster.GetName())
+			w.a.V(1).M(cr).Info("Walking over AP modified clusters. Cluster: %s", cluster.GetName())
 		},
 		func(shard api.IShard) {
-			w.a.V(1).M(chk).Info("Walking over AP modified shards. Shard: %s", shard.GetName())
+			w.a.V(1).M(cr).Info("Walking over AP modified shards. Shard: %s", shard.GetName())
 		},
 		func(host *api.Host) {
-			w.a.V(1).M(chk).Info("Walking over AP modified hosts. Host: %s", host.GetName())
-			w.a.V(1).M(chk).Info("Add host as MODIFIED via host. Host: %s", host.GetName())
-			host.GetReconcileAttributes().SetModify()
+			w.a.V(1).M(cr).Info("Walking over AP modified hosts. Host: %s", host.GetName())
+			w.a.V(1).M(cr).Info("Add host as MODIFIED via host. Host: %s", host.GetName())
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusModified)
 		},
 	)
 
-	chk.WalkHosts(func(host *api.Host) error {
-		w.a.V(3).M(chk).Info("Walking over CR hosts. Host: %s", host.GetName())
+	// Fill gaps in host statuses. Fill unfilled hosts
+	cr.WalkHosts(func(host *api.Host) error {
+		w.a.V(3).M(cr).Info("Walking over CR hosts. Host: %s", host.GetName())
+		_, err := w.c.kube.STS().Get(ctx, host)
 		switch {
-		case host.GetReconcileAttributes().IsAdd():
-			w.a.V(3).M(chk).Info("Walking over CR hosts. Host: is already added Host: %s", host.GetName())
+		case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested):
+			w.a.V(3).M(cr).Info("Walking over CR hosts. Host: is already listed as NEW. Status is clear. Host: %s", host.GetName())
 			return nil
-		case host.GetReconcileAttributes().IsModify():
-			w.a.V(3).M(chk).Info("Walking over CR hosts. Host: is already modified Host: %s", host.GetName())
+		case host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusModified):
+			w.a.V(3).M(cr).Info("Walking over CR hosts. Host: is already listed as MODIFIED. Status is clear. Host: %s", host.GetName())
+			return nil
+		case host.HasAncestor():
+			w.a.V(1).M(cr).Info("Add host as FOUND via host because host has an ancestor. Host: %s", host.GetName())
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusFound)
+			return nil
+		case err == nil:
+			w.a.V(1).M(cr).Info("Add host as FOUND via host because has found sts. Host: %s", host.GetName())
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusFound)
 			return nil
 		default:
-			w.a.V(3).M(chk).Info("Walking over CR hosts. Host: is not clear yet (not detected as added or modified) Host: %s", host.GetName())
-			if host.HasAncestor() {
-				w.a.V(1).M(chk).Info("Add host as FOUND via host. Host: %s", host.GetName())
-				host.GetReconcileAttributes().SetFound()
-			} else {
-				w.a.V(1).M(chk).Info("Add host as ADD via host. Host: %s", host.GetName())
-				host.GetReconcileAttributes().SetAdd()
-			}
+			w.a.V(1).M(cr).Info("Add host as New via host. Host: %s", host.GetName())
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+			return nil
 		}
-		return nil
 	})
 
-	// Log hosts statuses
-	chk.WalkHosts(func(host *api.Host) error {
-		switch {
-		case host.GetReconcileAttributes().IsAdd():
-			w.a.M(host).Info("ADD host: %s", host.Runtime.Address.CompactString())
-		case host.GetReconcileAttributes().IsModify():
-			w.a.M(host).Info("MODIFY host: %s", host.Runtime.Address.CompactString())
-		case host.GetReconcileAttributes().IsFound():
-			w.a.M(host).Info("FOUND host: %s", host.Runtime.Address.CompactString())
-		default:
-			w.a.M(host).Info("UNKNOWN host: %s", host.Runtime.Address.CompactString())
-		}
+	w.logHosts(cr)
+}
+
+// Log hosts statuses
+func (w *worker) logHosts(cr api.ICustomResource) {
+	cr.WalkHosts(func(host *api.Host) error {
+		w.a.M(host).Info("Host status: %s. Host: %s", host.GetReconcileAttributes().GetStatus(), host.Runtime.Address.CompactString())
 		return nil
 	})
+}
+
+func (w *worker) createTemplatedCR(_chk *apiChk.ClickHouseKeeperInstallation, _opts ...*commonNormalizer.Options[apiChk.ClickHouseKeeperInstallation]) *apiChk.ClickHouseKeeperInstallation {
+	l := w.a.V(1).M(_chk).F()
+
+	if _chk.HasAncestor() {
+		l.Info("CR has an ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(_chk))
+	} else {
+		l.Info("CR has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(_chk))
+	}
+
+	chk := w.createTemplated(_chk, _opts...)
+	chk.SetAncestor(w.createTemplated(_chk.GetAncestorT()))
+
+	return chk
+}
+
+func (w *worker) createTemplated(c *apiChk.ClickHouseKeeperInstallation, _opts ...*commonNormalizer.Options[apiChk.ClickHouseKeeperInstallation]) *apiChk.ClickHouseKeeperInstallation {
+	opts := commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()
+	if len(_opts) > 0 {
+		opts = _opts[0]
+	}
+	chk, _ := w.normalizer.CreateTemplated(c, opts)
+	return chk
 }
 
 // getRaftGeneratorOptions build base set of RaftOptions
@@ -418,7 +406,7 @@ func (w *worker) getRaftGeneratorOptions() *commonConfig.HostSelector {
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
-		api.NewHostReconcileAttributes(),
+		types.NewReconcileAttributes(),
 		//SetAdd().
 		//SetExclude(),
 	)
@@ -432,7 +420,11 @@ func (w *worker) options() *config.FilesGeneratorOptions {
 }
 
 // createCRFromObjectMeta
-func (w *worker) createCRFromObjectMeta(meta meta.Object, isCHI bool, options *commonNormalizer.Options) (*apiChk.ClickHouseKeeperInstallation, error) {
+func (w *worker) createCRFromObjectMeta(
+	meta meta.Object,
+	isCHI bool,
+	options *commonNormalizer.Options[apiChk.ClickHouseKeeperInstallation],
+) (*apiChk.ClickHouseKeeperInstallation, error) {
 	w.a.V(3).M(meta).S().P()
 	defer w.a.V(3).M(meta).E().P()
 

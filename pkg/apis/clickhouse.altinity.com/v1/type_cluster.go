@@ -29,7 +29,9 @@ type Cluster struct {
 	Insecure          *types.StringBool `json:"insecure,omitempty"          yaml:"insecure,omitempty"`
 	Secure            *types.StringBool `json:"secure,omitempty"            yaml:"secure,omitempty"`
 	Secret            *ClusterSecret    `json:"secret,omitempty"            yaml:"secret,omitempty"`
+	PDBManaged        *types.StringBool `json:"pdbManaged,omitempty"        yaml:"pdbManaged,omitempty"`
 	PDBMaxUnavailable *types.Int32      `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
+	Reconcile         ClusterReconcile  `json:"reconcile"                   yaml:"reconcile"`
 	Layout            *ChiClusterLayout `json:"layout,omitempty"            yaml:"layout,omitempty"`
 
 	Runtime ChiClusterRuntime `json:"-" yaml:"-"`
@@ -96,6 +98,14 @@ func (cluster *Cluster) GetName() string {
 	return cluster.Name
 }
 
+// HasName checks whether cluster has a name
+func (cluster *Cluster) HasName() bool {
+	if cluster == nil {
+		return false
+	}
+	return len(cluster.GetName()) > 0
+}
+
 func (c *Cluster) GetZookeeper() *ZookeeperConfig {
 	return c.Zookeeper
 }
@@ -120,45 +130,65 @@ func (cluster *Cluster) GetSecure() *types.StringBool {
 	return cluster.Secure
 }
 
+// GetSecret is a getter
 func (c *Cluster) GetSecret() *ClusterSecret {
 	return c.Secret
 }
 
-func (cluster *Cluster) GetRuntime() IClusterRuntime {
-	return &cluster.Runtime
+// GetPDBManaged is a getter
+func (cluster *Cluster) GetPDBManaged() *types.StringBool {
+	return cluster.PDBManaged
 }
 
+// GetPDBMaxUnavailable is a getter
 func (cluster *Cluster) GetPDBMaxUnavailable() *types.Int32 {
 	return cluster.PDBMaxUnavailable
 }
 
-// FillShardReplicaSpecified fills whether shard or replicas are explicitly specified
-func (cluster *Cluster) FillShardReplicaSpecified() {
+// GetReconcile is a getter
+func (cluster *Cluster) GetReconcile() ClusterReconcile {
+	return cluster.Reconcile
+}
+
+// GetRuntime is a getter
+func (cluster *Cluster) GetRuntime() IClusterRuntime {
+	return &cluster.Runtime
+}
+
+// FillShardsReplicasExplicitlySpecified fills whether shard or replicas are explicitly specified
+func (cluster *Cluster) FillShardsReplicasExplicitlySpecified() {
 	if len(cluster.Layout.Shards) > 0 {
-		cluster.Layout.ShardsSpecified = true
+		cluster.Layout.ShardsExplicitlySpecified = true
 	}
 	if len(cluster.Layout.Replicas) > 0 {
-		cluster.Layout.ReplicasSpecified = true
+		cluster.Layout.ReplicasExplicitlySpecified = true
 	}
 }
 
-// isShardSpecified checks whether shard is explicitly specified
-func (cluster *Cluster) isShardSpecified() bool {
-	return cluster.Layout.ShardsSpecified == true
+// isShardExplicitlySpecified checks whether shard is explicitly specified
+func (cluster *Cluster) isShardExplicitlySpecified() bool {
+	return cluster.Layout.ShardsExplicitlySpecified
 }
 
-// isReplicaSpecified checks whether replica is explicitly specified
-func (cluster *Cluster) isReplicaSpecified() bool {
-	return (cluster.Layout.ShardsSpecified == false) && (cluster.Layout.ReplicasSpecified == true)
+// isReplicaExplicitlySpecified checks whether replica is explicitly specified
+func (cluster *Cluster) isReplicaExplicitlySpecified() bool {
+	return cluster.Layout.ReplicasExplicitlySpecified && !cluster.isShardExplicitlySpecified()
 }
 
 // IsShardSpecified checks whether shard is explicitly specified
-func (cluster *Cluster) IsShardSpecified() bool {
-	if !cluster.isShardSpecified() && !cluster.isReplicaSpecified() {
+func (cluster *Cluster) isShardToBeUsedToInheritSettingsFrom() bool {
+	if !cluster.isShardExplicitlySpecified() && !cluster.isReplicaExplicitlySpecified() {
 		return true
 	}
 
-	return cluster.isShardSpecified()
+	return cluster.isShardExplicitlySpecified()
+}
+
+func (cluster *Cluster) SelectSettingsSourceFrom(shard IShard, replica IReplica) any {
+	if cluster.isShardToBeUsedToInheritSettingsFrom() {
+		return shard
+	}
+	return replica
 }
 
 // InheritZookeeperFrom inherits zookeeper config from CHI
@@ -196,6 +226,15 @@ func (cluster *Cluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 
 		return false
 	})
+}
+
+// InheritClusterReconcileFrom inherits reconcile runtime from CHI
+func (cluster *Cluster) InheritClusterReconcileFrom(chi *ClickHouseInstallation) {
+	if chi.Spec.Reconcile == nil {
+		return
+	}
+	cluster.Reconcile.Runtime = cluster.Reconcile.Runtime.MergeFrom(chi.Spec.Reconcile.Runtime, MergeTypeFillEmptyValues)
+	cluster.Reconcile.Host = cluster.Reconcile.Host.MergeFrom(chi.Spec.Reconcile.Host)
 }
 
 // InheritTemplatesFrom inherits templates from CHI
@@ -382,6 +421,13 @@ func (cluster *Cluster) IsStopped() bool {
 	return cluster.GetCR().IsStopped()
 }
 
+func (cluster *Cluster) Ensure(create func() *Cluster) *Cluster {
+	if cluster == nil {
+		cluster = create()
+	}
+	return cluster
+}
+
 // ChiClusterLayout defines layout section of .spec.configuration.clusters
 type ChiClusterLayout struct {
 	ShardsCount   int `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
@@ -393,9 +439,9 @@ type ChiClusterLayout struct {
 
 	// Internal data
 	// Whether shards or replicas are explicitly specified as Shards []ChiShard or Replicas []ChiReplica
-	ShardsSpecified   bool        `json:"-" yaml:"-" testdiff:"ignore"`
-	ReplicasSpecified bool        `json:"-" yaml:"-" testdiff:"ignore"`
-	HostsField        *HostsField `json:"-" yaml:"-" testdiff:"ignore"`
+	ShardsExplicitlySpecified   bool        `json:"-" yaml:"-" testdiff:"ignore"`
+	ReplicasExplicitlySpecified bool        `json:"-" yaml:"-" testdiff:"ignore"`
+	HostsField                  *HostsField `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // NewChiClusterLayout creates new cluster layout
@@ -405,6 +451,13 @@ func NewChiClusterLayout() *ChiClusterLayout {
 
 func (l *ChiClusterLayout) GetReplicasCount() int {
 	return l.ReplicasCount
+}
+
+func (l *ChiClusterLayout) Ensure() *ChiClusterLayout {
+	if l == nil {
+		l = NewChiClusterLayout()
+	}
+	return l
 }
 
 // SchemaPolicy defines schema management policy - replica or shard-based

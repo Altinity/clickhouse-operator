@@ -60,8 +60,8 @@ func (n *Normalizer) hostGetHostTemplate(host *chi.Host) *chi.HostTemplate {
 
 // hostApplyHostTemplate
 func hostApplyHostTemplate(host *chi.Host, template *chi.HostTemplate) {
-	if host.GetName() == "" {
-		host.Name = template.Spec.Name
+	if !host.HasName() {
+		host.SetName(template.Spec.Name)
 		log.V(3).M(host).F().Info("host has no name specified thus assigning name from Spec: %s", host.GetName())
 	}
 
@@ -159,8 +159,8 @@ func createHostsField(cluster *chk.Cluster) {
 	cluster.WalkHostsByReplicas(hostMigrationFunc)
 }
 
-// normalizeHost normalizes a host
-func (n *Normalizer) normalizeHost(
+// normalizeHostStage1 normalizes a host
+func (n *Normalizer) normalizeHostStage1(
 	host *chi.Host,
 	shard chi.IShard,
 	replica chi.IReplica,
@@ -168,21 +168,27 @@ func (n *Normalizer) normalizeHost(
 	shardIndex int,
 	replicaIndex int,
 ) {
-
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
-	// Inherit from either Shard or Replica
-	var s chi.IShard
-	var r chi.IReplica
-	if cluster.IsShardSpecified() {
-		s = shard
-	} else {
-		r = replica
-	}
-	host.InheritSettingsFrom(s, r)
+}
+
+// normalizeHostStage2 normalizes a host
+func (n *Normalizer) normalizeHostStage2(
+	host *chi.Host,
+	shard chi.IShard,
+	replica chi.IReplica,
+	cluster chi.ICluster,
+	shardIndex int,
+	replicaIndex int,
+) {
+	// Inherit from either Shard or Replica - use one of them as a source
+	src := cluster.SelectSettingsSourceFrom(shard, replica)
+	log.V(2).M(src).F().Info("will be used as source for host: %s", host.GetName())
+
+	host.InheritSettingsFrom(src)
 	host.Settings = n.normalizeConfigurationSettings(host.Settings)
-	host.InheritFilesFrom(s, r)
+	host.InheritFilesFrom(src)
 	host.Files = n.normalizeConfigurationFiles(host.Files)
-	host.InheritTemplatesFrom(s, r)
+	host.InheritTemplatesFrom(src)
 
 	n.normalizeHostEnvVars()
 }

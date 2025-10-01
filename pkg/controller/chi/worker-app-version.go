@@ -16,38 +16,39 @@ package chi
 
 import (
 	"context"
-
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 )
 
-// getHostClickHouseVersion gets host ClickHouse version
-func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host, opts versionOptions) (string, error) {
-	if skip, description := opts.shouldSkip(host); skip {
-		return description, nil
+func (w *worker) getTagBasedVersion(host *api.Host) *swversion.SoftWareVersion {
+	// Fetch tag from the image
+	var tagBasedVersion *swversion.SoftWareVersion
+	if tag, tagFound := w.task.Creator().GetAppImageTag(host); tagFound {
+		tagBasedVersion = swversion.NewSoftWareVersionFromTag(tag)
 	}
+	return tagBasedVersion
+}
 
+// getHostClickHouseVersion gets host ClickHouse version
+func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
 	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
 	if err != nil {
-		w.a.V(1).M(host).F().Warning("Failed to get ClickHouse version on host: %s", host.GetName())
-		return unknownVersion, err
+		w.a.V(1).M(host).F().Warning("Failed to get ClickHouse version on host: %s err: %v", host.GetName(), err)
+		return nil
 	}
 
 	w.a.V(1).M(host).F().Info("Get ClickHouse version on host: %s version: %s", host.GetName(), version)
-	host.Runtime.Version = swversion.NewSoftWareVersion(version)
-
-	return version, nil
+	return swversion.NewSoftWareVersion(version)
 }
 
-func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Host) (version string, err error) {
+func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Host) (version *swversion.SoftWareVersion, err error) {
 	err = domain.PollHost(
 		ctx,
 		host,
 		func(_ctx context.Context, _host *api.Host) bool {
-			var e error
-			version, e = w.getHostClickHouseVersion(_ctx, _host, versionOptions{skipStopped: true})
-			if e == nil {
+			version = w.getHostClickHouseVersion(_ctx, _host)
+			if version.IsKnown() {
 				return true
 			}
 			w.a.V(1).M(host).F().Warning("Host is NOT alive: %s ", host.GetName())

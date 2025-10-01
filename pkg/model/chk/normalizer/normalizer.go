@@ -17,8 +17,6 @@ package normalizer
 import (
 	"strings"
 
-	"github.com/google/uuid"
-
 	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -29,7 +27,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
@@ -39,23 +36,28 @@ import (
 
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	req     *Request
-	namer   interfaces.INameManager
-	macro   interfaces.IMacro
-	labeler interfaces.ILabeler
+	secretGet subst.SecretGetter
+	req       *Request
+	namer     interfaces.INameManager
+	macro     interfaces.IMacro
+	labeler   interfaces.ILabeler
 }
 
 // New creates new normalizer
 func New() *Normalizer {
 	return &Normalizer{
-		namer:   managers.NewNameManager(managers.NameManagerTypeKeeper),
-		macro:   commonMacro.New(macro.List),
-		labeler: labeler.New(nil),
+		secretGet: nil,
+		namer:     managers.NewNameManager(managers.NameManagerTypeKeeper),
+		macro:     macro.New(),
+		labeler:   labeler.New(nil),
 	}
 }
 
 // CreateTemplated produces ready-to-use object
-func (n *Normalizer) CreateTemplated(subj *chk.ClickHouseKeeperInstallation, options *normalizer.Options) (
+func (n *Normalizer) CreateTemplated(
+	subj *chk.ClickHouseKeeperInstallation,
+	options *normalizer.Options[chk.ClickHouseKeeperInstallation],
+) (
 	*chk.ClickHouseKeeperInstallation,
 	error,
 ) {
@@ -69,27 +71,38 @@ func (n *Normalizer) CreateTemplated(subj *chk.ClickHouseKeeperInstallation, opt
 	return n.normalizeTarget()
 }
 
-func (n *Normalizer) buildRequest(options *normalizer.Options) {
+func (n *Normalizer) buildRequest(options *normalizer.Options[chk.ClickHouseKeeperInstallation]) {
 	n.req = NewRequest(options)
 }
 
 func (n *Normalizer) buildTargetFromTemplates(subj *chk.ClickHouseKeeperInstallation) {
 	// Create new target that will be populated with data during normalization process
-	n.req.SetTarget(n.createTarget())
+	n.req.SetTarget(n.newSubject())
 
 	// At this moment we have target available - it is either newly created or a system-wide template
 
-	// Apply CR templates - both auto and explicitly requested - on top of target
-	n.applyCRTemplatesOnTarget(subj)
+	// Apply internal CR templates on top of target
+	n.applyInternalCRTemplatesOnTarget()
 
-	// After all CR templates applied, place provided 'subject' on top of the whole stack (target)
-	n.req.GetTarget().MergeFrom(subj, chi.MergeTypeOverrideByNonEmptyValues)
+	// Apply external CR templates - both auto and explicitly requested - on top of target
+	n.applyExternalCRTemplatesOnTarget(subj)
+
+	// After all CR templates applied, place provided 'subject' on top of the whole target stack
+	n.applyCROnTarget(subj)
 }
 
-func (n *Normalizer) applyCRTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
-	//for _, template := range crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), subj) {
-	//	n.req.GetTarget().EnsureStatus().PushUsedTemplate(template)
-	//}
+func (n *Normalizer) applyInternalCRTemplatesOnTarget() {
+	for _, template := range n.req.Options().Templates {
+		n.req.GetTarget().MergeFrom(template, chi.MergeTypeOverrideByNonEmptyValues)
+	}
+}
+
+func (n *Normalizer) applyExternalCRTemplatesOnTarget(templateRefSrc crTemplatesNormalizer.TemplateRefListSource) {
+}
+
+func (n *Normalizer) applyCROnTarget(cr *chk.ClickHouseKeeperInstallation) {
+	n.migrateReconcilingBackwardCompatibility(cr)
+	n.req.GetTarget().MergeFrom(cr, chi.MergeTypeOverrideByNonEmptyValues)
 }
 
 func (n *Normalizer) newSubject() *chk.ClickHouseKeeperInstallation {
@@ -118,24 +131,6 @@ func (n *Normalizer) ensureSubject(subj *chk.ClickHouseKeeperInstallation) *chk.
 	}
 }
 
-func (n *Normalizer) getTargetTemplate() *chk.ClickHouseKeeperInstallation {
-	return nil // return chop.Config().Template.CHI.Runtime.Template
-}
-
-func (n *Normalizer) hasTargetTemplate() bool {
-	return n.getTargetTemplate() != nil
-}
-
-func (n *Normalizer) createTarget() *chk.ClickHouseKeeperInstallation {
-	if n.hasTargetTemplate() {
-		// Template specified - start with template
-		return n.getTargetTemplate().DeepCopy()
-	} else {
-		// No template specified - start with clear page
-		return n.newSubject()
-	}
-}
-
 // normalizeTarget normalizes target
 func (n *Normalizer) normalizeTarget() (*chk.ClickHouseKeeperInstallation, error) {
 	n.normalizeSpec()
@@ -149,16 +144,16 @@ func (n *Normalizer) normalizeSpec() {
 	// Walk over Spec datatype fields
 	n.req.GetTarget().GetSpecT().TaskID = n.normalizeTaskID(n.req.GetTarget().GetSpecT().TaskID)
 	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
-	n.req.GetTarget().GetSpecT().Reconciling = n.normalizeReconciling(n.req.GetTarget().GetSpecT().Reconciling)
+	n.normalizeReconciling()
+	n.req.GetTarget().GetSpecT().Reconcile = n.normalizeReconcile(n.req.GetTarget().GetSpecT().Reconcile)
 	n.req.GetTarget().GetSpecT().Defaults = n.normalizeDefaults(n.req.GetTarget().GetSpecT().Defaults)
-	n.req.GetTarget().GetSpecT().Configuration = n.normalizeConfiguration(n.req.GetTarget().GetSpecT().Configuration)
+	n.normalizeConfiguration()
 	n.req.GetTarget().GetSpecT().Templates = n.normalizeTemplates(n.req.GetTarget().GetSpecT().Templates)
 	// UseTemplates already done
 }
 
 // finalize performs some finalization tasks, which should be done after CHI is normalized
 func (n *Normalizer) finalize() {
-	n.req.GetTarget().Fill()
 	n.req.GetTarget().WalkHosts(func(host *chi.Host) error {
 		n.hostApplyHostTemplateSpecifiedOrDefault(host)
 		return nil
@@ -177,7 +172,6 @@ func (n *Normalizer) fillCRAddressInfo() {
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
 	n.req.GetTarget().WalkHosts(func(host *chi.Host) error {
@@ -185,17 +179,33 @@ func (n *Normalizer) fillStatus() {
 		fqdns = append(fqdns, n.namer.Name(interfaces.NameFQDN, host))
 		return nil
 	})
-	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
-	n.req.GetTarget().FillStatus(endpoint, pods, fqdns, ip)
+	ip, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_IP)
+	n.req.GetTarget().FillStatus(n.endpoints(), pods, fqdns, ip)
+}
+
+func (n *Normalizer) endpoints() []string {
+	var names []string
+	if templates, ok := n.req.GetTarget().GetRootServiceTemplates(); ok {
+		for _, template := range templates {
+			names = append(names,
+				n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern(), template),
+			)
+		}
+	} else {
+		names = append(names,
+			n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern()),
+		)
+	}
+	return names
 }
 
 // normalizeTaskID normalizes .spec.taskID
-func (n *Normalizer) normalizeTaskID(taskID *types.String) *types.String {
-	if len(taskID.Value()) > 0 {
+func (n *Normalizer) normalizeTaskID(taskID *types.Id) *types.Id {
+	if taskID.HasValue() {
 		return taskID
 	}
 
-	return types.NewString(uuid.New().String())
+	return types.NewAutoId()
 }
 
 func isNamespaceDomainPatternValid(namespaceDomainPattern *types.String) bool {
@@ -238,15 +248,25 @@ func (n *Normalizer) normalizeDefaults(defaults *chi.Defaults) *chi.Defaults {
 	return defaults
 }
 
-// normalizeConfiguration normalizes .spec.configuration
-func (n *Normalizer) normalizeConfiguration(conf *chk.Configuration) *chk.Configuration {
-	if conf == nil {
-		conf = chk.NewConfiguration()
-	}
+func (n *Normalizer) normalizeConfiguration() {
+	n.req.GetTarget().GetSpecT().Configuration = n.normalizeConfigurationStage1(n.req.GetTarget().GetSpecT().Configuration)
+	n.req.GetTarget().Fill()
+	n.req.GetTarget().GetSpecT().Configuration = n.normalizeConfigurationStage2(n.req.GetTarget().GetSpecT().Configuration)
+}
 
-	n.normalizeConfigurationAllSettingsBasedSections(conf)
-	conf.Clusters = n.normalizeClusters(conf.Clusters)
-	return conf
+// normalizeConfigurationStage1 normalizes .spec.configuration
+func (n *Normalizer) normalizeConfigurationStage1(c *chk.Configuration) *chk.Configuration {
+	c = c.Ensure()
+	c.Clusters = n.normalizeClustersStage1(c.Clusters)
+	return c
+}
+
+// normalizeConfigurationStage2 normalizes .spec.configuration
+func (n *Normalizer) normalizeConfigurationStage2(c *chk.Configuration) *chk.Configuration {
+	n.normalizeConfigurationAllSettingsBasedSections(c)
+
+	c.Clusters = n.normalizeClustersStage2(c.Clusters)
+	return c
 }
 
 // normalizeConfigurationAllSettingsBasedSections normalizes Settings-based configuration
@@ -268,27 +288,63 @@ func (n *Normalizer) normalizeTemplates(templates *chi.Templates) *chi.Templates
 	return templates
 }
 
-// normalizeReconciling normalizes .spec.reconciling
-func (n *Normalizer) normalizeReconciling(reconciling *chi.Reconciling) *chi.Reconciling {
-	if reconciling == nil {
-		reconciling = chi.NewReconciling().SetDefaults()
+func (n *Normalizer) migrateReconcilingBackwardCompatibility(cr *chk.ClickHouseKeeperInstallation) {
+	if cr == nil {
+		return
 	}
-	switch strings.ToLower(reconciling.GetPolicy()) {
-	case strings.ToLower(chi.ReconcilingPolicyWait):
-		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(chi.ReconcilingPolicyWait)
-	case strings.ToLower(chi.ReconcilingPolicyNoWait):
-		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(chi.ReconcilingPolicyNoWait)
-	default:
-		// Unknown value, fallback to default
-		reconciling.SetPolicy(chi.ReconcilingPolicyUnspecified)
+	// Prefer to use Reconciling
+	if cr.Spec.Reconciling != nil {
+		cr.Spec.Reconcile = cr.Spec.Reconciling
+		cr.Spec.Reconciling = nil
 	}
-	reconciling.SetCleanup(n.normalizeReconcilingCleanup(reconciling.GetCleanup()))
-	return reconciling
 }
 
-func (n *Normalizer) normalizeReconcilingCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
+func (n *Normalizer) normalizeReconciling() {
+	// Prefer to use Reconciling
+	if n.req.GetTarget().GetSpecT().Reconciling != nil {
+		n.req.GetTarget().GetSpecT().Reconcile = n.req.GetTarget().GetSpecT().Reconciling
+		n.req.GetTarget().GetSpecT().Reconciling = nil
+	}
+}
+
+// normalizeReconcile normalizes .spec.reconciling
+func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiReconcile {
+	// Ensure reconcile is in place
+	if reconcile == nil {
+		reconcile = chi.NewChiReconcile().SetDefaults()
+	}
+
+	// Policy
+	switch strings.ToLower(reconcile.GetPolicy()) {
+	case strings.ToLower(chi.ReconcilingPolicyWait):
+		// Known value, overwrite it to ensure case-ness
+		reconcile.SetPolicy(chi.ReconcilingPolicyWait)
+	case strings.ToLower(chi.ReconcilingPolicyNoWait):
+		// Known value, overwrite it to ensure case-ness
+		reconcile.SetPolicy(chi.ReconcilingPolicyNoWait)
+	default:
+		// Unknown value, fallback to default
+		reconcile.SetPolicy(chi.ReconcilingPolicyUnspecified)
+	}
+
+	// ConfigMapPropagationTimeout
+	// No normalization yet
+
+	// Cleanup
+	reconcile.SetCleanup(n.normalizeReconcileCleanup(reconcile.GetCleanup()))
+
+	// Macros
+	// No normalization yet
+
+	// Runtime
+	// No normalization yet
+
+	// Host
+	// No normalization yet
+	return reconcile
+}
+
+func (n *Normalizer) normalizeReconcileCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
 	if cleanup == nil {
 		cleanup = chi.NewCleanup()
 	}
@@ -385,13 +441,22 @@ func (n *Normalizer) normalizeServiceTemplate(template *chi.ServiceTemplate) {
 	n.req.GetTarget().GetSpecT().GetTemplates().EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
-// normalizeClusters normalizes clusters
-func (n *Normalizer) normalizeClusters(clusters []*chk.Cluster) []*chk.Cluster {
+// normalizeClustersStage1 normalizes clusters
+func (n *Normalizer) normalizeClustersStage1(clusters []*chk.Cluster) []*chk.Cluster {
 	// We need to have at least one cluster available
 	clusters = n.ensureClusters(clusters)
 	// Normalize all clusters
 	for i := range clusters {
-		clusters[i] = n.normalizeCluster(clusters[i])
+		clusters[i] = n.normalizeClusterStage1(clusters[i])
+	}
+	return clusters
+}
+
+// normalizeClustersStage2 normalizes clusters
+func (n *Normalizer) normalizeClustersStage2(clusters []*chk.Cluster) []*chk.Cluster {
+	// Normalize all clusters
+	for i := range clusters {
+		clusters[i] = n.normalizeClusterStage2(clusters[i])
 	}
 	return clusters
 }
@@ -412,6 +477,9 @@ func (n *Normalizer) ensureClusters(clusters []*chk.Cluster) []*chk.Cluster {
 
 	// Nope, no clusters expected
 	return nil
+}
+
+func (n *Normalizer) appendClusterSecretEnvVar(cluster chi.ICluster) {
 }
 
 const envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS"
@@ -443,23 +511,38 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings) *chi.Setti
 	return files
 }
 
-func ensureCluster(cluster *chk.Cluster) *chk.Cluster {
-	if cluster == nil {
+// normalizeClusterStage1 normalizes cluster and returns deployments usage counters for this cluster
+func (n *Normalizer) normalizeClusterStage1(cluster *chk.Cluster) *chk.Cluster {
+	cluster = cluster.Ensure(func() *chk.Cluster {
 		return commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*chk.Cluster)
-	} else {
-		return cluster
-	}
-}
-
-// normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
-func (n *Normalizer) normalizeCluster(cluster *chk.Cluster) *chk.Cluster {
-	cluster = ensureCluster(cluster)
+	})
 
 	// Runtime has to be prepared first
 	cluster.GetRuntime().SetCR(n.req.GetTarget())
 
-	// Then we need to inherit values from the parent
+	n.normalizeClusterLayout(cluster)
 
+	// Loop over all shards and replicas inside shards and fill structure
+	cluster.WalkShards(func(index int, shard chi.IShard) error {
+		n.normalizeShardStage1(shard.(*chk.ChkShard), cluster, index)
+		return nil
+	})
+
+	cluster.WalkReplicas(func(index int, replica *chk.ChkReplica) error {
+		n.normalizeReplicaStage1(replica, cluster, index)
+		return nil
+	})
+
+	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *chi.Host) error {
+		n.normalizeHostStage1(host, cluster.GetShard(shard), cluster.GetReplica(replica), cluster, shard, replica)
+		return nil
+	})
+
+	return cluster
+}
+
+// normalizeClusterStage2 normalizes cluster and returns deployments usage counters for this cluster
+func (n *Normalizer) normalizeClusterStage2(cluster *chk.Cluster) *chk.Cluster {
 	// Inherit from .spec.configuration.files
 	cluster.InheritFilesFrom(n.req.GetTarget())
 	// Inherit from .spec.defaults
@@ -468,44 +551,52 @@ func (n *Normalizer) normalizeCluster(cluster *chk.Cluster) *chk.Cluster {
 	cluster.Settings = n.normalizeConfigurationSettings(cluster.Settings)
 	cluster.Files = n.normalizeConfigurationFiles(cluster.Files)
 
-	// Ensure layout
-	if cluster.Layout == nil {
-		cluster.Layout = chk.NewChkClusterLayout()
-	}
-	cluster.FillShardReplicaSpecified()
-	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
-	n.ensureClusterLayoutShards(cluster.Layout)
-	n.ensureClusterLayoutReplicas(cluster.Layout)
+	cluster.PDBManaged = n.normalizePDBManaged(cluster.PDBManaged)
+	cluster.PDBMaxUnavailable = n.normalizePDBMaxUnavailable(cluster.PDBMaxUnavailable)
 
-	createHostsField(cluster)
-	//n.appendClusterSecretEnvVar(cluster)
+	n.appendClusterSecretEnvVar(cluster)
 
 	// Loop over all shards and replicas inside shards and fill structure
 	cluster.WalkShards(func(index int, shard chi.IShard) error {
-		n.normalizeShard(shard.(*chk.ChkShard), cluster, index)
+		n.normalizeShardStage2(shard.(*chk.ChkShard), cluster, index)
 		return nil
 	})
 
 	cluster.WalkReplicas(func(index int, replica *chk.ChkReplica) error {
-		n.normalizeReplica(replica, cluster, index)
+		n.normalizeReplicaStage2(replica, cluster, index)
 		return nil
 	})
 
 	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *chi.Host) error {
-		n.normalizeHost(host, cluster.GetShard(shard), cluster.GetReplica(replica), cluster, shard, replica)
+		n.normalizeHostStage2(host, cluster.GetShard(shard), cluster.GetReplica(replica), cluster, shard, replica)
 		return nil
 	})
 
 	return cluster
 }
 
+func (n *Normalizer) normalizeClusterLayout(cluster *chk.Cluster) {
+	cluster.Layout = cluster.Layout.Ensure()
+	cluster.FillShardsReplicasExplicitlySpecified()
+	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
+	n.ensureClusterLayoutShards(cluster.Layout)
+	n.ensureClusterLayoutReplicas(cluster.Layout)
+
+	createHostsField(cluster)
+}
+
+// normalizePDBManaged normalizes PDBManaged
+func (n *Normalizer) normalizePDBManaged(value *types.StringBool) *types.StringBool {
+	return value.Normalize(true)
+}
+
+// normalizePDBMaxUnavailable normalizes PDBMaxUnavailable
+func (n *Normalizer) normalizePDBMaxUnavailable(value *types.Int32) *types.Int32 {
+	return value.Normalize(1)
+}
+
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
 func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLayout *chk.ChkClusterLayout) *chk.ChkClusterLayout {
-	// Ensure layout
-	if clusterLayout == nil {
-		clusterLayout = chk.NewChkClusterLayout()
-	}
-
 	// clusterLayout.ShardsCount
 	// and
 	// clusterLayout.ReplicasCount
@@ -601,9 +692,15 @@ func (n *Normalizer) ensureClusterLayoutReplicas(layout *chk.ChkClusterLayout) {
 	}
 }
 
-// normalizeShard normalizes a shard - walks over all fields
-func (n *Normalizer) normalizeShard(shard *chk.ChkShard, cluster *chk.Cluster, shardIndex int) {
+// normalizeShardStage1 normalizes a shard - walks over all fields
+func (n *Normalizer) normalizeShardStage1(shard *chk.ChkShard, cluster *chk.Cluster, shardIndex int) {
 	n.normalizeShardName(shard, shardIndex)
+	n.normalizeShardReplicasCount(shard, cluster.Layout.ReplicasCount)
+	n.normalizeShardHosts(shard, cluster, shardIndex)
+}
+
+// normalizeShardStage2 normalizes a shard - walks over all fields
+func (n *Normalizer) normalizeShardStage2(shard *chk.ChkShard, cluster *chk.Cluster, shardIndex int) {
 	n.normalizeShardWeight(shard)
 	// For each shard of this normalized cluster inherit from cluster
 	shard.InheritSettingsFrom(cluster)
@@ -611,25 +708,25 @@ func (n *Normalizer) normalizeShard(shard *chk.ChkShard, cluster *chk.Cluster, s
 	shard.InheritFilesFrom(cluster)
 	shard.Files = n.normalizeConfigurationFiles(shard.Files)
 	shard.InheritTemplatesFrom(cluster)
-	// Normalize Replicas
-	n.normalizeShardReplicasCount(shard, cluster.Layout.ReplicasCount)
-	n.normalizeShardHosts(shard, cluster, shardIndex)
 	// Internal replication uses ReplicasCount thus it has to be normalized after shard ReplicaCount normalized
 	//n.normalizeShardInternalReplication(shard)
 }
 
-// normalizeReplica normalizes a replica - walks over all fields
-func (n *Normalizer) normalizeReplica(replica *chk.ChkReplica, cluster *chk.Cluster, replicaIndex int) {
+// normalizeReplicaStage1 normalizes a replica - walks over all fields
+func (n *Normalizer) normalizeReplicaStage1(replica *chk.ChkReplica, cluster *chk.Cluster, replicaIndex int) {
 	n.normalizeReplicaName(replica, replicaIndex)
+	n.normalizeReplicaShardsCount(replica, cluster.Layout.ShardsCount)
+	n.normalizeReplicaHosts(replica, cluster, replicaIndex)
+}
+
+// normalizeReplicaStage2 normalizes a replica - walks over all fields
+func (n *Normalizer) normalizeReplicaStage2(replica *chk.ChkReplica, cluster *chk.Cluster, replicaIndex int) {
 	// For each replica of this normalized cluster inherit from cluster
 	replica.InheritSettingsFrom(cluster)
 	replica.Settings = n.normalizeConfigurationSettings(replica.Settings)
 	replica.InheritFilesFrom(cluster)
 	replica.Files = n.normalizeConfigurationFiles(replica.Files)
 	replica.InheritTemplatesFrom(cluster)
-	// Normalize Shards
-	n.normalizeReplicaShardsCount(replica, cluster.Layout.ShardsCount)
-	n.normalizeReplicaHosts(replica, cluster, replicaIndex)
 }
 
 // normalizeShardReplicasCount ensures shard.ReplicasCount filled properly

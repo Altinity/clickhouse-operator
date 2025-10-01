@@ -1,0 +1,17 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-056-replica-delay"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    clusters:
+      - name: "default"
+        layout:
+          shardsCount: 1
+          replicasCount: 1

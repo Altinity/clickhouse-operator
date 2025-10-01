@@ -75,14 +75,9 @@ func (l *Labeler) LabelMyObjectsTree(ctx context.Context) error {
 	//    name: clickhouse-operator
 	//    uid: a275a8a0-83ae-11e9-b92d-0208b778ea1a
 
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// What pod does operator run in?
-	name, ok1 := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAME)
-	namespace, ok2 := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
+	name, ok1 := chop.GetRuntimeParam(deployment.OPERATOR_POD_NAME)
+	namespace, ok2 := chop.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
 
 	if !ok1 || !ok2 {
 		str := fmt.Sprintf("ERROR read env vars: %s/%s ", deployment.OPERATOR_POD_NAME, deployment.OPERATOR_POD_NAMESPACE)
@@ -124,7 +119,7 @@ func (l *Labeler) LabelMyObjectsTree(ctx context.Context) error {
 }
 
 func (l *Labeler) labelPod(ctx context.Context, namespace, name string) (*core.Pod, error) {
-	pod, err := l.pod.Get(namespace, name)
+	pod, err := l.pod.Get(ctx, namespace, name)
 	if err != nil {
 		log.V(1).M(namespace, name).F().Error("ERROR get Pod %s/%s %v", namespace, name, err)
 		return nil, err
@@ -255,12 +250,7 @@ func (l *Labeler) addLabels(labels map[string]string) map[string]string {
 
 // appendLabelReadyOnPod appends Label "Ready" to the pod of the specified host
 func (l *Labeler) appendLabelReadyOnPod(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	pod, err := l.pod.Get(host)
+	pod, err := l.pod.Get(ctx, host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 		return err
@@ -280,15 +270,10 @@ func (l *Labeler) appendLabelReadyOnPod(ctx context.Context, host *api.Host) err
 
 // deleteLabelReadyOnPod deletes Label "Ready" from the pod of the specified host
 func (l *Labeler) deleteLabelReadyOnPod(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	if host == nil {
 		return nil
 	}
-	pod, err := l.pod.Get(host)
+	pod, err := l.pod.Get(ctx, host)
 	if apiErrors.IsNotFound(err) {
 		// Pod may be missing in case, say, StatefulSet has 0 pods because CHI is stopped
 		// This is not an error, after all
@@ -311,11 +296,6 @@ func (l *Labeler) deleteLabelReadyOnPod(ctx context.Context, host *api.Host) err
 
 // appendAnnotationReadyOnService appends Annotation "Ready" to the service of the specified host
 func (l *Labeler) appendAnnotationReadyOnService(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	svc, err := l.service.Get(ctx, host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get service for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
@@ -336,11 +316,6 @@ func (l *Labeler) appendAnnotationReadyOnService(ctx context.Context, host *api.
 
 // deleteAnnotationReadyOnService deletes Annotation "Ready" from the service of the specified host
 func (l *Labeler) deleteAnnotationReadyOnService(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	if host == nil {
 		return nil
 	}

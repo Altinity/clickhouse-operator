@@ -77,7 +77,7 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error
 	// Try to fetch data from any of the endpoints.
 	for _, host := range c.Hosts {
 		if util.IsContextDone(ctx) {
-			c.l.V(2).Info("ctx is done")
+			c.l.V(1).Info("ctx is done")
 			return nil, nil
 		}
 
@@ -101,7 +101,7 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error
 // Retry logic traverses the list of SQLs multiple times until all SQLs succeed.
 func (c *Cluster) ExecAll(ctx context.Context, queries []string, _opts ...*QueryOptions) error {
 	if util.IsContextDone(ctx) {
-		c.l.V(2).Info("ctx is done")
+		c.l.V(1).Info("ctx is done")
 		return nil
 	}
 
@@ -132,7 +132,7 @@ func (c *Cluster) ExecAll(ctx context.Context, queries []string, _opts ...*Query
 // Retry logic traverses the list of SQLs multiple times until all SQLs succeed
 func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts ...*QueryOptions) error {
 	if util.IsContextDone(ctx) {
-		c.l.V(2).Info("ctx is done")
+		c.l.V(1).Info("ctx is done")
 		return nil
 	}
 	conn := c.getHostConnection(host)
@@ -147,7 +147,7 @@ func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts
 			var errors []error
 			for i, sql := range queries {
 				if util.IsContextDone(ctx) {
-					c.l.V(2).Info("ctx is done")
+					c.l.V(1).Info("ctx is done")
 					return nil
 				}
 				if len(sql) == 0 {
@@ -158,6 +158,18 @@ func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts
 				if err != nil && strings.Contains(err.Error(), "Code: 253") && strings.Contains(sql, "CREATE TABLE") {
 					// WARNING: error message or code may change in newer ClickHouse versions
 					c.l.V(1).M(host).F().Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
+					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
+					err = conn.Exec(ctx, sqlAttach, opts)
+				}
+				if err != nil && strings.Contains(err.Error(), "Code: 57") && strings.Contains(sql, "CREATE TABLE") {
+					// WARNING: error message or code may change in newer ClickHouse versions
+					c.l.V(1).M(host).F().Info("Directory for table already exists. Trying ATTACH TABLE instead")
+					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
+					err = conn.Exec(ctx, sqlAttach, opts)
+				}
+				if err != nil && strings.Contains(err.Error(), "Code: 117") && strings.Contains(sql, "CREATE TABLE") {
+					// WARNING: error message or code may change in newer ClickHouse versions
+					c.l.V(1).M(host).F().Info("Directory for table already exists. Trying ATTACH TABLE instead")
 					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
 					err = conn.Exec(ctx, sqlAttach, opts)
 				}

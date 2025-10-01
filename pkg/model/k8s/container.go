@@ -15,13 +15,23 @@
 package k8s
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	docker "github.com/novln/docker-parser"
 	core "k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // PodSpecAddContainer adds container to PodSpec
 func PodSpecAddContainer(podSpec *core.PodSpec, container core.Container) {
 	podSpec.Containers = append(podSpec.Containers, container)
+}
+
+func ContainerWalkVolumeMounts(container *core.Container, f func(volumeMount *core.VolumeMount)) {
+	for i := range container.VolumeMounts {
+		// Convenience wrapper
+		volumeMount := &container.VolumeMounts[i]
+		f(volumeMount)
+	}
 }
 
 // ContainerAppendVolumeMounts appends multiple VolumeMount(s) to the specified container
@@ -46,10 +56,7 @@ func VolumeMountIsValid(volumeMount core.VolumeMount) bool {
 
 // ContainerAppendVolumeMount appends one VolumeMount to the specified container
 func ContainerAppendVolumeMount(container *core.Container, volumeMount core.VolumeMount) {
-	//
 	// Sanity checks
-	//
-
 	if container == nil {
 		return
 	}
@@ -59,29 +66,33 @@ func ContainerAppendVolumeMount(container *core.Container, volumeMount core.Volu
 		return
 	}
 
+	unableToAppend := false
+
 	// Check that:
-	// 1. Mountable item (VolumeClaimTemplate or Volume) specified in this VolumeMount is NOT already mounted
+	// 1. Mountable item (VolumeClaimTemplate or Volume) specified in VolumeMount to add is NOT already mounted
 	//    in this container by any other VolumeMount (to avoid double-mount of a mountable item)
 	// 2. And specified `mountPath` (say '/var/lib/clickhouse') is NOT already mounted in this container
 	//    by any VolumeMount (to avoid double-mount/rewrite into single `mountPath`)
-	for i := range container.VolumeMounts {
-		// Convenience wrapper
-		existingVolumeMount := &container.VolumeMounts[i]
-
+	ContainerWalkVolumeMounts(container, func(existingVolumeMount *core.VolumeMount) {
 		// 1. Check whether this mountable item is already listed in VolumeMount of this container
 		if volumeMount.Name == existingVolumeMount.Name {
 			// This .templates.VolumeClaimTemplate is already used in VolumeMount
-			return
+			unableToAppend = true
 		}
 
 		// 2. Check whether `mountPath` (say '/var/lib/clickhouse') is already mounted
 		if volumeMount.MountPath == existingVolumeMount.MountPath {
-			// `mountPath` (say /var/lib/clickhouse) is already mounted
-			return
+			// `mountPath` (say /var/lib/clickhouse) is already used as mount point
+			unableToAppend = true
 		}
+	})
+
+	if unableToAppend {
+		// VolumeMount is not good to be added into container
+		return
 	}
 
-	// Add VolumeMount to ClickHouse container to `mountPath` point
+	// Add VolumeMount into container to `mountPath` point
 	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 }
 
@@ -112,4 +123,15 @@ func ContainerEnsurePortByName(container *core.Container, name string, port int3
 		Name:          name,
 		ContainerPort: port,
 	})
+}
+
+func ContainerGetImageTag(container *core.Container) (string, bool) {
+	if container == nil {
+		return "", false
+	}
+	parts, err := docker.Parse(container.Image)
+	if err != nil {
+		return "", false
+	}
+	return parts.Tag(), true
 }

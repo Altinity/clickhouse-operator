@@ -15,12 +15,10 @@
 package action_plan
 
 import (
-	"gopkg.in/d4l3k/messagediff.v1"
-
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"gopkg.in/d4l3k/messagediff.v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ActionPlan is an action plan with list of differences between two CHIs
@@ -42,6 +40,8 @@ type ActionPlan struct {
 
 	attributesDiff  *messagediff.Diff
 	attributesEqual bool
+
+	skipTaskID bool
 }
 
 // NewActionPlan makes new ActionPlan out of two CHIs
@@ -88,6 +88,10 @@ func NewActionPlan(old, new api.ICustomResource) *ActionPlan {
 
 		ap.attributesDiff = nil
 		ap.attributesEqual = true
+	}
+
+	if (new != nil) && new.GetSpec().GetTaskID().IsAutoId() {
+		ap.skipTaskID = true
 	}
 
 	ap.excludePaths()
@@ -151,6 +155,16 @@ func (ap *ActionPlan) isExcludedPath(prev, cur string) bool {
 
 	if ((prev == "Status") && (cur == "Status")) ||
 		((prev == ".Status") && (cur == ".Status")) {
+		return true
+	}
+
+	if ((prev == "Runtime") && (cur == "Version")) ||
+		((prev == ".Runtime") && (cur == ".Version")) {
+		return true
+	}
+
+	if (((prev == "TaskID") && (cur == ".TaskID")) ||
+		((prev == ".TaskID") && (cur == ".TaskID"))) && ap.skipTaskID {
 		return true
 	}
 

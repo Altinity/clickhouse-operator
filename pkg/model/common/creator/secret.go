@@ -15,6 +15,8 @@
 package creator
 
 import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -22,11 +24,14 @@ import (
 )
 
 // CreateClusterSecret creates cluster secret
-func (c *Creator) CreateClusterSecret(name string) *core.Secret {
+func (c *Creator) CreateClusterSecret(cluster api.ICluster) *core.Secret {
 	return &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: c.cr.GetNamespace(),
-			Name:      name,
+			Namespace:       c.cr.GetNamespace(),
+			Name:            c.nm.Name(interfaces.NameClusterAutoSecret, cluster),
+			Labels:          c.macro.Scope(c.cr).Map(c.tagger.Label(interfaces.LabelSecret, cluster)),
+			Annotations:     c.macro.Scope(c.cr).Map(c.tagger.Annotate(interfaces.AnnotateSecret, cluster)),
+			OwnerReferences: c.or.CreateOwnerReferences(c.cr),
 		},
 		StringData: map[string]string{
 			"secret": util.RandStringRange(10, 20),

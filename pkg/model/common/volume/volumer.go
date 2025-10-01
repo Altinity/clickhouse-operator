@@ -22,21 +22,21 @@ import (
 
 func GetVolumeClaimTemplate(host *api.Host, volumeMount *core.VolumeMount) (*api.VolumeClaimTemplate, bool) {
 	volumeClaimTemplateName := volumeMount.Name
-	volumeClaimTemplate, ok := host.GetCR().GetVolumeClaimTemplate(volumeClaimTemplateName)
+	volumeClaimTemplate, found := host.GetCR().GetVolumeClaimTemplate(volumeClaimTemplateName)
 	// Sometimes it is impossible to find VolumeClaimTemplate related to specified volumeMount.
 	// May be this volumeMount is not created from VolumeClaimTemplate, it may be a reference to a ConfigMap
-	return volumeClaimTemplate, ok
+	return volumeClaimTemplate, found
 }
 
 func GetPVCReclaimPolicy(host *api.Host, template *api.VolumeClaimTemplate) api.PVCReclaimPolicy {
 	// Order by priority
 
 	// VolumeClaimTemplate.PVCReclaimPolicy, in case specified
-	if template.PVCReclaimPolicy != api.PVCReclaimPolicyUnspecified {
+	if template.PVCReclaimPolicy.IsSpecified() {
 		return template.PVCReclaimPolicy
 	}
 
-	if host.GetCR().GetSpec().GetDefaults().StorageManagement.PVCReclaimPolicy != api.PVCReclaimPolicyUnspecified {
+	if host.GetCR().GetSpec().GetDefaults().StorageManagement.PVCReclaimPolicy.IsSpecified() {
 		return host.GetCR().GetSpec().GetDefaults().StorageManagement.PVCReclaimPolicy
 	}
 
@@ -47,12 +47,13 @@ func GetPVCReclaimPolicy(host *api.Host, template *api.VolumeClaimTemplate) api.
 func GetPVCProvisioner(host *api.Host, template *api.VolumeClaimTemplate) api.PVCProvisioner {
 	// Order by priority
 
-	// VolumeClaimTemplate.PVCProvisioner, in case specified
-	if template.PVCProvisioner != api.PVCProvisionerUnspecified {
+	// Own PVCProvisioner from the template (VolumeClaimTemplate.PVCProvisioner) has top priority, in case specified
+	if template.PVCProvisioner.IsSpecified() {
 		return template.PVCProvisioner
 	}
 
-	if host.GetCR().GetSpec().GetDefaults().StorageManagement.PVCProvisioner != api.PVCProvisionerUnspecified {
+	// Then try PVCProvisioner from the CR, in case specified
+	if host.GetCR().GetSpec().GetDefaults().StorageManagement.PVCProvisioner.IsSpecified() {
 		return host.GetCR().GetSpec().GetDefaults().StorageManagement.PVCProvisioner
 	}
 

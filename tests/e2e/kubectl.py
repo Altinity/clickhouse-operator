@@ -71,29 +71,43 @@ def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None):
             shell=shell
         )
 
-def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
+
+def delete_chi(chi, ns=None, wait=True, ok_undeleted = False, ok_to_fail=False, shell=None):
     delete_kind("chi", chi, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
     if wait:
-            wait_objects(
-                chi,
-                {
-                    "statefulset": 0,
-                    "pod": 0,
-                    "service": 0,
-                },
-                ns,
-                shell=shell
-            )
+        wait_objects(
+            chi,
+            {
+                "statefulset": 0,
+                "pod": 0,
+                "service": 0
+            },
+            ns,
+            shell=shell
+        )
+
+        with Then("All objects should be deleted"):
+            cnt = get_count("all", chi=chi, ns=ns, shell=shell)
+            not_deleted_objects = get_obj_names(chi, "pod,service,sts,pvc,cm,pdb,secret", ns=ns, shell=shell)
+            not_deleted_objects_ext = get_obj_names_grepped("pod,service,sts,pvc,cm,pdb,secret", grep=chi, ns=ns, shell=shell)
+            if len(not_deleted_objects) > 0 or len(not_deleted_objects_ext) > 0:
+                print("WARNING: some objects were not deleted:")
+                print(*not_deleted_objects_ext, sep='\n')
+
+            assert ok_undeleted or cnt == 0
 
 
 def delete_chk(chk, ns=None, wait=True, ok_to_fail=False, shell=None):
     delete_kind("chk", chk, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
 
+
 def delete_all_chi(ns=None):
     delete_all("chi", ns=ns)
 
+
 def delete_all_chk(ns=None):
     delete_all("chk", ns=ns)
+
 
 def delete_all(kind, ns=None):
     crds = launch("get crds -o=custom-columns=name:.spec.names.shortNames[0]", ns=ns).splitlines()
@@ -193,7 +207,7 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
         check_configmaps(chi_name, ns=ns, shell=shell)
 
     if "pdb" in check:
-        check_pdb(chi_name, check["pdb"], ns=ns, shell=shell)
+        check_pdb(chi_name, kind, check["pdb"], ns=ns, shell=shell)
 
     if "do_not_delete" not in check:
         delete_chi(chi_name, ns=ns, shell=shell)
@@ -201,11 +215,25 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
 
 def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None):
     out = launch(f"get {kind} {name} {label} -o json", ns=ns, ok_to_fail=ok_to_fail, shell=shell)
-    return json.loads(out.strip())
+    stripped = out.strip()
+
+    if not stripped or stripped.startswith("Error"):
+        if ok_to_fail:
+            return None
+        raise ValueError(f"kubectl returned error: {stripped}")
+
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError as e:
+        if ok_to_fail:
+            return None
+        raise ValueError(f"Failed to parse JSON from: {stripped}") from e
+
 
 def get_chi_normalizedCompleted(chi, ns=None, shell=None):
     chi_storage = get("configmap", f"chi-storage-{chi}", ns=ns)
     return json.loads(chi_storage["data"]["status-normalizedCompleted"])
+
 
 def create_ns(ns):
     if ns is None:
@@ -372,15 +400,21 @@ def wait_chk_status(chk, status, ns=None, retries=max_retries, throw_error=True,
 
 
 def get_chi_status(chi, ns=None):
-    get_field("chi", chi, ".status.status", ns)
+    return get_field("chi", chi, ".status.status", ns)
 
 
-def wait_pod_status(pod, status,shell=None, ns=None):
+def wait_pod_status(pod, status, shell=None, ns=None):
     wait_field("pod", pod, ".status.phase", status, ns, shell=shell)
 
 
-def wait_container_status(pod, status, ns=None):
-    wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns)
+def get_pod_status(pod, shell=None, ns=None):
+    return get_field("pod", pod, ".status.phase", ns, shell=shell)
+
+def wait_container_status(pod, status, shell=None, ns=None):
+    wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns, shell=shell)
+
+def get_container_status(pod, shell=None, ns=None):
+    return get_field("pod", pod, ".status.containerStatuses[0]", ns, shell=shell)
 
 
 def wait_field(
@@ -395,12 +429,13 @@ def wait_field(
     shell=None,
 ):
     with Then(f"{kind} {name} {field} should be {value}"):
+        cur_value = get_field(kind, name, field, ns, shell=shell)
         for i in range(1, retries):
-            cur_value = get_field(kind, name, field, ns, shell=shell)
             if cur_value == value:
                 break
             with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
                 time.sleep(i * backoff)
+            cur_value = get_field(kind, name, field, ns, shell=shell)
         assert cur_value == value or throw_error is False, error()
 
 
@@ -452,7 +487,7 @@ def get_default_storage_class(ns=None):
     out = launch(
         f"get storageclass "
         f"-o=custom-columns="
-        f'DEFAULT:".metadata.annotations.storageclass\.kubernetes\.io/is-default-class",NAME:.metadata.name',
+        r'DEFAULT:".metadata.annotations.storageclass\.kubernetes\.io/is-default-class",NAME:.metadata.name',
         ns=ns,
     ).splitlines()
     for line in out[1:]:
@@ -462,7 +497,7 @@ def get_default_storage_class(ns=None):
     out = launch(
         f"get storageclass "
         f"-o=custom-columns="
-        f'DEFAULT:".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class",NAME:.metadata.name',
+        r'DEFAULT:".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class",NAME:.metadata.name',
         ns=ns,
     ).splitlines()
     for line in out[1:]:
@@ -479,6 +514,19 @@ def get_pod_spec(chi_name, pod_name="", ns=None, shell=None):
         pod = get("pod", pod_name, ns=ns, shell=shell)
     return pod["spec"]
 
+def get_pod_status_full(chi_name, pod_name="", ns=None, shell=None):
+    label = f"-l clickhouse.altinity.com/chi={chi_name}"
+    if pod_name == "":
+        pod = get("pod", "", ns=ns, label=label, shell=shell)["items"][0]
+    else:
+        pod = get("pod", pod_name, ns=ns, shell=shell)
+    return pod["status"]
+
+
+def get_clickhouse_start(chi_name, ns=None, shell=None):
+    pod_name = get_pod_names(chi_name, ns=ns, shell=shell)[0]
+    return get_field("pod", pod_name, ".status.containerStatuses[0].state.running.startedAt")
+
 
 def get_pod_image(chi_name, pod_name="", ns=None, shell=None):
     pod_image = get_pod_spec(chi_name, pod_name, ns, shell=shell)["containers"][0]["image"]
@@ -486,20 +534,23 @@ def get_pod_image(chi_name, pod_name="", ns=None, shell=None):
 
 
 def get_pod_names(chi_name, ns=None, shell=None):
-    pod_names = launch(
-        f"get pods -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
-        ns=ns,
-        shell=shell
-    ).splitlines()
-    return pod_names[1:]
+    return get_obj_names(chi_name, "pods", ns, shell)
 
 
-def get_obj_names(chi_name, obj_type="pods", ns=None):
-    pod_names = launch(
+def get_obj_names(chi_name, obj_type="pods", ns=None, shell=None):
+    obj_names = launch(
         f"get {obj_type} -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
         ns=ns,
     ).splitlines()
-    return pod_names[1:]
+    return obj_names[1:]
+
+
+def get_obj_names_grepped(obj_type="pods", grep = '', ns=None, shell=None):
+    obj_names = launch(
+        f"get {obj_type} -o=custom-columns=type:.kind,name:.metadata.name",
+        ns=ns,
+    ).splitlines()[1:]
+    return sorted(filter(lambda o: grep in o, obj_names))
 
 
 def get_pod_volumes(chi_name, pod_name="", ns=None, shell=None):
@@ -582,11 +633,23 @@ def check_pod_antiaffinity(
         assert pod_spec["affinity"]["podAntiAffinity"] == expected
 
 
-def check_service(service_name, service_type, ns=None, shell=None):
+def check_service(service_name, service_type, headless = False, ns=None, shell=None):
     with When(f"{service_name} is available"):
         service = get("service", service_name, ns=ns, shell=shell)
+
         with Then(f"Service type is {service_type}"):
             assert service["spec"]["type"] == service_type
+
+        if service_type == "ClusterIP":
+            clusterIP = service["spec"]["clusterIP"]
+            if headless:
+                with Then("clusterIP should be None"):
+                    if clusterIP != "None":
+                        print(f"ERROR: clusterIP should be None but it is: {clusterIP}")
+                    assert clusterIP == "None"
+            else:
+                with Then("clusterIP should be set"):
+                    assert clusterIP != "None"
 
 
 def check_configmaps(chi_name, ns=None, shell=None):
@@ -619,13 +682,44 @@ def check_configmap(cfg_name, values, ns=None, shell=None):
             assert v in cfm["data"], error()
 
 
-def check_pdb(chi, clusters, ns=None, shell=None):
+def check_pdb(chi, kind, clusters, ns=None, shell=None):
+    if kind == "chi":
+        label = "clickhouse.altinity.com"
+    elif kind == "chk":
+        label = "clickhouse-keeper.altinity.com"
+    else:
+        error("Unknown kind:" + kind)
+
     for c in clusters.keys():
         with Then(f"PDB is configured for cluster {c}"):
-            pdb = get("pdb", chi + "-" + c, shell=shell)
+            is_managed = True
+            if isinstance(clusters[c], dict):
+                is_managed = clusters[c].get("is_managed", True)
+                max_unavailable = clusters[c].get("max_unavailable", 1)
+            else:
+                # Treat simple integer as maxUnavailable to ensure backward compatibility.
+                max_unavailable = clusters[c]
+
+            pdb = get("pdb", kind + "-" + chi + "-" + c, ok_to_fail=is_managed is False, shell=shell)
+
+            if not is_managed:
+                assert pdb is None
+                continue
+
             labels = pdb["spec"]["selector"]["matchLabels"]
-            assert labels["clickhouse.altinity.com/app"] == "chop"
-            assert labels["clickhouse.altinity.com/chi"] == chi
-            assert labels["clickhouse.altinity.com/cluster"] == c
-            assert labels["clickhouse.altinity.com/namespace"] == current().context.test_namespace
-            assert pdb["spec"]["maxUnavailable"] == clusters[c]
+            assert labels[f"{label}/app"] == "chop"
+            if kind == "chi":
+                assert labels[f"{label}/chi"] == chi
+            else:
+                assert labels[f"{label}/chk"] == chi
+            assert labels[f"{label}/cluster"] == c
+            assert labels[f"{label}/namespace"] == current().context.test_namespace
+            assert pdb["spec"]["maxUnavailable"] == max_unavailable
+
+
+def force_reconcile(chi, taskID="reconcile", ns=None, shell=None):
+    with Then(f"Trigger CHI reconcile with taskID:\"{taskID}\""):
+        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"{taskID}"}}]\''
+        launch(cmd, ns=ns, shell=shell)
+        wait_chi_status(chi, "InProgress", ns=ns, shell=shell)
+        wait_chi_status(chi, "Completed", ns=ns, shell=shell)

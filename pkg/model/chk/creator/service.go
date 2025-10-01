@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -25,7 +26,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 )
 
 const (
@@ -45,13 +45,13 @@ type ServiceManager struct {
 func NewServiceManager() *ServiceManager {
 	return &ServiceManager{
 		or:      NewOwnerReferencer(),
-		macro:   commonMacro.New(macro.List),
+		macro:   macro.New(),
 		namer:   namer.New(),
 		labeler: nil,
 	}
 }
 
-func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
+func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...any) util.Slice[*core.Service] {
 	switch what {
 	case interfaces.ServiceCR:
 		return m.createServiceCR()
@@ -59,19 +59,19 @@ func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...an
 		var cluster chi.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(chi.ICluster)
-			return m.createServiceCluster(cluster)
+			return []*core.Service{m.createServiceCluster(cluster)}
 		}
 	case interfaces.ServiceShard:
 		var shard chi.IShard
 		if len(params) > 0 {
 			shard = params[0].(chi.IShard)
-			return m.createServiceShard(shard)
+			return []*core.Service{m.createServiceShard(shard)}
 		}
 	case interfaces.ServiceHost:
 		var host *chi.Host
 		if len(params) > 0 {
 			host = params[0].(*chi.Host)
-			return m.createServiceHost(host)
+			return []*core.Service{m.createServiceHost(host)}
 		}
 	}
 	panic("unknown service type")
@@ -86,23 +86,28 @@ func (m *ServiceManager) SetTagger(tagger interfaces.ITagger) {
 }
 
 // createServiceCR creates new core.Service for specified CR
-func (m *ServiceManager) createServiceCR() *core.Service {
+func (m *ServiceManager) createServiceCR() []*core.Service {
 	if m.cr.IsZero() {
 		return nil
 	}
-	if template, ok := m.cr.GetRootServiceTemplate(); ok {
-		// .templates.ServiceTemplate specified
-		return creator.CreateServiceFromTemplate(
-			template,
-			m.cr.GetNamespace(),
-			m.namer.Name(interfaces.NameCRService, m.cr),
-			m.tagger.Label(interfaces.LabelServiceCR, m.cr),
-			m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr),
-			m.tagger.Selector(interfaces.SelectorCRScopeReady),
-			m.or.CreateOwnerReferences(m.cr),
-			m.macro.Scope(m.cr),
-			m.labeler,
-		)
+	if templates, ok := m.cr.GetRootServiceTemplates(); ok {
+		var services []*core.Service
+		for _, template := range templates {
+			services = append(services,
+				creator.CreateServiceFromTemplate(
+					template,
+					m.cr.GetNamespace(),
+					m.namer.Name(interfaces.NameCRService, m.cr, template),
+					m.tagger.Label(interfaces.LabelServiceCR, m.cr),
+					m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr),
+					m.tagger.Selector(interfaces.SelectorCRScopeReady),
+					m.or.CreateOwnerReferences(m.cr),
+					m.macro.Scope(m.cr),
+					m.labeler,
+				),
+			)
+		}
+		return services
 	}
 
 	// Create default Service
@@ -137,7 +142,8 @@ func (m *ServiceManager) createServiceCR() *core.Service {
 		},
 	}
 	m.labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
-	return svc
+
+	return []*core.Service{svc}
 }
 
 // createServiceCluster creates new core.Service for specified Cluster

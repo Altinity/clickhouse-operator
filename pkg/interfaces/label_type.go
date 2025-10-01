@@ -33,9 +33,8 @@ const (
 	LabelNewPVC      LabelType = "Label new pvc"
 	LabelExistingPVC LabelType = "Label existing pvc"
 
-	LabelPDB LabelType = "Label pdb"
-
-	LabelSTS LabelType = "Label STS"
-
+	LabelPDB         LabelType = "Label pdb"
+	LabelSecret      LabelType = "Label secret"
+	LabelSTS         LabelType = "Label STS"
 	LabelPodTemplate LabelType = "Label PodTemplate"
 )

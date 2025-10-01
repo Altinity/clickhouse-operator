@@ -29,11 +29,6 @@ import (
 
 // OnStatefulSetCreateFailed handles situation when StatefulSet create failed on k8s level
 func (c *Controller) OnStatefulSetCreateFailed(ctx context.Context, host *api.Host) common.ErrorCRUD {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return common.ErrCRUDIgnore
-	}
-
 	// What to do with StatefulSet - look into chop configuration settings
 	switch chop.Config().Reconcile.StatefulSet.Create.OnFailure {
 	case api.OnStatefulSetCreateFailureActionAbort:
@@ -69,21 +64,16 @@ func (c *Controller) OnStatefulSetCreateFailed(ctx context.Context, host *api.Ho
 // OnStatefulSetUpdateFailed handles situation when StatefulSet update failed in k8s level
 // It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
 func (c *Controller) OnStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *apps.StatefulSet, host *api.Host, kubeSTS interfaces.IKubeSTS) common.ErrorCRUD {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return common.ErrCRUDIgnore
-	}
-
 	// What to do with StatefulSet - look into chop configuration settings
 	switch chop.Config().Reconcile.StatefulSet.Update.OnFailure {
 	case api.OnStatefulSetUpdateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
-		log.V(1).M(host).F().Info("abort StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
+		log.V(1).M(host).F().Info("ABORT StatefulSet: %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
 		return common.ErrCRUDAbort
 
 	case api.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
-		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
+		log.V(1).M(host).F().Info("ROLLBACK StatefulSet: %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
 		curStatefulSet, err := kubeSTS.Get(ctx, host)
 		if err != nil {
 			log.V(1).M(host).F().Warning("Unable to fetch current StatefulSet %s. err: %q", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()), err)

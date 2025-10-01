@@ -3,16 +3,17 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "altinity-clickhouse-operator.fullname" . }}-dashboards
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
   labels:
     {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
-{{- if .Values.dashboards.additionalLabels }}
+    {{- if .Values.dashboards.additionalLabels }}
     {{- toYaml .Values.dashboards.additionalLabels | nindent 4 }}
-{{- end }}
-{{- with .Values.dashboards.annotations }}
+    {{- end }}
   annotations:
-    {{- toYaml . | nindent 4 }}
-{{- end }}
+    {{- include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
+    {{- if .Values.dashboards.annotations }}
+    {{- toYaml .Values.dashboards.annotations | nindent 4 }}
+    {{- end }}
 data:
 {{- range $path, $_ := .Files.Glob "files/*.json" }}
   {{ $path | trimPrefix "files/" }}: |- {{ $.Files.Get $path | nindent 4 -}}

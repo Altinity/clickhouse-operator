@@ -51,3 +51,6 @@ tests/*.html
 
 # Ignore DevSpace cache and log folder
 /.devspace
+
+# agents
+.aider*

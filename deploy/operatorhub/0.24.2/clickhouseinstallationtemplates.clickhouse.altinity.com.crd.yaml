@@ -591,7 +591,7 @@ spec:
                         any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
                         look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                        secret value will pass in `pod.spec.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
+                        secret value will pass in `pod.spec.env`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
                         it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
@@ -1010,7 +1010,7 @@ spec:
                             properties:
                               name:
                                 type: string
-                                description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
+                                description: "by default, hostname will generate, but this allows define custom name for each `clickhouse-server`"
                                 minLength: 1
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
@@ -1264,7 +1264,7 @@ spec:
                         description: "name of `ClickHouseInstallationTemplate` (chit) resource"
                       namespace:
                         type: string
-                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clichouse-operator`"
+                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clickhouse-operator`"
                       useType:
                         type: string
                         description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit`"
