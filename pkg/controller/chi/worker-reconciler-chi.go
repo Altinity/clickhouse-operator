@@ -107,7 +107,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
 
 		metrics.CHIReconcilesCompleted(ctx, new)
-		metrics.CHIReconcilesTimings(ctx, new, time.Now().Sub(startTime).Seconds())
+		metrics.CHIReconcilesTimings(ctx, new, time.Since(startTime).Seconds())
 	}
 
 	return nil
@@ -732,7 +732,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	})
 
 	metrics.HostReconcilesCompleted(ctx, host.GetCR())
-	metrics.HostReconcilesTimings(ctx, host.GetCR(), time.Now().Sub(startTime).Seconds())
+	metrics.HostReconcilesTimings(ctx, host.GetCR(), time.Since(startTime).Seconds())
 
 	return nil
 }
@@ -908,8 +908,8 @@ func (w *worker) reconcileHostIncludeIntoAllActivities(ctx context.Context, host
 		l.Info("Reconcile Host completed. Host is stopped: %s", host.GetName())
 		return nil
 	case host.IsTroubleshoot():
-		return nil
 		l.Info("Reconcile Host completed. Host is in troubleshoot mode: %s", host.GetName())
+		return nil
 	}
 
 	// Report host software version

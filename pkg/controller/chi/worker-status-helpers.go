@@ -80,6 +80,7 @@ func (w *worker) isPodRestarted(ctx context.Context, host *api.Host, initialRest
 
 func (w *worker) doesHostHaveNoRunningQueries(ctx context.Context, host *api.Host) bool {
 	n, _ := w.ensureClusterSchemer(host).HostActiveQueriesNum(ctx, host)
+	log.V(1).Info("active queries %d host: %s", n, host.GetName())
 	return n <= 1
 }
 

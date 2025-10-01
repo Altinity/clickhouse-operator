@@ -3,13 +3,18 @@ kind: ClickHouseInstallation
 metadata:
   name: test-043-0-logs-customization
 spec:
+  defaults:
+    templates:
+      podTemplate: default
+      logVolumeClaimTemplate: log-volume-template
+  useTemplates:
+    - name: clickhouse-version
   templates:
     podTemplates:
-    - name: pod-template
+    - name: default
       spec:
         containers:
-          - name: clickhouse
-            image: clickhouse/clickhouse-server:24.8
+          - name: clickhouse-pod
           - name: clickhouse-log
             image: registry.access.redhat.com/ubi8/ubi-minimal:latest
             command:
@@ -26,7 +31,3 @@ spec:
           resources:
             requests:
               storage: 10Mi
-  defaults:
-    templates:
-      podTemplate: pod-template
-      logVolumeClaimTemplate: log-volume-template
