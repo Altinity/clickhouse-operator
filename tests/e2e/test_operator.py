@@ -2764,7 +2764,7 @@ def test_010023(self):
 
 
 @TestScenario
-@Name("test_010024№ Test annotations for various template types")
+@Name("test_010024# Test annotations for various template types")
 @Requirements(RQ_SRS_026_ClickHouseOperator_AnnotationsInTemplates("1.0"))
 def test_010024(self):
     create_shell_namespace_clickhouse_template()
