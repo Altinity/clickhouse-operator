@@ -106,7 +106,7 @@ jobs:
 
           for test_file in ./tests/e2e/test_operator*.py; do
             name=$(basename "$test_file" .py | sed 's/^test_//')
-            run_cmd="~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e?test_${name}/${ONLY} $test_mode --trim-results on -o short --native --log ./tests/raw_${name}.log && "
+            run_cmd="~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e?test_${name}/${ONLY} $test_mode --no-colors --trim-results on -o short --native --log ./tests/raw_${name}.log && "
             run_cmd+="~/venv/qa/bin/tfs --no-colors transform compact ./tests/raw_${name}.log ./tests/compact_${name}.log.txt && "
             run_cmd+="~/venv/qa/bin/tfs --no-colors transform nice ./tests/raw_${name}.log ./tests/nice_${name}.log.txt && "
             run_cmd+="~/venv/qa/bin/tfs --no-colors transform short ./tests/raw_${name}.log ./tests/short_${name}.log.txt && "
