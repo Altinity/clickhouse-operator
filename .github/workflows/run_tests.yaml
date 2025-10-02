@@ -77,6 +77,10 @@ jobs:
         run: |
           NO_WAIT=1 bash ./deploy/minio/create-minio.sh
 
+      - name: Deploy zookeeper-operator
+        run: |
+          bash ./deploy/zookeeper/zookeeper-with-zookeeper-operator/install-zookeeper-operator.sh
+
       - name: Run Tests
         id: run-tests
         continue-on-error: true
