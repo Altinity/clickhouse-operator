@@ -121,6 +121,16 @@ func (cm *ConfigManager) Config() *api.OperatorConfig {
 	return cm.config
 }
 
+// KubeClient is an access wrapper
+func (cm *ConfigManager) KubeClient() *kube.Clientset {
+	return cm.kubeClient
+}
+
+// ChopClient is an access wrapper
+func (cm *ConfigManager) ChopClient() *chopClientSet.Clientset {
+	return cm.chopClient
+}
+
 // getAllCRBasedConfigs reads all ClickHouseOperatorConfiguration objects in specified namespace
 func (cm *ConfigManager) getAllCRBasedConfigs(namespace string) {
 	// We need to have chop kube client available in order to fetch ClickHouseOperatorConfiguration objects

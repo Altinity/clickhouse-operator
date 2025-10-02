@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package altinity.backup.v1;
+option go_package = "github.com/altinity/clickhouse-operator/pkg/plugin/backup";
+
+// Service definition for managing backups
+service Backup {
+  // Trigger a ClickHouse backup
+  rpc Backup (BackupRequest) returns (BackupResult);
+}
+
+// Request to initiate a backup
+message BackupRequest {
+  // REQUIRED. JSON serialization of the CHI being backed up
+  bytes chi_definition = 1;
+
+  // REQUIRED. JSON serialization of the Backup object
+  bytes backup_definition = 2;
+
+  //} Backup configuration parameters (from Backup or ScheduledBackup object)
+  map<string, string> parameters = 3;
+}
+
+// Result returned after backup completes
+message BackupResult {
+  // REQUIRED. Machine-readable ID of the backup
+  string backup_id = 1;
+
+  // OPTIONAL. Human-readable name of the backup
+  string backup_name = 2;
+
+  // REQUIRED. Unix timestamp of the start time of the backup
+  int64 started_at = 3;
+
+  // REQUIRED. Unix timestamp of the stop time of the backup
+  int64 stopped_at = 4;
+
+  // OPTIONAL. Plugin-specific metadata key/values
+  map<string, string> metadata = 5;
+}
