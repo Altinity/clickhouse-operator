@@ -83,7 +83,6 @@ jobs:
 
       - name: Run Tests
         id: run-tests
-        continue-on-error: true
         run: |
           echo "Test run settings:"
           echo "  test mode: ${{ github.event.inputs.test_mode }}"
