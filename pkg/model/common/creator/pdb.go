@@ -15,23 +15,37 @@
 package creator
 
 import (
+	"fmt"
+
 	policy "k8s.io/api/policy/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 // CreatePodDisruptionBudget creates new PodDisruptionBudget
 func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDisruptionBudget {
+	// Determine prefix based on CR type
+	var prefix string
+	switch c.cr.(type) {
+	case *api.ClickHouseInstallation:
+		prefix = "chi-"
+	case *apiChk.ClickHouseKeeperInstallation:
+		prefix = "chk-"
+	default:
+		prefix = ""
+	}
+
 	return &policy.PodDisruptionBudget{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "PodDisruptionBudget",
 			APIVersion: "policy/v1",
 		},
 		ObjectMeta: meta.ObjectMeta{
-			Name:            c.nm.Name(interfaces.NameClusterPDB, cluster),
+			Name:            fmt.Sprintf("%s%s-%s", prefix, cluster.GetRuntime().GetAddress().GetCRName(), cluster.GetRuntime().GetAddress().GetClusterName()),
 			Namespace:       c.cr.GetNamespace(),
 			Labels:          c.macro.Scope(c.cr).Map(c.tagger.Label(interfaces.LabelPDB, cluster)),
 			Annotations:     c.macro.Scope(c.cr).Map(c.tagger.Annotate(interfaces.AnnotatePDB, cluster)),
