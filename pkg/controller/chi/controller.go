@@ -350,7 +350,7 @@ func isUpdatedEndpoints(old, new *core.Endpoints) bool {
 }
 
 func isUpdatedEndpointSlice(old, new *discovery.EndpointSlice) bool {
-	log.V(1).M(new).F().Info("Check whether is updated EndpointSlice. %s/%s Transition: '%s'=>'%s'", new.Namespace, new.Name, buildComparableEndpointAddresses(old), buildComparableEndpointAddresses(new))
+	log.V(2).M(new).F().Info("Check whether is updated EndpointSlice. %s/%s Transition: '%s'=>'%s'", new.Namespace, new.Name, buildComparableEndpointAddresses(old), buildComparableEndpointAddresses(new))
 	return buildComparableEndpointAddresses(old) != buildComparableEndpointAddresses(new)
 }
 
