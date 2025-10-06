@@ -288,9 +288,39 @@ func (w *Reconciler) reconcilePVC(
 		return nil, fmt.Errorf("task is done")
 	}
 
+	//
+	// NB. PVC reconcile updates limited number of fields due to static PVC nature
+	//
+
+	// Resources can be reconciled (partially - enlarged only) w/o PVC recreation
 	model.VolumeClaimTemplateApplyResourcesRequestsOnPVC(template, pvc)
+	// Labels and annotations can be reconciled w/o PVC recreation
 	pvc = w.task.Creator().TagPVC(pvc, host, template)
+	// VolumeAttributeClass can be reconciled (partially - assigned only) w/o PVC recreation
+	pvc = w.reconcileVolumeAttributeClass(pvc, template)
+
+	// Reconcile
 	return w.pvc.UpdateOrCreate(ctx, pvc)
+}
+
+func (w *Reconciler) reconcileVolumeAttributeClass(pvc *core.PersistentVolumeClaim, template *api.VolumeClaimTemplate) *core.PersistentVolumeClaim {
+	if template == nil {
+		return pvc
+	}
+	if pvc == nil {
+		return pvc
+	}
+
+	// VolumeAttributesClassName specifies VolumeAttributesClass used by the PVC.
+	// VolumeAttributesClassName can be changed after the claim is created.
+	// It's not allowed to reset this field to empty string once it is set.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+	if (template.Spec.VolumeAttributesClassName != nil) && (*template.Spec.VolumeAttributesClassName != "") {
+		// We have VolumeAttributesClassName specified
+		volumeAttributesClassName := *template.Spec.VolumeAttributesClassName
+		pvc.Spec.VolumeAttributesClassName = &volumeAttributesClassName
+	}
+	return pvc
 }
 
 func (w *Reconciler) deletePVC(ctx context.Context, pvc *core.PersistentVolumeClaim) bool {
