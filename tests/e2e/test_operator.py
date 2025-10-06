@@ -2903,14 +2903,6 @@ def test_010025(self):
         timeout=600,
     )
 
-    kubectl.wait_jsonpath(
-        "pod",
-        "chi-test-025-rescaling-default-0-0-0",
-        "{.status.containerStatuses[0].ready}",
-        "true",
-        ns=self.context.test_namespace,
-    )
-
     numbers = "100000000"
 
     with Given("Create replicated table and populate it"):
@@ -4233,6 +4225,10 @@ def test_010040_1(self):
     kubectl.create_and_check(
         manifest=manifest,
         check={
+            "apply_templates": {
+                current().context.clickhouse_template,
+            },
+            "pod_image": current().context.clickhouse_version,
             "pod_count": 1,
             "do_not_delete": 1,
         },
@@ -4279,6 +4275,10 @@ def test_010041(self):
         kubectl.create_and_check(
             manifest=manifest,
             check={
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "pod_image": current().context.clickhouse_version,
                 "pod_count": 2,
                 "do_not_delete": 1,
             },
@@ -4424,6 +4424,8 @@ def test_010042(self):
 def test_043(self, manifest):
     """Check that clickhouse-operator support logs container customizing."""
 
+    create_shell_namespace_clickhouse_template()
+
     cluster = "cluster"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
@@ -4431,6 +4433,10 @@ def test_043(self, manifest):
         kubectl.create_and_check(
             manifest=manifest,
             check={
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "pod_image": current().context.clickhouse_version,
                 "pod_count": 1,
                 "do_not_delete": 1,
                 },
@@ -4464,7 +4470,6 @@ def test_043(self, manifest):
 @Name("test_010043_0. Logs container customizing using PodTemplate")
 def test_010043_0(self):
     """Check that clickhouse-operator support manual logs container customizing."""
-    create_shell_namespace_clickhouse_template()
 
     test_043(manifest="manifests/chi/test-043-0-logs-container-customizing.yaml")
 
@@ -4474,7 +4479,6 @@ def test_010043_0(self):
 @Name("test_010043_1. Default clickhouse-log container")
 def test_010043_1(self):
     """Check that clickhouse-operator sets up default logs container if it is not specified in Pod."""
-    create_shell_namespace_clickhouse_template()
 
     test_043(manifest="manifests/chi/test-043-1-logs-container-customizing.yaml")
 

@@ -54,7 +54,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:24.3
+              image: altinity/clickhouse-server:25.3.6.10034.altinitystable
       - name: multi-volume
         spec:
           securityContext:
@@ -63,7 +63,7 @@ spec:
             fsGroup: 101
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:24.3
+              image: altinity/clickhouse-server:25.3.6.10034.altinitystable
               volumeMounts:
                 - name: disk1
                   mountPath: /var/lib/clickhouse
