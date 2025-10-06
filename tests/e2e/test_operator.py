@@ -5510,8 +5510,9 @@ def test_020003(self):
         kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-1-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
         kubectl.wait_field('pod', 'chk-clickhouse-keeper-test-0-2-0', '.spec.containers[0].image', f'clickhouse/clickhouse-keeper:{keeper_version_to}', retries=5)
 
-    check_replication(chi, {0, 1}, 2)
+    debug(kubectl.launch("get pods -l clickhouse-keeper.altinity.com/chk=clickhouse-keeper"))
 
+    check_replication(chi, {0, 1}, 2)
     with Finally("I clean up"):
         delete_test_namespace()
 
