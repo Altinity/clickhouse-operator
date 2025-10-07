@@ -68,6 +68,19 @@ jobs:
           minikube image load operator.tar
           minikube image load metrics-exporter.tar
 
+      - name: Deploy prometheus
+        run: |
+          cp ./deploy/prometheus/prometheus-sensitive-data.example.sh ./deploy/prometheus/prometheus-sensitive-data.sh
+          NO_WAIT=1 bash ./deploy/prometheus/create-prometheus.sh
+
+      - name: Deploy minio
+        run: |
+          NO_WAIT=1 bash ./deploy/minio/create-minio.sh
+
+      - name: Deploy zookeeper-operator
+        run: |
+          bash ./deploy/zookeeper/zookeeper-with-zookeeper-operator/install-zookeeper-operator.sh
+
       - name: Run Tests
         id: run-tests
         continue-on-error: true
