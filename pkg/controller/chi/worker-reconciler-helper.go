@@ -196,10 +196,7 @@ func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) (*statefulset.R
 	// 2. run tables migration again
 
 	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
-	migrateTableOpts := &migrateTableOptions{
-		forceMigrate: true,
-		dropReplica:  true,
-	}
+	migrateTableOpts := NewMigrateTableOptions().SetForceMigrate().SetDropReplica()
 	return stsReconcileOpts, migrateTableOpts
 }
 
@@ -210,6 +207,7 @@ func (w *worker) hostPVCsDataVolumeMissedDetectedOptions(host *api.Host) (*state
 
 	// In case of data volume missed detection, we need to:
 	// 1. recreate StatefulSet
+	// NB Do not run tables migration again
 
 	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
 	return stsReconcileOpts, nil
