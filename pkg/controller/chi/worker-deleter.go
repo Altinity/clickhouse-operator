@@ -334,12 +334,13 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 
 // canDropReplica
 func (w *worker) canDropReplica(ctx context.Context, host *api.Host, opts ...*dropReplicaOptions) (can bool) {
-	o := NewDropReplicaOptionsArr(opts...).First()
-
-	if o.ForceDrop() {
+	// Check explicit request to drop replica.
+	// It overrides any internal state-based decisions
+	if NewDropReplicaOptionsArr(opts...).First().ForceDrop() {
 		return true
 	}
 
+	// Check whether replica has retained PVCs
 	can = true
 	storage.NewStoragePVC(w.c.kube.Storage()).WalkDiscoveredPVCs(ctx, host, func(pvc *core.PersistentVolumeClaim) {
 		// Replica's state has to be kept in Zookeeper for retained volumes.
@@ -349,6 +350,7 @@ func (w *worker) canDropReplica(ctx context.Context, host *api.Host, opts ...*dr
 			can = false
 		}
 	})
+
 	return can
 }
 
