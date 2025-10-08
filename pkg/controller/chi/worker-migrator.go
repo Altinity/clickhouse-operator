@@ -16,7 +16,6 @@ package chi
 
 import (
 	"context"
-
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
@@ -30,11 +29,31 @@ type migrateTableOptions struct {
 	dropReplica  bool
 }
 
+func NewMigrateTableOptions() *migrateTableOptions {
+	return &migrateTableOptions{}
+}
+
+func (o *migrateTableOptions) SetForceMigrate() *migrateTableOptions {
+	if o == nil {
+		return o
+	}
+	o.forceMigrate = true
+	return o
+}
+
 func (o *migrateTableOptions) ForceMigrate() bool {
 	if o == nil {
 		return false
 	}
 	return o.forceMigrate
+}
+
+func (o *migrateTableOptions) SetDropReplica() *migrateTableOptions {
+	if o == nil {
+		return o
+	}
+	o.dropReplica = true
+	return o
 }
 
 func (o *migrateTableOptions) DropReplica() bool {
