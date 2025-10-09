@@ -334,6 +334,11 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 
 // canDropReplica
 func (w *worker) canDropReplica(ctx context.Context, host *api.Host, opts ...*dropReplicaOptions) (can bool) {
+	// Check whether drop replicas is allowed to the operator
+	if host.GetCluster().GetReconcile().Host.Drop.Replicas.All.IsFalse() {
+		return false
+	}
+
 	// Check explicit request to drop replica.
 	// It overrides any internal state-based decisions
 	if NewDropReplicaOptionsArr(opts...).First().ForceDrop() {
