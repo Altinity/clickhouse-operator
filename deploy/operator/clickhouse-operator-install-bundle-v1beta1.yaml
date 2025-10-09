@@ -5160,6 +5160,11 @@ data:
             # In case probe is unspecified wait is assumed to be completed successfully.
             # Default option value is to wait.
             readiness: yes
+        # The operator during reconcile procedure should drop the following entities:
+        drop:
+          replicas:
+            all: yes
+
 
     ################################################
     ##
