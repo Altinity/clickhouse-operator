@@ -43,8 +43,9 @@ func (c *Creator) CreatePVC(
 			//  we are close to proper disk inheritance
 			// Right now we hit the following error:
 			// "Forbidden: updates to StatefulSet spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
-			Labels:      c.macro.Scope(host).Map(c.tagger.Label(interfaces.LabelNewPVC, host, false)),
-			Annotations: c.macro.Scope(host).Map(c.tagger.Annotate(interfaces.AnnotateNewPVC, host)),
+			Labels:          c.macro.Scope(host).Map(c.tagger.Label(interfaces.LabelNewPVC, host, false)),
+			Annotations:     c.macro.Scope(host).Map(c.tagger.Annotate(interfaces.AnnotateNewPVC, host)),
+			OwnerReferences: c.or.CreateOwnerReferences(c.cr),
 		},
 		// Append copy of PersistentVolumeClaimSpec
 		Spec: *spec.DeepCopy(),
@@ -65,6 +66,7 @@ func (c *Creator) TagPVC(
 ) *core.PersistentVolumeClaim {
 	pvc.SetLabels(c.macro.Scope(host).Map(c.tagger.Label(interfaces.LabelExistingPVC, pvc, host, template)))
 	pvc.SetAnnotations(c.macro.Scope(host).Map(c.tagger.Annotate(interfaces.AnnotateExistingPVC, pvc, host, template)))
+    pvc.SetOwnerReferences(c.or.CreateOwnerReferences(c.cr))
 	// And after the object is ready we can put version label
 	c.labeler.MakeObjectVersion(&pvc.ObjectMeta, pvc)
 	return pvc
