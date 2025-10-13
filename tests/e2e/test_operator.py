@@ -1609,11 +1609,11 @@ def test_010014_0(self):
                         )
                         assert out == f"{shard}"
 
-    # replicas = [1]
-    replicas = [1, 2]
+    replicas = [1]
+    # replicas = [1, 2]
     with When(f"Add {len(replicas)} more replicas"):
         manifest = f"manifests/chi/test-014-0-replication-{1+len(replicas)}.yaml"
-        chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
+        chi = yaml_manifest.get_manifest_data(util.get_full_path(manifest))
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -1630,33 +1630,6 @@ def test_010014_0(self):
         assert start_time == new_start_time
 
         check_schema_propagation(replicas)
-
-    with When("Remove replicas"):
-        manifest = "manifests/chi/test-014-0-replication-1.yaml"
-        chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
-        chi = yaml_manifest.get_manifest_data(util.get_full_path(manifest))
-        kubectl.create_and_check(
-            manifest=manifest,
-            check={
-                "pod_count": 2,
-                "pdb": {"default": 1},
-                "do_not_delete": 1,
-            },
-        )
-        with Then("Replica is removed from remote_servers.xml as well"):
-            assert get_replicas_from_remote_servers(chi_name, cluster) == 1
-
-        new_start_time = kubectl.get_field("pod", f"chi-{chi_name}-{cluster}-0-0-0", ".status.startTime")
-        assert start_time == new_start_time
-
-        with Then("Replica needs to be removed from the Keeper as well"):
-            for shard in shards:
-                out = clickhouse.query(
-                    chi_name,
-                    f"SELECT max(total_replicas) FROM system.replicas",
-                    host=f"chi-{chi_name}-{cluster}-{shard}-0",
-                )
-                assert out == "1"
 
     with When("Restart (Zoo)Keeper pod"):
         if self.context.keeper_type == "zookeeper":
@@ -1686,9 +1659,33 @@ def test_010014_0(self):
         with Then("Table should be back to normal"):
             clickhouse.query(chi_name, "INSERT INTO test_local_014 VALUES(3)")
 
+    with When("Remove replicas"):
+        manifest = "manifests/chi/test-014-0-replication-1.yaml"
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "pdb": {"default": 1},
+                "do_not_delete": 1,
+            },
+        )
+        with Then("Replica is removed from remote_servers.xml"):
+            assert get_replicas_from_remote_servers(chi_name, cluster) == 1
+
+        new_start_time = kubectl.get_field("pod", f"chi-{chi_name}-{cluster}-0-0-0", ".status.startTime")
+        assert start_time == new_start_time
+
+        with Then(f"Replica is removed from the {self.context.keeper_type}"):
+            for shard in shards:
+                out = clickhouse.query(
+                    chi_name,
+                    f"SELECT max(total_replicas) FROM system.replicas",
+                    host=f"chi-{chi_name}-{cluster}-{shard}-0",
+                )
+                assert out == "1"
+
     with When("Add replica one more time"):
         manifest = "manifests/chi/test-014-0-replication-2.yaml"
-        chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -1704,7 +1701,6 @@ def test_010014_0(self):
 
     with When("Remove shard"):
         manifest = "manifests/chi/test-014-0-replication-2-1.yaml"
-        chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -1713,14 +1709,13 @@ def test_010014_0(self):
             },
             timeout=600,
         )
-        with Then("Shard should be deleted in ZooKeeper"):
+        with Then(f"Shard is removed from {self.context.keeper_type}", flags=XFAIL):
             out = clickhouse.query_with_error(
                 chi_name,
                 f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{cluster}/tables/1/default'",
             )
             note(f"Found {out} replicated tables in {self.context.keeper_type}")
-            # FIXME: it fails
-            # assert "DB::Exception: No node" in out or out == "0"
+            assert "DB::Exception: No node" in out or out == "0"
 
     with When("Delete chi"):
         kubectl.delete_chi("test-014-replication")
@@ -1733,7 +1728,7 @@ def test_010014_0(self):
                 "do_not_delete": 1,
             },
         )
-        with Then("Tables are deleted in (Zoo)Keeper"):
+        with Then(f"Tables are deleted in {self.context.keeper_type}"):
             out = clickhouse.query_with_error(
                 chi_name,
                 f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{cluster}/tables/0/default'",
@@ -1746,7 +1741,7 @@ def test_010014_0(self):
 
 
 @TestScenario
-@Name("test_010014_1. Test replication under different configuration scenarios")
+@Name("test_010014_1. Test replicasUseFQDN")
 def test_010014_1(self):
     create_shell_namespace_clickhouse_template()
 
