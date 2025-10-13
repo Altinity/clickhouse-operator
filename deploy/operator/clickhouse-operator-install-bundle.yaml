@@ -4898,7 +4898,9 @@ data:
       # Concurrently running operators should watch on different namespaces.
       # IMPORTANT
       # Regexp is applicable.
-      namespaces: []
+      namespaces:
+        include: []
+        exclude: []
     
     clickhouse:
       configuration:
