@@ -26,7 +26,7 @@ import (
 
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 const createTableDBEngines = `'Ordinary','Atomic','Memory','Lazy'`
-const log_queries = ` SETTINGS log_queries=1`
+const logQueries = ` SETTINGS log_queries=1`
 
 func (s *ClusterSchemer) sqlMaxReplicaDelay() string {
 	sql := heredoc.Docf(`
