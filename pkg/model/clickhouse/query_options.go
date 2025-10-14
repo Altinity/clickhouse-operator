@@ -21,10 +21,10 @@ const (
 
 // QueryOptions specifies options of a query
 type QueryOptions struct {
-	Retry    bool
-	Tries    int
-	Parallel bool
-	Silent   bool
+	Retry      bool
+	Tries      int
+	Parallel   bool
+	Silent     bool
 	LogQueries bool
 	*Timeouts
 }
