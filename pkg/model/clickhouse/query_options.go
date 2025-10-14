@@ -25,6 +25,7 @@ type QueryOptions struct {
 	Tries    int
 	Parallel bool
 	Silent   bool
+	LogQueries bool
 	*Timeouts
 }
 
@@ -89,5 +90,22 @@ func (o *QueryOptions) SetSilent(silent bool) *QueryOptions {
 		return nil
 	}
 	o.Silent = silent
+	return o
+}
+
+// GetLogQueries gets log_queries status
+func (o *QueryOptions) GetLogQueries() bool {
+	if o == nil {
+		return false
+	}
+	return o.LogQueries
+}
+
+// SetLogQueries sets log_queries option
+func (o *QueryOptions) SetLogQueries(log_queries bool) *QueryOptions {
+	if o == nil {
+		return nil
+	}
+	o.LogQueries = log_queries
 	return o
 }

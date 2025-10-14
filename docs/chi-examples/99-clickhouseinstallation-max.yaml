@@ -138,7 +138,7 @@ spec:
       drop:
         replicas:
           # Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
-          all: yes
+          all: "yes"
 
     macros:
       sections:

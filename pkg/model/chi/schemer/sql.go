@@ -26,6 +26,7 @@ import (
 
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 const createTableDBEngines = `'Ordinary','Atomic','Memory','Lazy'`
+const log_queries = ` SETTINGS log_queries=1`
 
 func (s *ClusterSchemer) sqlMaxReplicaDelay() string {
 	sql := heredoc.Docf(`
@@ -246,6 +247,10 @@ func (s *ClusterSchemer) sqlDropReplica(shard int, replica string) []string {
 		fmt.Sprintf("SYSTEM DROP REPLICA '%s'", replica),
 		fmt.Sprintf("SYSTEM DROP DATABASE REPLICA '%d|%s'", shard, replica),
 	}
+}
+
+func (s *ClusterSchemer) sqlIsReplicaActive(replica string) string {
+	return fmt.Sprintf("SELECT sumMap(replica_is_active)['%s'] FROM system.replicas", replica)
 }
 
 func (s *ClusterSchemer) sqlActiveQueriesNum() string {
