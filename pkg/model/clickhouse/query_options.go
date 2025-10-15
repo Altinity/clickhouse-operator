@@ -102,10 +102,10 @@ func (o *QueryOptions) GetLogQueries() bool {
 }
 
 // SetLogQueries sets log_queries option
-func (o *QueryOptions) SetLogQueries(log_queries bool) *QueryOptions {
+func (o *QueryOptions) SetLogQueries(logQueries bool) *QueryOptions {
 	if o == nil {
 		return nil
 	}
-	o.LogQueries = log_queries
+	o.LogQueries = logQueries
 	return o
 }
