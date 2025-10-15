@@ -45,7 +45,9 @@ func (c *Creator) CreatePVC(
 			// "Forbidden: updates to StatefulSet spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
 			Labels:          c.macro.Scope(host).Map(c.tagger.Label(interfaces.LabelNewPVC, host, false)),
 			Annotations:     c.macro.Scope(host).Map(c.tagger.Annotate(interfaces.AnnotateNewPVC, host)),
-			OwnerReferences: c.or.CreateOwnerReferences(c.cr),
+			// Incompatible with PV retain policy
+			// Fails PV retain policy test (19)
+			// OwnerReferences: c.or.CreateOwnerReferences(c.cr),
 		},
 		// Append copy of PersistentVolumeClaimSpec
 		Spec: *spec.DeepCopy(),
@@ -66,7 +68,9 @@ func (c *Creator) TagPVC(
 ) *core.PersistentVolumeClaim {
 	pvc.SetLabels(c.macro.Scope(host).Map(c.tagger.Label(interfaces.LabelExistingPVC, pvc, host, template)))
 	pvc.SetAnnotations(c.macro.Scope(host).Map(c.tagger.Annotate(interfaces.AnnotateExistingPVC, pvc, host, template)))
-	pvc.SetOwnerReferences(c.or.CreateOwnerReferences(c.cr))
+	// Incompatible with PV retain policy
+	// Fails PV retain policy test (19)
+	// pvc.SetOwnerReferences(c.or.CreateOwnerReferences(c.cr))
 	// And after the object is ready we can put version label
 	c.labeler.MakeObjectVersion(&pvc.ObjectMeta, pvc)
 	return pvc
