@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	// http://user:password@host:8123/
-	chDsnUrlPattern = "%s://%s%s:%s/"
+	// http://user:password@host:8123
+	chDsnUrlPattern = "%s://%s%s:%s"
 
 	usernameReplacer = "***"
 	passwordReplacer = "***"
@@ -46,6 +46,7 @@ type EndpointCredentials struct {
 	// Internal generated data
 	dsn                  string
 	dsnHiddenCredentials string
+	dsnLogQueries        string
 }
 
 // NewEndpointCredentials creates new EndpointCredentials object
@@ -61,6 +62,7 @@ func NewEndpointCredentials(scheme, hostname, username, password, rootCA string,
 
 	params.dsn = params.makeDSN(false)
 	params.dsnHiddenCredentials = params.makeDSN(true)
+	params.dsnLogQueries = params.makeDSNLogQueries(false)
 
 	return params
 }
@@ -111,6 +113,22 @@ func (c *EndpointCredentials) makeDSN(hideCredentials bool) string {
 	return baseUrl
 }
 
+// makeDSN makes ClickHouse DSN
+func (c *EndpointCredentials) makeDSNLogQueries(hideCredentials bool) string {
+	baseUrl := fmt.Sprintf(
+		chDsnUrlPattern,
+		c.scheme,
+		c.makeUsernamePassword(hideCredentials),
+		c.hostname,
+		strconv.Itoa(c.port),
+	)
+	baseUrl += "?log_queries=1"
+	if c.scheme == httpsScheme {
+		baseUrl += "&tls_config=" + tlsSettings
+	}
+	return baseUrl
+}
+
 // GetDSN gets DSN
 func (c *EndpointCredentials) GetDSN() string {
 	return c.dsn
@@ -119,4 +137,9 @@ func (c *EndpointCredentials) GetDSN() string {
 // GetDSNWithHiddenCredentials gets DSN with hidden sensitive info
 func (c *EndpointCredentials) GetDSNWithHiddenCredentials() string {
 	return c.dsnHiddenCredentials
+}
+
+// GetDSNLogQuery gets DSN with hidden sensitive info
+func (c *EndpointCredentials) GetDSNLogQueries() string {
+	return c.dsnLogQueries
 }
