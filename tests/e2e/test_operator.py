@@ -992,7 +992,7 @@ def test_010011_3(self):
                 assert sasl_password_env != ""
                 assert user5_password_env != ""
 
-            with By("Secrets are properly propagated to env variables for long settings names", flags=XFAIL):
+            with By("Secrets are properly propagated to env variables for long settings names"):
                 assert custom0_env != ""
                 assert custom1_env != ""
 
@@ -1508,6 +1508,25 @@ def test_010014_0(self):
                     host=f"chi-{chi_name}-{cluster}-1-0",
                 )
 
+    def check_query_log(log, do_not_log, since = '1970-01-01', flags = None):
+        out = clickhouse.query(chi_name, f"select query, substring(hostname, 1, locate('.', hostname)-1) from cluster('all-sharded', system.query_log) where user = 'clickhouse_operator' and event_time>='{since}'")
+        for q in log:
+            found = 0
+            with Then(f"system.query_log should contain {q} statements", flags = flags):
+                for l in out.splitlines():
+                    if l.lower().startswith(q.lower()):
+                        found = 1
+                        print(l)
+                assert found, error(out)
+        for q in do_not_log:
+            found = 0
+            with Then(f"system.query_log should NOT contain {q} statements", flags = flags):
+                for l in out.splitlines():
+                    if l.lower().startswith(q.lower()):
+                        found = 1
+                        print(l)
+                assert not found, error(out)
+
     def check_schema_propagation(replicas):
         for replica in replicas:
             host = f"chi-{chi_name}-{cluster}-0-{replica}"
@@ -1612,6 +1631,7 @@ def test_010014_0(self):
     replicas = [1]
     # replicas = [1, 2]
     with When(f"Add {len(replicas)} more replicas"):
+        query_log_start = clickhouse.query(chi_name, 'select now()')
         manifest = f"manifests/chi/test-014-0-replication-{1+len(replicas)}.yaml"
         chi = yaml_manifest.get_manifest_data(util.get_full_path(manifest))
         kubectl.create_and_check(
@@ -1630,6 +1650,8 @@ def test_010014_0(self):
         assert start_time == new_start_time
 
         check_schema_propagation(replicas)
+
+        check_query_log(['CREATE'], [], query_log_start)
 
     with When("Restart (Zoo)Keeper pod"):
         if self.context.keeper_type == "zookeeper":
@@ -1660,6 +1682,7 @@ def test_010014_0(self):
             clickhouse.query(chi_name, "INSERT INTO test_local_014 VALUES(3)")
 
     with When("Remove replicas"):
+        query_log_start = clickhouse.query(chi_name, 'select now()')
         manifest = "manifests/chi/test-014-0-replication-1.yaml"
         kubectl.create_and_check(
             manifest=manifest,
@@ -1684,6 +1707,8 @@ def test_010014_0(self):
                 )
                 assert out == "1"
 
+        check_query_log(['SYSTEM DROP REPLICA'], ['DROP TABLE', 'DROP DATABASE'], query_log_start)
+
     with When("Add replica one more time"):
         manifest = "manifests/chi/test-014-0-replication-2.yaml"
         kubectl.create_and_check(
@@ -1700,6 +1725,7 @@ def test_010014_0(self):
         check_schema_propagation([1])
 
     with When("Remove shard"):
+        query_log_start = clickhouse.query(chi_name, 'select now()')
         manifest = "manifests/chi/test-014-0-replication-2-1.yaml"
         kubectl.create_and_check(
             manifest=manifest,
@@ -1716,6 +1742,8 @@ def test_010014_0(self):
             )
             note(f"Found {out} replicated tables in {self.context.keeper_type}")
             assert "DB::Exception: No node" in out or out == "0"
+
+        check_query_log(['SYSTEM DROP REPLICA'], ['DROP TABLE', 'DROP DATABASE'], query_log_start, flags=XFAIL)
 
     with When("Delete chi"):
         kubectl.delete_chi("test-014-replication")
