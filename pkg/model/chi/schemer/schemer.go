@@ -52,6 +52,22 @@ func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *api.Host) err
 	return s.ExecHost(ctx, host, syncTableSQLs, opts)
 }
 
+// HostIsActiveReplica checks whether host is an active replica
+func (s *ClusterSchemer) IsHostActiveReplica(ctx context.Context, hostToRunOn, hostToCheck *api.Host) bool {
+	replica := s.Name(interfaces.NameInstanceHostname, hostToCheck)
+	log.V(1).M(hostToRunOn).F().Info("Check active replica: %v at %v", replica, hostToRunOn.Runtime.Address.HostName)
+	active := false
+	res, err := s.QueryHostString(ctx, hostToRunOn, s.sqlIsReplicaActive(replica))
+	if err == nil && res == "0" {
+		log.V(1).M(hostToRunOn).F().Info("The host %s is not active", hostToCheck.GetName())
+		active = false
+	} else {
+		log.V(1).M(hostToRunOn).F().Info("The host %s is active", hostToCheck.GetName())
+		active = true
+	}
+	return active
+}
+
 // HostDropReplica calls SYSTEM DROP REPLICA
 func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host) error {
 	replica := s.Name(interfaces.NameInstanceHostname, hostToDrop)
