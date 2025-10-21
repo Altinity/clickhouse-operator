@@ -2213,6 +2213,11 @@ func (in *ReconcileHostDropReplicas) DeepCopyInto(out *ReconcileHostDropReplicas
 		*out = new(types.StringBool)
 		**out = **in
 	}
+	if in.Active != nil {
+		in, out := &in.Active, &out.Active
+		*out = new(types.StringBool)
+		**out = **in
+	}
 	return
 }
 
