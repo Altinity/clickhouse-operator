@@ -558,6 +558,10 @@ spec:
                                   <<: *TypeStringBool
                                   description: |
                                     Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                active:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
                 reconcile:
                   <<: *TypeReconcile
                   description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
@@ -2002,6 +2006,10 @@ spec:
                                   <<: *TypeStringBool
                                   description: |
                                     Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                active:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
                 reconcile:
                   <<: *TypeReconcile
                   description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
@@ -3300,6 +3308,10 @@ spec:
                                   <<: *TypeStringBool
                                   description: |
                                     Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                active:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
