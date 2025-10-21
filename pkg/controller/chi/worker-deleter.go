@@ -333,30 +333,51 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 }
 
 // canDropReplica
-func (w *worker) canDropReplica(ctx context.Context, host *api.Host, opts ...*dropReplicaOptions) (can bool) {
+func (w *worker) canDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host, opts ...*dropReplicaOptions) (can bool) {
 	// Check whether drop replicas is allowed to the operator
-	if host.GetCluster().GetReconcile().Host.Drop.Replicas.All.IsFalse() {
+	if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.All.IsFalse() {
+		w.a.V(1).F().Info("All replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
 		return false
 	}
 
-	// Check explicit request to drop replica.
-	// It overrides any internal state-based decisions
+	// Active replica may have restriction to be deleted
+	if w.ensureClusterSchemer(hostToRunOn).IsHostActiveReplica(ctx, hostToRunOn, hostToDrop) {
+		// Check whether drop active replicas is allowed to the operator
+		if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.Active.IsFalse() {
+			w.a.V(1).F().Info("Active replicas replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+			return false
+		}
+	}
+
+	// Explicit request to drop replica overrides any internal state-based decisions
 	if NewDropReplicaOptionsArr(opts...).First().ForceDrop() {
+		w.a.V(1).F().Info("Force drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return true
 	}
 
-	// Check whether replica has retained PVCs
-	can = true
+	// In case host has volumes to retain - unable to drop replica
+	if w.hasHostVolumesToRetain(ctx, hostToDrop) {
+		w.a.V(1).F().Info("Retained volume(s) replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+		return false
+	}
+
+	w.a.V(1).F().Info("Allowed to drop replica. hostToDrop: %s", hostToDrop.GetName())
+	return true
+}
+
+// hasHostVolumesToRetain check whether host has PVCs to be retained
+// Replica's state has to be kept in Zookeeper for retained volumes.
+// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
+func (w *worker) hasHostVolumesToRetain(ctx context.Context, host *api.Host) (has bool) {
+	// Check whether among all PVCs host has reclaim policy "retain" specified
 	storage.NewStoragePVC(w.c.kube.Storage()).WalkDiscoveredPVCs(ctx, host, func(pvc *core.PersistentVolumeClaim) {
-		// Replica's state has to be kept in Zookeeper for retained volumes.
-		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
 		if chiLabeler.New(nil).GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {
 			w.a.V(1).F().Info("PVC: %s/%s blocks drop replica. Reclaim policy: %s", api.PVCReclaimPolicyRetain.String())
-			can = false
+			has = true
 		}
 	})
 
-	return can
+	return has
 }
 
 type dropReplicaOptions struct {
@@ -393,11 +414,6 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...
 		return nil
 	}
 
-	if !w.canDropReplica(ctx, hostToDrop, opts...) {
-		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop: %s", hostToDrop.GetName())
-		return nil
-	}
-
 	// Sometimes host to drop is already unavailable, so let's run SQL statement of the first replica in the shard
 	var hostToRunOn *api.Host
 	if shard := hostToDrop.GetShard(); shard != nil {
@@ -406,6 +422,11 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...
 
 	if hostToRunOn == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn: %s, hostToDrop: %s", hostToRunOn.GetName(), hostToDrop.GetName())
+		return nil
+	}
+
+	if !w.canDropReplica(ctx, hostToRunOn, hostToDrop, opts...) {
+		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
 
