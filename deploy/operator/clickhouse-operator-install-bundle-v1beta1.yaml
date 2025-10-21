@@ -5201,7 +5201,8 @@ data:
           replicas:
             # Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
             all: yes
-
+            # Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
+            active: no
 
     ################################################
     ##
