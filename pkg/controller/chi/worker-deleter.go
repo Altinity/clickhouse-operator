@@ -62,8 +62,9 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	cr.(*api.ClickHouseInstallation).EnsureStatus().SyncHostTablesCreated()
 }
 
-// dropReplicas cleans Zookeeper for replicas that are properly deleted - via AP
+// dropReplicas cleans Zookeeper for replicas that are properly deleted - via Action Plan
 func (w *worker) dropReplicas(ctx context.Context, cr api.ICustomResource, ap *action_plan.ActionPlan) {
+	// Iterate over Action Plan and drop all replicas that are properly removed as removed hosts
 	w.a.V(1).M(cr).F().S().Info("drop replicas based on AP")
 	cnt := 0
 	ap.WalkRemoved(
@@ -72,7 +73,7 @@ func (w *worker) dropReplicas(ctx context.Context, cr api.ICustomResource, ap *a
 		func(shard api.IShard) {
 		},
 		func(host *api.Host) {
-			_ = w.dropReplica(ctx, host)
+			_ = w.dropReplica(ctx, host, NewDropReplicaOptions().SetRegularDrop())
 			cnt++
 		},
 	)
@@ -333,36 +334,43 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 }
 
 // canDropReplica
-func (w *worker) canDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host, opts ...*dropReplicaOptions) (can bool) {
-	// Check whether drop replicas is allowed to the operator
-	if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.All.IsFalse() {
-		w.a.V(1).F().Info("All replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
-		return false
-	}
+func (w *worker) canDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host, opt *dropReplicaOptions) (can bool) {
 
-	// Active replica may have restriction to be deleted
-	if w.ensureClusterSchemer(hostToRunOn).IsHostActiveReplica(ctx, hostToRunOn, hostToDrop) {
-		// Check whether drop active replicas is allowed to the operator
-		if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.Active.IsFalse() {
-			w.a.V(1).F().Info("Active replicas replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+	switch {
+	case opt.RegularDrop():
+		w.a.V(1).F().Info("Regular drop replica. hostToDrop: %s", hostToDrop.GetName())
+		// Check whether drop replicas is allowed to the operator
+		if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.OnDelete.IsFalse() {
+			w.a.V(1).F().Info("Regular drop replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
 			return false
 		}
-	}
 
-	// Explicit request to drop replica overrides any internal state-based decisions
-	if NewDropReplicaOptionsArr(opts...).First().ForceDrop() {
-		w.a.V(1).F().Info("Force drop replica. hostToDrop: %s", hostToDrop.GetName())
+		// In case host has volumes to retain - unable to drop replica
+		if w.hasHostVolumesToRetain(ctx, hostToDrop) {
+			w.a.V(1).F().Info("Retained volume(s) replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+			return false
+		}
+
+		w.a.V(1).F().Info("Allowed to drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return true
-	}
 
-	// In case host has volumes to retain - unable to drop replica
-	if w.hasHostVolumesToRetain(ctx, hostToDrop) {
-		w.a.V(1).F().Info("Retained volume(s) replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
-		return false
-	}
+	case opt.ForceDropUponStorageLoss():
+		w.a.V(1).F().Info("Force drop replica upon storage loss. hostToDrop: %s", hostToDrop.GetName())
+		// Active replica may have restriction to be deleted
+		if w.ensureClusterSchemer(hostToRunOn).IsHostActiveReplica(ctx, hostToRunOn, hostToDrop) {
+			w.a.V(1).F().Info("Replica is an active one. Need ti check whether it can be dropped. hostToDrop: %s", hostToDrop.GetName())
+			// Check whether drop active replicas is allowed to the operator
+			if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.Active.IsFalse() {
+				w.a.V(1).F().Info("Active replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+				return false
+			}
+		}
+		w.a.V(1).F().Info("Accepted force drop replica upon storage loss. hostToDrop: %s", hostToDrop.GetName())
+		return true
 
-	w.a.V(1).F().Info("Allowed to drop replica. hostToDrop: %s", hostToDrop.GetName())
-	return true
+	default:
+		panic("unknown replica drop")
+	}
 }
 
 // hasHostVolumesToRetain check whether host has PVCs to be retained
@@ -381,15 +389,46 @@ func (w *worker) hasHostVolumesToRetain(ctx context.Context, host *api.Host) (ha
 }
 
 type dropReplicaOptions struct {
-	forceDrop bool
+	regularDrop              bool
+	forceDropUponStorageLoss bool
 }
 
-func (o *dropReplicaOptions) ForceDrop() bool {
+func NewDropReplicaOptions() *dropReplicaOptions {
+	return &dropReplicaOptions{}
+}
+
+func (o *dropReplicaOptions) SetRegularDrop() *dropReplicaOptions {
+	if o == nil {
+		return o
+	}
+	o.regularDrop = true
+
+	return o
+}
+
+func (o *dropReplicaOptions) RegularDrop() bool {
 	if o == nil {
 		return false
 	}
 
-	return o.forceDrop
+	return o.regularDrop
+}
+
+func (o *dropReplicaOptions) SetForceDropUponStorageLoss() *dropReplicaOptions {
+	if o == nil {
+		return o
+	}
+	o.forceDropUponStorageLoss = true
+
+	return o
+}
+
+func (o *dropReplicaOptions) ForceDropUponStorageLoss() bool {
+	if o == nil {
+		return false
+	}
+
+	return o.forceDropUponStorageLoss
 }
 
 type dropReplicaOptionsArr []*dropReplicaOptions
@@ -408,7 +447,7 @@ func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 }
 
 // dropReplica drops replica's info from Zookeeper
-func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...*dropReplicaOptions) error {
+func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts *dropReplicaOptions) error {
 	if hostToDrop == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop: %s", hostToDrop.GetName())
 		return nil
@@ -425,7 +464,7 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...
 		return nil
 	}
 
-	if !w.canDropReplica(ctx, hostToRunOn, hostToDrop, opts...) {
+	if !w.canDropReplica(ctx, hostToRunOn, hostToDrop, opts) {
 		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
