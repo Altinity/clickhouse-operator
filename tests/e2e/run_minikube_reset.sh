@@ -61,9 +61,11 @@ if [[ ! -z "${DOCKER_VERSION}" ]]; then
         echo "Docker version is OK"
     fi
 fi
-echo "--------------"
+echo "-----------------------"
+echo "-- Starting minikube --"
+echo "-----------------------"
 
-minikube start --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}" --cpus="${CPUS}" --memory="${MEMORY}"
+minikube start --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}" --cpus="${CPUS}" --memory="${MEMORY}" --cache-images=false
 
 if [[ -z "${SKIP_K9S}" ]]; then
     echo "Launching k9s"
