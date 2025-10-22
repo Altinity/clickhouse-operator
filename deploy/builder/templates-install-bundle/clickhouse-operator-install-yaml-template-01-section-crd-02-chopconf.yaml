@@ -401,10 +401,14 @@ spec:
                               description: |
                                 Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                               properties:
-                                all:
+                                onDelete:
                                   <<: *TypeStringBool
                                   description: |
-                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                 active:
                                   <<: *TypeStringBool
                                   description: |
