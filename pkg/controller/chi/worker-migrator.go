@@ -25,8 +25,8 @@ import (
 )
 
 type migrateTableOptions struct {
-	forceMigrate bool
-	dropReplica  bool
+	forceMigrate                    bool
+	forceDropReplicaUponStorageLoss bool
 }
 
 func NewMigrateTableOptions() *migrateTableOptions {
@@ -48,19 +48,19 @@ func (o *migrateTableOptions) ForceMigrate() bool {
 	return o.forceMigrate
 }
 
-func (o *migrateTableOptions) SetDropReplica() *migrateTableOptions {
+func (o *migrateTableOptions) SetForceDropReplicaUponStorageLoss() *migrateTableOptions {
 	if o == nil {
 		return o
 	}
-	o.dropReplica = true
+	o.forceDropReplicaUponStorageLoss = true
 	return o
 }
 
-func (o *migrateTableOptions) DropReplica() bool {
+func (o *migrateTableOptions) ForceDropReplicaUponStorageLoss() bool {
 	if o == nil {
 		return false
 	}
-	return o.dropReplica
+	return o.forceDropReplicaUponStorageLoss
 }
 
 type migrateTableOptionsArr []*migrateTableOptions
@@ -80,13 +80,13 @@ func (a migrateTableOptionsArr) First() *migrateTableOptions {
 
 // migrateTables
 func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrateTableOptions) error {
-	if w.shouldDropReplica(host, opts) {
+	if opts.ForceDropReplicaUponStorageLoss() {
 		w.a.V(1).
 			M(host).F().
 			Info(
 				"Need to drop replica on host %d to shard %d in cluster %s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-		w.dropReplica(ctx, host, &dropReplicaOptions{forceDrop: true})
+		w.dropReplica(ctx, host, NewDropReplicaOptions().SetForceDropUponStorageLoss())
 	}
 
 	w.a.V(1).
@@ -151,20 +151,6 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 
 	// In all the rest cases - perform migration
 	return true
-}
-
-// shouldDropTables
-func (w *worker) shouldDropReplica(host *api.Host, opts ...*migrateTableOptions) bool {
-	o := NewMigrateTableOptionsArr(opts...).First()
-
-	// Deal with special cases
-	switch {
-	case o.DropReplica():
-		return true
-
-	}
-
-	return false
 }
 
 func (w *worker) ensureClusterSchemer(host *api.Host) *schemer.ClusterSchemer {
