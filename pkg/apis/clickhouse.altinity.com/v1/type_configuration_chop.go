@@ -585,8 +585,9 @@ func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *Reco
 }
 
 type ReconcileHostDropReplicas struct {
-	All    *types.StringBool `json:"all,omitempty"    yaml:"all,omitempty"`
-	Active *types.StringBool `json:"active,omitempty" yaml:"active,omitempty"`
+	OnDelete     *types.StringBool `json:"onDelete,omitempty"     yaml:"onDelete,omitempty"`
+	OnLostVolume *types.StringBool `json:"onLostVolume,omitempty" yaml:"onLostVolume,omitempty"`
+	Active       *types.StringBool `json:"active,omitempty"       yaml:"active,omitempty"`
 }
 
 func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas) *ReconcileHostDropReplicas {
@@ -604,7 +605,8 @@ func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas) *
 
 	// Both recipient and `from` are specified, need to walk over fields
 
-	r.All = r.All.MergeFrom(from.All)
+	r.OnDelete = r.OnDelete.MergeFrom(from.OnDelete)
+	r.OnLostVolume = r.OnLostVolume.MergeFrom(from.OnLostVolume)
 	r.Active = r.Active.MergeFrom(from.Active)
 
 	return r
