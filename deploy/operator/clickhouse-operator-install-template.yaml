@@ -547,10 +547,14 @@ spec:
                               description: |
                                 Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                               properties:
-                                all:
+                                onDelete:
                                   <<: *TypeStringBool
                                   description: |
-                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                 active:
                                   <<: *TypeStringBool
                                   description: |
@@ -1995,10 +1999,14 @@ spec:
                               description: |
                                 Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                               properties:
-                                all:
+                                onDelete:
                                   <<: *TypeStringBool
                                   description: |
-                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                 active:
                                   <<: *TypeStringBool
                                   description: |
@@ -3297,10 +3305,14 @@ spec:
                               description: |
                                 Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                               properties:
-                                all:
+                                onDelete:
                                   <<: *TypeStringBool
                                   description: |
-                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                 active:
                                   <<: *TypeStringBool
                                   description: |
@@ -5005,8 +5017,10 @@ data:
         # The operator during reconcile procedure should drop the following entities:
         drop:
           replicas:
-            # Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
-            all: yes
+            # Whether the operator during reconcile procedure should drop replicas when replica is deleted
+            onDelete: yes
+            # Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+            onLostVolume: yes
             # Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
             active: no
     

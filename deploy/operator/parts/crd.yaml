@@ -936,7 +936,7 @@ spec:
                               description: |
                                 Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                               properties:
-                                all:
+                                onDelete:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
@@ -964,7 +964,36 @@ spec:
                                     - "Enabled"
                                     - "enabled"
                                   description: |
-                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                 active:
                                   type: string
                                   enum:
@@ -1521,7 +1550,7 @@ spec:
                               description: |
                                 Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                               properties:
-                                all:
+                                onDelete:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
@@ -1549,7 +1578,36 @@ spec:
                                     - "Enabled"
                                     - "enabled"
                                   description: |
-                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                 active:
                                   type: string
                                   enum:
@@ -2465,7 +2523,7 @@ spec:
                                         description: |
                                           Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                                         properties:
-                                          all:
+                                          onDelete:
                                             type: string
                                             enum:
                                               # List StringBoolXXX constants from model
@@ -2493,7 +2551,36 @@ spec:
                                               - "Enabled"
                                               - "enabled"
                                             description: |
-                                              Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                              Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                          onLostVolume:
+                                            type: string
+                                            enum:
+                                              # List StringBoolXXX constants from model
+                                              - ""
+                                              - "0"
+                                              - "1"
+                                              - "False"
+                                              - "false"
+                                              - "True"
+                                              - "true"
+                                              - "No"
+                                              - "no"
+                                              - "Yes"
+                                              - "yes"
+                                              - "Off"
+                                              - "off"
+                                              - "On"
+                                              - "on"
+                                              - "Disable"
+                                              - "disable"
+                                              - "Enable"
+                                              - "enable"
+                                              - "Disabled"
+                                              - "disabled"
+                                              - "Enabled"
+                                              - "enabled"
+                                            description: |
+                                              Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                           active:
                                             type: string
                                             enum:
@@ -4394,7 +4481,7 @@ spec:
                               description: |
                                 Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                               properties:
-                                all:
+                                onDelete:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
@@ -4422,7 +4509,36 @@ spec:
                                     - "Enabled"
                                     - "enabled"
                                   description: |
-                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                 active:
                                   type: string
                                   enum:
@@ -4979,7 +5095,7 @@ spec:
                               description: |
                                 Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                               properties:
-                                all:
+                                onDelete:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
@@ -5007,7 +5123,36 @@ spec:
                                     - "Enabled"
                                     - "enabled"
                                   description: |
-                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                 active:
                                   type: string
                                   enum:
@@ -5923,7 +6068,7 @@ spec:
                                         description: |
                                           Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                                         properties:
-                                          all:
+                                          onDelete:
                                             type: string
                                             enum:
                                               # List StringBoolXXX constants from model
@@ -5951,7 +6096,36 @@ spec:
                                               - "Enabled"
                                               - "enabled"
                                             description: |
-                                              Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                              Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                          onLostVolume:
+                                            type: string
+                                            enum:
+                                              # List StringBoolXXX constants from model
+                                              - ""
+                                              - "0"
+                                              - "1"
+                                              - "False"
+                                              - "false"
+                                              - "True"
+                                              - "true"
+                                              - "No"
+                                              - "no"
+                                              - "Yes"
+                                              - "yes"
+                                              - "Off"
+                                              - "off"
+                                              - "On"
+                                              - "on"
+                                              - "Disable"
+                                              - "disable"
+                                              - "Enable"
+                                              - "enable"
+                                              - "Disabled"
+                                              - "disabled"
+                                              - "Enabled"
+                                              - "enabled"
+                                            description: |
+                                              Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                           active:
                                             type: string
                                             enum:
@@ -7467,7 +7641,7 @@ spec:
                               description: |
                                 Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                               properties:
-                                all:
+                                onDelete:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
@@ -7495,7 +7669,36 @@ spec:
                                     - "Enabled"
                                     - "enabled"
                                   description: |
-                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - ""
+                                    - "0"
+                                    - "1"
+                                    - "False"
+                                    - "false"
+                                    - "True"
+                                    - "true"
+                                    - "No"
+                                    - "no"
+                                    - "Yes"
+                                    - "yes"
+                                    - "Off"
+                                    - "off"
+                                    - "On"
+                                    - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
+                                    - "Disabled"
+                                    - "disabled"
+                                    - "Enabled"
+                                    - "enabled"
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                 active:
                                   type: string
                                   enum:
