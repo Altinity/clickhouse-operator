@@ -8,6 +8,7 @@ import e2e.yaml_manifest as yaml_manifest
 import e2e.util as util
 
 from testflows.core import fail, Given, Then, But, current, message
+from testflows.asserts import error
 
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -359,3 +360,22 @@ def require_expandable_storage_class():
         allow_volume_expansion = kubectl.get_field("storageclass", default_storage_class, ".allowVolumeExpansion")
         if allow_volume_expansion != "true":
             kubectl.launch(f"patch storageclass {default_storage_class} -p '{{\"allowVolumeExpansion\":true}}'")
+
+def check_query_log(chi_name, log, do_not_log, since = '1970-01-01', flags = None):
+    out = clickhouse.query(chi_name, f"select query, substring(hostname, 1, locate('.', hostname)-1) from cluster('all-sharded', system.query_log) where user = 'clickhouse_operator' and event_time>='{since}'")
+    for q in log:
+        found = 0
+        with Then(f"system.query_log should contain {q} statements", flags = flags):
+            for l in out.splitlines():
+                if l.lower().startswith(q.lower()):
+                    found = 1
+                    print(l)
+            assert found, error(out)
+    for q in do_not_log:
+        found = 0
+        with Then(f"system.query_log should NOT contain {q} statements", flags = flags):
+            for l in out.splitlines():
+                if l.lower().startswith(q.lower()):
+                    found = 1
+                    print(l)
+            assert not found, error(out)
