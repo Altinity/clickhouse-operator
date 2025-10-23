@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package action_plan
+package v1
 
 import (
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	"gopkg.in/d4l3k/messagediff.v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // ActionPlan is an action plan with list of differences between two CHIs
@@ -44,8 +45,21 @@ type ActionPlan struct {
 	skipTaskID bool
 }
 
-// NewActionPlan makes new ActionPlan out of two CHIs
-func NewActionPlan(old, new api.ICustomResource) *ActionPlan {
+func (ap *ActionPlan) Log(tag string) {
+	log.V(1).Info(
+		"ActionPlan start %s ---------------------------------------------:\n%s\nActionPlan end %s ---------------------------------------------",
+		tag,
+		ap,
+		tag,
+	)
+}
+
+func NewActionPlan() *ActionPlan {
+	return &ActionPlan{}
+}
+
+// MakeActionPlan makes new ActionPlan out of two CHIs
+func MakeActionPlan(old, new api.ICustomResource) api.IActionPlan {
 	ap := &ActionPlan{
 		old: old,
 		new: new,
@@ -271,6 +285,9 @@ func (ap *ActionPlan) WalkRemoved(
 	shardFunc func(shard api.IShard),
 	hostFunc func(host *api.Host),
 ) {
+	if ap == nil {
+		return
+	}
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Removed {
 		switch ap.specDiff.Removed[path].(type) {
@@ -308,6 +325,9 @@ func (ap *ActionPlan) WalkAdded(
 	shardFunc func(shard api.IShard),
 	hostFunc func(host *api.Host),
 ) {
+	if ap == nil {
+		return
+	}
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Added {
 		switch ap.specDiff.Added[path].(type) {
@@ -345,6 +365,9 @@ func (ap *ActionPlan) WalkModified(
 	shardFunc func(shard api.IShard),
 	hostFunc func(host *api.Host),
 ) {
+	if ap == nil {
+		return
+	}
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Modified {
 		switch ap.specDiff.Modified[path].(type) {
