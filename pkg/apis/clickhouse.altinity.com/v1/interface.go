@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -281,4 +282,26 @@ type WalkHostsAddressFn func(
 type IGenerateName interface {
 	HasGenerateName() bool
 	GetGenerateName() string
+}
+
+type IActionPlan interface {
+	fmt.Stringer
+	HasActionsToDo() bool
+	GetRemovedHostsNum() int
+	Log(tag string) string
+	WalkRemoved(
+		clusterFunc func(cluster ICluster),
+		shardFunc func(shard IShard),
+		hostFunc func(host *Host),
+	)
+	WalkAdded(
+		clusterFunc func(cluster ICluster),
+		shardFunc func(shard IShard),
+		hostFunc func(host *Host),
+	)
+	WalkModified(
+		clusterFunc func(cluster ICluster),
+		shardFunc func(shard IShard),
+		hostFunc func(host *Host),
+	)
 }
