@@ -249,6 +249,10 @@ spec:
                   type: object
                   description: "Normalized resource completed"
                   x-kubernetes-preserve-unknown-fields: true
+                actionPlan:
+                  type: object
+                  description: "Action Plan"
+                  x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
                   description: "List of hosts with tables created by the operator"
@@ -1700,6 +1704,10 @@ spec:
                 normalizedCompleted:
                   type: object
                   description: "Normalized resource completed"
+                  x-kubernetes-preserve-unknown-fields: true
+                actionPlan:
+                  type: object
+                  description: "Action Plan"
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
