@@ -172,6 +172,9 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
         # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
         wait_field(kind=kind, name=chi_name, field=".status.status", value="InProgress"
                    , ns=ns, retries=3, throw_error=False, shell=shell)
+        actionPlan = get_chi_actionPlan(chi_name, ns, shell)
+        print(actionPlan)
+
         wait_field(kind=kind, name=chi_name, field=".status.status", value="Completed"
                    , ns=ns, shell=shell)
 
@@ -233,6 +236,10 @@ def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None):
 def get_chi_normalizedCompleted(chi, ns=None, shell=None):
     chi_storage = get("configmap", f"chi-storage-{chi}", ns=ns)
     return json.loads(chi_storage["data"]["status-normalizedCompleted"])
+
+def get_chi_actionPlan(chi, ns=None, shell=None):
+    chi_storage = get("configmap", f"chi-storage-{chi}", ns=ns)
+    return chi_storage["data"]["status-actionPlan"]
 
 
 def create_ns(ns):
