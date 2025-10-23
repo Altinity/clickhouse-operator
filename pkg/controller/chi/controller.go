@@ -54,7 +54,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -610,7 +609,7 @@ func prepareCHIAdd(command *cmd_queue.ReconcileCHI) bool {
 }
 
 func prepareCHIUpdate(command *cmd_queue.ReconcileCHI) bool {
-	actionPlan := action_plan.NewActionPlan(command.Old, command.New)
+	actionPlan := api.MakeActionPlan(command.Old, command.New)
 	if !actionPlan.HasActionsToDo() {
 		return false
 	}
