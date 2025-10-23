@@ -30,7 +30,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -63,11 +62,11 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 }
 
 // dropReplicas cleans Zookeeper for replicas that are properly deleted - via Action Plan
-func (w *worker) dropReplicas(ctx context.Context, cr api.ICustomResource, ap *action_plan.ActionPlan) {
+func (w *worker) dropReplicas(ctx context.Context, cr *api.ClickHouseInstallation) {
 	// Iterate over Action Plan and drop all replicas that are properly removed as removed hosts
 	w.a.V(1).M(cr).F().S().Info("drop replicas based on AP")
 	cnt := 0
-	ap.WalkRemoved(
+	cr.EnsureRuntime().ActionPlan.WalkRemoved(
 		func(cluster api.ICluster) {
 		},
 		func(shard api.IShard) {
