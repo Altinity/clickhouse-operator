@@ -15,17 +15,18 @@
 package v1
 
 import (
+	"fmt"
+
 	"gopkg.in/d4l3k/messagediff.v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // ActionPlan is an action plan with list of differences between two CHIs
 type ActionPlan struct {
-	old api.ICustomResource
-	new api.ICustomResource
+	old ICustomResource
+	new ICustomResource
 
 	specDiff  *messagediff.Diff
 	specEqual bool
@@ -45,21 +46,12 @@ type ActionPlan struct {
 	skipTaskID bool
 }
 
-func (ap *ActionPlan) Log(tag string) {
-	log.V(1).Info(
-		"ActionPlan start %s ---------------------------------------------:\n%s\nActionPlan end %s ---------------------------------------------",
-		tag,
-		ap,
-		tag,
-	)
-}
-
 func NewActionPlan() *ActionPlan {
 	return &ActionPlan{}
 }
 
 // MakeActionPlan makes new ActionPlan out of two CHIs
-func MakeActionPlan(old, new api.ICustomResource) api.IActionPlan {
+func MakeActionPlan(old, new ICustomResource) IActionPlan {
 	ap := &ActionPlan{
 		old: old,
 		new: new,
@@ -211,6 +203,15 @@ func (ap *ActionPlan) HasActionsToDo() bool {
 	return !ap.deletionTimestampEqual || !ap.finalizersEqual || !ap.attributesEqual
 }
 
+func (ap *ActionPlan) Log(tag string) string {
+	return fmt.Sprintf(
+		"ActionPlan start %s ---------------------------------------------:\n%s\nActionPlan end %s ---------------------------------------------",
+		tag,
+		ap,
+		tag,
+	)
+}
+
 // String stringifies ActionPlan
 func (ap *ActionPlan) String() string {
 	if !ap.HasActionsToDo() {
@@ -266,13 +267,13 @@ func (ap *ActionPlan) String() string {
 func (ap *ActionPlan) GetRemovedHostsNum() int {
 	var count int
 	ap.WalkRemoved(
-		func(cluster api.ICluster) {
+		func(cluster ICluster) {
 			count += cluster.HostsCount()
 		},
-		func(shard api.IShard) {
+		func(shard IShard) {
 			count += shard.HostsCount()
 		},
-		func(host *api.Host) {
+		func(host *Host) {
 			count++
 		},
 	)
@@ -281,9 +282,9 @@ func (ap *ActionPlan) GetRemovedHostsNum() int {
 
 // WalkRemoved walk removed cluster items
 func (ap *ActionPlan) WalkRemoved(
-	clusterFunc func(cluster api.ICluster),
-	shardFunc func(shard api.IShard),
-	hostFunc func(host *api.Host),
+	clusterFunc func(cluster ICluster),
+	shardFunc func(shard IShard),
+	hostFunc func(host *Host),
 ) {
 	if ap == nil {
 		return
@@ -291,7 +292,7 @@ func (ap *ActionPlan) WalkRemoved(
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Removed {
 		switch ap.specDiff.Removed[path].(type) {
-		//case api.ChiCluster:
+		//case ChiCluster:
 		//	cluster := ap.specDiff.Removed[path].(api.ChiCluster)
 		//	clusterFunc(&cluster)
 		//case api.ChiShard:
@@ -303,17 +304,17 @@ func (ap *ActionPlan) WalkRemoved(
 		//case *api.ChiCluster:
 		//	cluster := ap.specDiff.Removed[path].(*api.ChiCluster)
 		//	clusterFunc(cluster)
-		case api.ICluster:
-			cluster := ap.specDiff.Removed[path].(api.ICluster)
+		case ICluster:
+			cluster := ap.specDiff.Removed[path].(ICluster)
 			clusterFunc(cluster)
 		//case *api.ChiShard:
 		//	shard := ap.specDiff.Removed[path].(*api.ChiShard)
 		//	shardFunc(shard)
-		case api.IShard:
-			shard := ap.specDiff.Removed[path].(api.IShard)
+		case IShard:
+			shard := ap.specDiff.Removed[path].(IShard)
 			shardFunc(shard)
-		case *api.Host:
-			host := ap.specDiff.Removed[path].(*api.Host)
+		case *Host:
+			host := ap.specDiff.Removed[path].(*Host)
 			hostFunc(host)
 		}
 	}
@@ -321,9 +322,9 @@ func (ap *ActionPlan) WalkRemoved(
 
 // WalkAdded walk added cluster items
 func (ap *ActionPlan) WalkAdded(
-	clusterFunc func(cluster api.ICluster),
-	shardFunc func(shard api.IShard),
-	hostFunc func(host *api.Host),
+	clusterFunc func(cluster ICluster),
+	shardFunc func(shard IShard),
+	hostFunc func(host *Host),
 ) {
 	if ap == nil {
 		return
@@ -343,17 +344,17 @@ func (ap *ActionPlan) WalkAdded(
 		//case *api.ChiCluster:
 		//	cluster := ap.specDiff.Added[path].(*api.ChiCluster)
 		//	clusterFunc(cluster)
-		case api.ICluster:
-			cluster := ap.specDiff.Added[path].(api.ICluster)
+		case ICluster:
+			cluster := ap.specDiff.Added[path].(ICluster)
 			clusterFunc(cluster)
 		//case *api.ChiShard:
 		//	shard := ap.specDiff.Added[path].(*api.ChiShard)
 		//	shardFunc(shard)
-		case api.IShard:
-			shard := ap.specDiff.Added[path].(api.IShard)
+		case IShard:
+			shard := ap.specDiff.Added[path].(IShard)
 			shardFunc(shard)
-		case *api.Host:
-			host := ap.specDiff.Added[path].(*api.Host)
+		case *Host:
+			host := ap.specDiff.Added[path].(*Host)
 			hostFunc(host)
 		}
 	}
@@ -361,9 +362,9 @@ func (ap *ActionPlan) WalkAdded(
 
 // WalkModified walk modified cluster items
 func (ap *ActionPlan) WalkModified(
-	clusterFunc func(cluster api.ICluster),
-	shardFunc func(shard api.IShard),
-	hostFunc func(host *api.Host),
+	clusterFunc func(cluster ICluster),
+	shardFunc func(shard IShard),
+	hostFunc func(host *Host),
 ) {
 	if ap == nil {
 		return
@@ -383,17 +384,17 @@ func (ap *ActionPlan) WalkModified(
 		//case *api.ChiCluster:
 		//	cluster := ap.specDiff.Modified[path].(*api.ChiCluster)
 		//	clusterFunc(cluster)
-		case api.ICluster:
-			cluster := ap.specDiff.Modified[path].(api.ICluster)
+		case ICluster:
+			cluster := ap.specDiff.Modified[path].(ICluster)
 			clusterFunc(cluster)
-		//case *api.ChiShard:
-		//	shard := ap.specDiff.Modified[path].(*api.ChiShard)
+		//case *ChiShard:
+		//	shard := ap.specDiff.Modified[path].(*ChiShard)
 		//	shardFunc(shard)
-		case api.IShard:
-			shard := ap.specDiff.Modified[path].(api.IShard)
+		case IShard:
+			shard := ap.specDiff.Modified[path].(IShard)
 			shardFunc(shard)
-		case *api.Host:
-			host := ap.specDiff.Modified[path].(*api.Host)
+		case *Host:
+			host := ap.specDiff.Modified[path].(*Host)
 			hostFunc(host)
 		}
 	}
