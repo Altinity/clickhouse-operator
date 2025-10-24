@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.25.4
+# OPERATOR_VERSION=0.25.5
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -236,6 +236,10 @@ spec:
             normalizedCompleted:
               type: object
               description: "Normalized resource completed"
+              x-kubernetes-preserve-unknown-fields: true
+            actionPlan:
+              type: object
+              description: "Action Plan"
               x-kubernetes-preserve-unknown-fields: true
             hostsWithTablesCreated:
               type: array
@@ -534,6 +538,26 @@ spec:
                                 Whether the operator during host launch procedure should wait for ready probe to succeed.
                                 In case probe is unspecified wait is assumed to be completed successfully.
                                 Default option value is to wait.
+                    drop:
+                      type: object
+                      properties:
+                        replicas:
+                          type: object
+                          description: |
+                            Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                          properties:
+                            onDelete:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                            onLostVolume:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+                            active:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
             reconcile:
               !!merge <<: *TypeReconcile
               description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
@@ -1426,14 +1450,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.25.4
+# OPERATOR_VERSION=0.25.5
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1656,6 +1680,10 @@ spec:
             normalizedCompleted:
               type: object
               description: "Normalized resource completed"
+              x-kubernetes-preserve-unknown-fields: true
+            actionPlan:
+              type: object
+              description: "Action Plan"
               x-kubernetes-preserve-unknown-fields: true
             hostsWithTablesCreated:
               type: array
@@ -1954,6 +1982,26 @@ spec:
                                 Whether the operator during host launch procedure should wait for ready probe to succeed.
                                 In case probe is unspecified wait is assumed to be completed successfully.
                                 Default option value is to wait.
+                    drop:
+                      type: object
+                      properties:
+                        replicas:
+                          type: object
+                          description: |
+                            Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                          properties:
+                            onDelete:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                            onLostVolume:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+                            active:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
             reconcile:
               !!merge <<: *TypeReconcile
               description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
@@ -2849,7 +2897,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -3231,6 +3279,26 @@ spec:
                                 Whether the operator during host launch procedure should wait for readiness probe to succeed.
                                 In case probe is unspecified wait is assumed to be completed successfully.
                                 Default option value is to wait.
+                    drop:
+                      type: object
+                      properties:
+                        replicas:
+                          type: object
+                          description: |
+                            Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                          properties:
+                            onDelete:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                            onLostVolume:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+                            active:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
             annotation:
               type: object
               description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
@@ -3358,14 +3426,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.25.4
+# OPERATOR_VERSION=0.25.5
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.25.4
+    clickhouse-keeper.altinity.com/chop: 0.25.5
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -4253,7 +4321,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
 
 # Template Parameters:
 #
@@ -4278,7 +4346,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
 rules:
   #
   # Core API group
@@ -4498,7 +4566,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -4520,7 +4588,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -4877,12 +4945,13 @@ data:
 
       # Reconcile Host scenario
       host:
-        # Whether the operator during reconcile procedure should wait for a ClickHouse host:
-        #   - to be excluded from a ClickHouse cluster
-        #   - to complete all running queries
-        #   - to be included into a ClickHouse cluster
-        # respectfully before moving forward with host reconcile
+        # The operator during reconcile procedure should wait for a ClickHouse host to achieve the following conditions:
         wait:
+          # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+          #   - to be excluded from a ClickHouse cluster
+          #   - to complete all running queries
+          #   - to be included into a ClickHouse cluster
+          # respectfully before moving forward with host reconcile
           exclude: true
           queries: true
           include: false
@@ -4906,6 +4975,15 @@ data:
             # In case probe is unspecified wait is assumed to be completed successfully.
             # Default option value is to wait.
             readiness: yes
+        # The operator during reconcile procedure should drop the following entities:
+        drop:
+          replicas:
+            # Whether the operator during reconcile procedure should drop replicas when replica is deleted
+            onDelete: yes
+            # Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+            onLostVolume: yes
+            # Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
+            active: no
 
     ################################################
     ##
@@ -5017,7 +5095,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 data:
 ---
@@ -5033,7 +5111,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -5127,7 +5205,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -5225,7 +5303,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -5287,7 +5365,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 data:
 ---
@@ -5303,7 +5381,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -5378,7 +5456,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 data:
   readme: |
@@ -5396,7 +5474,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 data:
 ---
@@ -5404,7 +5482,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=${OPERATOR_NAMESPACE}
 #   COMMENT=
-#   OPERATOR_VERSION=0.25.4
+#   OPERATOR_VERSION=0.25.5
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -5414,7 +5492,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -5438,7 +5516,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -5650,7 +5728,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.5
     app: clickhouse-operator
 spec:
   ports:

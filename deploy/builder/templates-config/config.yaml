@@ -345,12 +345,13 @@ reconcile:
 
   # Reconcile Host scenario
   host:
-    # Whether the operator during reconcile procedure should wait for a ClickHouse host:
-    #   - to be excluded from a ClickHouse cluster
-    #   - to complete all running queries
-    #   - to be included into a ClickHouse cluster
-    # respectfully before moving forward with host reconcile
+    # The operator during reconcile procedure should wait for a ClickHouse host to achieve the following conditions:
     wait:
+      # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+      #   - to be excluded from a ClickHouse cluster
+      #   - to complete all running queries
+      #   - to be included into a ClickHouse cluster
+      # respectfully before moving forward with host reconcile
       exclude: true
       queries: true
       include: false
@@ -374,6 +375,15 @@ reconcile:
         # In case probe is unspecified wait is assumed to be completed successfully.
         # Default option value is to wait.
         readiness: yes
+    # The operator during reconcile procedure should drop the following entities:
+    drop:
+      replicas:
+        # Whether the operator during reconcile procedure should drop replicas when replica is deleted
+        onDelete: yes
+        # Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+        onLostVolume: yes
+        # Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
+        active: no
 
 ################################################
 ##

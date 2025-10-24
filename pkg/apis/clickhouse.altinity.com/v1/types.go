@@ -15,10 +15,11 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"sync"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 )
 
 // MergeType specifies merge types type
@@ -51,6 +52,7 @@ type ClickHouseInstallationRuntime struct {
 	commonConfigMutex sync.Mutex                 `json:"-" yaml:"-"`
 	MinVersion        *swversion.SoftWareVersion `json:"-" yaml:"-"`
 	MaxVersion        *swversion.SoftWareVersion `json:"-" yaml:"-"`
+	ActionPlan        IActionPlan                `json:"-" yaml:"-"`
 }
 
 func newClickHouseInstallationRuntime() *ClickHouseInstallationRuntime {

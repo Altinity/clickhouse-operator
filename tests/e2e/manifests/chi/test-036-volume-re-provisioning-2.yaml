@@ -1,15 +1,22 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test-021-2-rescale-volume"
+  name: "test-036-volume-re-provisioning"
 spec:
   useTemplates:
     - name: clickhouse-version
   configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
     clusters:
     - name: simple
       layout:
         shardsCount: 1
+        replicasCount: 2
+    profiles:
+      clickhouse_operator/log_queries: 1
     settings:
       storage_configuration/disks/disk2/path: /var/lib/clickhouse2/
       storage_configuration/policies/default/volumes/default/disk: default
@@ -18,10 +25,10 @@ spec:
     storageManagement:
       provisioner: Operator
     templates:
-      podTemplate: multi-volume
+      volumeClaimTemplate: default
   templates:
     volumeClaimTemplates:
-      - name: disk1
+      - name: default
         spec:
           accessModes:
             - ReadWriteOnce
@@ -36,17 +43,12 @@ spec:
             requests:
               storage: 1Gi
     podTemplates:
-      - name: multi-volume
+      - name: default
         spec:
           containers:
             - name: clickhouse-pod
-              image: altinity/clickhouse-server:25.3.6.10034.altinitystable
               volumeMounts:
-                - name: disk1
+                - name: default
                   mountPath: /var/lib/clickhouse
                 - name: disk2
                   mountPath: /var/lib/clickhouse2
-              command:
-                - /bin/bash
-                - '-c'
-                - chown clickhouse /var/lib/clickhouse2 && /entrypoint.sh

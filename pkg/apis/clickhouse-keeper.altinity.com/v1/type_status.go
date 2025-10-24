@@ -386,11 +386,13 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.FQDNs = true
 		opts.Copy.Endpoint = true
 		opts.Copy.NormalizedCR = true
+		opts.Copy.ActionPlan = true
 		opts.Copy.UsedTemplates = true
 	}
 
 	if opts.FieldGroupNormalized {
 		opts.Copy.NormalizedCR = true
+		opts.Copy.ActionPlan = true
 	}
 
 	if opts.FieldGroupWholeStatus {
@@ -422,6 +424,7 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.Endpoint = true
 		opts.Copy.NormalizedCR = true
 		opts.Copy.NormalizedCRCompleted = true
+		opts.Copy.ActionPlan = true
 		opts.Copy.UsedTemplates = true
 	}
 

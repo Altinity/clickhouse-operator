@@ -11,6 +11,7 @@ spec:
       podTemplate: default
   useTemplates:
     - name: persistent-volume
+    - name: clickhouse-version
   configuration:
     zookeeper:
       nodes:
@@ -24,10 +25,3 @@ spec:
         layout:
           shardsCount: 2
           replicasCount: 2
-  templates:
-    podTemplates:
-      - name: default
-        spec:
-          containers:
-            - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:24.8

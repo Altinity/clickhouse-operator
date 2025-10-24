@@ -97,6 +97,10 @@ func (c *CR) buildCR(chi *api.ClickHouseInstallation, cm *core.ConfigMap) *api.C
 		chi.EnsureStatus().NormalizedCRCompleted = normalizedCompleted
 	}
 
+	if len(cm.Data[statusActionPlan]) > 0 {
+		chi.EnsureStatus().ActionPlan = nil
+	}
+
 	return chi
 }
 
@@ -202,7 +206,6 @@ func (c *CR) statusUpdate(ctx context.Context, chi *api.ClickHouseInstallation) 
 
 func (c *CR) buildResources(chi *api.ClickHouseInstallation) (*api.ClickHouseInstallation, *core.ConfigMap) {
 	// Build required components
-	normalized, normalizedCompleted := c.buildNormalized(chi)
 	tagger := managers.NewTagManager(managers.TagManagerTypeClickHouse, chi)
 	namespace, name := c.buildNamespaceName(chi)
 
@@ -215,14 +218,11 @@ func (c *CR) buildResources(chi *api.ClickHouseInstallation) (*api.ClickHouseIns
 			Annotations:     c.macro.Scope(chi).Map(tagger.Annotate(interfaces.AnnotateConfigMapStorage)),
 			OwnerReferences: creator.NewOwnerReferencer().CreateOwnerReferences(chi),
 		},
-		Data: map[string]string{
-			statusNormalized:          normalized,
-			statusNormalizedCompleted: normalizedCompleted,
-		},
+		Data: c.buildResourceData(chi),
 	}
 
-	// Finalize resources
-	c.postprocessNormalized(chi)
+	// Clean data that are coped into resource
+	c.cleanResourceData(chi)
 
 	return chi, cm
 }
@@ -231,21 +231,28 @@ func (c *CR) buildNamespaceName(chi *api.ClickHouseInstallation) (string, string
 	return c.buildCMNamespace(chi), c.buildCMName(chi)
 }
 
-func (c *CR) buildNormalized(chi *api.ClickHouseInstallation) (normalized string, normalizedCompleted string) {
+func (c *CR) buildResourceData(chi *api.ClickHouseInstallation) map[string]string {
+	data := make(map[string]string)
 	if chi.Status.NormalizedCR != nil {
 		bytes, _ := json.Marshal(chi.Status.NormalizedCR)
-		normalized = string(bytes)
+		data[statusNormalized] = string(bytes)
 	}
 	if chi.Status.NormalizedCRCompleted != nil {
 		bytes, _ := json.Marshal(chi.Status.NormalizedCRCompleted)
-		normalizedCompleted = string(bytes)
+		data[statusNormalizedCompleted] = string(bytes)
 	}
-	return normalized, normalizedCompleted
+	if chi.Status.ActionPlan != nil {
+		data[statusActionPlan] = chi.Status.ActionPlan.String()
+	} else {
+		log.V(1).Info("ActionPlan is empty!")
+	}
+	return data
 }
 
-func (c *CR) postprocessNormalized(chi *api.ClickHouseInstallation) {
+func (c *CR) cleanResourceData(chi *api.ClickHouseInstallation) {
 	chi.Status.NormalizedCR = nil
 	chi.Status.NormalizedCRCompleted = nil
+	chi.Status.ActionPlan = nil
 }
 
 func (c *CR) statusUpdateCR(ctx context.Context, chi *api.ClickHouseInstallation) error {
@@ -276,4 +283,5 @@ func (c *CR) buildCMName(obj meta.Object) string {
 const (
 	statusNormalized          = "status-normalized"
 	statusNormalizedCompleted = "status-normalizedCompleted"
+	statusActionPlan          = "status-actionPlan"
 )

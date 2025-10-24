@@ -42,7 +42,7 @@ func ResourcesListApply(curResourceList core.ResourceList, desiredResourceList c
 	return updated
 }
 
-// ResourceListReplaceResource
+// ResourceListReplaceResourceQuantity
 func ResourceListReplaceResourceQuantity(
 	curResourceList core.ResourceList,
 	desiredResourceList core.ResourceList,

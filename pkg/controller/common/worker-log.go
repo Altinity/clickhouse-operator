@@ -19,7 +19,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 )
 
 // LogCR writes a CR into the log
@@ -29,14 +28,6 @@ func LogCR(name string, cr api.ICustomResource) {
 		name,
 		name,
 		cr.YAML(types.CopyCROptions{SkipStatus: true, SkipManagedFields: true}),
-	)
-}
-
-// LogActionPlan logs action plan
-func LogActionPlan(ap *action_plan.ActionPlan) {
-	log.V(1).Info(
-		"ActionPlan start---------------------------------------------:\n%s\nActionPlan end---------------------------------------------",
-		ap,
 	)
 }
 

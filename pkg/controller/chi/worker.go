@@ -39,7 +39,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
@@ -331,14 +330,14 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	return w.reconcileCR(ctx, old, new)
 }
 
-func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
+func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
-	cr.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
+	cr.EnsureStatus().ReconcileStart(cr.EnsureRuntime().ActionPlan)
 	_ = w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
@@ -353,7 +352,7 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInsta
 		WithActions(cr).
 		M(cr).F().
 		Info("reconcile started, task id: %s", cr.GetSpecT().GetTaskID())
-	w.a.V(2).M(cr).F().Info("action plan\n%s\n", ap.String())
+	w.a.V(2).M(cr).F().Info("action plan\n%s\n", cr.EnsureRuntime().ActionPlan.String())
 }
 
 func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api.ClickHouseInstallation) {
@@ -418,14 +417,14 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *a
 		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", cr.GetSpecT().GetTaskID())
 }
 
-func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
+func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
 	existingObjects := w.c.discovery(ctx, cr)
-	ap.WalkAdded(
+	cr.EnsureRuntime().ActionPlan.WalkAdded(
 		// Walk over added clusters
 		func(cluster api.ICluster) {
 			w.a.V(1).M(cr).Info("Walking over AP added clusters. Cluster: %s", cluster.GetName())
@@ -478,7 +477,7 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHo
 		},
 	)
 
-	ap.WalkModified(
+	cr.EnsureRuntime().ActionPlan.WalkModified(
 		func(cluster api.ICluster) {
 			w.a.V(1).M(cr).Info("Walking over AP modified clusters. Cluster: %s", cluster.GetName())
 		},
