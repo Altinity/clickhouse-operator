@@ -30,7 +30,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -62,17 +61,18 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	cr.(*api.ClickHouseInstallation).EnsureStatus().SyncHostTablesCreated()
 }
 
-// dropReplicas cleans Zookeeper for replicas that are properly deleted - via AP
-func (w *worker) dropReplicas(ctx context.Context, cr api.ICustomResource, ap *action_plan.ActionPlan) {
+// dropReplicas cleans Zookeeper for replicas that are properly deleted - via Action Plan
+func (w *worker) dropReplicas(ctx context.Context, cr *api.ClickHouseInstallation) {
+	// Iterate over Action Plan and drop all replicas that are properly removed as removed hosts
 	w.a.V(1).M(cr).F().S().Info("drop replicas based on AP")
 	cnt := 0
-	ap.WalkRemoved(
+	cr.EnsureRuntime().ActionPlan.WalkRemoved(
 		func(cluster api.ICluster) {
 		},
 		func(shard api.IShard) {
 		},
 		func(host *api.Host) {
-			_ = w.dropReplica(ctx, host)
+			_ = w.dropReplica(ctx, host, NewDropReplicaOptions().SetRegularDrop())
 			cnt++
 		},
 	)
@@ -333,35 +333,101 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 }
 
 // canDropReplica
-func (w *worker) canDropReplica(ctx context.Context, host *api.Host, opts ...*dropReplicaOptions) (can bool) {
-	o := NewDropReplicaOptionsArr(opts...).First()
+func (w *worker) canDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host, opt *dropReplicaOptions) (can bool) {
 
-	if o.ForceDrop() {
+	switch {
+	case opt.RegularDrop():
+		w.a.V(1).F().Info("Regular drop replica. hostToDrop: %s", hostToDrop.GetName())
+		// Check whether drop replicas is allowed to the operator
+		if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.OnDelete.IsFalse() {
+			w.a.V(1).F().Info("Regular drop replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+			return false
+		}
+
+		// In case host has volumes to retain - unable to drop replica
+		if w.hasHostVolumesToRetain(ctx, hostToDrop) {
+			w.a.V(1).F().Info("Retained volume(s) replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+			return false
+		}
+
+		w.a.V(1).F().Info("Allowed to drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return true
-	}
 
-	can = true
+	case opt.ForceDropUponStorageLoss():
+		w.a.V(1).F().Info("Force drop replica upon storage loss. hostToDrop: %s", hostToDrop.GetName())
+		// Active replica may have restriction to be deleted
+		if w.ensureClusterSchemer(hostToRunOn).IsHostActiveReplica(ctx, hostToRunOn, hostToDrop) {
+			w.a.V(1).F().Info("Replica is an active one. Need ti check whether it can be dropped. hostToDrop: %s", hostToDrop.GetName())
+			// Check whether drop active replicas is allowed to the operator
+			if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.Active.IsFalse() {
+				w.a.V(1).F().Info("Active replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+				return false
+			}
+		}
+		w.a.V(1).F().Info("Accepted force drop replica upon storage loss. hostToDrop: %s", hostToDrop.GetName())
+		return true
+
+	default:
+		panic("unknown replica drop")
+	}
+}
+
+// hasHostVolumesToRetain check whether host has PVCs to be retained
+// Replica's state has to be kept in Zookeeper for retained volumes.
+// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
+func (w *worker) hasHostVolumesToRetain(ctx context.Context, host *api.Host) (has bool) {
+	// Check whether among all PVCs host has reclaim policy "retain" specified
 	storage.NewStoragePVC(w.c.kube.Storage()).WalkDiscoveredPVCs(ctx, host, func(pvc *core.PersistentVolumeClaim) {
-		// Replica's state has to be kept in Zookeeper for retained volumes.
-		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
 		if chiLabeler.New(nil).GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {
 			w.a.V(1).F().Info("PVC: %s/%s blocks drop replica. Reclaim policy: %s", api.PVCReclaimPolicyRetain.String())
-			can = false
+			has = true
 		}
 	})
-	return can
+
+	return has
 }
 
 type dropReplicaOptions struct {
-	forceDrop bool
+	regularDrop              bool
+	forceDropUponStorageLoss bool
 }
 
-func (o *dropReplicaOptions) ForceDrop() bool {
+func NewDropReplicaOptions() *dropReplicaOptions {
+	return &dropReplicaOptions{}
+}
+
+func (o *dropReplicaOptions) SetRegularDrop() *dropReplicaOptions {
+	if o == nil {
+		return o
+	}
+	o.regularDrop = true
+
+	return o
+}
+
+func (o *dropReplicaOptions) RegularDrop() bool {
 	if o == nil {
 		return false
 	}
 
-	return o.forceDrop
+	return o.regularDrop
+}
+
+func (o *dropReplicaOptions) SetForceDropUponStorageLoss() *dropReplicaOptions {
+	if o == nil {
+		return o
+	}
+	o.forceDropUponStorageLoss = true
+
+	return o
+}
+
+func (o *dropReplicaOptions) ForceDropUponStorageLoss() bool {
+	if o == nil {
+		return false
+	}
+
+	return o.forceDropUponStorageLoss
 }
 
 type dropReplicaOptionsArr []*dropReplicaOptions
@@ -380,14 +446,9 @@ func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 }
 
 // dropReplica drops replica's info from Zookeeper
-func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...*dropReplicaOptions) error {
+func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts *dropReplicaOptions) error {
 	if hostToDrop == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop: %s", hostToDrop.GetName())
-		return nil
-	}
-
-	if !w.canDropReplica(ctx, hostToDrop, opts...) {
-		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
 
@@ -399,6 +460,11 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...
 
 	if hostToRunOn == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn: %s, hostToDrop: %s", hostToRunOn.GetName(), hostToDrop.GetName())
+		return nil
+	}
+
+	if !w.canDropReplica(ctx, hostToRunOn, hostToDrop, opts) {
+		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
 

@@ -248,6 +248,10 @@ func (s *ClusterSchemer) sqlDropReplica(shard int, replica string) []string {
 	}
 }
 
+func (s *ClusterSchemer) sqlIsReplicaActive(replica string) string {
+	return fmt.Sprintf("SELECT sumMap(replica_is_active)['%s'] FROM system.replicas", replica)
+}
+
 func (s *ClusterSchemer) sqlActiveQueriesNum() string {
 	return `SELECT count() FROM system.processes`
 }

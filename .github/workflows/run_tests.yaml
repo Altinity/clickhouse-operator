@@ -83,6 +83,7 @@ jobs:
 
       - name: Run Tests
         id: run-tests
+        continue-on-error: true
         run: |
           echo "Test run settings:"
           echo "  test mode: ${{ github.event.inputs.test_mode }}"
@@ -145,7 +146,7 @@ jobs:
           retention-days: 90
 
       - name: Test Failed
-        if: ${{ failure() }}
+        if: ${{ steps.run-tests.outputs.test_result != '0' }}
         uses: actions/github-script@v3
         with:
           script: |

@@ -70,6 +70,7 @@ type Status struct {
 	Endpoint               bool
 	NormalizedCR           bool
 	NormalizedCRCompleted  bool
+	ActionPlan             bool
 	HostsWithTablesCreated bool
 	UsedTemplates          bool
 }

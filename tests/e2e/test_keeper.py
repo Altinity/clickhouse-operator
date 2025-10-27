@@ -192,14 +192,16 @@ def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper
                               f"Pods expected={keeper_replica_count} actual={pod_counts}, wait {3*(i+1)} seconds"):
                         time.sleep(3*(i+1))
 
+def is_need_delete_keeper_pvc(keeper_type, keeper_manifest_1_node):
+    return keeper_type == "zookeeper" and ("scaleout-pvc" in keeper_manifest_1_node or "manual-teardown" in keeper_manifest_1_node)
 
 @TestOutline
 def test_keeper_rescale_outline(
         self,
-        keeper_type="zookeeper",
-        pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
-        keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
-        keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only.yaml",
+        keeper_type,
+        pod_for_insert_data,
+        keeper_manifest_1_node,
+        keeper_manifest_3_node,
 ):
     """
     test scenario for Zoo/Clickhouse Keeper
@@ -389,12 +391,22 @@ def test_clickhouse_keeper_rescale_chk(self):
 #     )
 
 
+@TestScenario
+@Name("test_zookeeper_manual_teardown_rescale# Check ZK+Manual TEARDOWN scale-up / scale-down cases")
+def test_zookeeper_manual_teardown_rescale(self):
+    test_keeper_rescale_outline(
+        keeper_type="zookeeper",
+        pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
+        keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only-manual-teardown.yaml",
+        keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only-manual-teardown.yaml",
+    )
+
 @TestOutline
 def test_keeper_probes_outline(
         self,
-        keeper_type="zookeeper",
-        keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
-        keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only.yaml",
+        keeper_type,
+        keeper_manifest_1_node,
+        keeper_manifest_3_node,
 ):
     with When("Clean exists ClickHouse Keeper and ZooKeeper"):
         kubectl.delete_all_chi(self.context.test_namespace)
@@ -556,6 +568,7 @@ def test(self):
         # test_zookeeper_pvc_scaleout_rescale,
         test_clickhouse_keeper_rescale,
         test_clickhouse_keeper_rescale_chk,
+        test_zookeeper_manual_teardown_rescale,
         test_zookeeper_rescale,
 
         # test_zookeeper_pvc_probes_workload,

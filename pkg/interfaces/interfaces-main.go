@@ -99,7 +99,7 @@ type ICreator interface {
 		host *api.Host,
 		spec *core.PersistentVolumeClaimSpec,
 	) *core.PersistentVolumeClaim
-	AdjustPVC(
+	TagPVC(
 		pvc *core.PersistentVolumeClaim,
 		host *api.Host,
 		template *api.VolumeClaimTemplate,

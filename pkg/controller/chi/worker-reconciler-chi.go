@@ -33,7 +33,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -64,11 +63,8 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 
 	new = w.buildCR(ctx, new)
 
-	actionPlan := action_plan.NewActionPlan(new.GetAncestorT(), new)
-	common.LogActionPlan(actionPlan)
-
 	switch {
-	case actionPlan.HasActionsToDo():
+	case new.EnsureRuntime().ActionPlan.HasActionsToDo():
 		w.a.M(new).F().Info("ActionPlan has actions - continue reconcile")
 	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
@@ -77,9 +73,9 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		return nil
 	}
 
-	w.markReconcileStart(ctx, new, actionPlan)
+	w.markReconcileStart(ctx, new)
 	w.excludeFromMonitoring(new)
-	w.setHostStatusesPreliminary(ctx, new, actionPlan)
+	w.setHostStatusesPreliminary(ctx, new)
 
 	if err := w.reconcile(ctx, new); err != nil {
 		// Something went wrong
@@ -101,7 +97,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		}
 
 		w.clean(ctx, new)
-		w.dropReplicas(ctx, new, actionPlan)
+		w.dropReplicas(ctx, new)
 		w.addToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
@@ -135,6 +131,11 @@ func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *
 
 	w.fillCurSTS(ctx, cr)
 	w.logSWVersion(ctx, cr)
+
+	actionPlan := api.MakeActionPlan(cr.GetAncestorT(), cr)
+	cr.EnsureRuntime().ActionPlan = actionPlan
+	cr.EnsureStatus().SetActionPlan(actionPlan)
+	w.a.V(1).M(cr).Info(actionPlan.Log("buildCR"))
 
 	return cr
 }

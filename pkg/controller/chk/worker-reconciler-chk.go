@@ -33,7 +33,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -52,8 +51,8 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 
 	new = w.buildCR(ctx, new)
 
-	actionPlan := action_plan.NewActionPlan(new.GetAncestorT(), new)
-	common.LogActionPlan(actionPlan)
+	actionPlan := api.MakeActionPlan(new.GetAncestorT(), new)
+	w.a.M(new).V(1).Info(actionPlan.Log("buildCR"))
 
 	switch {
 	case actionPlan.HasActionsToDo():
