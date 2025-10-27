@@ -25,6 +25,13 @@ jobs:
           sudo install cr /usr/local/bin/
           rm -f cr chart-releaser_1.4.1_linux_amd64.tar.gz
 
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Login to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Package Chart
         run: cr package deploy/helm/clickhouse-operator
 
@@ -73,6 +80,11 @@ jobs:
           echo "  HELM_GITHUB_REPOSITORY: ${{ vars.HELM_GITHUB_REPOSITORY }}"
           echo "  HELM_GITHUB_TOKEN: [SET]"
           
+      - name: Push Helm Chart to OCI Registry
+        run: |
+          CHART_PATH=$(ls .cr-release-packages/altinity-clickhouse-operator-*.tgz)
+          helm push "${CHART_PATH}" oci://ghcr.io/altinity/clickhouse-operator-helm-chart
+
       - name: Upload Release Artifacts to Helm Repo
         run: |
           cr upload \
