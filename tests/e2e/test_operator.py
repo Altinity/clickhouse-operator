@@ -5504,8 +5504,8 @@ def test_020003(self):
     manifest = f"manifests/chi/test-049-clickhouse-keeper-upgrade.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
-    keeper_version_from = "24.8"
-    keeper_version_to = "25.3"
+    keeper_version_from = "25.3"
+    keeper_version_to = "25.8"
     with Given("CHI with 2 replicas"):
         kubectl.create_and_check(
             manifest=manifest,
