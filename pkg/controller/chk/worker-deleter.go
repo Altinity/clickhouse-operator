@@ -41,8 +41,8 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 		Info("remove items scheduled for deletion")
 
 	// Remove deleted items
-	w.a.V(1).M(cr).F().Info("List of objects which have failed to reconcile:\n%s", w.task.RegistryFailed)
-	w.a.V(1).M(cr).F().Info("List of successfully reconciled objects:\n%s", w.task.RegistryReconciled)
+	w.a.V(1).M(cr).F().Info("List of objects which have failed to reconcile:\n%s", w.task.RegistryFailed())
+	w.a.V(1).M(cr).F().Info("List of successfully reconciled objects:\n%s", w.task.RegistryReconciled())
 	objs := w.c.discovery(ctx, cr)
 	need := w.task.RegistryReconciled()
 	w.a.V(1).M(cr).F().Info("Existing objects:\n%s", objs)
