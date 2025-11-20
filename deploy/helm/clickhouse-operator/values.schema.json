@@ -122,7 +122,7 @@
                                                                         "type": "object",
                                                                         "properties": {
                                                                             "files": {
-                                                                                "type": "null"
+                                                                                "type": ["object", "null"]
                                                                             },
                                                                             "profiles": {
                                                                                 "type": ["object", "null"],
@@ -821,7 +821,7 @@
             }
         },
         "serviceAccount": {
-            "type": "object",
+            "type": ["object", "null"],
             "properties": {
                 "annotations": {
                     "description": "annotations to add to the service account",
@@ -833,7 +833,7 @@
                 },
                 "name": {
                     "description": "the name of the service account to use; if not set and create is true, a name is generated using the fullname template",
-                    "type": "null"
+                    "type": ["string","null"]
                 }
             }
         },
