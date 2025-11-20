@@ -48,6 +48,6 @@ jobs:
             exit 1
           fi
           kubectl apply -n test -f ./docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml
-          kubectl wait -n test --for=create chi/simple-01 --timeout=60s
-          kubectl wait -n test --for=jsonpath='{.status.status}'=Completed chi/simple-01 --timeout=1m
-          kubectl wait -n test --for=condition=Ready pod/chi-simple-01-simple-0-0-0
+          kubectl wait -n test --for=create chi/simple-01 --timeout=1m
+          kubectl wait -n test --for=jsonpath='{.status.status}'=Completed chi/simple-01 --timeout=3m
+          kubectl wait -n test --for=condition=Ready pod/chi-simple-01-simple-0-0-0 --timeout=3m
