@@ -414,14 +414,7 @@ type OperatorConfigCHIRuntime struct {
 
 // OperatorConfigReconcile specifies reconcile section
 type OperatorConfigReconcile struct {
-	Runtime struct {
-		ReconcileCHIsThreadsNumber           int `json:"reconcileCHIsThreadsNumber"           yaml:"reconcileCHIsThreadsNumber"`
-		ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
-		ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
-
-		// DEPRECATED, is replaced with reconcileCHIsThreadsNumber
-		ThreadsNumber int `json:"threadsNumber" yaml:"threadsNumber"`
-	} `json:"runtime" yaml:"runtime"`
+	Runtime OperatorConfigReconcileRuntime `json:"runtime" yaml:"runtime"`
 
 	StatefulSet struct {
 		Create struct {
@@ -438,33 +431,31 @@ type OperatorConfigReconcile struct {
 	Host ReconcileHost `json:"host" yaml:"host"`
 }
 
+type OperatorConfigReconcileRuntime struct {
+	ReconcileCHIsThreadsNumber           int `json:"reconcileCHIsThreadsNumber"           yaml:"reconcileCHIsThreadsNumber"`
+	ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
+	ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
+
+	// DEPRECATED, is replaced with reconcileCHIsThreadsNumber
+	ThreadsNumber int `json:"threadsNumber" yaml:"threadsNumber"`
+}
+
 // ReconcileHost defines reconcile host config
 type ReconcileHost struct {
 	Wait ReconcileHostWait `json:"wait" yaml:"wait"`
+	Drop ReconcileHostDrop `json:"drop" yaml:"drop"`
 }
 
-func (host ReconcileHost) Normalize() ReconcileHost {
-	if host.Wait.Replicas == nil {
-		host.Wait.Replicas = &ReconcileHostWaitReplicas{}
-	}
-
-	if host.Wait.Replicas.Delay == nil {
-		// Default update timeout in seconds
-		host.Wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
-	}
-
-	if host.Wait.Probes == nil {
-		// Default value
-		host.Wait.Probes = &ReconcileHostWaitProbes{
-			Readiness: types.NewStringBool(true),
-		}
-	}
-	return host
+func (rh ReconcileHost) Normalize() ReconcileHost {
+	rh.Wait = rh.Wait.Normalize()
+	rh.Drop = rh.Drop.Normalize()
+	return rh
 }
 
-func (host ReconcileHost) MergeFrom(from ReconcileHost) ReconcileHost {
-	host.Wait = host.Wait.MergeFrom(from.Wait)
-	return host
+func (rh ReconcileHost) MergeFrom(from ReconcileHost) ReconcileHost {
+	rh.Wait = rh.Wait.MergeFrom(from.Wait)
+	rh.Drop = rh.Drop.MergeFrom(from.Drop)
+	return rh
 }
 
 // ReconcileHostWait defines reconcile host wait config
@@ -476,6 +467,26 @@ type ReconcileHostWait struct {
 	Probes   *ReconcileHostWaitProbes   `json:"probes,omitempty"   yaml:"probes,omitempty"`
 }
 
+func (wait ReconcileHostWait) Normalize() ReconcileHostWait {
+	if wait.Replicas == nil {
+		wait.Replicas = &ReconcileHostWaitReplicas{}
+	}
+
+	if wait.Replicas.Delay == nil {
+		// Default update timeout in seconds
+		wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
+	}
+
+	if wait.Probes == nil {
+		// Default value
+		wait.Probes = &ReconcileHostWaitProbes{
+			Readiness: types.NewStringBool(true),
+		}
+	}
+
+	return wait
+}
+
 func (wait ReconcileHostWait) MergeFrom(from ReconcileHostWait) ReconcileHostWait {
 	wait.Exclude = wait.Exclude.MergeFrom(from.Exclude)
 	wait.Queries = wait.Queries.MergeFrom(from.Queries)
@@ -484,6 +495,25 @@ func (wait ReconcileHostWait) MergeFrom(from ReconcileHostWait) ReconcileHostWai
 	wait.Probes = wait.Probes.MergeFrom(from.Probes)
 
 	return wait
+}
+
+// ReconcileHostDrop defines reconcile host drop config
+type ReconcileHostDrop struct {
+	Replicas *ReconcileHostDropReplicas `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+}
+
+func (drop ReconcileHostDrop) Normalize() ReconcileHostDrop {
+	if drop.Replicas == nil {
+		drop.Replicas = &ReconcileHostDropReplicas{}
+	}
+
+	return drop
+}
+
+func (drop ReconcileHostDrop) MergeFrom(from ReconcileHostDrop) ReconcileHostDrop {
+	drop.Replicas = drop.Replicas.MergeFrom(from.Replicas)
+
+	return drop
 }
 
 type ReconcileHostWaitReplicas struct {
@@ -519,6 +549,20 @@ type ReconcileHostWaitProbes struct {
 	Readiness *types.StringBool `json:"readiness,omitempty" yaml:"readiness,omitempty"`
 }
 
+func (p *ReconcileHostWaitProbes) GetStartup() *types.StringBool {
+	if p == nil {
+		return nil
+	}
+	return p.Startup
+}
+
+func (p *ReconcileHostWaitProbes) GetReadiness() *types.StringBool {
+	if p == nil {
+		return nil
+	}
+	return p.Readiness
+}
+
 func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *ReconcileHostWaitProbes {
 	if from == nil {
 		// Nothing to merge from, keep original value
@@ -538,6 +582,34 @@ func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *Reco
 	p.Readiness = p.Readiness.MergeFrom(from.Readiness)
 
 	return p
+}
+
+type ReconcileHostDropReplicas struct {
+	OnDelete     *types.StringBool `json:"onDelete,omitempty"     yaml:"onDelete,omitempty"`
+	OnLostVolume *types.StringBool `json:"onLostVolume,omitempty" yaml:"onLostVolume,omitempty"`
+	Active       *types.StringBool `json:"active,omitempty"       yaml:"active,omitempty"`
+}
+
+func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas) *ReconcileHostDropReplicas {
+	if from == nil {
+		// Nothing to merge from, keep original value
+		return r
+	}
+
+	// From now on we have `from` specified
+
+	if r == nil {
+		// Recipient is not specified, just use `from` value
+		return from
+	}
+
+	// Both recipient and `from` are specified, need to walk over fields
+
+	r.OnDelete = r.OnDelete.MergeFrom(from.OnDelete)
+	r.OnLostVolume = r.OnLostVolume.MergeFrom(from.OnLostVolume)
+	r.Active = r.Active.MergeFrom(from.Active)
+
+	return r
 }
 
 // OperatorConfigAnnotation specifies annotation section

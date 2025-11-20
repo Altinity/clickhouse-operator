@@ -393,6 +393,26 @@ spec:
                                     Whether the operator during host launch procedure should wait for readiness probe to succeed.
                                     In case probe is unspecified wait is assumed to be completed successfully.
                                     Default option value is to wait.
+                        drop:
+                          type: object
+                          properties:
+                            replicas:
+                              type: object
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                              properties:
+                                onDelete:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+                                active:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"

@@ -40,8 +40,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	"github.com/altinity/queue"
-
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
@@ -56,10 +54,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/queue"
 )
 
 // Controller defines CRO controller
@@ -350,7 +348,7 @@ func isUpdatedEndpoints(old, new *core.Endpoints) bool {
 }
 
 func isUpdatedEndpointSlice(old, new *discovery.EndpointSlice) bool {
-	log.V(1).M(new).F().Info("Check whether is updated EndpointSlice. %s/%s Transition: '%s'=>'%s'", new.Namespace, new.Name, buildComparableEndpointAddresses(old), buildComparableEndpointAddresses(new))
+	log.V(2).M(new).F().Info("Check whether is updated EndpointSlice. %s/%s Transition: '%s'=>'%s'", new.Namespace, new.Name, buildComparableEndpointAddresses(old), buildComparableEndpointAddresses(new))
 	return buildComparableEndpointAddresses(old) != buildComparableEndpointAddresses(new)
 }
 
@@ -611,7 +609,7 @@ func prepareCHIAdd(command *cmd_queue.ReconcileCHI) bool {
 }
 
 func prepareCHIUpdate(command *cmd_queue.ReconcileCHI) bool {
-	actionPlan := action_plan.NewActionPlan(command.Old, command.New)
+	actionPlan := api.MakeActionPlan(command.Old, command.New)
 	if !actionPlan.HasActionsToDo() {
 		return false
 	}

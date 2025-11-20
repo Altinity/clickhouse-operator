@@ -18,22 +18,32 @@ DOCKER_PRUNE="${DOCKER_PRUNE:-""}"
 DOCKER_PRUNE_ALL="${DOCKER_PRUNE_ALL:-""}"
 DOCKER_VERSION="${DOCKER_VERSION:-""}"
 
+# Whether to prune minikube during reset process
+MINIKUBE_PRUNE="${MINIKUBE_PRUNE:-""}"
+
 echo "Reset kubernetes cluster."
-echo "k8s version: ${KUBERNETES_VERSION}"
-echo "nodes:       ${NODES}"
-echo "cpus:        ${CPUS}"
-echo "memory:      ${MEMORY}"
-echo "docker prune:${DOCKER_PRUNE}"
+echo "k8s version:   ${KUBERNETES_VERSION}"
+echo "nodes:         ${NODES}"
+echo "cpus:          ${CPUS}"
+echo "memory:        ${MEMORY}"
+echo "docker prune:  ${DOCKER_PRUNE}"
+echo "minikube prune:${MINIKUBE_PRUNE}"
 
 echo "Delete cluster"
 minikube delete
 if [[ ! -z "${DOCKER_PRUNE}" ]]; then
-    echo "System prune"
+    echo "Docker system prune"
     docker system prune -f
 fi
 if [[ ! -z "${DOCKER_PRUNE_ALL}" ]]; then
-    echo "System prune all"
+    echo "Docker system prune all"
     docker system prune -f --all
+fi
+if [[ ! -z "${MINIKUBE_PRUNE}" ]]; then
+    echo "Minikube prune"
+    minikube stop
+    minikube delete --all --purge
+    rm -rf ~/.minikube
 fi
 
 echo "Create cluster"
@@ -61,9 +71,13 @@ if [[ ! -z "${DOCKER_VERSION}" ]]; then
         echo "Docker version is OK"
     fi
 fi
-echo "--------------"
+
+echo "-----------------------"
+echo "-- Starting minikube --"
+echo "-----------------------"
 
 minikube start --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}" --cpus="${CPUS}" --memory="${MEMORY}"
+#minikube start --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}" --cpus="${CPUS}" --memory="${MEMORY}" --cache-images=false
 
 if [[ -z "${SKIP_K9S}" ]]; then
     echo "Launching k9s"

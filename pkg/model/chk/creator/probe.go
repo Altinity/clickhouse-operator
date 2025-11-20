@@ -33,11 +33,12 @@ func NewProbeManager() *ProbeManager {
 
 func (m *ProbeManager) CreateProbe(what interfaces.ProbeType, host *api.Host) *core.Probe {
 	switch what {
+	case interfaces.ProbeDefaultStartup:
+		return nil
 	case interfaces.ProbeDefaultLiveness:
 		return m.createDefaultLivenessProbe(host)
 	case interfaces.ProbeDefaultReadiness:
-		return nil
-		//return m.createDefaultReadinessProbe(host)
+		return m.createDefaultReadinessProbe(host)
 	}
 	panic("unknown probe type")
 }

@@ -23,12 +23,13 @@ import (
 type Cluster struct {
 	Name string `json:"name,omitempty"         yaml:"name,omitempty"`
 
-	Settings          *apiChi.Settings      `json:"settings,omitempty"          yaml:"settings,omitempty"`
-	Files             *apiChi.Settings      `json:"files,omitempty"             yaml:"files,omitempty"`
-	Templates         *apiChi.TemplatesList `json:"templates,omitempty"         yaml:"templates,omitempty"`
-	Layout            *ChkClusterLayout     `json:"layout,omitempty"            yaml:"layout,omitempty"`
-	PDBManaged        *types.StringBool     `json:"pdbManaged,omitempty"        yaml:"pdbManaged,omitempty"`
-	PDBMaxUnavailable *types.Int32          `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
+	Settings          *apiChi.Settings        `json:"settings,omitempty"          yaml:"settings,omitempty"`
+	Files             *apiChi.Settings        `json:"files,omitempty"             yaml:"files,omitempty"`
+	Templates         *apiChi.TemplatesList   `json:"templates,omitempty"         yaml:"templates,omitempty"`
+	Layout            *ChkClusterLayout       `json:"layout,omitempty"            yaml:"layout,omitempty"`
+	PDBManaged        *types.StringBool       `json:"pdbManaged,omitempty"        yaml:"pdbManaged,omitempty"`
+	PDBMaxUnavailable *types.Int32            `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
+	Reconcile         apiChi.ClusterReconcile `json:"reconcile"                   yaml:"reconcile"`
 
 	Runtime ChkClusterRuntime `json:"-" yaml:"-"`
 }
@@ -125,11 +126,6 @@ func (c *Cluster) GetSecret() *apiChi.ClusterSecret {
 	return nil
 }
 
-// GetRuntime is a getter
-func (cluster *Cluster) GetRuntime() apiChi.IClusterRuntime {
-	return &cluster.Runtime
-}
-
 // GetPDBManaged is a getter
 func (cluster *Cluster) GetPDBManaged() *types.StringBool {
 	return cluster.PDBManaged
@@ -138,6 +134,16 @@ func (cluster *Cluster) GetPDBManaged() *types.StringBool {
 // GetPDBMaxUnavailable is a getter
 func (cluster *Cluster) GetPDBMaxUnavailable() *types.Int32 {
 	return cluster.PDBMaxUnavailable
+}
+
+// GetReconcile is a getter
+func (cluster *Cluster) GetReconcile() apiChi.ClusterReconcile {
+	return cluster.Reconcile
+}
+
+// GetRuntime is a getter
+func (cluster *Cluster) GetRuntime() apiChi.IClusterRuntime {
+	return &cluster.Runtime
 }
 
 // FillShardsReplicasExplicitlySpecified fills whether shard or replicas are explicitly specified

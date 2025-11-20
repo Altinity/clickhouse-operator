@@ -61,7 +61,7 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInst
 			// Stop polling
 			return false
 		}
-		if time.Now().Sub(start) > timeout {
+		if time.Since(start) > timeout {
 			l.Warning("not all IP addresses are in place but time has elapsed")
 			// Stop polling
 			return false
@@ -110,7 +110,7 @@ func (w *worker) completeQueries(ctx context.Context, host *api.Host) error {
 	return nil
 }
 
-// shouldIncludeHost determines whether host to be included into cluster after reconciling
+// shouldIncludeHost determines whether host to be included into cluster after reconcile
 func (w *worker) shouldIncludeHost(host *api.Host) bool {
 	switch {
 	case host.IsStopped():
@@ -349,7 +349,7 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error 
 	return err
 }
 
-// shouldExcludeHost determines whether host to be excluded from cluster before reconciling
+// shouldExcludeHost determines whether host to be excluded from cluster before reconcile
 func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 	switch {
 	case host.IsStopped():
@@ -407,13 +407,13 @@ func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 func (w *worker) shouldWaitExcludeHost(host *api.Host) bool {
 	// Check CHI settings
 	switch {
-	case host.GetCR().GetReconciling().IsReconcilingPolicyWait():
+	case host.GetCR().GetReconcile().IsReconcilingPolicyWait():
 		w.a.V(1).
 			M(host).F().
 			Info("IsReconcilingPolicyWait() need to wait to exclude host. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return true
-	case host.GetCR().GetReconciling().IsReconcilingPolicyNoWait():
+	case host.GetCR().GetReconcile().IsReconcilingPolicyNoWait():
 		w.a.V(1).
 			M(host).F().
 			Info("IsReconcilingPolicyNoWait() need NOT to wait to exclude host. Host/shard/cluster: %d/%d/%s",
@@ -445,7 +445,7 @@ func (w *worker) shouldWaitQueries(host *api.Host) bool {
 				"Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return true
-	case host.GetCR().GetReconciling().IsReconcilingPolicyWait():
+	case host.GetCR().GetReconcile().IsReconcilingPolicyWait():
 		w.a.V(1).
 			M(host).F().
 			Info("Will wait for queries to complete on a host according to CHI 'reconciling.policy' setting. "+
@@ -476,10 +476,10 @@ func (w *worker) shouldWaitIncludeHostIntoClickHouseCluster(host *api.Host) bool
 	case host.GetShard().HostsCount() == 1:
 		// No need to wait one-host-shard
 		return false
-	case host.GetCR().GetReconciling().IsReconcilingPolicyWait():
+	case host.GetCR().GetReconcile().IsReconcilingPolicyWait():
 		// Check CHI settings - explicitly requested to wait
 		return true
-	case host.GetCR().GetReconciling().IsReconcilingPolicyNoWait():
+	case host.GetCR().GetReconcile().IsReconcilingPolicyNoWait():
 		// Check CHI settings - explicitly requested to not wait
 		return false
 	}

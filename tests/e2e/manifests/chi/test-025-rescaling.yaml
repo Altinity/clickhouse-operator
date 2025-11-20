@@ -11,6 +11,7 @@ spec:
       podTemplate: default
   useTemplates:
     - name: persistent-volume
+    - name: clickhouse-version
   configuration:
     zookeeper:
       nodes:
@@ -27,7 +28,6 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:24.3
               command:
                 - "/bin/bash"
                 - "-c"

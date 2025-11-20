@@ -172,6 +172,9 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
         # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
         wait_field(kind=kind, name=chi_name, field=".status.status", value="InProgress"
                    , ns=ns, retries=3, throw_error=False, shell=shell)
+        actionPlan = get_actionPlan(kind, chi_name, ns, shell)
+        print(actionPlan)
+
         wait_field(kind=kind, name=chi_name, field=".status.status", value="Completed"
                    , ns=ns, shell=shell)
 
@@ -233,6 +236,13 @@ def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None):
 def get_chi_normalizedCompleted(chi, ns=None, shell=None):
     chi_storage = get("configmap", f"chi-storage-{chi}", ns=ns)
     return json.loads(chi_storage["data"]["status-normalizedCompleted"])
+
+def get_actionPlan(kind, name, ns=None, shell=None):
+    if kind == 'chi':
+        storage = get("configmap", f"chi-storage-{name}", ns=ns)
+        return storage["data"]["status-actionPlan"]
+    else:
+        return ""
 
 
 def create_ns(ns):
@@ -410,9 +420,11 @@ def wait_pod_status(pod, status, shell=None, ns=None):
 def get_pod_status(pod, shell=None, ns=None):
     return get_field("pod", pod, ".status.phase", ns, shell=shell)
 
+def wait_container_status(pod, status, shell=None, ns=None):
+    wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns, shell=shell)
 
-def wait_container_status(pod, status, ns=None):
-    wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns)
+def get_container_status(pod, shell=None, ns=None):
+    return get_field("pod", pod, ".status.containerStatuses[0]", ns, shell=shell)
 
 
 def wait_field(
@@ -511,6 +523,14 @@ def get_pod_spec(chi_name, pod_name="", ns=None, shell=None):
     else:
         pod = get("pod", pod_name, ns=ns, shell=shell)
     return pod["spec"]
+
+def get_pod_status_full(chi_name, pod_name="", ns=None, shell=None):
+    label = f"-l clickhouse.altinity.com/chi={chi_name}"
+    if pod_name == "":
+        pod = get("pod", "", ns=ns, label=label, shell=shell)["items"][0]
+    else:
+        pod = get("pod", pod_name, ns=ns, shell=shell)
+    return pod["status"]
 
 
 def get_clickhouse_start(chi_name, ns=None, shell=None):

@@ -61,6 +61,14 @@ func PodHasNotReadyContainers(pod *core.Pod) bool {
 func PodHasAllContainersStarted(pod *core.Pod) bool {
 	allContainersStarted := true
 	for _, containerStatus := range pod.Status.ContainerStatuses {
+		// Started indicates whether the container has finished its postStart lifecycle hook
+		// and passed its startup probe.
+		// Initialized as false, becomes true after startupProbe is considered
+		// successful. Resets to false when the container is restarted, or if kubelet
+		// loses state temporarily. In both cases, startup probes will run again.
+		// Is always true when no startupProbe is defined and container is running and
+		// has passed the postStart lifecycle hook. The null value must be treated the
+		// same as false.
 		if (containerStatus.Started != nil) && (*containerStatus.Started) {
 			// Current container is started. no changes in all status
 		} else {

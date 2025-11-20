@@ -436,12 +436,12 @@ func (cr *ClickHouseKeeperInstallation) IsTroubleshoot() bool {
 	return false
 }
 
-// GetReconciling gets reconciling spec
-func (cr *ClickHouseKeeperInstallation) GetReconciling() *apiChi.Reconciling {
+// GetReconcile gets reconcile spec
+func (cr *ClickHouseKeeperInstallation) GetReconcile() *apiChi.ChiReconcile {
 	if cr == nil {
 		return nil
 	}
-	return cr.GetSpecT().Reconciling
+	return cr.GetSpecT().Reconcile
 }
 
 // Copy makes copy of a CHI, filtering fields according to specified CopyOptions

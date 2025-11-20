@@ -98,40 +98,85 @@ spec:
   ##
   ################################################
   reconcile:
+    # Reconcile runtime settings
     runtime:
       # Max number of concurrent CHI reconciles in progress
       reconcileCHIsThreadsNumber: 10
-      # Max number of concurrent shard reconciles in progress
-      reconcileShardsThreadsNumber: 1
-      # The maximum percentage of cluster shards that may be reconciled in parallel
+
+      # The operator reconciles shards concurrently in each CHI with the following limitations:
+      #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
+      #      can not be greater than 'reconcileShardsThreadsNumber'.
+      #   2. Percentage of shards being reconciled (and thus having hosts down) in each CHI concurrently
+      #      can not be greater than 'reconcileShardsMaxConcurrencyPercent'.
+      #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
+      # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
+
+      # Max number of concurrent shard reconciles within one cluster in progress
+      reconcileShardsThreadsNumber: 5
+      # Max percentage of concurrent shard reconciles within one cluster in progress
       reconcileShardsMaxConcurrencyPercent: 50
 
+    # Reconcile StatefulSet scenario
     statefulSet:
+      # Create StatefulSet scenario
       create:
-        # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+        # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
         # Possible options:
-        # 1. abort - do nothing, just break the process and wait for admin
-        # 2. delete - delete newly created problematic StatefulSet
-        # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
+        # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+        #    do not try to fix or delete or update it, just abort reconcile cycle.
+        #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
+        # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+        # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
         onFailure: ignore
 
+      # Update StatefulSet scenario
       update:
-        # How many seconds to wait for created/updated StatefulSet to be Ready
+        # How many seconds to wait for created/updated StatefulSet to be 'Ready'
         timeout: 300
-        # How many seconds to wait between checks for created/updated StatefulSet status
+        # How many seconds to wait between checks/polls for created/updated StatefulSet status
         pollInterval: 5
-        # What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+        # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
         # Possible options:
-        # 1. abort - do nothing, just break the process and wait for admin
+        # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+        #    do not try to fix or delete or update it, just abort reconcile cycle.
+        #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
         # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
-        # Pod would be recreated by StatefulSet based on rollback-ed configuration
-        # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
-        onFailure: rollback
+        #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
+        #    Follow 'abort' path afterwards.
+        # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+        onFailure: abort
 
+    # Reconcile Host scenario
     host:
+      # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+      #   - to be excluded from a ClickHouse cluster
+      #   - to complete all running queries
+      #   - to be included into a ClickHouse cluster
+      # respectfully before moving forward with host reconcile
       wait:
-        exclude: "true"
-        include: "false"
+        exclude: true
+        queries: true
+        include: false
+        # The operator during reconcile procedure should wait for replicas to catch-up
+        # replication delay a.k.a replication lag for the following replicas
+        replicas:
+          # All replicas (new and known earlier) are explicitly requested to wait for replication to catch-up
+          all: no
+          # New replicas only are requested to wait for replication to catch-up
+          new: yes
+          # Replication catch-up is considered to be completed as soon as replication delay
+          # a.k.a replication lag - calculated as "MAX(absolute_delay) FROM system.replicas"
+          # is within this specified delay (in seconds)
+          delay: 10
+        probes:
+          # Whether the operator during host launch procedure should wait for startup probe to succeed.
+          # In case probe is unspecified wait is assumed to be completed successfully.
+          # Default option value is to do not wait.
+          startup: no
+          # Whether the operator during host launch procedure should wait for readiness probe to succeed.
+          # In case probe is unspecified wait is assumed to be completed successfully.
+          # Default option value is to wait.
+          readiness: yes
 
   ################################################
   ##

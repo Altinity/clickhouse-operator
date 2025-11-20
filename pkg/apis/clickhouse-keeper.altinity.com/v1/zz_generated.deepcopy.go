@@ -300,7 +300,12 @@ func (in *ChkSpec) DeepCopyInto(out *ChkSpec) {
 	}
 	if in.Reconciling != nil {
 		in, out := &in.Reconciling, &out.Reconciling
-		*out = new(clickhousealtinitycomv1.Reconciling)
+		*out = new(clickhousealtinitycomv1.ChiReconcile)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Reconcile != nil {
+		in, out := &in.Reconcile, &out.Reconcile
+		*out = new(clickhousealtinitycomv1.ChiReconcile)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Defaults != nil {
@@ -466,6 +471,7 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 		*out = new(types.Int32)
 		**out = **in
 	}
+	in.Reconcile.DeepCopyInto(&out.Reconcile)
 	in.Runtime.DeepCopyInto(&out.Runtime)
 	return
 }

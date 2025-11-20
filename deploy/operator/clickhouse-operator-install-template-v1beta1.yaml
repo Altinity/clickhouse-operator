@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.25.4
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -237,6 +237,10 @@ spec:
               type: object
               description: "Normalized resource completed"
               x-kubernetes-preserve-unknown-fields: true
+            actionPlan:
+              type: object
+              description: "Action Plan"
+              x-kubernetes-preserve-unknown-fields: true
             hostsWithTablesCreated:
               type: array
               description: "List of hosts with tables created by the operator"
@@ -353,9 +357,9 @@ spec:
                   description: "Optional, defines selector for ClickHouseInstallation(s) to be templated with ClickhouseInstallationTemplate"
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
-            reconciling:
+            reconciling: &TypeReconcile
               type: object
-              description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+              description: "[OBSOLETED] Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
               # nullable: true
               properties:
                 policy:
@@ -428,20 +432,6 @@ spec:
                         service:
                           !!merge <<: *TypeObjectsCleanup
                           description: "Behavior policy for failed Service, `Retain` by default"
-                runtime:
-                  type: object
-                  description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                  properties:
-                    reconcileShardsThreadsNumber:
-                      type: integer
-                      minimum: 1
-                      maximum: 65535
-                      description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                    reconcileShardsMaxConcurrencyPercent:
-                      type: integer
-                      minimum: 0
-                      maximum: 100
-                      description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                 macros:
                   type: object
                   description: "macros parameters"
@@ -485,7 +475,21 @@ spec:
                             enabled:
                               !!merge <<: *TypeStringBool
                               description: "enabled or not"
-                host:
+                runtime: &TypeReconcileRuntime
+                  type: object
+                  description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                  properties:
+                    reconcileShardsThreadsNumber:
+                      type: integer
+                      minimum: 1
+                      maximum: 65535
+                      description: "The maximum number of cluster shards that may be reconciled in parallel, 1 by default"
+                    reconcileShardsMaxConcurrencyPercent:
+                      type: integer
+                      minimum: 0
+                      maximum: 100
+                      description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                host: &TypeReconcileHost
                   type: object
                   description: |
                     Whether the operator during reconcile procedure should wait for a ClickHouse host:
@@ -528,12 +532,35 @@ spec:
                                 Whether the operator during host launch procedure should wait for startup probe to succeed.
                                 In case probe is unspecified wait is assumed to be completed successfully.
                                 Default option value is to do not wait.
-                            ready:
+                            readiness:
                               !!merge <<: *TypeStringBool
                               description: |
                                 Whether the operator during host launch procedure should wait for ready probe to succeed.
                                 In case probe is unspecified wait is assumed to be completed successfully.
                                 Default option value is to wait.
+                    drop:
+                      type: object
+                      properties:
+                        replicas:
+                          type: object
+                          description: |
+                            Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                          properties:
+                            onDelete:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                            onLostVolume:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+                            active:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
+            reconcile:
+              !!merge <<: *TypeReconcile
+              description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
             defaults:
               type: object
               description: |
@@ -865,19 +892,9 @@ spec:
                         description: "allow tuning reconciling process"
                         properties:
                           runtime:
-                            type: object
-                            description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                            properties:
-                              reconcileShardsThreadsNumber:
-                                type: integer
-                                minimum: 1
-                                maximum: 65535
-                                description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                              reconcileShardsMaxConcurrencyPercent:
-                                type: integer
-                                minimum: 0
-                                maximum: 100
-                                description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                            !!merge <<: *TypeReconcileRuntime
+                          host:
+                            !!merge <<: *TypeReconcileHost
                       layout:
                         type: object
                         description: |
@@ -1433,14 +1450,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.25.4
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1664,6 +1681,10 @@ spec:
               type: object
               description: "Normalized resource completed"
               x-kubernetes-preserve-unknown-fields: true
+            actionPlan:
+              type: object
+              description: "Action Plan"
+              x-kubernetes-preserve-unknown-fields: true
             hostsWithTablesCreated:
               type: array
               description: "List of hosts with tables created by the operator"
@@ -1780,9 +1801,9 @@ spec:
                   description: "Optional, defines selector for ClickHouseInstallation(s) to be templated with ClickhouseInstallationTemplate"
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
-            reconciling:
+            reconciling: &TypeReconcile
               type: object
-              description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+              description: "[OBSOLETED] Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
               # nullable: true
               properties:
                 policy:
@@ -1855,20 +1876,6 @@ spec:
                         service:
                           !!merge <<: *TypeObjectsCleanup
                           description: "Behavior policy for failed Service, `Retain` by default"
-                runtime:
-                  type: object
-                  description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                  properties:
-                    reconcileShardsThreadsNumber:
-                      type: integer
-                      minimum: 1
-                      maximum: 65535
-                      description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                    reconcileShardsMaxConcurrencyPercent:
-                      type: integer
-                      minimum: 0
-                      maximum: 100
-                      description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                 macros:
                   type: object
                   description: "macros parameters"
@@ -1912,7 +1919,21 @@ spec:
                             enabled:
                               !!merge <<: *TypeStringBool
                               description: "enabled or not"
-                host:
+                runtime: &TypeReconcileRuntime
+                  type: object
+                  description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
+                  properties:
+                    reconcileShardsThreadsNumber:
+                      type: integer
+                      minimum: 1
+                      maximum: 65535
+                      description: "The maximum number of cluster shards that may be reconciled in parallel, 1 by default"
+                    reconcileShardsMaxConcurrencyPercent:
+                      type: integer
+                      minimum: 0
+                      maximum: 100
+                      description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                host: &TypeReconcileHost
                   type: object
                   description: |
                     Whether the operator during reconcile procedure should wait for a ClickHouse host:
@@ -1955,12 +1976,35 @@ spec:
                                 Whether the operator during host launch procedure should wait for startup probe to succeed.
                                 In case probe is unspecified wait is assumed to be completed successfully.
                                 Default option value is to do not wait.
-                            ready:
+                            readiness:
                               !!merge <<: *TypeStringBool
                               description: |
                                 Whether the operator during host launch procedure should wait for ready probe to succeed.
                                 In case probe is unspecified wait is assumed to be completed successfully.
                                 Default option value is to wait.
+                    drop:
+                      type: object
+                      properties:
+                        replicas:
+                          type: object
+                          description: |
+                            Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                          properties:
+                            onDelete:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                            onLostVolume:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+                            active:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
+            reconcile:
+              !!merge <<: *TypeReconcile
+              description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
             defaults:
               type: object
               description: |
@@ -2292,19 +2336,9 @@ spec:
                         description: "allow tuning reconciling process"
                         properties:
                           runtime:
-                            type: object
-                            description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                            properties:
-                              reconcileShardsThreadsNumber:
-                                type: integer
-                                minimum: 1
-                                maximum: 65535
-                                description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                              reconcileShardsMaxConcurrencyPercent:
-                                type: integer
-                                minimum: 0
-                                maximum: 100
-                                description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                            !!merge <<: *TypeReconcileRuntime
+                          host:
+                            !!merge <<: *TypeReconcileHost
                       layout:
                         type: object
                         description: |
@@ -2863,7 +2897,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -3245,6 +3279,26 @@ spec:
                                 Whether the operator during host launch procedure should wait for readiness probe to succeed.
                                 In case probe is unspecified wait is assumed to be completed successfully.
                                 Default option value is to wait.
+                    drop:
+                      type: object
+                      properties:
+                        replicas:
+                          type: object
+                          description: |
+                            Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                          properties:
+                            onDelete:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                            onLostVolume:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+                            active:
+                              !!merge <<: *TypeStringBool
+                              description: |
+                                Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
             annotation:
               type: object
               description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
@@ -3372,14 +3426,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.25.4
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.25.4
+    clickhouse-keeper.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -4267,7 +4321,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
 
 # Template Parameters:
 #
@@ -4292,7 +4346,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
 rules:
   #
   # Core API group
@@ -4512,7 +4566,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -4534,7 +4588,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -4891,12 +4945,13 @@ data:
 
       # Reconcile Host scenario
       host:
-        # Whether the operator during reconcile procedure should wait for a ClickHouse host:
-        #   - to be excluded from a ClickHouse cluster
-        #   - to complete all running queries
-        #   - to be included into a ClickHouse cluster
-        # respectfully before moving forward with host reconcile
+        # The operator during reconcile procedure should wait for a ClickHouse host to achieve the following conditions:
         wait:
+          # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+          #   - to be excluded from a ClickHouse cluster
+          #   - to complete all running queries
+          #   - to be included into a ClickHouse cluster
+          # respectfully before moving forward with host reconcile
           exclude: true
           queries: true
           include: false
@@ -4920,6 +4975,15 @@ data:
             # In case probe is unspecified wait is assumed to be completed successfully.
             # Default option value is to wait.
             readiness: yes
+        # The operator during reconcile procedure should drop the following entities:
+        drop:
+          replicas:
+            # Whether the operator during reconcile procedure should drop replicas when replica is deleted
+            onDelete: yes
+            # Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+            onLostVolume: yes
+            # Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
+            active: no
 
     ################################################
     ##
@@ -5031,7 +5095,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
 ---
@@ -5047,7 +5111,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -5141,7 +5205,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -5239,7 +5303,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -5301,7 +5365,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
 ---
@@ -5317,7 +5381,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -5392,7 +5456,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   readme: |
@@ -5410,7 +5474,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
 ---
@@ -5418,7 +5482,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=${OPERATOR_NAMESPACE}
 #   COMMENT=
-#   OPERATOR_VERSION=0.25.4
+#   OPERATOR_VERSION=0.25.6
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -5428,7 +5492,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -5452,7 +5516,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -5664,7 +5728,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 spec:
   ports:
