@@ -49,7 +49,7 @@ jobs:
           done
           
           if [[ "$need_build" = true ]]; then
-            DOCKERHUB_PUBLISH=no ./dev/image_build_all_dev.sh
+            TAG="${TAG}" DOCKERHUB_PUBLISH=no ./dev/image_build_all_dev.sh
             minikube image load altinity/clickhouse-operator:${TAG} --daemon=true
             minikube image load altinity/metrics-exporter:${TAG} --daemon=true
           fi
