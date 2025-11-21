@@ -49,9 +49,14 @@ jobs:
           done
           
           if [[ "$need_build" = true ]]; then
-            TAG="${CHO_RELEASE}" DOCKERHUB_PUBLISH=no ./dev/image_build_all_dev.sh
+            export GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
+  
+            docker build -f dockerfile/operator/Dockerfile         --build-arg GO_VERSION=${GO_VERSION} -t altinity/clickhouse-operator:${CHO_RELEASE} --pull .
+            docker build -f dockerfile/metrics-exporter/Dockerfile --build-arg GO_VERSION=${GO_VERSION} -t altinity/metrics-exporter:${CHO_RELEASE}    --pull .
+          
             docker image save altinity/clickhouse-operator:${CHO_RELEASE} -o operator.tar
             docker image save altinity/metrics-exporter:${CHO_RELEASE}    -o metrics-exporter.tar  
+
             minikube image load operator.tar
             minikube image load metrics-exporter.tar
           fi
