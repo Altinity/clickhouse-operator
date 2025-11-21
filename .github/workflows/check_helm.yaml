@@ -32,10 +32,10 @@ jobs:
       - name: Local Helm Test
         run: |
           set -xe
-          export TAG=$(cat release)
+          export CHO_RELEASE=$(cat release)
           IMAGES=(
-            "altinity/clickhouse-operator:${TAG}"
-            "altinity/metrics-exporter:${TAG}"
+            "altinity/clickhouse-operator:${CHO_RELEASE}"
+            "altinity/metrics-exporter:${CHO_RELEASE}"
             )
           need_build=false
           echo "Checking images in registry…"
@@ -49,9 +49,11 @@ jobs:
           done
           
           if [[ "$need_build" = true ]]; then
-            TAG="${TAG}" DOCKERHUB_PUBLISH=no ./dev/image_build_all_dev.sh
-            minikube image load altinity/clickhouse-operator:${TAG} --daemon=true
-            minikube image load altinity/metrics-exporter:${TAG} --daemon=true
+            TAG="${CHO_RELEASE}" DOCKERHUB_PUBLISH=no ./dev/image_build_all_dev.sh
+            docker image save altinity/clickhouse-operator:${CHO_RELEASE} -o operator.tar
+            docker image save altinity/metrics-exporter:${CHO_RELEASE}    -o metrics-exporter.tar  
+            minikube image load operator.tar
+            minikube image load metrics-exporter.tar
           fi
           minikube kubectl create ns test
           ./dev/generate_helm_chart.sh
