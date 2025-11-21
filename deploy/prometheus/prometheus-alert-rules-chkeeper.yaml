@@ -106,3 +106,97 @@ spec:
               `ClickHouseAsyncMetrics_KeeperEphemeralsCount{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "ClickHouseAsyncMetrics_KeeperEphemeralsCount{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} nodes{{ end }}
               Look to documentation:
               https://clickhouse.com/docs/en/operations/clickhouse-keeper
+
+        - alert: ClickHouseKeeperCommitsFailed
+          expr: increase(ClickHouseProfileEvents_KeeperCommitsFailed{app=~'clickhouse-keeper.*'}[5m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "ClickHouse Keeper has failed commits."
+            description: |-
+              ClickHouse Keeper is experiencing failed commits which indicates serious issues with the Raft consensus.
+              `ClickHouseProfileEvents_KeeperCommitsFailed{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` increased in the last 5 minutes.
+              
+              Check logs for errors:
+              ```
+              kubectl logs -n {{ $labels.namespace }} {{ $labels.pod_name }} --tail=100
+              ```
+
+        - alert: ClickHouseKeeperSnapshotCreationsFailed
+          expr: increase(ClickHouseProfileEvents_KeeperSnapshotCreationsFailed{app=~'clickhouse-keeper.*'}[10m]) > 0
+          for: 5m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "ClickHouse Keeper snapshot creation failed."
+            description: |-
+              ClickHouse Keeper failed to create snapshots which may lead to log accumulation and disk space issues.
+              
+              Check disk space:
+              ```
+              kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- df -h
+              ```
+              
+              Check logs:
+              ```
+              kubectl logs -n {{ $labels.namespace }} {{ $labels.pod_name }} --tail=100 | grep -i snapshot
+              ```
+
+        - alert: ClickHouseKeeperLostQuorum
+          expr: ClickHouseAsyncMetrics_KeeperSyncedFollowers{app=~'clickhouse-keeper.*'} < 1 and ClickHouseAsyncMetrics_KeeperIsLeader{app=~'clickhouse-keeper.*'} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "ClickHouse Keeper leader has lost quorum."
+            description: |-
+              ClickHouse Keeper leader has less than the required number of synced followers.
+              Current synced followers: {{ with printf "ClickHouseAsyncMetrics_KeeperSyncedFollowers{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              
+              This means the cluster cannot commit new operations and is in a degraded state.
+              
+              Check all keeper pods:
+              ```
+              kubectl get pods -n {{ $labels.namespace }} -l app=clickhouse-keeper
+              kubectl logs -n {{ $labels.namespace }} -l app=clickhouse-keeper --tail=50
+              ```
+
+        - alert: ClickHouseKeeperMemorySoftLimitExceeded
+          expr: ClickHouseAsyncMetrics_KeeperIsExceedingMemorySoftLimitHit{app=~'clickhouse-keeper.*'} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "ClickHouse Keeper is exceeding memory soft limit."
+            description: |-
+              ClickHouse Keeper is using more memory than the configured soft limit.
+              This may lead to performance degradation or OOM issues.
+              
+              Check memory usage:
+              ```
+              kubectl top pod -n {{ $labels.namespace }} {{ $labels.pod_name }}
+              kubectl describe pod -n {{ $labels.namespace }} {{ $labels.pod_name }}
+              ```
+              
+              Consider increasing memory limits or investigating memory leaks.
+
+        - alert: ClickHouseKeeperHighFileDescriptorUsage
+          expr: (ClickHouseAsyncMetrics_KeeperOpenFileDescriptorCount{app=~'clickhouse-keeper.*'} / ClickHouseAsyncMetrics_KeeperMaxFileDescriptorCount{app=~'clickhouse-keeper.*'}) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "ClickHouse Keeper is using a high percentage of available file descriptors."
+            description: |-
+              ClickHouse Keeper is using {{ with printf "(ClickHouseAsyncMetrics_KeeperOpenFileDescriptorCount{pod_name='%s',namespace='%s'} / ClickHouseAsyncMetrics_KeeperMaxFileDescriptorCount{pod_name='%s',namespace='%s'}) * 100" .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.1f" }}{{ end }}% of available file descriptors.
+              
+              Current open FDs: {{ with printf "ClickHouseAsyncMetrics_KeeperOpenFileDescriptorCount{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              Max FDs: {{ with printf "ClickHouseAsyncMetrics_KeeperMaxFileDescriptorCount{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              
+              If this continues to increase, the keeper may run out of file descriptors and become unresponsive.
