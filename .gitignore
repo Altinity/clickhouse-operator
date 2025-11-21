@@ -52,6 +52,6 @@ tests/image/cache
 
 # agents
 .aider*
-.claude/
+CLAUDE.md
 AGENTS.md
-CRUSH.md
+.claude
