@@ -32,6 +32,27 @@ jobs:
       - name: Local Helm Test
         run: |
           set -xe
+          export TAG=$(cat release)
+          IMAGES=(
+            "altinity/clickhouse-operator:${TAG}"
+            "altinity/metrics-exporter:${TAG}"
+            )
+          need_build=false
+          echo "Checking images in registry…"
+          for img in "${IMAGES[@]}"; do
+            if docker manifest inspect "$img" >/dev/null 2>&1; then
+             echo "✔ Image exists: $img"
+            else
+              echo "✖ Image missing: $img"
+              need_build=true
+            fi
+          done
+          
+          if [[ "$need_build" = true ]]; then
+            DOCKERHUB_PUBLISH=no ./dev/image_build_all_dev.sh
+            minikube image load altinity/clickhouse-operator:${TAG} --daemon=true
+            minikube image load altinity/metrics-exporter:${TAG} --daemon=true
+          fi
           minikube kubectl create ns test
           ./dev/generate_helm_chart.sh
           helm install -n test test-operator ./deploy/helm/clickhouse-operator/

@@ -78,7 +78,7 @@ crdHook:
 | crdHook.enabled | bool | `true` | enable automatic CRD installation/update via pre-install/pre-upgrade hooks when disabled, CRDs must be installed manually using kubectl apply |
 | crdHook.image.pullPolicy | string | `"IfNotPresent"` | image pull policy for CRD installation job |
 | crdHook.image.repository | string | `"bitnami/kubectl"` | image repository for CRD installation job |
-| crdHook.image.tag | string | `"1.31"` | image tag for CRD installation job |
+| crdHook.image.tag | string | `"latest"` | image tag for CRD installation job |
 | crdHook.nodeSelector | object | `{}` | node selector for CRD installation job |
 | crdHook.resources | object | `{}` | resource limits and requests for CRD installation job |
 | crdHook.tolerations | list | `[]` | tolerations for CRD installation job |
