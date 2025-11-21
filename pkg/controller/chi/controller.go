@@ -356,10 +356,12 @@ func buildComparableEndpointAddresses(epSlice *discovery.EndpointSlice) string {
 	return strings.Join(fetchUniqueReadyAddresses(epSlice), ",")
 }
 
+// fetchUniqueReadyAddresses returns sorted list of ready addresses
 func fetchUniqueReadyAddresses(epSlice *discovery.EndpointSlice) (res []string) {
 	if epSlice == nil {
 		return nil
 	}
+	// Extract ready addresses from endpoints
 	for _, ep := range epSlice.Endpoints {
 		if (ep.Conditions.Ready != nil) && (*ep.Conditions.Ready == false) {
 			// Skip not-ready address
@@ -367,9 +369,12 @@ func fetchUniqueReadyAddresses(epSlice *discovery.EndpointSlice) (res []string) 
 		}
 		res = append(res, ep.Addresses...)
 	}
+	// Be ready for duplicate endpoints, though
+	res = util.Unique(res)
+	// And unique does not preserve order
 	sort.Strings(res)
 
-	return util.Unique(res)
+	return res
 }
 
 func (c *Controller) addEventHandlersEndpoints(
