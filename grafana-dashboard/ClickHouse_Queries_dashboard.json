@@ -1183,20 +1183,20 @@
       {
         "current": {
           "selected": false,
-          "text": "k8s-test-test-001",
-          "value": "k8s-test-test-001"
+          "text": "",
+          "value": ""
         },
         "description": null,
         "error": null,
-        "hide": 2,
+        "hide": 0,
         "includeAll": false,
-        "label": "K8S ClickHouse installation",
+        "label": "ClickHouse Datasource",
         "multi": false,
         "name": "db",
         "options": [],
         "query": "vertamedia-clickhouse-datasource",
         "refresh": 1,
-        "regex": "k8s-$exported_namespace-$chi",
+        "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
       },
