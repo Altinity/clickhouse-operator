@@ -51,9 +51,9 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	w.a.V(1).M(cr).F().Info("List of successfully reconciled objects:\n%s", w.task.RegistryReconciled())
 	objs := w.c.discovery(ctx, cr)
 	need := w.task.RegistryReconciled()
-	w.a.V(1).M(cr).F().Info("Existing objects:\n%s", objs)
+	w.a.V(1).M(cr).F().Info("List of existing objects:\n%s", objs)
 	objs.Subtract(need)
-	w.a.V(1).M(cr).F().Info("Non-reconciled objects:\n%s", objs)
+	w.a.V(1).M(cr).F().Info("List of non-reconciled objects:\n%s", objs)
 	if w.purge(ctx, cr, objs, w.task.RegistryFailed()) > 0 {
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
