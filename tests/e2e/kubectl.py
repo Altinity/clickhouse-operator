@@ -239,10 +239,10 @@ def get_chi_normalizedCompleted(chi, ns=None, shell=None):
 
 def get_actionPlan(kind, name, ns=None, shell=None):
     if kind == 'chi':
-        storage = get("configmap", f"chi-storage-{name}", ok_to_fail=True, ns=ns)
-        if storage != None:
-            return storage["data"].get("status-actionPlan", "")
-    return ""
+        storage = get("configmap", f"chi-storage-{name}", ns=ns)
+        return storage["data"].get("status-actionPlan", "")
+    else:
+        return ""
 
 
 def create_ns(ns):

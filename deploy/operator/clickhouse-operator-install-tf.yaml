@@ -244,14 +244,17 @@ spec:
                 normalized:
                   type: object
                   description: "Normalized resource requested"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
                   description: "Normalized resource completed"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 actionPlan:
                   type: object
                   description: "Action Plan"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
@@ -1700,14 +1703,17 @@ spec:
                 normalized:
                   type: object
                   description: "Normalized resource requested"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
                   description: "Normalized resource completed"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 actionPlan:
                   type: object
                   description: "Action Plan"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array

@@ -17,11 +17,11 @@ package zookeeper
 import "time"
 
 const (
-	defaultMaxRetriesNum               = 25
+	defaultMaxRetriesNum               = 10
 	defaultMaxConcurrentRequests int64 = 32
 
-	defaultTimeoutConnect   = 30 * time.Second
-	defaultTimeoutKeepAlive = 30 * time.Second
+	defaultTimeoutConnect   = 10 * time.Second
+	defaultTimeoutKeepAlive = 10 * time.Second
 )
 
 type ConnectionParams struct {
