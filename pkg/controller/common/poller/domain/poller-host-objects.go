@@ -25,10 +25,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
-type readyMarkDeleter interface {
-	DeleteReadyMarkOnPodAndService(ctx context.Context, host *api.Host) error
-}
-
 type HostObjectsPoller struct {
 	stsPoller        *HostObjectPoller[apps.StatefulSet]
 	podPoller        *HostObjectPoller[core.Pod]
@@ -41,11 +37,19 @@ func NewHostObjectsPoller(
 	podPoller *HostObjectPoller[core.Pod],
 	readyMarkDeleter readyMarkDeleter,
 ) *HostObjectsPoller {
-	return &HostObjectsPoller{
+	return (&HostObjectsPoller{
 		stsPoller:        stsPoller,
 		podPoller:        podPoller,
 		readyMarkDeleter: readyMarkDeleter,
+	}).validate()
+}
+
+func (p *HostObjectsPoller) validate() *HostObjectsPoller {
+	if p.readyMarkDeleter == nil {
+		p.readyMarkDeleter = newDefaultReadyMarkDeleter()
 	}
+
+	return p
 }
 
 // WaitHostStatefulSetReady polls host's StatefulSet until it is ready
