@@ -5107,8 +5107,8 @@ data:
       fields:
         action: false
         actions: false
-        error: false
-        errors: false
+        error: true
+        errors: true
     
     ################################################
     ##
