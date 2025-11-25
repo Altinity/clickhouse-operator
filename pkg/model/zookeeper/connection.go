@@ -56,8 +56,8 @@ func NewConnection(nodes api.ZookeeperNodes, _params ...*ConnectionParams) *Conn
 		nodes:            nodes,
 		sema:             semaphore.NewWeighted(params.MaxConcurrentRequests),
 		ConnectionParams: *params,
-		// retryDelayFn:     retryDelayFnFlooredCappedLn(1, 30),
-		retryDelayFn:     retryDelayFnLinear(),
+		retryDelayFn:     retryDelayFnFlooredCappedLn(1, 30),
+		//retryDelayFn:     retryDelayFnLinear(),
 	}
 }
 
