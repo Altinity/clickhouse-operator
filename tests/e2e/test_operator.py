@@ -582,7 +582,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
 @Name("test_010009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_010009_1(self, version_from="0.24.5", version_to=None):
+def test_010009_1(self, version_from="0.25.2", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -598,7 +598,7 @@ def test_010009_1(self, version_from="0.24.5", version_to=None):
 @TestScenario
 @Name("test_010009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_010009_2(self, version_from="0.24.5", version_to=None):
+def test_010009_2(self, version_from="0.25.2", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -4172,9 +4172,9 @@ def test_010039_1(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_010039_2. Inter-cluster communications with plane text secret")
+@Name("test_010039_2. Inter-cluster communications with plain text secret")
 def test_010039_2(self):
-    """Check clickhouse-operator support inter-cluster communications with plan text secret."""
+    """Check clickhouse-operator support inter-cluster communications with plain text secret."""
     create_shell_namespace_clickhouse_template()
 
     test_039(step=2)
@@ -5363,6 +5363,9 @@ def test_010060(self):
     kubectl.create_and_check(
         manifest="manifests/chi/test-060-pdb-management-disabled.yaml",
         check={
+            "apply_templates": {
+                current().context.clickhouse_template,
+            },
             "object_counts": {
                 "statefulset": 1,
                 "pod": 1,
@@ -5384,6 +5387,64 @@ def test_010060(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+@TestScenario
+@Name("test_010061. Test fractional CPU requests/limits handling")
+def test_010061(self):
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-061-fractional-cpu"
+    kubectl.create_and_check(
+        manifest="manifests/chi/test-061-fractional-cpu-1.yaml",
+        check={
+            "apply_templates": {
+                current().context.clickhouse_template,
+            },
+            "object_counts": {
+                "statefulset": 1,
+                "pod": 1,
+                "service": 2,
+            },
+            "do_not_delete": 1,
+        },
+    )
+
+    with Then("cpu.limits are set to 500m"):
+        pod_spec = kubectl.get_pod_spec(chi)
+        cpu_limits = pod_spec["containers"][0]["resources"]["requests"]["cpu"]
+        assert cpu_limits == "500m"
+
+    kubectl.force_reconcile(chi, "reconcile1")
+
+    actionPlan = kubectl.get_actionPlan("chi", chi)
+    print(actionPlan)
+    with Then("ActionPlan should not contain Templates.PodTemplates[0].Spec.Containers[0].Resources"):
+        assert "Templates.PodTemplates[0].Spec.Containers[0].Resources" not in actionPlan
+
+    kubectl.create_and_check(
+        manifest="manifests/chi/test-061-fractional-cpu-2.yaml",
+        check={
+            "do_not_delete": 1,
+        },
+    )
+
+    print(kubectl.get_actionPlan("chi", chi))
+
+    with Then("cpu.limits are set to 500m"):
+        pod_spec = kubectl.get_pod_spec(chi)
+        cpu_limits = pod_spec["containers"][0]["resources"]["requests"]["cpu"]
+        assert cpu_limits == "500m"
+
+    kubectl.force_reconcile(chi, "reconcile2")
+
+    actionPlan = kubectl.get_actionPlan("chi", chi)
+    print(actionPlan)
+    with Then("ActionPlan should not contain Templates.PodTemplates[0].Spec.Containers[0].Resources"):
+        assert "Templates.PodTemplates[0].Spec.Containers[0].Resources" not in actionPlan
+
+    kubectl.delete_chi(chi)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 #
 # Keeper tests section
