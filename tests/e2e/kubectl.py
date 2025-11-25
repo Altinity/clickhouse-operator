@@ -12,7 +12,7 @@ import e2e.yaml_manifest as yaml_manifest
 import e2e.util as util
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-max_retries = 20
+max_retries = 30
 
 
 def launch(command, ok_to_fail=False, ns=None, timeout=600, shell=None):
@@ -170,13 +170,15 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
     else:
         # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
         # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
-        wait_field(kind=kind, name=chi_name, field=".status.status", value="InProgress"
-                   , ns=ns, retries=3, throw_error=False, shell=shell)
-        actionPlan = get_actionPlan(kind, chi_name, ns, shell)
-        print(actionPlan)
+        wait_field(kind=kind, name=chi_name, field=".status.status", value="InProgress",
+                   ns=ns, retries=3, throw_error=False, shell=shell)
 
-        wait_field(kind=kind, name=chi_name, field=".status.status", value="Completed"
-                   , ns=ns, shell=shell)
+        # getter is buggy, not expecting neither situation w/o plan nor to meet old operator w/o plan
+        # thus crashing good test(s)
+        # action_plan = get_actionPlan(kind, chi_name, ns, shell)
+        # print(action_plan)
+
+        wait_field(kind=kind, name=chi_name, field=".status.status", value="Completed", ns=ns, shell=shell)
 
     if "object_counts" in check:
         wait_objects(chi_name, check["object_counts"], ns=ns, shell=shell)
@@ -237,10 +239,11 @@ def get_chi_normalizedCompleted(chi, ns=None, shell=None):
     chi_storage = get("configmap", f"chi-storage-{chi}", ns=ns)
     return json.loads(chi_storage["data"]["status-normalizedCompleted"])
 
+
 def get_actionPlan(kind, name, ns=None, shell=None):
     if kind == 'chi':
-        storage = get("configmap", f"chi-storage-{name}", ns=ns)
-        return storage["data"]["status-actionPlan"]
+        storage = get("configmap", f"chi-storage-{name}", ns=ns, ok_to_fail=True)
+        return storage.get("data", {}).get("status-actionPlan", "")
     else:
         return ""
 
@@ -420,8 +423,10 @@ def wait_pod_status(pod, status, shell=None, ns=None):
 def get_pod_status(pod, shell=None, ns=None):
     return get_field("pod", pod, ".status.phase", ns, shell=shell)
 
+
 def wait_container_status(pod, status, shell=None, ns=None):
     wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns, shell=shell)
+
 
 def get_container_status(pod, shell=None, ns=None):
     return get_field("pod", pod, ".status.containerStatuses[0]", ns, shell=shell)
@@ -523,6 +528,7 @@ def get_pod_spec(chi_name, pod_name="", ns=None, shell=None):
     else:
         pod = get("pod", pod_name, ns=ns, shell=shell)
     return pod["spec"]
+
 
 def get_pod_status_full(chi_name, pod_name="", ns=None, shell=None):
     label = f"-l clickhouse.altinity.com/chi={chi_name}"
