@@ -395,7 +395,7 @@ func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 		return false
 	}
 
-	shouldExcludeHost := true
+	shouldExcludeHost := false
 	w.a.V(1).
 		M(host).F().
 		Info("No explicit case on whether host should be excluded - going default %t. Host/shard/cluster: %d/%d/%s",
