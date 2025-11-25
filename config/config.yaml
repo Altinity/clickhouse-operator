@@ -453,8 +453,8 @@ status:
   fields:
     action: false
     actions: false
-    error: true
-    errors: true
+    error: false
+    errors: false
 
 ################################################
 ##
