@@ -137,6 +137,7 @@ func Prefix(slice []string, prefix string) (res []string) {
 	return res
 }
 
+// Unique does not preserve order.
 func Unique(slice []string) (unique []string) {
 	found := make(map[string]bool)
 
