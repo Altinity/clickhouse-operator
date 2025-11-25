@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.25.5
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -237,14 +237,17 @@ spec:
                 normalized:
                   type: object
                   description: "Normalized resource requested"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
                   description: "Normalized resource completed"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 actionPlan:
                   type: object
                   description: "Action Plan"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
@@ -3553,14 +3556,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.25.5
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -3786,14 +3789,17 @@ spec:
                 normalized:
                   type: object
                   description: "Normalized resource requested"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
                   description: "Normalized resource completed"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 actionPlan:
                   type: object
                   description: "Action Plan"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
@@ -7105,7 +7111,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -7988,14 +7994,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.25.5
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.25.5
+    clickhouse-keeper.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced

@@ -74,7 +74,7 @@ type Status struct {
 	Endpoints                []string                `json:"endpoints,omitempty"                yaml:"endpoints,omitempty"`
 	NormalizedCR             *ClickHouseInstallation `json:"normalized,omitempty"               yaml:"normalized,omitempty"`
 	NormalizedCRCompleted    *ClickHouseInstallation `json:"normalizedCompleted,omitempty"      yaml:"normalizedCompleted,omitempty"`
-	ActionPlan               *ActionPlan             `json:"actionPlan"                         yaml:"actionPlan"`
+	ActionPlan               *ActionPlan             `json:"actionPlan,omitempty"               yaml:"actionPlan,omitempty"`
 	HostsWithTablesCreated   []string                `json:"hostsWithTablesCreated,omitempty"   yaml:"hostsWithTablesCreated,omitempty"`
 	HostsWithReplicaCaughtUp []string                `json:"hostsWithReplicaCaughtUp,omitempty" yaml:"hostsWithReplicaCaughtUp,omitempty"`
 	UsedTemplates            []*TemplateRef          `json:"usedTemplates,omitempty"            yaml:"usedTemplates,omitempty"`
