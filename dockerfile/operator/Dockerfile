@@ -13,7 +13,7 @@ ARG GCFLAGS
 # Install required packages
 RUN apt-get update && \
     apt-get install -y apt-utils && \
-    apt-get install -y gettext-base wget
+    apt-get install -y gettext-base wget xz-utils
 RUN wget -O /usr/bin/yq --progress=bar:force:noscroll "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64" && \
     chmod +x /usr/bin/yq
 RUN PLATFORM="x86_64" && if [ "${TARGETARCH}" = "arm64" ]; then PLATFORM="aarch64"; fi && \
