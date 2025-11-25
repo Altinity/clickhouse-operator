@@ -4322,6 +4322,7 @@ metadata:
   namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.25.6
+
 # Template Parameters:
 #
 # NAMESPACE=${OPERATOR_NAMESPACE}
