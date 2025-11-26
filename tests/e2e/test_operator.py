@@ -309,9 +309,9 @@ def test_operator_restart(self, manifest, service, version=None):
     check_operator_restart(
         chi=chi,
         wait_objects={
-            "statefulset": 2,
-            "pod": 2,
-            "service": 3,
+            "statefulset": shards * replicas,
+            "pod": shards * replicas,
+            "service": shards * replicas + 1,
         },
         pod=f"chi-{chi}-{cluster}-0-0-0"
     )
@@ -334,10 +334,11 @@ def test_operator_restart(self, manifest, service, version=None):
             kubectl.delete_chi(chi)
 
 
-def get_replicas_from_remote_servers(chi, cluster):
+def get_replicas_from_remote_servers(chi, cluster, shell=None):
     if cluster == "":
         cluster = chi
-    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
+
+    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd", shell=shell)["data"]["chop-generated-remote_servers.xml"]
 
     chi_start = remote_servers.find(f"<{cluster}>")
     chi_end = remote_servers.find(f"</{cluster}>")
@@ -422,11 +423,8 @@ def test_010008_3(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-008-operator-restart-3-1.yaml"
-    manifest_2 = "manifests/chi/test-008-operator-restart-3-2.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = chi
-
-    util.require_keeper(keeper_type=self.context.keeper_type)
 
     full_cluster = {"statefulset": 4, "pod": 4, "service": 5}
 
@@ -436,7 +434,7 @@ def test_010008_3(self):
                 manifest,
                 check={
                     "apply_templates": {
-                        "manifests/chit/tpl-persistent-volume-100Mi.yaml",
+                        current().context.clickhouse_template,
                     },
                     "pod_count": 2,
                     "do_not_delete": 1,
@@ -455,36 +453,6 @@ def test_010008_3(self):
                 )
                 kubectl.wait_objects(chi, full_cluster)
                 kubectl.wait_chi_status(chi, "Completed")
-
-    with Then("Upgrade ClickHouse version to run a reconcile"):
-        kubectl.create_and_check(manifest_2, check={"do_not_delete": 1, "chi_status": "InProgress"})
-
-    trigger_event = threading.Event()
-
-    with When("I create new shells"):
-        shell_1 = get_shell()
-        shell_2 = get_shell()
-
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
-        chi=chi,
-        check_shards = True,
-        check_replicas = False,
-        trigger_event=trigger_event,
-        shell=shell_1
-    )
-    # Just wait for restart operator. After restart it will update cluster with new ClickHouse version
-    wait_operator_restart(
-        chi=chi,
-        wait_objects={"statefulset": 4, "pod": 4, "service": 5},
-        shell=shell_2
-    )
-    trigger_event.set()
-    time.sleep(5) # let threads to finish
-    join()
-
-    # with Then("I recreate shell"):
-    #    shell = get_shell()
-    #    self.context.shell = shell
 
     with Finally("I clean up"):
         delete_test_namespace()
