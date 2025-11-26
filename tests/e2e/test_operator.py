@@ -261,7 +261,7 @@ def test_operator_restart(self, manifest, service, version=None):
     with Then("Create tables"):
         for s in range(shards):
             for r in range(replicas):
-                h = f"chi-{chi}-{cluster}-{s}-{r]-0"
+                h = f"chi-{chi}-{cluster}-{s}-{r}-0"
                 clickhouse.query(
                     chi, "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log", host=h,
                 )
