@@ -259,17 +259,15 @@ def test_operator_restart(self, manifest, service, version=None):
     wait_for_cluster(chi, cluster, shards, replicas)
 
     with Then("Create tables"):
-        for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
-            clickhouse.query(
-                chi,
-                "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log",
-                host=h,
-            )
-            clickhouse.query(
-                chi,
-                "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a)",
-                host=h,
-            )
+        for s in range(shards):
+            for r in range(replicas):
+                h = f"chi-{chi}-{cluster}-{s}-{r]-0"
+                clickhouse.query(
+                    chi, "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log", host=h,
+                )
+                clickhouse.query(
+                    chi, "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a)", host=h,
+                )
 
     trigger_event = threading.Event()
 
@@ -323,9 +321,9 @@ def test_operator_restart(self, manifest, service, version=None):
     #    shell = get_shell()
     #    self.context.shell = shell
 
-    with Then("Local tables should have exactly the same number of rows"):
-        cnt0 = clickhouse.query(chi, "select count() from test_local", host=f'chi-{chi}-{cluster}-0-0-0')
-        cnt1 = clickhouse.query(chi, "select count() from test_local", host=f'chi-{chi}-{cluster}-1-0-0')
+    with Then("Data in shards should be evenly distributed"):
+        cnt0 = clickhouse.query(chi, "select count() from clusterAllReplicas('{cluster}', default.test_local) where _shard_num=1")
+        cnt1 = clickhouse.query(chi, "select count() from clusterAllReplicas('{cluster}', default.test_local) where _shard_num=2")
         print(f"{cnt0} {cnt1}")
         assert cnt0 == cnt1 and cnt0 != "0"
 
