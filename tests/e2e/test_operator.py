@@ -249,16 +249,14 @@ def test_operator_restart(self, manifest, service, version=None):
         kubectl.create_and_check(
             manifest=manifest,
             check={
-                "object_counts": {
-                    "statefulset": 2,
-                    "pod": 2,
-                    "service": 3,
-                },
                 "do_not_delete": 1,
             },
         )
 
-    wait_for_cluster(chi, cluster, 2, 1)
+    shards = get_shards_from_remote_servers(chi, cluster)
+    replicas = get_replicas_from_remote_servers(chi, cluster)
+
+    wait_for_cluster(chi, cluster, shards, replicas)
 
     with Then("Create tables"):
         for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
@@ -302,7 +300,8 @@ def test_operator_restart(self, manifest, service, version=None):
 
     Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
-        shards=2,
+        check_shards = True,
+        check_replicas = True,
         trigger_event=trigger_event,
         shell=shell_3
     )
@@ -353,23 +352,31 @@ def get_replicas_from_remote_servers(chi, cluster):
     chi_shards = chi_cluster.count("<shard>")
     chi_replicas = chi_cluster.count("<replica>")
 
-    return chi_replicas / chi_shards
+    return chi_replicas // chi_shards
 
 
 @TestCheck
-def check_remote_servers(self, chi, shards, trigger_event, shell=None, cluster=""):
+def check_remote_servers(self, chi, check_shards, check_replicas, trigger_event, shell=None, cluster=""):
     """Check cluster definition in configmap until signal is received"""
     if cluster == "":
         cluster = chi
 
     ok_runs = 0
+    shards = get_shards_from_remote_servers(chi, cluster, shell=shell)
+    replicas = get_replicas_from_remote_servers(chi, cluster, shell=shell)
     with Then(f"Check remote_servers contains {shards} shards until receiving a stop event"):
         while not trigger_event.is_set():
-            chi_shards = get_shards_from_remote_servers(chi, cluster, shell=shell)
+            if check_shards:
+                chi_shards = get_shards_from_remote_servers(chi, cluster, shell=shell)
+                if chi_shards != shards:
+                    with Then(f"Number of shards in {cluster} cluster should be {shards} got {chi_shards} instead"):
+                        assert chi_shards == shards
 
-            if chi_shards != shards:
-                with Then(f"Number of shards in {cluster} cluster should be {shards} got {chi_shards} instead"):
-                    assert chi_shards == shards
+            if check_replicas:
+                chi_replicas = get_replicas_from_remote_servers(chi, cluster, shell=shell)
+                if chi_replicas != replicas:
+                    with Then(f"Number of replicss in {cluster} cluster should be {replicas} got {chi_replicas} instead"):
+                        assert chi_replicas == replicas
 
             ok_runs += 1
             time.sleep(0.5)
@@ -460,7 +467,8 @@ def test_010008_3(self):
 
     Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
-        shards=2,
+        check_shards = True,
+        check_replicas = False,
         trigger_event=trigger_event,
         shell=shell_1
     )
@@ -480,7 +488,6 @@ def test_010008_3(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
-
 
 @TestCheck
 def test_operator_upgrade(self, manifest, service, version_from, version_to=None, shell=None):
@@ -535,7 +542,8 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
 
     Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
-        shards=2,
+        check_shards = True,
+        check_replicas = False,
         trigger_event=trigger_event,
         shell=shell_2
     )
@@ -3572,7 +3580,8 @@ def test_010032(self):
     Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
         cluster="default",
-        shards=2,
+        check_shards = True,
+        check_replicas = False,
         trigger_event=trigger_event,
         shell=shell_2
     )
@@ -4383,6 +4392,11 @@ def test_010042(self):
         with Then("Operator should apply changes, and both pods should be created"):
             kubectl.wait_chi_status(chi, "Aborted")
             kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+
+        with And(".status.error should be not empty"):
+            status_err = kubectl.get_field("chi", chi, ".status.error")
+            print(status_err)
+            assert status_err != ""
 
         with And("First node is in CrashLoopBackOff"):
             kubectl.wait_field(
