@@ -322,8 +322,8 @@ def test_operator_restart(self, manifest, service, version=None):
     #    self.context.shell = shell
 
     with Then("Data in shards should be evenly distributed"):
-        cnt0 = clickhouse.query(chi, "select count() from clusterAllReplicas('{cluster}', default.test_local) where _shard_num=1")
-        cnt1 = clickhouse.query(chi, "select count() from clusterAllReplicas('{cluster}', default.test_local) where _shard_num=2")
+        cnt0 = clickhouse.query(chi, "select count() from clusterAllReplicas('{cluster}', default.test_local) where _shard_num in (1,3)")
+        cnt1 = clickhouse.query(chi, "select count() from clusterAllReplicas('{cluster}', default.test_local) where _shard_num in (2,4)")
         print(f"{cnt0} {cnt1}")
         assert cnt0 == cnt1 and cnt0 != "0"
 
