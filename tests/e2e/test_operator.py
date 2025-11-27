@@ -5158,6 +5158,7 @@ def test_010056(self):
 
 @TestScenario
 @Name("test_010057. Test reconcile concurrency settings on CHI level")
+@Tags("NO_PARALLEL")
 def test_010057(self):
     create_shell_namespace_clickhouse_template()
 
