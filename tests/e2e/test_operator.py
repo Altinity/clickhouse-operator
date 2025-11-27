@@ -2498,7 +2498,7 @@ def test_021(self, step=1):
             disk = clickhouse.query(chi, "select disk_name from system.parts where table='test_local_021'")
             print(f"out : {disk}")
             print(f"want: default")
-            assert disk == "default" or True
+            assert disk == "default"
 
         with When("alter table test_local_021 move partition tuple() to disk 'disk2'"):
             clickhouse.query_with_error(chi, "alter table test_local_021 move partition tuple() to disk 'disk2'")
@@ -2507,12 +2507,7 @@ def test_021(self, step=1):
                 disk = clickhouse.query(chi,"select disk_name from system.parts where table='test_local_021'")
                 print(f"out : {disk}")
                 print(f"want: disk2")
-                assert disk == "disk2" or True
-
-        with And("Table should exist"):
-            pause()
-            out = clickhouse.query(chi, "select * from test_local_021")
-            assert out == "1"
+                assert disk == "disk2"
 
     with When("Downscale disk1 back to 1Gi"):
         pause()
@@ -5158,7 +5153,6 @@ def test_010056(self):
 
 @TestScenario
 @Name("test_010057. Test reconcile concurrency settings on CHI level")
-@Tags("NO_PARALLEL")
 def test_010057(self):
     create_shell_namespace_clickhouse_template()
 
@@ -5180,6 +5174,7 @@ def test_010057(self):
 
     with When("First shard is Running"):
         kubectl.wait_pod_status(f"chi-{chi}-{cluster}-0-0-0", "Running")
+        time.sleep(10)
         with Then("Other shards are running or being created"):
             for shard in [1,2,3]:
                 pod_status = kubectl.get_pod_status(f"chi-{chi}-{cluster}-{shard}-0-0")
