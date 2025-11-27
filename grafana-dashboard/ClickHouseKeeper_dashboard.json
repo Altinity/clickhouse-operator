@@ -990,14 +990,14 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values({__name__=~\"ClickHouse.*Keeper.*\",pod=~\"chk-clickhouse-keeper.*\"},namespace)",
+        "definition": "label_values({__name__=~\"ClickHouse.*Keeper.*\",pod=~\"chk-.*\"},namespace)",
         "includeAll": true,
         "multi": true,
         "name": "namespace",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values({__name__=~\"ClickHouse.*Keeper.*\",pod=~\"chk-clickhouse-keeper.*\"},namespace)",
+          "query": "label_values({__name__=~\"ClickHouse.*Keeper.*\",pod=~\"chk-.*\"},namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -1011,14 +1011,14 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values({__name__=~\"ClickHouse.*Keeper.*\",pod=~\"chk-clickhouse-keeper.*\",namespace=~\"$namespace\"},pod)",
+        "definition": "label_values({__name__=~\"ClickHouse.*Keeper.*\",pod=~\"chk-.*\",namespace=~\"$namespace\"},pod)",
         "includeAll": true,
         "multi": true,
         "name": "pod",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values({__name__=~\"ClickHouse.*Keeper.*\",pod=~\"chk-clickhouse-keeper.*\",namespace=~\"$namespace\"},pod)",
+          "query": "label_values({__name__=~\"ClickHouse.*Keeper.*\",pod=~\"chk-.*\",namespace=~\"$namespace\"},pod)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
