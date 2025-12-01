@@ -17,7 +17,7 @@ package zookeeper
 import "time"
 
 const (
-	defaultMaxRetriesNum               = 20
+	defaultMaxRetriesNum               = 30
 	defaultMaxConcurrentRequests int64 = 32
 
 	defaultTimeoutConnect   = 10 * time.Second
