@@ -33,6 +33,7 @@ type CR struct {
 	kubeClient client.Client
 }
 
+// NewCR is a constructor
 func NewCR(kubeClient client.Client) *CR {
 	return &CR{
 		kubeClient: kubeClient,
@@ -55,16 +56,19 @@ func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResour
 // StatusUpdate updates CR object's Status
 func (c *CR) StatusUpdate(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return nil
 	}
 
 	return c.statusUpdateRetry(ctx, cr, opts)
 }
 
+const maxRetryAttempts = 50
+
 func (c *CR) statusUpdateRetry(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) (err error) {
 	for retry, attempt := true, 1; retry; attempt++ {
-		if attempt > 60 {
+		if attempt >= maxRetryAttempts {
+			// Make last attempt
 			retry = false
 		}
 
@@ -74,10 +78,10 @@ func (c *CR) statusUpdateRetry(ctx context.Context, cr api.ICustomResource, opts
 		}
 
 		if retry {
-			log.V(2).M(cr).F().Warning("got error, will retry. err: %q", err)
+			log.V(2).M(cr).F().Warning("got error, will retry attempt %d. err: %q", attempt, err)
 			time.Sleep(1 * time.Second)
 		} else {
-			log.V(1).M(cr).F().Error("got error, all retries are exhausted. err: %q", err)
+			log.V(1).M(cr).F().Error("got error, attempt %d all retries are exhausted. err: %q", attempt, err)
 		}
 	}
 	return
@@ -86,7 +90,7 @@ func (c *CR) statusUpdateRetry(ctx context.Context, cr api.ICustomResource, opts
 // statusUpdateProcess updates CR object's Status
 func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", icr.GetName())
 		return nil
 	}
 
@@ -111,7 +115,7 @@ func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, o
 		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", namespace, name)
 	}
 
-	// Update status of a real object.
+	// Update status of a real (current) object.
 	cur.EnsureStatus().CopyFrom(cr.Status, opts.CopyStatusOptions)
 
 	err = c.statusUpdate(ctx, cur)
@@ -124,7 +128,7 @@ func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, o
 	_cur, err = c.Get(ctx, namespace, name)
 	cur = _cur.(*apiChk.ClickHouseKeeperInstallation)
 
-	// Propagate updated ResourceVersion into chi
+	// Propagate updated ResourceVersion upstairs into the CR
 	if cr.GetResourceVersion() != cur.GetResourceVersion() {
 		log.V(3).M(cr).F().Info("ResourceVersion change: %s to %s", cr.GetResourceVersion(), cur.GetResourceVersion())
 		cr.SetResourceVersion(cur.GetResourceVersion())

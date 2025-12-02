@@ -349,7 +349,7 @@ configs:
                 - settings/user_directories/*: "no"
                 # these settings should not lead to pod restarts
                 - settings/display_secrets_in_show_and_select: "no"
-                - zookeeper/*: "yes"
+                - zookeeper/*: "no"
                 - files/*.xml: "yes"
                 - files/config.d/*.xml: "yes"
                 - files/config.d/*dict*.xml: "no"
@@ -659,8 +659,8 @@ configs:
         fields:
           action: false
           actions: false
-          error: false
-          errors: false
+          error: true
+          errors: true
       ################################################
       ##
       ## StatefulSet management section
