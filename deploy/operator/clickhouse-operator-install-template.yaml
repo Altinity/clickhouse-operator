@@ -4768,7 +4768,7 @@ data:
               # these settings should not lead to pod restarts
               - settings/display_secrets_in_show_and_select: "no"
     
-              - zookeeper/*: "yes"
+              - zookeeper/*: "no"
     
               - files/*.xml: "yes"
               - files/config.d/*.xml: "yes"
@@ -5100,8 +5100,8 @@ data:
       fields:
         action: false
         actions: false
-        error: false
-        errors: false
+        error: true
+        errors: true
     
     ################################################
     ##
