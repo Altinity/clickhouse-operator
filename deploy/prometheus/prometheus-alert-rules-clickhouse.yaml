@@ -15,12 +15,12 @@ spec:
           labels:
             severity: critical
           annotations:
-            identifier: "{{ $labels.pod }}"
+            identifier: "{{ $labels.pod_name }}"
             summary: "metrics-exporter possible down"
             description: |-
               `metrics-exporter` not sent data more than 1 minutes.
               Please check instance status
-              ```kubectl logs -n {{ $labels.namespace }} {{ $labels.pod }} -c metrics-exporter -f```
+              ```kubectl logs -n {{ $labels.namespace }} {{ $labels.pod_name }} -c metrics-exporter -f```
 
         - alert: ClickHouseServerDown
           expr: chi_clickhouse_metric_fetch_errors{fetch_type='system.metrics'} > 0

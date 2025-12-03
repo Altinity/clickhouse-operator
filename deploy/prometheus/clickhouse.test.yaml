@@ -23,7 +23,7 @@ tests:
   - name: ClickHouseMetricsExporterDown
     interval: 30s
     input_series:
-      - series: 'up{app="clickhouse-operator", pod="clickhouse-operator-XXX"}'
+      - series: 'up{app="clickhouse-operator", pod_name="clickhouse-operator-XXX"}'
         values: "0+0x10"
     alert_rule_test:
       - eval_time: 30s
@@ -31,7 +31,7 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
-              pod: clickhouse-operator-XXX
+              pod_name: clickhouse-operator-XXX
               app: clickhouse-operator
             exp_annotations:
               description: "`metrics-exporter` not sent data more than 1 minutes.\nPlease check instance status\n```kubectl logs -n  clickhouse-operator-XXX -c metrics-exporter -f```"

@@ -12,6 +12,7 @@ spec:
       - name: test-008-1
         layout:
           shardsCount: 2
+          replicasCount: 2
     users:
       test_008/password: test_008
       test_008/networks/ip: 0.0.0.0/0
