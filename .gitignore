@@ -54,3 +54,6 @@ tests/*.html
 
 # agents
 .aider*
+CLAUDE.md
+AGENTS.md
+.claude

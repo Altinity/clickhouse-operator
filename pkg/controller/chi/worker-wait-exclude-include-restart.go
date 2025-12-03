@@ -395,12 +395,14 @@ func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 		return false
 	}
 
+	shouldExcludeHost := false
 	w.a.V(1).
 		M(host).F().
-		Info("Host should be excluded. Host/shard/cluster: %d/%d/%s",
+		Info("No explicit case on whether host should be excluded - going default %t. Host/shard/cluster: %d/%d/%s",
+			shouldExcludeHost,
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	return true
+	return shouldExcludeHost
 }
 
 // shouldWaitExcludeHost determines whether reconciler should wait for the host to be excluded from cluster
