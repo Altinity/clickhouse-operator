@@ -13,11 +13,11 @@ if [[ ! -z "${RUN_ALL}" ]]; then
     RUN_ALL="--test-to-end"
 fi
 
-python3 "$CUR_DIR/../regression.py" --only="/regression/e2e.test_operator/${ONLY}" ${RUN_ALL} -o short --trim-results on --debug --native
-#python3 "$CUR_DIR/../regression.py" --only="/regression/e2e.test_operator/${ONLY}" --test-to-end -o short --trim-results on --debug --native
-#python3 "$CUR_DIR/../regression.py" --only="/regression/e2e.test_operator/${ONLY}" --parallel-pool ${MAX_PARALLEL} -o short --trim-results on --debug --native
-#python3 "$CUR_DIR/../regression.py" --only=/regression/e2e.test_operator/* -o short --trim-results on --debug --native --native
-#python3 "$CUR_DIR/../regression.py" --only=/regression/e2e.test_operator/* --trim-results on --debug --native --native
-#python3 "$CUR_DIR/../regression.py" --only=/regression/e2e.test_operator/test_008_2* --trim-results on --debug --native --native
-#python3 "$CUR_DIR/../regression.py" --only=/regression/e2e.test_operator/test_008_2* --trim-results on --debug --native -o short --native
-#python3 "$CUR_DIR/../regression.py" --only=/regression/e2e.test_operator/*32* --trim-results on --debug --native -o short --native
+python3 "$CUR_DIR/../regression.py" --only="/regression/e2e?test_operator/${ONLY}" ${RUN_ALL} -o short --trim-results on --debug --native
+#python3 "$CUR_DIR/../regression.py" --only="/regression/e2e?test_operator/${ONLY}" --test-to-end -o short --trim-results on --debug --native
+#python3 "$CUR_DIR/../regression.py" --only="/regression/e2e?test_operator/${ONLY}" --parallel-pool ${MAX_PARALLEL} -o short --trim-results on --debug --native
+#python3 "$CUR_DIR/../regression.py" --only=/regression/e2e?test_operator/* -o short --trim-results on --debug --native --native
+#python3 "$CUR_DIR/../regression.py" --only=/regression/e2e?test_operator/* --trim-results on --debug --native --native
+#python3 "$CUR_DIR/../regression.py" --only=/regression/e2e?test_operator/test_008_2* --trim-results on --debug --native --native
+#python3 "$CUR_DIR/../regression.py" --only=/regression/e2e?test_operator/test_008_2* --trim-results on --debug --native -o short --native
+#python3 "$CUR_DIR/../regression.py" --only=/regression/e2e?test_operator/*32* --trim-results on --debug --native -o short --native

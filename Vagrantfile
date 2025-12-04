@@ -121,15 +121,13 @@ Vagrant.configure(2) do |config|
     # docker
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
     add-apt-repository "deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) test"
-    apt-get install --no-install-recommends -y docker-ce pigz
+    apt-get install --no-install-recommends -y docker-ce docker-ce-cli containerd.io docker-compose-plugin pigz
 
-    # docker compose
     apt-get install -y --no-install-recommends python3-distutils
     curl -sL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
     python3 /tmp/get-pip.py
 
-    pip3 install -U setuptools
-    pip3 install -U docker-compose
+    pip3 install -U -r ./tests/image/requirements.txt
 
     # k9s CLI
     K9S_VERSION=$(curl -sL https://github.com/derailed/k9s/releases/latest -H "Accept: application/json" | jq -r .tag_name)
@@ -170,7 +168,8 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.23.1}
 #    K8S_VERSION=${K8S_VERSION:-1.24.8}
 #    K8S_VERSION=${K8S_VERSION:-1.25.4}
-    K8S_VERSION=${K8S_VERSION:-1.31.1}
+#    K8S_VERSION=${K8S_VERSION:-1.31.1}
+    K8S_VERSION=${K8S_VERSION:-1.31.2}
     export VALIDATE_YAML=true
 
     killall kubectl || true

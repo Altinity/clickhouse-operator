@@ -382,13 +382,13 @@ spec:
       containers:
         - name: clickhouse-keeper
           imagePullPolicy: Always
-          image: "clickhouse/clickhouse-keeper:latest-alpine"
+          image: "clickhouse/clickhouse-keeper:24.8"
           resources:
             requests:
               memory: "256M"
               cpu: "1"
             limits:
-              memory: "4Gi"
+              memory: "1Gi"
               cpu: "2"
           volumeMounts:
             - name: clickhouse-keeper-settings

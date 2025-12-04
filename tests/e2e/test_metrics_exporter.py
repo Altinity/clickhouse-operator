@@ -1,5 +1,6 @@
-import time
-import re
+import json
+import os
+os.environ["TEST_NAMESPACE"]="test-metrics-exporter"
 import json
 
 from e2e.steps import *
@@ -14,16 +15,16 @@ import e2e.steps as steps
 
 
 @TestScenario
-@Name("Check metrics server setup and version")
+@Name("test_metrics_exporter_setup: Check metrics server setup and version")
 def test_metrics_exporter_setup(self):
     with Given("clickhouse-operator is installed"):
-        assert kubectl.get_count("pod", ns="--all-namespaces", label=util.operator_label) > 0, error()
+        assert kubectl.get_count("pod", ns=self.context.operator_namespace, label=util.operator_label) > 0, error()
         with Then(f"Set metrics-exporter version {settings.operator_version}"):
             util.set_metrics_exporter_version(settings.operator_version)
 
 
 @TestScenario
-@Name("Test basic metrics exporter functionality")
+@Name("test_metrics_exporter_chi: Test basic metrics exporter functionality")
 def test_metrics_exporter_chi(self):
     def check_monitoring_chi(operator_namespace, operator_pod, expect_result, max_retries=10):
         with Then(f"metrics-exporter /chi endpoint result should return {expect_result}"):
@@ -77,7 +78,7 @@ def test_metrics_exporter_chi(self):
             "true,true",
             ns=self.context.operator_namespace,
         )
-        assert kubectl.get_count("pod", ns="--all-namespaces", label=util.operator_label) > 0, error()
+        assert kubectl.get_count("pod", ns=self.context.operator_namespace, label=util.operator_label) > 0, error()
 
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=self.context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
@@ -98,7 +99,7 @@ def test_metrics_exporter_chi(self):
             )
             expected_chi = [
                 {
-                    "namespace": "test",
+                    "namespace": self.context.test_namespace,
                     "name": "test-017-multi-version",
                     "labels": {"clickhouse.altinity.com/chi": "test-017-multi-version"},
                     "annotations": {"clickhouse.altinity.com/email": "myname@mydomain.com, yourname@yourdoman.com"},
@@ -108,13 +109,13 @@ def test_metrics_exporter_chi(self):
                             "hosts": [
                                 {
                                     "name": "0-0",
-                                    "hostname": "chi-test-017-multi-version-default-0-0.test.svc.cluster.local",
+                                    "hostname": f"chi-test-017-multi-version-default-0-0.{self.context.test_namespace}.svc.cluster.local",
                                     "tcpPort": 9000,
                                     "httpPort": 8123
                                 },
                                 {
                                     "name": "1-0",
-                                    "hostname": "chi-test-017-multi-version-default-1-0.test.svc.cluster.local",
+                                    "hostname": f"chi-test-017-multi-version-default-1-0.{self.context.test_namespace}.svc.cluster.local",
                                     "tcpPort": 9000,
                                     "httpPort": 8123
                                 }
@@ -186,8 +187,8 @@ def test_metrics_exporter_chi(self):
 def test(self):
     with Given("set settings"):
         set_settings()
-        self.context.test_namespace = "test"
-        self.context.operator_namespace = "test"
+        self.context.test_namespace = "test-metrics-exporter"
+        self.context.operator_namespace = "test-metrics-exporter"
     with Given("I create shell"):
         shell = get_shell()
         self.context.shell = shell

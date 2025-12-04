@@ -674,7 +674,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:24.8
               volumeMounts:
                 - name: default-volume-claim
                   mountPath: /var/lib/clickhouse
@@ -686,7 +686,7 @@ spec:
                   memory: "64Mi"
                   cpu: "100m"
             - name: clickhouse-log
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:24.8
               command:
                 - "/bin/sh"
                 - "-c"
@@ -704,7 +704,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:24.8
               volumeMounts:
                 - name: default-volume-claim
                   mountPath: /var/lib/clickhouse
@@ -716,7 +716,7 @@ spec:
                   memory: "64Mi"
                   cpu: "100m"
             - name: clickhouse-log
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:24.8
               command:
                 - "/bin/sh"
                 - "-c"
