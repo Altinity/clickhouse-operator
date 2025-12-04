@@ -31,7 +31,7 @@ func New(kubeClient *kube.Clientset, chopClient *chopclientset.Clientset, initCH
 	// Create operator instance
 	chop = newCHOp(version.Version, version.GitSHA, version.BuiltAt, kubeClient, chopClient, initCHOpConfigFilePath)
 	if err := chop.Init(); err != nil {
-		log.F().Fatal("Unable to init CHOP instance %v", err)
+		log.F().Fatal("Unable to init CHOP instance. Err: %v", err)
 		os.Exit(1)
 	}
 	chop.SetupLog()

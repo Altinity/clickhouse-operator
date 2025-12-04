@@ -30,14 +30,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile clean is aborted. CR: %s ", cr.GetName())
 		return
 	}
 
@@ -48,13 +47,13 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 		Info("remove items scheduled for deletion")
 
 	// Remove deleted items
-	w.a.V(1).M(cr).F().Info("List of objects which have failed to reconcile:\n%s", w.task.RegistryFailed)
-	w.a.V(1).M(cr).F().Info("List of successfully reconciled objects:\n%s", w.task.RegistryReconciled)
+	w.a.V(1).M(cr).F().Info("List of objects which have failed to reconcile:\n%s", w.task.RegistryFailed())
+	w.a.V(1).M(cr).F().Info("List of successfully reconciled objects:\n%s", w.task.RegistryReconciled())
 	objs := w.c.discovery(ctx, cr)
 	need := w.task.RegistryReconciled()
-	w.a.V(1).M(cr).F().Info("Existing objects:\n%s", objs)
+	w.a.V(1).M(cr).F().Info("List of existing objects:\n%s", objs)
 	objs.Subtract(need)
-	w.a.V(1).M(cr).F().Info("Non-reconciled objects:\n%s", objs)
+	w.a.V(1).M(cr).F().Info("List of non-reconciled objects:\n%s", objs)
 	if w.purge(ctx, cr, objs, w.task.RegistryFailed()) > 0 {
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
@@ -62,22 +61,18 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	cr.(*api.ClickHouseInstallation).EnsureStatus().SyncHostTablesCreated()
 }
 
-// dropReplicas cleans Zookeeper for replicas that are properly deleted - via AP
-func (w *worker) dropReplicas(ctx context.Context, cr api.ICustomResource, ap *action_plan.ActionPlan) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
+// dropReplicas cleans Zookeeper for replicas that are properly deleted - via Action Plan
+func (w *worker) dropReplicas(ctx context.Context, cr *api.ClickHouseInstallation) {
+	// Iterate over Action Plan and drop all replicas that are properly removed as removed hosts
 	w.a.V(1).M(cr).F().S().Info("drop replicas based on AP")
 	cnt := 0
-	ap.WalkRemoved(
+	cr.EnsureRuntime().ActionPlan.WalkRemoved(
 		func(cluster api.ICluster) {
 		},
 		func(shard api.IShard) {
 		},
 		func(host *api.Host) {
-			_ = w.dropReplica(ctx, host)
+			_ = w.dropReplica(ctx, host, NewDropReplicaOptions().SetRegularDrop())
 			cnt++
 		},
 	)
@@ -92,7 +87,7 @@ func (w *worker) purge(
 	reconcileFailedObjs *model.Registry,
 ) (cnt int) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Purge is aborted. CR: %s ", cr.GetName())
 		return cnt
 	}
 
@@ -205,37 +200,37 @@ func (w *worker) purgePDB(
 
 func shouldPurgeStatefulSet(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasStatefulSet(m) {
-		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetStatefulSet() == api.ObjectsCleanupDelete
+		return cr.GetReconcile().GetCleanup().GetReconcileFailedObjects().GetStatefulSet() == api.ObjectsCleanupDelete
 	}
-	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetStatefulSet() == api.ObjectsCleanupDelete
+	return cr.GetReconcile().GetCleanup().GetUnknownObjects().GetStatefulSet() == api.ObjectsCleanupDelete
 }
 
 func shouldPurgePVC(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasPVC(m) {
-		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetPVC() == api.ObjectsCleanupDelete
+		return cr.GetReconcile().GetCleanup().GetReconcileFailedObjects().GetPVC() == api.ObjectsCleanupDelete
 	}
-	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetPVC() == api.ObjectsCleanupDelete
+	return cr.GetReconcile().GetCleanup().GetUnknownObjects().GetPVC() == api.ObjectsCleanupDelete
 }
 
 func shouldPurgeConfigMap(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasConfigMap(m) {
-		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetConfigMap() == api.ObjectsCleanupDelete
+		return cr.GetReconcile().GetCleanup().GetReconcileFailedObjects().GetConfigMap() == api.ObjectsCleanupDelete
 	}
-	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetConfigMap() == api.ObjectsCleanupDelete
+	return cr.GetReconcile().GetCleanup().GetUnknownObjects().GetConfigMap() == api.ObjectsCleanupDelete
 }
 
 func shouldPurgeService(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasService(m) {
-		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetService() == api.ObjectsCleanupDelete
+		return cr.GetReconcile().GetCleanup().GetReconcileFailedObjects().GetService() == api.ObjectsCleanupDelete
 	}
-	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetService() == api.ObjectsCleanupDelete
+	return cr.GetReconcile().GetCleanup().GetUnknownObjects().GetService() == api.ObjectsCleanupDelete
 }
 
 func shouldPurgeSecret(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasSecret(m) {
-		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetSecret() == api.ObjectsCleanupDelete
+		return cr.GetReconcile().GetCleanup().GetReconcileFailedObjects().GetSecret() == api.ObjectsCleanupDelete
 	}
-	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetSecret() == api.ObjectsCleanupDelete
+	return cr.GetReconcile().GetCleanup().GetUnknownObjects().GetSecret() == api.ObjectsCleanupDelete
 }
 
 func shouldPurgePDB(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
@@ -245,7 +240,7 @@ func shouldPurgePDB(cr api.ICustomResource, reconcileFailedObjs *model.Registry,
 // discoveryAndDeleteCR deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
 func (w *worker) discoveryAndDeleteCR(ctx context.Context, cr api.ICustomResource) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Discovery and delete is aborted. CR: %s ", cr.GetName())
 		return nil
 	}
 
@@ -265,7 +260,7 @@ func (w *worker) discoveryAndDeleteCR(ctx context.Context, cr api.ICustomResourc
 // deleteCHIProtocol deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
 func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete CHI protocol is aborted")
 		return nil
 	}
 
@@ -321,7 +316,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	})
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete is aborted")
 		return nil
 	}
 
@@ -338,35 +333,101 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 }
 
 // canDropReplica
-func (w *worker) canDropReplica(ctx context.Context, host *api.Host, opts ...*dropReplicaOptions) (can bool) {
-	o := NewDropReplicaOptionsArr(opts...).First()
+func (w *worker) canDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host, opt *dropReplicaOptions) (can bool) {
 
-	if o.ForceDrop() {
+	switch {
+	case opt.RegularDrop():
+		w.a.V(1).F().Info("Regular drop replica. hostToDrop: %s", hostToDrop.GetName())
+		// Check whether drop replicas is allowed to the operator
+		if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.OnDelete.IsFalse() {
+			w.a.V(1).F().Info("Regular drop replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+			return false
+		}
+
+		// In case host has volumes to retain - unable to drop replica
+		if w.hasHostVolumesToRetain(ctx, hostToDrop) {
+			w.a.V(1).F().Info("Retained volume(s) replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+			return false
+		}
+
+		w.a.V(1).F().Info("Allowed to drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return true
-	}
 
-	can = true
+	case opt.ForceDropUponStorageLoss():
+		w.a.V(1).F().Info("Force drop replica upon storage loss. hostToDrop: %s", hostToDrop.GetName())
+		// Active replica may have restriction to be deleted
+		if w.ensureClusterSchemer(hostToRunOn).IsHostActiveReplica(ctx, hostToRunOn, hostToDrop) {
+			w.a.V(1).F().Info("Replica is an active one. Need ti check whether it can be dropped. hostToDrop: %s", hostToDrop.GetName())
+			// Check whether drop active replicas is allowed to the operator
+			if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.Active.IsFalse() {
+				w.a.V(1).F().Info("Active replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+				return false
+			}
+		}
+		w.a.V(1).F().Info("Accepted force drop replica upon storage loss. hostToDrop: %s", hostToDrop.GetName())
+		return true
+
+	default:
+		panic("unknown replica drop")
+	}
+}
+
+// hasHostVolumesToRetain check whether host has PVCs to be retained
+// Replica's state has to be kept in Zookeeper for retained volumes.
+// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
+func (w *worker) hasHostVolumesToRetain(ctx context.Context, host *api.Host) (has bool) {
+	// Check whether among all PVCs host has reclaim policy "retain" specified
 	storage.NewStoragePVC(w.c.kube.Storage()).WalkDiscoveredPVCs(ctx, host, func(pvc *core.PersistentVolumeClaim) {
-		// Replica's state has to be kept in Zookeeper for retained volumes.
-		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
 		if chiLabeler.New(nil).GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {
 			w.a.V(1).F().Info("PVC: %s/%s blocks drop replica. Reclaim policy: %s", api.PVCReclaimPolicyRetain.String())
-			can = false
+			has = true
 		}
 	})
-	return can
+
+	return has
 }
 
 type dropReplicaOptions struct {
-	forceDrop bool
+	regularDrop              bool
+	forceDropUponStorageLoss bool
 }
 
-func (o *dropReplicaOptions) ForceDrop() bool {
+func NewDropReplicaOptions() *dropReplicaOptions {
+	return &dropReplicaOptions{}
+}
+
+func (o *dropReplicaOptions) SetRegularDrop() *dropReplicaOptions {
+	if o == nil {
+		return o
+	}
+	o.regularDrop = true
+
+	return o
+}
+
+func (o *dropReplicaOptions) RegularDrop() bool {
 	if o == nil {
 		return false
 	}
 
-	return o.forceDrop
+	return o.regularDrop
+}
+
+func (o *dropReplicaOptions) SetForceDropUponStorageLoss() *dropReplicaOptions {
+	if o == nil {
+		return o
+	}
+	o.forceDropUponStorageLoss = true
+
+	return o
+}
+
+func (o *dropReplicaOptions) ForceDropUponStorageLoss() bool {
+	if o == nil {
+		return false
+	}
+
+	return o.forceDropUponStorageLoss
 }
 
 type dropReplicaOptionsArr []*dropReplicaOptions
@@ -385,19 +446,9 @@ func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 }
 
 // dropReplica drops replica's info from Zookeeper
-func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...*dropReplicaOptions) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
+func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts *dropReplicaOptions) error {
 	if hostToDrop == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop: %s", hostToDrop.GetName())
-		return nil
-	}
-
-	if !w.canDropReplica(ctx, hostToDrop, opts...) {
-		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
 
@@ -409,6 +460,11 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...
 
 	if hostToRunOn == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn: %s, hostToDrop: %s", hostToRunOn.GetName(), hostToDrop.GetName())
+		return nil
+	}
+
+	if !w.canDropReplica(ctx, hostToRunOn, hostToDrop, opts) {
+		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
 
@@ -433,7 +489,7 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...
 // deleteTables
 func (w *worker) deleteTables(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete tables. Host: %s ", host.GetName())
 		return nil
 	}
 
@@ -463,7 +519,7 @@ func (w *worker) deleteTables(ctx context.Context, host *api.Host) error {
 // chi is the new CHI in which there will be no more this host
 func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation, host *api.Host) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete host is aborted. Host: %s ", host.GetName())
 		return nil
 	}
 
@@ -527,7 +583,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 // chi is the new CHI in which there will be no more this shard
 func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallation, shard *api.ChiShard) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete shard is aborted. shard: %s ", shard.GetName())
 		return nil
 	}
 
@@ -600,7 +656,7 @@ func (w *worker) deleteCluster(ctx context.Context, chi *api.ClickHouseInstallat
 // deleteCHI
 func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Delete CHI is aborted")
 		return false
 	}
 

@@ -47,7 +47,7 @@ jobs:
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.31.2
+          kubernetes-version: v1.33.5
           cpus: max
           memory: max
 
@@ -55,16 +55,31 @@ jobs:
         run: |
           minikube status
           export CHO_RELEASE=$(cat release)
+          export GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
           echo "current release=$CHO_RELEASE"
+          echo "current go version=$GO_VERSION"
 
-          docker build -f dockerfile/operator/Dockerfile -t altinity/clickhouse-operator:${CHO_RELEASE} --pull .
-          docker build -f dockerfile/metrics-exporter/Dockerfile -t altinity/metrics-exporter:${CHO_RELEASE} --pull .
+          docker build -f dockerfile/operator/Dockerfile         --build-arg GO_VERSION=${GO_VERSION} -t altinity/clickhouse-operator:${CHO_RELEASE} --pull .
+          docker build -f dockerfile/metrics-exporter/Dockerfile --build-arg GO_VERSION=${GO_VERSION} -t altinity/metrics-exporter:${CHO_RELEASE}    --pull .
 
           docker image save altinity/clickhouse-operator:${CHO_RELEASE} -o operator.tar
-          docker image save altinity/metrics-exporter:${CHO_RELEASE} -o metrics-exporter.tar
+          docker image save altinity/metrics-exporter:${CHO_RELEASE}    -o metrics-exporter.tar
 
           minikube image load operator.tar
           minikube image load metrics-exporter.tar
+
+      - name: Deploy prometheus
+        run: |
+          cp ./deploy/prometheus/prometheus-sensitive-data.example.sh ./deploy/prometheus/prometheus-sensitive-data.sh
+          NO_WAIT=1 bash ./deploy/prometheus/create-prometheus.sh
+
+      - name: Deploy minio
+        run: |
+          NO_WAIT=1 bash ./deploy/minio/create-minio.sh
+
+      - name: Deploy zookeeper-operator
+        run: |
+          bash ./deploy/zookeeper/zookeeper-with-zookeeper-operator/install-zookeeper-operator.sh
 
       - name: Run Tests
         id: run-tests
@@ -93,7 +108,7 @@ jobs:
             test_mode="--test-to-end"
           fi
 
-          ~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e.test_operator/${ONLY} $test_mode --trim-results on -o short --native --log ./tests/raw.log
+          ~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e.test_operator/${ONLY} $test_mode --trim-results on -o short --no-colors --native --log ./tests/raw.log
           test_result=$?
           ~/venv/qa/bin/tfs --no-colors transform compact ./tests/raw.log ./tests/compact.log
           ~/venv/qa/bin/tfs --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
@@ -121,7 +136,7 @@ jobs:
           retention-days: 90
 
       - name: Test Failed
-        if: ${{ failure() }}
+        if: ${{ steps.run-tests.outputs.test_result != '0' }}
         uses: actions/github-script@v3
         with:
           script: |

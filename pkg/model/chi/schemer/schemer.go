@@ -52,12 +52,29 @@ func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *api.Host) err
 	return s.ExecHost(ctx, host, syncTableSQLs, opts)
 }
 
+// HostIsActiveReplica checks whether host is an active replica
+func (s *ClusterSchemer) IsHostActiveReplica(ctx context.Context, hostToRunOn, hostToCheck *api.Host) bool {
+	replica := s.Name(interfaces.NameInstanceHostname, hostToCheck)
+	log.V(1).M(hostToRunOn).F().Info("Check active replica: %v at %v", replica, hostToRunOn.Runtime.Address.HostName)
+	active := false
+	res, err := s.QueryHostString(ctx, hostToRunOn, s.sqlIsReplicaActive(replica))
+	if err == nil && res == "0" {
+		log.V(1).M(hostToRunOn).F().Info("The host %s is not active", hostToCheck.GetName())
+		active = false
+	} else {
+		log.V(1).M(hostToRunOn).F().Info("The host %s is active", hostToCheck.GetName())
+		active = true
+	}
+	return active
+}
+
 // HostDropReplica calls SYSTEM DROP REPLICA
 func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host) error {
 	replica := s.Name(interfaces.NameInstanceHostname, hostToDrop)
 	shard := hostToRunOn.Runtime.Address.ShardIndex
 	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", replica, hostToRunOn.Runtime.Address.HostName)
-	return s.ExecHost(ctx, hostToRunOn, s.sqlDropReplica(shard, replica), clickhouse.NewQueryOptions().SetRetry(false))
+	return s.ExecHost(ctx, hostToRunOn, s.sqlDropReplica(shard, replica),
+		clickhouse.NewQueryOptions().SetRetry(false).SetLogQueries(true))
 }
 
 // createTablesSQLs makes all SQL for migrating tables
@@ -84,7 +101,7 @@ func (s *ClusterSchemer) createTablesSQLs(
 // HostCreateTables creates tables on a new host
 func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(1).Info("ctx is done")
 		return nil
 	}
 
@@ -100,14 +117,16 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.Host) e
 	if len(replicatedCreateSQLs) > 0 {
 		log.V(1).M(host).F().Info("Creating replicated objects at %s: %v", host.Runtime.Address.HostName, replicatedObjectNames)
 		log.V(2).M(host).F().Info("\n%v", replicatedCreateSQLs)
-		err1 = s.ExecHost(ctx, host, replicatedCreateSQLs, clickhouse.NewQueryOptions().SetRetry(true))
+		err1 = s.ExecHost(ctx, host, replicatedCreateSQLs,
+			clickhouse.NewQueryOptions().SetRetry(true).SetLogQueries(true))
 	}
 
 	var err2 error
 	if len(distributedCreateSQLs) > 0 {
 		log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Runtime.Address.HostName, distributedObjectNames)
 		log.V(2).M(host).F().Info("\n%v", distributedCreateSQLs)
-		err2 = s.ExecHost(ctx, host, distributedCreateSQLs, clickhouse.NewQueryOptions().SetRetry(true))
+		err2 = s.ExecHost(ctx, host, distributedCreateSQLs,
+			clickhouse.NewQueryOptions().SetRetry(true).SetLogQueries(true))
 	}
 
 	if err2 != nil {
@@ -124,7 +143,8 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.Host) e
 func (s *ClusterSchemer) HostDropTables(ctx context.Context, host *api.Host) error {
 	tableNames, dropTableSQLs, _ := s.sqlDropTable(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	return s.ExecHost(ctx, host, dropTableSQLs, clickhouse.NewQueryOptions().SetRetry(false))
+	return s.ExecHost(ctx, host, dropTableSQLs,
+		clickhouse.NewQueryOptions().SetRetry(false).SetLogQueries(true))
 }
 
 // IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
@@ -132,12 +152,12 @@ func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *api.Host) bo
 	inside := false
 	sql := s.sqlHostInCluster(host.Runtime.Address.ClusterName)
 	res, err := s.QueryHostString(ctx, host, sql)
-	if err == nil && res == "1" {
-		log.V(1).M(host).F().Info("The host %s is inside the cluster", host.GetName())
-		inside = true
-	} else {
+	if err == nil && res == "0" {
 		log.V(1).M(host).F().Info("The host %s is outside of the cluster", host.GetName())
 		inside = false
+	} else {
+		log.V(1).M(host).F().Info("The host %s is inside the cluster", host.GetName())
+		inside = true
 	}
 	return inside
 }
@@ -160,7 +180,8 @@ func (s *ClusterSchemer) HostMaxReplicaDelay(ctx context.Context, host *api.Host
 // HostShutdown shutdown a host
 func (s *ClusterSchemer) HostShutdown(ctx context.Context, host *api.Host) error {
 	log.V(1).M(host).F().Info("Host shutdown: %s", host.GetName())
-	return s.ExecHost(ctx, host, s.sqlShutDown(), clickhouse.NewQueryOptions().SetRetry(false))
+	return s.ExecHost(ctx, host, s.sqlShutDown(),
+		clickhouse.NewQueryOptions().SetRetry(false).SetLogQueries(true))
 }
 
 func debugCreateSQLs(names, sqls []string, err error) ([]string, []string) {

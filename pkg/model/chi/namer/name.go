@@ -144,9 +144,9 @@ func (n *Namer) createStatefulSetName(host *api.Host) string {
 	// PodTemplate may have personal name pattern specified
 	if template, ok := host.GetPodTemplate(); ok {
 		// PodTemplate available
-		if template.GenerateName != "" {
+		if template.HasGenerateName() {
 			// PodTemplate has explicitly specified name pattern
-			pattern = template.GenerateName
+			pattern = template.GetGenerateName()
 		}
 	}
 
@@ -306,4 +306,13 @@ func (n *Namer) createPVCName(host *api.Host, volumeMountName string) string {
 // createPVCNameByVolumeClaimTemplate creates PVC name
 func (n *Namer) createPVCNameByVolumeClaimTemplate(host *api.Host, volumeClaimTemplate *api.VolumeClaimTemplate) string {
 	return n.createPVCName(host, volumeClaimTemplate.Name)
+}
+
+// createClusterPDBName creates a name of a cluster-scope PDB
+func (n *Namer) createClusterPDBName(cluster api.ICluster) string {
+	// Start with default name pattern
+	pattern := patterns.Get(patternClusterPDBName)
+
+	// Create PDB name based on name pattern available
+	return n.macro.Scope(cluster).Line(pattern)
 }

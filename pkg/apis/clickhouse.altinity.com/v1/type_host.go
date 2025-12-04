@@ -127,30 +127,44 @@ func (host *Host) GetReconcileAttributes() *types.ReconcileAttributes {
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
-func (host *Host) InheritSettingsFrom(shard IShard, replica IReplica) {
+func (host *Host) InheritSettingsFrom(sources ...any) {
 	if host == nil {
 		return
 	}
-	if (shard != nil) && shard.HasSettings() {
-		host.Settings = host.Settings.MergeFrom(shard.GetSettings())
-	}
-
-	if (replica != nil) && replica.HasSettings() {
-		host.Settings = host.Settings.MergeFrom(replica.GetSettings())
+	for _, source := range sources {
+		switch typed := source.(type) {
+		case IShard:
+			shard := typed
+			if shard.HasSettings() {
+				host.Settings = host.Settings.MergeFrom(shard.GetSettings())
+			}
+		case IReplica:
+			replica := typed
+			if replica.HasSettings() {
+				host.Settings = host.Settings.MergeFrom(replica.GetSettings())
+			}
+		}
 	}
 }
 
 // InheritFilesFrom inherits files from specified shard and replica
-func (host *Host) InheritFilesFrom(shard IShard, replica IReplica) {
+func (host *Host) InheritFilesFrom(sources ...any) {
 	if host == nil {
 		return
 	}
-	if (shard != nil) && shard.HasFiles() {
-		host.Files = host.Files.MergeFrom(shard.GetFiles())
-	}
-
-	if (replica != nil) && replica.HasFiles() {
-		host.Files = host.Files.MergeFrom(replica.GetFiles())
+	for _, source := range sources {
+		switch typed := source.(type) {
+		case IShard:
+			shard := typed
+			if shard.HasFiles() {
+				host.Files = host.Files.MergeFrom(shard.GetFiles())
+			}
+		case IReplica:
+			replica := typed
+			if replica.HasFiles() {
+				host.Files = host.Files.MergeFrom(replica.GetFiles())
+			}
+		}
 	}
 }
 
@@ -280,6 +294,22 @@ func (host *Host) GetName() string {
 		return "host-is-nil"
 	}
 	return host.Name
+}
+
+// HasName checks whether host has a name
+func (host *Host) HasName() bool {
+	if host == nil {
+		return false
+	}
+	return len(host.GetName()) > 0
+}
+
+// SetName is a setter
+func (host *Host) SetName(name string) {
+	if host == nil {
+		return
+	}
+	host.Name = name
 }
 
 // GetCR gets CHI
@@ -460,13 +490,22 @@ func (host *Host) IsInsecure() bool {
 	return true
 }
 
-// IsFirst checks whether the host is the first host of the whole CHI
-func (host *Host) IsFirst() bool {
+// IsFirstInCR checks whether the host is the first host of the whole CHI
+func (host *Host) IsFirstInCR() bool {
 	if host == nil {
 		return false
 	}
 
 	return host.Runtime.Address.CHIScopeIndex == 0
+}
+
+// IsFirstInCluster checks whether the host is the first host of the cluster
+func (host *Host) IsFirstInCluster() bool {
+	if host == nil {
+		return false
+	}
+
+	return host.Runtime.Address.ClusterScopeIndex == 0
 }
 
 // IsFirst checks whether the host is the last host of the whole CHI

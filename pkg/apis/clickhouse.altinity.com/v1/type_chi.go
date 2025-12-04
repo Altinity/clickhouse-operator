@@ -171,7 +171,7 @@ func (cr *ClickHouseInstallation) FillStatus(endpoints util.Slice[string], pods,
 		ClustersCount:       cr.ClustersCount(),
 		ShardsCount:         cr.ShardsCount(),
 		HostsCount:          cr.HostsCount(),
-		TaskID:              cr.GetSpecT().GetTaskID(),
+		TaskID:              cr.GetSpecT().GetTaskID().Value(),
 		HostsUpdatedCount:   0,
 		HostsAddedCount:     0,
 		HostsUnchangedCount: 0,
@@ -376,7 +376,7 @@ func (cr *ClickHouseInstallation) GetServiceTemplates(names ...string) ([]*Servi
 	return nil, false
 }
 
-// GetRootServiceTemplate gets ServiceTemplate of a CR
+// GetRootServiceTemplates gets service templates of a CR
 func (cr *ClickHouseInstallation) GetRootServiceTemplates() ([]*ServiceTemplate, bool) {
 	if !cr.GetSpecT().GetDefaults().Templates.HasAnyServiceTemplate() {
 		return nil, false
@@ -432,7 +432,7 @@ func (cr *ClickHouseInstallation) IsAuto() bool {
 	return cr.GetSpecT().GetTemplating().GetPolicy() == TemplatingPolicyAuto
 }
 
-// IsStopped checks whether CHI is stopped
+// IsStopped checks whether CR is stopped
 func (cr *ClickHouseInstallation) IsStopped() bool {
 	if cr == nil {
 		return false
@@ -464,12 +464,12 @@ func (cr *ClickHouseInstallation) IsTroubleshoot() bool {
 	return cr.GetSpecT().GetTroubleshoot().Value()
 }
 
-// GetReconciling gets reconciling spec
-func (cr *ClickHouseInstallation) GetReconciling() *Reconciling {
+// GetReconcile gets reconcile spec
+func (cr *ClickHouseInstallation) GetReconcile() *ChiReconcile {
 	if cr == nil {
 		return nil
 	}
-	return cr.GetSpecT().Reconciling
+	return cr.GetSpecT().Reconcile
 }
 
 // Copy makes copy of a CHI, filtering fields according to specified CopyOptions

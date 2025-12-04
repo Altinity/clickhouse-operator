@@ -28,17 +28,25 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// waitForIPAddresses waits for all pods to get IP address assigned
 func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR polling IP: %s ", chi.GetName())
 		return
 	}
+
 	if chi.IsStopped() {
 		// No need to wait for stopped CHI
 		return
 	}
-	w.a.V(1).M(chi).F().S().Info("wait for IP addresses to be assigned to all pods")
+
+	l := w.a.V(1).M(chi)
+	l.F().S().Info("wait for IP addresses to be assigned to all pods")
+
+	// Let's limit polling time
 	start := time.Now()
+	timeout := 1 * time.Minute
+
 	w.c.poll(ctx, chi, func(c *api.ClickHouseInstallation, e error) bool {
 		// TODO fix later
 		// status IPs list can be empty
@@ -47,34 +55,31 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInst
 		//	cur.EnsureStatus().SetPodIPs(podIPs)
 		// and here
 		// c.Status.GetPodIPs()
-		podIPs := w.c.getPodsIPs(chi)
+		podIPs := w.c.getPodsIPs(ctx, chi)
 		if len(podIPs) >= len(c.Status.GetPods()) {
+			l.Info("all IP addresses are in place")
 			// Stop polling
-			w.a.V(1).M(c).Info("all IP addresses are in place")
 			return false
 		}
-		if time.Now().Sub(start) > 1*time.Minute {
+		if time.Since(start) > timeout {
+			l.Warning("not all IP addresses are in place but time has elapsed")
 			// Stop polling
-			w.a.V(1).M(c).Warning("not all IP addresses are in place but time has elapsed")
 			return false
 		}
+
+		l.Info("still waiting - not all IP addresses are in place yet")
+
 		// Continue polling
-		w.a.V(1).M(c).Warning("still waiting - not all IP addresses are in place yet")
 		return true
 	})
 }
 
 // excludeHost excludes host from ClickHouse clusters if required
 func (w *worker) excludeHost(ctx context.Context, host *api.Host) bool {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return false
-	}
-
 	log.V(1).M(host).F().S().Info("exclude host start")
 	defer log.V(1).M(host).F().E().Info("exclude host end")
 
-	if !w.shouldExcludeHost(host) {
+	if !w.shouldExcludeHost(ctx, host) {
 		w.a.V(1).
 			M(host).F().
 			Info("No need to exclude host from cluster. Host/shard/cluster: %d/%d/%s",
@@ -105,7 +110,7 @@ func (w *worker) completeQueries(ctx context.Context, host *api.Host) error {
 	return nil
 }
 
-// shouldIncludeHost determines whether host to be included into cluster after reconciling
+// shouldIncludeHost determines whether host to be included into cluster after reconcile
 func (w *worker) shouldIncludeHost(host *api.Host) bool {
 	switch {
 	case host.IsStopped():
@@ -115,6 +120,7 @@ func (w *worker) shouldIncludeHost(host *api.Host) bool {
 	return true
 }
 
+// shouldWaitReplicationHost determines whether host to waited for replication lag to catch-up
 func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 	switch {
 	case host.IsStopped():
@@ -138,28 +144,49 @@ func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
 
-	case chop.Config().Reconcile.Host.Wait.Replicas.All.Value():
-		// All replicas are explicitly requested to wait for replication to catch-up
+	case host.IsFirstInCluster():
+		w.a.V(1).
+			M(host).F().
+			Info("Host is the first on the cluster, no need to wait for replication to catch up. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return false
+
+	case chop.Config().Reconcile.Host.Wait.Replicas.All.IsTrue():
+		w.a.V(1).
+			M(host).F().
+			Info("All replicas are explicitly requested to wait for replication to catch-up")
 		return true
 
-	case chop.Config().Reconcile.Host.Wait.Replicas.New.Value():
-		// New replicas are explicitly requested to wait for replication to catch-up.
+	case chop.Config().Reconcile.Host.Wait.Replicas.New.IsTrue():
+		// New replicas have personal catch-up requirements
 		if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusCreated) {
-			// This is a new replica - certainly need to catch-up
+			w.a.V(1).
+				M(host).F().
+				Info("New replicas are explicitly requested to wait for replication to catch-up and this is a new host replica ")
 			return true
 		}
 
-		// This is not a new replica, it may have incomplete replication catch-up job still
+		// This is not a new replica.
+		// But this replica may have incomplete replication catch-up job still
 
+		// Whether replication is listed as caught-up earlier
 		if host.HasListedReplicaCaughtUp(w.c.namer.Name(interfaces.NameFQDN, host)) {
-			// Replica is already listed as caught, no need to catch-up again
+			w.a.V(1).
+				M(host).F().
+				Info("Replica is already listed as caught, no need to catch-up again")
 			return false
 		}
 
-		// Replica has never reached caught-up status, need to wait for replication to commence
+		// Host was seen before, but replication is not listed as caught-up, need to finish the replication
+		w.a.V(1).
+			M(host).F().
+			Info("Host replica has never reached caught-up status, need to wait for replication to commence")
 		return true
 	}
 
+	w.a.V(1).
+		M(host).F().
+		Info("Host replica is in unidentified replication position - report no need to catch-up ")
 	return false
 }
 
@@ -191,33 +218,18 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 
 // excludeHostFromService
 func (w *worker) excludeHostFromService(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	_ = w.c.ctrlLabeler.DeleteReadyMarkOnPodAndService(ctx, host)
 	return nil
 }
 
 // includeHostIntoService
 func (w *worker) includeHostIntoService(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	_ = w.c.ctrlLabeler.SetReadyMarkOnPodAndService(ctx, host)
 	return nil
 }
 
 // excludeHostFromClickHouseCluster excludes host from ClickHouse configuration
 func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api.Host) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	w.a.V(1).
 		M(host).F().
 		Info("going to exclude host. Host/shard/cluster: %d/%d/%s",
@@ -238,11 +250,6 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api
 
 // includeHostIntoClickHouseCluster includes host into ClickHouse configuration
 func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api.Host) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	w.a.V(1).
 		M(host).F().
 		Info("going to include host. Host/shard/cluster: %d/%d/%s",
@@ -271,12 +278,8 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api
 	_ = w.waitHostIsInCluster(ctx, host)
 }
 
+// descendHostInClickHouseCluster
 func (w *worker) descendHostInClickHouseCluster(ctx context.Context, host *api.Host) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	w.a.V(1).
 		M(host).F().
 		Info("going to descent host. Host/shard/cluster: %d/%d/%s",
@@ -290,12 +293,8 @@ func (w *worker) descendHostInClickHouseCluster(ctx context.Context, host *api.H
 	w.task.WaitForConfigMapPropagation(ctx, host)
 }
 
+// ascendHostInClickHouseCluster
 func (w *worker) ascendHostInClickHouseCluster(ctx context.Context, host *api.Host) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	w.a.V(1).
 		M(host).F().
 		Info("going to ascend host. Host/shard/cluster: %d/%d/%s",
@@ -309,6 +308,7 @@ func (w *worker) ascendHostInClickHouseCluster(ctx context.Context, host *api.Ho
 	w.task.WaitForConfigMapPropagation(ctx, host)
 }
 
+// catchReplicationLag
 func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error {
 	if !w.shouldWaitReplicationHost(host) {
 		w.a.V(1).
@@ -349,8 +349,8 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error 
 	return err
 }
 
-// shouldExcludeHost determines whether host to be excluded from cluster before reconciling
-func (w *worker) shouldExcludeHost(host *api.Host) bool {
+// shouldExcludeHost determines whether host to be excluded from cluster before reconcile
+func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 	switch {
 	case host.IsStopped():
 		w.a.V(1).
@@ -373,7 +373,7 @@ func (w *worker) shouldExcludeHost(host *api.Host) bool {
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
 
-	case w.shouldForceRestartHost(host):
+	case w.shouldForceRestartHost(ctx, host):
 		w.a.V(1).
 			M(host).F().
 			Info("Host should be restarted, need to exclude. Host/shard/cluster: %d/%d/%s",
@@ -395,25 +395,27 @@ func (w *worker) shouldExcludeHost(host *api.Host) bool {
 		return false
 	}
 
+	shouldExcludeHost := false
 	w.a.V(1).
 		M(host).F().
-		Info("Host should be excluded. Host/shard/cluster: %d/%d/%s",
+		Info("No explicit case on whether host should be excluded - going default %t. Host/shard/cluster: %d/%d/%s",
+			shouldExcludeHost,
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	return true
+	return shouldExcludeHost
 }
 
 // shouldWaitExcludeHost determines whether reconciler should wait for the host to be excluded from cluster
 func (w *worker) shouldWaitExcludeHost(host *api.Host) bool {
 	// Check CHI settings
 	switch {
-	case host.GetCR().GetReconciling().IsReconcilingPolicyWait():
+	case host.GetCR().GetReconcile().IsReconcilingPolicyWait():
 		w.a.V(1).
 			M(host).F().
 			Info("IsReconcilingPolicyWait() need to wait to exclude host. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return true
-	case host.GetCR().GetReconciling().IsReconcilingPolicyNoWait():
+	case host.GetCR().GetReconcile().IsReconcilingPolicyNoWait():
 		w.a.V(1).
 			M(host).F().
 			Info("IsReconcilingPolicyNoWait() need NOT to wait to exclude host. Host/shard/cluster: %d/%d/%s",
@@ -445,7 +447,7 @@ func (w *worker) shouldWaitQueries(host *api.Host) bool {
 				"Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return true
-	case host.GetCR().GetReconciling().IsReconcilingPolicyWait():
+	case host.GetCR().GetReconcile().IsReconcilingPolicyWait():
 		w.a.V(1).
 			M(host).F().
 			Info("Will wait for queries to complete on a host according to CHI 'reconciling.policy' setting. "+
@@ -476,10 +478,10 @@ func (w *worker) shouldWaitIncludeHostIntoClickHouseCluster(host *api.Host) bool
 	case host.GetShard().HostsCount() == 1:
 		// No need to wait one-host-shard
 		return false
-	case host.GetCR().GetReconciling().IsReconcilingPolicyWait():
+	case host.GetCR().GetReconcile().IsReconcilingPolicyWait():
 		// Check CHI settings - explicitly requested to wait
 		return true
-	case host.GetCR().GetReconciling().IsReconcilingPolicyNoWait():
+	case host.GetCR().GetReconcile().IsReconcilingPolicyNoWait():
 		// Check CHI settings - explicitly requested to not wait
 		return false
 	}
@@ -511,9 +513,9 @@ func (w *worker) waitHostHasNoReplicationDelay(ctx context.Context, host *api.Ho
 }
 
 // waitHostRestart
-func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, start map[string]int) error {
+func (w *worker) waitHostRestart(ctx context.Context, host *api.Host, restartCounters map[string]int) error {
 	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
-		return w.isPodRestarted(ctx, host, start)
+		return w.isPodRestarted(ctx, host, restartCounters)
 	})
 }
 

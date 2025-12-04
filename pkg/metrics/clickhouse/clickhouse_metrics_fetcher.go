@@ -38,14 +38,14 @@ const (
         	toString(value)           AS value,
         	''                        AS description,
         	'gauge'                   AS type
-    	FROM system.asynchronous_metrics
-    	UNION ALL
+    	FROM merge('system','^(metrics|custom_metrics)$')
+	    UNION ALL
     	SELECT
-	        concat('metric.', metric) AS metric,
-	        toString(value)           AS value,
-    	    ''                        AS description,
-	        'gauge'                   AS type
-	    FROM system.metrics
+        	concat('metric.', metric) AS metric,
+        	toString(value)           AS value,
+        	''                        AS description,
+        	'gauge'                   AS type
+    	FROM system.asynchronous_metrics
 	    UNION ALL
 	    SELECT
 	        concat('event.', event)   AS metric,

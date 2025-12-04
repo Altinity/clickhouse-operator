@@ -17,8 +17,10 @@ metadata:
   annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
 spec:
   ports:
+{{ if .Values.metrics.enabled }}
     - port: 8888
-      name: clickhouse-metrics
+      name: ch-metrics
+{{ end }}
     - port: 9999
-      name: operator-metrics
+      name: op-metrics
   selector: {{ include "altinity-clickhouse-operator.selectorLabels" . | nindent 4 }}

@@ -449,7 +449,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "max(chi_clickhouse_metric_NumberOfTables{chi=~\"$chi\",hostname=~\"$hostname\"})",
@@ -461,7 +461,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "max(chi_clickhouse_metric_NumberOfDatabases{chi=~\"$chi\",hostname=~\"$hostname\"})",

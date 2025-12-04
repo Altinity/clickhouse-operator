@@ -7,10 +7,8 @@ from requirements.requirements import *
 
 xfails = {
     # test_operator.py
-    #"/regression/e2e.test_operator/test_009*": [(Fail, "deal with it later")],
-    # "/regression/e2e.test_operator/test_014_0*": [(Fail, "Hidden properties fail prior 0.25.x")],
-    "/regression/e2e.test_operator/test_049*": [(Fail, "Keeper is flaky")],
-    "/regression/e2e.test_operator/test_052*": [(Fail, "Keeper scale-up/scale-down is flaky")],
+    "/regression/e2e.test_operator/test_020003*": [(Fail, "Keeper upgrade is flaky")],
+    "/regression/e2e.test_operator/test_020005*": [(Fail, "Keeper scale-up/scale-down is flaky")],
     # test_clickhouse.py
     "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
     # test_metrics_alerts.py

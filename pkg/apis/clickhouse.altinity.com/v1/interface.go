@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -31,7 +32,7 @@ type ICustomResource interface {
 	GetSpec() ICRSpec
 	GetRuntime() ICustomResourceRuntime
 	GetRootServiceTemplates() ([]*ServiceTemplate, bool)
-	GetReconciling() *Reconciling
+	GetReconcile() *ChiReconcile
 
 	WalkClusters(f func(cluster ICluster) error) []error
 	WalkHosts(func(host *Host) error) []error
@@ -67,6 +68,7 @@ type ICRSpec interface {
 	GetNamespaceDomainPattern() *types.String
 	GetDefaults() *Defaults
 	GetConfiguration() IConfiguration
+	GetTaskID() *types.Id
 }
 
 type IConfiguration interface {
@@ -110,11 +112,13 @@ type ICluster interface {
 	IsZero() bool
 
 	GetName() string
+	HasName() bool
 	GetZookeeper() *ZookeeperConfig
 	GetSchemaPolicy() *SchemaPolicy
 	GetInsecure() *types.StringBool
 	GetSecure() *types.StringBool
 	GetSecret() *ClusterSecret
+	GetPDBManaged() *types.StringBool
 	GetPDBMaxUnavailable() *types.Int32
 
 	WalkShards(f func(index int, shard IShard) error) []error
@@ -125,9 +129,10 @@ type ICluster interface {
 	FindShard(needle interface{}) IShard
 	FindHost(needleShard interface{}, needleHost interface{}) *Host
 
-	IsShardSpecified() bool
+	SelectSettingsSourceFrom(shard IShard, replica IReplica) any
 
 	GetRuntime() IClusterRuntime
+	GetReconcile() ClusterReconcile
 	GetServiceTemplate() (*ServiceTemplate, bool)
 	GetAncestor() ICluster
 }
@@ -277,4 +282,26 @@ type WalkHostsAddressFn func(
 type IGenerateName interface {
 	HasGenerateName() bool
 	GetGenerateName() string
+}
+
+type IActionPlan interface {
+	fmt.Stringer
+	HasActionsToDo() bool
+	GetRemovedHostsNum() int
+	Log(tag string) string
+	WalkRemoved(
+		clusterFunc func(cluster ICluster),
+		shardFunc func(shard IShard),
+		hostFunc func(host *Host),
+	)
+	WalkAdded(
+		clusterFunc func(cluster ICluster),
+		shardFunc func(shard IShard),
+		hostFunc func(host *Host),
+	)
+	WalkModified(
+		clusterFunc func(cluster ICluster),
+		shardFunc func(shard IShard),
+		hostFunc func(host *Host),
+	)
 }

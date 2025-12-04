@@ -18,6 +18,7 @@ import (
 	"context"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -25,7 +26,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func getLabeler(cr api.ICustomResource) interfaces.ILabeler {
@@ -33,32 +33,40 @@ func getLabeler(cr api.ICustomResource) interfaces.ILabeler {
 }
 
 func (c *Controller) discovery(ctx context.Context, cr api.ICustomResource) *model.Registry {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
+	l := log.V(1).M(cr).F()
 
-	opts := controller.NewListOptions(getLabeler(cr).Selector(interfaces.SelectorCRScope))
+	l.Info("Discovery")
+
+	// TODO
+	// Exclude
+	includeSelector := getLabeler(cr).Selector(interfaces.SelectorCRScope)
+	excludeSelector := labels.SelectorFromSet(getLabeler(cr).Label(interfaces.LabelConfigMapStorage))
+	opts := controller.NewListOptions(includeSelector)
+
+	l.Info("Discovery\ninclude: %s\nexclude: %s", includeSelector, excludeSelector)
+
 	r := model.NewRegistry()
 	c.discoveryStatefulSets(ctx, r, cr, opts)
-	c.discoveryConfigMaps(ctx, r, cr, opts)
+	c.discoveryConfigMaps(ctx, r, cr, opts, excludeSelector)
 	c.discoveryServices(ctx, r, cr, opts)
 	c.discoverySecrets(ctx, r, cr, opts)
 	c.discoveryPVCs(ctx, r, cr, opts)
 	// Comment out PV
 	//c.discoveryPVs(ctx, r, chi, opts)
 	c.discoveryPDBs(ctx, r, cr, opts)
+
+	l.Info("Discovery found %d objects", r.Len())
 	return r
 }
 
 func (c *Controller) discoveryStatefulSets(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
 	list, err := c.kube.STS().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
-		log.M(cr).F().Error("FAIL to list StatefulSet - err: %v", err)
+		log.V(1).M(cr).F().Error("FAIL to list StatefulSet - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(cr).F().Error("FAIL to list StatefulSet - list is nil")
+		log.V(1).M(cr).F().Error("FAIL to list StatefulSet - list is nil")
 		return
 	}
 	for _, obj := range list {
@@ -66,29 +74,34 @@ func (c *Controller) discoveryStatefulSets(ctx context.Context, r *model.Registr
 	}
 }
 
-func (c *Controller) discoveryConfigMaps(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
+func (c *Controller) discoveryConfigMaps(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions, exclude labels.Selector) {
 	list, err := c.kube.ConfigMap().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
-		log.M(cr).F().Error("FAIL to list ConfigMap - err: %v", err)
+		log.V(1).M(cr).F().Error("FAIL to list ConfigMap - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(cr).F().Error("FAIL to list ConfigMap - list is nil")
+		log.V(1).M(cr).F().Error("FAIL to list ConfigMap - list is nil")
 		return
 	}
 	for _, obj := range list {
-		r.RegisterConfigMap(obj.GetObjectMeta())
+		if exclude.Matches(labels.Set(obj.GetLabels())) {
+			log.V(1).M(cr).F().Info("Exclude ConfigMap from Discovery %s/%s", obj.GetNamespace(), obj.GetName())
+		} else {
+			log.V(1).M(cr).F().Info("Register ConfigMap in Discovery %s/%s", obj.GetNamespace(), obj.GetName())
+			r.RegisterConfigMap(obj.GetObjectMeta())
+		}
 	}
 }
 
 func (c *Controller) discoveryServices(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
 	list, err := c.kube.Service().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
-		log.M(cr).F().Error("FAIL to list Service - err: %v", err)
+		log.V(1).M(cr).F().Error("FAIL to list Service - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(cr).F().Error("FAIL to list Service - list is nil")
+		log.V(1).M(cr).F().Error("FAIL to list Service - list is nil")
 		return
 	}
 	for _, obj := range list {
@@ -99,11 +112,11 @@ func (c *Controller) discoveryServices(ctx context.Context, r *model.Registry, c
 func (c *Controller) discoverySecrets(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
 	list, err := c.kube.Secret().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
-		log.M(cr).F().Error("FAIL to list Secret - err: %v", err)
+		log.V(1).M(cr).F().Error("FAIL to list Secret - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(cr).F().Error("FAIL to list Secret - list is nil")
+		log.V(1).M(cr).F().Error("FAIL to list Secret - list is nil")
 		return
 	}
 	for _, obj := range list {
@@ -114,11 +127,11 @@ func (c *Controller) discoverySecrets(ctx context.Context, r *model.Registry, cr
 func (c *Controller) discoveryPVCs(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
 	list, err := c.kube.Storage().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
-		log.M(cr).F().Error("FAIL to list PVC - err: %v", err)
+		log.V(1).M(cr).F().Error("FAIL to list PVC - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(cr).F().Error("FAIL to list PVC - list is nil")
+		log.V(1).M(cr).F().Error("FAIL to list PVC - list is nil")
 		return
 	}
 	for _, obj := range list {
@@ -145,11 +158,11 @@ func (c *Controller) discoveryPVCs(ctx context.Context, r *model.Registry, cr ap
 func (c *Controller) discoveryPDBs(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
 	list, err := c.kube.PDB().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
-		log.M(cr).F().Error("FAIL to list PDB - err: %v", err)
+		log.V(1).M(cr).F().Error("FAIL to list PDB - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(cr).F().Error("FAIL to list PDB - list is nil")
+		log.V(1).M(cr).F().Error("FAIL to list PDB - list is nil")
 		return
 	}
 	for _, obj := range list {

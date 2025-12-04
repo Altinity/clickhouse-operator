@@ -1,0 +1,12 @@
+# test_023
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: set-labels
+  labels:
+    my-label: test
+spec:
+  templating:
+    policy: auto

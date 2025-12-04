@@ -117,7 +117,21 @@ func (w *worker) processReconcileChopConfig(cmd *cmd_queue.ReconcileChopConfig) 
 func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *cmd_queue.ReconcileEndpoints) error {
 	switch cmd.Cmd {
 	case cmd_queue.ReconcileUpdate:
-		return w.updateEndpoints(ctx, cmd.Old, cmd.New)
+		w.a.V(1).M(cmd.New).F().Info("Reconcile Endpoints. %s/%s", cmd.New.Namespace, cmd.New.Name)
+		return w.updateEndpoints(ctx, cmd.New.GetObjectMeta())
+	}
+
+	// Unknown item type, don't know what to do with it
+	// Just skip it and behave like it never existed
+	utilRuntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
+	return nil
+}
+
+func (w *worker) processReconcileEndpointSlice(ctx context.Context, cmd *cmd_queue.ReconcileEndpointSlice) error {
+	switch cmd.Cmd {
+	case cmd_queue.ReconcileUpdate:
+		w.a.V(1).M(cmd.New).F().Info("Reconcile EndpointSlice. %s/%s Transition: '%s'=>'%s'", cmd.New.Namespace, cmd.New.Name, buildComparableEndpointAddresses(cmd.Old), buildComparableEndpointAddresses(cmd.New))
+		return w.updateEndpoints(ctx, cmd.New.GetObjectMeta())
 	}
 
 	// Unknown item type, don't know what to do with it
@@ -152,7 +166,7 @@ func (w *worker) processReconcilePod(ctx context.Context, cmd *cmd_queue.Reconci
 // processItem processes one work item according to its type
 func (w *worker) processItem(ctx context.Context, item interface{}) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted")
 		return nil
 	}
 
@@ -168,6 +182,8 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 		return w.processReconcileChopConfig(cmd)
 	case *cmd_queue.ReconcileEndpoints:
 		return w.processReconcileEndpoints(ctx, cmd)
+	case *cmd_queue.ReconcileEndpointSlice:
+		return w.processReconcileEndpointSlice(ctx, cmd)
 	case *cmd_queue.ReconcilePod:
 		return w.processReconcilePod(ctx, cmd)
 	}

@@ -1,0 +1,29 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-058-chopconf-root-ca"
+spec:
+  clickhouse:
+    access:
+      scheme: https  # Use HTTPS for connecting to ClickHouse
+      rootCA: |-
+        -----BEGIN CERTIFICATE-----
+        MIIDFzCCAf+gAwIBAgIUKPAilo3+YvoeiIkvieiBp5GaXYUwDQYJKoZIhvcNAQEL
+        BQAwGzEZMBcGA1UEAwwQbWFyc25ldC5sb2NhbCBDQTAeFw0yNTA2MTkxMzE1MDda
+        Fw0yODA2MTgxMzE1MDdaMBsxGTAXBgNVBAMMEG1hcnNuZXQubG9jYWwgQ0EwggEi
+        MA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCv5k1vd7s1KrPnENFB9Tw0dtYT
+        wlIzpulIKuXmbEGNXIB9SEV69A7UxUZrwF585kFX91LVq+SOb3WD0/KWjs7N+hXq
+        RLiLuObBVrehoFFRHUca/JZS3Gz9Wsrlsr8twnX5pxavfmnhXOdw/+3P47e22kQ8
+        zeAKaSfJ2wF9U9gic/uQWZmLUohrUaT0AejSQpXMm2dlk4ZhBos5BnDbQ+R+rsXu
+        WiTR4aS3W5Not/mV9neVJZpv2k5+02G0Wdhwy93Q44kEezSVBnSz3hvzEI5RmA72
+        LhqTR/Z3y7wZf57vxkqKjqaampwzIhFxtcpAl3j+UVHPV7WkrJ59OkfaxLdtAgMB
+        AAGjUzBRMB0GA1UdDgQWBBSPxwYV5VGN3/J5N8ipfzefxQyvAjAfBgNVHSMEGDAW
+        gBSPxwYV5VGN3/J5N8ipfzefxQyvAjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3
+        DQEBCwUAA4IBAQCAKisQ/Ez9t88CzbrKkC4MA7rqLvHwV33sC9ttbsILk5kwvlyQ
+        yeeVYme6+KyK28UzuvUQrge6+JY4a33ki4G+gcltXHUaCxSWMGl20Kx++533uH4W
+        bLXmEPDsR1iPh+sl+3zJBs/aH3HSovBeaLu0pFRupKW5HWDDxgBz92JLVHfqHfY5
+        U4bHqOiLopbcRKOQTRAqP9IQsbCmVr4PU8/LWvdMWrYTpn5IIcq1CD0GpunQBxv1
+        N7YosHN5QijMvdHVTdR1B7m3ylJa5cVUPaR6HDrDkXJibaFdZBa0eIXZc3KwTon3
+        q/+BIPQNS7JiXY82j8OC2HcPFSuS7t5wqcQN
+        -----END CERTIFICATE-----
+

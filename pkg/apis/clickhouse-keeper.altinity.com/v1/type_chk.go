@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
@@ -376,7 +377,7 @@ func (cr *ClickHouseKeeperInstallation) GetServiceTemplates(names ...string) ([]
 	return nil, false
 }
 
-// GetRootServiceTemplates gets ServiceTemplates of a CR
+// GetRootServiceTemplates gets service templates of a CR
 func (cr *ClickHouseKeeperInstallation) GetRootServiceTemplates() ([]*apiChi.ServiceTemplate, bool) {
 	if !cr.GetSpecT().GetDefaults().Templates.HasAnyServiceTemplate() {
 		return nil, false
@@ -420,7 +421,7 @@ func (cr *ClickHouseKeeperInstallation) IsAuto() bool {
 	return false
 }
 
-// IsStopped checks whether CHI is stopped
+// IsStopped checks whether CR is stopped
 func (cr *ClickHouseKeeperInstallation) IsStopped() bool {
 	return false
 }
@@ -435,12 +436,12 @@ func (cr *ClickHouseKeeperInstallation) IsTroubleshoot() bool {
 	return false
 }
 
-// GetReconciling gets reconciling spec
-func (cr *ClickHouseKeeperInstallation) GetReconciling() *apiChi.Reconciling {
+// GetReconcile gets reconcile spec
+func (cr *ClickHouseKeeperInstallation) GetReconcile() *apiChi.ChiReconcile {
 	if cr == nil {
 		return nil
 	}
-	return cr.GetSpecT().Reconciling
+	return cr.GetSpecT().Reconcile
 }
 
 // Copy makes copy of a CHI, filtering fields according to specified CopyOptions
@@ -689,4 +690,26 @@ func (cr *ClickHouseKeeperInstallation) IsNonZero() bool {
 
 func (cr *ClickHouseKeeperInstallation) NamespaceName() (string, string) {
 	return util.NamespaceName(cr)
+}
+
+func (cr *ClickHouseKeeperInstallation) FindMinMaxVersions() {
+	cr.runtime.MinVersion = swversion.MaxVersion()
+	cr.runtime.MaxVersion = swversion.MinVersion()
+	cr.WalkHosts(func(host *apiChi.Host) error {
+		if host.Runtime.Version.Cmp(cr.runtime.MinVersion) < 0 {
+			cr.runtime.MinVersion = host.Runtime.Version
+		}
+		if host.Runtime.Version.Cmp(cr.runtime.MaxVersion) > 0 {
+			cr.runtime.MaxVersion = host.Runtime.Version
+		}
+		return nil
+	})
+}
+
+func (cr *ClickHouseKeeperInstallation) GetMinVersion() *swversion.SoftWareVersion {
+	return cr.runtime.MinVersion
+}
+
+func (cr *ClickHouseKeeperInstallation) GetMaxVersion() *swversion.SoftWareVersion {
+	return cr.runtime.MaxVersion
 }

@@ -161,7 +161,7 @@ func (cm *ConfigManager) getAllCRBasedConfigs(namespace string) {
 
 				cm.crConfigs = append(cm.crConfigs, &chOperatorConfiguration.Spec)
 
-				log.V(1).F().Error("Append ClickHouseOperatorConfigurations '%s/%s'.", namespace, name)
+				log.V(1).F().Info("Append ClickHouseOperatorConfigurations '%s/%s'.", namespace, name)
 				continue
 			}
 		}
@@ -340,6 +340,7 @@ func (cm *ConfigManager) listSupportedEnvVarNames() []string {
 
 		deployment.WATCH_NAMESPACE,
 		deployment.WATCH_NAMESPACES,
+		deployment.WATCH_NAMESPACES_EXCLUDE,
 	}
 }
 

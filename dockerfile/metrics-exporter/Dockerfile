@@ -2,7 +2,9 @@
 # ===== Builder =====
 # ===================
 
-FROM --platform=${BUILDPLATFORM} golang:1.23 AS builder
+ARG GO_VERSION
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION:-latest} AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -11,15 +13,18 @@ ARG GCFLAGS
 # Install required packages
 RUN apt-get update && \
     apt-get install -y apt-utils && \
-    apt-get install -y gettext-base wget
+    apt-get install -y gettext-base wget xz-utils
 RUN wget -O /usr/bin/yq --progress=bar:force:noscroll "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64" && \
     chmod +x /usr/bin/yq
 RUN PLATFORM="x86_64" && if [ "${TARGETARCH}" = "arm64" ]; then PLATFORM="aarch64"; fi && \
     wget -O /tmp/bash --progress=bar:force:noscroll "https://github.com/robxu9/bash-static/releases/latest/download/bash-linux-${PLATFORM}" && \
     chmod +x /tmp/bash
-RUN PLATFORM="amd64" && if [ "${TARGETARCH}" = "arm64" ]; then PLATFORM="aarch64"; fi && \
-    wget -O /tmp/curl --progress=bar:force:noscroll "https://github.com/moparisthebest/static-curl/releases/latest/download/curl-${PLATFORM}" && \
-    chmod +x /tmp/curl
+RUN PLATFORM="x86_64" && if [ "${TARGETARCH}" = "arm64" ]; then PLATFORM="aarch64"; fi && \
+    CURL_VERSION=$(wget -qO- https://github.com/stunnel/static-curl/releases/latest 2>&1 | grep -oE 'tag/[0-9.]+' | head -n1 | cut -d'/' -f2) && \
+    wget -O /tmp/curl.tar.xz --progress=bar:force:noscroll "https://github.com/stunnel/static-curl/releases/download/${CURL_VERSION}/curl-linux-${PLATFORM}-glibc-${CURL_VERSION}.tar.xz" && \
+    tar -xf /tmp/curl.tar.xz -C /tmp/ && \
+    chmod +x /tmp/curl && \
+    rm -f /tmp/curl.tar.xz
 
 # Reconstruct source tree inside docker
 WORKDIR /clickhouse-operator
@@ -34,7 +39,7 @@ RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter bash -xe ./dev/go_build_metrics_e
 # ===================
 # == Delve builder ==
 # ===================
-FROM --platform=${BUILDPLATFORM} golang:1.23 AS delve-builder
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION:-latest} AS delve-builder
 RUN CGO_ENABLED=0 GO111MODULE=on GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
     go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest && \
     rm -rf /root/.cache/go-build/ /go/pkg/mod/

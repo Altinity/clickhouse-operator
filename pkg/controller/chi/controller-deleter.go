@@ -25,7 +25,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // deleteHost deletes all kubernetes resources related to replica *chop.Host
@@ -45,11 +44,6 @@ func (c *Controller) deleteHost(ctx context.Context, host *api.Host) error {
 
 // deleteConfigMapsCHI
 func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *api.ClickHouseInstallation) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// Delete common ConfigMap's
 	//
 	// chi-b3d29f-common-configd   2      61s
@@ -88,11 +82,6 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *api.ClickHous
 
 // statefulSetDeletePod delete a pod of a StatefulSet. This requests StatefulSet to relaunch deleted pod
 func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps.StatefulSet, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	name := c.namer.Name(interfaces.NamePod, statefulSet)
 	log.V(1).M(host).Info("Delete Pod %s/%s", statefulSet.Namespace, name)
 	err := c.kube.Pod().Delete(ctx, statefulSet.Namespace, name)
@@ -109,11 +98,6 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 }
 
 func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	name := c.namer.Name(interfaces.NameStatefulSet, host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
@@ -122,11 +106,6 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.Host) erro
 
 // deleteConfigMap deletes ConfigMap
 func (c *Controller) deleteConfigMap(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	name := c.namer.Name(interfaces.NameConfigMapHost, host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
@@ -143,11 +122,6 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *api.Host) error 
 
 // deleteServiceHost deletes Service
 func (c *Controller) deleteServiceHost(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	serviceName := c.namer.Name(interfaces.NameStatefulSetService, host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, serviceName)
@@ -156,11 +130,6 @@ func (c *Controller) deleteServiceHost(ctx context.Context, host *api.Host) erro
 
 // deleteServiceShard
 func (c *Controller) deleteServiceShard(ctx context.Context, shard *api.ChiShard) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	serviceName := c.namer.Name(interfaces.NameShardService, shard)
 	namespace := shard.Runtime.Address.Namespace
 	log.V(1).M(shard).F().Info("%s/%s", namespace, serviceName)
@@ -169,11 +138,6 @@ func (c *Controller) deleteServiceShard(ctx context.Context, shard *api.ChiShard
 
 // deleteServiceCluster
 func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *api.Cluster) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	serviceName := c.namer.Name(interfaces.NameClusterService, cluster)
 	namespace := cluster.Runtime.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, serviceName)
@@ -182,11 +146,6 @@ func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *api.Clus
 
 // deleteServiceCR
 func (c *Controller) deleteServiceCR(ctx context.Context, cr api.ICustomResource) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	if templates, ok := cr.GetRootServiceTemplates(); ok {
 		for _, template := range templates {
 			serviceName := c.namer.Name(interfaces.NameCRService, cr, template)
@@ -206,11 +165,6 @@ func (c *Controller) deleteServiceCR(ctx context.Context, cr api.ICustomResource
 
 // deleteSecretCluster
 func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *api.Cluster) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	secretName := c.namer.Name(interfaces.NameClusterAutoSecret, cluster)
 	namespace := cluster.Runtime.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, secretName)
@@ -219,11 +173,6 @@ func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *api.Clust
 
 // deleteSecretIfExists deletes Secret in case it does not exist
 func (c *Controller) deleteSecretIfExists(ctx context.Context, namespace, name string) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// Check specified service exists
 	_, err := c.kube.Secret().Get(ctx, &core.Secret{
 		ObjectMeta: meta.ObjectMeta{

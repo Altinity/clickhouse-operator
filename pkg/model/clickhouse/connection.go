@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-
 	goch "github.com/mailru/go-clickhouse/v2"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -33,14 +32,15 @@ import (
 const clickHouseDriverName = "chhttp"
 
 func init() {
-	goch.RegisterTLSConfig(tlsSettings, &tls.Config{InsecureSkipVerify: true})
+	setupTLSBasic()
 }
 
 // Connection specifies clickhouse database connection object
 type Connection struct {
-	params *EndpointConnectionParams
-	db     *sql.DB
-	l      log.Announcer
+	params      *EndpointConnectionParams
+	dbPrimary   *sql.DB
+	dbSecondary *sql.DB
+	l           log.Announcer
 }
 
 // NewConnection creates new clickhouse connection
@@ -73,29 +73,53 @@ func (c *Connection) SetLog(l log.Announcer) *Connection {
 // connect performs connect
 func (c *Connection) connect(ctx context.Context) {
 	// ClickHouse connection may have custom TLS options specified
-	c.setupTLS()
+	c.setupTLSAdvanced()
 
 	c.l.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
-	dbConnection, err := sql.Open(clickHouseDriverName, c.params.GetDSN())
+	dbPrimaryConn, err := sql.Open(clickHouseDriverName, c.params.GetDSN())
 	if err != nil {
 		c.l.V(1).F().Error("FAILED Open(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		return
 	}
 
-	// Ping should have timeout
-	pingCtx, cancel := context.WithTimeout(c.ensureCtx(ctx), c.params.GetConnectTimeout())
-	defer cancel()
-
-	if err := dbConnection.PingContext(pingCtx); err != nil {
-		c.l.V(1).F().Error("FAILED Ping(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
-		_ = dbConnection.Close()
+	dbSecondaryConn, err := sql.Open(clickHouseDriverName, c.params.GetDSNLogQueries())
+	if err != nil {
+		c.l.V(1).F().Error("FAILED Open2(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		return
 	}
 
-	c.db = dbConnection
+	// Ping should have timeout
+	pingCtxPrimary, cancel1 := context.WithTimeout(c.ensureCtx(ctx), c.params.GetConnectTimeout())
+	defer cancel1()
+
+	if err := dbPrimaryConn.PingContext(pingCtxPrimary); err != nil {
+		c.l.V(1).F().Error("FAILED Ping(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
+		_ = dbPrimaryConn.Close()
+		_ = dbSecondaryConn.Close()
+		return
+	}
+
+	pingCtxSecondary, cancel2 := context.WithTimeout(c.ensureCtx(ctx), c.params.GetConnectTimeout())
+	defer cancel2()
+
+	if err := dbSecondaryConn.PingContext(pingCtxSecondary); err != nil {
+		c.l.V(1).F().Error("FAILED Ping2(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
+		_ = dbPrimaryConn.Close()
+		_ = dbSecondaryConn.Close()
+		return
+	}
+
+	c.dbPrimary = dbPrimaryConn
+	c.dbSecondary = dbSecondaryConn
 }
 
-func (c *Connection) setupTLS() {
+func setupTLSBasic() {
+	goch.RegisterTLSConfig(tlsSettings, &tls.Config{
+		InsecureSkipVerify: true,
+	})
+}
+
+func (c *Connection) setupTLSAdvanced() {
 	// Convenience wrapper
 	certString := c.params.rootCA
 
@@ -108,7 +132,7 @@ func (c *Connection) setupTLS() {
 	certBytes, err := base64.StdEncoding.DecodeString(certString)
 	if err != nil {
 		// No, it is not
-		c.l.V(1).F().Info("CERT is not base64-encoded err: %v", err)
+		c.l.V(1).F().Info("CERT is not Base64-encoded err: %v", err)
 		// Treat provided cert string as PEM-encoded
 		certBytes = []byte(certString)
 	}
@@ -117,10 +141,11 @@ func (c *Connection) setupTLS() {
 	block, _ := pem.Decode(certBytes)
 	if block != nil {
 		// Yes, it is
+		c.l.V(1).F().Info("CERT is PEM-encoded")
 		certBytes = block.Bytes
 	} else {
 		// No, it is not
-		c.l.V(1).F().Info("CERT is not pem-encoded")
+		c.l.V(1).F().Info("CERT is not PEM-encoded")
 		// Treat cert string as DER-encoded
 		certBytes = []byte(certString)
 	}
@@ -138,7 +163,8 @@ func (c *Connection) setupTLS() {
 
 	// Setup TLS
 	err = goch.RegisterTLSConfig(tlsSettings, &tls.Config{
-		RootCAs: rootCAs,
+		RootCAs:            rootCAs,
+		InsecureSkipVerify: true, // TODO: Make it configurable
 	})
 	if err != nil {
 		c.l.V(1).F().Error("unable to register TLS config err: %v", err)
@@ -150,14 +176,14 @@ func (c *Connection) setupTLS() {
 
 // ensureConnected ensures connection is set
 func (c *Connection) ensureConnected(ctx context.Context) bool {
-	if c.db != nil {
+	if c.dbPrimary != nil {
 		c.l.V(2).F().Info("Already connected: %s", c.params.GetDSNWithHiddenCredentials())
 		return true
 	}
 
 	c.connect(ctx)
 
-	return c.db != nil
+	return c.dbPrimary != nil
 }
 
 // QueryContext runs given sql query on behalf of specified context
@@ -179,7 +205,7 @@ func (c *Connection) QueryContext(ctx context.Context, sql string) (*QueryResult
 	// Query should have timeout
 	queryCtx, cancel := context.WithTimeout(c.ensureCtx(ctx), c.params.GetQueryTimeout())
 
-	rows, err := c.db.QueryContext(queryCtx, sql)
+	rows, err := c.dbPrimary.QueryContext(queryCtx, sql)
 	if err != nil {
 		cancel()
 		s := fmt.Sprintf("FAILED Query(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
@@ -228,7 +254,12 @@ func (c *Connection) Exec(_ctx context.Context, sql string, opts *QueryOptions) 
 		return fmt.Errorf(s)
 	}
 
-	_, err := c.db.ExecContext(ctx, sql)
+	db := c.dbPrimary
+	if opts.GetLogQueries() {
+		db = c.dbSecondary
+	}
+
+	_, err := db.ExecContext(ctx, sql)
 
 	if err != nil {
 		cancel()

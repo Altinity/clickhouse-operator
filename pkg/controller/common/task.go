@@ -86,16 +86,16 @@ func (t *Task) WaitForConfigMapPropagation(ctx context.Context, host *api.Host) 
 
 	// What timeout is expected to be enough for ConfigMap propagation?
 	// In case timeout is not specified, no need to wait
-	if !host.GetCR().GetReconciling().HasConfigMapPropagationTimeout() {
+	if !host.GetCR().GetReconcile().HasConfigMapPropagationTimeout() {
 		log.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable due to missing timeout value")
 		return false
 	}
 
-	timeout := host.GetCR().GetReconciling().GetConfigMapPropagationTimeoutDuration()
+	timeout := host.GetCR().GetReconcile().GetConfigMapPropagationTimeoutDuration()
 
 	// How much time has elapsed since last ConfigMap update?
 	// May be there is no need to wait already
-	elapsed := time.Now().Sub(t.CmUpdate())
+	elapsed := time.Since(t.CmUpdate())
 	if elapsed >= timeout {
 		log.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. [elapsed/timeout: %s/%s]", elapsed, timeout)
 		return false

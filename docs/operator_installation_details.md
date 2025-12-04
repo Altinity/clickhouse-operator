@@ -59,12 +59,12 @@ since 0.20.1 version official clickhouse-operator helm chart, also available
 
 installation
 ```bash
-helm repo add clickhouse-operator https://docs.altinity.com/clickhouse-operator/
+helm repo add clickhouse-operator https://helm.altinity.com
 helm install clickhouse-operator clickhouse-operator/altinity-clickhouse-operator
 ```
 upgrade
 ```bash
-helm repo upgrade clickhouse-operator
+helm repo update clickhouse-operator
 helm upgrade clickhouse-operator clickhouse-operator/altinity-clickhouse-operator
 ```
 

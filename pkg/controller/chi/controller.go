@@ -18,6 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -25,6 +27,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeTypes "k8s.io/apimachinery/pkg/types"
@@ -36,8 +39,6 @@ import (
 	typedCore "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-
-	"github.com/altinity/queue"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -53,10 +54,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/queue"
 )
 
 // Controller defines CRO controller
@@ -170,7 +171,7 @@ func (c *Controller) addEventHandlersCHI(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chi := obj.(*api.ClickHouseInstallation)
-			if !chop.Config().IsWatchedNamespace(chi.Namespace) {
+			if !chop.Config().IsNamespaceWatched(chi.Namespace) {
 				return
 			}
 			log.V(3).M(chi).Info("chiInformer.DeleteFunc")
@@ -185,7 +186,8 @@ func (c *Controller) addEventHandlersCHIT(
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chit := obj.(*api.ClickHouseInstallationTemplate)
-			if !chop.Config().IsWatchedNamespace(chit.Namespace) {
+			if !chop.Config().IsNamespaceWatched(chit.Namespace) {
+				log.V(2).M(chit).Info("chitInformer: skip event, namespace '%s' is not watched or is in deny list", chit.Namespace)
 				return
 			}
 			log.V(3).M(chit).Info("chitInformer.AddFunc")
@@ -194,7 +196,7 @@ func (c *Controller) addEventHandlersCHIT(
 		UpdateFunc: func(old, new interface{}) {
 			oldChit := old.(*api.ClickHouseInstallationTemplate)
 			newChit := new.(*api.ClickHouseInstallationTemplate)
-			if !chop.Config().IsWatchedNamespace(newChit.Namespace) {
+			if !chop.Config().IsNamespaceWatched(newChit.Namespace) {
 				return
 			}
 			log.V(3).M(newChit).Info("chitInformer.UpdateFunc")
@@ -202,7 +204,7 @@ func (c *Controller) addEventHandlersCHIT(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chit := obj.(*api.ClickHouseInstallationTemplate)
-			if !chop.Config().IsWatchedNamespace(chit.Namespace) {
+			if !chop.Config().IsNamespaceWatched(chit.Namespace) {
 				return
 			}
 			log.V(3).M(chit).Info("chitInformer.DeleteFunc")
@@ -217,7 +219,8 @@ func (c *Controller) addEventHandlersChopConfig(
 	chopInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chopConfig := obj.(*api.ClickHouseOperatorConfiguration)
-			if !chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
+			if !chop.Config().IsNamespaceWatched(chopConfig.Namespace) {
+				log.V(2).M(chopConfig).Info("chopInformer: skip event, namespace '%s' is not watched or is in deny list", chopConfig.Namespace)
 				return
 			}
 			log.V(3).M(chopConfig).Info("chopInformer.AddFunc")
@@ -226,7 +229,7 @@ func (c *Controller) addEventHandlersChopConfig(
 		UpdateFunc: func(old, new interface{}) {
 			newChopConfig := new.(*api.ClickHouseOperatorConfiguration)
 			oldChopConfig := old.(*api.ClickHouseOperatorConfiguration)
-			if !chop.Config().IsWatchedNamespace(newChopConfig.Namespace) {
+			if !chop.Config().IsNamespaceWatched(newChopConfig.Namespace) {
 				return
 			}
 			log.V(3).M(newChopConfig).Info("chopInformer.UpdateFunc")
@@ -234,7 +237,7 @@ func (c *Controller) addEventHandlersChopConfig(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chopConfig := obj.(*api.ClickHouseOperatorConfiguration)
-			if !chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
+			if !chop.Config().IsNamespaceWatched(chopConfig.Namespace) {
 				return
 			}
 			log.V(3).M(chopConfig).Info("chopInformer.DeleteFunc")
@@ -306,9 +309,11 @@ func checkIP(path *messagediff.Path, iValue interface{}) bool {
 	return false
 }
 
-func updated(old, new *core.Endpoints) bool {
+func isUpdatedEndpoints(old, new *core.Endpoints) bool {
 	oldSubsets := normalizeEndpoints(old).Subsets
 	newSubsets := normalizeEndpoints(new).Subsets
+
+	log.V(2).M(new).F().Info("Check whether is updated Endpoints. %s/%s", new.Namespace, new.Name)
 
 	diff, equal := messagediff.DeepDiff(oldSubsets[0].Addresses, newSubsets[0].Addresses)
 	if equal {
@@ -335,14 +340,44 @@ func updated(old, new *core.Endpoints) bool {
 	}
 
 	if assigned {
-		log.V(2).M(old).Info("endpointsInformer.UpdateFunc: IP ASSIGNED: %s", litter.Sdump(new.Subsets))
+		log.V(1).M(old).Info("endpointsInformer.UpdateFunc: IP ASSIGNED: %s", litter.Sdump(new.Subsets))
 		return true
 	}
 
 	return false
 }
 
-func (c *Controller) addEventHandlersEndpoint(
+func isUpdatedEndpointSlice(old, new *discovery.EndpointSlice) bool {
+	log.V(2).M(new).F().Info("Check whether is updated EndpointSlice. %s/%s Transition: '%s'=>'%s'", new.Namespace, new.Name, buildComparableEndpointAddresses(old), buildComparableEndpointAddresses(new))
+	return buildComparableEndpointAddresses(old) != buildComparableEndpointAddresses(new)
+}
+
+func buildComparableEndpointAddresses(epSlice *discovery.EndpointSlice) string {
+	return strings.Join(fetchUniqueReadyAddresses(epSlice), ",")
+}
+
+// fetchUniqueReadyAddresses returns sorted list of ready addresses
+func fetchUniqueReadyAddresses(epSlice *discovery.EndpointSlice) (res []string) {
+	if epSlice == nil {
+		return nil
+	}
+	// Extract ready addresses from endpoints
+	for _, ep := range epSlice.Endpoints {
+		if (ep.Conditions.Ready != nil) && (*ep.Conditions.Ready == false) {
+			// Skip not-ready address
+			continue
+		}
+		res = append(res, ep.Addresses...)
+	}
+	// Be ready for duplicate endpoints, though
+	res = util.Unique(res)
+	// And unique does not preserve order
+	sort.Strings(res)
+
+	return res
+}
+
+func (c *Controller) addEventHandlersEndpoints(
 	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) {
 	kubeInformerFactory.Core().V1().Endpoints().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -360,7 +395,7 @@ func (c *Controller) addEventHandlersEndpoint(
 				return
 			}
 			log.V(3).M(newEndpoints).Info("endpointsInformer.UpdateFunc")
-			if updated(oldEndpoints, newEndpoints) {
+			if isUpdatedEndpoints(oldEndpoints, newEndpoints) {
 				c.enqueueObject(cmd_queue.NewReconcileEndpoints(cmd_queue.ReconcileUpdate, oldEndpoints, newEndpoints))
 			}
 		},
@@ -370,6 +405,38 @@ func (c *Controller) addEventHandlersEndpoint(
 				return
 			}
 			log.V(3).M(endpoints).Info("endpointsInformer.DeleteFunc")
+		},
+	})
+}
+
+func (c *Controller) addEventHandlersEndpointSlice(
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
+) {
+	kubeInformerFactory.Discovery().V1().EndpointSlices().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			endpointSlice := obj.(*discovery.EndpointSlice)
+			if !c.isTrackedObject(&endpointSlice.ObjectMeta) {
+				return
+			}
+			log.V(3).M(endpointSlice).Info("endpointSliceInformer.AddFunc")
+		},
+		UpdateFunc: func(old, new interface{}) {
+			oldEndpointSlice := old.(*discovery.EndpointSlice)
+			newEndpointSlice := new.(*discovery.EndpointSlice)
+			if !c.isTrackedObject(&oldEndpointSlice.ObjectMeta) {
+				return
+			}
+			log.V(3).M(newEndpointSlice).Info("endpointSliceInformer.UpdateFunc")
+			if isUpdatedEndpointSlice(oldEndpointSlice, newEndpointSlice) {
+				c.enqueueObject(cmd_queue.NewReconcileEndpointSlice(cmd_queue.ReconcileUpdate, oldEndpointSlice, newEndpointSlice))
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			endpointSlice := obj.(*discovery.EndpointSlice)
+			if !c.isTrackedObject(&endpointSlice.ObjectMeta) {
+				return
+			}
+			log.V(3).M(endpointSlice).Info("endpointSliceInformer.DeleteFunc")
 		},
 	})
 }
@@ -473,7 +540,8 @@ func (c *Controller) addEventHandlers(
 	c.addEventHandlersCHIT(chopInformerFactory)
 	c.addEventHandlersChopConfig(chopInformerFactory)
 	c.addEventHandlersService(kubeInformerFactory)
-	c.addEventHandlersEndpoint(kubeInformerFactory)
+	//c.addEventHandlersEndpoints(kubeInformerFactory)
+	c.addEventHandlersEndpointSlice(kubeInformerFactory)
 	c.addEventHandlersConfigMap(kubeInformerFactory)
 	c.addEventHandlersStatefulSet(kubeInformerFactory)
 	c.addEventHandlersPod(kubeInformerFactory)
@@ -481,7 +549,7 @@ func (c *Controller) addEventHandlers(
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(meta meta.Object) bool {
-	return chop.Config().IsWatchedNamespace(meta.GetNamespace()) && chiLabeler.New(nil).IsCHOPGeneratedObject(meta)
+	return chop.Config().IsNamespaceWatched(meta.GetNamespace()) && chiLabeler.New(nil).IsCHOPGeneratedObject(meta)
 }
 
 // Run syncs caches, starts workers
@@ -546,7 +614,7 @@ func prepareCHIAdd(command *cmd_queue.ReconcileCHI) bool {
 }
 
 func prepareCHIUpdate(command *cmd_queue.ReconcileCHI) bool {
-	actionPlan := action_plan.NewActionPlan(command.Old, command.New)
+	actionPlan := api.MakeActionPlan(command.Old, command.New)
 	if !actionPlan.HasActionsToDo() {
 		return false
 	}
@@ -606,6 +674,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		*cmd_queue.ReconcileCHIT,
 		*cmd_queue.ReconcileChopConfig,
 		*cmd_queue.ReconcileEndpoints,
+		*cmd_queue.ReconcileEndpointSlice,
 		*cmd_queue.ReconcilePod:
 		variants := api.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)
@@ -696,7 +765,7 @@ type patchFinalizers struct {
 // patchCHIFinalizers patch ClickHouseInstallation finalizers
 func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR patch fin: %s ", chi.GetName())
 		return nil
 	}
 
@@ -736,7 +805,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 
 func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, f func(c *api.ClickHouseInstallation, e error) bool) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. Polling CR: %s ", chi.GetName())
 		return
 	}
 
@@ -747,7 +816,7 @@ func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, 
 		if f(cur.(*api.ClickHouseInstallation), err) {
 			// Continue polling
 			if util.IsContextDone(ctx) {
-				log.V(2).Info("task is done")
+				log.V(1).Info("Reconcile is aborted. Polling CR: %s ", chi.GetName())
 				return
 			}
 			time.Sleep(15 * time.Second)
@@ -761,7 +830,7 @@ func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, 
 // installFinalizer
 func (c *Controller) installFinalizer(ctx context.Context, chi *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR install fn: %s ", chi.GetName())
 		return nil
 	}
 
@@ -789,7 +858,7 @@ func (c *Controller) installFinalizer(ctx context.Context, chi *api.ClickHouseIn
 // uninstallFinalizer
 func (c *Controller) uninstallFinalizer(ctx context.Context, chi *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR uninstall fin: %s ", chi.GetName())
 		return nil
 	}
 
@@ -856,7 +925,8 @@ func (c *Controller) handleObject(obj interface{}) {
 }
 
 func shouldEnqueue(chi *api.ClickHouseInstallation) bool {
-	if !chop.Config().IsWatchedNamespace(chi.Namespace) {
+	if !chop.Config().IsNamespaceWatched(chi.Namespace) {
+		log.V(2).M(chi).Info("chiInformer: skip enqueue, namespace '%s' is not watched or is in deny list", chi.Namespace)
 		return false
 	}
 

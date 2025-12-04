@@ -33,6 +33,7 @@ func New(cr api.ICustomResource, config ...*labeler.Config) *Labeler {
 	}
 }
 
+// Label
 func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]string {
 	switch what {
 	case interfaces.LabelConfigMapCommon:
@@ -48,6 +49,7 @@ func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]str
 	panic("unknown label type")
 }
 
+// Selector
 func (l *Labeler) Selector(what interfaces.SelectorType, params ...any) map[string]string {
 	return l.Labeler.Selector(what, params...)
 }
@@ -70,6 +72,7 @@ func (l *Labeler) labelConfigMapCRCommonUsers() map[string]string {
 		})
 }
 
+// labelConfigMapHost
 func (l *Labeler) labelConfigMapHost(params ...any) map[string]string {
 	var host *api.Host
 	if len(params) > 0 {

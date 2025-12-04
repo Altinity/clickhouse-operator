@@ -74,6 +74,7 @@ type Status struct {
 	Endpoints                []string                `json:"endpoints,omitempty"                yaml:"endpoints,omitempty"`
 	NormalizedCR             *ClickHouseInstallation `json:"normalized,omitempty"               yaml:"normalized,omitempty"`
 	NormalizedCRCompleted    *ClickHouseInstallation `json:"normalizedCompleted,omitempty"      yaml:"normalizedCompleted,omitempty"`
+	ActionPlan               *ActionPlan             `json:"actionPlan,omitempty"               yaml:"actionPlan,omitempty"`
 	HostsWithTablesCreated   []string                `json:"hostsWithTablesCreated,omitempty"   yaml:"hostsWithTablesCreated,omitempty"`
 	HostsWithReplicaCaughtUp []string                `json:"hostsWithReplicaCaughtUp,omitempty" yaml:"hostsWithReplicaCaughtUp,omitempty"`
 	UsedTemplates            []*TemplateRef          `json:"usedTemplates,omitempty"            yaml:"usedTemplates,omitempty"`
@@ -280,7 +281,7 @@ func (s *Status) HostCompleted() {
 }
 
 // ReconcileStart marks reconcile start
-func (s *Status) ReconcileStart(deleteHostsCount int) {
+func (s *Status) ReconcileStart(ap IActionPlan) {
 	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
@@ -291,7 +292,8 @@ func (s *Status) ReconcileStart(deleteHostsCount int) {
 		s.HostsUnchangedCount = 0
 		s.HostsCompletedCount = 0
 		s.HostsDeletedCount = 0
-		s.HostsDeleteCount = deleteHostsCount
+		s.HostsDeleteCount = ap.GetRemovedHostsNum()
+		s.ActionPlan = ap.(*ActionPlan)
 		pushTaskIDStartedNoSync(s)
 	})
 }
@@ -334,6 +336,13 @@ func (s *Status) DeleteStart() {
 		s.HostsDeletedCount = 0
 		s.HostsDeleteCount = 0
 		pushTaskIDStartedNoSync(s)
+	})
+}
+
+// SetActionPlan sets action plan
+func (s *Status) SetActionPlan(ap IActionPlan) {
+	doWithWriteLock(s, func(s *Status) {
+		s.ActionPlan = ap.(*ActionPlan)
 	})
 }
 
@@ -388,11 +397,13 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.FQDNs = true
 		opts.Copy.Endpoint = true
 		opts.Copy.NormalizedCR = true
+		opts.Copy.ActionPlan = true
 		opts.Copy.UsedTemplates = true
 	}
 
 	if opts.FieldGroupNormalized {
 		opts.Copy.NormalizedCR = true
+		opts.Copy.ActionPlan = true
 	}
 
 	if opts.FieldGroupWholeStatus {
@@ -425,6 +436,7 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.Endpoint = true
 		opts.Copy.NormalizedCR = true
 		opts.Copy.NormalizedCRCompleted = true
+		opts.Copy.ActionPlan = true
 		opts.Copy.UsedTemplates = true
 	}
 
@@ -530,6 +542,9 @@ func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 			}
 			if opts.Copy.NormalizedCRCompleted {
 				s.NormalizedCRCompleted = from.NormalizedCRCompleted
+			}
+			if opts.Copy.ActionPlan {
+				s.ActionPlan = from.ActionPlan
 			}
 			if opts.Copy.HostsWithTablesCreated {
 				s.HostsWithTablesCreated = nil

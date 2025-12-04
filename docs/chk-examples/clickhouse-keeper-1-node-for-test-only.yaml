@@ -17,11 +17,15 @@ spec:
   templates:
     podTemplates:
       - name: clickhouse-keeper
+        metadata:
+          annotations:
+            prometheus.io/port: "7000"
+            prometheus.io/scrape: "true"
         spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: Always
-              image: "clickhouse/clickhouse-keeper:24.8"
+              image: "clickhouse/clickhouse-keeper:25.3"
     volumeClaimTemplates:
       - name: data-volume
         spec:

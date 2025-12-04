@@ -36,10 +36,10 @@ type Reconciler struct {
 	a    a.Announcer
 	task *common.Task
 
-	hostSTSPoller IHostStatefulSetPoller
-	namer         interfaces.INameManager
-	labeler       interfaces.ILabeler
-	storage       *storage.Reconciler
+	hostObjectsPoller IHostObjectsPoller
+	namer             interfaces.INameManager
+	labeler           interfaces.ILabeler
+	storage           *storage.Reconciler
 
 	cr  interfaces.IKubeCR
 	sts interfaces.IKubeSTS
@@ -50,7 +50,7 @@ type Reconciler struct {
 func NewReconciler(
 	a a.Announcer,
 	task *common.Task,
-	hostSTSPoller IHostStatefulSetPoller,
+	hostObjectsPoller IHostObjectsPoller,
 	namer interfaces.INameManager,
 	labeler interfaces.ILabeler,
 	storage *storage.Reconciler,
@@ -61,10 +61,10 @@ func NewReconciler(
 		a:    a,
 		task: task,
 
-		hostSTSPoller: hostSTSPoller,
-		namer:         namer,
-		labeler:       labeler,
-		storage:       storage,
+		hostObjectsPoller: hostObjectsPoller,
+		namer:             namer,
+		labeler:           labeler,
+		storage:           storage,
 
 		cr:  kube.CR(),
 		sts: kube.STS(),
@@ -75,11 +75,6 @@ func NewReconciler(
 
 // PrepareHostStatefulSetWithStatus prepares host's StatefulSet status
 func (r *Reconciler) PrepareHostStatefulSetWithStatus(ctx context.Context, host *api.Host, shutdown bool) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	r.prepareDesiredStatefulSet(host, shutdown)
 	host.GetReconcileAttributes().SetStatus(r.getStatefulSetStatus(host))
 }
@@ -136,7 +131,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	opts *ReconcileOptions,
 ) (err error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("reconcile sts is aborted. Host: %s", host.GetName())
 		return nil
 	}
 
@@ -170,9 +165,9 @@ func (r *Reconciler) ReconcileStatefulSet(
 	}
 
 	switch {
-	case opts.IsForceRecreate():
+	case opts.ForceRecreate():
 		// Force recreate prevails over all other requests
-		r.recreateStatefulSet(ctx, host, register, opts)
+		_ = r.recreateStatefulSet(ctx, host, register, opts)
 	default:
 		// We have (or had in the past) StatefulSet - try to update|recreate it
 		err = r.updateStatefulSet(ctx, host, register, opts)
@@ -192,7 +187,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 // recreateStatefulSet
 func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("recreate sts is aborted host: %s", host.GetName())
 		return nil
 	}
 
@@ -228,7 +223,7 @@ func (r *Reconciler) copyKubectlAnnotationsBeforeUpdate(old, new *apps.StatefulS
 // updateStatefulSet
 func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("update sts is aborted host: %s", host.GetName())
 		return nil
 	}
 
@@ -257,7 +252,7 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 
 	action := common.ErrCRUDRecreate
 	if k8s.IsStatefulSetReady(curStatefulSet) {
-		action = r.doUpdateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
+		action = r.doUpdateStatefulSet(ctx, curStatefulSet, newStatefulSet, host, opts)
 	}
 
 	switch action {
@@ -302,11 +297,6 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 
 // createStatefulSet
 func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	statefulSet := host.Runtime.DesiredStatefulSet
 
 	r.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
@@ -366,11 +356,6 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
 func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, opts *ReconcileOptions) common.ErrorCRUD {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	log.V(1).M(host).F().P()
 	statefulSet := host.Runtime.DesiredStatefulSet
 
@@ -380,16 +365,45 @@ func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, op
 		return common.ErrCRUDRecreate
 	}
 
-	if opts.IsDoNotWait() {
-		// StatefulSet created, do not wait until host is ready, go by
-		log.V(1).M(host).F().Info("Will NOT wait for StatefulSet to be ready, consider it is created successfully")
-	} else {
-		// StatefulSet created, wait until host is ready
-		if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
-			log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
-			return r.fallback.OnStatefulSetCreateFailed(ctx, host)
+	// StatefulSet created, wait until host is launched
+	if err := r.waitHostStatefulSetToLaunch(ctx, host, opts); err != nil {
+		log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
+		return r.fallback.OnStatefulSetCreateFailed(ctx, host)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) waitHostStatefulSetToLaunch(ctx context.Context, host *api.Host, opts *ReconcileOptions) error {
+	// Whether StatefulSet has launched successfully
+	launched := false
+
+	// Start with waiting for startup probe
+	if opts.WaitUntilStarted() {
+		log.V(1).M(host).F().Info("Wait host pod started. Host: %s", host.GetName())
+		if err := r.hostObjectsPoller.WaitHostPodStarted(ctx, host); err != nil {
+			log.V(1).M(host).F().Error("Host pod wait failed. host: %s err: %v", host.GetName(), err)
+			return err
 		}
-		log.V(2).M(host).F().Info("Target generation reached, StatefulSet created successfully")
+		log.V(1).M(host).F().Info("Host pod started. Host: %s", host.GetName())
+		launched = true
+	}
+
+	// Continue with waiting for ready probe
+	if opts.WaitUntilReady() {
+		log.V(1).M(host).F().Info("Wait host sts ready. Host: %s", host.GetName())
+		if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
+			log.V(1).M(host).F().Error("Host sts wait failed. host: %s err: %v", host.GetName(), err)
+			return err
+		}
+		log.V(1).M(host).F().Info("Host sts ready. Host: %s", host.GetName())
+		launched = true
+	}
+
+	if launched {
+		log.V(1).M(host).F().Info("Host launched. Host: %s", host.GetName())
+	} else {
+		log.V(1).M(host).F().Warning("Host is not properly launched - no waiting sts at all. Host: %s", host.GetName())
 	}
 
 	return nil
@@ -401,14 +415,9 @@ func (r *Reconciler) doUpdateStatefulSet(
 	oldStatefulSet *apps.StatefulSet,
 	newStatefulSet *apps.StatefulSet,
 	host *api.Host,
+	opts *ReconcileOptions,
 ) common.ErrorCRUD {
 	log.V(2).M(host).F().P()
-
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// Apply newStatefulSet and wait for Generation to change
 	updatedStatefulSet, err := r.sts.Update(ctx, newStatefulSet)
 	if err != nil {
@@ -429,7 +438,8 @@ func (r *Reconciler) doUpdateStatefulSet(
 
 	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
+	// StatefulSet updated, wait until host is launched
+	if err := r.waitHostStatefulSetToLaunch(ctx, host, opts); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet update FAILED - wait for ready StatefulSet failed. err: %v", err)
 		return r.fallback.OnStatefulSetUpdateFailed(ctx, oldStatefulSet, host, r.sts)
 	}
@@ -440,11 +450,6 @@ func (r *Reconciler) doUpdateStatefulSet(
 
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
 func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	// IMPORTANT
 	// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
 	// To achieve ordered and graceful termination of the pods in the StatefulSet,
@@ -476,7 +481,7 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 	}
 
 	// Wait until StatefulSet scales down to 0 pods count.
-	_ = r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host)
+	_ = r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host)
 
 	// And now delete empty StatefulSet
 	if err := r.sts.Delete(ctx, namespace, name); err == nil {

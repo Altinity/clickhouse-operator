@@ -41,8 +41,8 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 		Info("remove items scheduled for deletion")
 
 	// Remove deleted items
-	w.a.V(1).M(cr).F().Info("List of objects which have failed to reconcile:\n%s", w.task.RegistryFailed)
-	w.a.V(1).M(cr).F().Info("List of successfully reconciled objects:\n%s", w.task.RegistryReconciled)
+	w.a.V(1).M(cr).F().Info("List of objects which have failed to reconcile:\n%s", w.task.RegistryFailed())
+	w.a.V(1).M(cr).F().Info("List of successfully reconciled objects:\n%s", w.task.RegistryReconciled())
 	objs := w.c.discovery(ctx, cr)
 	need := w.task.RegistryReconciled()
 	w.a.V(1).M(cr).F().Info("Existing objects:\n%s", objs)
@@ -176,37 +176,37 @@ func (w *worker) purgePDB(
 
 func shouldPurgeStatefulSet(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasStatefulSet(m) {
-		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetStatefulSet() == api.ObjectsCleanupDelete
+		return cr.GetReconcile().GetCleanup().GetReconcileFailedObjects().GetStatefulSet() == api.ObjectsCleanupDelete
 	}
-	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetStatefulSet() == api.ObjectsCleanupDelete
+	return cr.GetReconcile().GetCleanup().GetUnknownObjects().GetStatefulSet() == api.ObjectsCleanupDelete
 }
 
 func shouldPurgePVC(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasPVC(m) {
-		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetPVC() == api.ObjectsCleanupDelete
+		return cr.GetReconcile().GetCleanup().GetReconcileFailedObjects().GetPVC() == api.ObjectsCleanupDelete
 	}
-	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetPVC() == api.ObjectsCleanupDelete
+	return cr.GetReconcile().GetCleanup().GetUnknownObjects().GetPVC() == api.ObjectsCleanupDelete
 }
 
 func shouldPurgeConfigMap(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasConfigMap(m) {
-		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetConfigMap() == api.ObjectsCleanupDelete
+		return cr.GetReconcile().GetCleanup().GetReconcileFailedObjects().GetConfigMap() == api.ObjectsCleanupDelete
 	}
-	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetConfigMap() == api.ObjectsCleanupDelete
+	return cr.GetReconcile().GetCleanup().GetUnknownObjects().GetConfigMap() == api.ObjectsCleanupDelete
 }
 
 func shouldPurgeService(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasService(m) {
-		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetService() == api.ObjectsCleanupDelete
+		return cr.GetReconcile().GetCleanup().GetReconcileFailedObjects().GetService() == api.ObjectsCleanupDelete
 	}
-	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetService() == api.ObjectsCleanupDelete
+	return cr.GetReconcile().GetCleanup().GetUnknownObjects().GetService() == api.ObjectsCleanupDelete
 }
 
 func shouldPurgeSecret(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasSecret(m) {
-		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetSecret() == api.ObjectsCleanupDelete
+		return cr.GetReconcile().GetCleanup().GetReconcileFailedObjects().GetSecret() == api.ObjectsCleanupDelete
 	}
-	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetSecret() == api.ObjectsCleanupDelete
+	return cr.GetReconcile().GetCleanup().GetUnknownObjects().GetSecret() == api.ObjectsCleanupDelete
 }
 
 func shouldPurgePDB(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {

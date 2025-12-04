@@ -11,14 +11,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.25.1
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -244,10 +244,17 @@ spec:
                 normalized:
                   type: object
                   description: "Normalized resource requested"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
                   description: "Normalized resource completed"
+                  nullable: true
+                  x-kubernetes-preserve-unknown-fields: true
+                actionPlan:
+                  type: object
+                  description: "Action Plan"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
@@ -365,9 +372,9 @@ spec:
                       description: "Optional, defines selector for ClickHouseInstallation(s) to be templated with ClickhouseInstallationTemplate"
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
-                reconciling:
+                reconciling: &TypeReconcile
                   type: object
-                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+                  description: "[OBSOLETED] Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                   # nullable: true
                   properties:
                     policy:
@@ -440,7 +447,50 @@ spec:
                             service:
                               <<: *TypeObjectsCleanup
                               description: "Behavior policy for failed Service, `Retain` by default"
-                    runtime:
+                    macros:
+                      type: object
+                      description: "macros parameters"
+                      properties:
+                        sections:
+                          type: object
+                          description: "sections behaviour for macros"
+                          properties:
+                            users:
+                              type: object
+                              description: "sections behaviour for macros on users"
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            profiles:
+                              type: object
+                              description: "sections behaviour for macros on profiles"
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            quotas:
+                              type: object
+                              description: "sections behaviour for macros on quotas"
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            settings:
+                              type: object
+                              description: "sections behaviour for macros on settings"
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            files:
+                              type: object
+                              description: "sections behaviour for macros on files"
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                    runtime: &TypeReconcileRuntime
                       type: object
                       description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
                       properties:
@@ -448,13 +498,84 @@ spec:
                           type: integer
                           minimum: 1
                           maximum: 65535
-                          description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
+                          description: "The maximum number of cluster shards that may be reconciled in parallel, 1 by default"
                         reconcileShardsMaxConcurrencyPercent:
                           type: integer
                           minimum: 0
                           maximum: 100
                           description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
-
+                    host: &TypeReconcileHost
+                      type: object
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+                      properties:
+                        wait:
+                          type: object
+                          properties:
+                            exclude:
+                              <<: *TypeStringBool
+                            queries:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
+                            include:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
+                            replicas:
+                              type: object
+                              description: "Whether the operator during reconcile procedure should wait for replicas to catch-up"
+                              properties:
+                                all:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for all replicas to catch-up"
+                                new:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for new replicas to catch-up"
+                                delay:
+                                  type: integer
+                                  description: "replication max absolute delay to consider replica is not delayed"
+                            probes:
+                              type: object
+                              description: "What probes the operator should wait during host launch procedure"
+                              properties:
+                                startup:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for startup probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to do not wait.
+                                readiness:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for ready probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to wait.
+                        drop:
+                          type: object
+                          properties:
+                            replicas:
+                              type: object
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                              properties:
+                                onDelete:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+                                active:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
+                reconcile:
+                  <<: *TypeReconcile
+                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                 defaults:
                   type: object
                   description: |
@@ -585,6 +706,9 @@ spec:
                         identity:
                           type: string
                           description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
+                        use_compression:
+                          !!merge <<: *TypeStringBool
+                          description: "Enables compression in Keeper protocol if set to true"
                     users:
                       type: object
                       description: |
@@ -649,7 +773,7 @@ spec:
                         every key in this object is the file name
                         every value in this object is the file content
                         you can use `!!binary |` and base64 for binary files, see details here https://yaml.org/type/binary.html
-                        each key could contains prefix like {users}, {common}, {host} or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
+                        each key could contains prefix like {common}, {users}, {hosts} or config.d, users.d, conf.d, wrong prefixes will be ignored, subfolders also will be ignored
                         More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
 
                         any key could contains `valueFrom` with `secretKeyRef` which allow pass values from kubernetes secrets
@@ -764,6 +888,15 @@ spec:
                                     required:
                                       - name
                                       - key
+                          pdbManaged:
+                            <<: *TypeStringBool
+                            description: |
+                              Specifies whether the Pod Disruption Budget (PDB) should be managed.
+                              During the next installation, if PDB management is enabled, the operator will
+                              attempt to retrieve any existing PDB. If none is found, it will create a new one
+                              and initiate a reconciliation loop. If PDB management is disabled, the existing PDB
+                              will remain intact, and the reconciliation loop will not be executed. By default,
+                              PDB management is enabled.
                           pdbMaxUnavailable:
                             type: integer
                             description: |
@@ -772,6 +905,14 @@ spec:
                               by specifying 0. This is a mutually exclusive setting with "minAvailable".
                             minimum: 0
                             maximum: 65535
+                          reconcile:
+                            type: object
+                            description: "allow tuning reconciling process"
+                            properties:
+                              runtime:
+                                <<: *TypeReconcileRuntime
+                              host:
+                                <<: *TypeReconcileHost
                           layout:
                             type: object
                             description: |
@@ -1018,24 +1159,6 @@ spec:
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
-                          reconcile:
-                            type: object
-                            description: "allow tuning reconciling process"
-                            properties:
-                              runtime:
-                                type: object
-                                description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                                properties:
-                                  reconcileShardsThreadsNumber:
-                                    type: integer
-                                    minimum: 1
-                                    maximum: 65535
-                                    description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                                  reconcileShardsMaxConcurrencyPercent:
-                                    type: integer
-                                    minimum: 0
-                                    maximum: 100
-                                    description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                 templates:
                   type: object
                   description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
@@ -1076,7 +1199,7 @@ spec:
                             properties:
                               name:
                                 type: string
-                                description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
+                                description: "by default, hostname will generate, but this allows define custom name for each `clickhouse-server`"
                                 minLength: 1
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
@@ -1332,7 +1455,7 @@ spec:
                         description: "name of `ClickHouseInstallationTemplate` (chit) resource"
                       namespace:
                         type: string
-                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clichouse-operator`"
+                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clickhouse-operator`"
                       useType:
                         type: string
                         description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit`"
@@ -1347,14 +1470,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.25.1
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1580,10 +1703,17 @@ spec:
                 normalized:
                   type: object
                   description: "Normalized resource requested"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
                   description: "Normalized resource completed"
+                  nullable: true
+                  x-kubernetes-preserve-unknown-fields: true
+                actionPlan:
+                  type: object
+                  description: "Action Plan"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
@@ -1701,9 +1831,9 @@ spec:
                       description: "Optional, defines selector for ClickHouseInstallation(s) to be templated with ClickhouseInstallationTemplate"
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
-                reconciling:
+                reconciling: &TypeReconcile
                   type: object
-                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+                  description: "[OBSOLETED] Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                   # nullable: true
                   properties:
                     policy:
@@ -1776,7 +1906,50 @@ spec:
                             service:
                               <<: *TypeObjectsCleanup
                               description: "Behavior policy for failed Service, `Retain` by default"
-                    runtime:
+                    macros:
+                      type: object
+                      description: "macros parameters"
+                      properties:
+                        sections:
+                          type: object
+                          description: "sections behaviour for macros"
+                          properties:
+                            users:
+                              type: object
+                              description: "sections behaviour for macros on users"
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            profiles:
+                              type: object
+                              description: "sections behaviour for macros on profiles"
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            quotas:
+                              type: object
+                              description: "sections behaviour for macros on quotas"
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            settings:
+                              type: object
+                              description: "sections behaviour for macros on settings"
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                            files:
+                              type: object
+                              description: "sections behaviour for macros on files"
+                              properties:
+                                enabled:
+                                  <<: *TypeStringBool
+                                  description: "enabled or not"
+                    runtime: &TypeReconcileRuntime
                       type: object
                       description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
                       properties:
@@ -1784,13 +1957,84 @@ spec:
                           type: integer
                           minimum: 1
                           maximum: 65535
-                          description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
+                          description: "The maximum number of cluster shards that may be reconciled in parallel, 1 by default"
                         reconcileShardsMaxConcurrencyPercent:
                           type: integer
                           minimum: 0
                           maximum: 100
                           description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
-
+                    host: &TypeReconcileHost
+                      type: object
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+                      properties:
+                        wait:
+                          type: object
+                          properties:
+                            exclude:
+                              <<: *TypeStringBool
+                            queries:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
+                            include:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
+                            replicas:
+                              type: object
+                              description: "Whether the operator during reconcile procedure should wait for replicas to catch-up"
+                              properties:
+                                all:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for all replicas to catch-up"
+                                new:
+                                  <<: *TypeStringBool
+                                  description: "Whether the operator during reconcile procedure should wait for new replicas to catch-up"
+                                delay:
+                                  type: integer
+                                  description: "replication max absolute delay to consider replica is not delayed"
+                            probes:
+                              type: object
+                              description: "What probes the operator should wait during host launch procedure"
+                              properties:
+                                startup:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for startup probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to do not wait.
+                                readiness:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for ready probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to wait.
+                        drop:
+                          type: object
+                          properties:
+                            replicas:
+                              type: object
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                              properties:
+                                onDelete:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+                                active:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
+                reconcile:
+                  <<: *TypeReconcile
+                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                 defaults:
                   type: object
                   description: |
@@ -1921,6 +2165,9 @@ spec:
                         identity:
                           type: string
                           description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
+                        use_compression:
+                          !!merge <<: *TypeStringBool
+                          description: "Enables compression in Keeper protocol if set to true"
                     users:
                       type: object
                       description: |
@@ -1985,7 +2232,7 @@ spec:
                         every key in this object is the file name
                         every value in this object is the file content
                         you can use `!!binary |` and base64 for binary files, see details here https://yaml.org/type/binary.html
-                        each key could contains prefix like {users}, {common}, {host} or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
+                        each key could contains prefix like {common}, {users}, {hosts} or config.d, users.d, conf.d, wrong prefixes will be ignored, subfolders also will be ignored
                         More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
 
                         any key could contains `valueFrom` with `secretKeyRef` which allow pass values from kubernetes secrets
@@ -2100,6 +2347,15 @@ spec:
                                     required:
                                       - name
                                       - key
+                          pdbManaged:
+                            <<: *TypeStringBool
+                            description: |
+                              Specifies whether the Pod Disruption Budget (PDB) should be managed.
+                              During the next installation, if PDB management is enabled, the operator will
+                              attempt to retrieve any existing PDB. If none is found, it will create a new one
+                              and initiate a reconciliation loop. If PDB management is disabled, the existing PDB
+                              will remain intact, and the reconciliation loop will not be executed. By default,
+                              PDB management is enabled.
                           pdbMaxUnavailable:
                             type: integer
                             description: |
@@ -2108,6 +2364,14 @@ spec:
                               by specifying 0. This is a mutually exclusive setting with "minAvailable".
                             minimum: 0
                             maximum: 65535
+                          reconcile:
+                            type: object
+                            description: "allow tuning reconciling process"
+                            properties:
+                              runtime:
+                                <<: *TypeReconcileRuntime
+                              host:
+                                <<: *TypeReconcileHost
                           layout:
                             type: object
                             description: |
@@ -2354,24 +2618,6 @@ spec:
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
-                          reconcile:
-                            type: object
-                            description: "allow tuning reconciling process"
-                            properties:
-                              runtime:
-                                type: object
-                                description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
-                                properties:
-                                  reconcileShardsThreadsNumber:
-                                    type: integer
-                                    minimum: 1
-                                    maximum: 65535
-                                    description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
-                                  reconcileShardsMaxConcurrencyPercent:
-                                    type: integer
-                                    minimum: 0
-                                    maximum: 100
-                                    description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                 templates:
                   type: object
                   description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
@@ -2412,7 +2658,7 @@ spec:
                             properties:
                               name:
                                 type: string
-                                description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
+                                description: "by default, hostname will generate, but this allows define custom name for each `clickhouse-server`"
                                 minLength: 1
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
@@ -2668,7 +2914,7 @@ spec:
                         description: "name of `ClickHouseInstallationTemplate` (chit) resource"
                       namespace:
                         type: string
-                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clichouse-operator`"
+                        description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clickhouse-operator`"
                       useType:
                         type: string
                         description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit`"
@@ -2686,7 +2932,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2732,10 +2978,9 @@ spec:
                   description: "Parameters for watch kubernetes resources which used by clickhouse-operator deployment"
                   properties:
                     namespaces:
-                      type: array
+                      type: object
                       description: "List of namespaces where clickhouse-operator watches for events."
-                      items:
-                        type: string
+                      x-kubernetes-preserve-unknown-fields: true
                 clickhouse:
                   type: object
                   description: "Clickhouse related parameters used by clickhouse-operator"
@@ -3006,7 +3251,6 @@ spec:
                           - to complete all running queries
                           - to be included into a ClickHouse cluster
                         respectfully before moving forward
-
                       properties:
                         wait:
                           type: object
@@ -3058,6 +3302,42 @@ spec:
                                 delay:
                                   type: integer
                                   description: "replication max absolute delay to consider replica is not delayed"
+                            probes:
+                              type: object
+                              description: "What probes the operator should wait during host launch procedure"
+                              properties:
+                                startup:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for startup probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to do not wait.
+                                readiness:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during host launch procedure should wait for readiness probe to succeed.
+                                    In case probe is unspecified wait is assumed to be completed successfully.
+                                    Default option value is to wait.
+                        drop:
+                          type: object
+                          properties:
+                            replicas:
+                              type: object
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                              properties:
+                                onDelete:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+                                active:
+                                  <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
@@ -3190,14 +3470,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.25.1
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.25.1
+    clickhouse-keeper.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -3718,6 +3998,23 @@ spec:
                             description: |
                               optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                               override top-level `chi.spec.configuration.files`
+                          pdbManaged:
+                            <<: *TypeStringBool
+                            description: |
+                              Specifies whether the Pod Disruption Budget (PDB) should be managed.
+                              During the next installation, if PDB management is enabled, the operator will
+                              attempt to retrieve any existing PDB. If none is found, it will create a new one
+                              and initiate a reconciliation loop. If PDB management is disabled, the existing PDB
+                              will remain intact, and the reconciliation loop will not be executed. By default,
+                              PDB management is enabled.
+                          pdbMaxUnavailable:
+                            type: integer
+                            description: |
+                              Pod eviction is allowed if at most "pdbMaxUnavailable" pods are unavailable after the eviction,
+                              i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions
+                              by specifying 0. This is a mutually exclusive setting with "minAvailable".
+                            minimum: 0
+                            maximum: 65535
                           templates:
                             <<: *TypeTemplateNames
                             description: |
@@ -3849,7 +4146,7 @@ spec:
                             properties:
                               name:
                                 type: string
-                                description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
+                                description: "by default, hostname will generate, but this allows define custom name for each `clickhouse-server`"
                                 minLength: 1
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
@@ -4071,7 +4368,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
 ---
 # Template Parameters:
 #
@@ -4097,7 +4394,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
 rules:
 
   #
@@ -4218,6 +4515,19 @@ rules:
       - delete
 
   #
+  # discovery.* resources
+  #
+
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+    verbs:
+      - get
+      - list
+      - watch
+
+  #
   # apiextensions
   #
 
@@ -4316,7 +4626,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -4338,7 +4648,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -4367,7 +4677,6 @@ data:
       # Concurrently running operators should watch on different namespaces.
       # IMPORTANT
       # Regexp is applicable.
-      #namespaces: ["dev", "test"]
       namespaces: [${namespace}]
     
     clickhouse:
@@ -4466,7 +4775,7 @@ data:
               # these settings should not lead to pod restarts
               - settings/display_secrets_in_show_and_select: "no"
     
-              - zookeeper/*: "yes"
+              - zookeeper/*: "no"
     
               - files/*.xml: "yes"
               - files/config.d/*.xml: "yes"
@@ -4620,8 +4929,8 @@ data:
       chi:
         # CHI template updates handling policy
         # Possible policy values:
-        #   - ReadOnStart. Accept CHIT updates on the operators start only.
-        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+        #   - ReadOnStart. Accept CHIT updates on the operator's start only.
+        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
         policy: ApplyOnNextReconcile
     
         # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
@@ -4632,7 +4941,7 @@ data:
         # CHK template updates handling policy
         # Possible policy values:
         #   - ReadOnStart. Accept CHIT updates on the operators start only.
-        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
         policy: ApplyOnNextReconcile
     
         # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
@@ -4696,19 +5005,45 @@ data:
     
       # Reconcile Host scenario
       host:
-        # Whether the operator during reconcile procedure should wait for a ClickHouse host:
-        #   - to be excluded from a ClickHouse cluster
-        #   - to complete all running queries
-        #   - to be included into a ClickHouse cluster
-        # respectfully before moving forward
+        # The operator during reconcile procedure should wait for a ClickHouse host to achieve the following conditions:
         wait:
+          # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+          #   - to be excluded from a ClickHouse cluster
+          #   - to complete all running queries
+          #   - to be included into a ClickHouse cluster
+          # respectfully before moving forward with host reconcile
           exclude: true
           queries: true
           include: false
+          # The operator during reconcile procedure should wait for replicas to catch-up
+          # replication delay a.k.a replication lag for the following replicas
           replicas:
+            # All replicas (new and known earlier) are explicitly requested to wait for replication to catch-up
             all: no
+            # New replicas only are requested to wait for replication to catch-up
             new: yes
+            # Replication catch-up is considered to be completed as soon as replication delay
+            # a.k.a replication lag - calculated as "MAX(absolute_delay) FROM system.replicas"
+            # is within this specified delay (in seconds)
             delay: 10
+          probes:
+            # Whether the operator during host launch procedure should wait for startup probe to succeed.
+            # In case probe is unspecified wait is assumed to be completed successfully.
+            # Default option value is to do not wait.
+            startup: no
+            # Whether the operator during host launch procedure should wait for readiness probe to succeed.
+            # In case probe is unspecified wait is assumed to be completed successfully.
+            # Default option value is to wait.
+            readiness: yes
+        # The operator during reconcile procedure should drop the following entities:
+        drop:
+          replicas:
+            # Whether the operator during reconcile procedure should drop replicas when replica is deleted
+            onDelete: yes
+            # Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+            onLostVolume: yes
+            # Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
+            active: no
     
     ################################################
     ##
@@ -4772,8 +5107,8 @@ data:
       fields:
         action: false
         actions: false
-        error: false
-        errors: false
+        error: true
+        errors: true
     
     ################################################
     ##
@@ -4821,7 +5156,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
 ---
@@ -4837,7 +5172,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -4936,7 +5271,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -5036,7 +5371,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -5099,7 +5434,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
 ---
@@ -5115,7 +5450,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -5193,7 +5528,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   readme: |
@@ -5211,7 +5546,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
 ---
@@ -5219,7 +5554,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=${namespace}
 #   COMMENT=
-#   OPERATOR_VERSION=0.25.1
+#   OPERATOR_VERSION=0.25.6
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=${password}
 #
@@ -5229,7 +5564,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -5240,9 +5575,9 @@ stringData:
 #
 # NAMESPACE=${namespace}
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.25.1
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.25.6
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.25.1
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.25.6
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -5253,7 +5588,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -5301,7 +5636,7 @@ spec:
             name: etc-keeper-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.25.1
+          image: altinity/clickhouse-operator:0.25.6
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5374,10 +5709,10 @@ spec:
                   resource: limits.memory
           ports:
             - containerPort: 9999
-              name: metrics
+              name: op-metrics
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.25.1
+          image: altinity/metrics-exporter:0.25.6
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5450,7 +5785,7 @@ spec:
                   resource: limits.memory
           ports:
             - containerPort: 8888
-              name: metrics
+              name: ch-metrics
 ---
 # Template Parameters:
 #
@@ -5468,13 +5803,13 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.25.1
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 spec:
   ports:
     - port: 8888
-      name: clickhouse-metrics
+      name: ch-metrics
     - port: 9999
-      name: operator-metrics
+      name: op-metrics
   selector:
     app: clickhouse-operator

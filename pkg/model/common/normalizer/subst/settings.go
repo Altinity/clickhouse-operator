@@ -67,11 +67,16 @@ func substSettingsFieldWithDataFromDataSource(
 	}
 
 	// Create setting from the secret with a provided function
-	if newSetting, err := newSettingCreator(secretAddress); err == nil {
-		// Set the new setting as dst.
-		// Replacing src in case src name is the same as dst name.
-		settings.Set(dstField, newSetting)
+	newSetting, err := newSettingCreator(secretAddress)
+	if err != nil {
+		// Unable to create new setting
+		// No substitution done
+		return false
 	}
+
+	// Set the new setting as dst.
+	// Replacing src in case src name is the same as dst name.
+	settings.Set(dstField, newSetting)
 
 	// In case we are NOT replacing the same field with its new value, then remove the source field.
 	// Typically non-replaced source field is not expected to be included into the final config,
@@ -92,7 +97,12 @@ func ReplaceSettingsFieldWithSecretFieldValue(
 	srcSecretRefField string,
 	secretGet SecretGetter,
 ) bool {
-	return substSettingsFieldWithDataFromDataSource(settings, req.GetTargetNamespace(), dstField, srcSecretRefField, true,
+	return substSettingsFieldWithDataFromDataSource(
+		settings,
+		req.GetTargetNamespace(),
+		dstField,
+		srcSecretRefField,
+		true,
 		func(secretAddress types.ObjectAddress) (*api.Setting, error) {
 			secretFieldValue, err := fetchSecretFieldValue(secretAddress, secretGet)
 			if err != nil {
@@ -100,7 +110,8 @@ func ReplaceSettingsFieldWithSecretFieldValue(
 			}
 			// Create new setting with the value
 			return api.NewSettingScalar(secretFieldValue), nil
-		})
+		},
+	)
 }
 
 // ReplaceSettingsFieldWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
@@ -112,11 +123,20 @@ func ReplaceSettingsFieldWithEnvRefToSecretField(
 	envVarNamePrefix string,
 	parseScalarString bool,
 ) bool {
-	return substSettingsFieldWithDataFromDataSource(settings, req.GetTargetNamespace(), dstField, srcSecretRefField, parseScalarString,
+	return substSettingsFieldWithDataFromDataSource(
+		settings,
+		req.GetTargetNamespace(),
+		dstField,
+		srcSecretRefField,
+		parseScalarString,
 		func(secretAddress types.ObjectAddress) (*api.Setting, error) {
 			// ENV VAR name and value
 			// In case not OK env var name will be empty and config will be incorrect. CH may not start
-			envVarName, _ := util.BuildShellEnvVarName(envVarNamePrefix + "_" + settings.Name2Key(dstField))
+			envVarName, ok := util.BuildShellEnvVarName(envVarNamePrefix + "_" + settings.Name2Key(dstField))
+			if !ok {
+				return nil, fmt.Errorf("unable to build shell env var name for dstField: %s", dstField)
+			}
+
 			req.AppendAdditionalEnvVar(
 				core.EnvVar{
 					Name: envVarName,
@@ -130,6 +150,7 @@ func ReplaceSettingsFieldWithEnvRefToSecretField(
 					},
 				},
 			)
+
 			// Create new setting w/o value but with attribute to read from ENV var
 			return api.NewSettingScalar("").SetAttribute("from_env", envVarName), nil
 		})

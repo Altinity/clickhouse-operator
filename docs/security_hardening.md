@@ -10,7 +10,17 @@ With the default settings, the ClickHouse operator deploys ClickHouse with two u
 
 The '**default**' user is used to connect to ClickHouse instance from a pod where it is running, and also for distributed queries. It is deployed with an **empty password** that was a long-time default for ClickHouse out-of-the-box installation.
 
-To secure it, the operator applies network security rules that restrict connections to the pods running the ClickHouse cluster, and nothing else.
+For security purposes, we recommend that you disable the `default` user altogether. As an example, create a file named `remove_default_user.xml` and place it in the `users.d` directory. This markup does the trick:
+
+```xml
+<clickhouse>
+   <users>
+      <default remove="1"/>
+   </users>
+</clickhouse>
+```
+
+However, if you do use the `default` user, the operator applies network security rules that restrict connections to the pods running the ClickHouse cluster, and nothing else.
 
 Before version **0.19.0**  `hostRegexp` was applied that captured pod names. This did not work correctly in some Kubernetes distributions, such as GKE. In later versions, the operator additionally applies a restrictive set of pod IP addresses and rebuilds this set if the IP address of a pod changes for whatever reason.
 

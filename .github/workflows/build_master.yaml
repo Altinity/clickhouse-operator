@@ -23,8 +23,8 @@ jobs:
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
         run: |
           export CHO_RELEASE=latest
+          export GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
 
           echo "${DOCKER_PASS}" | docker login -u $DOCKER_USER --password-stdin docker.io
-          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/operator/Dockerfile -t docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE} --pull --push  .
-          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/metrics-exporter/Dockerfile -t docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE} --pull --push .
-  
+          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/operator/Dockerfile         --build-arg GO_VERSION=${GO_VERSION} -t docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE} --pull --push .
+          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/metrics-exporter/Dockerfile --build-arg GO_VERSION=${GO_VERSION} -t docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE}    --pull --push .

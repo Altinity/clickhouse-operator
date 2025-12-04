@@ -31,11 +31,11 @@ func InArray(needle string, haystack []string) bool {
 	return false
 }
 
-// InArrayWithRegexp checks whether the needle can be matched by haystack
-func InArrayWithRegexp(needle string, haystack []string) bool {
-	for _, item := range haystack {
-		matched, _ := regexp.MatchString(item, needle)
-		if item == needle || matched {
+// MatchArrayOfRegexps checks whether the needle can be matched by haystack
+func MatchArrayOfRegexps(needle string, haystack []string) bool {
+	for _, pattern := range haystack {
+		matched, _ := regexp.MatchString(pattern, needle)
+		if pattern == needle || matched {
 			return true
 		}
 	}
@@ -137,6 +137,7 @@ func Prefix(slice []string, prefix string) (res []string) {
 	return res
 }
 
+// Unique does not preserve order.
 func Unique(slice []string) (unique []string) {
 	found := make(map[string]bool)
 

@@ -17,6 +17,7 @@ package interfaces
 type ProbeType string
 
 const (
+	ProbeDefaultStartup   ProbeType = "ProbeDefaultStartup"
 	ProbeDefaultLiveness  ProbeType = "ProbeDefaultLiveness"
 	ProbeDefaultReadiness ProbeType = "ProbeDefaultReadiness"
 )

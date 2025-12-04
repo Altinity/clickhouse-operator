@@ -25,6 +25,8 @@ VERSION=$(cd "${SRC_ROOT}"; cat release)
 GIT_SHA=$(cd "${SRC_ROOT}"; git rev-parse --short HEAD)
 # 2020-03-07 14:54:56
 NOW=$(date "+%FT%T")
+# Which version of golang to use. Ex.: 1.23.0
+GO_VERSION=$(cd "${SRC_ROOT}"; grep '^go ' go.mod | awk '{print $2}')
 
 RELEASE="1"
 

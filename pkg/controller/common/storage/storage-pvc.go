@@ -45,7 +45,7 @@ func NewStoragePVC(pvcKube interfaces.IKubePVC) *PVC {
 func (c *PVC) UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
 	log.V(2).M(pvc).F().P()
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("task is done")
 		return nil, fmt.Errorf("task is done")
 	}
 
@@ -89,7 +89,7 @@ func (c *PVC) UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClai
 // deletePVC deletes PersistentVolumeClaim
 func (c *PVC) DeletePVC(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("task is done")
 		return nil
 	}
 
@@ -99,7 +99,7 @@ func (c *PVC) DeletePVC(ctx context.Context, host *api.Host) error {
 	namespace := host.Runtime.Address.Namespace
 	c.WalkDiscoveredPVCs(ctx, host, func(pvc *core.PersistentVolumeClaim) {
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("task is done")
+			log.V(1).Info("task is done")
 			return
 		}
 

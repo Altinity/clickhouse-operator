@@ -49,6 +49,7 @@ type IMacro interface {
 	Scope(scope any) IMacro
 	Line(line string) string
 	Map(_map map[string]string) map[string]string
+	Replacer() *util.Replacer
 }
 
 type ILabeler interface {
@@ -98,7 +99,7 @@ type ICreator interface {
 		host *api.Host,
 		spec *core.PersistentVolumeClaimSpec,
 	) *core.PersistentVolumeClaim
-	AdjustPVC(
+	TagPVC(
 		pvc *core.PersistentVolumeClaim,
 		host *api.Host,
 		template *api.VolumeClaimTemplate,

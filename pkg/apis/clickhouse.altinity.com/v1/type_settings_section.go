@@ -22,7 +22,7 @@ var (
 	SectionEmpty  SettingsSection = ""
 	SectionCommon SettingsSection = "{common}"
 	SectionUsers  SettingsSection = "{users}"
-	SectionHost   SettingsSection = "{host}"
+	SectionHost   SettingsSection = "{hosts}"
 )
 
 // SettingsSection specifies settings section

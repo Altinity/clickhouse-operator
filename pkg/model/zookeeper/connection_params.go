@@ -17,11 +17,11 @@ package zookeeper
 import "time"
 
 const (
-	defaultMaxRetriesNum               = 25
+	defaultMaxRetriesNum               = 30
 	defaultMaxConcurrentRequests int64 = 32
 
-	defaultTimeoutConnect   = 30 * time.Second
-	defaultTimeoutKeepAlive = 30 * time.Second
+	defaultTimeoutConnect   = 10 * time.Second
+	defaultTimeoutKeepAlive = 10 * time.Second
 )
 
 type ConnectionParams struct {
@@ -34,6 +34,14 @@ type ConnectionParams struct {
 	KeyFile  string
 	CaFile   string
 	AuthFile string
+}
+
+func BuildConnectionParams(_params ...*ConnectionParams) *ConnectionParams {
+	var params *ConnectionParams
+	if len(_params) > 0 {
+		params = _params[0]
+	}
+	return params.Normalize()
 }
 
 func (p *ConnectionParams) Normalize() *ConnectionParams {

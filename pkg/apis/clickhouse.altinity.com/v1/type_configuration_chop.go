@@ -168,7 +168,36 @@ type OperatorConfigRuntime struct {
 // OperatorConfigWatch specifies watch section
 type OperatorConfigWatch struct {
 	// Namespaces where operator watches for events
-	Namespaces []string `json:"namespaces" yaml:"namespaces"`
+	Namespaces OperatorConfigWatchNamespaces `json:"namespaces" yaml:"namespaces"`
+}
+
+type OperatorConfigWatchNamespaces struct {
+	Include *types.Strings `json:"include" yaml:"include`
+	Exclude *types.Strings `json:"exclude" yaml:"exclude`
+}
+
+func (n *OperatorConfigWatchNamespaces) UnmarshalJSON(data []byte) error {
+	type OperatorConfigWatchNamespaces2 OperatorConfigWatchNamespaces
+	var namespaces OperatorConfigWatchNamespaces2
+	if err := json.Unmarshal(data, &namespaces); err == nil {
+		s := OperatorConfigWatchNamespaces{
+			Include: namespaces.Include,
+			Exclude: namespaces.Exclude,
+		}
+		*n = s
+		return nil
+	}
+
+	var sl []string
+	if err := json.Unmarshal(data, &sl); err == nil {
+		s := OperatorConfigWatchNamespaces{
+			Include: types.NewStrings(sl),
+		}
+		*n = s
+		return nil
+	}
+
+	return fmt.Errorf("unable to OperatorConfigWatchNamespaces.UnmarshalJSON()")
 }
 
 // OperatorConfigConfig specifies Config section
@@ -385,14 +414,7 @@ type OperatorConfigCHIRuntime struct {
 
 // OperatorConfigReconcile specifies reconcile section
 type OperatorConfigReconcile struct {
-	Runtime struct {
-		ReconcileCHIsThreadsNumber           int `json:"reconcileCHIsThreadsNumber"           yaml:"reconcileCHIsThreadsNumber"`
-		ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
-		ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
-
-		// DEPRECATED, is replaced with reconcileCHIsThreadsNumber
-		ThreadsNumber int `json:"threadsNumber" yaml:"threadsNumber"`
-	} `json:"runtime" yaml:"runtime"`
+	Runtime OperatorConfigReconcileRuntime `json:"runtime" yaml:"runtime"`
 
 	StatefulSet struct {
 		Create struct {
@@ -406,26 +428,188 @@ type OperatorConfigReconcile struct {
 		} `json:"update" yaml:"update"`
 	} `json:"statefulSet" yaml:"statefulSet"`
 
-	Host OperatorConfigReconcileHost `json:"host" yaml:"host"`
+	Host ReconcileHost `json:"host" yaml:"host"`
 }
 
-// OperatorConfigReconcileHost defines reconcile host config
-type OperatorConfigReconcileHost struct {
-	Wait OperatorConfigReconcileHostWait `json:"wait" yaml:"wait"`
+type OperatorConfigReconcileRuntime struct {
+	ReconcileCHIsThreadsNumber           int `json:"reconcileCHIsThreadsNumber"           yaml:"reconcileCHIsThreadsNumber"`
+	ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
+	ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
+
+	// DEPRECATED, is replaced with reconcileCHIsThreadsNumber
+	ThreadsNumber int `json:"threadsNumber" yaml:"threadsNumber"`
 }
 
-// OperatorConfigReconcileHostWait defines reconcile host wait config
-type OperatorConfigReconcileHostWait struct {
-	Exclude  *types.StringBool                        `json:"exclude,omitempty"  yaml:"exclude,omitempty"`
-	Queries  *types.StringBool                        `json:"queries,omitempty"  yaml:"queries,omitempty"`
-	Include  *types.StringBool                        `json:"include,omitempty"  yaml:"include,omitempty"`
-	Replicas *OperatorConfigReconcileHostWaitReplicas `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+// ReconcileHost defines reconcile host config
+type ReconcileHost struct {
+	Wait ReconcileHostWait `json:"wait" yaml:"wait"`
+	Drop ReconcileHostDrop `json:"drop" yaml:"drop"`
 }
 
-type OperatorConfigReconcileHostWaitReplicas struct {
+func (rh ReconcileHost) Normalize() ReconcileHost {
+	rh.Wait = rh.Wait.Normalize()
+	rh.Drop = rh.Drop.Normalize()
+	return rh
+}
+
+func (rh ReconcileHost) MergeFrom(from ReconcileHost) ReconcileHost {
+	rh.Wait = rh.Wait.MergeFrom(from.Wait)
+	rh.Drop = rh.Drop.MergeFrom(from.Drop)
+	return rh
+}
+
+// ReconcileHostWait defines reconcile host wait config
+type ReconcileHostWait struct {
+	Exclude  *types.StringBool          `json:"exclude,omitempty"  yaml:"exclude,omitempty"`
+	Queries  *types.StringBool          `json:"queries,omitempty"  yaml:"queries,omitempty"`
+	Include  *types.StringBool          `json:"include,omitempty"  yaml:"include,omitempty"`
+	Replicas *ReconcileHostWaitReplicas `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+	Probes   *ReconcileHostWaitProbes   `json:"probes,omitempty"   yaml:"probes,omitempty"`
+}
+
+func (wait ReconcileHostWait) Normalize() ReconcileHostWait {
+	if wait.Replicas == nil {
+		wait.Replicas = &ReconcileHostWaitReplicas{}
+	}
+
+	if wait.Replicas.Delay == nil {
+		// Default update timeout in seconds
+		wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
+	}
+
+	if wait.Probes == nil {
+		// Default value
+		wait.Probes = &ReconcileHostWaitProbes{
+			Readiness: types.NewStringBool(true),
+		}
+	}
+
+	return wait
+}
+
+func (wait ReconcileHostWait) MergeFrom(from ReconcileHostWait) ReconcileHostWait {
+	wait.Exclude = wait.Exclude.MergeFrom(from.Exclude)
+	wait.Queries = wait.Queries.MergeFrom(from.Queries)
+	wait.Include = wait.Include.MergeFrom(from.Include)
+	wait.Replicas = wait.Replicas.MergeFrom(from.Replicas)
+	wait.Probes = wait.Probes.MergeFrom(from.Probes)
+
+	return wait
+}
+
+// ReconcileHostDrop defines reconcile host drop config
+type ReconcileHostDrop struct {
+	Replicas *ReconcileHostDropReplicas `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+}
+
+func (drop ReconcileHostDrop) Normalize() ReconcileHostDrop {
+	if drop.Replicas == nil {
+		drop.Replicas = &ReconcileHostDropReplicas{}
+	}
+
+	return drop
+}
+
+func (drop ReconcileHostDrop) MergeFrom(from ReconcileHostDrop) ReconcileHostDrop {
+	drop.Replicas = drop.Replicas.MergeFrom(from.Replicas)
+
+	return drop
+}
+
+type ReconcileHostWaitReplicas struct {
 	All   *types.StringBool `json:"all,omitempty"   yaml:"all,omitempty"`
 	New   *types.StringBool `json:"new,omitempty"   yaml:"new,omitempty"`
 	Delay *types.Int32      `json:"delay,omitempty" yaml:"delay,omitempty"`
+}
+
+func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas) *ReconcileHostWaitReplicas {
+	if from == nil {
+		// Nothing to merge from, keep original value
+		return r
+	}
+
+	// From now on we have `from` specified
+
+	if r == nil {
+		// Recipient is not specified, just use `from` value
+		return from
+	}
+
+	// Both recipient and `from` are specified, need to walk over fields
+
+	r.All = r.All.MergeFrom(from.All)
+	r.New = r.New.MergeFrom(from.New)
+	r.Delay = r.Delay.MergeFrom(from.Delay)
+
+	return r
+}
+
+type ReconcileHostWaitProbes struct {
+	Startup   *types.StringBool `json:"startup,omitempty"   yaml:"startup,omitempty"`
+	Readiness *types.StringBool `json:"readiness,omitempty" yaml:"readiness,omitempty"`
+}
+
+func (p *ReconcileHostWaitProbes) GetStartup() *types.StringBool {
+	if p == nil {
+		return nil
+	}
+	return p.Startup
+}
+
+func (p *ReconcileHostWaitProbes) GetReadiness() *types.StringBool {
+	if p == nil {
+		return nil
+	}
+	return p.Readiness
+}
+
+func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *ReconcileHostWaitProbes {
+	if from == nil {
+		// Nothing to merge from, keep original value
+		return p
+	}
+
+	// From now on we have `from` specified
+
+	if p == nil {
+		// Recipient is not specified, just use `from` value
+		return from
+	}
+
+	// Both recipient and `from` are specified, need to walk over fields
+
+	p.Startup = p.Startup.MergeFrom(from.Startup)
+	p.Readiness = p.Readiness.MergeFrom(from.Readiness)
+
+	return p
+}
+
+type ReconcileHostDropReplicas struct {
+	OnDelete     *types.StringBool `json:"onDelete,omitempty"     yaml:"onDelete,omitempty"`
+	OnLostVolume *types.StringBool `json:"onLostVolume,omitempty" yaml:"onLostVolume,omitempty"`
+	Active       *types.StringBool `json:"active,omitempty"       yaml:"active,omitempty"`
+}
+
+func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas) *ReconcileHostDropReplicas {
+	if from == nil {
+		// Nothing to merge from, keep original value
+		return r
+	}
+
+	// From now on we have `from` specified
+
+	if r == nil {
+		// Recipient is not specified, just use `from` value
+		return from
+	}
+
+	// Both recipient and `from` are specified, need to walk over fields
+
+	r.OnDelete = r.OnDelete.MergeFrom(from.OnDelete)
+	r.OnLostVolume = r.OnLostVolume.MergeFrom(from.OnLostVolume)
+	r.Active = r.Active.MergeFrom(from.Active)
+
+	return r
 }
 
 // OperatorConfigAnnotation specifies annotation section
@@ -837,15 +1021,7 @@ func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
 }
 
 func (c *OperatorConfig) normalizeSectionReconcileHost() {
-	// Timeouts
-	if c.Reconcile.Host.Wait.Replicas == nil {
-		c.Reconcile.Host.Wait.Replicas = &OperatorConfigReconcileHostWaitReplicas{}
-	}
-
-	if c.Reconcile.Host.Wait.Replicas.Delay == nil {
-		// Default update timeout in seconds
-		c.Reconcile.Host.Wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
-	}
+	c.Reconcile.Host = c.Reconcile.Host.Normalize()
 }
 
 func (c *OperatorConfig) normalizeSectionClickHouseConfigurationUserDefault() {
@@ -1003,47 +1179,61 @@ func (c *OperatorConfig) normalize() {
 func (c *OperatorConfig) applyEnvVarParams() {
 	if ns := os.Getenv(deployment.WATCH_NAMESPACE); len(ns) > 0 {
 		// We have WATCH_NAMESPACE explicitly specified
-		c.Watch.Namespaces = []string{ns}
+		c.Watch.Namespaces.Include = types.NewStrings([]string{ns})
 	}
 
 	if nss := os.Getenv(deployment.WATCH_NAMESPACES); len(nss) > 0 {
 		// We have WATCH_NAMESPACES explicitly specified
-		namespaces := strings.FieldsFunc(nss, func(r rune) bool {
-			return r == ':' || r == ','
-		})
-		c.Watch.Namespaces = []string{}
-		for i := range namespaces {
-			if len(namespaces[i]) > 0 {
-				c.Watch.Namespaces = append(c.Watch.Namespaces, namespaces[i])
-			}
+		if namespaces := c.splitNamespaces(nss); len(namespaces) > 0 {
+			c.Watch.Namespaces.Include = types.NewStrings(namespaces)
+		}
+	}
+
+	if nss := os.Getenv(deployment.WATCH_NAMESPACES_EXCLUDE); len(nss) > 0 {
+		// We have WATCH_NAMESPACES_EXCLUDE explicitly specified
+		if namespaces := c.splitNamespaces(nss); len(namespaces) > 0 {
+			c.Watch.Namespaces.Exclude = types.NewStrings(namespaces)
 		}
 	}
 }
 
+func (c *OperatorConfig) splitNamespaces(combined string) (namespaces []string) {
+	candidates := strings.FieldsFunc(combined, func(r rune) bool {
+		return r == ':' || r == ','
+	})
+	for _, str := range candidates {
+		candidate := strings.TrimSpace(str)
+		if len(candidate) > 0 {
+			namespaces = append(namespaces, candidate)
+		}
+	}
+	return namespaces
+}
+
 // applyDefaultWatchNamespace applies default watch namespace in case none specified earlier
 func (c *OperatorConfig) applyDefaultWatchNamespace() {
-	// In case we have watched namespaces specified, all is fine
-	// In case we do not have watched namespaces specified, we need to decide, what namespace to watch.
+	// In case we have watched namespaces specified explicitly, all is fine
+	// In case we do not have watched namespaces specified, we need to decide, what namespace(s) to watch.
 	// In this case, there are two options:
-	// 1. Operator runs in kube-system namespace - assume this is global installation, need to watch ALL namespaces
+	// 1. Operator runs in 'kube-system' namespace - assume this is global installation, need to watch ALL namespaces
 	// 2. Operator runs in other (non kube-system) namespace - assume this is local installation, watch this namespace only
-	// Watch in own namespace only in case no other specified earlier
+	// Main idea is to watch in own namespace only in case no other specified explicitly and non-global deploy (not in 'kube-system')
 
-	if len(c.Watch.Namespaces) > 0 {
-		// We have namespace(s) specified already
+	if c.Watch.Namespaces.Include.HasValue() {
+		// We have namespace(s) explicitly specified already, all is good
 		return
 	}
 
-	// No namespaces specified
+	// No namespace(s) specified explicitly, need to infer
 
-	if c.Runtime.Namespace == "kube-system" {
+	if c.Runtime.Namespace == meta.NamespaceSystem {
 		// Operator is running in system namespace
 		// Do nothing, we already have len(config.WatchNamespaces) == 0
 	} else {
-		// Operator is running is explicit namespace. Watch in it
-		c.Watch.Namespaces = []string{
+		// Operator is running inside a namespace. Watch in it
+		c.Watch.Namespaces.Include = types.NewStrings([]string{
 			c.Runtime.Namespace,
-		}
+		})
 	}
 }
 
@@ -1119,15 +1309,42 @@ func (c *OperatorConfig) copyWithHiddenCredentials() *OperatorConfig {
 	return conf
 }
 
-// IsWatchedNamespace returns whether specified namespace is in a list of watched
+// IsNamespaceWatched returns whether specified namespace is in a list of watched
 // TODO unify with GetInformerNamespace
-func (c *OperatorConfig) IsWatchedNamespace(namespace string) bool {
-	// In case no namespaces specified - watch all namespaces
-	if len(c.Watch.Namespaces) == 0 {
-		return true
-	}
+func (c *OperatorConfig) IsNamespaceWatched(namespace string) bool {
+	return c.isNamespaceIncluded(namespace) && !c.isNamespaceExcluded(namespace)
+}
 
-	return util.InArrayWithRegexp(namespace, c.Watch.Namespaces)
+func (c *OperatorConfig) isNamespaceIncluded(namespace string) bool {
+	switch {
+	// In case no included namespaces specified - consider all namespaces included
+	case !c.Watch.Namespaces.Include.HasValue():
+		return true
+
+	// In case matches any included namespaces regexp specified - consider it included
+	case c.Watch.Namespaces.Include.Match(namespace):
+		return true
+
+	// No match to explicitly specified set of namespace regexp - not included
+	default:
+		return false
+	}
+}
+
+func (c *OperatorConfig) isNamespaceExcluded(namespace string) bool {
+	switch {
+	// In case no excluded namespaces specified - consider not excluded
+	case !c.Watch.Namespaces.Exclude.HasValue():
+		return false
+
+	// In case matches any excluded namespaces regexp specified - consider it excluded
+	case c.Watch.Namespaces.Exclude.Match(namespace):
+		return true
+
+	// No match to explicitly specified set of namespace regexp - not excluded
+	default:
+		return false
+	}
 }
 
 // GetInformerNamespace is a TODO stub
@@ -1136,12 +1353,13 @@ func (c *OperatorConfig) IsWatchedNamespace(namespace string) bool {
 // be it explicitly specified namespace or empty line for "all namespaces".
 // That's what conflicts with CHOp's approach to 'specify list of namespaces to watch in', having
 // slice of namespaces (CHOp's approach) incompatible with "one namespace name" approach
-// TODO unify with IsWatchedNamespace
+// TODO unify with IsNamespaceWatched
 // TODO unify approaches to multiple namespaces support
 func (c *OperatorConfig) GetInformerNamespace() string {
 	// Namespace where informers would watch notifications from
 	namespace := meta.NamespaceAll
-	if len(c.Watch.Namespaces) == 1 {
+
+	if c.Watch.Namespaces.Include.Len() == 1 {
 		// We have exactly one watch namespace specified
 		// This scenario is implemented in go-client
 		// In any other case, just keep metav1.NamespaceAll
@@ -1149,8 +1367,8 @@ func (c *OperatorConfig) GetInformerNamespace() string {
 		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
 		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
 		var labelRegexp = regexp.MustCompile("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
-		if labelRegexp.MatchString(c.Watch.Namespaces[0]) {
-			namespace = c.Watch.Namespaces[0]
+		if labelRegexp.MatchString(c.Watch.Namespaces.Include.First()) {
+			namespace = c.Watch.Namespaces.Include.First()
 		}
 	}
 
@@ -1182,7 +1400,7 @@ func (c *OperatorConfig) GetRevisionHistoryLimit() *int32 {
 func (c *OperatorConfig) move() {
 	// WatchNamespaces where operator watches for events
 	if len(c.WatchNamespaces) > 0 {
-		c.Watch.Namespaces = c.WatchNamespaces
+		c.Watch.Namespaces.Include = types.NewStrings(c.WatchNamespaces)
 	}
 
 	if c.CHCommonConfigsPath != "" {

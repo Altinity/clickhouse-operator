@@ -13,8 +13,8 @@ spec:
       storage_configuration/policies/default/volumes/default/disk: default
       storage_configuration/policies/default/volumes/disk2/disk: disk2
   defaults:
-#    storageManagement:
-#      provisioner: StatefulSet
+    storageManagement:
+      provisioner: StatefulSet # this is default
     templates:
       podTemplate: multi-volume
   templates:
@@ -38,7 +38,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:24.3
+              image: altinity/clickhouse-server:25.3.6.10034.altinitystable
               volumeMounts:
                 - name: disk1
                   mountPath: /var/lib/clickhouse

@@ -49,3 +49,9 @@ tests/image/cache
 
 # Ignore DevSpace cache and log folder
 /.devspace
+
+# agents
+.aider*
+CLAUDE.md
+AGENTS.md
+.claude

@@ -10,7 +10,7 @@ stringData:
   disable_internal_dns_cache: "1"
   quota: "test_quota"
   example.xml: |
-    <yandex> <!-- just example --> </yandex>
+    <yandex><!-- just an example --></yandex>
 
 ---
 apiVersion: "clickhouse.altinity.com/v1"
@@ -115,7 +115,6 @@ spec:
           secretKeyRef:
             name: clickhouse-credentials
             key: example.xml
-
       dict1.xml: |
         <yandex>
             <!-- ref to file /etc/clickhouse-data/config.d/source1.csv -->

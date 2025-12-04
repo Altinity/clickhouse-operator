@@ -21,8 +21,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 )
 
-// func getMaxNumberOfPodsPerNode
-// What is the max number of Pods allowed per Node
+// getMaxNumberOfPodsPerNode calculates the max number of Pods allowed per Node
+// Used for scope cycles calculation
 // TODO need to support multi-cluster
 func getMaxNumberOfPodsPerNode(cr ICustomResource) int {
 	maxNumberOfPodsPerNode := 0
@@ -37,6 +37,7 @@ func getMaxNumberOfPodsPerNode(cr ICustomResource) int {
 	return maxNumberOfPodsPerNode
 }
 
+// calcCRAndClusterScopeCycleSizes calculates scope cycle sizes
 func calcCRAndClusterScopeCycleSizes(cr ICustomResource, maxNumberOfPodsPerNode int) (crScopeCycleSize int, clusterScopeCycleSize int) {
 	//          1perNode   2perNode  3perNode  4perNode  5perNode
 	// sh1r1    n1   a     n1  a     n1 a      n1  a     n1  a
@@ -72,6 +73,7 @@ func calcCRAndClusterScopeCycleSizes(cr ICustomResource, maxNumberOfPodsPerNode 
 		// One cycle only requested
 		clusterScopeCycleSize = 0 // Unlimited
 	} else {
+		// Multiple cycles requested
 		clusterScopeCycleSize = int(math.Ceil(float64(cr.HostsCount()) / float64(requestedClusterScopeCyclesNum)))
 	}
 
@@ -88,36 +90,36 @@ func fillSelfCalculatedAddressInfo(cr ICustomResource) {
 		chiScopeCycleSize,
 		clusterScopeCycleSize,
 		func(
-			chi ICustomResource,
+			cr ICustomResource,
 			cluster ICluster,
 			shard IShard,
 			replica IReplica,
 			host IHost,
 			address *types.HostScopeAddress,
 		) error {
-			cluster.GetRuntime().GetAddress().SetNamespace(chi.GetNamespace())
-			cluster.GetRuntime().GetAddress().SetCRName(chi.GetName())
+			cluster.GetRuntime().GetAddress().SetNamespace(cr.GetNamespace())
+			cluster.GetRuntime().GetAddress().SetCRName(cr.GetName())
 			cluster.GetRuntime().GetAddress().SetClusterName(cluster.GetName())
 			cluster.GetRuntime().GetAddress().SetClusterIndex(address.ClusterIndex)
 
-			shard.GetRuntime().GetAddress().SetNamespace(chi.GetNamespace())
-			shard.GetRuntime().GetAddress().SetCRName(chi.GetName())
+			shard.GetRuntime().GetAddress().SetNamespace(cr.GetNamespace())
+			shard.GetRuntime().GetAddress().SetCRName(cr.GetName())
 			shard.GetRuntime().GetAddress().SetClusterName(cluster.GetName())
 			shard.GetRuntime().GetAddress().SetClusterIndex(address.ClusterIndex)
 			shard.GetRuntime().GetAddress().SetShardName(shard.GetName())
 			shard.GetRuntime().GetAddress().SetShardIndex(address.ShardIndex)
 
-			replica.GetRuntime().GetAddress().SetNamespace(chi.GetNamespace())
-			replica.GetRuntime().GetAddress().SetCRName(chi.GetName())
+			replica.GetRuntime().GetAddress().SetNamespace(cr.GetNamespace())
+			replica.GetRuntime().GetAddress().SetCRName(cr.GetName())
 			replica.GetRuntime().GetAddress().SetClusterName(cluster.GetName())
 			replica.GetRuntime().GetAddress().SetClusterIndex(address.ClusterIndex)
 			replica.GetRuntime().GetAddress().SetReplicaName(replica.GetName())
 			replica.GetRuntime().GetAddress().SetReplicaIndex(address.ReplicaIndex)
 
-			host.GetRuntime().GetAddress().SetNamespace(chi.GetNamespace())
+			host.GetRuntime().GetAddress().SetNamespace(cr.GetNamespace())
 			// Skip StatefulSet as impossible to self-calculate
 			// host.Address.StatefulSet = CreateStatefulSetName(host)
-			host.GetRuntime().GetAddress().SetCRName(chi.GetName())
+			host.GetRuntime().GetAddress().SetCRName(cr.GetName())
 			host.GetRuntime().GetAddress().SetClusterName(cluster.GetName())
 			host.GetRuntime().GetAddress().SetClusterIndex(address.ClusterIndex)
 			host.GetRuntime().GetAddress().SetShardName(shard.GetName())

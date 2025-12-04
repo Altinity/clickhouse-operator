@@ -1,0 +1,20 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020001
+spec:
+  defaults:
+    templates:
+      volumeClaimTemplate: default
+  configuration:
+    clusters:
+      - name: default
+  templates:
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

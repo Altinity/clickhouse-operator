@@ -26,65 +26,45 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host, _opts ...*VersionOptions) *swversion.SoftWareVersion {
-	var opts *VersionOptions
-	if len(_opts) > 0 {
-		opts = _opts[0]
+func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
+	opts := &VersionOptions{
+		Skip{
+			New:             true,
+			StoppedAncestor: true,
+		},
+	}
+
+	// Try to report tag-based version
+	if tagBasedVersion := w.getTagBasedVersion(host); tagBasedVersion.IsKnown() {
+		// Able to report version from the tag
+		return tagBasedVersion.SetDescription("parsed from the tag: '%s'", tagBasedVersion.GetOriginal())
 	} else {
-		opts = &VersionOptions{
-			Skip{
-				New:             true,
-				StoppedAncestor: true,
-			},
+		w.a.V(1).M(host).F().Info("Unable to report version from the tag. Tag: '%s' Host: %s ", tagBasedVersion.GetOriginal(), host.GetName())
+		if tagBasedOnly, description := opts.tagBasedOnly(host); tagBasedOnly {
+			return swversion.MinVersion().SetDescription("set min version cause unable to parse from the tag: '%s' via '%s'", tagBasedVersion.GetOriginal(), description)
 		}
-	}
-
-	// Fetch tag from the image
-	tag, tagFound := w.task.Creator().GetAppImageTag(host)
-	var tagBasedVersion *swversion.SoftWareVersion
-	if tagFound {
-		tagBasedVersion = swversion.NewSoftWareVersionFromTag(tag)
-	}
-
-	if skip, description := opts.shouldSkip(host); skip {
-		// We know for sure no need to even try to check version from the host itself
-		// Just fall back to tag-based version
-		w.a.V(1).M(host).F().Info("Need to report version from the tag. Tag: %s Host: %s ", tag, host.GetName())
-		if tagBasedVersion != nil {
-			// Able to report version from the tag
-			return tagBasedVersion.SetDescription("parsed from tag: '" + tag + "' via " + description)
-		}
-		// Unable to report version from the tag - report min one
-		return swversion.MinVersion().SetDescription("set min version cause unable to parse from tag: '" + tag + "' via " + description)
+		w.a.V(1).M(host).F().Info("Fallback to app-based version. Tag: '%s' Host: %s ", tagBasedVersion.GetOriginal(), host.GetName())
 	}
 
 	// Try to report version from the app
-
-	if version, err := w.getHostClickHouseVersion(ctx, host); err == nil {
+	if appBasedVersion := w.getHostClickHouseVersion(ctx, host); appBasedVersion.IsKnown() {
 		// Able to fetch version from the app - report version
-		return version.SetDescription("fetched from host")
+		return appBasedVersion.SetDescription("fetched from the host")
 	}
 
-	// Unable to fetch version fom the app
-	// Try to fallback to tag-based version
-
-	if tagBasedVersion != nil {
-		// Able to report version from the tag
-		return tagBasedVersion.SetDescription("parsed from tag: '" + tag + "'")
-	}
-
-	// Unable to report version from the tag - report min one
-	return swversion.MinVersion().SetDescription("min - unable to parse neither from host nor from tag: '" + tag + "'")
+	// Unable to acquire any version - report min one
+	return swversion.MinVersion().SetDescription("min - unable to acquire neither from the tag nor from the app")
 }
 
 func (w *worker) isHostSoftwareAbleToRespond(ctx context.Context, host *api.Host) error {
 	// Check whether the software is able to respond its version
-	version, err := w.getHostClickHouseVersion(ctx, host)
-	if err != nil {
-		w.a.V(1).M(host).F().Info("Host software is not alive - version NOT detected. Host: %s Err: %v", host.GetName(), err)
+	version := w.getHostClickHouseVersion(ctx, host)
+	if version.IsKnown() {
+		w.a.V(1).M(host).F().Info("Host software is alive - version detected. Host: %s version: %s", host.GetName(), version)
+	} else {
+		w.a.V(1).M(host).F().Info("Host software is not alive - version NOT detected. Host: %s ", host.GetName())
 	}
 
-	w.a.V(1).M(host).F().Info("Host software is alive - version detected. Host: %s version: %s", host.GetName(), version)
 	return nil
 }
 
@@ -206,7 +186,7 @@ func (w *worker) runConcurrentlyInBatches(ctx context.Context, workersNum int, s
 	return nil
 }
 
-func (w *worker) hostPVCsDataLossDetected(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {
+func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {
 	w.a.V(1).
 		M(host).F().
 		Info("Data loss detected for host: %s. Will do force data recovery", host.GetName())
@@ -214,8 +194,21 @@ func (w *worker) hostPVCsDataLossDetected(host *api.Host) (*statefulset.Reconcil
 	// In case of data loss detection on existing volumes, we need to:
 	// 1. recreate StatefulSet
 	// 2. run tables migration again
-	return statefulset.NewReconcileStatefulSetOptions().SetForceRecreate(), &migrateTableOptions{
-		forceMigrate: true,
-		dropReplica:  true,
-	}
+
+	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
+	migrateTableOpts := NewMigrateTableOptions().SetForceMigrate().SetForceDropReplicaUponStorageLoss()
+	return stsReconcileOpts, migrateTableOpts
+}
+
+func (w *worker) hostPVCsDataVolumeMissedDetectedOptions(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {
+	w.a.V(1).
+		M(host).F().
+		Info("Data volume missed detected for host: %s. Will do force volume creation", host.GetName())
+
+	// In case of data volume missed detection, we need to:
+	// 1. recreate StatefulSet
+	// NB Do not run tables migration again
+
+	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
+	return stsReconcileOpts, nil
 }

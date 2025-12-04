@@ -53,16 +53,19 @@ func (n *Namer) createPodHostnameRegexp(chi api.ICustomResource, template string
 
 // createClusterAutoSecretName creates Secret name where auto-generated secret is kept
 func createClusterAutoSecretName(cluster api.ICluster) string {
-	if cluster.GetName() == "" {
+	if cluster.HasName() {
 		return fmt.Sprintf(
-			"%s-auto-secret",
+			// "{cr name}-{cluster name}-auto-secret"
+			"%s-%s-auto-secret",
 			cluster.GetRuntime().GetCR().GetName(),
+			cluster.GetName(),
 		)
 	}
-
+	// Cluster has no name
 	return fmt.Sprintf(
-		"%s-%s-auto-secret",
+		// "{cr name}-auto-secret"
+		"%s-auto-secret",
 		cluster.GetRuntime().GetCR().GetName(),
-		cluster.GetName(),
 	)
+
 }

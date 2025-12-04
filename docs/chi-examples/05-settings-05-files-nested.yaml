@@ -23,7 +23,7 @@ spec:
         <yandex>
           <!-- users_prefixed_1.file -->
         </yandex>
-      "{host}/host_prefixed_1.file": |
+      "{hosts}/host_prefixed_1.file": |
         <yandex>
           <!-- host_prefixed_1.file -->
         </yandex>
@@ -50,9 +50,9 @@ spec:
         files:
           simple_2.file: |
             <yandex>
-              <!-- simple_2.file goes to {host} -->
+              <!-- simple_2.file goes to {hosts} -->
             </yandex>
-          "{host}/host_prefixed_2.file": |
+          "{hosts}/host_prefixed_2.file": |
             <yandex>
               <!-- host_prefixed_2.file -->
             </yandex>
@@ -65,9 +65,9 @@ spec:
         files:
           simple_3.file: |
             <yandex>
-              <!-- simple_3.file goes to {host} -->
+              <!-- simple_3.file goes to {hosts} -->
             </yandex>
-          "{host}/host_prefixed_3.file": |
+          "{hosts}/host_prefixed_3.file": |
             <yandex>
               <!-- host_prefixed_3.file -->
             </yandex>
@@ -80,9 +80,9 @@ spec:
             - files:
                 simple_4.file: |
                   <yandex>
-                    <!-- simple_4.file goes to {host} -->
+                    <!-- simple_4.file goes to {hosts} -->
                   </yandex>
-                "{host}/host_prefixed_4.file": |
+                "{hosts}/host_prefixed_4.file": |
                   <yandex>
                     <!-- host_prefixed_4.file -->
                   </yandex>
@@ -95,9 +95,9 @@ spec:
         files:
           simple_5.file: |
             <yandex>
-              <!-- simple_5.file goes to {host} -->
+              <!-- simple_5.file goes to {hosst} -->
             </yandex>
-          "{host}/host_prefixed_5.file": |
+          "{hosts}/host_prefixed_5.file": |
             <yandex>
               <!-- host_prefixed_5.file -->
             </yandex>
@@ -110,9 +110,9 @@ spec:
             - files:
                 simple_6.file: |
                   <yandex>
-                    <!-- simple_6.file goes to {host} -->
+                    <!-- simple_6.file goes to {hosts} -->
                   </yandex>
-                "{host}/host_prefixed_6.file": |
+                "{hosts}/host_prefixed_6.file": |
                   <yandex>
                     <!-- host_prefixed_6.file -->
                   </yandex>
@@ -125,9 +125,9 @@ spec:
         files:
           simple_7.file: |
             <yandex>
-              <!-- simple_7.file goes to {host} -->
+              <!-- simple_7.file goes to {hosts} -->
             </yandex>
-          "{host}/host_prefixed_7.file": |
+          "{hosts}/host_prefixed_7.file": |
             <yandex>
               <!-- host_prefixed_7.file -->
             </yandex>
@@ -140,9 +140,9 @@ spec:
             - files:
                 simple_8.file: |
                   <yandex>
-                    <!-- simple_8.file goes to {host} -->
+                    <!-- simple_8.file goes to {hosts} -->
                   </yandex>
-                "{host}/host_prefixed_8.file": |
+                "{hosts}/host_prefixed_8.file": |
                   <yandex>
                     <!-- host_prefixed_8.file -->
                   </yandex>
@@ -154,9 +154,9 @@ spec:
                 - files:
                     simple_9.file: |
                       <yandex>
-                        <!-- simple_9.file goes to {host} -->
+                        <!-- simple_9.file goes to {hosts} -->
                       </yandex>
-                    "{host}/host_prefixed_9.file": |
+                    "{hosts}/host_prefixed_9.file": |
                       <yandex>
                         <!-- host_prefixed_9.file -->
                       </yandex>
@@ -169,9 +169,9 @@ spec:
         files:
           simple_10.file: |
             <yandex>
-              <!-- simple_10.file goes to {host} -->
+              <!-- simple_10.file goes to {hosts} -->
             </yandex>
-          "{host}/host_prefixed_10.file": |
+          "{hosts}/host_prefixed_10.file": |
             <yandex>
               <!-- host_prefixed_10.file -->
             </yandex>
@@ -184,9 +184,9 @@ spec:
             - files:
                 simple_11.file: |
                   <yandex>
-                    <!-- simple_11.file goes to {host} -->
+                    <!-- simple_11.file goes to {hosts} -->
                   </yandex>
-                "{host}/host_prefixed_11.file": |
+                "{hosts}/host_prefixed_11.file": |
                   <yandex>
                     <!-- host_prefixed_11.file -->
                   </yandex>
@@ -198,9 +198,9 @@ spec:
                 - files:
                     simple_12.file: |
                       <yandex>
-                        <!-- simple_12.file goes to {host} -->
+                        <!-- simple_12.file goes to {hosts} -->
                       </yandex>
-                    "{host}/host_prefixed_12.file": |
+                    "{hosts}/host_prefixed_12.file": |
                       <yandex>
                         <!-- host_prefixed_12.file -->
                       </yandex>

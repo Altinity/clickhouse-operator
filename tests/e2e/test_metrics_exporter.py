@@ -9,6 +9,8 @@ from testflows.asserts import error
 import e2e.kubectl as kubectl
 import e2e.settings as settings
 import e2e.util as util
+import e2e.clickhouse as clickhouse
+import e2e.steps as steps
 
 
 @TestScenario
@@ -46,6 +48,7 @@ def test_metrics_exporter_chi(self):
                 with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                     time.sleep(i * 5)
             assert out == expect_result, error()
+
     def check_monitoring_metrics(operator_namespace, operator_pod, expect_result, max_retries=10):
         with Then(f"metrics-exporter /metrics endpoint result should match with {expect_result}"):
             found = 0
@@ -120,6 +123,11 @@ def test_metrics_exporter_chi(self):
                     ]
                 }
             ]
+
+        with Then("Add system.custom_metrics"):
+            clickhouse.query("test-017-multi-version", "CREATE VIEW system.custom_metrics as SELECT 'MyCustomMetric' as metric, 1 as value")
+
+
         with Then("Check both pods are monitored"):
             check_monitoring_chi(self.context.operator_namespace, operator_pod, expected_chi)
         labels = ','.join([
@@ -127,17 +135,25 @@ def test_metrics_exporter_chi(self):
                   'clickhouse_altinity_com_chi="test-017-multi-version"',
                   'clickhouse_altinity_com_email="myname@mydomain.com, yourname@yourdoman.com"'
                   ])
+
         with Then("Check not empty /metrics"):
-                check_monitoring_metrics(
-                    self.context.operator_namespace,
-                    operator_pod,
-                    expect_result={
-                        "# HELP chi_clickhouse_metric_VersionInteger": True,
-                        "# TYPE chi_clickhouse_metric_VersionInteger gauge": True,
-                        "chi_clickhouse_metric_VersionInteger{" + labels +",hostname=\"chi-test-017-multi-version-default-0-0": True,
-                        "chi_clickhouse_metric_VersionInteger{" + labels +",hostname=\"chi-test-017-multi-version-default-1-0": True,
-                    },
-                )
+            check_monitoring_metrics(
+                self.context.operator_namespace,
+                operator_pod,
+                expect_result={
+                    "# HELP chi_clickhouse_metric_VersionInteger": True,
+                    "# TYPE chi_clickhouse_metric_VersionInteger gauge": True,
+                    "chi_clickhouse_metric_VersionInteger{" + labels +",hostname=\"chi-test-017-multi-version-default-0-0": True,
+                    "chi_clickhouse_metric_VersionInteger{" + labels +",hostname=\"chi-test-017-multi-version-default-1-0": True,
+                },
+            )
+
+        with Then("Check that custom_metrics is properly monitored"):
+            steps.check_metrics_monitoring(
+                operator_namespace = self.context.operator_namespace,
+                operator_pod = operator_pod,
+                expect_pattern="^chi_clickhouse_metric_MyCustomMetric{(.*?)} 1$"
+            )
 
         with When("reboot metrics exporter"):
             kubectl.launch(f"exec -n {self.context.operator_namespace} {operator_pod} -c metrics-exporter -- bash -c 'kill 1'")

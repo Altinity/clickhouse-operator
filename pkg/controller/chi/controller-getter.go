@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"context"
 	"fmt"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,35 +24,48 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // getPodsIPs gets all pod IPs
-func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
-	log.V(3).M(obj).F().S().Info("looking for pods IPs")
-	defer log.V(3).M(obj).F().E().Info("looking for pods IPs")
+func (c *Controller) getPodsIPs(ctx context.Context, obj interface{}) (ips []string) {
+	l := log.V(3).M(obj).F()
 
-	for _, pod := range c.kube.Pod().GetAll(obj) {
+	l.S().Info("looking for pods IPs")
+	defer l.E().Info("looking for pods IPs")
+
+	for _, pod := range c.kube.Pod().GetAll(ctx, obj) {
 		if ip := pod.Status.PodIP; ip == "" {
-			log.V(3).M(pod).F().Warning("Pod NO IP address found. Pod: %s/%s", pod.Namespace, pod.Name)
+			l.Warning("Pod NO IP address found. Pod: %s", util.NamespacedName(pod))
 		} else {
 			ips = append(ips, ip)
-			log.V(3).M(pod).F().Info("Pod IP address found. Pod: %s/%s IP: %s", pod.Namespace, pod.Name, ip)
+			l.Info("Pod IP address found. Pod: %s IP: %s", util.NamespacedName(pod), ip)
 		}
 	}
 	return ips
 }
 
-// GetCHIByObjectMeta gets CHI by namespaced name
-func (c *Controller) GetCHIByObjectMeta(obj meta.Object, searchByName bool) (*api.ClickHouseInstallation, error) {
-	var crName string
-	if searchByName {
-		crName = obj.GetName()
-	} else {
-		var err error
-		crName, err = chiLabeler.New(nil).GetCRNameFromObjectMeta(obj)
-		if err != nil {
-			return nil, fmt.Errorf("unable to find CR by name: '%s'. More info: %v", obj.GetName(), err)
+// GetCR gets CR by any object that is either a CR itself or has labels referencing a CR
+func (c *Controller) GetCR(obj meta.Object) (*api.ClickHouseInstallation, error) {
+	switch obj.(type) {
+	case *api.ClickHouseInstallation:
+		// Object is a CR itself. Try to find it directly by namespace+name pair
+		cr, err := c.kube.CR().Get(controller.NewContext(), obj.GetNamespace(), obj.GetName())
+		if cr == nil {
+			return nil, err
 		}
+		return cr.(*api.ClickHouseInstallation), err
+	default:
+		// Object is not a CR itself. Try to find it by labels referencing owner CR
+		return c.getCRByObject(obj)
+	}
+}
+
+// getCRByObject gets CR by labels
+func (c *Controller) getCRByObject(obj meta.Object) (*api.ClickHouseInstallation, error) {
+	crName, err := chiLabeler.New(nil).GetCRNameFromObjectMeta(obj)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find CR name in labels provided by the object: '%s'. err: %v", util.NamespacedName(obj), err)
 	}
 
 	cr, err := c.kube.CR().Get(controller.NewContext(), obj.GetNamespace(), crName)

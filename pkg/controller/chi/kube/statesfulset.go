@@ -23,8 +23,8 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -64,30 +64,44 @@ func (c *STS) Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 			name = c.namer.Name(interfaces.NameStatefulSet, obj)
 			namespace = typedObj.Runtime.Address.Namespace
 		default:
-			panic("unknown type")
+			panic(any("unknown type"))
 		}
 	default:
-		panic("unexxpected number of args")
+		panic(any("unexpected number of args"))
 	}
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *STS) Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, controller.NewCreateOptions())
 }
 
 // Update is an internal function, used in reconcileStatefulSet only
 func (c *STS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.AppsV1().StatefulSets(sts.Namespace).Update(ctx, sts, controller.NewUpdateOptions())
+}
+
+func (c *STS) Remove(ctx context.Context, namespace, name string) error {
+	ctx = k8sCtx(ctx)
+	return c.kubeClient.AppsV1().StatefulSets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 }
 
 // Delete gracefully deletes StatefulSet through zeroing Pod's count
 func (c *STS) Delete(ctx context.Context, namespace, name string) error {
-	c.kubeClient.AppsV1().StatefulSets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
-	return poller.New(ctx, fmt.Sprintf("%s/%s", namespace, name)).
-		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
+	item := "StatefulSet"
+	return poller.New(ctx, fmt.Sprintf("delete %s: %s/%s", item, namespace, name)).
+		WithOptions(poller.NewOptionsFromConfig()).
 		WithFunctions(&poller.Functions{
 			IsDone: func(_ctx context.Context, _ any) bool {
+				if err := c.Remove(ctx, namespace, name); err != nil {
+					if !errors.IsNotFound(err) {
+						log.V(1).Warning("Error deleting %s: %s/%s err: %v ", item, namespace, name, err)
+					}
+				}
+
 				_, err := c.Get(ctx, namespace, name)
 				return errors.IsNotFound(err)
 			},
@@ -95,6 +109,7 @@ func (c *STS) Delete(ctx context.Context, namespace, name string) error {
 }
 
 func (c *STS) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]apps.StatefulSet, error) {
+	ctx = k8sCtx(ctx)
 	list, err := c.kubeClient.AppsV1().StatefulSets(namespace).List(ctx, opts)
 	if err != nil {
 		return nil, err

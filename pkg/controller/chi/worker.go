@@ -39,9 +39,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -129,7 +127,7 @@ func (w *worker) buildCreator(cr *api.ClickHouseInstallation) *commonCreator.Cre
 		managers.NewNameManager(managers.NameManagerTypeClickHouse),
 		managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeClickHouse),
 		namer.New(),
-		commonMacro.New(macro.List),
+		macro.New(),
 		labeler.New(cr),
 	)
 }
@@ -139,7 +137,7 @@ func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
-		domain.NewHostStatefulSetPoller(domain.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.ctrlLabeler),
+		domain.NewHostObjectsPoller(domain.NewHostObjectPoller(w.c.kube.STS()), domain.NewHostObjectPoller(w.c.kube.Pod()), w.c.ctrlLabeler),
 		w.c.namer,
 		labeler.New(new),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
@@ -149,7 +147,7 @@ func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
 }
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
-func (w *worker) shouldForceRestartHost(host *api.Host) bool {
+func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) bool {
 	switch {
 	case host.HasAncestor() && host.GetAncestor().IsStopped():
 		w.a.V(1).M(host).F().Info("Host ancestor is stopped, no restart applicable. Host: %s", host.GetName())
@@ -183,7 +181,7 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 
-	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(host):
+	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host):
 		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
 		return true
 
@@ -193,25 +191,10 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	}
 }
 
-func (w *worker) createTemplated(c *api.ClickHouseInstallation, _opts ...*commonNormalizer.Options[api.ClickHouseInstallation]) *api.ClickHouseInstallation {
-	opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
-	if len(_opts) > 0 {
-		opts = _opts[0]
-	}
-	chi, err := w.normalizer.CreateTemplated(c, opts)
-	if err != nil {
-		w.a.WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileFailed).
-			WithError(chi).
-			M(chi).F().
-			Error("FAILED to normalize CR: %v", err)
-	}
-	return chi
-}
-
 // ensureFinalizer
 func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR ensure fin: %s ", chi.GetName())
 		return false
 	}
 
@@ -238,11 +221,10 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 }
 
 // updateEndpoints updates endpoints
-func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
-	w.updateFromMeta(
+func (w *worker) updateEndpoints(ctx context.Context, m meta.Object) error {
+	_ = w.finalizeCR(
 		ctx,
-		new.GetObjectMeta(),
-		false,
+		m,
 		types.UpdateStatusOptions{
 			TolerateAbsence: true,
 			CopyStatusOptions: types.CopyStatusOptions{
@@ -256,23 +238,24 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 	return nil
 }
 
-func (w *worker) updateFromMeta(
+func (w *worker) finalizeCR(
 	ctx context.Context,
 	obj meta.Object,
-	searchByName bool,
 	updateStatusOpts types.UpdateStatusOptions,
 	f func(*api.ClickHouseInstallation),
 ) error {
-	chi, _ := w.buildFromMeta(ctx, obj, searchByName)
+	chi, err := w.buildCRFromObj(ctx, obj)
+	if err != nil {
+		log.V(1).Error("Unable to finalize CR: %s err: %v", util.NamespacedName(obj), err)
+		return err
+	}
 
 	if f != nil {
 		f(chi)
 	}
 
-	// TODO unify with finalize reconcile
-	w.newTask(chi, chi.GetAncestorT())
-	w.reconcileConfigMapCommonUsers(ctx, chi)
-	w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
+	_ = w.reconcileConfigMapCommonUsers(ctx, chi)
+	_ = w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
 
 	return nil
 }
@@ -280,7 +263,7 @@ func (w *worker) updateFromMeta(
 // updateCHI sync CHI which was already created earlier
 func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Update CHI is aborted. CR: %s ", new.GetName())
 		return nil
 	}
 
@@ -307,7 +290,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	}
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted")
 		return nil
 	}
 
@@ -328,7 +311,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	}
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted")
 		return nil
 	}
 
@@ -339,7 +322,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	}
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted.")
 		return nil
 	}
 
@@ -347,44 +330,14 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	return w.reconcileCR(ctx, old, new)
 }
 
-// excludeStoppedCHIFromMonitoring excludes stopped CHI from monitoring
-func (w *worker) excludeStoppedCHIFromMonitoring(chi *api.ClickHouseInstallation) {
-	if !chi.IsStopped() {
-		// No need to exclude non-stopped CHI
-		return
-	}
-
-	w.a.V(1).
-		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileInProgress).
-		WithAction(chi).
-		M(chi).F().
-		Info("exclude CHI from monitoring")
-	w.c.deleteWatch(chi)
-}
-
-// addCHIToMonitoring adds CHI to monitoring
-func (w *worker) addCHIToMonitoring(chi *api.ClickHouseInstallation) {
-	if chi.IsStopped() {
-		// No need to add stopped CHI
-		return
-	}
-
-	w.a.V(1).
-		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileInProgress).
-		WithAction(chi).
-		M(chi).F().
-		Info("add CHI to monitoring")
-	w.c.updateWatch(chi)
-}
-
-func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
+func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
-	cr.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
+	cr.EnsureStatus().ReconcileStart(cr.EnsureRuntime().ActionPlan)
 	_ = w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
@@ -399,21 +352,21 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInsta
 		WithActions(cr).
 		M(cr).F().
 		Info("reconcile started, task id: %s", cr.GetSpecT().GetTaskID())
-	w.a.V(2).M(cr).F().Info("action plan\n%s\n", ap.String())
+	w.a.V(2).M(cr).F().Info("action plan\n%s\n", cr.EnsureRuntime().ActionPlan.String())
 }
 
 func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", _cr.GetName())
 		return
 	}
+
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	w.updateFromMeta(
+	_ = w.finalizeCR(
 		ctx,
 		_cr,
-		true,
 		types.UpdateStatusOptions{
 			CopyStatusOptions: types.CopyStatusOptions{
 				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
@@ -438,7 +391,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 
 func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *api.ClickHouseInstallation, err error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
@@ -464,14 +417,14 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *a
 		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", cr.GetSpecT().GetTaskID())
 }
 
-func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
+func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
 	existingObjects := w.c.discovery(ctx, cr)
-	ap.WalkAdded(
+	cr.EnsureRuntime().ActionPlan.WalkAdded(
 		// Walk over added clusters
 		func(cluster api.ICluster) {
 			w.a.V(1).M(cr).Info("Walking over AP added clusters. Cluster: %s", cluster.GetName())
@@ -524,7 +477,7 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *api.ClickHo
 		},
 	)
 
-	ap.WalkModified(
+	cr.EnsureRuntime().ActionPlan.WalkModified(
 		func(cluster api.ICluster) {
 			w.a.V(1).M(cr).Info("Walking over AP modified clusters. Cluster: %s", cluster.GetName())
 		},
@@ -575,24 +528,26 @@ func (w *worker) logHosts(cr api.ICustomResource) {
 	})
 }
 
-// createTemplatedCRFromObjectMeta
-func (w *worker) createTemplatedCRFromObjectMeta(
-	obj meta.Object,
-	searchByName bool,
-	options *commonNormalizer.Options[api.ClickHouseInstallation],
-) (*api.ClickHouseInstallation, error) {
-	w.a.V(3).M(obj).S().P()
-	defer w.a.V(3).M(obj).E().P()
+func (w *worker) createTemplatedCR(_chi *api.ClickHouseInstallation, _opts ...*commonNormalizer.Options[api.ClickHouseInstallation]) *api.ClickHouseInstallation {
+	l := w.a.V(1).M(_chi).F()
 
-	chi, err := w.c.GetCHIByObjectMeta(obj, searchByName)
-	if err != nil {
-		return nil, err
+	if _chi.HasAncestor() {
+		l.Info("CR has an ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(_chi))
+	} else {
+		l.Info("CR has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(_chi))
 	}
 
-	chi, err = w.normalizer.CreateTemplated(chi, options)
-	if err != nil {
-		return nil, err
-	}
+	chi := w.createTemplated(_chi, _opts...)
+	chi.SetAncestor(w.createTemplated(_chi.GetAncestorT()))
 
-	return chi, nil
+	return chi
+}
+
+func (w *worker) createTemplated(c *api.ClickHouseInstallation, _opts ...*commonNormalizer.Options[api.ClickHouseInstallation]) *api.ClickHouseInstallation {
+	opts := commonNormalizer.NewOptions[api.ClickHouseInstallation]()
+	if len(_opts) > 0 {
+		opts = _opts[0]
+	}
+	chi, _ := w.normalizer.CreateTemplated(c, opts)
+	return chi
 }

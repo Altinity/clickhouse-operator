@@ -1,13 +1,12 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "clickhouse-with-ca"
+  name: "test-058-root-ca"
 spec:
   configuration:
     clusters:
-      - name: "cluster1"
+      - name: default
         secure: "yes"
-        insecure: "no"
         layout:
           shardsCount: 1
           replicasCount: 1
@@ -22,10 +21,11 @@ spec:
         <yandex>
           <openSSL>
             <server>
-              <certificateFile>/etc/clickhouse-server/secrets.d/server.crt/test-056-root-ca/server.crt</certificateFile>
-              <privateKeyFile>/etc/clickhouse-server/secrets.d/server.key/test-056-root-ca/server.key</privateKeyFile>
-              <verificationMode>none</verificationMode>
-              <loadDefaultCAFile>true</loadDefaultCAFile>
+              <certificateFile>/etc/clickhouse-server/secrets.d/server.crt/test-058-root-ca/server.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/secrets.d/server.key/test-058-root-ca/server.key</privateKeyFile>
+              <verificationMode>relaxed</verificationMode>
+              <loadDefaultCAFile>false</loadDefaultCAFile>
+              <caConfig>/etc/clickhouse-server/secrets.d/ca.crt/test-058-root-ca/ca.crt</caConfig>
               <cacheSessions>true</cacheSessions>
               <disableProtocols>sslv2,sslv3</disableProtocols>
               <preferServerCiphers>true</preferServerCiphers>
@@ -35,10 +35,15 @@ spec:
       server.crt:
         valueFrom:
           secretKeyRef:
-            name: test-056-root-ca
+            name: test-058-root-ca
             key: server.crt
       server.key:
         valueFrom:
           secretKeyRef:
-            name: test-056-root-ca
+            name: test-058-root-ca
             key: server.key
+      ca.crt:
+        valueFrom:
+          secretKeyRef:
+            name: test-058-root-ca
+            key: ca.crt

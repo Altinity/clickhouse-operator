@@ -32,9 +32,11 @@ func NewDeployment(kubeClient kube.Interface) *Deployment {
 }
 
 func (c *Deployment) Get(namespace, name string) (*apps.Deployment, error) {
-	return c.kubeClient.AppsV1().Deployments(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
+	ctx := k8sCtx(controller.NewContext())
+	return c.kubeClient.AppsV1().Deployments(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *Deployment) Update(deployment *apps.Deployment) (*apps.Deployment, error) {
-	return c.kubeClient.AppsV1().Deployments(deployment.Namespace).Update(controller.NewContext(), deployment, controller.NewUpdateOptions())
+	ctx := k8sCtx(controller.NewContext())
+	return c.kubeClient.AppsV1().Deployments(deployment.Namespace).Update(ctx, deployment, controller.NewUpdateOptions())
 }

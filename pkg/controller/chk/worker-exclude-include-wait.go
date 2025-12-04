@@ -43,13 +43,13 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chk *apiChk.ClickHouseK
 		//	cur.EnsureStatus().SetPodIPs(podIPs)
 		// and here
 		// c.Status.GetPodIPs()
-		podIPs := w.c.getPodsIPs(chk)
+		podIPs := w.c.getPodsIPs(ctx, chk)
 		if len(podIPs) >= len(c.Status.GetPods()) {
 			// Stop polling
 			w.a.V(1).M(c).Info("all IP addresses are in place")
 			return false
 		}
-		if time.Now().Sub(start) > 1*time.Minute {
+		if time.Since(start) > 1*time.Minute {
 			// Stop polling
 			w.a.V(1).M(c).Warning("not all IP addresses are in place but time has elapsed")
 			return false
@@ -60,7 +60,7 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chk *apiChk.ClickHouseK
 	})
 }
 
-// shouldIncludeHost determines whether host to be included into cluster after reconciling
+// shouldIncludeHost determines whether host to be included into cluster after reconcile
 func (w *worker) shouldIncludeHost(host *api.Host) bool {
 	switch {
 	case host.IsStopped():

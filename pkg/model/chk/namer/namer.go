@@ -19,7 +19,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
-	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 )
 
@@ -30,7 +29,7 @@ type Namer struct {
 
 // New creates new namer with specified context
 func New() *Namer {
-	me := commonMacro.New(macro.List)
+	me := macro.New()
 	return &Namer{
 		commonNamer: commonNamer.New(me),
 		macro:       me,
@@ -94,6 +93,9 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 		host := params[0].(*api.Host)
 		volumeClaimTemplate := params[1].(*api.VolumeClaimTemplate)
 		return n.createPVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
+	case interfaces.NameClusterPDB:
+		cluster := params[0].(api.ICluster)
+		return n.createClusterPDBName(cluster)
 
 	default:
 		return n.commonNamer.Name(what, params...)

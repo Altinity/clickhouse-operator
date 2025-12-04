@@ -110,8 +110,8 @@ func findApplicableTemplate(templateRef *api.TemplateRef, templatesSrc TemplateR
 	template := getTemplate(templateRef, defaultNamespace)
 	if template == nil {
 		log.V(1).M(templateRef).F().Warning(
-			"skip template - UNABLE to find by templateRef: %s/%s",
-			templateRef.Namespace, templateRef.Name)
+			"Skip template - UNABLE to find by templateRef: '[%s|%s]/%s'",
+			templateRef.Namespace, defaultNamespace, templateRef.Name)
 		// Template is not applied
 		return nil
 	}
@@ -123,8 +123,8 @@ func findApplicableTemplate(templateRef *api.TemplateRef, templatesSrc TemplateR
 	if !selector.Matches(templatesSrc.GetLabels()) {
 		// This template does not want to be applied to this CHI
 		log.V(1).M(templateRef).F().Info(
-			"Skip template: %s/%s. Selector: %v does not match labels: %v",
-			templateRef.Namespace, templateRef.Name, selector, templatesSrc.GetLabels())
+			"Skip template: '%s/%s'. Selector: '%v' does not match labels: '%v'",
+			template.GetNamespace(), template.GetName(), selector, templatesSrc.GetLabels())
 		// Template is not applied
 		return nil
 	}
@@ -134,8 +134,8 @@ func findApplicableTemplate(templateRef *api.TemplateRef, templatesSrc TemplateR
 	//
 
 	log.V(1).M(templateRef).F().Info(
-		"Apply template: %s/%s. Selector: %v matches labels: %v",
-		templateRef.Namespace, templateRef.Name, selector, templatesSrc.GetLabels())
+		"Apply template: '%s/%s'. Selector: '%v' matches labels: '%v'",
+		template.GetNamespace(), template.GetName(), selector, templatesSrc.GetLabels())
 
 	return template
 }

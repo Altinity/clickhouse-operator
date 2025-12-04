@@ -4,7 +4,7 @@ echo "External value for \$PROMETHEUS_NAMESPACE=$PROMETHEUS_NAMESPACE"
 echo "External value for \$VALIDATE_YAML=$VALIDATE_YAML"
 
 export PROMETHEUS_NAMESPACE="${PROMETHEUS_NAMESPACE:-prometheus}"
-export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-v0.79.0}"
+export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-v0.83.0}"
 export ALERT_MANAGER_EXTERNAL_URL="${ALERT_MANAGER_EXTERNAL_URL:-http://localhost:9093}"
 # Possible values for "validate yaml" are values from --validate=XXX kubectl option. They are true/false ATM
 export VALIDATE_YAML="${VALIDATE_YAML:-true}"

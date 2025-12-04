@@ -29,5 +29,6 @@ spec:
       default/allow_experimental_database_replicated: 1
     users:
       test_014/password: test_014
+      test_014/networks/ip: "::/1"
     settings:
       logger/level: information

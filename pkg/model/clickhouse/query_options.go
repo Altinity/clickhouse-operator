@@ -21,10 +21,11 @@ const (
 
 // QueryOptions specifies options of a query
 type QueryOptions struct {
-	Retry    bool
-	Tries    int
-	Parallel bool
-	Silent   bool
+	Retry      bool
+	Tries      int
+	Parallel   bool
+	Silent     bool
+	LogQueries bool
 	*Timeouts
 }
 
@@ -89,5 +90,22 @@ func (o *QueryOptions) SetSilent(silent bool) *QueryOptions {
 		return nil
 	}
 	o.Silent = silent
+	return o
+}
+
+// GetLogQueries gets log_queries status
+func (o *QueryOptions) GetLogQueries() bool {
+	if o == nil {
+		return false
+	}
+	return o.LogQueries
+}
+
+// SetLogQueries sets log_queries option
+func (o *QueryOptions) SetLogQueries(logQueries bool) *QueryOptions {
+	if o == nil {
+		return nil
+	}
+	o.LogQueries = logQueries
 	return o
 }

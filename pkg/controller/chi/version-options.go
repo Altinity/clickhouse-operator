@@ -28,7 +28,7 @@ type Skip struct {
 	StoppedAncestor bool
 }
 
-func (opts *VersionOptions) shouldSkip(host *api.Host) (bool, string) {
+func (opts *VersionOptions) tagBasedOnly(host *api.Host) (bool, string) {
 	switch {
 	case !host.HasAncestor():
 		if opts.Skip.New {

@@ -23,7 +23,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 
-	"github.com/altinity/clickhouse-operator/pkg/chop"
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 )
@@ -39,23 +39,37 @@ func NewConfigMap(kubeClient kube.Interface) *ConfigMap {
 }
 
 func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().ConfigMaps(cm.Namespace).Create(ctx, cm, controller.NewCreateOptions())
 }
 
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
+	ctx = k8sCtx(ctx)
 	return c.kubeClient.CoreV1().ConfigMaps(cm.Namespace).Update(ctx, cm, controller.NewUpdateOptions())
 }
 
+func (c *ConfigMap) Remove(ctx context.Context, namespace, name string) error {
+	ctx = k8sCtx(ctx)
+	return c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+}
+
 func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
-	c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, controller.NewDeleteOptions())
-	return poller.New(ctx, fmt.Sprintf("%s/%s", namespace, name)).
-		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
+	item := "ConfigMap"
+	return poller.New(ctx, fmt.Sprintf("delete %s: %s/%s", item, namespace, name)).
+		WithOptions(poller.NewOptionsFromConfig()).
 		WithFunctions(&poller.Functions{
 			IsDone: func(_ctx context.Context, _ any) bool {
+				if err := c.Remove(ctx, namespace, name); err != nil {
+					if !errors.IsNotFound(err) {
+						log.V(1).Warning("Error deleting %s: %s/%s err: %v ", item, namespace, name, err)
+					}
+				}
+
 				_, err := c.Get(ctx, namespace, name)
 				return errors.IsNotFound(err)
 			},
@@ -63,6 +77,7 @@ func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
 }
 
 func (c *ConfigMap) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.ConfigMap, error) {
+	ctx = k8sCtx(ctx)
 	list, err := c.kubeClient.CoreV1().ConfigMaps(namespace).List(ctx, opts)
 	if err != nil {
 		return nil, err

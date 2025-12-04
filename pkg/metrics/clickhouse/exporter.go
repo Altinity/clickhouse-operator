@@ -80,7 +80,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	log.V(1).Info("Collect started")
 	defer func() {
-		log.V(1).Infof("Collect completed [%s]", time.Now().Sub(start))
+		log.V(1).Infof("Collect completed [%s]", time.Since(start))
 	}()
 
 	// Collect should have timeout
@@ -91,7 +91,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
-	log.V(1).Infof("Launching host collectors [%s]", time.Now().Sub(start))
+	log.V(1).Infof("Launching host collectors [%s]", time.Since(start))
 
 	var wg = sync.WaitGroup{}
 	e.chInstallations.walk(func(chi *metrics.WatchedCR, _ *metrics.WatchedCluster, host *metrics.WatchedHost) {
@@ -213,7 +213,7 @@ func (e *Exporter) collectHostSystemMetrics(
 	log.V(1).Infof("Querying system metrics for host %s", host.Hostname)
 	start := time.Now()
 	metrics, err := fetcher.getClickHouseQueryMetrics(ctx)
-	elapsed := time.Now().Sub(start)
+	elapsed := time.Since(start)
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d system metrics for host %s", elapsed, len(metrics), host.Hostname)
 		writer.WriteMetrics(metrics)
@@ -234,7 +234,7 @@ func (e *Exporter) collectHostSystemPartsMetrics(
 	log.V(1).Infof("Querying table sizes for host %s", host.Hostname)
 	start := time.Now()
 	systemPartsData, err := fetcher.getClickHouseSystemParts(ctx)
-	elapsed := time.Now().Sub(start)
+	elapsed := time.Since(start)
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d table sizes for host %s", elapsed, len(systemPartsData), host.Hostname)
 		writer.WriteTableSizes(systemPartsData)
@@ -258,7 +258,7 @@ func (e *Exporter) collectHostSystemReplicasMetrics(
 	log.V(1).Infof("Querying system replicas for host %s", host.Hostname)
 	start := time.Now()
 	systemReplicas, err := fetcher.getClickHouseQuerySystemReplicas(ctx)
-	elapsed := time.Now().Sub(start)
+	elapsed := time.Since(start)
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d system replicas for host %s", elapsed, len(systemReplicas), host.Hostname)
 		writer.WriteSystemReplicas(systemReplicas)
@@ -279,7 +279,7 @@ func (e *Exporter) collectHostMutationsMetrics(
 	log.V(1).Infof("Querying mutations for host %s", host.Hostname)
 	start := time.Now()
 	mutations, err := fetcher.getClickHouseQueryMutations(ctx)
-	elapsed := time.Now().Sub(start)
+	elapsed := time.Since(start)
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d mutations for %s", elapsed, len(mutations), host.Hostname)
 		writer.WriteMutations(mutations)
@@ -300,7 +300,7 @@ func (e *Exporter) collectHostSystemDisksMetrics(
 	log.V(1).Infof("Querying disks for host %s", host.Hostname)
 	start := time.Now()
 	disks, err := fetcher.getClickHouseQuerySystemDisks(ctx)
-	elapsed := time.Now().Sub(start)
+	elapsed := time.Since(start)
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d disks for host %s", elapsed, len(disks), host.Hostname)
 		writer.WriteSystemDisks(disks)
@@ -321,7 +321,7 @@ func (e *Exporter) collectHostDetachedPartsMetrics(
 	log.V(1).Infof("Querying detached parts for host %s", host.Hostname)
 	start := time.Now()
 	detachedParts, err := fetcher.getClickHouseQueryDetachedParts(ctx)
-	elapsed := time.Now().Sub(start)
+	elapsed := time.Since(start)
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d detached parts info for host %s", elapsed, len(detachedParts), host.Hostname)
 		writer.WriteDetachedParts(detachedParts)
@@ -386,27 +386,32 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 
 	// Walk over the list of ClickHouseInstallation objects and add them as watched
 	for i := range list.Items {
-		// Convenience wrapper
-		chi := &list.Items[i]
-
-		if chi.IsStopped() {
-			log.V(1).Infof("CHI %s/%s is stopped, skip it", chi.Namespace, chi.Name)
-			continue
-		}
-
-		if !chi.GetStatus().HasNormalizedCRCompleted() {
-			log.V(1).Infof("CHI %s/%s is not completed yet, skip it", chi.Namespace, chi.Name)
-			continue
-		}
-
-		log.V(1).Infof("CHI %s/%s is completed, add it", chi.Namespace, chi.Name)
-		normalizer := chiNormalizer.New(func(namespace, name string) (*core.Secret, error) {
-			return kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
-		})
-
-		normalized, _ := normalizer.CreateTemplated(chi, normalizerCommon.NewOptions[api.ClickHouseInstallation]())
-
-		watchedCHI := metrics.NewWatchedCR(normalized)
-		e.updateWatched(watchedCHI)
+		e.processDiscoveredCR(kubeClient, &list.Items[i])
 	}
+}
+
+func (e *Exporter) processDiscoveredCR(kubeClient kube.Interface, chi *api.ClickHouseInstallation) {
+	if e.shouldSkipDiscoveredCR(chi) {
+		log.V(1).Infof("Skip discovered CHI: %s/%s", chi.Namespace, chi.Name)
+		return
+	}
+
+	log.V(1).Infof("Add discovered CHI: %s/%s", chi.Namespace, chi.Name)
+	normalizer := chiNormalizer.New(func(namespace, name string) (*core.Secret, error) {
+		return kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
+	})
+
+	normalized, _ := normalizer.CreateTemplated(chi, normalizerCommon.NewOptions[api.ClickHouseInstallation]())
+
+	watchedCHI := metrics.NewWatchedCR(normalized)
+	e.updateWatched(watchedCHI)
+}
+
+func (e *Exporter) shouldSkipDiscoveredCR(chi *api.ClickHouseInstallation) bool {
+	if chi.IsStopped() {
+		log.V(1).Infof("CHI %s/%s is stopped, skip it", chi.Namespace, chi.Name)
+		return true
+	}
+
+	return false
 }
