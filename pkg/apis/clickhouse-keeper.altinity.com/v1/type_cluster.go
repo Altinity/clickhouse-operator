@@ -163,13 +163,19 @@ func (cluster *Cluster) isShardExplicitlySpecified() bool {
 
 // isReplicaExplicitlySpecified checks whether replica is explicitly specified
 func (cluster *Cluster) isReplicaExplicitlySpecified() bool {
-	return cluster.Layout.ReplicasExplicitlySpecified && !cluster.isShardExplicitlySpecified()
+	return cluster.Layout.ReplicasExplicitlySpecified
 }
 
 // IsShardSpecified checks whether shard is explicitly specified
 func (cluster *Cluster) isShardToBeUsedToInheritSettingsFrom() bool {
 	if !cluster.isShardExplicitlySpecified() && !cluster.isReplicaExplicitlySpecified() {
 		return true
+	}
+
+	// When both shards and replicas are explicitly specified, prefer replicas
+	// since replica-level configuration is more specific than shard-level
+	if cluster.isShardExplicitlySpecified() && cluster.isReplicaExplicitlySpecified() {
+		return false
 	}
 
 	return cluster.isShardExplicitlySpecified()
