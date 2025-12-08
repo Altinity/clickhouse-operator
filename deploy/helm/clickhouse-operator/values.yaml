@@ -897,7 +897,9 @@ dashboards:
   enabled: false
   # dashboards.additionalLabels -- labels to add to a secret with dashboards
   additionalLabels:
+    # dashboards.additionalLabels.grafana_dashboard - will watch when official grafana helm chart sidecar.dashboards.enabled=true
     grafana_dashboard: ""
   # dashboards.annotations -- annotations to add to a secret with dashboards
-  annotations: {}
-  grafana_folder: clickhouse
+  annotations:
+    # dashboards.annotations.grafana_folder -- folder where will place dashboards, requires define values in official grafana helm chart sidecar.dashboards.folderAnnotation: grafana_folder
+    grafana_folder: clickhouse-operator

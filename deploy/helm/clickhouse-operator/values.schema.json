@@ -640,12 +640,7 @@
             "properties": {
                 "additionalLabels": {
                     "description": "labels to add to a secret with dashboards",
-                    "type": "object",
-                    "properties": {
-                        "grafana_dashboard": {
-                            "type": "string"
-                        }
-                    }
+                    "type": "object"
                 },
                 "annotations": {
                     "description": "annotations to add to a secret with dashboards",
@@ -654,9 +649,6 @@
                 "enabled": {
                     "description": "provision grafana dashboards as configMaps (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-8.3.4/charts/grafana/values.yaml#L778 )",
                     "type": "boolean"
-                },
-                "grafana_folder": {
-                    "type": "string"
                 }
             }
         },
