@@ -31,7 +31,7 @@ require (
 	github.com/mailru/go-clickhouse/v2 v2.1.0
 	github.com/novln/docker-parser v1.0.0
 	github.com/prometheus/client_golang v1.18.0
-	github.com/sanity-io/litter v1.3.0
+	github.com/sanity-io/litter v1.5.8
 	github.com/securego/gosec/v2 v2.8.1
 	github.com/stretchr/testify v1.8.4
 	go.opentelemetry.io/otel v1.24.0
