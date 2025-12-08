@@ -5363,6 +5363,7 @@ def test_010060(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_010061. Test fractional CPU requests/limits handling")
 def test_010061(self):
@@ -5393,7 +5394,7 @@ def test_010061(self):
 
     actionPlan = kubectl.get_actionPlan("chi", chi)
     print(actionPlan)
-    with Then("ActionPlan should not contain Templates.PodTemplates[0].Spec.Containers[0].Resources"):
+    with Then("ActionPlan should not contain Templates.PodTemplates[0].Spec.Containers[0].Resources [1]"):
         assert "Templates.PodTemplates[0].Spec.Containers[0].Resources" not in actionPlan
 
     kubectl.create_and_check(
@@ -5414,7 +5415,7 @@ def test_010061(self):
 
     actionPlan = kubectl.get_actionPlan("chi", chi)
     print(actionPlan)
-    with Then("ActionPlan should not contain Templates.PodTemplates[0].Spec.Containers[0].Resources"):
+    with Then("ActionPlan should not contain Templates.PodTemplates[0].Spec.Containers[0].Resources [2]"):
         assert "Templates.PodTemplates[0].Spec.Containers[0].Resources" not in actionPlan
 
     kubectl.delete_chi(chi)
@@ -5425,6 +5426,7 @@ def test_010061(self):
 #
 # Keeper tests section
 #
+
 
 @TestScenario
 @Name("test_020000. Test Basic CHK functions")
@@ -5462,6 +5464,7 @@ def test_020000(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 @TestScenario
 @Name("test_020001. Test that Kubernetes objects between CHI and CHK does not overlap")
@@ -5501,6 +5504,7 @@ def test_020001(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 @TestScenario
 @Name("test_020002. Test CHI with CHK")
