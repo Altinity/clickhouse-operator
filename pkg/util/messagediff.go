@@ -46,6 +46,34 @@ func MessageDiffString(diff *messagediff.Diff, equal bool) string {
 	return str
 }
 
+func PrintPath(path *messagediff.Path, defaultPath string) (res string) {
+	if path == nil {
+		// Path is not reasonable, need to skip somehow
+	} else {
+		// Path is reasonable, can dereference a pointer to a slice
+		// Building string: .Template.Spec.Containers[0].Ports[1].Protocol
+		for _, pathNode := range *path {
+			res += fmt.Sprintf("%v", pathNode)
+		}
+	}
+	if res == "" {
+		return defaultPath
+	} else {
+		return res
+	}
+}
+
+func PrintTrimmedValue(value any) string {
+	valueFull := fmt.Sprintf("%s", Dump(value))
+	ln := len(valueFull)
+	if (0 < ln) && (ln < 300) {
+		return valueFull
+	} else {
+		valueShort := fmt.Sprintf("%+v", value)
+		return valueShort
+	}
+}
+
 // MessageDiffItemString stringifies one map[*messagediff.Path]interface{} item
 func MessageDiffItemString(bannerForDiff, bannerForNoDiff, defaultPath string, items map[*messagediff.Path]interface{}) (str string) {
 	if len(items) == 0 {
@@ -57,39 +85,12 @@ func MessageDiffItemString(bannerForDiff, bannerForNoDiff, defaultPath string, i
 	str += fmt.Sprintf("%s num: %d\n", bannerForDiff, len(items))
 
 	i := 0
-	for pathPtr := range items {
-		path := ""
-		for _, pathNode := range *pathPtr {
-			// Format
-			//	.Template
-			//	.Spec
-			//	.Containers
-			//	[0]
-			//	.Ports
-			//	[1]
-			//	.Protocol
-			// as
-			//	.Template.Spec.Containers[0].Ports[1].Protocol
-			path += fmt.Sprintf("%v", pathNode)
-		}
-		if path == "" {
-			path = defaultPath
-		}
-
-		valueShort := fmt.Sprintf("%+v", items[pathPtr])
-		valueFull := fmt.Sprintf("%s", Dump(items[pathPtr]))
-		value := ""
-		if len(valueFull) < 300 {
-			value = valueFull
-		} else {
-			value = valueShort
-		}
-
+	for _path, _item := range items {
+		path := PrintPath(_path, defaultPath)
+		value := PrintTrimmedValue(_item)
 		//str += fmt.Sprintf("diff item path [%d]:'%s'\n", i, path)
 		//str += fmt.Sprintf("diff item value[%d]:'%s'\n", i, value)
-
 		str += fmt.Sprintf("diff item [%d]:'%s' = '%s'\n", i, path, value)
-
 		i++
 	}
 	str += fmt.Sprintf("Diff end -------------------------\n")
