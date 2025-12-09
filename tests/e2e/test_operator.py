@@ -2584,6 +2584,7 @@ def test_021(self, step=1):
 @TestScenario
 @Name("test_010021_1. Test rescaling storage. Provisioner: StatefulSet")
 @Requirements(RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0"))
+@Tags("NO_PARALLEL")
 def test_010021_1(self):
     create_shell_namespace_clickhouse_template()
 
@@ -2593,6 +2594,7 @@ def test_010021_1(self):
 @TestScenario
 @Name("test_010021_2. Test rescaling storage. Provisioner: Operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0"))
+@Tags("NO_PARALLEL")
 def test_010021_2(self):
     create_shell_namespace_clickhouse_template()
 
