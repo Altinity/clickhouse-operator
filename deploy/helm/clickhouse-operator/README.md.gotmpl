@@ -13,5 +13,44 @@
 
 {{ template "chart.requirementsSection" . }}
 
+## CRD Management
+
+This chart includes automatic CRD installation and update functionality using Helm hooks. CRDs are automatically applied during `helm install` and `helm upgrade` operations.
+
+### How It Works
+
+- **Automatic Updates**: CRDs are installed/updated via pre-install and pre-upgrade hooks (enabled by default)
+- **Backward Compatible**: CRDs remain in the `crds/` directory for standard Helm 3 behavior
+- **Server-Side Apply**: Uses kubectl with `--server-side` flag for better conflict resolution
+- **Configurable**: Can be disabled via `crdHook.enabled: false` in values.yaml
+
+### Manual CRD Management
+
+If you prefer to manage CRDs manually or have disabled the automatic hooks, you can apply CRDs using kubectl:
+
+```bash
+kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallations.clickhouse.altinity.com.yaml
+kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallationtemplates.clickhouse.altinity.com.yaml
+kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseoperatorconfigurations.clickhouse.altinity.com.yaml
+kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousekeeperinstallations.clickhouse-keeper.altinity.com.yaml
+```
+
+### Troubleshooting
+
+**Hook Job Fails with Permission Denied**
+- Ensure the cluster has RBAC enabled and the ServiceAccount has proper permissions to manage CRDs
+- The hook requires cluster-level permissions for `apiextensions.k8s.io/customresourcedefinitions`
+
+**CRDs Not Updating**
+- Check if `crdHook.enabled` is set to `true` in your values
+- Verify the hook Job ran successfully: `kubectl get jobs -n <namespace> | grep crd-install`
+- Check Job logs: `kubectl logs -n <namespace> job/<release-name>-crd-install`
+
+**Disabling Automatic CRD Updates**
+```yaml
+crdHook:
+  enabled: false
+```
+
 {{ template "chart.valuesSection" . }}
 

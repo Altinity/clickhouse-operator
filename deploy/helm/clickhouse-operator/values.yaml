@@ -7,6 +7,31 @@ deployment:
   # look details in `kubectl explain deployment.spec.strategy`
   strategy:
     type: Recreate
+crdHook:
+  # crdHook.enabled -- enable automatic CRD installation/update via pre-install/pre-upgrade hooks
+  # when disabled, CRDs must be installed manually using kubectl apply
+  enabled: true
+  image:
+    # crdHook.image.repository -- image repository for CRD installation job
+    repository: bitnami/kubectl
+    # crdHook.image.tag -- image tag for CRD installation job
+    tag: "latest"
+    # crdHook.image.pullPolicy -- image pull policy for CRD installation job
+    pullPolicy: IfNotPresent
+  # crdHook.resources -- resource limits and requests for CRD installation job
+  resources: {}
+  #  limits:
+  #    cpu: 100m
+  #    memory: 128Mi
+  #  requests:
+  #    cpu: 100m
+  #    memory: 128Mi
+  # crdHook.nodeSelector -- node selector for CRD installation job
+  nodeSelector: {}
+  # crdHook.tolerations -- tolerations for CRD installation job
+  tolerations: []
+  # crdHook.affinity -- affinity for CRD installation job
+  affinity: {}
 operator:
   image:
     # operator.image.repository -- image repository
