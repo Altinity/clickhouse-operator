@@ -2584,7 +2584,6 @@ def test_021(self, step=1):
 @TestScenario
 @Name("test_010021_1. Test rescaling storage. Provisioner: StatefulSet")
 @Requirements(RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0"))
-@Tags("NO_PARALLEL")
 def test_010021_1(self):
     create_shell_namespace_clickhouse_template()
 
@@ -2594,7 +2593,6 @@ def test_010021_1(self):
 @TestScenario
 @Name("test_010021_2. Test rescaling storage. Provisioner: Operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0"))
-@Tags("NO_PARALLEL")
 def test_010021_2(self):
     create_shell_namespace_clickhouse_template()
 
@@ -3468,7 +3466,6 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
 
 @TestScenario
 @Name("test_010032. Test rolling update logic")
-# @Tags("NO_PARALLEL")
 def test_010032(self):
     """Test rolling update logic."""
     create_shell_namespace_clickhouse_template()
@@ -3858,7 +3855,7 @@ def test_010036(self):
 
     def recover_volume(volume, reconcile_task_id):
         with When(f"Kick operator to start reconcile cycle to fix lost {volume} volume"):
-            kubectl.force_chi_reconcile(chi, "reconcile_task_id")
+            kubectl.force_chi_reconcile(chi, reconcile_task_id)
             wait_for_cluster(chi, cluster, 1, 2)
 
             with Then("I check PV is in place"):
