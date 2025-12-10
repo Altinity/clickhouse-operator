@@ -83,9 +83,9 @@ crdHook:
 | crdHook.resources | object | `{}` | resource limits and requests for CRD installation job |
 | crdHook.tolerations | list | `[]` | tolerations for CRD installation job |
 | dashboards.additionalLabels | object | `{"grafana_dashboard":""}` | labels to add to a secret with dashboards |
-| dashboards.annotations | object | `{}` | annotations to add to a secret with dashboards |
+| dashboards.annotations | object | `{"grafana_folder":"clickhouse-operator"}` | annotations to add to a secret with dashboards |
+| dashboards.annotations.grafana_folder | string | `"clickhouse-operator"` | folder where will place dashboards, requires define values in official grafana helm chart sidecar.dashboards.folderAnnotation: grafana_folder |
 | dashboards.enabled | bool | `false` | provision grafana dashboards as configMaps (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-8.3.4/charts/grafana/values.yaml#L778 ) |
-| dashboards.grafana_folder | string | `"clickhouse"` |  |
 | deployment.strategy.type | string | `"Recreate"` |  |
 | fullnameOverride | string | `""` | full name of the chart. |
 | imagePullSecrets | list | `[]` | image pull secret for private images in clickhouse-operator pod possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |

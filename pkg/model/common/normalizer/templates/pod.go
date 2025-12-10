@@ -15,7 +15,9 @@
 package templates
 
 import (
+	"encoding/json"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
@@ -46,6 +48,49 @@ func NormalizePodTemplate(macro interfaces.IMacro, labeler interfaces.ILabeler, 
 	// which tells:  For Pods running with hostNetwork, you should explicitly set its DNS policy “ClusterFirstWithHostNet”.
 	if template.Spec.HostNetwork {
 		template.Spec.DNSPolicy = core.DNSClusterFirstWithHostNet
+	}
+
+	normalizePodTemplateContainers(template)
+}
+
+func normalizePodTemplateContainers(template *api.PodTemplate) {
+	for i := range template.Spec.InitContainers {
+		container := &template.Spec.InitContainers[i]
+		normalizeContainer(container)
+	}
+	for i := range template.Spec.Containers {
+		container := &template.Spec.Containers[i]
+		normalizeContainer(container)
+	}
+	for i := range template.Spec.EphemeralContainers {
+		container := &template.Spec.EphemeralContainers[i]
+		normalizeEphemeralContainer(container)
+	}
+}
+
+func normalizeContainer(container *core.Container) {
+	resources := &container.Resources
+	normalizeResources(resources)
+}
+
+func normalizeEphemeralContainer(container *core.EphemeralContainer) {
+	resources := &container.Resources
+	normalizeResources(resources)
+}
+
+func normalizeResources(resources *core.ResourceRequirements) {
+	normalizeResourceList(&resources.Limits)
+	normalizeResourceList(&resources.Requests)
+}
+
+func normalizeResourceList(list *core.ResourceList) {
+	for name, quantity := range *list {
+		if buf, err := json.Marshal(quantity); err == nil {
+			var normalizedQuantity resource.Quantity
+			if err := json.Unmarshal(buf, &normalizedQuantity); err == nil {
+				(*list)[name] = normalizedQuantity
+			}
+		}
 	}
 }
 

@@ -148,18 +148,29 @@ func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, o
 		return nil
 	}
 
-	cr := icr.(*api.ClickHouseInstallation)
+	cr, ok := icr.(*api.ClickHouseInstallation)
+	if !ok {
+		return nil
+	}
+
 	namespace, name := cr.NamespaceName()
 	log.V(3).M(cr).F().Info("Update CR status")
 
 	_cur, err := c.Get(ctx, namespace, name)
-	cur := _cur.(*api.ClickHouseInstallation)
 	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			return nil
+		}
 		if opts.TolerateAbsence {
 			return nil
 		}
 		log.V(1).M(cr).F().Error("%q", err)
 		return err
+	}
+
+	cur, ok := _cur.(*api.ClickHouseInstallation)
+	if !ok {
+		return nil
 	}
 	if cur == nil {
 		if opts.TolerateAbsence {
@@ -180,7 +191,13 @@ func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, o
 	}
 
 	_cur, err = c.Get(ctx, namespace, name)
-	cur = _cur.(*api.ClickHouseInstallation)
+	if err != nil {
+		return nil
+	}
+	cur, ok = _cur.(*api.ClickHouseInstallation)
+	if !ok {
+		return nil
+	}
 
 	// Propagate updated ResourceVersion upstairs into the CR
 	if cr.GetResourceVersion() != cur.GetResourceVersion() {

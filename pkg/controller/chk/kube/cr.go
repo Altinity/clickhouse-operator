@@ -17,6 +17,7 @@ package kube
 import (
 	"context"
 	"fmt"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -94,18 +95,29 @@ func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, o
 		return nil
 	}
 
-	cr := icr.(*apiChk.ClickHouseKeeperInstallation)
+	cr, ok := icr.(*apiChk.ClickHouseKeeperInstallation)
+	if !ok {
+		return nil
+	}
+
 	namespace, name := cr.NamespaceName()
 	log.V(3).M(cr).F().Info("Update CR status")
 
 	_cur, err := c.Get(ctx, namespace, name)
-	cur := _cur.(*apiChk.ClickHouseKeeperInstallation)
 	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			return nil
+		}
 		if opts.TolerateAbsence {
 			return nil
 		}
 		log.V(1).M(cr).F().Error("%q", err)
 		return err
+	}
+
+	cur, ok := _cur.(*apiChk.ClickHouseKeeperInstallation)
+	if !ok {
+		return nil
 	}
 	if cur == nil {
 		if opts.TolerateAbsence {
@@ -126,7 +138,13 @@ func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, o
 	}
 
 	_cur, err = c.Get(ctx, namespace, name)
-	cur = _cur.(*apiChk.ClickHouseKeeperInstallation)
+	if err != nil {
+		return nil
+	}
+	cur, ok = _cur.(*apiChk.ClickHouseKeeperInstallation)
+	if !ok {
+		return nil
+	}
 
 	// Propagate updated ResourceVersion upstairs into the CR
 	if cr.GetResourceVersion() != cur.GetResourceVersion() {

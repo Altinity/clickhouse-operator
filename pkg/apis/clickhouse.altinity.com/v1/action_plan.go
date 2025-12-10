@@ -28,8 +28,9 @@ type ActionPlan struct {
 	old ICustomResource
 	new ICustomResource
 
-	specDiff  *messagediff.Diff
-	specEqual bool
+	specDiff        *messagediff.Diff
+	specDiffReverse *messagediff.Diff
+	specEqual       bool
 
 	labelsDiff  *messagediff.Diff
 	labelsEqual bool
@@ -59,9 +60,10 @@ func MakeActionPlan(old, new ICustomResource) IActionPlan {
 
 	if (old != nil) && (new != nil) {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.GetSpecA(), ap.new.GetSpecA())
+		ap.specDiffReverse, _ = messagediff.DeepDiff(ap.new.GetSpecA(), ap.old.GetSpecA())
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.GetLabels(), ap.new.GetLabels())
-		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.GetDeletionTimestamp(), ap.new.GetDeletionTimestamp())
 		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.GetDeletionTimestamp(), ap.new.GetDeletionTimestamp())
+		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.GetDeletionTimestamp(), ap.new.GetDeletionTimestamp())
 		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.GetFinalizers(), ap.new.GetFinalizers())
 		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.GetRuntime().GetAttributes(), ap.new.GetRuntime().GetAttributes())
 	} else if old == nil {
@@ -108,52 +110,69 @@ func MakeActionPlan(old, new ICustomResource) IActionPlan {
 func (ap *ActionPlan) timestampEqual(old, new *meta.Time) bool {
 	switch {
 	case (old == nil) && (new == nil):
-		// Both are useless
+		// Both are useless - consider equal
 		return true
 	case (old == nil) && (new != nil):
-		// Timestamp assigned
+		// Timestamp is assigned - unequal
 		return false
 	case (old != nil) && (new == nil):
-		// Timestamp unassigned
+		// Timestamp unassigned - unequal
+		return false
+	case (old != nil) && (new != nil):
+		// Both have value - need to compare
+		return old.Equal(new)
+	default:
+		// WTF?
 		return false
 	}
-	return old.Equal(new)
 }
 
-// excludePaths - sanitize diff - do not pay attention to changes in some paths, such as
-// ObjectMeta.ResourceVersion
+// excludePaths - sanitize diff - do not pay attention to changes in some paths, such as ObjectMeta.ResourceVersion
 func (ap *ActionPlan) excludePaths() {
+	// Sanity check
 	if ap.specDiff == nil {
 		return
 	}
 
-	excludePaths := make([]*messagediff.Path, 0)
-	// Walk over all .diff.Modified paths and find .ObjectMeta.ResourceVersion path
-	for ptrPath := range ap.specDiff.Modified {
-		for i := range *ptrPath {
-			pathNodeCurr := (*ptrPath)[i]
-			pathNodePrev := (*ptrPath)[i]
-			if i > 0 {
-				// We have prev node
-				pathNodePrev = (*ptrPath)[i-1]
-			}
+	// List of paths to be excluded
+	var excludePaths []*messagediff.Path
 
-			if ap.isExcludedPath(pathNodePrev.String(), pathNodeCurr.String()) {
-				// This path should be excluded from Modified
-				excludePaths = append(excludePaths, ptrPath)
-				break
-			}
+	// Walk over all .diff.Modified paths and find all paths that are to be excluded from modified
+	for path := range ap.specDiff.Modified {
+		if ap.isExcludedPath(path) {
+			// This path should be excluded from Modified
+			excludePaths = append(excludePaths, path)
 		}
 	}
 
-	// Exclude paths from diff.Modified
-	for _, ptrPath := range excludePaths {
-		delete(ap.specDiff.Modified, ptrPath)
+	// Exclude paths from diff.Modified according to the list of paths to be excluded
+	for _, path := range excludePaths {
+		delete(ap.specDiff.Modified, path)
 	}
 }
 
 // isExcludedPath checks whether path is excluded
-func (ap *ActionPlan) isExcludedPath(prev, cur string) bool {
+func (ap *ActionPlan) isExcludedPath(path *messagediff.Path) bool {
+	// Walk over all path's segments and check whether any segment is excluded
+	for i := range *path {
+		pathNodeCurr := (*path)[i]
+		pathNodePrev := (*path)[i]
+		if i > 0 {
+			// We have prev node
+			pathNodePrev = (*path)[i-1]
+		}
+
+		if ap.isExcludedPathSegment(pathNodePrev.String(), pathNodeCurr.String()) {
+			// Path has segment which specifies to exclude this path
+			return true
+		}
+	}
+
+	return false
+}
+
+// isExcludedPathSegment checks whether path segment is excluded
+func (ap *ActionPlan) isExcludedPathSegment(prev, cur string) bool {
 	if ((prev == "ObjectMeta") && (cur == ".ResourceVersion")) ||
 		((prev == ".ObjectMeta") && (cur == ".ResourceVersion")) {
 		return true
@@ -205,7 +224,7 @@ func (ap *ActionPlan) HasActionsToDo() bool {
 
 func (ap *ActionPlan) Log(tag string) string {
 	return fmt.Sprintf(
-		"ActionPlan start %s ---------------------------------------------:\n%s\nActionPlan end %s ---------------------------------------------",
+		"\nActionPlan start %s ---------------------------------------------:\n%s\nActionPlan end %s ---------------------------------------------",
 		tag,
 		ap,
 		tag,
@@ -233,6 +252,11 @@ func (ap *ActionPlan) String() string {
 	if len(ap.specDiff.Modified) > 0 {
 		// Something modified
 		str += util.MessageDiffItemString("modified spec items", "none", "", ap.specDiff.Modified)
+	}
+
+	if len(ap.specDiffReverse.Modified) > 0 {
+		// Something modified
+		str += util.MessageDiffItemString("prev spec items", "none", "", ap.specDiffReverse.Modified)
 	}
 
 	if len(ap.labelsDiff.Added) > 0 {
