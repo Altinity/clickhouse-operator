@@ -1,0 +1,37 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020007-fractional-resources
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+      volumeClaimTemplate: default
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: IfNotPresent
+              image: "clickhouse/clickhouse-keeper:25.3"
+              resources:
+                requests:
+                  cpu: "0.5"
+                  memory: 1Gi
+                limits:
+                  cpu: "0.5"
+                  memory: 1Gi
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+  configuration:
+    clusters:
+      - name: keeper
+        layout:
+          replicasCount: 1
