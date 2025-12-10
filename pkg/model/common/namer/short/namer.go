@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -132,6 +133,9 @@ func (n *Namer) getNamePartNamespace(obj interface{}) string {
 	case api.ICluster:
 		cluster := obj.(api.ICluster)
 		return n.namePartCRName(cluster.GetRuntime().GetAddress().GetNamespace())
+	case *apiChk.Cluster:
+		cluster := obj.(*apiChk.Cluster)
+		return n.namePartCRName(cluster.GetRuntime().GetAddress().GetNamespace())
 	case api.IShard:
 		shard := obj.(api.IShard)
 		return n.namePartCRName(shard.GetRuntime().GetAddress().GetNamespace())
@@ -152,6 +156,9 @@ func (n *Namer) getNamePartCRName(obj interface{}) string {
 	case api.ICluster:
 		cluster := obj.(api.ICluster)
 		return n.namePartCRName(cluster.GetRuntime().GetAddress().GetCRName())
+	case *apiChk.Cluster:
+		cluster := obj.(*apiChk.Cluster)
+		return n.namePartCRName(cluster.GetRuntime().GetAddress().GetCRName())
 	case api.IShard:
 		shard := obj.(api.IShard)
 		return n.namePartCRName(shard.GetRuntime().GetAddress().GetCRName())
@@ -168,6 +175,9 @@ func (n *Namer) getNamePartClusterName(obj interface{}) string {
 	switch obj.(type) {
 	case api.ICluster:
 		cluster := obj.(api.ICluster)
+		return n.namePartClusterName(cluster.GetRuntime().GetAddress().GetClusterName())
+	case *apiChk.Cluster:
+		cluster := obj.(*apiChk.Cluster)
 		return n.namePartClusterName(cluster.GetRuntime().GetAddress().GetClusterName())
 	case api.IShard:
 		shard := obj.(api.IShard)
