@@ -20,6 +20,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"net"
 	"os"
@@ -33,17 +34,6 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
-
-// ZKClient abstracts the subset of zk.Conn methods used by Connection for testability.
-type ZKClient interface {
-	Get(path string) ([]byte, *zk.Stat, error)
-	Set(path string, data []byte, version int32) (*zk.Stat, error)
-	Create(path string, data []byte, flags int32, acl []zk.ACL) (string, error)
-	Delete(path string, version int32) error
-	Exists(path string) (bool, *zk.Stat, error)
-	AddAuth(scheme string, auth []byte) error
-	Close()
-}
 
 // Assert that zk.Conn implements ZKClient
 var _ ZKClient = (*zk.Conn)(nil)
@@ -66,9 +56,38 @@ func NewConnection(nodes api.ZookeeperNodes, _params ...*ConnectionParams) *Conn
 		nodes:            nodes,
 		sema:             semaphore.NewWeighted(params.MaxConcurrentRequests),
 		ConnectionParams: *params,
-		retryDelayFn: func(i int) {
-			time.Sleep(time.Duration(i)*time.Second + time.Duration(rand.Int63n(int64(1*time.Second))))
-		},
+		retryDelayFn:     retryDelayFnFlooredCappedLn(1, 30),
+		//retryDelayFn:     retryDelayFnLinear(),
+	}
+}
+
+func retryDelayFnLinear() func(int) {
+	return func(i int) {
+		// Progressive delay
+		time.Sleep(time.Duration(i)*time.Second + time.Duration(rand.Int63n(int64(1*time.Second))))
+	}
+}
+
+func retryDelayFnFlooredCappedLn(floor int, cap int) func(int) {
+	return func(i int) {
+		// Progressive delay
+		base := int(math.Ceil(math.Log(float64(i + 1))))
+		if base < floor {
+			base = floor
+		}
+		if base > cap {
+			base = cap
+		}
+		jitterFloor := 1
+		jitterCap := 5
+		jitter := int(rand.Int63n(int64(jitterCap)))
+		if jitter < jitterFloor {
+			jitter = jitterFloor
+		}
+		if jitter > jitterCap {
+			jitter = jitterCap
+		}
+		time.Sleep(time.Duration(base+jitter) * time.Second)
 	}
 }
 
@@ -143,7 +162,7 @@ func (c *Connection) retry(ctx context.Context, fn func(connection ZKClient) err
 	var errs []error
 	for i := 0; i < c.MaxRetriesNum; i++ {
 		if i > 0 {
-			// Progressive delay before each retry
+			// Delay before each consequent retry
 			c.retryDelayFn(i)
 		}
 
@@ -174,12 +193,16 @@ func (c *Connection) retry(ctx context.Context, fn func(connection ZKClient) err
 		errs = append(errs, fmt.Errorf("retry %d: %w", i+1, err))
 	}
 
-	// All retries failed - wrap all errors
+	//
+	// All retries have failed - wrap accumulated errors
+	//
+
 	if len(errs) == 0 {
+		// No errors found, just to response received
 		return fmt.Errorf("max retries number reached: %d", c.MaxRetriesNum)
 	}
 
-	return fmt.Errorf("all retries (%d) failed: %w", c.MaxRetriesNum, errors.Join(errs...))
+	return fmt.Errorf("all retries (%d) have failed: %w", c.MaxRetriesNum, errors.Join(errs...))
 }
 
 func (c *Connection) ensureConnection(ctx context.Context) (ZKClient, error) {

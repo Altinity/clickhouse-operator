@@ -21,9 +21,7 @@ const (
 	LabelConfigMapCommonUsers LabelType = "Label cm common users"
 	LabelConfigMapHost        LabelType = "Label cm host"
 	LabelConfigMapStorage     LabelType = "Label cm storage"
-)
 
-const (
 	LabelServiceCR      LabelType = "Label svc chi"
 	LabelServiceCluster LabelType = "Label svc cluster"
 	LabelServiceShard   LabelType = "Label svc shard"

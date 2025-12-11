@@ -537,7 +537,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 	if err := w.reconcileClusterPodDisruptionBudget(ctx, cluster); err != nil {
 		return err
 	}
-	if err := reconcileClusterZookeeperRootPath(cluster); err != nil {
+	if err := w.reconcileClusterZookeeperRootPath(cluster); err != nil {
 		return err
 	}
 	if err := w.reconcileClusterShardsAndHosts(ctx, cluster); err != nil {

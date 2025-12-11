@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.25.5
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -232,14 +232,17 @@ spec:
             normalized:
               type: object
               description: "Normalized resource requested"
+              nullable: true
               x-kubernetes-preserve-unknown-fields: true
             normalizedCompleted:
               type: object
               description: "Normalized resource completed"
+              nullable: true
               x-kubernetes-preserve-unknown-fields: true
             actionPlan:
               type: object
               description: "Action Plan"
+              nullable: true
               x-kubernetes-preserve-unknown-fields: true
             hostsWithTablesCreated:
               type: array
@@ -1450,14 +1453,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.25.5
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1676,14 +1679,17 @@ spec:
             normalized:
               type: object
               description: "Normalized resource requested"
+              nullable: true
               x-kubernetes-preserve-unknown-fields: true
             normalizedCompleted:
               type: object
               description: "Normalized resource completed"
+              nullable: true
               x-kubernetes-preserve-unknown-fields: true
             actionPlan:
               type: object
               description: "Action Plan"
+              nullable: true
               x-kubernetes-preserve-unknown-fields: true
             hostsWithTablesCreated:
               type: array
@@ -2897,7 +2903,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -3426,14 +3432,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.25.5
+# OPERATOR_VERSION=0.25.6
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.25.5
+    clickhouse-keeper.altinity.com/chop: 0.25.6
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -4321,7 +4327,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
 
 # Template Parameters:
 #
@@ -4346,7 +4352,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
 rules:
   #
   # Core API group
@@ -4566,7 +4572,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -4599,7 +4605,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
 rules:
   #
   # Core API group
@@ -4819,7 +4825,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -4841,7 +4847,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -4968,7 +4974,7 @@ data:
               # these settings should not lead to pod restarts
               - settings/display_secrets_in_show_and_select: "no"
 
-              - zookeeper/*: "yes"
+              - zookeeper/*: "no"
 
               - files/*.xml: "yes"
               - files/config.d/*.xml: "yes"
@@ -5300,8 +5306,8 @@ data:
       fields:
         action: false
         actions: false
-        error: false
-        errors: false
+        error: true
+        errors: true
 
     ################################################
     ##
@@ -5348,7 +5354,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
 ---
@@ -5364,7 +5370,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -5458,7 +5464,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -5556,7 +5562,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -5618,7 +5624,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
 ---
@@ -5634,7 +5640,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -5709,7 +5715,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
   readme: |
@@ -5727,7 +5733,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 data:
 ---
@@ -5735,7 +5741,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=kube-system
 #   COMMENT=
-#   OPERATOR_VERSION=0.25.5
+#   OPERATOR_VERSION=0.25.6
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -5745,7 +5751,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -5756,9 +5762,9 @@ stringData:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.25.5
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.25.6
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.25.5
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.25.6
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -5769,7 +5775,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -5817,7 +5823,7 @@ spec:
             name: etc-keeper-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.25.5
+          image: altinity/clickhouse-operator:0.25.6
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5891,7 +5897,7 @@ spec:
             - containerPort: 9999
               name: op-metrics
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.25.5
+          image: altinity/metrics-exporter:0.25.6
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -5981,7 +5987,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.25.5
+    clickhouse.altinity.com/chop: 0.25.6
     app: clickhouse-operator
 spec:
   ports:

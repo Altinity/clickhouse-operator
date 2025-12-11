@@ -1,0 +1,91 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: "clickhouse"
+  annotations:
+    prometheus.io/port: "7000"
+    prometheus.io/scrape: "true"
+
+spec:
+  configuration:
+    clusters:
+      - name: "0"
+        layout:
+          replicasCount: 3
+
+    settings:
+      logger/level: "information"
+      logger/console: "true"
+
+      listen_host: "0.0.0.0"
+
+      keeper_server/four_letter_word_white_list: "*"
+      keeper_server/coordination_settings/raft_logs_level: "information"
+      keeper_server/path: "/var/lib/clickhouse-keeper"
+
+      prometheus/endpoint: "/metrics"
+      prometheus/port: "7000"
+      prometheus/metrics: "true"
+      prometheus/events: "true"
+      prometheus/asynchronous_metrics: "true"
+      prometheus/status_info: "false"
+
+  defaults:
+    templates:
+      podTemplate: keeper-default
+
+  templates:
+    podTemplates:
+      - name: keeper-default
+        metadata:
+          labels:
+            app: clickhouse-keeper
+          annotations:
+            prometheus.io/port: "7000"
+            prometheus.io/scrape: "true"
+        spec:
+#          affinity:
+#            podAntiAffinity:
+#              requiredDuringSchedulingIgnoredDuringExecution:
+#                - labelSelector:
+#                    matchExpressions:
+#                      - key: "app"
+#                        operator: In
+#                        values:
+#                          - clickhouse-keeper
+#                  topologyKey: "kubernetes.io/hostname"
+
+#          nodeSelector:
+#            node-role.kubernetes.io/controlplane: "true"
+
+          tolerations:
+            - key: "node-role.kubernetes.io/controlplane"
+              operator: "Exists"
+              effect: "NoSchedule"
+            - key: "node-role.kubernetes.io/etcd"
+              operator: "Exists"
+              effect: "NoExecute"
+
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: IfNotPresent
+              image: "docker.io/clickhouse/clickhouse-keeper:23.8.16"
+              # resources:
+              #  requests:
+              #    memory: "256Mi"
+              #    cpu: "1"
+              #  limits:
+              #    memory: "4Gi"
+              #    cpu: "2"
+              volumeMounts:
+                - name: keeper-storage
+                  mountPath: /var/lib/clickhouse-keeper
+
+          securityContext:
+            fsGroup: 101
+
+          volumes:
+            - name: keeper-storage
+              hostPath:
+                path: /mnt/data/clickhouse-keeper
+                type: DirectoryOrCreate

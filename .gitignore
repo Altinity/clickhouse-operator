@@ -15,6 +15,7 @@
 .idea
 .project
 .pydevproject
+.vscode
 
 # Skip logs and caches
 log
@@ -52,3 +53,6 @@ tests/image/cache
 
 # agents
 .aider*
+CLAUDE.md
+AGENTS.md
+.claude

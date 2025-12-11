@@ -16,8 +16,10 @@ package v1
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 type ICustomResource interface {

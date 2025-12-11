@@ -16,19 +16,41 @@ package chi
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
 )
 
-func reconcileClusterZookeeperRootPath(cluster *api.Cluster) error {
+func (w *worker) reconcileClusterZookeeperRootPath(cluster *api.Cluster) error {
+	// Cluster ZK path reconciliation is optional
 	if !shouldReconcileClusterZookeeperPath(cluster) {
 		// Nothing to reconcile
 		return nil
 	}
+
+	// Yes, we are expected to reconcile ZK path
+
+	w.a.V(1).
+		WithEvent(cluster.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
+		WithAction(cluster.GetCR()).
+		M(cluster.GetCR()).F().
+		Info("Confirm ZK is configured for cluster %s/%s/%s", cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName())
+
+	ensureZkPath(cluster)
+
+	w.a.V(1).
+		WithEvent(cluster.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
+		WithAction(cluster.GetCR()).
+		M(cluster.GetCR()).F().
+		Info("ZK is configured for cluster %s/%s/%s", cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName())
+
+	return nil
+}
+
+func ensureZkPath(cluster *api.Cluster) {
 	conn := zookeeper.NewConnection(cluster.Zookeeper.Nodes)
 	path := zookeeper.NewPathManager(conn)
 	path.Ensure(cluster.Zookeeper.Root)
 	path.Close()
-	return nil
 }
 
 func shouldReconcileClusterZookeeperPath(cluster *api.Cluster) bool {

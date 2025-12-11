@@ -1,12 +1,16 @@
 # altinity-clickhouse-operator
 
-![Version: 0.25.5](https://img.shields.io/badge/Version-0.25.5-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.25.5](https://img.shields.io/badge/AppVersion-0.25.5-informational?style=flat-square)
+![Version: 0.25.6](https://img.shields.io/badge/Version-0.25.6-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.25.6](https://img.shields.io/badge/AppVersion-0.25.6-informational?style=flat-square)
 
 Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
 
 The ClickHouse Operator creates, configures and manages ClickHouse clusters running on Kubernetes.
 
-For upgrade please install CRDs separately:
+## CRD Management
+
+CRDs are automatically installed and updated during `helm install` and `helm upgrade` using pre-install/pre-upgrade hooks (enabled by default).
+
+To disable automatic CRD updates, set `crdHook.enabled: false` in values.yaml. When disabled, CRDs must be installed manually:
 ```bash
   kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallations.clickhouse.altinity.com.yaml
   kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallationtemplates.clickhouse.altinity.com.yaml
@@ -22,6 +26,45 @@ For upgrade please install CRDs separately:
 | ---- | ------ | --- |
 | altinity | <support@altinity.com> |  |
 
+## CRD Management
+
+This chart includes automatic CRD installation and update functionality using Helm hooks. CRDs are automatically applied during `helm install` and `helm upgrade` operations.
+
+### How It Works
+
+- **Automatic Updates**: CRDs are installed/updated via pre-install and pre-upgrade hooks (enabled by default)
+- **Backward Compatible**: CRDs remain in the `crds/` directory for standard Helm 3 behavior
+- **Server-Side Apply**: Uses kubectl with `--server-side` flag for better conflict resolution
+- **Configurable**: Can be disabled via `crdHook.enabled: false` in values.yaml
+
+### Manual CRD Management
+
+If you prefer to manage CRDs manually or have disabled the automatic hooks, you can apply CRDs using kubectl:
+
+```bash
+kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallations.clickhouse.altinity.com.yaml
+kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallationtemplates.clickhouse.altinity.com.yaml
+kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseoperatorconfigurations.clickhouse.altinity.com.yaml
+kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousekeeperinstallations.clickhouse-keeper.altinity.com.yaml
+```
+
+### Troubleshooting
+
+**Hook Job Fails with Permission Denied**
+- Ensure the cluster has RBAC enabled and the ServiceAccount has proper permissions to manage CRDs
+- The hook requires cluster-level permissions for `apiextensions.k8s.io/customresourcedefinitions`
+
+**CRDs Not Updating**
+- Check if `crdHook.enabled` is set to `true` in your values
+- Verify the hook Job ran successfully: `kubectl get jobs -n <namespace> | grep crd-install`
+- Check Job logs: `kubectl logs -n <namespace> job/<release-name>-crd-install`
+
+**Disabling Automatic CRD Updates**
+```yaml
+crdHook:
+  enabled: false
+```
+
 ## Values
 
 | Key | Type | Default | Description |
@@ -31,10 +74,18 @@ For upgrade please install CRDs separately:
 | commonAnnotations | object | `{}` | set of annotations that will be applied to all the resources for the operator |
 | commonLabels | object | `{}` | set of labels that will be applied to all the resources for the operator |
 | configs | object | check the `values.yaml` file for the config content (auto-generated from latest operator release) | clickhouse operator configs |
+| crdHook.affinity | object | `{}` | affinity for CRD installation job |
+| crdHook.enabled | bool | `true` | enable automatic CRD installation/update via pre-install/pre-upgrade hooks when disabled, CRDs must be installed manually using kubectl apply |
+| crdHook.image.pullPolicy | string | `"IfNotPresent"` | image pull policy for CRD installation job |
+| crdHook.image.repository | string | `"bitnami/kubectl"` | image repository for CRD installation job |
+| crdHook.image.tag | string | `"latest"` | image tag for CRD installation job |
+| crdHook.nodeSelector | object | `{}` | node selector for CRD installation job |
+| crdHook.resources | object | `{}` | resource limits and requests for CRD installation job |
+| crdHook.tolerations | list | `[]` | tolerations for CRD installation job |
 | dashboards.additionalLabels | object | `{"grafana_dashboard":""}` | labels to add to a secret with dashboards |
-| dashboards.annotations | object | `{}` | annotations to add to a secret with dashboards |
+| dashboards.annotations | object | `{"grafana_folder":"clickhouse-operator"}` | annotations to add to a secret with dashboards |
+| dashboards.annotations.grafana_folder | string | `"clickhouse-operator"` | folder where will place dashboards, requires define values in official grafana helm chart sidecar.dashboards.folderAnnotation: grafana_folder |
 | dashboards.enabled | bool | `false` | provision grafana dashboards as configMaps (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-8.3.4/charts/grafana/values.yaml#L778 ) |
-| dashboards.grafana_folder | string | `"clickhouse"` |  |
 | deployment.strategy.type | string | `"Recreate"` |  |
 | fullnameOverride | string | `""` | full name of the chart. |
 | imagePullSecrets | list | `[]` | image pull secret for private images in clickhouse-operator pod possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |
