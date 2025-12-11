@@ -33,7 +33,7 @@ func (w *worker) reconcileClusterZookeeperRootPath(cluster *api.Cluster) error {
 		WithEvent(cluster.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
 		WithAction(cluster.GetCR()).
 		M(cluster.GetCR()).F().
-		Info("Verify ZK path for cluster %s/%s/%s", cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName())
+		Info("Confirm ZK is configured for cluster %s/%s/%s", cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName())
 
 	ensureZkPath(cluster)
 
@@ -41,7 +41,7 @@ func (w *worker) reconcileClusterZookeeperRootPath(cluster *api.Cluster) error {
 		WithEvent(cluster.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
 		WithAction(cluster.GetCR()).
 		M(cluster.GetCR()).F().
-		Info("ZK path verified for cluster %s/%s/%s", cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName())
+		Info("ZK is configured for cluster %s/%s/%s", cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName())
 
 	return nil
 }
