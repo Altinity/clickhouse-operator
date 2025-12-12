@@ -63,13 +63,21 @@ echo "Setup minio.io operator ${MINIO_OPERATOR_VERSION} into ${MINIO_NAMESPACE} 
 ## TODO: need to refactor after next minio-operator release
 
 MINIO_KUSTOMIZE_DIR="${MINIO_OPERATOR_DIR}/resources"
-sed -i -e "s/replicas: 2/replicas: 1/" $MINIO_KUSTOMIZE_DIR/base/deployment.yaml
-sed -i -e "s/name: minio-operator/name: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/base/namespace.yaml
-sed -i -e "s/: restricted/: baseline/" $MINIO_KUSTOMIZE_DIR/base/namespace.yaml
-sed -i -e "s/namespace: default/namespace: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/base/*.yaml
-sed -i -e "s/namespace: minio-operator/namespace: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/base/*.yaml
-sed -i -e "s/namespace: minio-operator/namespace: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/kustomization.yaml
-sed -i -e "s/imagePullPolicy: Always/imagePullPolicy: IfNotPresent/" $MINIO_KUSTOMIZE_DIR/base/*.yaml
+
+# Use sed with compatibility for both macOS and Linux
+if [[ "$(uname)" == "Darwin" ]]; then
+    SED_INPLACE="sed -i ''"
+else
+    SED_INPLACE="sed -i"
+fi
+
+$SED_INPLACE -e "s/replicas: 2/replicas: 1/" $MINIO_KUSTOMIZE_DIR/base/deployment.yaml
+$SED_INPLACE -e "s/name: minio-operator/name: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/base/namespace.yaml
+$SED_INPLACE -e "s/: restricted/: baseline/" $MINIO_KUSTOMIZE_DIR/base/namespace.yaml
+$SED_INPLACE -e "s/namespace: default/namespace: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/base/*.yaml
+$SED_INPLACE -e "s/namespace: minio-operator/namespace: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/base/*.yaml
+$SED_INPLACE -e "s/namespace: minio-operator/namespace: ${MINIO_NAMESPACE}/" $MINIO_KUSTOMIZE_DIR/kustomization.yaml
+$SED_INPLACE -e "s/imagePullPolicy: Always/imagePullPolicy: IfNotPresent/" $MINIO_KUSTOMIZE_DIR/base/*.yaml
 
 # Setup minio-operator into dedicated namespace via kustomize
 kubectl --namespace="${MINIO_NAMESPACE}" apply -k "${MINIO_KUSTOMIZE_DIR}"
