@@ -336,10 +336,29 @@ func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) err
 	return nil
 }
 
+// prepareStsReconcileOptsWaitSection prepares StatefulSet reconcile options with wait settings
+func (w *worker) prepareStsReconcileOptsWaitSection(host *api.Host, opts *statefulset.ReconcileOptions) *statefulset.ReconcileOptions {
+	if host.GetCluster().GetReconcile().Host.Wait.Probes.GetStartup().IsTrue() {
+		opts = opts.SetWaitUntilStarted()
+		w.a.V(1).
+			M(host).F().
+			Warning("Setting option SetWaitUntilStarted ")
+	}
+	if host.GetCluster().GetReconcile().Host.Wait.Probes.GetReadiness().IsTrue() {
+		opts = opts.SetWaitUntilReady()
+		w.a.V(1).
+			M(host).F().
+			Warning("Setting option SetWaitUntilReady")
+	}
+	return opts
+}
+
 // reconcileHostStatefulSet reconciles host's StatefulSet
 func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
+
+	opts = w.prepareStsReconcileOptsWaitSection(host, opts)
 
 	version := w.getHostSoftwareVersion(ctx, host)
 	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)

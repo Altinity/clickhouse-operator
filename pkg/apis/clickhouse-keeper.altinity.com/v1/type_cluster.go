@@ -224,6 +224,15 @@ func (cluster *Cluster) GetAncestor() apiChi.ICluster {
 	return (*Cluster)(nil)
 }
 
+// InheritClusterReconcileFrom inherits reconcile settings from CHK CR
+func (cluster *Cluster) InheritClusterReconcileFrom(chk *ClickHouseKeeperInstallation) {
+	if chk.Spec.Reconcile == nil {
+		return
+	}
+	cluster.Reconcile.Runtime = cluster.Reconcile.Runtime.MergeFrom(chk.Spec.Reconcile.Runtime, apiChi.MergeTypeFillEmptyValues)
+	cluster.Reconcile.Host = cluster.Reconcile.Host.MergeFrom(chk.Spec.Reconcile.Host)
+}
+
 // GetShard gets shard with specified index
 func (cluster *Cluster) GetShard(shard int) *ChkShard {
 	return cluster.Layout.Shards[shard]

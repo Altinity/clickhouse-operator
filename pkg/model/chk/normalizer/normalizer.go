@@ -340,8 +340,14 @@ func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiRec
 	// No normalization yet
 
 	// Host
-	// No normalization yet
+	reconcile.Host = n.normalizeReconcileHost(reconcile.Host)
 	return reconcile
+}
+
+func (n *Normalizer) normalizeReconcileHost(rh chi.ReconcileHost) chi.ReconcileHost {
+	// Normalize
+	rh = rh.Normalize()
+	return rh
 }
 
 func (n *Normalizer) normalizeReconcileCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
@@ -519,6 +525,9 @@ func (n *Normalizer) normalizeClusterStage1(cluster *chk.Cluster) *chk.Cluster {
 
 	// Runtime has to be prepared first
 	cluster.GetRuntime().SetCR(n.req.GetTarget())
+
+	// Inherit reconcile settings from CR
+	cluster.InheritClusterReconcileFrom(n.req.GetTarget())
 
 	n.normalizeClusterLayout(cluster)
 

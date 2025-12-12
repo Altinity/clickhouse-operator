@@ -99,7 +99,9 @@ func (p *HostObjectsPoller) WaitHostStatefulSetReady(ctx context.Context, host *
 			if sts == nil {
 				return false
 			}
-			_ = p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
+			if p.readyMarkDeleter != nil {
+				_ = p.readyMarkDeleter.DeleteReadyMarkOnPodAndService(_ctx, host)
+			}
 			return k8s.IsStatefulSetReconcileCompleted(sts)
 		},
 	)
