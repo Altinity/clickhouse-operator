@@ -5,6 +5,7 @@ on:
     types:
     - published
     - edited
+  workflow_dispatch: {}
 
 jobs:
   release_chart:
