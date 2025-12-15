@@ -47,7 +47,7 @@ jobs:
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.33.5
+          kubernetes-version: v1.34.3
           cpus: max
           memory: max
 
@@ -128,7 +128,7 @@ jobs:
           echo "test_result=$test_result" >> $GITHUB_OUTPUT
           exit "$test_result"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: testflows-logs
           path: |
@@ -137,7 +137,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: testflows-report
           path: |
