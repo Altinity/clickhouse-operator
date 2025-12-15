@@ -22,8 +22,8 @@ spec:
             - name: clickhouse-pod
               resources:
                 requests:
-                  memory: 1Gi
                   cpu: "0.5"
+                  memory: 1Gi
                 limits:
-                  memory: 1Gi
                   cpu: "0.5"
+                  memory: 1Gi

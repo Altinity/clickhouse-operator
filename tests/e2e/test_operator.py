@@ -2718,7 +2718,7 @@ def test_010023(self):
         time.sleep(15)
 
     with Then("Trigger CHI update"):
-        kubectl.force_reconcile(chi, "apply-templates")
+        kubectl.force_chi_reconcile(chi, "apply-templates")
 
     with Then(".status.usedTemplates has 3 values"):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
@@ -3475,7 +3475,6 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
 
 @TestScenario
 @Name("test_010032# Test rolling update logic")
-# @Tags("NO_PARALLEL")
 def test_010032(self):
     """Test rolling update logic."""
     create_shell_namespace_clickhouse_template()
@@ -3865,7 +3864,7 @@ def test_010036(self):
 
     def recover_volume(volume, reconcile_task_id):
         with When(f"Kick operator to start reconcile cycle to fix lost {volume} volume"):
-            kubectl.force_reconcile(chi, reconcile_task_id)
+            kubectl.force_chi_reconcile(chi, reconcile_task_id)
             wait_for_cluster(chi, cluster, 1, 2)
 
             with Then("I check PV is in place"):
@@ -4535,7 +4534,7 @@ def test_010044(self):
             r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
             assert not ("test_local" in r), error()
 
-    kubectl.force_reconcile(chi)
+    kubectl.force_chi_reconcile(chi)
 
     with Then("I check schema is propagated"):
         with By("checking schema on the slow replica"):
@@ -4925,7 +4924,7 @@ def test_010053(self):
         start_time = kubectl.get_field("pod", pod, ".status.startTime")
 
         with Then("Trigger reconcile"):
-            kubectl.force_reconcile(chi)
+            kubectl.force_chi_reconcile(chi)
             check_restart()
 
         with When("Restart operator"):
@@ -5360,6 +5359,7 @@ def test_010060(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_010061. Test fractional CPU requests/limits handling")
 def test_010061(self):
@@ -5383,14 +5383,14 @@ def test_010061(self):
 
     with Then("cpu.limits are set to 500m"):
         pod_spec = kubectl.get_pod_spec(chi)
-        cpu_limits = pod_spec["containers"][0]["resources"]["requests"]["cpu"]
+        cpu_limits = pod_spec["containers"][0]["resources"]["limits"]["cpu"]
         assert cpu_limits == "500m"
 
-    kubectl.force_reconcile(chi, "reconcile1")
+    kubectl.force_chi_reconcile(chi, "reconcile1")
 
     actionPlan = kubectl.get_actionPlan("chi", chi)
     print(actionPlan)
-    with Then("ActionPlan should not contain Templates.PodTemplates[0].Spec.Containers[0].Resources"):
+    with Then("ActionPlan should not contain Templates.PodTemplates[0].Spec.Containers[0].Resources [1]"):
         assert "Templates.PodTemplates[0].Spec.Containers[0].Resources" not in actionPlan
 
     kubectl.create_and_check(
@@ -5404,14 +5404,14 @@ def test_010061(self):
 
     with Then("cpu.limits are set to 500m"):
         pod_spec = kubectl.get_pod_spec(chi)
-        cpu_limits = pod_spec["containers"][0]["resources"]["requests"]["cpu"]
+        cpu_limits = pod_spec["containers"][0]["resources"]["limits"]["cpu"]
         assert cpu_limits == "500m"
 
-    kubectl.force_reconcile(chi, "reconcile2")
+    kubectl.force_chi_reconcile(chi, "reconcile2")
 
     actionPlan = kubectl.get_actionPlan("chi", chi)
     print(actionPlan)
-    with Then("ActionPlan should not contain Templates.PodTemplates[0].Spec.Containers[0].Resources"):
+    with Then("ActionPlan should not contain Templates.PodTemplates[0].Spec.Containers[0].Resources [2]"):
         assert "Templates.PodTemplates[0].Spec.Containers[0].Resources" not in actionPlan
 
     kubectl.delete_chi(chi)
@@ -5422,6 +5422,7 @@ def test_010061(self):
 #
 # Keeper tests section
 #
+
 
 @TestScenario
 @Name("test_020000# Test Basic CHK functions")
@@ -5459,6 +5460,7 @@ def test_020000(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 @TestScenario
 @Name("test_020001# Test that Kubernetes objects between CHI and CHK does not overlap")
@@ -5498,6 +5500,7 @@ def test_020001(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 @TestScenario
 @Name("test_020002# Test CHI with CHK")
@@ -5855,6 +5858,63 @@ def test_020005(self):
         )
 
     check_replication(chi, {0, 1}, 5)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+@TestScenario
+@Name("test_020006. Test https://github.com/Altinity/clickhouse-operator/issues/1863")
+def test_020006(self):
+    create_shell_namespace_clickhouse_template()
+
+    chk_manifest = "manifests/chk/test-020006-issue-1863.yaml"
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
+
+    with Given("Install CHK"):
+        kubectl.create_and_check(
+            manifest=chk_manifest, kind="chk",
+            check={
+                "pod_count": 3,
+                "do_not_delete": 1
+            }
+        )
+
+    kubectl.delete_chk(chk)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+@TestScenario
+@Name("test_020007. Test fractional CPU requests/limits handling for CHK")
+def test_020007(self):
+    create_shell_namespace_clickhouse_template()
+
+    chk_manifest = "manifests/chk/test-020007-fractional-resources.yaml"
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
+
+    kubectl.create_and_check(
+        manifest=chk_manifest, kind="chk",
+        check={
+            "pod_count": 1,
+            "do_not_delete": 1
+        }
+    )
+
+    with Then("cpu.limits are set to 500m"):
+        pod_spec = kubectl.get_chk_pod_spec(chk)
+        cpu_limits = pod_spec["containers"][0]["resources"]["limits"]["cpu"]
+        assert cpu_limits == "500m"
+
+    kubectl.force_chk_reconcile(chk, "reconcile1")
+
+    with Then("cpu.limits are set to 500m"):
+        pod_spec = kubectl.get_chk_pod_spec(chk)
+        cpu_limits = pod_spec["containers"][0]["resources"]["limits"]["cpu"]
+        assert cpu_limits == "500m"
+
+    kubectl.force_chk_reconcile(chk, "reconcile2")
+
+    kubectl.delete_chk(chk)
 
     with Finally("I clean up"):
         delete_test_namespace()

@@ -524,6 +524,14 @@ def get_pod_spec(chi_name, pod_name="", ns=None, shell=None):
         pod = get("pod", pod_name, ns=ns, shell=shell)
     return pod["spec"]
 
+def get_chk_pod_spec(chk_name, pod_name="", ns=None, shell=None):
+    label = f"-l clickhouse-keeper.altinity.com/chk={chk_name}"
+    if pod_name == "":
+        pod = get("pod", "", ns=ns, label=label, shell=shell)["items"][0]
+    else:
+        pod = get("pod", pod_name, ns=ns, shell=shell)
+    return pod["spec"]
+
 def get_pod_status_full(chi_name, pod_name="", ns=None, shell=None):
     label = f"-l clickhouse.altinity.com/chi={chi_name}"
     if pod_name == "":
@@ -726,10 +734,22 @@ def check_pdb(chi, kind, clusters, ns=None, shell=None):
             assert labels[f"{label}/namespace"] == current().context.test_namespace
             assert pdb["spec"]["maxUnavailable"] == max_unavailable
 
+def force_chi_reconcile(chi, taskID="reconcile", ns=None, shell=None):
+    force_reconcile(chi, "chi", taskID, ns, shell)
 
-def force_reconcile(chi, taskID="reconcile", ns=None, shell=None):
-    with Then(f"Trigger CHI reconcile with taskID:\"{taskID}\""):
-        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"{taskID}"}}]\''
+def force_chk_reconcile(chk, taskID="reconcile", ns=None, shell=None):
+    force_reconcile(chk, "chk", taskID, ns, shell)
+
+
+def force_reconcile(name, kind, taskID, ns=None, shell=None):
+    with Then(f"Trigger {kind} reconcile with taskID:\"{taskID}\""):
+        cmd = f'patch {kind} {name} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"{taskID}"}}]\''
         launch(cmd, ns=ns, shell=shell)
-        wait_chi_status(chi, "InProgress", ns=ns, shell=shell)
-        wait_chi_status(chi, "Completed", ns=ns, shell=shell)
+        if kind == "chi":
+            wait_chi_status(name, "InProgress", ns=ns, shell=shell)
+            wait_chi_status(name, "Completed", ns=ns, shell=shell)
+        elif kind == "chk":
+            wait_chk_status(name, "InProgress", ns=ns, shell=shell)
+            wait_chk_status(name, "Completed", ns=ns, shell=shell)
+        else:
+            assert kind == "chi" or kind == "chi"

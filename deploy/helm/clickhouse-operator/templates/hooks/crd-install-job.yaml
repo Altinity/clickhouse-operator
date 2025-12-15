@@ -1,0 +1,63 @@
+{{- if .Values.crdHook.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "altinity-clickhouse-operator.fullname" . }}-crd-install
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
+  labels:
+    {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crd-install-hook
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      name: {{ include "altinity-clickhouse-operator.fullname" . }}-crd-install
+      labels:
+        {{- include "altinity-clickhouse-operator.labels" . | nindent 8 }}
+        app.kubernetes.io/component: crd-install-hook
+    spec:
+      serviceAccountName: {{ include "altinity-clickhouse-operator.fullname" . }}-crd-install
+      restartPolicy: OnFailure
+      {{- with .Values.crdHook.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.crdHook.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.crdHook.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: crd-install
+        image: "{{ .Values.crdHook.image.repository }}:{{ .Values.crdHook.image.tag }}"
+        imagePullPolicy: {{ .Values.crdHook.image.pullPolicy | default "IfNotPresent" }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Installing/Updating ClickHouse Operator CRDs..."
+          for crd_file in /crds/*.yaml; do
+            echo "Applying $(basename $crd_file)..."
+            kubectl apply --server-side=true --force-conflicts -f "$crd_file"
+          done
+          echo "CRD installation completed successfully"
+        volumeMounts:
+        - name: crds
+          mountPath: /crds
+          readOnly: true
+        {{- with .Values.crdHook.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      volumes:
+      - name: crds
+        configMap:
+          name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds
+{{- end }}
