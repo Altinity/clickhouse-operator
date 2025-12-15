@@ -1,0 +1,23 @@
+{{- if .Values.crdHook.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
+  labels:
+    {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crd-install-hook
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-7"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+  clickhouseinstallations.yaml: |
+{{ .Files.Get "crds/CustomResourceDefinition-clickhouseinstallations.clickhouse.altinity.com.yaml" | indent 4 }}
+  clickhouseinstallationtemplates.yaml: |
+{{ .Files.Get "crds/CustomResourceDefinition-clickhouseinstallationtemplates.clickhouse.altinity.com.yaml" | indent 4 }}
+  clickhousekeeperinstallations.yaml: |
+{{ .Files.Get "crds/CustomResourceDefinition-clickhousekeeperinstallations.clickhouse-keeper.altinity.com.yaml" | indent 4 }}
+  clickhouseoperatorconfigurations.yaml: |
+{{ .Files.Get "crds/CustomResourceDefinition-clickhouseoperatorconfigurations.clickhouse.altinity.com.yaml" | indent 4 }}
+{{- end }}

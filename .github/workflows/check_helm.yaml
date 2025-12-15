@@ -32,6 +32,34 @@ jobs:
       - name: Local Helm Test
         run: |
           set -xe
+          export CHO_RELEASE=$(cat release)
+          IMAGES=(
+            "altinity/clickhouse-operator:${CHO_RELEASE}"
+            "altinity/metrics-exporter:${CHO_RELEASE}"
+            )
+          need_build=false
+          echo "Checking images in registry…"
+          for img in "${IMAGES[@]}"; do
+            if docker manifest inspect "$img" >/dev/null 2>&1; then
+             echo "✔ Image exists: $img"
+            else
+              echo "✖ Image missing: $img"
+              need_build=true
+            fi
+          done
+          
+          if [[ "$need_build" = true ]]; then
+            export GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
+  
+            docker build -f dockerfile/operator/Dockerfile         --build-arg GO_VERSION=${GO_VERSION} -t altinity/clickhouse-operator:${CHO_RELEASE} --pull .
+            docker build -f dockerfile/metrics-exporter/Dockerfile --build-arg GO_VERSION=${GO_VERSION} -t altinity/metrics-exporter:${CHO_RELEASE}    --pull .
+          
+            docker image save altinity/clickhouse-operator:${CHO_RELEASE} -o operator.tar
+            docker image save altinity/metrics-exporter:${CHO_RELEASE}    -o metrics-exporter.tar  
+
+            minikube image load operator.tar
+            minikube image load metrics-exporter.tar
+          fi
           minikube kubectl create ns test
           ./dev/generate_helm_chart.sh
           helm install -n test test-operator ./deploy/helm/clickhouse-operator/
@@ -48,6 +76,6 @@ jobs:
             exit 1
           fi
           kubectl apply -n test -f ./docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml
-          kubectl wait -n test --for=create chi/simple-01 --timeout=60s
-          kubectl wait -n test --for=jsonpath='{.status.status}'=Completed chi/simple-01 --timeout=1m
-          kubectl wait -n test --for=condition=Ready pod/chi-simple-01-simple-0-0-0
+          kubectl wait -n test --for=create chi/simple-01 --timeout=1m
+          kubectl wait -n test --for=jsonpath='{.status.status}'=Completed chi/simple-01 --timeout=3m
+          kubectl wait -n test --for=condition=Ready pod/chi-simple-01-simple-0-0-0 --timeout=3m

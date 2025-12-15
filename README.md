@@ -71,7 +71,7 @@ The Altinity Kubernetes Operator for ClickHouse is a community effort sponsored 
  
 ## License
 
-Copyright (c) 2019-2023, Altinity Inc and/or its affiliates. All rights reserved.
+Copyright (c) 2019-2025, Altinity Inc and/or its affiliates. All rights reserved.
 
 Altinity Kubernetes Operator for ClickHouse is licensed under the Apache License 2.0.
 
