@@ -336,7 +336,7 @@ def test_keeper_rescale_outline(
 
 
 @TestScenario
-@Name("test_zookeeper_rescale. Check ZK scale-up / scale-down cases")
+@Name("test_zookeeper_rescale# Check ZK scale-up / scale-down cases")
 def test_zookeeper_rescale(self):
     test_keeper_rescale_outline(
         keeper_type="zookeeper",
@@ -347,7 +347,7 @@ def test_zookeeper_rescale(self):
 
 
 @TestScenario
-@Name("test_clickhouse_keeper_rescale. Check KEEPER scale-up / scale-down cases")
+@Name("test_clickhouse_keeper_rescale# Check KEEPER scale-up / scale-down cases")
 def test_clickhouse_keeper_rescale(self):
     test_keeper_rescale_outline(
         keeper_type="clickhouse-keeper",
@@ -358,7 +358,7 @@ def test_clickhouse_keeper_rescale(self):
 
 
 @TestScenario
-@Name("test_clickhouse_keeper_rescale_chk. Using ClickHouseKeeperInstallation. Check KEEPER scale-up / scale-down cases")
+@Name("test_clickhouse_keeper_rescale_chk# Using ClickHouseKeeperInstallation. Check KEEPER scale-up / scale-down cases")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
 def test_clickhouse_keeper_rescale_chk(self):
     test_keeper_rescale_outline(
@@ -370,7 +370,7 @@ def test_clickhouse_keeper_rescale_chk(self):
 
 
 # @TestScenario
-# @Name("test_zookeeper_operator_rescale. Check Zookeeper OPERATOR scale-up / scale-down cases")
+# @Name("test_zookeeper_operator_rescale# Check Zookeeper OPERATOR scale-up / scale-down cases")
 # def test_zookeeper_operator_rescale(self):
 #     test_keeper_rescale_outline(
 #         keeper_type="zookeeper-operator",
@@ -381,7 +381,7 @@ def test_clickhouse_keeper_rescale_chk(self):
 
 
 # @TestScenario
-# @Name("test_zookeeper_pvc_scaleout_rescale. Check ZK+PVC scale-up / scale-down cases")
+# @Name("test_zookeeper_pvc_scaleout_rescale# Check ZK+PVC scale-up / scale-down cases")
 # def test_zookeeper_pvc_scaleout_rescale(self):
 #     test_keeper_rescale_outline(
 #         keeper_type="zookeeper",
@@ -392,7 +392,7 @@ def test_clickhouse_keeper_rescale_chk(self):
 
 
 @TestScenario
-@Name("test_zookeeper_manual_teardown_rescale. Check ZK+Manual TEARDOWN scale-up / scale-down cases")
+@Name("test_zookeeper_manual_teardown_rescale# Check ZK+Manual TEARDOWN scale-up / scale-down cases")
 def test_zookeeper_manual_teardown_rescale(self):
     test_keeper_rescale_outline(
         keeper_type="zookeeper",
@@ -480,7 +480,7 @@ def test_keeper_probes_outline(
 
 @TestScenario
 @Name(
-    "test_zookeeper_probes_workload. Liveness + Readiness probes shall works fine "
+    "test_zookeeper_probes_workload# Liveness + Readiness probes shall works fine "
     "under workload in multi-datacenter installation"
 )
 def test_zookeeper_probes_workload(self):
@@ -493,7 +493,7 @@ def test_zookeeper_probes_workload(self):
 
 # @TestScenario
 # @Name(
-#     "test_zookeeper_pvc_probes_workload. Liveness + Readiness probes shall works fine "
+#     "test_zookeeper_pvc_probes_workload# Liveness + Readiness probes shall works fine "
 #     "under workload in multi-datacenter installation"
 # )
 # def test_zookeeper_pvc_probes_workload(self):
@@ -506,7 +506,7 @@ def test_zookeeper_probes_workload(self):
 
 # @TestScenario
 # @Name(
-#     "test_zookeeper_operator_probes_workload. Liveness + Readiness probes shall works fine "
+#     "test_zookeeper_operator_probes_workload# Liveness + Readiness probes shall works fine "
 #     "under workload in multi-datacenter installation"
 # )
 # def test_zookeeper_operator_probes_workload(self):
@@ -523,7 +523,7 @@ def test_zookeeper_probes_workload(self):
 
 @TestScenario
 @Name(
-    "test_clickhouse_keeper_probes_workload. Liveness + Readiness probes shall works fine "
+    "test_clickhouse_keeper_probes_workload# Liveness + Readiness probes shall works fine "
     "under workload in multi-datacenter installation"
 )
 def test_clickhouse_keeper_probes_workload(self):
@@ -536,7 +536,7 @@ def test_clickhouse_keeper_probes_workload(self):
 
 @TestScenario
 @Name(
-    "test_clickhouse_keeper_probes_workload_with_chk. Liveness + Readiness probes shall works fine "
+    "test_clickhouse_keeper_probes_workload_with_chk# Liveness + Readiness probes shall works fine "
     "under workload in multi-datacenter installation"
 )
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))

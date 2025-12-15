@@ -1,17 +1,20 @@
+import os
+os.environ["TEST_NAMESPACE"]="test-clickhouse"
+
 import time
 
 import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
 import e2e.yaml_manifest as yaml_manifest
-import e2e.settings as settings
 import e2e.util as util
+import e2e.steps as steps
 
 from testflows.core import *
 from testflows.asserts import error
 
 
 @TestScenario
-@Name("test_ch_001. Insert quorum")
+@Name("test_ch_001: Insert quorum")
 def test_ch_001(self):
     util.require_keeper(keeper_type=self.context.keeper_type)
     quorum_template = "manifests/chit/tpl-clickhouse-stable.yaml"
@@ -19,7 +22,7 @@ def test_ch_001(self):
 
     kubectl.launch(
         f"delete chit {chit_data['metadata']['name']}",
-        ns=settings.test_namespace,
+        ns=self.context.test_namespace,
         ok_to_fail=True,
     )
     kubectl.create_and_check(
@@ -32,7 +35,7 @@ def test_ch_001(self):
     )
 
     chi = yaml_manifest.get_name(util.get_full_path("manifests/chi/test-ch-001-insert-quorum.yaml"))
-    chi_data = kubectl.get("chi", ns=settings.test_namespace, name=chi)
+    chi_data = kubectl.get("chi", ns=self.context.test_namespace, name=chi)
     util.wait_clickhouse_cluster_ready(chi_data)
 
     host0 = "chi-test-ch-001-insert-quorum-default-0-0"
@@ -112,9 +115,7 @@ def test_ch_001(self):
         with When("Resume fetches for t2 at replica1"):
             clickhouse.query(chi, "system start fetches default.t2", host=host1)
             i = 0
-            while (
-                "2"
-                != clickhouse.query(
+            while ("2" != clickhouse.query(
                     chi,
                     "select active_replicas from system.replicas where database='default' and table='t1'",
                     pod=host0,
@@ -156,7 +157,7 @@ def test_ch_001(self):
 
 
 @TestScenario
-@Name("test_ch_002. Row-level security")
+@Name("test_ch_002: Row-level security")
 def test_ch_002(self):
     kubectl.create_and_check(
         "manifests/chi/test-ch-002-row-level.yaml",
@@ -198,16 +199,23 @@ def test_ch_002(self):
 @TestFeature
 @Name("e2e.test_clickhouse")
 def test(self):
-    util.clean_namespace(delete_chi=False)
+    with Given("set settings"):
+        steps.set_settings()
+    with Given("I create shell"):
+        shell = steps.get_shell()
+        self.context.shell = shell
+
+    util.clean_namespace(delete_chi=True, delete_keeper=True, namespace=self.context.test_namespace)
+    util.install_operator_if_not_exist()
     all_tests = [
         test_ch_001,
         test_ch_002,
     ]
 
-    run_test = all_tests
-
     # placeholder for selective test running
-    # run_test = [test_ch_002]
+    # all_tests = [test_ch_002]
 
-    for t in run_test:
+    for t in all_tests:
         Scenario(test=t)()
+
+    util.clean_namespace(delete_chi=True, delete_keeper=True, namespace=self.context.test_namespace)

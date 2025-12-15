@@ -25,7 +25,7 @@ kubectl_mode = os.getenv("KUBECTL_MODE") if "KUBECTL_MODE" in os.environ else "a
 kubectl_cmd = (
     "kubectl"
     if current().context.native else
-    f"docker-compose -f {get_docker_compose_path()[0]} exec -T runner kubectl"
+    f"docker compose -f {get_docker_compose_path()[0]} exec -T runner kubectl"
 )
 
 kubectl_cmd = os.getenv("KUBECTL_CMD") if "KUBECTL_CMD" in os.environ else kubectl_cmd

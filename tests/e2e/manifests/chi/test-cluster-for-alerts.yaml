@@ -18,6 +18,14 @@ spec:
       prometheus/metrics: true
       prometheus/events: true
       prometheus/asynchronous_metrics: true
+      # tune for low memory
+      mark_cache_size: 67108864
+      merge_tree/parts_to_throw_insert: 300
+      merge_tree/parts_to_delay_insert: 150
+#      merge_tree/merge_max_block_size: 1024
+#      merge_tree/max_bytes_to_merge_at_max_space_in_pool: 1073741824
+#      merge_tree/number_of_free_entries_in_pool_to_lower_max_size_of_merge: 0
+#      background_schedule_pool_size: 128
 
     zookeeper:
       nodes:

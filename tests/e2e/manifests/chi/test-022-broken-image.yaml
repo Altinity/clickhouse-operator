@@ -5,14 +5,14 @@ metadata:
 spec:
   defaults:
     templates:
-      podTemplate: v20.3
+      podTemplate: broken-image
   templates:
     podTemplates:
-    - name: v20.3
+    - name: broken-image
       spec:
         containers:
         - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:24.3-broken
+          image: clickhouse/clickhouse-server:24.8-broken
   configuration:
     clusters:
     - name: default
