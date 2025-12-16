@@ -5,12 +5,14 @@ on:
     types:
     - published
     - edited
+  workflow_dispatch: {}
 
 jobs:
   release_chart:
     name: Release Chart
     permissions:
       contents: write
+      packages: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -20,14 +22,15 @@ jobs:
 
       - name: Install chart-releaser
         run: |
-          wget https://github.com/helm/chart-releaser/releases/download/v1.4.1/chart-releaser_1.4.1_linux_amd64.tar.gz
-          tar -zxf chart-releaser_1.4.1_linux_amd64.tar.gz cr
+          HELM_CHART_RELEASER_VERSION=$(curl -fsSL https://github.com/helm/chart-releaser/releases/latest -H "Accept: application/json" | jq -r .tag_name)
+          wget -qO "chart-releaser_${HELM_CHART_RELEASER_VERSION#v}_linux_$(dpkg --print-architecture).tar.gz" "https://github.com/helm/chart-releaser/releases/download/${HELM_CHART_RELEASER_VERSION}/chart-releaser_${HELM_CHART_RELEASER_VERSION#v}_linux_$(dpkg --print-architecture).tar.gz"
+          tar -zxf "chart-releaser_${HELM_CHART_RELEASER_VERSION#v}_linux_$(dpkg --print-architecture).tar.gz"
           sudo install cr /usr/local/bin/
           rm -f cr chart-releaser_1.4.1_linux_amd64.tar.gz
 
       - name: Install Helm
         run: |
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash
 
       - name: Login to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
