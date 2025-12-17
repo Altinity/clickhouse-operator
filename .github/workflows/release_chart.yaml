@@ -5,7 +5,11 @@ on:
     types:
     - published
     - edited
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'release tag'
+        required: true
 
 jobs:
   release_chart:
@@ -38,13 +42,27 @@ jobs:
       - name: Package Chart
         run: cr package deploy/helm/clickhouse-operator
 
+      - name: Resolve Helm release ID and NAME
+        run: |
+          RELEASE_ID="${{ github.event.release.id }}"
+          RELEASE_NAME="${{ github.event.release.name }}"
+          if [[ -z "${RELEASE_ID}" || -z "${RELEASE_NAME}" ]]; then
+          
+            RELEASE_ID=$(curl -s -H "Accept: application/json" https://github.com/${{ github.repository }}/releases/${{ github.event.inputs.release_tag }} | jq .id)
+            RELEASE_NAME="${{ github.event.inputs.release_tag }}"
+          fi
+          echo "RELEASE_ID=$RELEASE_ID" >> "$GITHUB_ENV"
+          echo "RELEASE_NAME=$RELEASE_NAME" >> "$GITHUB_ENV"
+          
+          
+
       - name: Get Release Assets
         id: get_assets
         run: |
           CHART_PATH=$(ls .cr-release-packages/altinity-clickhouse-operator-*.tgz)
           ASSET_NAME=$(basename ${CHART_PATH})
           ASSET_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          "https://api.github.com/repos/${{ github.repository }}/releases/${{ github.event.release.id }}/assets" | \
+          "https://api.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}/assets" | \
           jq -r ".[] | select(.name == \"$ASSET_NAME\") | .id")
           
           echo "Asset ID is $ASSET_ID"
@@ -54,7 +72,7 @@ jobs:
         if: steps.get_assets.outputs.asset_id != ''
         run: |
           curl -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          "https://api.github.com/repos/${{ github.repository }}/releases/${{ github.event.release.id }}/assets/${{ steps.get_assets.outputs.asset_id }}"
+          "https://api.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}/assets/${{ steps.get_assets.outputs.asset_id }}"
 
       - name: Upload Release Artifacts
         run: |
@@ -64,7 +82,7 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/gzip" \
             -T "${CHART_PATH}" \
-            "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${{ github.event.release.id }}/assets?name=$(basename ${CHART_PATH})"
+            "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets?name=$(basename ${CHART_PATH})"
       - name: Validate Helm Repository Configuration
         run: |
           if [ -z "${{ secrets.HELM_GITHUB_TOKEN }}" ]; then
@@ -93,7 +111,7 @@ jobs:
           cr upload \
             --git-repo=${{ vars.HELM_GITHUB_REPOSITORY }} \
             --owner=${GITHUB_REPOSITORY_OWNER} \
-            --release-name-template=${{ github.event.release.name }} \
+            --release-name-template=${RELEASE_NAME} \
             --token=${{ secrets.HELM_GITHUB_TOKEN }} \
             --package-path=.cr-release-packages \
             --skip-existing
@@ -108,7 +126,7 @@ jobs:
           cr index \
             --git-repo=${GITHUB_REPOSITORY#*/} \
             --owner=${GITHUB_REPOSITORY_OWNER} \
-            --release-name-template=${{ github.event.release.name }} \
+            --release-name-template=${RELEASE_NAME} \
             --token=${{ secrets.GITHUB_TOKEN }}  \
             --index-path=index.yaml \
             --remote=httpsorigin \
@@ -177,7 +195,7 @@ jobs:
           cr index \
             --git-repo=${{ vars.HELM_GITHUB_REPOSITORY }} \
             --owner=${GITHUB_REPOSITORY_OWNER} \
-            --release-name-template=${{ github.event.release.name }} \
+            --release-name-template=${RELEASE_NAME} \
             --token=${{ secrets.HELM_GITHUB_TOKEN }} \
             --package-path=.cr-release-packages \
             --index-path=index.yaml \
