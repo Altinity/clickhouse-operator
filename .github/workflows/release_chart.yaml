@@ -45,7 +45,7 @@ jobs:
       - name: Resolve release ID
         run: |
           RELEASE_ID="${{ github.event.release.id }}"
-          if [[ -z "RELEASE_ID" ]]; then
+          if [[ -z "${RELEASE_ID}" ]]; then
             RELEASE_ID=$(curl -s -H "Accept: application/json" https://github.com/${{ github.repository }}/releases/${{ github.event.inputs.release_tag }} | jq .id)
           fi
           echo "RELEASE_ID=$RELEASE_ID" >> "$GITHUB_ENV"
