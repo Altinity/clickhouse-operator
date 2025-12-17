@@ -2,6 +2,31 @@ apiVersion: v1
 entries:
   altinity-clickhouse-operator:
   - apiVersion: v2
+    appVersion: 0.25.6
+    created: "2025-12-17T13:24:00.416261763Z"
+    description: 'Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).  The
+      ClickHouse Operator creates, configures and manages ClickHouse clusters running
+      on Kubernetes.  ## CRD Management  CRDs are automatically installed and updated
+      during `helm install` and `helm upgrade` using pre-install/pre-upgrade hooks
+      (enabled by default).  To disable automatic CRD updates, set `crdHook.enabled:
+      false` in values.yaml. When disabled, CRDs must be installed manually: ```bash   kubectl
+      apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallations.clickhouse.altinity.com.yaml   kubectl
+      apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallationtemplates.clickhouse.altinity.com.yaml   kubectl
+      apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseoperatorconfigurations.clickhouse.altinity.com.yaml   kubectl
+      apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousekeeperinstallations.clickhouse-keeper.altinity.com.yaml
+      ```'
+    digest: f7963e205cf54c1b6f7a8dee315606c88520546897608734d935e15097f8540f
+    home: https://github.com/Altinity/clickhouse-operator
+    icon: https://logosandtypes.com/wp-content/uploads/2020/12/altinity.svg
+    maintainers:
+    - email: support@altinity.com
+      name: altinity
+    name: altinity-clickhouse-operator
+    type: application
+    urls:
+    - https://github.com/Altinity/clickhouse-operator/releases/download/release-0.25.6/altinity-clickhouse-operator-0.25.6.tgz
+    version: 0.25.6
+  - apiVersion: v2
     appVersion: 0.25.5
     created: "2025-10-24T09:52:25.282515658Z"
     description: 'Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).  The
@@ -618,4 +643,4 @@ entries:
     urls:
     - https://github.com/Altinity/clickhouse-operator/releases/download/release-0.20.1/altinity-clickhouse-operator-0.20.1.tgz
     version: 0.20.1
-generated: "2025-10-24T09:52:25.282972219Z"
+generated: "2025-12-17T13:24:00.416519323Z"
