@@ -119,21 +119,31 @@ func (c *Creator) stsEnsureAppContainerProbesSpecified(statefulSet *apps.Statefu
 
 // stsSetupHostAliases
 func (c *Creator) stsSetupHostAliases(statefulSet *apps.StatefulSet, host *api.Host) {
+	var aliases []core.HostAlias
+
 	// Ensure pod created by this StatefulSet has alias 127.0.0.1
-	statefulSet.Spec.Template.Spec.HostAliases = []core.HostAlias{
-		{
-			IP: "127.0.0.1",
+	// Only add if there's a valid hostname
+	podHostname := c.nm.Name(interfaces.NamePodHostname, host)
+	if podHostname != "" {
+		aliases = append(aliases, core. HostAlias{
+			IP:  "127.0.0.1",
 			Hostnames: []string{
-				c.nm.Name(interfaces.NamePodHostname, host),
+				podHostname,
 			},
-		},
+		})
 	}
+
 	// Add hostAliases from PodTemplate if any
 	if podTemplate, ok := host.GetPodTemplate(); ok {
-		statefulSet.Spec.Template.Spec.HostAliases = append(
-			statefulSet.Spec.Template.Spec.HostAliases,
-			podTemplate.Spec.HostAliases...,
-		)
+		aliases = append(aliases, podTemplate. Spec.HostAliases...)
+	}
+
+	// Only set hostAliases if we have any; otherwise leave it nil (unset)
+	if len(aliases) > 0 {
+		statefulSet.Spec.Template.Spec.HostAliases = aliases
+	} else {
+		// Explicitly unset to comply with Gatekeeper policy
+		statefulSet.Spec.Template.Spec.HostAliases = nil
 	}
 }
 
