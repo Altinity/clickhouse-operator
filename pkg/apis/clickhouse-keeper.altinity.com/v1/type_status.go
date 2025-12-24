@@ -75,6 +75,7 @@ type Status struct {
 	Endpoints                []string                      `json:"endpoints,omitempty"                yaml:"endpoints,omitempty"`
 	NormalizedCR             *ClickHouseKeeperInstallation `json:"normalized,omitempty"               yaml:"normalized,omitempty"`
 	NormalizedCRCompleted    *ClickHouseKeeperInstallation `json:"normalizedCompleted,omitempty"      yaml:"normalizedCompleted,omitempty"`
+	ActionPlan               *chi.ActionPlan               `json:"actionPlan,omitempty"               yaml:"actionPlan,omitempty"`
 	HostsWithTablesCreated   []string                      `json:"hostsWithTablesCreated,omitempty"   yaml:"hostsWithTablesCreated,omitempty"`
 	HostsWithReplicaCaughtUp []string                      `json:"hostsWithReplicaCaughtUp,omitempty" yaml:"hostsWithReplicaCaughtUp,omitempty"`
 	UsedTemplates            []*chi.TemplateRef            `json:"usedTemplates,omitempty"            yaml:"usedTemplates,omitempty"`
@@ -281,7 +282,7 @@ func (s *Status) HostCompleted() {
 }
 
 // ReconcileStart marks reconcile start
-func (s *Status) ReconcileStart(deleteHostsCount int) {
+func (s *Status) ReconcileStart(ap chi.IActionPlan) {
 	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
@@ -292,7 +293,8 @@ func (s *Status) ReconcileStart(deleteHostsCount int) {
 		s.HostsUnchangedCount = 0
 		s.HostsCompletedCount = 0
 		s.HostsDeletedCount = 0
-		s.HostsDeleteCount = deleteHostsCount
+		s.HostsDeleteCount = ap.GetRemovedHostsNum()
+		s.ActionPlan = ap.(*chi.ActionPlan)
 		pushTaskIDStartedNoSync(s)
 	})
 }
@@ -335,6 +337,13 @@ func (s *Status) DeleteStart() {
 		s.HostsDeletedCount = 0
 		s.HostsDeleteCount = 0
 		pushTaskIDStartedNoSync(s)
+	})
+}
+
+// SetActionPlan sets action plan
+func (s *Status) SetActionPlan(ap chi.IActionPlan) {
+	doWithWriteLock(s, func(s *Status) {
+		s.ActionPlan = ap.(*chi.ActionPlan)
 	})
 }
 
@@ -530,6 +539,9 @@ func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 			}
 			if opts.Copy.NormalizedCRCompleted {
 				s.NormalizedCRCompleted = from.NormalizedCRCompleted
+			}
+			if opts.Copy.ActionPlan {
+				s.ActionPlan = from.ActionPlan
 			}
 			if opts.Copy.HostsWithTablesCreated {
 				s.HostsWithTablesCreated = nil
