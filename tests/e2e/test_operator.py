@@ -5866,6 +5866,7 @@ def test_020005(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_020006. Test https://github.com/Altinity/clickhouse-operator/issues/1863")
 def test_020006(self):
@@ -5887,6 +5888,7 @@ def test_020006(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
 
 @TestScenario
 @Name("test_020007. Test fractional CPU requests/limits handling for CHK")
