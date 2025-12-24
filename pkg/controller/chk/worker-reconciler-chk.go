@@ -51,19 +51,16 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 
 	new = w.buildCR(ctx, new)
 
-	actionPlan := api.MakeActionPlan(new.GetAncestorT(), new)
-	w.a.M(new).V(1).Info(actionPlan.Log("buildCR"))
-
 	switch {
-	case actionPlan.HasActionsToDo():
+	case new.EnsureRuntime().ActionPlan.HasActionsToDo():
 		w.a.M(new).F().Info("ActionPlan has actions - continue reconcile")
 	default:
 		w.a.M(new).F().Info("ActionPlan has no actions - abort reconcile")
 		return nil
 	}
 
-	w.markReconcileStart(ctx, new, actionPlan)
-	w.setHostStatusesPreliminary(ctx, new, actionPlan)
+	w.markReconcileStart(ctx, new)
+	w.setHostStatusesPreliminary(ctx, new)
 
 	if err := w.reconcile(ctx, new); err != nil {
 		// Something went wrong
@@ -114,6 +111,11 @@ func (w *worker) buildCR(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstal
 	w.fillCurSTS(ctx, cr)
 	w.logSWVersion(ctx, cr)
 
+	actionPlan := api.MakeActionPlan(cr.GetAncestorT(), cr)
+	cr.EnsureRuntime().ActionPlan = actionPlan
+	cr.EnsureStatus().SetActionPlan(actionPlan)
+	w.a.V(1).M(cr).Info(actionPlan.Log("buildCR"))
+
 	return cr
 }
 
@@ -154,7 +156,7 @@ func (w *worker) logSWVersion(ctx context.Context, cr *apiChk.ClickHouseKeeperIn
 		l.M(host).Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
 		return nil
 	})
-	l.M(cr).Info("CR software versions [min, max]: %s %s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
+	l.M(cr).Info("CR software versions min=%s max=%s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
 }
 
 // reconcile reconciles Custom Resource
@@ -345,18 +347,12 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
 
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), version)
-	// In case we have to force-restart host
-	// We'll do it via replicas: 0 in StatefulSet.
 	if w.shouldForceRestartHost(ctx, host) {
-		w.a.V(1).M(host).F().Info("Reconcile host: %s. Shutting host down due to force restart", host.GetName())
-		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
-		_ = w.stsReconciler.ReconcileStatefulSet(ctx, host, false, opts)
-		metrics.HostReconcilesRestart(ctx, host.GetCR())
-		// At this moment StatefulSet has 0 replicas.
-		// First stage of RollingUpdate completed.
+		w.a.V(1).M(host).F().Info("Reconcile host STS force restart: %s", host.GetName())
+		_ = w.hostForceRestart(ctx, host, opts)
 	}
 
-	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. Reconcile StatefulSet", host.GetName())
@@ -379,6 +375,20 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	}
 
 	return err
+}
+
+func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
+	w.a.V(1).M(host).F().Info("Reconcile host. Force restart: %s", host.GetName())
+
+	// In case we have to force-restart host
+	// We'll do it via replicas: 0 in StatefulSet.
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
+	_ = w.stsReconciler.ReconcileStatefulSet(ctx, host, false, opts)
+	metrics.HostReconcilesRestart(ctx, host.GetCR())
+	// At this moment StatefulSet has 0 replicas.
+	// First stage of RollingUpdate completed.
+
+	return nil
 }
 
 // reconcileHostService reconciles host's Service
@@ -489,7 +499,7 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*apiChk.C
 	// Process shards using specified concurrency level while maintaining specified max concurrency percentage.
 	// Loop over shards.
 	workersNum := w.getReconcileShardsWorkersNum(shards, opts)
-	w.a.V(1).Info("Starting rest of shards on workers: %d", workersNum)
+	w.a.V(1).Info("Starting rest of shards on workers. Workers num: %d", workersNum)
 	for startShardIndex := startShard; startShardIndex < len(shards); startShardIndex += workersNum {
 		endShardIndex := startShardIndex + workersNum
 		if endShardIndex > len(shards) {
@@ -571,6 +581,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 	// Create artifacts
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
+
+	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), host.Runtime.Version.Render())
 
 	if err := w.reconcileHostPrepare(ctx, host); err != nil {
 		return err
@@ -718,6 +730,14 @@ func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host) er
 
 // reconcileHostIncludeIntoAllActivities includes specified ClickHouse host into all activities
 func (w *worker) reconcileHostIncludeIntoAllActivities(ctx context.Context, host *api.Host) error {
+	if !w.shouldIncludeHost(host) {
+		w.a.V(1).
+			M(host).F().
+			Info("No need to include host into cluster. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return nil
+	}
+
 	// Include host back into all activities - such as cluster, service, etc
 	err := w.includeHost(ctx, host)
 	if err != nil {
@@ -727,6 +747,25 @@ func (w *worker) reconcileHostIncludeIntoAllActivities(ctx context.Context, host
 			Warning("Reconcile Host interrupted with an error 4. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
+
+	l := w.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
+		WithAction(host.GetCR()).
+		M(host).F()
+
+	// In case host is unable to report its version we are done with inclusion
+	switch {
+	case host.IsStopped():
+		l.Info("Reconcile Host completed. Host is stopped: %s", host.GetName())
+		return nil
+	case host.IsTroubleshoot():
+		l.Info("Reconcile Host completed. Host is in troubleshoot mode: %s", host.GetName())
+		return nil
+	}
+
+	// Report host software version
+	version := w.getHostSoftwareVersion(ctx, host)
+	l.Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version.Render())
 
 	return nil
 }
