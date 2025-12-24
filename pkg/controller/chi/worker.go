@@ -22,6 +22,8 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/altinity/queue"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -43,7 +45,6 @@ import (
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/altinity/queue"
 )
 
 // FinalizerName specifies name of the finalizer to be used with CHI
@@ -528,19 +529,19 @@ func (w *worker) logHosts(cr api.ICustomResource) {
 	})
 }
 
-func (w *worker) createTemplatedCR(_chi *api.ClickHouseInstallation, _opts ...*commonNormalizer.Options[api.ClickHouseInstallation]) *api.ClickHouseInstallation {
-	l := w.a.V(1).M(_chi).F()
+func (w *worker) createTemplatedCR(_cr *api.ClickHouseInstallation, _opts ...*commonNormalizer.Options[api.ClickHouseInstallation]) *api.ClickHouseInstallation {
+	l := w.a.V(1).M(_cr).F()
 
-	if _chi.HasAncestor() {
-		l.Info("CR has an ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(_chi))
+	if _cr.HasAncestor() {
+		l.Info("CR has an ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(_cr))
 	} else {
-		l.Info("CR has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(_chi))
+		l.Info("CR has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(_cr))
 	}
 
-	chi := w.createTemplated(_chi, _opts...)
-	chi.SetAncestor(w.createTemplated(_chi.GetAncestorT()))
+	cr := w.createTemplated(_cr, _opts...)
+	cr.SetAncestor(w.createTemplated(_cr.GetAncestorT()))
 
-	return chi
+	return cr
 }
 
 func (w *worker) createTemplated(c *api.ClickHouseInstallation, _opts ...*commonNormalizer.Options[api.ClickHouseInstallation]) *api.ClickHouseInstallation {
@@ -548,6 +549,6 @@ func (w *worker) createTemplated(c *api.ClickHouseInstallation, _opts ...*common
 	if len(_opts) > 0 {
 		opts = _opts[0]
 	}
-	chi, _ := w.normalizer.CreateTemplated(c, opts)
-	return chi
+	cr, _ := w.normalizer.CreateTemplated(c, opts)
+	return cr
 }
