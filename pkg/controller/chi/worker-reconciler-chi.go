@@ -182,7 +182,7 @@ func (w *worker) logSWVersion(ctx context.Context, cr *api.ClickHouseInstallatio
 		l.M(host).Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
 		return nil
 	})
-	l.M(cr).Info("CR software versions [min, max]: %s %s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
+	l.M(cr).Info("CR software versions min=%s max=%s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
 }
 
 // reconcile reconciles Custom Resource
@@ -405,6 +405,7 @@ func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *sta
 	}
 
 	metrics.HostReconcilesRestart(ctx, host.GetCR())
+
 	return nil
 }
 
