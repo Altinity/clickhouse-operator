@@ -41,10 +41,10 @@ func (cr *ClickHouseKeeperInstallation) GetSpecA() any {
 }
 
 func (cr *ClickHouseKeeperInstallation) GetRuntime() apiChi.ICustomResourceRuntime {
-	return cr.ensureRuntime()
+	return cr.EnsureRuntime()
 }
 
-func (cr *ClickHouseKeeperInstallation) ensureRuntime() *ClickHouseKeeperInstallationRuntime {
+func (cr *ClickHouseKeeperInstallation) EnsureRuntime() *ClickHouseKeeperInstallationRuntime {
 	if cr == nil {
 		return nil
 	}
@@ -172,7 +172,7 @@ func (cr *ClickHouseKeeperInstallation) FillStatus(endpoints util.Slice[string],
 		ClustersCount:       cr.ClustersCount(),
 		ShardsCount:         cr.ShardsCount(),
 		HostsCount:          cr.HostsCount(),
-		TaskID:              "",
+		TaskID:              cr.GetSpecT().GetTaskID().Value(),
 		HostsUpdatedCount:   0,
 		HostsAddedCount:     0,
 		HostsUnchangedCount: 0,
@@ -454,20 +454,20 @@ func (cr *ClickHouseKeeperInstallation) Copy(opts types.CopyCROptions) *ClickHou
 		return nil
 	}
 
-	var chi2 *ClickHouseKeeperInstallation
-	if err := json.Unmarshal(jsonBytes, &chi2); err != nil {
+	var cr2 *ClickHouseKeeperInstallation
+	if err := json.Unmarshal(jsonBytes, &cr2); err != nil {
 		return nil
 	}
 
 	if opts.SkipStatus {
-		chi2.Status = nil
+		cr2.Status = nil
 	}
 
 	if opts.SkipManagedFields {
-		chi2.SetManagedFields(nil)
+		cr2.SetManagedFields(nil)
 	}
 
-	return chi2
+	return cr2
 }
 
 // JSON returns JSON string
@@ -499,7 +499,7 @@ func (cr *ClickHouseKeeperInstallation) YAML(opts types.CopyCROptions) string {
 	return string(yamlBytes)
 }
 
-// FirstHost returns first host of the CHI
+// FirstHost returns first host of the CR
 func (cr *ClickHouseKeeperInstallation) FirstHost() *apiChi.Host {
 	var result *apiChi.Host
 	cr.WalkHosts(func(host *apiChi.Host) error {
