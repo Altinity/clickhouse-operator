@@ -15,20 +15,20 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"sync"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClickHouseKeeperInstallation defines a ClickHouse Keeper ChkCluster
 type ClickHouseKeeperInstallation struct {
-	meta.TypeMeta   `json:",inline"                     yaml:",inline"`
-	meta.ObjectMeta `json:"metadata,omitempty"          yaml:"metadata,omitempty"`
+	meta.TypeMeta   `json:",inline"            yaml:",inline"`
+	meta.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Spec   ChkSpec `json:"spec"             yaml:"spec"`
 	Status *Status `json:"status,omitempty" yaml:"status,omitempty"`
@@ -43,6 +43,7 @@ type ClickHouseKeeperInstallationRuntime struct {
 	commonConfigMutex sync.Mutex                   `json:"-" yaml:"-"`
 	MinVersion        *swversion.SoftWareVersion   `json:"-" yaml:"-"`
 	MaxVersion        *swversion.SoftWareVersion   `json:"-" yaml:"-"`
+	ActionPlan        apiChi.IActionPlan           `json:"-" yaml:"-"`
 }
 
 func newClickHouseKeeperInstallationRuntime() *ClickHouseKeeperInstallationRuntime {
