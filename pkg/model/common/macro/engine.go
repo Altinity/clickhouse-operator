@@ -17,6 +17,7 @@ package macro
 import (
 	"strconv"
 
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -68,6 +69,8 @@ func (e *Engine) Replacer() *util.Replacer {
 		return e.newReplacerCR(t)
 	case api.ICluster:
 		return e.newReplacerCluster(t)
+	case *apiChk.Cluster:
+		return e.newReplacerCHKCluster(t)
 	case api.IShard:
 		return e.newReplacerShard(t)
 	case api.IReplica:
@@ -97,6 +100,16 @@ func (e *Engine) newReplacerCR(cr api.ICustomResource) *util.Replacer {
 
 // newReplacerCluster
 func (e *Engine) newReplacerCluster(cluster api.ICluster) *util.Replacer {
+	return util.NewReplacer(map[string]string{
+		e.Get(MacrosNamespace):    e.namer.Name(short.Namespace, cluster),
+		e.Get(MacrosCRName):       e.namer.Name(short.CRName, cluster),
+		e.Get(MacrosClusterName):  e.namer.Name(short.ClusterName, cluster),
+		e.Get(MacrosClusterIndex): strconv.Itoa(cluster.GetRuntime().GetAddress().GetClusterIndex()),
+	})
+}
+
+// newReplacerCHKCluster
+func (e *Engine) newReplacerCHKCluster(cluster *apiChk.Cluster) *util.Replacer {
 	return util.NewReplacer(map[string]string{
 		e.Get(MacrosNamespace):    e.namer.Name(short.Namespace, cluster),
 		e.Get(MacrosCRName):       e.namer.Name(short.CRName, cluster),
