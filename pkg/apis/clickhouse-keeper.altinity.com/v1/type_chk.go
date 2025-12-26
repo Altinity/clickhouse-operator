@@ -651,7 +651,6 @@ func (cr *ClickHouseKeeperInstallation) WalkTillError(
 	ctx context.Context,
 	fCRPreliminary func(ctx context.Context, chi *ClickHouseKeeperInstallation) error,
 	fCluster func(ctx context.Context, cluster *Cluster) error,
-	fShards func(ctx context.Context, shards []*ChkShard) error,
 	fCRFinal func(ctx context.Context, chi *ClickHouseKeeperInstallation) error,
 ) error {
 	if err := fCRPreliminary(ctx, cr); err != nil {
@@ -661,14 +660,6 @@ func (cr *ClickHouseKeeperInstallation) WalkTillError(
 	for clusterIndex := range cr.GetSpecT().Configuration.Clusters {
 		cluster := cr.GetSpecT().Configuration.Clusters[clusterIndex]
 		if err := fCluster(ctx, cluster); err != nil {
-			return err
-		}
-
-		shards := make([]*ChkShard, 0, len(cluster.Layout.Shards))
-		for shardIndex := range cluster.Layout.Shards {
-			shards = append(shards, cluster.Layout.Shards[shardIndex])
-		}
-		if err := fShards(ctx, shards); err != nil {
 			return err
 		}
 	}
