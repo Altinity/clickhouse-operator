@@ -16,12 +16,13 @@ package chk
 
 import (
 	"context"
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"sync"
 
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 )
 
 func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
@@ -30,7 +31,7 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *sw
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
-func (w *worker) getReconcileShardsWorkersNum(shards []*apiChk.ChkShard, opts *common.ReconcileShardsAndHostsOptions) int {
+func (w *worker) getReconcileShardsWorkersNum(cluster *apiChk.Cluster, opts *common.ReconcileShardsAndHostsOptions) int {
 	return 1
 }
 
@@ -45,6 +46,56 @@ func (w *worker) reconcileShardsAndHostsFetchOpts(ctx context.Context) *common.R
 	}
 }
 
+func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShardIndex int, shards []*apiChk.ChkShard) error {
+	if len(shards) == 0 {
+		return nil
+	}
+
+	type shardReconcile struct {
+		shard *apiChk.ChkShard
+		index int
+	}
+
+	ch := make(chan *shardReconcile)
+	wg := sync.WaitGroup{}
+
+	// Launch tasks feeder
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(ch)
+		for i, shard := range shards {
+			ch <- &shardReconcile{
+				shard,
+				startShardIndex + i,
+			}
+		}
+	}()
+
+	// Launch workers
+	var err error
+	var errLock sync.Mutex
+	for i := 0; i < workersNum; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for rq := range ch {
+				w.a.V(1).Info("Starting shard index: %d on worker", rq.index)
+				if e := w.reconcileShardWithHosts(ctx, rq.shard); e != nil {
+					errLock.Lock()
+					err = e
+					errLock.Unlock()
+				}
+			}
+		}()
+	}
+
+	w.a.V(1).Info("Starting to wait shards from index: %d on workers.", startShardIndex)
+	wg.Wait()
+	w.a.V(1).Info("Finished to wait shards from index: %d on workers.", startShardIndex)
+	return err
+}
+
 func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) *statefulset.ReconcileOptions {
 	w.a.V(1).
 		M(host).F().
@@ -53,6 +104,7 @@ func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) *statefulset.Re
 	// In case of data loss detection on existing volumes, we need to:
 	// 1. recreate StatefulSet
 	// 2. run tables migration again
+
 	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
 	return stsReconcileOpts
 }
