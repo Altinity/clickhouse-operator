@@ -166,6 +166,27 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 	}
 }
 
+func (w *worker) finalizeCR(
+	ctx context.Context,
+	obj meta.Object,
+	updateStatusOpts types.UpdateStatusOptions,
+	f func(*apiChk.ClickHouseKeeperInstallation),
+) error {
+	chi, err := w.buildCRFromObj(ctx, obj)
+	if err != nil {
+		log.V(1).Error("Unable to finalize CR: %s err: %v", util.NamespacedName(obj), err)
+		return err
+	}
+
+	if f != nil {
+		f(chi)
+	}
+
+	_ = w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
+
+	return nil
+}
+
 func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
@@ -199,34 +220,23 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
-	// Update CHI object
-	if chi, err := w.createCRFromObjectMeta(_cr, true, commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()); err == nil {
-		w.a.V(1).M(chi).Info("updating endpoints for CR-2 %s", chi.Name)
-		ips := w.c.getPodsIPs(ctx, chi)
-		w.a.V(1).M(chi).Info("IPs of the CR-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()
-		opts.DefaultUserAdditionalIPs = ips
-		if chi, err := w.createCRFromObjectMeta(_cr, true, opts); err == nil {
-			w.a.V(1).M(chi).Info("Update users IPS-2")
-			chi.SetAncestor(chi.GetTarget())
-			chi.SetTarget(nil)
-			chi.EnsureStatus().ReconcileComplete()
-			// TODO unify with update endpoints
-			w.newTask(chi, chi.GetAncestorT())
-			//w.reconcileConfigMapCommonUsers(ctx, chi)
-			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
-				CopyStatusOptions: types.CopyStatusOptions{
-					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
-						FieldGroupWholeStatus: true,
-					},
+	// Update CR object
+	_ = w.finalizeCR(
+		ctx,
+		_cr,
+		types.UpdateStatusOptions{
+			CopyStatusOptions: types.CopyStatusOptions{
+				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+					FieldGroupWholeStatus: true,
 				},
-			})
-		} else {
-			w.a.M(_cr).F().Error("internal unable to find CR by %v err: %v", _cr.GetLabels(), err)
-		}
-	} else {
-		w.a.M(_cr).F().Error("external unable to find CR by %v err %v", _cr.GetLabels(), err)
-	}
+			},
+		},
+		func(c *apiChk.ClickHouseKeeperInstallation) {
+			c.SetAncestor(c.GetTarget())
+			c.SetTarget(nil)
+			c.EnsureStatus().ReconcileComplete()
+		},
+	)
 
 	w.a.V(1).
 		WithEvent(_cr, a.EventActionReconcile, a.EventReasonReconcileCompleted).
@@ -416,26 +426,4 @@ func (w *worker) options() *config.FilesGeneratorOptions {
 	opts := w.getRaftGeneratorOptions()
 	w.a.Info("RaftOptions: %s", opts)
 	return config.NewFilesGeneratorOptions().SetRaftOptions(opts)
-}
-
-// createCRFromObjectMeta
-func (w *worker) createCRFromObjectMeta(
-	meta meta.Object,
-	isCHI bool,
-	options *commonNormalizer.Options[apiChk.ClickHouseKeeperInstallation],
-) (*apiChk.ClickHouseKeeperInstallation, error) {
-	w.a.V(3).M(meta).S().P()
-	defer w.a.V(3).M(meta).E().P()
-
-	chi, err := w.c.GetCHIByObjectMeta(meta, isCHI)
-	if err != nil {
-		return nil, err
-	}
-
-	chi, err = w.normalizer.CreateTemplated(chi, options)
-	if err != nil {
-		return nil, err
-	}
-
-	return chi, nil
 }
