@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
@@ -86,7 +87,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrat
 			Info(
 				"Need to drop replica on host %d to shard %d in cluster %s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-		w.dropReplica(ctx, host, NewDropReplicaOptions().SetForceDropUponStorageLoss())
+		w.dropZKReplica(ctx, host, NewDropReplicaOptions().SetForceDropUponStorageLoss())
 	}
 
 	w.a.V(1).
