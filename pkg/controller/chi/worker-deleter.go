@@ -61,8 +61,8 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	cr.(*api.ClickHouseInstallation).EnsureStatus().SyncHostTablesCreated()
 }
 
-// dropReplicas cleans Zookeeper for replicas that are properly deleted - via Action Plan
-func (w *worker) dropReplicas(ctx context.Context, cr *api.ClickHouseInstallation) {
+// dropZKReplicas cleans Zookeeper for replicas that are properly deleted - via Action Plan
+func (w *worker) dropZKReplicas(ctx context.Context, cr *api.ClickHouseInstallation) {
 	// Iterate over Action Plan and drop all replicas that are properly removed as removed hosts
 	w.a.V(1).M(cr).F().S().Info("drop replicas based on AP")
 	cnt := 0
@@ -72,7 +72,7 @@ func (w *worker) dropReplicas(ctx context.Context, cr *api.ClickHouseInstallatio
 		func(shard api.IShard) {
 		},
 		func(host *api.Host) {
-			_ = w.dropReplica(ctx, host, NewDropReplicaOptions().SetRegularDrop())
+			_ = w.dropZKReplica(ctx, host, NewDropReplicaOptions().SetRegularDrop())
 			cnt++
 		},
 	)
@@ -244,7 +244,7 @@ func (w *worker) discoveryAndDeleteCR(ctx context.Context, cr api.ICustomResourc
 		return nil
 	}
 
-	metrics.CHIUnregister(ctx, cr)
+	metrics.CRUnregister(ctx, cr)
 
 	objs := w.c.discovery(ctx, cr)
 	if objs.NumStatefulSet() > 0 {
@@ -445,8 +445,8 @@ func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 	return nil
 }
 
-// dropReplica drops replica's info from Zookeeper
-func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts *dropReplicaOptions) error {
+// dropZKReplica drops replica's info from Zookeeper
+func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *dropReplicaOptions) error {
 	if hostToDrop == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop: %s", hostToDrop.GetName())
 		return nil
