@@ -122,7 +122,7 @@ crdHook:
 | serviceMonitor.clickhouseMetrics.metricRelabelings | list | `[]` |  |
 | serviceMonitor.clickhouseMetrics.relabelings | list | `[]` |  |
 | serviceMonitor.clickhouseMetrics.scrapeTimeout | string | `""` |  |
-| serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) In serviceMonitor will be created two endpoints ch-metrics on port 8888 and op-metrics # 9999. Ypu can specify interval, scrapeTimeout, relabelings, metricRelabelings for each endpoint below |
+| serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) In serviceMonitor will be created two endpoints ch-metrics on port 8888 and op-metrics # 9999. You can specify interval, scrapeTimeout, relabelings, metricRelabelings for each endpoint below |
 | serviceMonitor.operatorMetrics.interval | string | `"30s"` |  |
 | serviceMonitor.operatorMetrics.metricRelabelings | list | `[]` |  |
 | serviceMonitor.operatorMetrics.relabelings | list | `[]` |  |
