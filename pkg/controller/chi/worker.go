@@ -303,11 +303,11 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 		new = n.(*api.ClickHouseInstallation)
 	}
 
-	metrics.CHIRegister(ctx, new)
+	metrics.CRRegister(ctx, new)
 
 	if w.deleteCHI(ctx, old, new) {
 		// CHI is being deleted
-		metrics.CHIUnregister(ctx, new)
+		metrics.CRUnregister(ctx, new)
 		return nil
 	}
 
@@ -364,7 +364,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
-	// Update CHI object
+	// Update CR object
 	_ = w.finalizeCR(
 		ctx,
 		_cr,
