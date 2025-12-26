@@ -23,7 +23,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
@@ -146,44 +145,6 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 	wg.Wait()
 	w.a.V(1).Info("Finished to wait shards from index: %d on workers.", startShardIndex)
 	return err
-}
-
-func (w *worker) runConcurrentlyInBatches(ctx context.Context, workersNum int, start int, shards []*api.ChiShard) error {
-	for startShardIndex := 0; startShardIndex < len(shards); startShardIndex += workersNum {
-		endShardIndex := util.IncTopped(startShardIndex, workersNum, len(shards))
-		concurrentlyProcessedShards := shards[startShardIndex:endShardIndex]
-		w.a.V(1).Info("Starting shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
-
-		// Processing error protected with mutex
-		var err error
-		var errLock sync.Mutex
-
-		wg := sync.WaitGroup{}
-		wg.Add(len(concurrentlyProcessedShards))
-		// Launch shard concurrent processing
-		for j := range concurrentlyProcessedShards {
-			shard := concurrentlyProcessedShards[j]
-			w.a.V(1).Info("Starting shard on worker. Shard index: %d", start+startShardIndex+j)
-			go func() {
-				defer wg.Done()
-				w.a.V(1).Info("Starting shard on goroutine. Shard index: %d", start+startShardIndex+j)
-				if e := w.reconcileShardWithHosts(ctx, shard); e != nil {
-					errLock.Lock()
-					err = e
-					errLock.Unlock()
-				}
-				w.a.V(1).Info("Finished shard on goroutine. Shard index: %d", start+startShardIndex+j)
-			}()
-		}
-		w.a.V(1).Info("Starting to wait shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
-		wg.Wait()
-		w.a.V(1).Info("Finished to wait shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
-		if err != nil {
-			w.a.V(1).Warning("Skipping rest of shards due to an error: %v", err)
-			return err
-		}
-	}
-	return nil
 }
 
 func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {
