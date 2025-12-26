@@ -21,20 +21,20 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func CHIInitZeroValues(ctx context.Context, src labelsSource) {
+func CRInitZeroValues(ctx context.Context, src labelsSource) {
 	chiInitZeroValues(ctx, src)
 }
 
-func CHIReconcilesStarted(ctx context.Context, src labelsSource) {
+func CRReconcilesStarted(ctx context.Context, src labelsSource) {
 	chiReconcilesStarted(ctx, src)
 }
-func CHIReconcilesCompleted(ctx context.Context, src labelsSource) {
+func CRReconcilesCompleted(ctx context.Context, src labelsSource) {
 	chiReconcilesCompleted(ctx, src)
 }
-func CHIReconcilesAborted(ctx context.Context, src labelsSource) {
+func CRReconcilesAborted(ctx context.Context, src labelsSource) {
 	chiReconcilesAborted(ctx, src)
 }
-func CHIReconcilesTimings(ctx context.Context, src labelsSource, seconds float64) {
+func CRReconcilesTimings(ctx context.Context, src labelsSource, seconds float64) {
 	chiReconcilesTimings(ctx, src, seconds)
 }
 
@@ -67,7 +67,7 @@ func PodDelete(ctx context.Context) {
 var r = map[string]bool{}
 var mx = sync.Mutex{}
 
-func CHIRegister(ctx context.Context, src labelsSource) {
+func CRRegister(ctx context.Context, src labelsSource) {
 	mx.Lock()
 	defer mx.Unlock()
 
@@ -81,7 +81,7 @@ func CHIRegister(ctx context.Context, src labelsSource) {
 	chiRegister(ctx, src)
 }
 
-func CHIUnregister(ctx context.Context, src labelsSource) {
+func CRUnregister(ctx context.Context, src labelsSource) {
 	mx.Lock()
 	defer mx.Unlock()
 
