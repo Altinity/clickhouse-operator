@@ -21,6 +21,7 @@ import (
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -91,15 +92,19 @@ func (w *worker) updateService(
 	// spec.resourceVersion is required in order to update an object
 	newService.ResourceVersion = curService.ResourceVersion
 
-	//
-	// Migrate ClusterIP to the new service
-	//
-	// spec.clusterIP field is immutable, need to use already assigned value
-	// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
-	// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
-	// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
-	// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
-	newService.Spec.ClusterIP = curService.Spec.ClusterIP
+	if newService.Spec.ClusterIP == core.ClusterIPNone {
+		// In case if new service has no ClusterIP requested, we'll keep it unassigned.
+		// Otherwise we need to migrate IP address assigned earlier to new service in order to reuse it
+		log.V(1).Info("switch service %s to IP-less mode. ClusterIP=None", util.NamespacedName(newService))
+	} else {
+		// Migrate assigned IP value - ClusterIP - to the new service
+		// spec.clusterIP field is immutable, need to use already assigned value
+		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+		// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
+		// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
+		newService.Spec.ClusterIP = curService.Spec.ClusterIP
+	}
 
 	//
 	// Migrate existing ports to the new service for NodePort and LoadBalancer services
@@ -114,9 +119,13 @@ func (w *worker) updateService(
 	// No changes in service type is allowed.
 	// Already exposed port details can not be changed.
 
-	serviceTypeIsNodePort := (curService.Spec.Type == core.ServiceTypeNodePort) && (newService.Spec.Type == core.ServiceTypeNodePort)
-	serviceTypeIsLoadBalancer := (curService.Spec.Type == core.ServiceTypeLoadBalancer) && (newService.Spec.Type == core.ServiceTypeLoadBalancer)
-	if serviceTypeIsNodePort || serviceTypeIsLoadBalancer {
+	// Service type of new and cur service is the same.
+	// In case it is not the same service has to be just recreated.
+	// So we can check for one type only - let's check for type of new service
+	typeIsNodePort := newService.Spec.Type == core.ServiceTypeNodePort
+	typeIsLoadBalancer := newService.Spec.Type == core.ServiceTypeLoadBalancer
+	if typeIsNodePort || typeIsLoadBalancer {
+		// Migrate cur ports to new service
 		for i := range newService.Spec.Ports {
 			newPort := &newService.Spec.Ports[i]
 			for j := range curService.Spec.Ports {
