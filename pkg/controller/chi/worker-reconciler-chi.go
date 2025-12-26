@@ -57,8 +57,8 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
-	metrics.CHIInitZeroValues(ctx, new)
-	metrics.CHIReconcilesStarted(ctx, new)
+	metrics.CRInitZeroValues(ctx, new)
+	metrics.CRReconcilesStarted(ctx, new)
 	startTime := time.Now()
 
 	new = w.buildCR(ctx, new)
@@ -86,7 +86,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		err = common.ErrCRUDAbort
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 		if errors.Is(err, common.ErrCRUDAbort) {
-			metrics.CHIReconcilesAborted(ctx, new)
+			metrics.CRReconcilesAborted(ctx, new)
 		}
 	} else {
 		// Reconcile successful
@@ -97,13 +97,14 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		}
 
 		w.clean(ctx, new)
-		w.dropReplicas(ctx, new)
 		w.addToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
 
-		metrics.CHIReconcilesCompleted(ctx, new)
-		metrics.CHIReconcilesTimings(ctx, new, time.Since(startTime).Seconds())
+		w.dropZKReplicas(ctx, new)
+
+		metrics.CRReconcilesCompleted(ctx, new)
+		metrics.CRReconcilesTimings(ctx, new, time.Since(startTime).Seconds())
 	}
 
 	return nil
