@@ -300,11 +300,15 @@ func (s *Settings) SetScalarsFromMap(m map[string]string) *Settings {
 	return s
 }
 
-// Keys gets keys of the settings
+// Keys gets keys of the settings in alphabetical order
 func (s *Settings) Keys() (keys []string) {
 	s.WalkKeys(func(key string, setting *Setting) {
 		keys = append(keys, key)
 	})
+
+	// Sort keys to ensure deterministic ordering for Kubernetes manifest stability.
+	// Consistent ordering prevents unnecessary resource updates during reconciliation.
+	sort.Strings(keys)
 	return keys
 }
 
