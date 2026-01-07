@@ -5,6 +5,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 var normalizedChiA = &ClickHouseInstallation{}
@@ -158,12 +160,14 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 			name: "CopyFrom",
 			goRoutineA: func(s *Status) {
 				s.PushAction("always-present-action") // CopyFrom preserves existing actions (does not clobber)
-				s.CopyFrom(copyTestStatusFrom, CopyStatusOptions{
-					Actions:           true,
-					Errors:            true,
-					MainFields:        true,
-					WholeStatus:       true,
-					InheritableFields: true,
+				s.CopyFrom(copyTestStatusFrom, types.CopyStatusOptions{
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupActions:     true,
+						FieldGroupErrors:      true,
+						FieldGroupMain:        true,
+						FieldGroupWholeStatus: true,
+						FieldGroupInheritable: true,
+					},
 				})
 			},
 			goRoutineB: func(s *Status) {
@@ -171,7 +175,6 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 			},
 			postConditionsVerification: func(tt *testing.T, s *Status) {
 				if len(s.GetActions()) == len(copyTestStatusFrom.GetActions())+2 {
-					require.Equal(tt, copyTestStatusFrom.GetActions(), s.GetActions())
 					require.Contains(tt, s.GetActions(), "always-present-action")
 					require.Contains(tt, s.GetActions(), "additional-action")
 					for _, action := range copyTestStatusFrom.GetActions() {
@@ -179,7 +182,7 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 					}
 				} else {
 					require.Equal(tt, len(copyTestStatusFrom.GetActions())+1, len(s.GetActions()))
-					require.Contains(tt, s.GetActions(), "additional-action")
+					require.Contains(tt, s.GetActions(), "always-present-action")
 					for _, action := range copyTestStatusFrom.GetActions() {
 						require.Contains(tt, s.GetActions(), action)
 					}
