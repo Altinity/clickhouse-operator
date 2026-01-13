@@ -423,7 +423,10 @@ func (cr *ClickHouseKeeperInstallation) IsAuto() bool {
 
 // IsStopped checks whether CR is stopped
 func (cr *ClickHouseKeeperInstallation) IsStopped() bool {
-	return false
+	if cr == nil {
+		return false
+	}
+	return cr.GetSpecT().GetStop().Value()
 }
 
 // IsRollingUpdate checks whether CHI should perform rolling update

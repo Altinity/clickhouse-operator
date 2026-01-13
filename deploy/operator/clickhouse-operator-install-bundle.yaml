@@ -3512,11 +3512,10 @@ spec:
           type: string
           description: Resource status
           jsonPath: .status.status
-        - name: hosts-unchanged
+        - name: hosts-completed
           type: integer
-          description: Unchanged hosts count
-          priority: 1 # show in wide view
-          jsonPath: .status.hostsUnchanged
+          description: Completed hosts count
+          jsonPath: .status.hostsCompleted
         - name: hosts-updated
           type: integer
           description: Updated hosts count
@@ -3527,20 +3526,11 @@ spec:
           description: Added hosts count
           priority: 1 # show in wide view
           jsonPath: .status.hostsAdded
-        - name: hosts-completed
-          type: integer
-          description: Completed hosts count
-          jsonPath: .status.hostsCompleted
         - name: hosts-deleted
           type: integer
           description: Hosts deleted count
           priority: 1 # show in wide view
           jsonPath: .status.hostsDeleted
-        - name: hosts-delete
-          type: integer
-          description: Hosts to be deleted count
-          priority: 1 # show in wide view
-          jsonPath: .status.hostsDelete
         - name: endpoint
           type: string
           description: Client access endpoint
@@ -3706,10 +3696,12 @@ spec:
                 normalized:
                   type: object
                   description: "Normalized resource requested"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
                   description: "Normalized resource completed"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
@@ -3747,7 +3739,7 @@ spec:
                 stop: &TypeStringBool
                   type: string
                   description: |
-                    Allows to stop all ClickHouse clusters defined in a CHI.
+                    Allows to stop all ClickHouse Keeper clusters defined in a CHK.
                     Works as the following:
                      - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
                      - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
@@ -3991,6 +3983,11 @@ spec:
                             description: |
                               optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                               override top-level `chi.spec.configuration.files`
+                          templates:
+                            <<: *TypeTemplateNames
+                            description: |
+                              optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
+                              override top-level `chi.spec.configuration.templates`
                           pdbManaged:
                             <<: *TypeStringBool
                             description: |
@@ -4008,11 +4005,6 @@ spec:
                               by specifying 0. This is a mutually exclusive setting with "minAvailable".
                             minimum: 0
                             maximum: 65535
-                          templates:
-                            <<: *TypeTemplateNames
-                            description: |
-                              optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
-                              override top-level `chi.spec.configuration.templates`
                           layout:
                             type: object
                             description: |

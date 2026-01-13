@@ -16,6 +16,7 @@ package chk
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -104,4 +105,14 @@ func (c *Controller) poll(ctx context.Context, cr api.ICustomResource, f func(c 
 			return
 		}
 	}
+}
+
+func ShouldEnqueue(cr *apiChk.ClickHouseKeeperInstallation) bool {
+	ns := cr.GetNamespace()
+	if !chop.Config().IsNamespaceWatched(ns) {
+		log.V(2).M(cr).Info("skip enqueue, namespace '%s' is not watched or is in deny list", ns)
+		return false
+	}
+
+	return true
 }

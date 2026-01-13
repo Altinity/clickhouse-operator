@@ -26,8 +26,14 @@ import (
 )
 
 func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
+	// Try to report tag-based version
+	if tagBasedVersion := w.getTagBasedVersion(host); tagBasedVersion.IsKnown() {
+		// Able to report version from the tag
+		return tagBasedVersion.SetDescription("parsed from the tag: '%s'", tagBasedVersion.GetOriginal())
+	}
+
 	// Unable to acquire any version - report min one
-	return swversion.MaxVersion().SetDescription("so far so")
+	return swversion.MinVersion().SetDescription("min - unable to acquire neither from the tag nor from the app")
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile

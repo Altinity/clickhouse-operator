@@ -288,6 +288,11 @@ func (in *ChkSpec) DeepCopyInto(out *ChkSpec) {
 		*out = new(types.Id)
 		**out = **in
 	}
+	if in.Stop != nil {
+		in, out := &in.Stop, &out.Stop
+		*out = new(types.StringBool)
+		**out = **in
+	}
 	if in.NamespaceDomainPattern != nil {
 		in, out := &in.NamespaceDomainPattern, &out.NamespaceDomainPattern
 		*out = new(types.String)
@@ -610,6 +615,11 @@ func (in *Status) DeepCopyInto(out *Status) {
 	if in.NormalizedCRCompleted != nil {
 		in, out := &in.NormalizedCRCompleted, &out.NormalizedCRCompleted
 		*out = new(ClickHouseKeeperInstallation)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.ActionPlan != nil {
+		in, out := &in.ActionPlan, &out.ActionPlan
+		*out = new(clickhousealtinitycomv1.ActionPlan)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.HostsWithTablesCreated != nil {

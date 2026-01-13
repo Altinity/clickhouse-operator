@@ -98,8 +98,21 @@ def test_010003(self):
                 "service": 5,
             },
             "pdb": {"cluster1": 0, "cluster2": 1},
+            "do_not_delete": 1
         },
     )
+
+    chi = "test-003-complex-layout"
+    cluster = "cluster1"
+    with Then('Cluster settings should be different on replicas'):
+        replica0 = clickhouse.query(chi, "select value from system.server_settings where name = 'default_replica_name'",
+                                    host=f"chi-{chi}-{cluster}-replica0-0-0")
+        replica1 = clickhouse.query(chi, "select value from system.server_settings where name = 'default_replica_name'",
+                                    host=f"chi-{chi}-{cluster}-replica0-1-0")
+        print(replica0)
+        print(replica1)
+        assert replica0 == "myreplica0" and replica1 == "myreplica1"
+
     with Finally("I clean up"):
         delete_test_namespace()
 
@@ -124,8 +137,7 @@ def test_010004(self):
         },
     )
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario

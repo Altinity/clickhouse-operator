@@ -29,25 +29,25 @@ import (
 )
 
 // waitForIPAddresses waits for all pods to get IP address assigned
-func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInstallation) {
+func (w *worker) waitForIPAddresses(ctx context.Context, cr *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
-		log.V(1).Info("Reconcile is aborted. CR polling IP: %s ", chi.GetName())
+		log.V(1).Info("Reconcile is aborted. CR polling IP: %s ", cr.GetName())
 		return
 	}
 
-	if chi.IsStopped() {
+	if cr.IsStopped() {
 		// No need to wait for stopped CHI
 		return
 	}
 
-	l := w.a.V(1).M(chi)
+	l := w.a.V(1).M(cr)
 	l.F().S().Info("wait for IP addresses to be assigned to all pods")
 
 	// Let's limit polling time
 	start := time.Now()
 	timeout := 1 * time.Minute
 
-	w.c.poll(ctx, chi, func(c *api.ClickHouseInstallation, e error) bool {
+	w.c.poll(ctx, cr, func(c *api.ClickHouseInstallation, e error) bool {
 		// TODO fix later
 		// status IPs list can be empty
 		// Instead of doing in status:
@@ -55,7 +55,7 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInst
 		//	cur.EnsureStatus().SetPodIPs(podIPs)
 		// and here
 		// c.Status.GetPodIPs()
-		podIPs := w.c.getPodsIPs(ctx, chi)
+		podIPs := w.c.getPodsIPs(ctx, cr)
 		if len(podIPs) >= len(c.Status.GetPods()) {
 			l.Info("all IP addresses are in place")
 			// Stop polling

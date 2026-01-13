@@ -155,6 +155,7 @@ func (n *Normalizer) normalizeSpec() {
 	n.req.GetTarget().GetSpecT().Stop = n.normalizeStop(n.req.GetTarget().GetSpecT().Stop)
 	n.req.GetTarget().GetSpecT().Restart = n.normalizeRestart(n.req.GetTarget().GetSpecT().Restart)
 	n.req.GetTarget().GetSpecT().Troubleshoot = n.normalizeTroubleshoot(n.req.GetTarget().GetSpecT().Troubleshoot)
+	n.req.GetTarget().GetSpecT().Suspend = n.normalizeSuspend(n.req.GetTarget().GetSpecT().Suspend)
 	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
 	n.req.GetTarget().GetSpecT().Templating = n.normalizeTemplating(n.req.GetTarget().GetSpecT().Templating)
 	n.normalizeReconciling()
@@ -249,6 +250,17 @@ func (n *Normalizer) normalizeTroubleshoot(troubleshoot *types.StringBool) *type
 	if troubleshoot.IsValid() {
 		// It is bool, use as it is
 		return troubleshoot
+	}
+
+	// In case it is unknown value - just use set it to false
+	return types.NewStringBool(false)
+}
+
+// normalizeSuspend normalizes .spec.suspend
+func (n *Normalizer) normalizeSuspend(suspend *types.StringBool) *types.StringBool {
+	if suspend.IsValid() {
+		// It is bool, use as it is
+		return suspend
 	}
 
 	// In case it is unknown value - just use set it to false

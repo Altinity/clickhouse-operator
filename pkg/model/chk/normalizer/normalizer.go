@@ -143,6 +143,8 @@ func (n *Normalizer) normalizeTarget() (*chk.ClickHouseKeeperInstallation, error
 func (n *Normalizer) normalizeSpec() {
 	// Walk over Spec datatype fields
 	n.req.GetTarget().GetSpecT().TaskID = n.normalizeTaskID(n.req.GetTarget().GetSpecT().TaskID)
+	n.req.GetTarget().GetSpecT().Stop = n.normalizeStop(n.req.GetTarget().GetSpecT().Stop)
+	n.req.GetTarget().GetSpecT().Suspend = n.normalizeSuspend(n.req.GetTarget().GetSpecT().Suspend)
 	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
 	n.normalizeReconciling()
 	n.req.GetTarget().GetSpecT().Reconcile = n.normalizeReconcile(n.req.GetTarget().GetSpecT().Reconcile)
@@ -206,6 +208,28 @@ func (n *Normalizer) normalizeTaskID(taskID *types.Id) *types.Id {
 	}
 
 	return types.NewAutoId()
+}
+
+// normalizeStop normalizes .spec.stop
+func (n *Normalizer) normalizeStop(stop *types.StringBool) *types.StringBool {
+	if stop.IsValid() {
+		// It is bool, use as it is
+		return stop
+	}
+
+	// In case it is unknown value - just use set it to false
+	return types.NewStringBool(false)
+}
+
+// normalizeSuspend normalizes .spec.suspend
+func (n *Normalizer) normalizeSuspend(suspend *types.StringBool) *types.StringBool {
+	if suspend.IsValid() {
+		// It is bool, use as it is
+		return suspend
+	}
+
+	// In case it is unknown value - just use set it to false
+	return types.NewStringBool(false)
 }
 
 func isNamespaceDomainPatternValid(namespaceDomainPattern *types.String) bool {

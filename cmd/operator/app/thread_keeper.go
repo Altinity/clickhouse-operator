@@ -59,7 +59,10 @@ func initKeeper(ctx context.Context) error {
 
 	err = ctrlRuntime.
 		NewControllerManagedBy(manager).
-		For(&api.ClickHouseKeeperInstallation{}, builder.WithPredicates(keeperPredicate())).
+		For(
+			&api.ClickHouseKeeperInstallation{},
+			builder.WithPredicates(keeperPredicate()),
+		).
 		Owns(&apps.StatefulSet{}).
 		Complete(
 			&controller.Controller{
@@ -88,40 +91,30 @@ func runKeeper(ctx context.Context) error {
 func keeperPredicate() predicate.Funcs {
 	return predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			obj, ok := e.Object.(*api.ClickHouseKeeperInstallation)
+			new, ok := e.Object.(*api.ClickHouseKeeperInstallation)
 			if !ok {
 				return false
 			}
 
-			// Check if namespace should be watched (includes deny list check)
-			if !chop.Config().IsNamespaceWatched(obj.Namespace) {
-				logger.V(2).Info("chkInformer: skip event, namespace is not watched or is in deny list", "namespace", obj.Namespace)
+			if !controller.ShouldEnqueue(new) {
 				return false
 			}
 
-			if obj.Spec.Suspend.Value() {
-				return false
-			}
 			return true
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return true
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			obj, ok := e.ObjectNew.(*api.ClickHouseKeeperInstallation)
+			new, ok := e.ObjectNew.(*api.ClickHouseKeeperInstallation)
 			if !ok {
 				return false
 			}
 
-			// Check if namespace should be watched (includes deny list check)
-			if !chop.Config().IsNamespaceWatched(obj.Namespace) {
-				logger.V(2).Info("chkInformer: skip event, namespace is not watched or is in deny list", "namespace", obj.Namespace)
+			if !controller.ShouldEnqueue(new) {
 				return false
 			}
 
-			if obj.Spec.Suspend.Value() {
-				return false
-			}
 			return true
 		},
 		GenericFunc: func(e event.GenericEvent) bool {

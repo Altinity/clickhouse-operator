@@ -15,13 +15,15 @@
 package chk
 
 import (
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 )
 
-// excludeFromMonitoring excludes stopped CR from monitoring
-func (w *worker) excludeFromMonitoring(cr *api.ClickHouseKeeperInstallation) {
-}
-
-// addToMonitoring adds CR to monitoring
-func (w *worker) addToMonitoring(cr *api.ClickHouseKeeperInstallation) {
+func (w *worker) getTagBasedVersion(host *api.Host) *swversion.SoftWareVersion {
+	// Fetch tag from the image
+	var tagBasedVersion *swversion.SoftWareVersion
+	if tag, tagFound := w.task.Creator().GetAppImageTag(host); tagFound {
+		tagBasedVersion = swversion.NewSoftWareVersionFromTag(tag)
+	}
+	return tagBasedVersion
 }

@@ -24,18 +24,26 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (w *worker) waitForIPAddresses(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) {
+// waitForIPAddresses waits for all pods to get IP address assigned
+func (w *worker) waitForIPAddresses(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. CR polling IP: %s ", cr.GetName())
 		return
 	}
-	if chk.IsStopped() {
+
+	if cr.IsStopped() {
 		// No need to wait for stopped CHI
 		return
 	}
-	w.a.V(1).M(chk).F().S().Info("wait for IP addresses to be assigned to all pods")
+
+	l := w.a.V(1).M(cr)
+	l.F().S().Info("wait for IP addresses to be assigned to all pods")
+
+	// Let's limit polling time
 	start := time.Now()
-	w.c.poll(ctx, chk, func(c *apiChk.ClickHouseKeeperInstallation, e error) bool {
+	timeout := 1 * time.Minute
+
+	w.c.poll(ctx, cr, func(c *apiChk.ClickHouseKeeperInstallation, e error) bool {
 		// TODO fix later
 		// status IPs list can be empty
 		// Instead of doing in status:
@@ -43,19 +51,21 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chk *apiChk.ClickHouseK
 		//	cur.EnsureStatus().SetPodIPs(podIPs)
 		// and here
 		// c.Status.GetPodIPs()
-		podIPs := w.c.getPodsIPs(ctx, chk)
+		podIPs := w.c.getPodsIPs(ctx, cr)
 		if len(podIPs) >= len(c.Status.GetPods()) {
+			l.Info("all IP addresses are in place")
 			// Stop polling
-			w.a.V(1).M(c).Info("all IP addresses are in place")
 			return false
 		}
-		if time.Since(start) > 1*time.Minute {
+		if time.Since(start) > timeout {
+			l.Warning("not all IP addresses are in place but time has elapsed")
 			// Stop polling
-			w.a.V(1).M(c).Warning("not all IP addresses are in place but time has elapsed")
 			return false
 		}
+
+		l.Info("still waiting - not all IP addresses are in place yet")
+
 		// Continue polling
-		w.a.V(1).M(c).Warning("still waiting - not all IP addresses are in place yet")
 		return true
 	})
 }
@@ -70,13 +80,8 @@ func (w *worker) shouldIncludeHost(host *api.Host) bool {
 	return true
 }
 
-// includeHost includes host back back into ClickHouse clusters
+// includeHost includes host back into ClickHouse clusters
 func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
 	if !w.shouldIncludeHost(host) {
 		w.a.V(1).
 			M(host).F().
@@ -90,11 +95,6 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 
 // includeHostIntoRaftCluster includes host into raft configuration
 func (w *worker) includeHostIntoRaftCluster(ctx context.Context, host *api.Host) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
 	w.a.V(1).
 		M(host).F().
 		Info("going to include host. Host/shard/cluster: %d/%d/%s",

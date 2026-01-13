@@ -220,6 +220,11 @@ func (cluster *Cluster) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
 	return nil, false
 }
 
+// GetCR gets parent CR
+func (cluster *Cluster) GetCR() *ClickHouseKeeperInstallation {
+	return cluster.Runtime.CHK
+}
+
 func (cluster *Cluster) GetAncestor() apiChi.ICluster {
 	return (*Cluster)(nil)
 }
@@ -371,6 +376,11 @@ func (cluster *Cluster) IsZero() bool {
 
 func (cluster *Cluster) IsNonZero() bool {
 	return cluster != nil
+}
+
+// IsStopped checks whether host is stopped
+func (cluster *Cluster) IsStopped() bool {
+	return cluster.GetCR().IsStopped()
 }
 
 func (cluster *Cluster) Ensure(create func() *Cluster) *Cluster {

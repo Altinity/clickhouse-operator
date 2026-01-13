@@ -55,7 +55,10 @@ func (in *SoftWareVersion) DeepCopyInto(out *SoftWareVersion) {
 }
 
 // NewSoftWareVersion creates new software version
-// version - specifies original software version, such as: 21 or 21.1 or 21.9.6.24-alpha
+// version - specifies original software version, such as:
+// a) 21 or
+// b) 21.1 or
+// c) 21.9.6.24-alpha
 func NewSoftWareVersion(version string) *SoftWareVersion {
 	if strings.TrimSpace(version) == "" {
 		return nil
@@ -64,12 +67,12 @@ func NewSoftWareVersion(version string) *SoftWareVersion {
 	// Fetch comma-separated parts of the software version
 	parts := strings.Split(version, ".")
 
-	// Need to have at least something to as a major version
+	// Need to have at least something to be treated as a major version
 	if len(parts) < 1 {
 		return nil
 	}
 
-	// Need to have at least 3 parts in software version specification
+	// Pad to have 3 parts in software version specification
 	for len(parts) < 3 {
 		parts = append(parts, "0")
 	}
@@ -82,15 +85,16 @@ func NewSoftWareVersion(version string) *SoftWareVersion {
 		}
 	}
 
-	// Normalized version of the original
+	// Build normalized version from the original/padded parts
 	normalized := strings.Join(parts, ".")
 
-	// Build version
+	// Build semver version
 	_semver, err := semver.NewVersion(normalized)
 	if err != nil {
 		return nil
 	}
 
+	// So far so good, version is available
 	return &SoftWareVersion{
 		original:   version,
 		normalized: normalized,
@@ -98,6 +102,8 @@ func NewSoftWareVersion(version string) *SoftWareVersion {
 	}
 }
 
+// NewSoftWareVersionFromTag build SoftWareVersion from docker image tag
+// Tag 'latest' leads to default MaxVersion()
 func NewSoftWareVersionFromTag(tag string) *SoftWareVersion {
 	if strings.ToLower(strings.TrimSpace(tag)) == "latest" {
 		return MaxVersion()
@@ -157,6 +163,7 @@ func (v *SoftWareVersion) IsKnown() bool {
 	return !v.IsUnknown()
 }
 
+// SetDescription sets string description
 func (v *SoftWareVersion) SetDescription(format string, args ...interface{}) *SoftWareVersion {
 	if v == nil {
 		return nil
