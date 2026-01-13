@@ -75,12 +75,6 @@ func IsStatefulSetReady(statefulSet *apps.StatefulSet) bool {
 		return false
 	}
 
-	// A StatefulSet scaled to 0 is considered ready (intentionally scaled down)
-	// This prevents infinite reconciliation loops when replicas == 0
-	if *statefulSet.Spec.Replicas == 0 {
-		return statefulSet.Status.ReadyReplicas == 0
-	}
-
 	// All replicas are in "Ready" status - meaning ready to be used - no failure inside
 	return statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas
 }

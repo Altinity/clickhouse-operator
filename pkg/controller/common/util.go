@@ -15,11 +15,15 @@
 package common
 
 import (
+	"context"
+
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
 
+	can "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -67,4 +71,25 @@ func DumpStatefulSetDiff(host *api.Host, cur, new *apps.StatefulSet) {
 			)
 		}
 	}
+}
+
+// FixStuckStatefulSets checks all hosts in a CR for StatefulSets stuck at 0 replicas
+// and forces them to scale up to the desired replica count.
+func FixStuckStatefulSets(ctx context.Context, announcer can.Announcer, sts interfaces.IKubeSTS, cr api.ICustomResource) {
+	cr.WalkHosts(func(host *api.Host) error {
+		curStatefulSet := host.Runtime.CurStatefulSet
+		if curStatefulSet == nil {
+			return nil
+		}
+
+		desiredReplicas := host.GetStatefulSetReplicasNum(false)
+		if curStatefulSet.Spec.Replicas != nil && *curStatefulSet.Spec.Replicas == 0 && desiredReplicas != nil && *desiredReplicas > 0 {
+			announcer.V(1).M(host).Info("StatefulSet stuck at 0 replicas, forcing scale to %d", *desiredReplicas)
+			curStatefulSet.Spec.Replicas = desiredReplicas
+			if _, err := sts.Update(ctx, curStatefulSet); err != nil {
+				announcer.V(1).M(host).Error("Failed to scale up stuck StatefulSet: %v", err)
+			}
+		}
+		return nil
+	})
 }

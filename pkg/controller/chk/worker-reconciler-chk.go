@@ -63,6 +63,10 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 
 	new = w.buildCR(ctx, new)
 
+	// Check for StatefulSets stuck at 0 replicas when they should have more.
+	// This must run before ActionPlan check to handle stuck state.
+	common.FixStuckStatefulSets(ctx, w.a, w.c.kube.STS(), new)
+
 	switch {
 	case new.Spec.Suspend.Value():
 		// if CR is suspended, should skip reconciliation
