@@ -74,7 +74,6 @@ func IsStatefulSetReady(statefulSet *apps.StatefulSet) bool {
 	if statefulSet.Spec.Replicas == nil {
 		return false
 	}
-
 	// All replicas are in "Ready" status - meaning ready to be used - no failure inside
 	return statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas
 }
