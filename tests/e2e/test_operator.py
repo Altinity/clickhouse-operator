@@ -98,8 +98,21 @@ def test_010003(self):
                 "service": 5,
             },
             "pdb": {"cluster1": 0, "cluster2": 1},
+            "do_not_delete": 1
         },
     )
+
+    chi = "test-003-complex-layout"
+    cluster = "cluster1"
+    with Then('Cluster settings should be different on replicas'):
+        replica0 = clickhouse.query(chi, "select value from system.server_settings where name = 'default_replica_name'",
+                                    host=f"chi-{chi}-{cluster}-replica0-0-0")
+        replica1 = clickhouse.query(chi, "select value from system.server_settings where name = 'default_replica_name'",
+                                    host=f"chi-{chi}-{cluster}-replica0-1-0")
+        print(replica0)
+        print(replica1)
+        assert replica0 == "myreplica0" and replica1 == "myreplica1"
+
     with Finally("I clean up"):
         delete_test_namespace()
 
@@ -124,8 +137,7 @@ def test_010004(self):
         },
     )
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -5429,6 +5441,7 @@ def test_010061(self):
 
 @TestScenario
 @Name("test_020000. Test Basic CHK functions")
+@Tags("NO_PARALLEL")
 def test_020000(self):
     create_shell_namespace_clickhouse_template()
 
@@ -5467,6 +5480,7 @@ def test_020000(self):
 
 @TestScenario
 @Name("test_020001. Test that Kubernetes objects between CHI and CHK does not overlap")
+@Tags("NO_PARALLEL")
 def test_020001(self):
     create_shell_namespace_clickhouse_template()
 
@@ -5509,6 +5523,7 @@ def test_020001(self):
 @Name("test_020002. Test CHI with CHK")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"),
               RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_volumeClaimTemplates("1.0"))
+@Tags("NO_PARALLEL")
 def test_020002(self):
     """Check clickhouse-operator support ClickHouseKeeperInstallation with PVC in keeper manifest."""
 
@@ -5534,6 +5549,7 @@ def test_020002(self):
 
 @TestScenario
 @Name("test_020003. Clickhouse-keeper upgrade")
+@Tags("NO_PARALLEL")
 def test_020003(self):
     """Check that clickhouse-operator support upgrading clickhouse-keeper version
      when clickhouse-keeper defined with ClickHouseKeeperInstallation."""
@@ -5781,6 +5797,7 @@ def test_020004_1(self):
 
 @TestScenario
 @Name("test_020005. Clickhouse-keeper scale-up/scale-down")
+@Tags("NO_PARALLEL")
 def test_020005(self):
     """Check that clickhouse-operator support scale-up/scale-down without service interruption"""
 
@@ -5866,8 +5883,10 @@ def test_020005(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_020006. Test https://github.com/Altinity/clickhouse-operator/issues/1863")
+@Tags("NO_PARALLEL")
 def test_020006(self):
     create_shell_namespace_clickhouse_template()
 
@@ -5888,8 +5907,10 @@ def test_020006(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
 @TestScenario
 @Name("test_020007. Test fractional CPU requests/limits handling for CHK")
+@Tags("NO_PARALLEL")
 def test_020007(self):
     create_shell_namespace_clickhouse_template()
 

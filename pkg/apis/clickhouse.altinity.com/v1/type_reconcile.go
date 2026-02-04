@@ -33,6 +33,8 @@ type ChiReconcile struct {
 
 	// Runtime specifies runtime settings
 	Runtime ReconcileRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
+	// StatefulSet specifies StatefulSet reconcile settings
+	StatefulSet ReconcileStatefulSet `json:"statefulSet,omitempty" yaml:"statefulSet,omitempty"`
 	// Host specifies host-lever reconcile settings
 	Host ReconcileHost `json:"host" yaml:"host"`
 }
@@ -40,8 +42,65 @@ type ChiReconcile struct {
 type ClusterReconcile struct {
 	// Runtime specifies runtime settings
 	Runtime ReconcileRuntime `json:"runtime" yaml:"runtime"`
+	// StatefulSet specifies StatefulSet reconcile settings
+	StatefulSet ReconcileStatefulSet `json:"statefulSet,omitempty" yaml:"statefulSet,omitempty"`
 	// Host specifies host-lever reconcile settings
 	Host ReconcileHost `json:"host" yaml:"host"`
+}
+
+// ReconcileStatefulSet defines StatefulSet reconcile settings
+type ReconcileStatefulSet struct {
+	Create   ReconcileStatefulSetCreate   `json:"create,omitempty"   yaml:"create,omitempty"`
+	Update   ReconcileStatefulSetUpdate   `json:"update,omitempty"   yaml:"update,omitempty"`
+	Recreate ReconcileStatefulSetRecreate `json:"recreate,omitempty" yaml:"recreate,omitempty"`
+}
+
+// ReconcileStatefulSetCreate defines StatefulSet create settings
+type ReconcileStatefulSetCreate struct {
+	OnFailure string `json:"onFailure,omitempty" yaml:"onFailure,omitempty"`
+}
+
+// ReconcileStatefulSetUpdate defines StatefulSet update settings
+type ReconcileStatefulSetUpdate struct {
+	Timeout      uint64 `json:"timeout,omitempty"      yaml:"timeout,omitempty"`
+	PollInterval uint64 `json:"pollInterval,omitempty" yaml:"pollInterval,omitempty"`
+	OnFailure    string `json:"onFailure,omitempty"    yaml:"onFailure,omitempty"`
+}
+
+// ReconcileStatefulSetRecreate defines StatefulSet recreate settings
+type ReconcileStatefulSetRecreate struct {
+	OnDataLoss      string `json:"onDataLoss,omitempty"      yaml:"onDataLoss,omitempty"`
+	OnUpdateFailure string `json:"onUpdateFailure,omitempty" yaml:"onUpdateFailure,omitempty"`
+}
+
+// MergeFrom merges from specified ReconcileStatefulSet
+func (s ReconcileStatefulSet) MergeFrom(from ReconcileStatefulSet) ReconcileStatefulSet {
+	if s.Create.OnFailure == "" {
+		s.Create.OnFailure = from.Create.OnFailure
+	}
+	if s.Update.Timeout == 0 {
+		s.Update.Timeout = from.Update.Timeout
+	}
+	if s.Update.PollInterval == 0 {
+		s.Update.PollInterval = from.Update.PollInterval
+	}
+	if s.Update.OnFailure == "" {
+		s.Update.OnFailure = from.Update.OnFailure
+	}
+	if s.Recreate.OnDataLoss == "" {
+		s.Recreate.OnDataLoss = from.Recreate.OnDataLoss
+	}
+	if s.Recreate.OnUpdateFailure == "" {
+		s.Recreate.OnUpdateFailure = from.Recreate.OnUpdateFailure
+	}
+	return s
+}
+
+func (reconcile *ClusterReconcile) Ensure() *ClusterReconcile {
+	if reconcile == nil {
+		reconcile = &ClusterReconcile{}
+	}
+	return reconcile
 }
 
 // NewChiReconcile creates new reconcile
@@ -81,6 +140,7 @@ func (r *ChiReconcile) MergeFrom(from *ChiReconcile, _type MergeType) *ChiReconc
 	r.Cleanup = r.Cleanup.MergeFrom(from.Cleanup, _type)
 	r.Macros = r.Macros.MergeFrom(from.Macros, _type)
 	r.Runtime = r.Runtime.MergeFrom(from.Runtime, _type)
+	r.StatefulSet = r.StatefulSet.MergeFrom(from.StatefulSet)
 	r.Host = r.Host.MergeFrom(from.Host)
 
 	return r
@@ -184,6 +244,31 @@ func (r *ChiReconcile) InheritRuntimeFrom(from OperatorConfigReconcileRuntime) {
 	}
 	if r.Runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
 		r.Runtime.ReconcileShardsMaxConcurrencyPercent = from.ReconcileShardsMaxConcurrencyPercent
+	}
+}
+
+func (r *ChiReconcile) InheritStatefulSetFrom(from OperatorConfigReconcile) {
+	if r == nil {
+		return
+	}
+
+	if r.StatefulSet.Create.OnFailure == "" {
+		r.StatefulSet.Create.OnFailure = from.StatefulSet.Create.OnFailure
+	}
+	if r.StatefulSet.Update.Timeout == 0 {
+		r.StatefulSet.Update.Timeout = from.StatefulSet.Update.Timeout
+	}
+	if r.StatefulSet.Update.PollInterval == 0 {
+		r.StatefulSet.Update.PollInterval = from.StatefulSet.Update.PollInterval
+	}
+	if r.StatefulSet.Update.OnFailure == "" {
+		r.StatefulSet.Update.OnFailure = from.StatefulSet.Update.OnFailure
+	}
+	if r.StatefulSet.Recreate.OnDataLoss == "" {
+		r.StatefulSet.Recreate.OnDataLoss = from.StatefulSet.Recreate.OnDataLoss
+	}
+	if r.StatefulSet.Recreate.OnUpdateFailure == "" {
+		r.StatefulSet.Recreate.OnUpdateFailure = from.StatefulSet.Recreate.OnUpdateFailure
 	}
 }
 

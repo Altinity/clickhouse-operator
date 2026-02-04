@@ -143,6 +143,8 @@ func (n *Normalizer) normalizeTarget() (*chk.ClickHouseKeeperInstallation, error
 func (n *Normalizer) normalizeSpec() {
 	// Walk over Spec datatype fields
 	n.req.GetTarget().GetSpecT().TaskID = n.normalizeTaskID(n.req.GetTarget().GetSpecT().TaskID)
+	n.req.GetTarget().GetSpecT().Stop = n.normalizeStop(n.req.GetTarget().GetSpecT().Stop)
+	n.req.GetTarget().GetSpecT().Suspend = n.normalizeSuspend(n.req.GetTarget().GetSpecT().Suspend)
 	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
 	n.normalizeReconciling()
 	n.req.GetTarget().GetSpecT().Reconcile = n.normalizeReconcile(n.req.GetTarget().GetSpecT().Reconcile)
@@ -206,6 +208,28 @@ func (n *Normalizer) normalizeTaskID(taskID *types.Id) *types.Id {
 	}
 
 	return types.NewAutoId()
+}
+
+// normalizeStop normalizes .spec.stop
+func (n *Normalizer) normalizeStop(stop *types.StringBool) *types.StringBool {
+	if stop.IsValid() {
+		// It is bool, use as it is
+		return stop
+	}
+
+	// In case it is unknown value - just use set it to false
+	return types.NewStringBool(false)
+}
+
+// normalizeSuspend normalizes .spec.suspend
+func (n *Normalizer) normalizeSuspend(suspend *types.StringBool) *types.StringBool {
+	if suspend.IsValid() {
+		// It is bool, use as it is
+		return suspend
+	}
+
+	// In case it is unknown value - just use set it to false
+	return types.NewStringBool(false)
 }
 
 func isNamespaceDomainPatternValid(namespaceDomainPattern *types.String) bool {
@@ -337,11 +361,62 @@ func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiRec
 	// No normalization yet
 
 	// Runtime
-	// No normalization yet
+	// Inherit from chop Config
+	reconcile.InheritRuntimeFrom(chop.Config().Reconcile.Runtime)
+	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
+
+	// StatefulSet
+	// Inherit from chop Config
+	reconcile.InheritStatefulSetFrom(chop.Config().Reconcile)
+	reconcile.StatefulSet = n.normalizeReconcileStatefulSet(reconcile.StatefulSet)
 
 	// Host
-	// No normalization yet
+	// Inherit from chop Config
+	reconcile.InheritHostFrom(chop.Config().Reconcile.Host)
+	reconcile.Host = n.normalizeReconcileHost(reconcile.Host)
+
 	return reconcile
+}
+
+func (n *Normalizer) normalizeReconcileRuntime(runtime chi.ReconcileRuntime) chi.ReconcileRuntime {
+	if runtime.ReconcileShardsThreadsNumber == 0 {
+		runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
+	}
+	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
+	}
+	return runtime
+}
+
+func (n *Normalizer) normalizeReconcileStatefulSet(sts chi.ReconcileStatefulSet) chi.ReconcileStatefulSet {
+	// Create
+	if sts.Create.OnFailure == "" {
+		sts.Create.OnFailure = chi.OnStatefulSetCreateFailureActionDelete
+	}
+	// Update
+	if sts.Update.Timeout == 0 {
+		sts.Update.Timeout = defaultStatefulSetUpdateTimeout
+	}
+	if sts.Update.PollInterval == 0 {
+		sts.Update.PollInterval = defaultStatefulSetUpdatePollInterval
+	}
+	if sts.Update.OnFailure == "" {
+		sts.Update.OnFailure = chi.OnStatefulSetUpdateFailureActionRollback
+	}
+	// Recreate
+	if sts.Recreate.OnDataLoss == "" {
+		sts.Recreate.OnDataLoss = chi.OnStatefulSetRecreateOnDataLossActionRecreate
+	}
+	if sts.Recreate.OnUpdateFailure == "" {
+		sts.Recreate.OnUpdateFailure = chi.OnStatefulSetRecreateOnUpdateFailureActionRecreate
+	}
+	return sts
+}
+
+func (n *Normalizer) normalizeReconcileHost(rh chi.ReconcileHost) chi.ReconcileHost {
+	// Normalize
+	rh = rh.Normalize(types.NewStringBool(false), true)
+	return rh
 }
 
 func (n *Normalizer) normalizeReconcileCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
@@ -545,6 +620,8 @@ func (n *Normalizer) normalizeClusterStage1(cluster *chk.Cluster) *chk.Cluster {
 func (n *Normalizer) normalizeClusterStage2(cluster *chk.Cluster) *chk.Cluster {
 	// Inherit from .spec.configuration.files
 	cluster.InheritFilesFrom(n.req.GetTarget())
+	// Inherit from .spec.reconciling
+	cluster.InheritClusterReconcileFrom(n.req.GetTarget())
 	// Inherit from .spec.defaults
 	cluster.InheritTemplatesFrom(n.req.GetTarget())
 
@@ -553,6 +630,7 @@ func (n *Normalizer) normalizeClusterStage2(cluster *chk.Cluster) *chk.Cluster {
 
 	cluster.PDBManaged = n.normalizePDBManaged(cluster.PDBManaged)
 	cluster.PDBMaxUnavailable = n.normalizePDBMaxUnavailable(cluster.PDBMaxUnavailable)
+	cluster.Reconcile = n.normalizeClusterReconcile(cluster.Reconcile)
 
 	n.appendClusterSecretEnvVar(cluster)
 
@@ -668,6 +746,15 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 	return clusterLayout
 }
 
+func (n *Normalizer) normalizeClusterReconcile(reconcile *chi.ClusterReconcile) *chi.ClusterReconcile {
+	reconcile = reconcile.Ensure()
+
+	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
+	reconcile.StatefulSet = n.normalizeReconcileStatefulSet(reconcile.StatefulSet)
+	reconcile.Host = n.normalizeReconcileHost(reconcile.Host)
+	return reconcile
+}
+
 // ensureClusterLayoutShards ensures slice layout.Shards is in place
 func (n *Normalizer) ensureClusterLayoutShards(layout *chk.ChkClusterLayout) {
 	// Disposition of shards in slice would be
@@ -709,7 +796,7 @@ func (n *Normalizer) normalizeShardStage2(shard *chk.ChkShard, cluster *chk.Clus
 	shard.Files = n.normalizeConfigurationFiles(shard.Files)
 	shard.InheritTemplatesFrom(cluster)
 	// Internal replication uses ReplicasCount thus it has to be normalized after shard ReplicaCount normalized
-	//n.normalizeShardInternalReplication(shard)
+	n.normalizeShardInternalReplication(shard)
 }
 
 // normalizeReplicaStage1 normalizes a replica - walks over all fields
@@ -824,4 +911,15 @@ func (n *Normalizer) normalizeReplicaHosts(replica *chk.ChkReplica, cluster *chk
 		host := cluster.GetOrCreateHost(shardIndex, replicaIndex)
 		replica.Hosts = append(replica.Hosts, host)
 	}
+}
+
+// normalizeShardInternalReplication ensures reasonable values in
+// .spec.configuration.clusters.layout.shards.internalReplication
+func (n *Normalizer) normalizeShardInternalReplication(shard *chk.ChkShard) {
+	// Shards with replicas are expected to have internal replication on by default
+	//defaultInternalReplication := false
+	//if shard.ReplicasCount > 1 {
+	//	defaultInternalReplication = true
+	//}
+	//shard.InternalReplication = shard.InternalReplication.Normalize(defaultInternalReplication)
 }

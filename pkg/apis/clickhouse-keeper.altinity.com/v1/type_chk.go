@@ -41,10 +41,10 @@ func (cr *ClickHouseKeeperInstallation) GetSpecA() any {
 }
 
 func (cr *ClickHouseKeeperInstallation) GetRuntime() apiChi.ICustomResourceRuntime {
-	return cr.ensureRuntime()
+	return cr.EnsureRuntime()
 }
 
-func (cr *ClickHouseKeeperInstallation) ensureRuntime() *ClickHouseKeeperInstallationRuntime {
+func (cr *ClickHouseKeeperInstallation) EnsureRuntime() *ClickHouseKeeperInstallationRuntime {
 	if cr == nil {
 		return nil
 	}
@@ -172,7 +172,7 @@ func (cr *ClickHouseKeeperInstallation) FillStatus(endpoints util.Slice[string],
 		ClustersCount:       cr.ClustersCount(),
 		ShardsCount:         cr.ShardsCount(),
 		HostsCount:          cr.HostsCount(),
-		TaskID:              "",
+		TaskID:              cr.GetSpecT().GetTaskID().Value(),
 		HostsUpdatedCount:   0,
 		HostsAddedCount:     0,
 		HostsUnchangedCount: 0,
@@ -423,7 +423,10 @@ func (cr *ClickHouseKeeperInstallation) IsAuto() bool {
 
 // IsStopped checks whether CR is stopped
 func (cr *ClickHouseKeeperInstallation) IsStopped() bool {
-	return false
+	if cr == nil {
+		return false
+	}
+	return cr.GetSpecT().GetStop().Value()
 }
 
 // IsRollingUpdate checks whether CHI should perform rolling update
@@ -454,20 +457,20 @@ func (cr *ClickHouseKeeperInstallation) Copy(opts types.CopyCROptions) *ClickHou
 		return nil
 	}
 
-	var chi2 *ClickHouseKeeperInstallation
-	if err := json.Unmarshal(jsonBytes, &chi2); err != nil {
+	var cr2 *ClickHouseKeeperInstallation
+	if err := json.Unmarshal(jsonBytes, &cr2); err != nil {
 		return nil
 	}
 
 	if opts.SkipStatus {
-		chi2.Status = nil
+		cr2.Status = nil
 	}
 
 	if opts.SkipManagedFields {
-		chi2.SetManagedFields(nil)
+		cr2.SetManagedFields(nil)
 	}
 
-	return chi2
+	return cr2
 }
 
 // JSON returns JSON string
@@ -499,7 +502,7 @@ func (cr *ClickHouseKeeperInstallation) YAML(opts types.CopyCROptions) string {
 	return string(yamlBytes)
 }
 
-// FirstHost returns first host of the CHI
+// FirstHost returns first host of the CR
 func (cr *ClickHouseKeeperInstallation) FirstHost() *apiChi.Host {
 	var result *apiChi.Host
 	cr.WalkHosts(func(host *apiChi.Host) error {
@@ -651,7 +654,6 @@ func (cr *ClickHouseKeeperInstallation) WalkTillError(
 	ctx context.Context,
 	fCRPreliminary func(ctx context.Context, chi *ClickHouseKeeperInstallation) error,
 	fCluster func(ctx context.Context, cluster *Cluster) error,
-	fShards func(ctx context.Context, shards []*ChkShard) error,
 	fCRFinal func(ctx context.Context, chi *ClickHouseKeeperInstallation) error,
 ) error {
 	if err := fCRPreliminary(ctx, cr); err != nil {
@@ -661,14 +663,6 @@ func (cr *ClickHouseKeeperInstallation) WalkTillError(
 	for clusterIndex := range cr.GetSpecT().Configuration.Clusters {
 		cluster := cr.GetSpecT().Configuration.Clusters[clusterIndex]
 		if err := fCluster(ctx, cluster); err != nil {
-			return err
-		}
-
-		shards := make([]*ChkShard, 0, len(cluster.Layout.Shards))
-		for shardIndex := range cluster.Layout.Shards {
-			shards = append(shards, cluster.Layout.Shards[shardIndex])
-		}
-		if err := fShards(ctx, shards); err != nil {
 			return err
 		}
 	}

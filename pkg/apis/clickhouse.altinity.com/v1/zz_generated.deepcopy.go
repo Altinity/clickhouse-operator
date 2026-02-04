@@ -854,7 +854,11 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 		*out = new(types.Int32)
 		**out = **in
 	}
-	in.Reconcile.DeepCopyInto(&out.Reconcile)
+	if in.Reconcile != nil {
+		in, out := &in.Reconcile, &out.Reconcile
+		*out = new(ClusterReconcile)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Layout != nil {
 		in, out := &in.Layout, &out.Layout
 		*out = new(ChiClusterLayout)

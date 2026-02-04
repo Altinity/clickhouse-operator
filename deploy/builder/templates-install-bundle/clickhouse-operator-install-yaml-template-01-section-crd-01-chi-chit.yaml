@@ -497,6 +497,80 @@ spec:
                           minimum: 0
                           maximum: 100
                           description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                    statefulSet: &TypeReconcileStatefulSet
+                      type: object
+                      description: "Optional, StatefulSet reconcile behavior tuning"
+                      properties:
+                        create:
+                          type: object
+                          description: "Behavior during create StatefulSet"
+                          properties:
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "delete"
+                                - "ignore"
+                        update:
+                          type: object
+                          description: "Behavior during update StatefulSet"
+                          properties:
+                            timeout:
+                              type: integer
+                              description: "How many seconds to wait for StatefulSet to be 'Ready' during update"
+                              minimum: 0
+                              maximum: 3600
+                            pollInterval:
+                              type: integer
+                              description: "How many seconds to wait between checks for StatefulSet status during update"
+                              minimum: 1
+                              maximum: 600
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. rollback - delete Pod and rollback StatefulSet to previous Generation. Follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "rollback"
+                                - "ignore"
+                        recreate:
+                          type: object
+                          description: "Behavior during recreate StatefulSet"
+                          properties:
+                            onDataLoss:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to PVC data loss or missing volumes.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "recreate"
+                            onUpdateFailure:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to update failure or StatefulSet not ready.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "recreate"
                     host: &TypeReconcileHost
                       type: object
                       description: |

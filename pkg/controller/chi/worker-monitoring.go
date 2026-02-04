@@ -19,34 +19,34 @@ import (
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 )
 
-// excludeFromMonitoring excludes stopped CHI from monitoring
-func (w *worker) excludeFromMonitoring(chi *api.ClickHouseInstallation) {
-	if !chi.IsStopped() {
-		// No need to exclude non-stopped CHI
+// excludeFromMonitoring excludes stopped CR from monitoring
+func (w *worker) excludeFromMonitoring(cr *api.ClickHouseInstallation) {
+	if !cr.IsStopped() {
+		// No need to exclude non-stopped CR
 		return
 	}
 
 	// CR is stopped, let's exclude it from monitoring
 	// because it makes no sense to send SQL requests to stopped instances
 	w.a.V(1).
-		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileInProgress).
-		WithAction(chi).
-		M(chi).F().
-		Info("exclude CHI from monitoring")
-	w.c.deleteWatch(chi)
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileInProgress).
+		WithAction(cr).
+		M(cr).F().
+		Info("exclude CR from monitoring")
+	w.c.deleteWatch(cr)
 }
 
-// addToMonitoring adds CHI to monitoring
-func (w *worker) addToMonitoring(chi *api.ClickHouseInstallation) {
-	if chi.IsStopped() {
-		// No need to add stopped CHI
+// addToMonitoring adds CR to monitoring
+func (w *worker) addToMonitoring(cr *api.ClickHouseInstallation) {
+	if cr.IsStopped() {
+		// No need to add stopped CR
 		return
 	}
 
 	w.a.V(1).
-		WithEvent(chi, a.EventActionReconcile, a.EventReasonReconcileInProgress).
-		WithAction(chi).
-		M(chi).F().
-		Info("add CHI to monitoring")
-	w.c.updateWatch(chi)
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileInProgress).
+		WithAction(cr).
+		M(cr).F().
+		Info("add CR to monitoring")
+	w.c.updateWatch(cr)
 }

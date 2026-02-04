@@ -252,47 +252,81 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 
 	action := common.ErrCRUDRecreate
 	if k8s.IsStatefulSetReady(curStatefulSet) {
-		action = r.doUpdateStatefulSet(ctx, curStatefulSet, newStatefulSet, host, opts)
+		if action = r.doUpdateStatefulSet(ctx, curStatefulSet, newStatefulSet, host, opts); action == nil {
+			// Straightforward success
+			if register {
+				host.GetCR().IEnsureStatus().HostUpdated()
+				_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
+					CopyStatusOptions: types.CopyStatusOptions{
+						CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+							FieldGroupMain: true,
+						},
+					},
+				})
+			}
+			r.a.V(1).
+				WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateCompleted).
+				WithAction(host.GetCR()).
+				M(host).F().
+				Info("Update StatefulSet(%s/%s) - completed", namespace, name)
+
+			// All is done here
+			return nil
+		}
 	}
 
+	// Something is incorrect, need to decide next moves
+
 	switch action {
-	case nil:
-		if register {
-			host.GetCR().IEnsureStatus().HostUpdated()
-			_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
-				CopyStatusOptions: types.CopyStatusOptions{
-					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
-						FieldGroupMain: true,
-					},
-				},
-			})
-		}
-		r.a.V(1).
-			WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateCompleted).
-			WithAction(host.GetCR()).
-			M(host).F().
-			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
-		return nil
-	case common.ErrCRUDAbort:
-		r.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got abort. Abort", namespace, name)
-		return common.ErrCRUDAbort
-	case common.ErrCRUDIgnore:
-		r.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got ignore. Ignore", namespace, name)
-		return nil
 	case common.ErrCRUDRecreate:
+		// Second attempt requested
+
+		onUpdateFailure := host.GetCluster().GetReconcile().StatefulSet.Recreate.OnUpdateFailure
+		if onUpdateFailure == api.OnStatefulSetRecreateOnUpdateFailureActionAbort {
+			r.a.V(1).M(host).Warning("Update StatefulSet(%s/%s) - would need recreate but aborting as configured (onUpdateFailure: abort)", namespace, name)
+			return common.ErrCRUDAbort
+		}
+
+		// Continue second attempt
 		r.a.WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateInProgress).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
 		common.DumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
 		return r.recreateStatefulSet(ctx, host, register, opts)
+
+	default:
+		// Decide on other non-successful cases
+		return r.shouldAbortOrContinueUpdateStatefulSet(action, host)
+	}
+}
+
+func (r *Reconciler) shouldAbortOrContinueUpdateStatefulSet(action error, host *api.Host) error {
+	newStatefulSet := host.Runtime.DesiredStatefulSet
+	namespace := newStatefulSet.Namespace
+	name := newStatefulSet.Name
+
+	switch action {
+	case common.ErrCRUDAbort:
+		// Abort
+		r.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got abort. Abort", namespace, name)
+		return common.ErrCRUDAbort
+
+	case common.ErrCRUDIgnore:
+		// Continue
+		r.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got ignore. Ignore", namespace, name)
+		return nil
+
 	case common.ErrCRUDUnexpectedFlow:
+		// Continue
 		r.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
 		return nil
-	}
 
-	r.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
-	return nil
+	default:
+		// Continue
+		r.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
+		return nil
+	}
 }
 
 // createStatefulSet
@@ -321,37 +355,53 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 		})
 	}
 
+	return r.shouldAbortOrContinueCreateStatefulSet(action, host)
+}
+
+func (r *Reconciler) shouldAbortOrContinueCreateStatefulSet(action error, host *api.Host) error {
+	statefulSet := host.Runtime.DesiredStatefulSet
 	switch action {
 	case nil:
+		// Continue
 		r.a.V(1).
 			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Info("Create StatefulSet: %s - completed", util.NamespaceNameString(statefulSet))
 		return nil
+
 	case common.ErrCRUDAbort:
+		// Abort
 		r.a.WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
 			WithAction(host.GetCR()).
 			WithError(host.GetCR()).
 			M(host).F().
 			Error("Create StatefulSet: %s - failed with error: %v", util.NamespaceNameString(statefulSet), action)
-		return action
+		return common.ErrCRUDAbort
+
 	case common.ErrCRUDIgnore:
+		// Continue
 		r.a.WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
 			WithAction(host.GetCR()).
 			M(host).F().
 			Warning("Create StatefulSet: %s - error ignored", util.NamespaceNameString(statefulSet))
 		return nil
+
 	case common.ErrCRUDRecreate:
+		// Continue
 		r.a.V(1).M(host).Warning("Got recreate action. Ignore and continue for now")
 		return nil
+
 	case common.ErrCRUDUnexpectedFlow:
+		// Continue
 		r.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
 		return nil
-	}
 
-	r.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
-	return nil
+	default:
+		// Continue
+		r.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
+		return nil
+	}
 }
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
@@ -459,6 +509,7 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
+	// Fetch cur host's StatefulSet
 	var err error
 	host.Runtime.CurStatefulSet, err = r.sts.Get(ctx, host)
 	if err != nil {
@@ -471,7 +522,7 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 		return err
 	}
 
-	// Scale StatefulSet down to 0 pods count.
+	// Scale cur host's StatefulSet down to 0 pods count.
 	// This is the proper and graceful way to delete StatefulSet
 	var zero int32 = 0
 	host.Runtime.CurStatefulSet.Spec.Replicas = &zero
@@ -486,7 +537,6 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 	// And now delete empty StatefulSet
 	if err := r.sts.Delete(ctx, namespace, name); err == nil {
 		log.V(1).M(host).Info("OK delete StatefulSet %s/%s", namespace, name)
-		//		r.hostSTSPoller.WaitHostStatefulSetDeleted(host)
 	} else if apiErrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
 	} else {

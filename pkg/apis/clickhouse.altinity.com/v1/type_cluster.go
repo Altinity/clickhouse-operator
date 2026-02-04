@@ -31,7 +31,7 @@ type Cluster struct {
 	Secret            *ClusterSecret    `json:"secret,omitempty"            yaml:"secret,omitempty"`
 	PDBManaged        *types.StringBool `json:"pdbManaged,omitempty"        yaml:"pdbManaged,omitempty"`
 	PDBMaxUnavailable *types.Int32      `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
-	Reconcile         ClusterReconcile  `json:"reconcile"                   yaml:"reconcile"`
+	Reconcile         *ClusterReconcile `json:"reconcile,omitempty"         yaml:"reconcile,omitempty"`
 	Layout            *ChiClusterLayout `json:"layout,omitempty"            yaml:"layout,omitempty"`
 
 	Runtime ChiClusterRuntime `json:"-" yaml:"-"`
@@ -146,7 +146,8 @@ func (cluster *Cluster) GetPDBMaxUnavailable() *types.Int32 {
 }
 
 // GetReconcile is a getter
-func (cluster *Cluster) GetReconcile() ClusterReconcile {
+func (cluster *Cluster) GetReconcile() *ClusterReconcile {
+	cluster.Reconcile = cluster.Reconcile.Ensure()
 	return cluster.Reconcile
 }
 
@@ -207,7 +208,7 @@ func (cluster *Cluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 	cluster.Zookeeper = cluster.Zookeeper.MergeFrom(chi.GetSpecT().Configuration.Zookeeper, MergeTypeFillEmptyValues)
 }
 
-// InheritFilesFrom inherits files from CHI
+// InheritFilesFrom inherits files from CR
 func (cluster *Cluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 	if chi.GetSpecT().Configuration == nil {
 		return
@@ -233,8 +234,11 @@ func (cluster *Cluster) InheritClusterReconcileFrom(chi *ClickHouseInstallation)
 	if chi.Spec.Reconcile == nil {
 		return
 	}
-	cluster.Reconcile.Runtime = cluster.Reconcile.Runtime.MergeFrom(chi.Spec.Reconcile.Runtime, MergeTypeFillEmptyValues)
-	cluster.Reconcile.Host = cluster.Reconcile.Host.MergeFrom(chi.Spec.Reconcile.Host)
+	reconcile := cluster.GetReconcile()
+	reconcile.Runtime = reconcile.Runtime.MergeFrom(chi.Spec.Reconcile.Runtime, MergeTypeFillEmptyValues)
+	reconcile.StatefulSet = reconcile.StatefulSet.MergeFrom(chi.Spec.Reconcile.StatefulSet)
+	reconcile.Host = reconcile.Host.MergeFrom(chi.Spec.Reconcile.Host)
+	cluster.Reconcile = reconcile
 }
 
 // InheritTemplatesFrom inherits templates from CHI

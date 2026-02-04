@@ -93,7 +93,6 @@ spec:
               echo "ClickHouseKeeper Write $((($writeEnd - $writeBegin) / 5)) b/s"
               ```
 
-
         - alert: ClickHouseKeeperHighEphemeralNodes
           expr: ClickHouseAsyncMetrics_KeeperEphemeralsCount{app=~'clickhouse-keeper.*'} > 100
           for: 10m
@@ -196,7 +195,7 @@ spec:
             description: |-
               ClickHouse Keeper is using {{ with printf "(ClickHouseAsyncMetrics_KeeperOpenFileDescriptorCount{pod_name='%s',namespace='%s'} / ClickHouseAsyncMetrics_KeeperMaxFileDescriptorCount{pod_name='%s',namespace='%s'}) * 100" .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.1f" }}{{ end }}% of available file descriptors.
               
-              Current open FDs: {{ with printf "ClickHouseAsyncMetrics_KeeperOpenFileDescriptorCount{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
-              Max FDs: {{ with printf "ClickHouseAsyncMetrics_KeeperMaxFileDescriptorCount{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              Current open FDs: {{ with printf "ClickHouseAsyncMetrics_KeeperOpenFileDescriptorCount{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%d" }}{{ end }}
+              Max FDs: {{ with printf "ClickHouseAsyncMetrics_KeeperMaxFileDescriptorCount{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%d" }}{{ end }}
               
               If this continues to increase, the keeper may run out of file descriptors and become unresponsive.

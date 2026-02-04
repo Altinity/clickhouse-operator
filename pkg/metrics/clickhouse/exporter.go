@@ -167,7 +167,10 @@ func (e *Exporter) newHostFetcher(host *metrics.WatchedHost) *ClickHouseMetricsF
 		clusterConnectionParams.Port = int(host.HTTPSPort)
 	}
 
-	return NewClickHouseFetcher(clusterConnectionParams.NewEndpointConnectionParams(host.Hostname))
+	return NewClickHouseFetcher(
+		clusterConnectionParams.NewEndpointConnectionParams(host.Hostname),
+		chop.Config().ClickHouse.Metrics.TablesRegexp,
+	)
 }
 
 // collectHostMetrics collects metrics from one host and writes them into chan

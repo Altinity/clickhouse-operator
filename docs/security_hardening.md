@@ -73,7 +73,7 @@ stringData:
 
 We recommend that you do not include the **user** and **password** within the operator configuration without a **secret**, though it is also supported.
 
-To change '**clickhouse_operator**' user password you can modify `etc-clickhouse-operator-files` configmap or create `ClickHouseOperatorConfiguration` object.
+To change '**clickhouse_operator**' user password you can modify `etc-clickhouse-operator-files` configmap or create `ClickHouseOperatorConfiguration` object, then restart the operator to apply the change.
 
 See [operator configuration](https://github.com/Altinity/clickhouse-operator/blob/master/docs/operator_configuration.md) for more information about operator configuration files.
 

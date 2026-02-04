@@ -18,6 +18,10 @@ crdHook:
     tag: "latest"
     # crdHook.image.pullPolicy -- image pull policy for CRD installation job
     pullPolicy: IfNotPresent
+  # crdHook.imagePullSecrets -- image pull secrets for CRD installation job
+  # possible value format `[{"name":"your-secret-name"}]`,
+  # check `kubectl explain pod.spec.imagePullSecrets` for details
+  imagePullSecrets: []
   # crdHook.resources -- resource limits and requests for CRD installation job
   resources: {}
   #  limits:
@@ -32,6 +36,8 @@ crdHook:
   tolerations: []
   # crdHook.affinity -- affinity for CRD installation job
   affinity: {}
+  # crdHook.annotations -- additional annotations for CRD installation job
+  annotations: {}
 operator:
   image:
     # operator.image.repository -- image repository
@@ -464,6 +470,10 @@ configs:
             # Upon reaching this timeout metrics collection is aborted and no more metrics are collected in this cycle.
             # All collected metrics are returned.
             collect: 9
+          # Regexp to match tables in system database to fetch metrics from.
+          # Multiple tables can be matched using regexp. Matched tables are merged using merge() table function.
+          # Default is "^(metrics|custom_metrics)$" which fetches from both system.metrics and system.custom_metrics.
+          tablesRegexp: "^(metrics|custom_metrics)$"
       keeper:
         configuration:
           ################################################
@@ -559,6 +569,19 @@ configs:
             #    Follow 'abort' path afterwards.
             # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
             onFailure: abort
+          # Recreate StatefulSet scenario
+          recreate:
+            # What to do in case operator is in need to recreate StatefulSet?
+            # Possible options:
+            # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+            #    do not try to fix or delete or update it, just abort reconcile cycle.
+            #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
+            # 2. recreate - proceed and recreate StatefulSet.
+
+            # Triggered when PVC data loss or missing volumes are detected
+            onDataLoss: recreate
+            # Triggered when StatefulSet update fails or StatefulSet is not ready
+            onUpdateFailure: recreate
         # Reconcile Host scenario
         host:
           # The operator during reconcile procedure should wait for a ClickHouse host to achieve the following conditions:

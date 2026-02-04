@@ -6,6 +6,12 @@ metadata:
   labels:
     app: grafana
 spec:
+  # Service account for the Grafana Operator to manage datasources and dashboards
+  serviceAccount:
+    metadata:
+      annotations: {}
+      labels: {}
+
   deployment:
     metadata:
       annotations:

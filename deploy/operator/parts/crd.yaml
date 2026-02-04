@@ -706,6 +706,80 @@ spec:
                           minimum: 0
                           maximum: 100
                           description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                    statefulSet:
+                      type: object
+                      description: "Optional, StatefulSet reconcile behavior tuning"
+                      properties:
+                        create:
+                          type: object
+                          description: "Behavior during create StatefulSet"
+                          properties:
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "delete"
+                                - "ignore"
+                        update:
+                          type: object
+                          description: "Behavior during update StatefulSet"
+                          properties:
+                            timeout:
+                              type: integer
+                              description: "How many seconds to wait for StatefulSet to be 'Ready' during update"
+                              minimum: 0
+                              maximum: 3600
+                            pollInterval:
+                              type: integer
+                              description: "How many seconds to wait between checks for StatefulSet status during update"
+                              minimum: 1
+                              maximum: 600
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. rollback - delete Pod and rollback StatefulSet to previous Generation. Follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "rollback"
+                                - "ignore"
+                        recreate:
+                          type: object
+                          description: "Behavior during recreate StatefulSet"
+                          properties:
+                            onDataLoss:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to PVC data loss or missing volumes.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "recreate"
+                            onUpdateFailure:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to update failure or StatefulSet not ready.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "recreate"
                     host:
                       type: object
                       description: |
@@ -1320,6 +1394,80 @@ spec:
                           minimum: 0
                           maximum: 100
                           description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                    statefulSet:
+                      type: object
+                      description: "Optional, StatefulSet reconcile behavior tuning"
+                      properties:
+                        create:
+                          type: object
+                          description: "Behavior during create StatefulSet"
+                          properties:
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "delete"
+                                - "ignore"
+                        update:
+                          type: object
+                          description: "Behavior during update StatefulSet"
+                          properties:
+                            timeout:
+                              type: integer
+                              description: "How many seconds to wait for StatefulSet to be 'Ready' during update"
+                              minimum: 0
+                              maximum: 3600
+                            pollInterval:
+                              type: integer
+                              description: "How many seconds to wait between checks for StatefulSet status during update"
+                              minimum: 1
+                              maximum: 600
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. rollback - delete Pod and rollback StatefulSet to previous Generation. Follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "rollback"
+                                - "ignore"
+                        recreate:
+                          type: object
+                          description: "Behavior during recreate StatefulSet"
+                          properties:
+                            onDataLoss:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to PVC data loss or missing volumes.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "recreate"
+                            onUpdateFailure:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to update failure or StatefulSet not ready.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "recreate"
                     host:
                       type: object
                       description: |
@@ -4258,6 +4406,80 @@ spec:
                           minimum: 0
                           maximum: 100
                           description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                    statefulSet:
+                      type: object
+                      description: "Optional, StatefulSet reconcile behavior tuning"
+                      properties:
+                        create:
+                          type: object
+                          description: "Behavior during create StatefulSet"
+                          properties:
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "delete"
+                                - "ignore"
+                        update:
+                          type: object
+                          description: "Behavior during update StatefulSet"
+                          properties:
+                            timeout:
+                              type: integer
+                              description: "How many seconds to wait for StatefulSet to be 'Ready' during update"
+                              minimum: 0
+                              maximum: 3600
+                            pollInterval:
+                              type: integer
+                              description: "How many seconds to wait between checks for StatefulSet status during update"
+                              minimum: 1
+                              maximum: 600
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. rollback - delete Pod and rollback StatefulSet to previous Generation. Follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "rollback"
+                                - "ignore"
+                        recreate:
+                          type: object
+                          description: "Behavior during recreate StatefulSet"
+                          properties:
+                            onDataLoss:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to PVC data loss or missing volumes.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "recreate"
+                            onUpdateFailure:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to update failure or StatefulSet not ready.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "recreate"
                     host:
                       type: object
                       description: |
@@ -4872,6 +5094,80 @@ spec:
                           minimum: 0
                           maximum: 100
                           description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                    statefulSet:
+                      type: object
+                      description: "Optional, StatefulSet reconcile behavior tuning"
+                      properties:
+                        create:
+                          type: object
+                          description: "Behavior during create StatefulSet"
+                          properties:
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "delete"
+                                - "ignore"
+                        update:
+                          type: object
+                          description: "Behavior during update StatefulSet"
+                          properties:
+                            timeout:
+                              type: integer
+                              description: "How many seconds to wait for StatefulSet to be 'Ready' during update"
+                              minimum: 0
+                              maximum: 3600
+                            pollInterval:
+                              type: integer
+                              description: "How many seconds to wait between checks for StatefulSet status during update"
+                              minimum: 1
+                              maximum: 600
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. rollback - delete Pod and rollback StatefulSet to previous Generation. Follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "rollback"
+                                - "ignore"
+                        recreate:
+                          type: object
+                          description: "Behavior during recreate StatefulSet"
+                          properties:
+                            onDataLoss:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to PVC data loss or missing volumes.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "recreate"
+                            onUpdateFailure:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to update failure or StatefulSet not ready.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "abort"
+                                - "recreate"
                     host:
                       type: object
                       description: |
@@ -7344,6 +7640,12 @@ spec:
                                 Timeout used to limit metrics collection request. In seconds.
                                 Upon reaching this timeout metrics collection is aborted and no more metrics are collected in this cycle.
                                 All collected metrics are returned.
+                        tablesRegexp:
+                          type: string
+                          description: |
+                            Regexp to match tables in system database to fetch metrics from.
+                            Multiple tables can be matched using regexp. Matched tables are merged using merge() table function.
+                            Default is "^(metrics|custom_metrics)$".
                 template:
                   type: object
                   description: "Parameters which are used if you want to generate ClickHouseInstallationTemplate custom resources from files which are stored inside clickhouse-operator deployment"
@@ -7422,6 +7724,24 @@ spec:
                                 1. abort - do nothing, just break the process and wait for admin.
                                 2. rollback (default) - delete Pod and rollback StatefulSet to previous Generation. Pod would be recreated by StatefulSet based on rollback-ed configuration.
                                 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet.
+                        recreate:
+                          type: object
+                          description: "Behavior during recreate StatefulSet"
+                          properties:
+                            onDataLoss:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to PVC data loss or missing volumes.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate (default) - proceed and recreate StatefulSet.
+                            onUpdateFailure:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to update failure or StatefulSet not ready.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate (default) - proceed and recreate StatefulSet.
                     host:
                       type: object
                       description: |
@@ -8043,11 +8363,10 @@ spec:
           type: string
           description: Resource status
           jsonPath: .status.status
-        - name: hosts-unchanged
+        - name: hosts-completed
           type: integer
-          description: Unchanged hosts count
-          priority: 1 # show in wide view
-          jsonPath: .status.hostsUnchanged
+          description: Completed hosts count
+          jsonPath: .status.hostsCompleted
         - name: hosts-updated
           type: integer
           description: Updated hosts count
@@ -8058,20 +8377,11 @@ spec:
           description: Added hosts count
           priority: 1 # show in wide view
           jsonPath: .status.hostsAdded
-        - name: hosts-completed
-          type: integer
-          description: Completed hosts count
-          jsonPath: .status.hostsCompleted
         - name: hosts-deleted
           type: integer
           description: Hosts deleted count
           priority: 1 # show in wide view
           jsonPath: .status.hostsDeleted
-        - name: hosts-delete
-          type: integer
-          description: Hosts to be deleted count
-          priority: 1 # show in wide view
-          jsonPath: .status.hostsDelete
         - name: endpoint
           type: string
           description: Client access endpoint
@@ -8237,10 +8547,12 @@ spec:
                 normalized:
                   type: object
                   description: "Normalized resource requested"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
                   description: "Normalized resource completed"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
@@ -8278,7 +8590,7 @@ spec:
                 stop:
                   type: string
                   description: |
-                    Allows to stop all ClickHouse clusters defined in a CHI.
+                    Allows to stop all ClickHouse Keeper clusters defined in a CHK.
                     Works as the following:
                      - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
                      - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
@@ -8609,6 +8921,46 @@ spec:
                             description: |
                               optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                               override top-level `chi.spec.configuration.files`
+                          templates:
+                            type: object
+                            # nullable: true
+                            properties:
+                              hostTemplate:
+                                type: string
+                                description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure every `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod`"
+                              podTemplate:
+                                type: string
+                                description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
+                              dataVolumeClaimTemplate:
+                                type: string
+                                description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
+                              logVolumeClaimTemplate:
+                                type: string
+                                description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
+                              serviceTemplate:
+                                type: string
+                                description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                              serviceTemplates:
+                                type: array
+                                description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
+                                nullable: true
+                                items:
+                                  type: string
+                              clusterServiceTemplate:
+                                type: string
+                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
+                              shardServiceTemplate:
+                                type: string
+                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each shard inside clickhouse cluster described in `chi.spec.configuration.clusters`"
+                              replicaServiceTemplate:
+                                type: string
+                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
+                              volumeClaimTemplate:
+                                type: string
+                                description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
+                            description: |
+                              optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
+                              override top-level `chi.spec.configuration.templates`
                           pdbManaged:
                             type: string
                             enum:
@@ -8651,46 +9003,6 @@ spec:
                               by specifying 0. This is a mutually exclusive setting with "minAvailable".
                             minimum: 0
                             maximum: 65535
-                          templates:
-                            type: object
-                            # nullable: true
-                            properties:
-                              hostTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure every `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod`"
-                              podTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
-                              dataVolumeClaimTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
-                              logVolumeClaimTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
-                              serviceTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
-                              serviceTemplates:
-                                type: array
-                                description: "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource"
-                                nullable: true
-                                items:
-                                  type: string
-                              clusterServiceTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`"
-                              shardServiceTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each shard inside clickhouse cluster described in `chi.spec.configuration.clusters`"
-                              replicaServiceTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
-                              volumeClaimTemplate:
-                                type: string
-                                description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
-                            description: |
-                              optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
-                              override top-level `chi.spec.configuration.templates`
                           layout:
                             type: object
                             description: |

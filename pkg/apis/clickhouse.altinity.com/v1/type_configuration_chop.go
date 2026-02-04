@@ -39,7 +39,7 @@ import (
 const (
 	// Default values for update timeout and polling period in seconds
 	defaultStatefulSetUpdateTimeout      = 300
-	defaultStatefulSetUpdatePollInterval = 15
+	defaultStatefulSetUpdatePollInterval = 5
 
 	// Default values for ClickHouse user configuration
 	// 1. user/profile
@@ -77,6 +77,9 @@ const (
 	defaultTimeoutQuery = 5
 	// defaultTimeoutCollect specifies default timeout to collect metrics from the ClickHouse instance. In seconds
 	defaultTimeoutCollect = 8
+
+	// defaultMetricsTablesRegexp specifies default regexp to match tables in system database to fetch metrics from
+	defaultMetricsTablesRegexp = "^(metrics|custom_metrics)$"
 
 	// defaultReconcileCHIsThreadsNumber specifies default number of controller threads running concurrently.
 	// Used in case no other specified in config
@@ -134,6 +137,22 @@ const (
 
 	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
 	OnStatefulSetUpdateFailureActionIgnore = "ignore"
+)
+
+const (
+	// What to do in case StatefulSet needs to be recreated due to PVC data loss or missing volumes
+	// Abort - Loss: abort CHI reconcile
+	OnStatefulSetRecreateOnDataLossActionAbort = "abort"
+
+	// Recreate - Loss: proceed and recreate StatefulSet
+	OnStatefulSetRecreateOnDataLossActionRecreate = "recreate"
+
+	// What to do in case StatefulSet needs to be recreated due to update failure or StatefulSet not ready
+	// Abort - Failure: abort CHI reconcile
+	OnStatefulSetRecreateOnUpdateFailureActionAbort = "abort"
+
+	// Recreate - Failure: proceed and recreate StatefulSet
+	OnStatefulSetRecreateOnUpdateFailureActionRecreate = "recreate"
 )
 
 const (
@@ -355,6 +374,10 @@ type OperatorConfigClickHouse struct {
 		Timeouts struct {
 			Collect time.Duration `json:"collect" yaml:"collect"`
 		} `json:"timeouts" yaml:"timeouts"`
+		// TablesRegexp specifies regexp to match tables in system database to fetch metrics from.
+		// Multiple tables can be matched using regexp. Matched tables are merged using merge() table function.
+		// Default is "^(metrics|custom_metrics)$" which fetches from both system.metrics and system.custom_metrics.
+		TablesRegexp string `json:"tablesRegexp" yaml:"tablesRegexp"`
 	} `json:"metrics" yaml:"metrics"`
 }
 
@@ -422,10 +445,15 @@ type OperatorConfigReconcile struct {
 		} `json:"create" yaml:"create"`
 
 		Update struct {
-			Timeout      uint64 `json:"timeout" yaml:"timeout"`
+			Timeout      uint64 `json:"timeout"      yaml:"timeout"`
 			PollInterval uint64 `json:"pollInterval" yaml:"pollInterval"`
-			OnFailure    string `json:"onFailure" yaml:"onFailure"`
+			OnFailure    string `json:"onFailure"    yaml:"onFailure"`
 		} `json:"update" yaml:"update"`
+
+		Recreate struct {
+			OnDataLoss      string `json:"onDataLoss"      yaml:"onDataLoss"`
+			OnUpdateFailure string `json:"onUpdateFailure" yaml:"onUpdateFailure"`
+		} `json:"recreate" yaml:"recreate"`
 	} `json:"statefulSet" yaml:"statefulSet"`
 
 	Host ReconcileHost `json:"host" yaml:"host"`
@@ -446,8 +474,8 @@ type ReconcileHost struct {
 	Drop ReconcileHostDrop `json:"drop" yaml:"drop"`
 }
 
-func (rh ReconcileHost) Normalize() ReconcileHost {
-	rh.Wait = rh.Wait.Normalize()
+func (rh ReconcileHost) Normalize(readiness *types.StringBool, overwrite bool) ReconcileHost {
+	rh.Wait = rh.Wait.Normalize(readiness, overwrite)
 	rh.Drop = rh.Drop.Normalize()
 	return rh
 }
@@ -467,7 +495,7 @@ type ReconcileHostWait struct {
 	Probes   *ReconcileHostWaitProbes   `json:"probes,omitempty"   yaml:"probes,omitempty"`
 }
 
-func (wait ReconcileHostWait) Normalize() ReconcileHostWait {
+func (wait ReconcileHostWait) Normalize(readiness *types.StringBool, overwrite bool) ReconcileHostWait {
 	if wait.Replicas == nil {
 		wait.Replicas = &ReconcileHostWaitReplicas{}
 	}
@@ -478,10 +506,13 @@ func (wait ReconcileHostWait) Normalize() ReconcileHostWait {
 	}
 
 	if wait.Probes == nil {
-		// Default value
+		// Apply default when probes are not specified at all.
 		wait.Probes = &ReconcileHostWaitProbes{
-			Readiness: types.NewStringBool(true),
+			Readiness: readiness,
 		}
+	} else if overwrite {
+		// Force override even when a value is already set.
+		wait.Probes.Readiness = readiness
 	}
 
 	return wait
@@ -1018,10 +1049,18 @@ func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
 	if c.Reconcile.StatefulSet.Update.OnFailure == "" {
 		c.Reconcile.StatefulSet.Update.OnFailure = OnStatefulSetUpdateFailureActionRollback
 	}
+
+	// Default Recreate actions - recreate
+	if c.Reconcile.StatefulSet.Recreate.OnDataLoss == "" {
+		c.Reconcile.StatefulSet.Recreate.OnDataLoss = OnStatefulSetRecreateOnDataLossActionRecreate
+	}
+	if c.Reconcile.StatefulSet.Recreate.OnUpdateFailure == "" {
+		c.Reconcile.StatefulSet.Recreate.OnUpdateFailure = OnStatefulSetRecreateOnUpdateFailureActionRecreate
+	}
 }
 
 func (c *OperatorConfig) normalizeSectionReconcileHost() {
-	c.Reconcile.Host = c.Reconcile.Host.Normalize()
+	c.Reconcile.Host = c.Reconcile.Host.Normalize(nil, false)
 }
 
 func (c *OperatorConfig) normalizeSectionClickHouseConfigurationUserDefault() {
@@ -1105,6 +1144,10 @@ func (c *OperatorConfig) normalizeSectionClickHouseMetrics() {
 	}
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Metrics.Timeouts.Collect = c.ClickHouse.Metrics.Timeouts.Collect * time.Second
+
+	if c.ClickHouse.Metrics.TablesRegexp == "" {
+		c.ClickHouse.Metrics.TablesRegexp = defaultMetricsTablesRegexp
+	}
 }
 
 func (c *OperatorConfig) normalizeSectionLogger() {

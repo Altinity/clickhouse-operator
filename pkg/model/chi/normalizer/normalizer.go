@@ -155,6 +155,7 @@ func (n *Normalizer) normalizeSpec() {
 	n.req.GetTarget().GetSpecT().Stop = n.normalizeStop(n.req.GetTarget().GetSpecT().Stop)
 	n.req.GetTarget().GetSpecT().Restart = n.normalizeRestart(n.req.GetTarget().GetSpecT().Restart)
 	n.req.GetTarget().GetSpecT().Troubleshoot = n.normalizeTroubleshoot(n.req.GetTarget().GetSpecT().Troubleshoot)
+	n.req.GetTarget().GetSpecT().Suspend = n.normalizeSuspend(n.req.GetTarget().GetSpecT().Suspend)
 	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
 	n.req.GetTarget().GetSpecT().Templating = n.normalizeTemplating(n.req.GetTarget().GetSpecT().Templating)
 	n.normalizeReconciling()
@@ -249,6 +250,17 @@ func (n *Normalizer) normalizeTroubleshoot(troubleshoot *types.StringBool) *type
 	if troubleshoot.IsValid() {
 		// It is bool, use as it is
 		return troubleshoot
+	}
+
+	// In case it is unknown value - just use set it to false
+	return types.NewStringBool(false)
+}
+
+// normalizeSuspend normalizes .spec.suspend
+func (n *Normalizer) normalizeSuspend(suspend *types.StringBool) *types.StringBool {
+	if suspend.IsValid() {
+		// It is bool, use as it is
+		return suspend
 	}
 
 	// In case it is unknown value - just use set it to false
@@ -411,6 +423,11 @@ func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiRec
 	reconcile.InheritRuntimeFrom(chop.Config().Reconcile.Runtime)
 	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
 
+	// StatefulSet
+	// Inherit from chop Config
+	reconcile.InheritStatefulSetFrom(chop.Config().Reconcile)
+	reconcile.StatefulSet = n.normalizeReconcileStatefulSet(reconcile.StatefulSet)
+
 	// Host
 	// Inherit from chop Config
 	reconcile.InheritHostFrom(chop.Config().Reconcile.Host)
@@ -429,9 +446,34 @@ func (n *Normalizer) normalizeReconcileRuntime(runtime chi.ReconcileRuntime) chi
 	return runtime
 }
 
+func (n *Normalizer) normalizeReconcileStatefulSet(sts chi.ReconcileStatefulSet) chi.ReconcileStatefulSet {
+	// Create
+	if sts.Create.OnFailure == "" {
+		sts.Create.OnFailure = chi.OnStatefulSetCreateFailureActionDelete
+	}
+	// Update
+	if sts.Update.Timeout == 0 {
+		sts.Update.Timeout = defaultStatefulSetUpdateTimeout
+	}
+	if sts.Update.PollInterval == 0 {
+		sts.Update.PollInterval = defaultStatefulSetUpdatePollInterval
+	}
+	if sts.Update.OnFailure == "" {
+		sts.Update.OnFailure = chi.OnStatefulSetUpdateFailureActionRollback
+	}
+	// Recreate
+	if sts.Recreate.OnDataLoss == "" {
+		sts.Recreate.OnDataLoss = chi.OnStatefulSetRecreateOnDataLossActionRecreate
+	}
+	if sts.Recreate.OnUpdateFailure == "" {
+		sts.Recreate.OnUpdateFailure = chi.OnStatefulSetRecreateOnUpdateFailureActionRecreate
+	}
+	return sts
+}
+
 func (n *Normalizer) normalizeReconcileHost(rh chi.ReconcileHost) chi.ReconcileHost {
 	// Normalize
-	rh = rh.Normalize()
+	rh = rh.Normalize(types.NewStringBool(true), false)
 	return rh
 }
 
@@ -993,8 +1035,11 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 	return clusterLayout
 }
 
-func (n *Normalizer) normalizeClusterReconcile(reconcile chi.ClusterReconcile) chi.ClusterReconcile {
+func (n *Normalizer) normalizeClusterReconcile(reconcile *chi.ClusterReconcile) *chi.ClusterReconcile {
+	reconcile = reconcile.Ensure()
+
 	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
+	reconcile.StatefulSet = n.normalizeReconcileStatefulSet(reconcile.StatefulSet)
 	reconcile.Host = n.normalizeReconcileHost(reconcile.Host)
 	return reconcile
 }

@@ -482,20 +482,20 @@ func (cr *ClickHouseInstallation) Copy(opts types.CopyCROptions) *ClickHouseInst
 		return nil
 	}
 
-	var chi2 *ClickHouseInstallation
-	if err := json.Unmarshal(jsonBytes, &chi2); err != nil {
+	var cr2 *ClickHouseInstallation
+	if err := json.Unmarshal(jsonBytes, &cr2); err != nil {
 		return nil
 	}
 
 	if opts.SkipStatus {
-		chi2.Status = nil
+		cr2.Status = nil
 	}
 
 	if opts.SkipManagedFields {
-		chi2.SetManagedFields(nil)
+		cr2.SetManagedFields(nil)
 	}
 
-	return chi2
+	return cr2
 }
 
 // JSON returns JSON string
@@ -527,7 +527,7 @@ func (cr *ClickHouseInstallation) YAML(opts types.CopyCROptions) string {
 	return string(yamlBytes)
 }
 
-// FirstHost returns first host of the CHI
+// FirstHost returns first host of the CR
 func (cr *ClickHouseInstallation) FirstHost() *Host {
 	var result *Host
 	cr.WalkHosts(func(host *Host) error {

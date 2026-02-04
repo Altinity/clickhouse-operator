@@ -1282,7 +1282,7 @@
         {
           "targetBlank": true,
           "title": "max_concurent_queries",
-          "url": "https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings#max_concurrent_queries"
+          "url": "https://clickhouse.com/docs/operations/server-configuration-parameters/settings#max_concurrent_queries"
         },
         {
           "targetBlank": true,
@@ -1412,7 +1412,7 @@
         {
           "targetBlank": true,
           "title": "max_concurent_queries",
-          "url": "https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings#max-concurrent-queries"
+          "url": "https://clickhouse.com/docs/operations/server-configuration-parameters/settings#max_concurrent_queries"
         },
         {
           "targetBlank": true,
@@ -1727,7 +1727,7 @@
         {
           "targetBlank": true,
           "title": "max_concurent_queries",
-          "url": "https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings#max_concurrent_queries"
+          "url": "https://clickhouse.com/docs/operations/server-configuration-parameters/settings#max_concurrent_queries"
         },
         {
           "targetBlank": true,
@@ -2253,7 +2253,7 @@
         {
           "targetBlank": true,
           "title": "max_replica_delay_for_distributed_queries",
-          "url": "https://clickhouse.com/docs/en/operations/settings/settings#settings-max_replica_delay_for_distributed_queries"
+          "url": "https://clickhouse.com/docs/operations/settings/settings#max_replica_delay_for_distributed_queries"
         }
       ],
       "options": {
@@ -4298,7 +4298,7 @@
         {
           "targetBlank": true,
           "title": "mark_cache_size",
-          "url": "https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings/#server-mark-cache-size"
+          "url": "https://clickhouse.com/docs/operations/server-configuration-parameters/settings#mark_cache_size"
         },
         {
           "targetBlank": true,
@@ -5335,12 +5335,12 @@
         {
           "targetBlank": true,
           "title": "max_connections",
-          "url": "https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings#max-connections"
+          "url": "https://clickhouse.com/docs/operations/server-configuration-parameters/settings#max_connections"
         },
         {
           "targetBlank": true,
           "title": "max_distributed_connections",
-          "url": "https://clickhouse.com/docs/en/operations/settings/settings#max-distributed-connections"
+          "url": "https://clickhouse.com/docs/operations/settings/settings#max_distributed_connections"
         },
         {
           "targetBlank": true,

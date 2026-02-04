@@ -104,6 +104,53 @@ spec:
       # Max percentage of concurrent shard reconciles within one cluster in progress
       reconcileShardsMaxConcurrencyPercent: 50
 
+    # Optional, overwrites reconcile.statefulSet from the operator's config
+    # Reconcile StatefulSet scenario
+    statefulSet:
+      # Create StatefulSet scenario
+      create:
+        # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
+        # Possible options:
+        # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+        #    do not try to fix or delete or update it, just abort reconcile cycle.
+        #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
+        # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+        # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+        onFailure: ignore
+
+      # Update StatefulSet scenario
+      update:
+        # How many seconds to wait for created/updated StatefulSet to be 'Ready'
+        timeout: 300
+        # How many seconds to wait between checks/polls for created/updated StatefulSet status
+        pollInterval: 5
+        # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
+        # Possible options:
+        # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+        #    do not try to fix or delete or update it, just abort reconcile cycle.
+        #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
+        # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
+        #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
+        #    Follow 'abort' path afterwards.
+        # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+        onFailure: abort
+
+      # Recreate StatefulSet scenario
+      recreate:
+        # What to do in case operator is in need to recreate StatefulSet?
+        # Possible options:
+        # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+        #    do not try to fix or delete or update it, just abort reconcile cycle.
+        #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
+        # 2. recreate - proceed and recreate StatefulSet.
+
+        # Triggered when PVC data loss or missing volumes are detected
+        onDataLoss: recreate
+        # Triggered when StatefulSet update fails or StatefulSet is not ready
+        onUpdateFailure: recreate
+
+    # Optional, overwrites reconcile.host from the operator's config
+    # Reconcile Host scenario
     host:
       # Whether the operator during reconcile procedure should wait for a ClickHouse host:
       #   - to be excluded from a ClickHouse cluster

@@ -157,8 +157,7 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
 		}
 		if from.Suspend.HasValue() {
-			// Override by non-empty values only
-			spec.Suspend = from.Suspend
+			spec.Suspend = spec.Suspend.MergeFrom(from.Suspend)
 		}
 	}
 

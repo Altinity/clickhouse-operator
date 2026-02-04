@@ -18,7 +18,7 @@ Operator settings are initialized in-order from 3 sources:
 * etc-clickhouse-operator-files configmap (also a part of default [clickhouse-operator-install-bundle.yaml][clickhouse-operator-install-bundle.yaml]
 * `ClickHouseOperatorConfiguration` resource. See [example][70-chop-config.yaml] for details.
 
-Next sources merges with the previous one. Changes to `etc-clickhouse-operator-files` are not monitored, but picked up if operator is restarted. Changes to `ClickHouseOperatorConfiguration` are monitored by an operator and applied immediately.
+Next sources merge with the previous ones. Currently the operator does not self-reconcile its own configuration: changes to `etc-clickhouse-operator-files` or `ClickHouseOperatorConfiguration` are read only at startup and require an operator restart to apply.
 
 `config.yaml` has following settings:
 

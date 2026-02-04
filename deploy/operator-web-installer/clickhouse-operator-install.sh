@@ -141,9 +141,6 @@ check_envsubst_available
 
 # Manifest is expected to be ready-to-use manifest file
 MANIFEST="${MANIFEST:-""}"
-# Template can have params to substitute
-DEFAULT_TEMPLATE="https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-template.yaml"
-TEMPLATE="${TEMPLATE:-"${DEFAULT_TEMPLATE}"}"
 # Namespace to install operator
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-"kube-system"}"
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
@@ -153,6 +150,9 @@ if [[ -z "${OPERATOR_VERSION}" ]]; then
     RELEASE_VERSION=$(get_file https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/release)
 fi
 OPERATOR_VERSION="${OPERATOR_VERSION:-"${RELEASE_VERSION}"}"
+# Template can have params to substitute
+DEFAULT_TEMPLATE="https://raw.githubusercontent.com/Altinity/clickhouse-operator/${OPERATOR_VERSION:-master}/deploy/operator/clickhouse-operator-install-template.yaml"
+TEMPLATE="${TEMPLATE:-"${DEFAULT_TEMPLATE}"}"
 OPERATOR_IMAGE="${OPERATOR_IMAGE:-"altinity/clickhouse-operator:${OPERATOR_VERSION}"}"
 OPERATOR_IMAGE_PULL_POLICY="${OPERATOR_IMAGE_PULL_POLICY:-"Always"}"
 METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-"altinity/metrics-exporter:${OPERATOR_VERSION}"}"

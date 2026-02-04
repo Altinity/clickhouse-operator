@@ -72,8 +72,8 @@ spec:
               `increase(chi_clickhouse_event_DNSError[1m])` = {{ with printf "increase(chi_clickhouse_event_DNSError{hostname='%s',exported_namespace='%s'}[1m]) or increase(chi_clickhouse_event_NetworkErrors{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} errors{{ end }}
               Please check DNS settings in `/etc/resolve.conf` and `<remote_servers>` part of `/etc/clickhouse-server/`
               See documentation:
-              - https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
-              - https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings/#server-settings-disable-internal-dns-cache
+              - https://clickhouse.com/docs/operations/server-configuration-parameters/settings#remote_servers
+              - https://clickhouse.com/docs/operations/server-configuration-parameters/settings#disable_internal_dns_cache
               - https://clickhouse.com/docs/en/sql-reference/statements/system/
 
         - alert: ClickHouseDistributedFilesToInsertHigh
@@ -112,7 +112,7 @@ spec:
               `increase(chi_clickhouse_event_DistributedConnectionFailAtAll[1m])` = {{ with printf "increase(chi_clickhouse_event_DistributedConnectionFailAtAll{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} errors{{ end }}
 
               Please, check communications between clickhouse server and host `remote_servers` in `/etc/clickhouse-server/`
-              https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
+              https://clickhouse.com/docs/operations/server-configuration-parameters/settings#remote_servers
 
               Also, you can check logs:
               ```kubectl logs -n {{ $labels.exported_namespace }} $( echo {{ $labels.hostname }} | cut -d '.' -f 1)-0 -f```
@@ -178,7 +178,7 @@ spec:
               Please use Buffer table
               https://clickhouse.com/docs/en/engines/table-engines/special/buffer/
               or
-              https://clickhouse.com/docs/en/operations/settings/settings/#async-insert
+              https://clickhouse.com/docs/operations/settings/settings#async_insert
 
         - alert: ClickHouseLongestRunningQuery
           expr: chi_clickhouse_metric_LongestRunningQuery > 600
@@ -259,7 +259,7 @@ spec:
               The ClickHouse is adapted to run not a very large number of parallel SQL requests, not every HTTP/TCP(Native)/MySQL protocol connection means a running SQL request, but a large number of open connections can cause a spike in sudden SQL requests, resulting in performance degradation.
 
               Also read documentation:
-              - https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings/#max-concurrent-queries
+              - https://clickhouse.com/docs/operations/server-configuration-parameters/settings#max_concurrent_queries
 
 
         - alert: ClickHouseTooManyRunningQueries
@@ -279,7 +279,7 @@ spec:
               Look at following documentation parts:
               - https://clickhouse.com/docs/en/operations/settings/query-complexity/
               - https://clickhouse.com/docs/en/operations/quotas/
-              - https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings/#max-concurrent-queries
+              - https://clickhouse.com/docs/operations/server-configuration-parameters/settings#max_concurrent_queries
               - https://clickhouse.com/docs/en/operations/system-tables/query_log/
 
         - alert: ClickHouseSystemSettingsChanged
@@ -527,7 +527,7 @@ spec:
               chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolTask = {{ with printf "chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolTask{exported_namespace='%s',chi='%s',hostname='%s'}" .Labels.exported_namespace .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
               chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolSize = {{ with printf "chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolSize{exported_namespace='%s',chi='%s',hostname='%s'}" .Labels.exported_namespace .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
               - https://kb.altinity.com/altinity-kb-integrations/altinity-kb-kafka/background_message_broker_schedule_pool_size/
-              - https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings#background_message_broker_schedule_pool_size
+              - https://clickhouse.com/docs/operations/server-configuration-parameters/settings#background_message_broker_schedule_pool_size
               - https://clickhouse.com/docs/en/operations/system-tables/metrics#backgroundmessagebrokerschedulepoolsize
               This pool is used for tasks related to message streaming from Apache Kafka or other message brokers.
               You need to increase `background_message_broker_schedule_pool_size` to fix the problem.

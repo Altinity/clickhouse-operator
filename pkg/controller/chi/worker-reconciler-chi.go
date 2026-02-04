@@ -57,19 +57,25 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
-	metrics.CHIInitZeroValues(ctx, new)
-	metrics.CHIReconcilesStarted(ctx, new)
+	metrics.CRInitZeroValues(ctx, new)
+	metrics.CRReconcilesStarted(ctx, new)
 	startTime := time.Now()
 
 	new = w.buildCR(ctx, new)
 
 	switch {
+	case new.Spec.Suspend.Value():
+		// if CR is suspended, should skip reconciliation
+		w.a.M(new).F().Info("Suspended CR")
+		metrics.CRReconcilesCompleted(ctx, new)
+		return nil
 	case new.EnsureRuntime().ActionPlan.HasActionsToDo():
 		w.a.M(new).F().Info("ActionPlan has actions - continue reconcile")
 	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
 	default:
 		w.a.M(new).F().Info("ActionPlan has no actions - abort reconcile")
+		metrics.CRReconcilesCompleted(ctx, new)
 		return nil
 	}
 
@@ -86,7 +92,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		err = common.ErrCRUDAbort
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 		if errors.Is(err, common.ErrCRUDAbort) {
-			metrics.CHIReconcilesAborted(ctx, new)
+			metrics.CRReconcilesAborted(ctx, new)
 		}
 	} else {
 		// Reconcile successful
@@ -97,13 +103,14 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		}
 
 		w.clean(ctx, new)
-		w.dropReplicas(ctx, new)
 		w.addToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
 
-		metrics.CHIReconcilesCompleted(ctx, new)
-		metrics.CHIReconcilesTimings(ctx, new, time.Since(startTime).Seconds())
+		w.dropZKReplicas(ctx, new)
+
+		metrics.CRReconcilesCompleted(ctx, new)
+		metrics.CRReconcilesTimings(ctx, new, time.Since(startTime).Seconds())
 	}
 
 	return nil
@@ -182,7 +189,7 @@ func (w *worker) logSWVersion(ctx context.Context, cr *api.ClickHouseInstallatio
 		l.M(host).Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
 		return nil
 	})
-	l.M(cr).Info("CR software versions [min, max]: %s %s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
+	l.M(cr).Info("CR software versions min=%s max=%s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
 }
 
 // reconcile reconciles Custom Resource
@@ -256,7 +263,7 @@ func (w *worker) reconcileCRServiceFinal(ctx context.Context, cr api.ICustomReso
 	defer log.V(2).F().E().Info("second stage")
 
 	if cr.IsStopped() {
-		// Stopped CHI must have no entry point
+		// Stopped CR must have no entry point
 		return nil
 	}
 
@@ -405,6 +412,7 @@ func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *sta
 	}
 
 	metrics.HostReconcilesRestart(ctx, host.GetCR())
+
 	return nil
 }
 
@@ -770,15 +778,26 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 
 	w.a.V(1).M(host).F().Info("Reconcile PVCs and data loss for host: %s", host.GetName())
 
-	// In case data loss or volumes missing detected we may need to specify additional reconcile options
+	// In case data loss or volumes missing detected we may
+	// 1. need to specify additional reconcile options
+	// 2. abort the reconcile completely
 	err := w.reconcileHostPVCs(ctx, host)
+	onDataLoss := host.GetCluster().GetReconcile().StatefulSet.Recreate.OnDataLoss
 	switch {
 	case storage.ErrIsDataLoss(err):
+		if onDataLoss == api.OnStatefulSetRecreateOnDataLossActionAbort {
+			w.a.V(1).M(host).F().Warning("Data loss detected for host: %s. Aborting reconcile as configured (onDataLoss: abort)", host.GetName())
+			return common.ErrCRUDAbort
+		}
 		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataLossDetectedOptions(host)
 		w.a.V(1).
 			M(host).F().
 			Info("Data loss detected for host: %s.", host.GetName())
 	case storage.ErrIsVolumeMissed(err):
+		if onDataLoss == api.OnStatefulSetRecreateOnDataLossActionAbort {
+			w.a.V(1).M(host).F().Warning("Data volume missed for host: %s. Aborting reconcile as configured (onDataLoss: abort)", host.GetName())
+			return common.ErrCRUDAbort
+		}
 		// stsReconcileOpts, migrateTableOpts = w.hostPVCsDataVolumeMissedDetectedOptions(host)
 		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataLossDetectedOptions(host)
 		w.a.V(1).

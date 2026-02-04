@@ -17,6 +17,8 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
+	"fmt"
+
 	"github.com/MakeNowJust/heredoc"
 
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
@@ -28,17 +30,18 @@ const (
 		SELECT
 			database,
 			table,
-			toString(is_session_expired) AS is_session_expired
+			'1' AS session_expired
 		FROM system.replicas
+		WHERE is_session_expired
 	`
 
-	queryMetricsSQL = `
+	queryMetricsSQLTemplate = `
     	SELECT
         	concat('metric.', metric) AS metric,
         	toString(value)           AS value,
         	''                        AS description,
         	'gauge'                   AS type
-    	FROM merge('system','^(metrics|custom_metrics)$')
+    	FROM %s
 	    UNION ALL
     	SELECT
         	concat('metric.', metric) AS metric,
@@ -138,12 +141,17 @@ const (
 // ClickHouseMetricsFetcher specifies clickhouse fetcher object
 type ClickHouseMetricsFetcher struct {
 	connectionParams *clickhouse.EndpointConnectionParams
+	tablesRegexp     string
 }
 
 // NewClickHouseFetcher creates new clickhouse fetcher object
-func NewClickHouseFetcher(endpointConnectionParams *clickhouse.EndpointConnectionParams) *ClickHouseMetricsFetcher {
+func NewClickHouseFetcher(
+	endpointConnectionParams *clickhouse.EndpointConnectionParams,
+	tablesRegexp string,
+) *ClickHouseMetricsFetcher {
 	return &ClickHouseMetricsFetcher{
 		connectionParams: endpointConnectionParams,
+		tablesRegexp:     tablesRegexp,
 	}
 }
 
@@ -151,11 +159,21 @@ func (f *ClickHouseMetricsFetcher) connection() *clickhouse.Connection {
 	return clickhouse.GetPooledDBConnection(f.connectionParams)
 }
 
+// buildMetricsTableSource returns the FROM clause for the metrics query.
+// If tablesRegexp is set, it uses merge() to query tables matching the regexp.
+func (f *ClickHouseMetricsFetcher) buildMetricsTableSource() string {
+	if f.tablesRegexp == "" {
+		return "merge('system','^(metrics|custom_metrics)$')"
+	}
+	return fmt.Sprintf("merge('system','%s')", f.tablesRegexp)
+}
+
 // getClickHouseQueryMetrics requests metrics data from ClickHouse
 func (f *ClickHouseMetricsFetcher) getClickHouseQueryMetrics(ctx context.Context) (Table, error) {
+	metricsSQL := fmt.Sprintf(queryMetricsSQLTemplate, f.buildMetricsTableSource())
 	return f.clickHouseQueryScanRows(
 		ctx,
-		queryMetricsSQL,
+		metricsSQL,
 		func(rows *sql.Rows, data *Table) error {
 			var metric, value, description, _type string
 			if err := rows.Scan(&metric, &value, &description, &_type); err == nil {

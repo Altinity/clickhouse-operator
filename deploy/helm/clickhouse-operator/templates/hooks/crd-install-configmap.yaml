@@ -11,6 +11,9 @@ metadata:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-7"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    {{- with .Values.crdHook.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 data:
   clickhouseinstallations.yaml: |
 {{ .Files.Get "crds/CustomResourceDefinition-clickhouseinstallations.clickhouse.altinity.com.yaml" | indent 4 }}
