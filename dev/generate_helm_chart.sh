@@ -273,7 +273,15 @@ function update_configmap_resource() {
   yq e -i '.metadata.namespace |= "{{ include \"altinity-clickhouse-operator.namespace\" . }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
   yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
-  yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${camel_cased_name}"') | nindent 2 }}"' "${file}"
+  # For the operator files ConfigMap, use the operatorFilesData helper which
+  # merges configs.watch into configs.files.config.yaml.watch so the user-facing
+  # configs.watch.namespaces value actually takes effect.
+  # See: https://github.com/Altinity/clickhouse-operator/issues/1919
+  if [ "${name}" = "etc-clickhouse-operator-files" ]; then
+    yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . (include \"altinity-clickhouse-operator.operatorFilesData\" . | fromJson)) | nindent 2 }}"' "${file}"
+  else
+    yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${camel_cased_name}"') | nindent 2 }}"' "${file}"
+  fi
 
   if [ -z "${data}" ]; then
     yq e -i '.configs.'"${camel_cased_name}"' |= null' "${values_yaml}"

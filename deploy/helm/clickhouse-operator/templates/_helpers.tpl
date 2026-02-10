@@ -122,3 +122,27 @@ null
 {{- tpl (toYaml (dict $k $v)) $root }}
 {{ end }}
 {{- end }}
+
+{{/*
+altinity-clickhouse-operator.operatorFilesData returns configs.files with
+configs.watch merged into configs.files.config.yaml.watch so that the
+user-facing configs.watch.namespaces value actually takes effect.
+
+Without this, configs.watch.namespaces is silently ignored because the
+ConfigMap template renders configs.files directly, which contains a
+hardcoded watch.namespaces: [] in the config.yaml blob.
+
+See: https://github.com/Altinity/clickhouse-operator/issues/1919
+*/}}
+{{- define "altinity-clickhouse-operator.operatorFilesData" -}}
+{{- $files := deepCopy .Values.configs.files -}}
+{{- if and .Values.configs.watch .Values.configs.watch.namespaces -}}
+  {{- if index $files "config.yaml" -}}
+    {{- $configYaml := index $files "config.yaml" -}}
+    {{- if kindIs "map" $configYaml -}}
+      {{- $_ := set $configYaml "watch" (deepCopy .Values.configs.watch) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- toJson $files -}}
+{{- end -}}
