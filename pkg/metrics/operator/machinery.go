@@ -23,7 +23,7 @@ import (
 	otelApi "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/metric"
 	otelResource "go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
