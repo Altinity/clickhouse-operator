@@ -174,12 +174,13 @@ func (n *Namer) createStatefulSetServiceName(host *api.Host) string {
 	return n.macro.Scope(host).Line(pattern)
 }
 
-// createPodHostname returns a hostname of a Pod of a ClickHouse instance.
+// createPodHostname returns a hostname of a Pod of a ClickHouse Keeper instance.
 // Is supposed to be used where network connection to a Pod is required.
-// NB: right now Pod's hostname points to a Service, through which Pod can be accessed.
+// For StatefulSet pods, this returns <pod-name>.<headless-service-name> to ensure DNS resolution works.
 func (n *Namer) createPodHostname(host *api.Host) string {
-	// Do not use Pod own hostname - point to appropriate StatefulSet's Service
-	return n.createStatefulSetServiceName(host)
+	// For StatefulSet pods, we need <pod-name>.<headless-service-name> format 
+	// to ensure proper DNS resolution within the cluster
+	return fmt.Sprintf("%s.%s", n.createPodName(host), n.createStatefulSetServiceName(host))
 }
 
 // createInstanceHostname returns hostname (pod-hostname + service or FQDN) which can be used as a replica name
@@ -200,23 +201,31 @@ func (n *Namer) createInstanceHostname(host *api.Host) string {
 }
 
 // createPodFQDN creates a fully qualified domain name of a pod
-// ss-1eb454-2-0.my-dev-domain.svc.cluster.local
+// chk-keeper-cluster-0-0.chk-keeper-cluster-0.my-dev-namespace.svc.cluster.local
 func (n *Namer) createPodFQDN(host *api.Host) string {
 	// FQDN can be generated either from default pattern,
 	// or from personal pattern provided
 
-	// Start with default pattern
-	pattern := patternPodFQDN
-
 	if host.GetCR().GetSpec().GetNamespaceDomainPattern().HasValue() {
 		// NamespaceDomainPattern has been explicitly specified
-		pattern = "%s." + host.GetCR().GetSpec().GetNamespaceDomainPattern().Value()
+		// Use custom pattern: <pod-name>.<headless-service-name>.<custom-domain>
+		pattern := "%s.%s." + host.GetCR().GetSpec().GetNamespaceDomainPattern().Value()
+		return fmt.Sprintf(
+			pattern,
+			n.createPodName(host),
+			n.createStatefulSetServiceName(host),
+		)
 	}
 
-	// Create FQDN based on pattern available
+	// Use standard Kubernetes StatefulSet DNS pattern:
+	// <pod-name>.<headless-service-name>.<namespace>.svc.cluster.local
+	// This fixes the hostname mismatch issue in remote_servers.xml where
+	// StatefulSet pods have names like "chk-keeper-cluster-0-0" but
+	// the generated hostnames were missing the headless service component
 	return fmt.Sprintf(
-		pattern,
-		n.createPodHostname(host),
+		"%s.%s.%s.svc.cluster.local",
+		n.createPodName(host),
+		n.createStatefulSetServiceName(host),
 		host.GetRuntime().GetAddress().GetNamespace(),
 	)
 }
