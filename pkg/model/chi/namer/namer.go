@@ -47,6 +47,11 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	case interfaces.NameConfigMapCommonUsers:
 		cr := params[0].(api.ICustomResource)
 		return n.createConfigMapNameCommonUsers(cr)
+	case interfaces.NameConfigMapRemoteServers:
+		cr := params[0].(api.ICustomResource)
+		clusterName := params[1].(string)
+		shardStart := params[2].(int)
+		return n.createConfigMapNameRemoteServers(cr, clusterName, shardStart)
 
 	case interfaces.NameCRService:
 		if len(params) > 1 {

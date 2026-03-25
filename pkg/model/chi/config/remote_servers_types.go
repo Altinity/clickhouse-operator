@@ -12,14 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package interfaces
+package config
 
-type ConfigMapType string
+import "github.com/altinity/clickhouse-operator/pkg/interfaces"
 
-const (
-	ConfigMapCommon        ConfigMapType = "common"
-	ConfigMapCommonUsers   ConfigMapType = "common users"
-	ConfigMapHost          ConfigMapType = "host"
-	ConfigMapRemoteServers ConfigMapType = "remote servers"
-	ConfigMapConfig        ConfigMapType = "config"
-)
+// RemoteServersFragment is an alias used by CHI configuration code.
+type RemoteServersFragment = interfaces.RemoteServersFragment

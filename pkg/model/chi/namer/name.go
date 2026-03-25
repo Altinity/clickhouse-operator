@@ -39,6 +39,11 @@ func (n *Namer) createConfigMapNameHost(host *api.Host) string {
 	return n.macro.Scope(host).Line(patterns.Get(patternConfigMapHostName))
 }
 
+// createConfigMapNameRemoteServers returns a name for a remote_servers fragment ConfigMap.
+func (n *Namer) createConfigMapNameRemoteServers(cr api.ICustomResource, clusterName string, shardStart int) string {
+	return fmt.Sprintf("chi-%s-%s-remote-servers-shard-%05d", cr.GetName(), clusterName, shardStart)
+}
+
 // createCRServiceName creates a name of a root ClickHouseInstallation Service resource
 func (n *Namer) createCRServiceName(cr api.ICustomResource, templates ...*api.ServiceTemplate) string {
 	// Name can be generated either from default name pattern,

@@ -1,0 +1,10 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-062-remote-servers-fragmentation"
+spec:
+  clickhouse:
+    configuration:
+      remoteServers:
+        remoteServersSplitThresholdBytes: 500
+        maxRemoteServersFragments: 32

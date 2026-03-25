@@ -81,6 +81,11 @@ const (
 	// defaultMetricsTablesRegexp specifies default regexp to match tables in system database to fetch metrics from
 	defaultMetricsTablesRegexp = "^(metrics|custom_metrics)$"
 
+	// Default remote_servers fragmentation settings.
+	// 600KiB payload + XML metadata/wrappers keeps resulting ConfigMap data safely below 1MiB limit.
+	defaultRemoteServersSplitThresholdBytes = 600 * 1024
+	defaultRemoteServersMaxFragments        = 100
+
 	// defaultReconcileCHIsThreadsNumber specifies default number of controller threads running concurrently.
 	// Used in case no other specified in config
 	defaultReconcileCHIsThreadsNumber = 1
@@ -225,9 +230,27 @@ type OperatorConfigConfig struct {
 
 	User OperatorConfigUser `json:"user" yaml:"user"`
 
+	RemoteServers OperatorConfigRemoteServers `json:"remoteServers" yaml:"remoteServers"`
+
 	Network struct {
 		HostRegexpTemplate string `json:"hostRegexpTemplate" yaml:"hostRegexpTemplate"`
 	} `json:"network" yaml:"network"`
+}
+
+// OperatorConfigRemoteServers specifies remote_servers fragmentation behavior.
+type OperatorConfigRemoteServers struct {
+	RemoteServersSplitThresholdBytes int `json:"remoteServersSplitThresholdBytes" yaml:"remoteServersSplitThresholdBytes"`
+	MaxRemoteServersFragments        int `json:"maxRemoteServersFragments" yaml:"maxRemoteServersFragments"`
+}
+
+// SplitThresholdBytes returns configured remote_servers fragment payload threshold in bytes.
+func (c OperatorConfigConfig) SplitThresholdBytes() int {
+	return c.RemoteServers.RemoteServersSplitThresholdBytes
+}
+
+// MaxFragments returns configured maximum allowed number of remote_servers fragments.
+func (c OperatorConfigConfig) MaxFragments() int {
+	return c.RemoteServers.MaxRemoteServersFragments
 }
 
 // OperatorConfigRestartPolicyRuleSet specifies set of rules
@@ -1079,6 +1102,15 @@ func (c *OperatorConfig) normalizeSectionClickHouseConfigurationUserDefault() {
 	// chConfigNetworksHostRegexpTemplate
 }
 
+func (c *OperatorConfig) normalizeSectionClickHouseConfigurationRemoteServers() {
+	if c.ClickHouse.Config.RemoteServers.RemoteServersSplitThresholdBytes <= 0 {
+		c.ClickHouse.Config.RemoteServers.RemoteServersSplitThresholdBytes = defaultRemoteServersSplitThresholdBytes
+	}
+	if c.ClickHouse.Config.RemoteServers.MaxRemoteServersFragments <= 0 {
+		c.ClickHouse.Config.RemoteServers.MaxRemoteServersFragments = defaultRemoteServersMaxFragments
+	}
+}
+
 func (c *OperatorConfig) normalizeSectionClickHouseAccess() {
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
@@ -1199,6 +1231,7 @@ func (c *OperatorConfig) normalize() {
 
 	c.normalizeSectionClickHouseConfigurationFile()
 	c.normalizeSectionClickHouseConfigurationUserDefault()
+	c.normalizeSectionClickHouseConfigurationRemoteServers()
 	c.normalizeSectionClickHouseAccess()
 	c.normalizeSectionClickHouseMetrics()
 	c.normalizeSectionKeeperConfigurationFile()

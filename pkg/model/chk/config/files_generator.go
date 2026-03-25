@@ -74,6 +74,10 @@ func (c *FilesGenerator) CreateConfigFiles(what interfaces.FilesGroupType, param
 	return nil
 }
 
+func (c *FilesGenerator) CreateRemoteServersFragments(options any) ([]interfaces.RemoteServersFragment, error) {
+	return []interfaces.RemoteServersFragment{}, nil
+}
+
 // createConfigFilesGroupCommon creates common config files
 func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOptions) map[string]string {
 	if options == nil {
@@ -93,6 +97,7 @@ func (c *FilesGenerator) createConfigFilesGroupCommonDomain(configSections map[s
 }
 
 func (c *FilesGenerator) createConfigFilesGroupCommonGeneric(configSections map[string]string, options *FilesGeneratorOptions) {
+	_ = options
 	// common settings
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGeneratorGeneric.GetGlobalSettings())
 	// common files

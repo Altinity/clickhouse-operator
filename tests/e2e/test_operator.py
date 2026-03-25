@@ -404,7 +404,7 @@ def get_replicas_from_remote_servers(chi, cluster, shell=None):
     if cluster == "":
         cluster = chi
 
-    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd", shell=shell)["data"]["chop-generated-remote_servers.xml"]
+    remote_servers = get_remote_servers_xml(chi, shell=shell)
 
     chi_start = remote_servers.find(f"<{cluster}>")
     chi_end = remote_servers.find(f"</{cluster}>")
@@ -420,6 +420,218 @@ def get_replicas_from_remote_servers(chi, cluster, shell=None):
     chi_replicas = chi_cluster.count("<replica>")
 
     return chi_replicas // chi_shards
+
+
+def get_remote_servers_xml(chi, shell=None):
+    common_config = kubectl.get("configmap", f"chi-{chi}-common-configd", shell=shell)
+    data = common_config.get("data", {})
+
+    legacy = data.get("chop-generated-remote_servers.xml")
+    if legacy is not None:
+        return legacy
+
+    fragments = get_remote_servers_fragment_configmaps(chi, shell=shell)
+    xml = ""
+    for cm in fragments:
+        cm_data = cm.get("data", {})
+        for key in sorted(cm_data.keys()):
+            if key.startswith("chop-generated-remote_servers-part-") and key.endswith(".xml"):
+                xml += cm_data[key]
+
+    return xml
+
+
+def get_remote_servers_fragment_configmaps(chi, shell=None):
+    fragments_list = kubectl.get(
+        "configmap",
+        "",
+        label=f"-l clickhouse.altinity.com/chi={chi},clickhouse.altinity.com/remote-servers-shard",
+        shell=shell,
+        ok_to_fail=True,
+    )
+
+    items = fragments_list.get("items", []) if fragments_list else []
+    return sorted(items, key=lambda x: x["metadata"]["name"])
+
+
+def get_remote_servers_fragment_names(chi, shell=None):
+    return [item["metadata"]["name"] for item in get_remote_servers_fragment_configmaps(chi, shell=shell)]
+
+
+def get_remote_servers_volume_configmaps(chi, pod_name="", shell=None):
+    pod_spec = kubectl.get_pod_spec(chi, pod_name=pod_name, shell=shell)
+    names = []
+    for volume in pod_spec.get("volumes", []):
+        config_map = volume.get("configMap")
+        if config_map is None:
+            projected = volume.get("projected")
+            if projected is None:
+                continue
+            for source in projected.get("sources", []):
+                projected_config_map = source.get("configMap")
+                if projected_config_map is None:
+                    continue
+                projected_name = projected_config_map.get("name", "")
+                if "-remote-servers-shard-" in projected_name:
+                    names.append(projected_name)
+            continue
+
+        name = config_map.get("name", "")
+        if "-remote-servers-shard-" in name:
+            names.append(name)
+    return sorted(set(names))
+
+
+def get_chi_pod_names(chi, shell=None):
+    pods = kubectl.get(
+        "pod",
+        "",
+        label=f"-l clickhouse.altinity.com/chi={chi}",
+        ok_to_fail=True,
+        shell=shell,
+    )
+    items = pods.get("items", []) if pods else []
+    return sorted(item["metadata"]["name"] for item in items)
+
+
+def get_chi_status_pod_names(chi, shell=None):
+    obj = kubectl.get("chi", chi, ok_to_fail=True, shell=shell) or {}
+    status = obj.get("status", {})
+    pods = status.get("pods", [])
+    return sorted(pods) if isinstance(pods, list) else []
+
+
+def get_existing_pod_names_from_status(chi, shell=None):
+    existing = []
+    for pod_name in get_chi_status_pod_names(chi, shell=shell):
+        pod = kubectl.get("pod", pod_name, ok_to_fail=True, shell=shell)
+        if pod:
+            existing.append(pod_name)
+    return sorted(existing)
+
+
+def get_chi_statefulset_names(chi, shell=None):
+    sts = kubectl.get(
+        "statefulset",
+        "",
+        label=f"-l clickhouse.altinity.com/chi={chi}",
+        ok_to_fail=True,
+        shell=shell,
+    )
+    items = sts.get("items", []) if sts else []
+    return sorted(item["metadata"]["name"] for item in items)
+
+
+def format_chi_reconcile_diagnostics(chi, shell=None):
+    status = kubectl.get("chi", chi, ok_to_fail=True, shell=shell) or {}
+    status_data = status.get("status", {})
+    status_text = status_data.get("status", "<none>")
+    errors = status_data.get("errors", [])
+    recent_errors = "\n".join(errors[-5:]) if errors else "<none>"
+    return (
+        f"CHI={chi} status={status_text}, "
+        f"hosts={status_data.get('hosts', '<none>')}, "
+        f"hostsCompleted={status_data.get('hostsCompleted', '<none>')}, "
+        f"pods={status_data.get('pods', [])}, "
+        f"existingPodsByLabel={get_chi_pod_names(chi, shell=shell)}, "
+        f"existingPodsByStatusName={get_existing_pod_names_from_status(chi, shell=shell)}, "
+        f"statefulsets={get_chi_statefulset_names(chi, shell=shell)}. "
+        f"Recent CHI errors:\n{recent_errors}"
+    )
+
+
+def wait_for_chi_pods(chi, expected_count, timeout=900, delay=5, shell=None):
+    deadline = time.time() + timeout
+    completed_without_pods_since = None
+    completed_without_pods_grace = 120
+
+    while time.time() < deadline:
+        pod_names = sorted(
+            set(get_chi_pod_names(chi, shell=shell))
+            | set(get_existing_pod_names_from_status(chi, shell=shell))
+        )
+        if len(pod_names) >= expected_count:
+            return pod_names
+
+        chi_status = kubectl.get_field("chi", chi, ".status.status", shell=shell)
+        # Allow short stabilization after Completed, because label/index propagation may lag.
+        if chi_status == "Completed" and len(pod_names) == 0:
+            now = time.time()
+            if completed_without_pods_since is None:
+                completed_without_pods_since = now
+            elif now - completed_without_pods_since >= completed_without_pods_grace:
+                assert False, error(
+                    "CHI is Completed but no ClickHouse pods were created. "
+                    + format_chi_reconcile_diagnostics(chi, shell=shell)
+                )
+        else:
+            completed_without_pods_since = None
+
+        time.sleep(delay)
+
+    assert False, error(
+        f"Timed out waiting for {expected_count} ClickHouse pods. "
+        + format_chi_reconcile_diagnostics(chi, shell=shell)
+    )
+
+
+def wait_for_clickhouse_pod_ready(pod_name, timeout=300, delay=5, shell=None):
+    deadline = time.time() + timeout
+    last_state = "pod not found"
+
+    while time.time() < deadline:
+        pod = kubectl.get("pod", pod_name, ok_to_fail=True, shell=shell)
+        if pod:
+            status = pod.get("status", {})
+            phase = status.get("phase", "<none>")
+            container_statuses = status.get("containerStatuses", [])
+
+            # Wait for pod phase to be Running, but do not block on container readiness.
+            # File read verification below already retries transient exec failures.
+            if phase == "Running":
+                return
+
+            last_state = f"phase={phase}, containerStatuses={container_statuses}"
+
+        time.sleep(delay)
+
+    assert False, error(
+        f"Timed out waiting for pod {pod_name} to be Running. "
+        f"Last observed state: {last_state}"
+    )
+
+
+def read_pod_file_with_retry(pod_name, file_path, timeout=120, delay=3, shell=None):
+    deadline = time.time() + timeout
+    missing_marker = "__MISSING_FILE__"
+    transient_errors = (
+        "unable to upgrade connection",
+        "container not found",
+        "error: internal error occurred",
+        "error from server",
+    )
+
+    while time.time() < deadline:
+        output = kubectl.launch(
+            f'exec {pod_name} -- bash -c "cat \"{file_path}\" 2>/dev/null || echo {missing_marker}"',
+            ok_to_fail=True,
+            shell=shell,
+        )
+
+        output_lower = output.lower()
+        if any(text in output_lower for text in transient_errors):
+            time.sleep(delay)
+            continue
+
+        if missing_marker in output:
+            time.sleep(delay)
+            continue
+
+        return output
+
+    assert False, error(
+        f"Timed out waiting for file {file_path} to become available in pod {pod_name}"
+    )
 
 
 @TestCheck
@@ -1361,7 +1573,7 @@ def test_010013_1(self):
 def get_shards_from_remote_servers(chi, cluster, shell=None):
     if cluster == "":
         cluster = chi
-    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd", shell=shell)["data"]["chop-generated-remote_servers.xml"]
+    remote_servers = get_remote_servers_xml(chi, shell=shell)
 
     chi_start = remote_servers.find(f"<{cluster}>")
     chi_end = remote_servers.find(f"</{cluster}>")
@@ -5322,7 +5534,7 @@ def test_010056(self):
             assert out != "0"
 
         with And("Replica still should be unready after reconcile timeout"):
-            ready = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-1-0", ".metadata.labels.clickhouse\.altinity\.com\/ready")
+            ready = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-1-0", r".metadata.labels.clickhouse\.altinity\.com\/ready")
             print(f"ready label={ready}")
             assert ready != "yes", error("Replica should be unready")
 
@@ -5348,7 +5560,7 @@ def test_010056(self):
 
         with Then("Replica should become ready"):
             kubectl.wait_field("pod", f"chi-{chi}-{cluster}-0-1-0",
-                                       ".metadata.labels.clickhouse\.altinity\.com\/ready", value="yes")
+                                       r".metadata.labels.clickhouse\.altinity\.com\/ready", value="yes")
 
         with And("Replication delay should be zero"):
             out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
@@ -5630,6 +5842,134 @@ def test_010061(self):
         assert "Templates.PodTemplates[0].Spec.Containers[0].Resources" not in actionPlan
 
     kubectl.delete_chi(chi)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_010062. Test remote_servers fragment mounts and GC")
+def test_010062(self):
+    create_shell_namespace_clickhouse_template()
+    chopconf_manifest = "manifests/chopconf/test-062-remote-servers-fragmentation.yaml"
+
+    with Given("Operator configuration enables remote_servers fragmentation"):
+        kubectl.apply(
+            util.get_full_path(chopconf_manifest, lookup_in_host=False),
+            current().context.operator_namespace,
+        )
+        util.restart_operator(ns=current().context.operator_namespace)
+
+    manifest = "manifests/chi/test-062-remote-servers-fragmentation-1.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    pod_name = ""
+
+    with Given("CHI with multiple shards is installed"):
+        kubectl.apply_chi(util.get_full_path(manifest, False))
+        kubectl.wait_chi_status(chi, "InProgress", retries=4, throw_error=False)
+        pod_names = wait_for_chi_pods(chi, expected_count=4)
+        kubectl.wait_chi_status(chi, "Completed")
+        pod_name = pod_names[0]
+        wait_for_clickhouse_pod_ready(pod_name)
+
+    with Then("remote_servers are fragmented into multiple ConfigMaps"):
+        initial_fragments = []
+        for attempt in retries(timeout=120, delay=5):
+            with attempt:
+                initial_fragments = get_remote_servers_fragment_configmaps(chi)
+                assert len(initial_fragments) > 1, error(
+                    "expected multiple remote_servers fragments, "
+                    f"got {len(initial_fragments)}"
+                )
+
+        initial_fragment_names = {item["metadata"]["name"] for item in initial_fragments}
+
+    with Then("Fragment files are mounted into pod and match ConfigMap XML"):
+        mounted_configmaps = set(get_remote_servers_volume_configmaps(chi, pod_name=pod_name))
+        assert mounted_configmaps == initial_fragment_names
+
+        for fragment in initial_fragments:
+            cm_name = fragment["metadata"]["name"]
+            cm_data = fragment.get("data", {})
+            assert cm_name in mounted_configmaps
+            for file_name, expected_xml in cm_data.items():
+                cat_path = f"/etc/clickhouse-server/config.d/{file_name}"
+                actual_xml = read_pod_file_with_retry(pod_name, cat_path)
+                assert actual_xml.strip() == expected_xml.strip(), error(f"mismatch for {cm_name}/{file_name}")
+
+    with When("CHI is scaled down and rollout completes"):
+        kubectl.apply_chi(util.get_full_path("manifests/chi/test-062-remote-servers-fragmentation-2.yaml", False))
+        kubectl.wait_chi_status(chi, "InProgress", retries=4, throw_error=False)
+        wait_for_chi_pods(chi, expected_count=1)
+        kubectl.wait_chi_status(chi, "Completed")
+
+    with Then("Stale remote_servers fragment ConfigMaps are garbage collected"):
+        current_fragment_names = set(get_remote_servers_fragment_names(chi))
+        stale_fragment_names = initial_fragment_names - current_fragment_names
+        assert len(stale_fragment_names) > 0
+
+        for attempt in retries(timeout=180, delay=5):
+            with attempt:
+                remaining_fragment_names = set(get_remote_servers_fragment_names(chi))
+                assert len(remaining_fragment_names & stale_fragment_names) == 0
+                current_fragment_names = remaining_fragment_names
+
+    with Then("Pods do not reference deleted remote_servers ConfigMaps"):
+        mounted_after_rollout = set(get_remote_servers_volume_configmaps(chi, pod_name=f"chi-{chi}-default-0-0-0"))
+        assert mounted_after_rollout == current_fragment_names
+
+    with Then("remote_servers XML is still valid after GC"):
+        assert get_shards_from_remote_servers(chi, "default") == 1
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_010063. Test maxRemoteServersFragments reconcile failure")
+def test_010063(self):
+    create_shell_namespace_clickhouse_template()
+    chopconf_manifest = "manifests/chopconf/test-063-remote-servers-max-fragments.yaml"
+
+    with Given("Operator configuration sets very low maxRemoteServersFragments"):
+        kubectl.apply(
+            util.get_full_path(chopconf_manifest, lookup_in_host=False),
+            current().context.operator_namespace,
+        )
+        util.restart_operator(ns=current().context.operator_namespace)
+
+    manifest = "manifests/chi/test-063-remote-servers-max-fragments.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+
+    with When("CHI is applied"):
+        kubectl.apply_chi(util.get_full_path(manifest, False))
+
+    with Then("Reconcile fails and emits ReconcileFailed event"):
+        expected_error_signature = "remote_servers fragments limit exceeded"
+        events = None
+        for attempt in retries(timeout=180, delay=5):
+            with attempt:
+                events = kubectl.get(
+                    "events",
+                    "",
+                    label=(
+                        "--field-selector "
+                        f"involvedObject.kind=ClickHouseInstallation,"
+                        f"involvedObject.name={chi},"
+                        "reason=ReconcileFailed"
+                    ),
+                    ok_to_fail=True,
+                )
+                items = events.get("items", []) if events else []
+                assert len(items) > 0
+                messages = [item.get("message", "") for item in items]
+                assert any(expected_error_signature in message.lower() for message in messages), error(
+                    "expected ReconcileFailed event with max fragments error signature. "
+                    f"signature='{expected_error_signature}', messages={messages}"
+                )
+
+        status = kubectl.get_field("chi", chi, ".status.status")
+        assert status != "Completed"
 
     with Finally("I clean up"):
         delete_test_namespace()

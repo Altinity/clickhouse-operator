@@ -33,6 +33,7 @@ type IConfigMapManager interface {
 
 type IConfigFilesGenerator interface {
 	CreateConfigFiles(what FilesGroupType, params ...any) map[string]string
+	CreateRemoteServersFragments(options any) ([]RemoteServersFragment, error)
 }
 
 type INameManager interface {
