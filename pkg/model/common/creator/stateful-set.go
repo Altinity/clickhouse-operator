@@ -99,6 +99,7 @@ func (c *Creator) createPodTemplateSpec(template *api.PodTemplate, host *api.Hos
 		c.tagger.Annotate(interfaces.AnnotatePodTemplate, host),
 		template.ObjectMeta.GetAnnotations(),
 	))
+	annotations = util.MergeStringMapsOverwrite(annotations, host.GetCR().GetRuntime().GetAttributes().GetAdditionalPodTemplateAnnotations())
 
 	return core.PodTemplateSpec{
 		ObjectMeta: meta.ObjectMeta{

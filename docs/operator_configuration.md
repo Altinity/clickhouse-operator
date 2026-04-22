@@ -9,11 +9,12 @@ Common configuration typically contains general ClickHouse configuration section
 1. ClickHouse user configuration files - ready-to-use XML files with sections of ClickHouse configuration **as-is**
 User configuration typically contains ClickHouse configuration sections with user accounts specifications. Those are exposed via config maps as well.
 1. `ClickHouseOperatorConfiguration` resource.
-1. `ClickHouseInstallationTemplate`s. Operator provides functionality to specify parts of `ClickHouseInstallation` manifest as a set of templates, which would be used in all `ClickHouseInstallation`s.   
+1. `ClickHouseInstallationTemplate`s. Operator provides functionality to specify parts of `ClickHouseInstallation` manifest as a set of templates, which would be used in all `ClickHouseInstallation`s. 
 
 ## Operator settings
 
 Operator settings are initialized in-order from 3 sources:
+
 * `/etc/clickhouse-operator/config.yaml`
 * etc-clickhouse-operator-files configmap (also a part of default [clickhouse-operator-install-bundle.yaml][clickhouse-operator-install-bundle.yaml]
 * `ClickHouseOperatorConfiguration` resource. See [example][70-chop-config.yaml] for details.
@@ -115,6 +116,34 @@ chPassword: clickhouse_operator_password
 chPort: 8123
 ```
 
+## `remote_servers` fragmentation
+
+Large CHIs can generate a very large `remote_servers.xml`. The operator can split this into deterministic fragments to keep ConfigMaps within Kubernetes size limits.
+
+Fragmentation knobs are configured under `clickhouse.configuration.remoteServers`:
+
+```yaml
+clickhouse:
+  configuration:
+    remoteServers:
+      # Default: 600 * 1024
+      # 600 KiB payload + XML metadata/wrappers keeps ConfigMap data safely below 1 MiB.
+      remoteServersSplitThresholdBytes: 614400
+
+      # Default: 100
+      maxRemoteServersFragments: 100
+```
+
+Behavior:
+
+1. If generated `remote_servers` fits into one fragment under threshold, the legacy file `chop-generated-remote_servers.xml` remains in `chi-<chi>-common-configd`.
+1. If threshold is exceeded, operator creates per-cluster fragment ConfigMaps: `chi-<chi>-<cluster>-remote-servers-shard-<paddedStart>`.
+1. Fragment file names are `chop-generated-remote_servers-part-<paddedStart>.xml`.
+1. StatefulSet pod template annotation `clickhouse.altinity.com/remote-servers-hash` is updated from canonical fragment metadata, so relevant pods roll out deterministically.
+1. During legacy fallback, stale fragment ConfigMaps are removed.
+
+ClickHouse merges all files from `config.d`, so multiple remote-server fragment files are applied automatically.
+
 ## ClickHouse Installation settings
 
 Operator deploys ClickHouse clusters with different defaults, that can be configured in a flexible way. 
@@ -122,6 +151,7 @@ Operator deploys ClickHouse clusters with different defaults, that can be config
 ### Default ClickHouse configuration files
 
 Default ClickHouse configuration files can be found in the following config maps, that are mounted to corresponding configuration folders of ClickHouse pods:
+
 * etc-clickhouse-operator-confd-files
 * etc-clickhouse-operator-configd-files
 * etc-clickhouse-operator-usersd-files
@@ -131,6 +161,7 @@ Config maps are initialized in default [clickhouse-operator-install-bundle.yaml]
 ### Defaults for ClickHouseInstallation
 
 Defaults for ClickHouseInstallation can be provided by `ClickHouseInstallationTemplate` it a variety of ways:
+
 * etc-clickhouse-operator-templatesd-files configmap
 * `ClickHouseInstallationTemplate` resources.
 
@@ -153,6 +184,7 @@ spec:
 ```
 
 Template needs to be deployed to some namespace, and later on used in the installation:
+
 ```
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"

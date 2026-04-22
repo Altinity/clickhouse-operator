@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+
+# Python 3.13 removed some private lzma mode constants that TestFlows 2.2.8 still references.
+# Provide backward-compatible fallbacks before importing testflows.
+import lzma
+
+if not hasattr(lzma, "_MODE_CLOSED"):
+    lzma._MODE_CLOSED = 0
+if not hasattr(lzma, "_MODE_READ"):
+    lzma._MODE_READ = 1
+if not hasattr(lzma, "_MODE_WRITE"):
+    lzma._MODE_WRITE = 3
+
 from testflows.core import *
 
 from helpers.argparser import argparser

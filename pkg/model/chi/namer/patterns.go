@@ -30,6 +30,9 @@ var patterns = types.List{
 	// patternConfigMapHostName is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
 	patternConfigMapHostName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-deploy-confd-" + macrosList.Get().Get(macro.MacrosClusterName) + "-" + macrosList.Get().Get(macro.MacrosHostName),
 
+	// patternConfigMapRemoteServersName is a template of per-fragment remote_servers ConfigMap.
+	patternConfigMapRemoteServersName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-" + macrosList.Get().Get(macro.MacrosClusterName) + "-remote-servers-shard-%s",
+
 	// patternCRServiceName is a template of Custom Resource Service name. "clickhouse-{chi}"
 	patternCRServiceName: "clickhouse-" + macrosList.Get().Get(macro.MacrosCRName),
 

@@ -14,12 +14,13 @@
 
 package interfaces
 
-type ConfigMapType string
-
-const (
-	ConfigMapCommon        ConfigMapType = "common"
-	ConfigMapCommonUsers   ConfigMapType = "common users"
-	ConfigMapHost          ConfigMapType = "host"
-	ConfigMapRemoteServers ConfigMapType = "remote servers"
-	ConfigMapConfig        ConfigMapType = "config"
-)
+// RemoteServersFragment represents a deterministic remote_servers XML fragment.
+type RemoteServersFragment struct {
+	Cluster      string
+	ShardStart   int
+	ShardEnd     int
+	Index        int
+	XML          string
+	PayloadBytes int
+	TotalBytes   int
+}

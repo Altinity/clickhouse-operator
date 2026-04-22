@@ -15,15 +15,20 @@
 package creator
 
 import (
+	"fmt"
+
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	clickhouseAltinityCom "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type ConfigMapManager struct {
@@ -62,6 +67,11 @@ func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params
 			host = params[0].(*api.Host)
 			options = config.NewFilesGeneratorOptions().SetHost(host)
 			return m.createConfigMapHost(host, options)
+		}
+	case interfaces.ConfigMapRemoteServers:
+		if len(params) > 0 {
+			fragment := params[0].(interfaces.RemoteServersFragment)
+			return m.createConfigMapRemoteServers(fragment)
 		}
 	}
 	panic("unknown config map type")
@@ -139,6 +149,47 @@ func (m *ConfigMapManager) createConfigMapHost(host *api.Host, options *config.F
 		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, options),
 	}
 	// And after the object is ready we can put version label
+	m.labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	return cm
+}
+
+func remoteServersFilename(cluster string, shardStart int) string {
+	return fmt.Sprintf("chop-generated-remote_servers-part-%05d-%s.xml", shardStart, cluster)
+}
+
+func FragmentFilenameByClusterAndShardStart(cluster string, shardStart int) string {
+	return remoteServersFilename(cluster, shardStart)
+}
+
+func (m *ConfigMapManager) createConfigMapRemoteServers(fragment interfaces.RemoteServersFragment) *core.ConfigMap {
+	cmName := m.namer.Name(interfaces.NameConfigMapRemoteServers, m.cr, fragment.Cluster, fragment.ShardStart)
+	filename := remoteServersFilename(fragment.Cluster, fragment.ShardStart)
+
+	labels := util.MergeStringMapsOverwrite(
+		m.macro.Scope(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommon)),
+		map[string]string{
+			m.labeler.Get(commonLabeler.LabelClusterName):                fragment.Cluster,
+			clickhouseAltinityCom.APIGroupName + "/remote-servers-shard": fmt.Sprintf("%05d", fragment.ShardStart),
+		},
+	)
+
+	cm := &core.ConfigMap{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: meta.ObjectMeta{
+			Name:            cmName,
+			Namespace:       m.cr.GetNamespace(),
+			Labels:          labels,
+			Annotations:     m.macro.Scope(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommon)),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
+		},
+		Data: map[string]string{
+			filename: fragment.XML,
+		},
+	}
+
 	m.labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }

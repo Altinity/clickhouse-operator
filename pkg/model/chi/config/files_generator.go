@@ -15,7 +15,10 @@
 package config
 
 import (
+	"fmt"
+
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -72,6 +75,66 @@ func (c *FilesGenerator) CreateConfigFiles(what interfaces.FilesGroupType, param
 		}
 	}
 	return nil
+}
+
+func (c *FilesGenerator) CreateRemoteServersFragments(options any) ([]interfaces.RemoteServersFragment, error) {
+	var opts *FilesGeneratorOptions
+	if options != nil {
+		opts = options.(*FilesGeneratorOptions)
+	} else {
+		opts = defaultFilesGeneratorOptions()
+	}
+
+	domain, ok := c.configFilesGeneratorDomain.(*FilesGeneratorDomain)
+	if !ok {
+		return []interfaces.RemoteServersFragment{}, fmt.Errorf("unexpected files generator domain type: %T", c.configFilesGeneratorDomain)
+	}
+
+	thresholdBytes := chop.Config().ClickHouse.Config.SplitThresholdBytes()
+	maxFragments := chop.Config().ClickHouse.Config.MaxFragments()
+	if thresholdBytes <= 0 {
+		return nil, fmt.Errorf("invalid remote_servers split threshold: %d", thresholdBytes)
+	}
+	if maxFragments <= 0 {
+		return nil, fmt.Errorf("invalid remote_servers max fragments: %d", maxFragments)
+	}
+
+	selector := opts.GetRemoteServersOptions()
+	legacyXML := domain.configGenerator.getRemoteServers(selector)
+	if legacyXML == "" {
+		return []interfaces.RemoteServersFragment{}, nil
+	}
+
+	if len(legacyXML) <= thresholdBytes {
+		return []interfaces.RemoteServersFragment{{
+			Cluster:      "",
+			ShardStart:   0,
+			ShardEnd:     0,
+			Index:        0,
+			XML:          legacyXML,
+			PayloadBytes: len(legacyXML),
+			TotalBytes:   len(legacyXML),
+		}}, nil
+	}
+
+	topology := domain.configGenerator.buildRemoteServersTopology(selector)
+	fragments := make([]interfaces.RemoteServersFragment, 0)
+	for _, clusterTopology := range topology {
+		clusterFragments, err := domain.configGenerator.streamRemoteServersFragments(clusterTopology, thresholdBytes, maxFragments)
+		if err != nil {
+			return nil, err
+		}
+		fragments = append(fragments, clusterFragments...)
+		if len(fragments) > maxFragments {
+			return nil, fmt.Errorf("remote_servers fragments limit exceeded: total=%d max=%d", len(fragments), maxFragments)
+		}
+	}
+	if len(fragments) == 0 {
+		return nil, fmt.Errorf("remote_servers split requested but no fragments were generated")
+	}
+
+	sortRemoteServersFragments(fragments)
+	return fragments, nil
 }
 
 // createConfigFilesGroupCommon creates common config files

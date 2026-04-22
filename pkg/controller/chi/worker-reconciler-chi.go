@@ -267,6 +267,8 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 	cr.GetRuntime().LockCommonConfig()
 	if err := w.reconcileConfigMapCommon(ctx, cr, w.options()); err != nil {
 		w.a.F().Error("failed to reconcile config map common. err: %v", err)
+		cr.GetRuntime().UnlockCommonConfig()
+		return err
 	}
 	cr.GetRuntime().UnlockCommonConfig()
 
@@ -331,6 +333,9 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 	cr.GetRuntime().LockCommonConfig()
 	err = w.reconcileConfigMapCommon(ctx, cr)
 	cr.GetRuntime().UnlockCommonConfig()
+	if err == nil {
+		err = w.deleteRemoteServersFragmentConfigMapsPostSTS(ctx, cr)
+	}
 
 	w.includeAllHostsIntoCluster(ctx, cr)
 	return err
@@ -357,10 +362,34 @@ func (w *worker) reconcileConfigMapCommon(
 		opts = options[0]
 	}
 
+	chi, ok := cr.(*api.ClickHouseInstallation)
+	if !ok {
+		return nil
+	}
+
+	// Fragment generation must be based on the full desired CR topology.
+	// Using reconcile-time exclusion selectors here may suppress fragments while hosts are still Requested.
+	fragments, createFragmentsErr := w.createRemoteServersFragments(chi, nil)
+	if createFragmentsErr != nil {
+		return createFragmentsErr
+	}
+	legacyMode := w.isLegacyRemoteServersMode(fragments)
+	w.applyRemoteServersRuntimeAttributes(chi, fragments, legacyMode)
+
+	if !legacyMode {
+		if err := w.reconcileConfigMapRemoteServers(ctx, cr, fragments); err != nil {
+			return err
+		}
+	}
+
 	// ConfigMap common for all resources in CR
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
 	configMapCommon := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommon, opts)
+	if !legacyMode {
+		delete(configMapCommon.Data, remoteServersLegacyFilename)
+	}
+
 	err := w.reconcileConfigMap(ctx, cr, configMapCommon)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
