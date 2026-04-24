@@ -959,6 +959,15 @@ func (c *Controller) handleObject(obj interface{}) {
 }
 
 func ShouldEnqueue(cr *api.ClickHouseInstallation) bool {
+	if cr == nil {
+		return false
+	}
+
+	if cr.Spec.Suspend.Value() {
+		log.V(2).M(cr).Info("skip enqueue, CHI is suspended")
+		return false
+	}
+
 	ns := cr.GetNamespace()
 	if !chop.Config().IsNamespaceWatched(ns) {
 		log.V(2).M(cr).Info("skip enqueue, namespace '%s' is not watched or is in deny list", ns)

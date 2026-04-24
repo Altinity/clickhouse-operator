@@ -64,6 +64,11 @@ type worker struct {
 	task          *common.Task
 	stsReconciler *statefulset.Reconciler
 
+	// Optional test hooks. Production code leaves these nil.
+	hostHealthyFn   func(ctx context.Context, host *api.Host) bool
+	reconcileHostFn func(ctx context.Context, host *api.Host) error
+	reconcileShardFn func(ctx context.Context, shard api.IShard) error
+
 	start time.Time
 }
 
@@ -339,12 +344,6 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted")
-		return nil
-	}
-
-	if w.isCHIProcessedOnTheSameIP(new) {
-		// First minute after restart do not reconcile already reconciled generations
-		w.a.V(1).M(new).F().Info("Will not reconcile known generation after restart. Generation %d", new.Generation)
 		return nil
 	}
 

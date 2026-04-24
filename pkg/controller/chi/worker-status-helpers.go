@@ -73,6 +73,103 @@ func (w *worker) isPodOK(ctx context.Context, host *api.Host) bool {
 	return false
 }
 
+// isHostHealthyForReconcile reports whether host is healthy enough to proceed with shard disruption.
+// Stopped and troubleshoot hosts are considered intentionally unavailable and do not block rollout safety checks.
+func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) bool {
+	if w.hostHealthyFn != nil {
+		return w.hostHealthyFn(ctx, host)
+	}
+
+	if host == nil {
+		return false
+	}
+
+	if host.IsStopped() || host.IsTroubleshoot() {
+		return true
+	}
+
+	if w == nil || w.c == nil || w.c.kube == nil {
+		return false
+	}
+
+	if !w.isPodRunning(ctx, host) {
+		return false
+	}
+	if !w.isPodReady(ctx, host) {
+		return false
+	}
+	if w.isPodCrushed(ctx, host) {
+		return false
+	}
+
+	return true
+}
+
+func (w *worker) hasUnhealthyHosts(ctx context.Context, cr *api.ClickHouseInstallation) bool {
+	if cr == nil {
+		return false
+	}
+
+	hasUnhealthy := false
+	cr.WalkHosts(func(host *api.Host) error {
+		if !w.isHostHealthyForReconcile(ctx, host) {
+			hasUnhealthy = true
+		}
+		return nil
+	})
+
+	return hasUnhealthy
+}
+
+// isShardSafeToDisruptHost verifies there is at least one healthy peer in shard before disrupting host.
+func (w *worker) isShardSafeToDisruptHost(ctx context.Context, host *api.Host) bool {
+	if host == nil || host.GetShard() == nil {
+		return true
+	}
+
+	shard := host.GetShard()
+	if shard.HostsCount() <= 1 {
+		return true
+	}
+
+	hasHealthyPeer := false
+	shard.WalkHosts(func(peer *api.Host) error {
+		if peer == nil {
+			return nil
+		}
+		if peer.GetName() == host.GetName() {
+			return nil
+		}
+		if w.isHostHealthyForReconcile(ctx, peer) {
+			hasHealthyPeer = true
+		}
+		return nil
+	})
+
+	return hasHealthyPeer
+}
+
+// hostMayRequireDisruption returns true when host reconcile is expected to restart/exclude/update host.
+func (w *worker) hostMayRequireDisruption(ctx context.Context, host *api.Host) bool {
+	if host == nil {
+		return false
+	}
+	if host.IsStopped() || host.IsTroubleshoot() {
+		return false
+	}
+
+	if w.shouldForceRestartHost(ctx, host) {
+		return true
+	}
+
+	status := host.GetReconcileAttributes().GetStatus()
+	if status.Is(types.ObjectStatusRequested) || status.Is(types.ObjectStatusSame) {
+		return false
+	}
+
+	return true
+}
+
 func (w *worker) isPodRestarted(ctx context.Context, host *api.Host, initialRestartCounters map[string]int) bool {
 	curRestartCounters, _ := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(ctx, host)
 	return !util.MapsAreTheSame(initialRestartCounters, curRestartCounters)

@@ -49,9 +49,6 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	switch {
 	case w.isAfterFinalizerInstalled(old, new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-1")
-	case w.isGenerationTheSame(old, new):
-		log.V(2).M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
-		return nil
 	}
 
 	w.a.M(new).S().P()
@@ -62,6 +59,8 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	startTime := time.Now()
 
 	new = w.buildCR(ctx, new)
+	generationTheSame := w.isGenerationTheSame(old, new)
+	hasUnhealthyHosts := w.hasUnhealthyHosts(ctx, new)
 
 	switch {
 	case new.Spec.Suspend.Value():
@@ -87,6 +86,12 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 			metrics.CRReconcilesCompleted(ctx, new)
 		}
 		return nil
+	case generationTheSame && !hasUnhealthyHosts:
+		w.a.M(new).F().Info("isGenerationTheSame() and all hosts are healthy - nothing to do, exit")
+		metrics.CRReconcilesCompleted(ctx, new)
+		return nil
+	case generationTheSame && hasUnhealthyHosts:
+		w.a.M(new).F().Warning("Generation is unchanged, but unhealthy hosts detected - forcing steady-state recovery reconcile")
 	case new.HasReconcileWork():
 		w.a.M(new).F().Info("CR has reconcile work - continue reconcile")
 	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
@@ -401,8 +406,12 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 
 	// Start with force-restart host
 	if w.shouldForceRestartHost(ctx, host) {
-		w.a.V(1).M(host).F().Info("Reconcile host STS force restart: %s", host.GetName())
-		_ = w.hostForceRestart(ctx, host, opts)
+		if w.isHostHealthyForReconcile(ctx, host) && !w.isShardSafeToDisruptHost(ctx, host) {
+			w.a.V(1).M(host).F().Warning("Skip force restart for host due to shard safety guard (no healthy peer): %s", host.GetName())
+		} else {
+			w.a.V(1).M(host).F().Info("Reconcile host STS force restart: %s", host.GetName())
+			_ = w.hostForceRestart(ctx, host, opts)
+		}
 	}
 
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
@@ -670,12 +679,66 @@ func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *ap
 }
 
 func (w *worker) reconcileShardWithHosts(ctx context.Context, shard api.IShard) error {
-	if err := w.reconcileShard(ctx, shard); err != nil {
+	if err := w.reconcileShardWithHook(ctx, shard); err != nil {
 		return err
 	}
-	return shard.WalkHostsAbortOnError(func(host *api.Host) error {
-		return w.reconcileHost(ctx, host)
+
+	recoveryHosts := make([]*api.Host, 0)
+	rolloutHosts := make([]*api.Host, 0)
+	shard.WalkHosts(func(host *api.Host) error {
+		if w.isHostHealthyForReconcile(ctx, host) {
+			rolloutHosts = append(rolloutHosts, host)
+		} else {
+			recoveryHosts = append(recoveryHosts, host)
+		}
+		return nil
 	})
+
+	recoveredHosts := 0
+	reconciledHosts := 0
+	deferredHosts := 0
+
+	for _, host := range recoveryHosts {
+		w.a.V(1).M(host).F().Info("Recovery-first pass: reconciling unhealthy host before rollout")
+		if err := w.reconcileHostWithHook(ctx, host); err != nil {
+			return err
+		}
+		recoveredHosts++
+	}
+
+	for _, host := range rolloutHosts {
+		if w.hostMayRequireDisruption(ctx, host) && !w.isShardSafeToDisruptHost(ctx, host) {
+			w.a.V(1).M(host).F().Warning("Deferring host reconcile due to shard safety guard (no healthy peer). Host: %s", host.GetName())
+			deferredHosts++
+			continue
+		}
+
+		if err := w.reconcileHostWithHook(ctx, host); err != nil {
+			return err
+		}
+		reconciledHosts++
+	}
+
+	if deferredHosts > 0 && recoveredHosts == 0 && reconciledHosts == 0 {
+		w.a.V(1).M(shard).F().Warning("No progress in shard reconcile: %d host(s) deferred by shard safety guard", deferredHosts)
+		return common.ErrCRUDAbort
+	}
+
+	return nil
+}
+
+func (w *worker) reconcileShardWithHook(ctx context.Context, shard api.IShard) error {
+	if w.reconcileShardFn != nil {
+		return w.reconcileShardFn(ctx, shard)
+	}
+	return w.reconcileShard(ctx, shard)
+}
+
+func (w *worker) reconcileHostWithHook(ctx context.Context, host *api.Host) error {
+	if w.reconcileHostFn != nil {
+		return w.reconcileHostFn(ctx, host)
+	}
+	return w.reconcileHost(ctx, host)
 }
 
 // reconcileShard reconciles specified shard, excluding nested replicas

@@ -382,7 +382,10 @@ func (w *worker) hasHostVolumesToRetain(ctx context.Context, host *api.Host) (ha
 	// Check whether among all PVCs host has reclaim policy "retain" specified
 	storage.NewStoragePVC(w.c.kube.Storage()).WalkDiscoveredPVCs(ctx, host, func(pvc *core.PersistentVolumeClaim) {
 		if chiLabeler.New(nil).GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {
-			w.a.V(1).F().Info("PVC: %s/%s blocks drop replica. Reclaim policy: %s", api.PVCReclaimPolicyRetain.String())
+			w.a.V(1).F().Info(
+				"PVC: %s/%s blocks drop replica. Reclaim policy: %s",
+				api.PVCReclaimPolicyRetain.String(),
+			)
 			has = true
 		}
 	})
@@ -451,7 +454,7 @@ func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 // dropZKReplica drops replica's info from Zookeeper
 func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *dropReplicaOptions) error {
 	if hostToDrop == nil {
-		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop: %s", hostToDrop.GetName())
+		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop is nil")
 		return nil
 	}
 
@@ -462,7 +465,7 @@ func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *
 	}
 
 	if hostToRunOn == nil {
-		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn: %s, hostToDrop: %s", hostToRunOn.GetName(), hostToDrop.GetName())
+		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn is nil, hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
 

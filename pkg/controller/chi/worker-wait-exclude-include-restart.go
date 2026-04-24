@@ -381,6 +381,22 @@ func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 		return false
 
 	case w.shouldForceRestartHost(ctx, host):
+		if !w.isHostHealthyForReconcile(ctx, host) {
+			w.a.V(1).
+				M(host).F().
+				Info("Host requires restart but is not healthy now, no need to exclude before recovery. Host/shard/cluster: %d/%d/%s",
+					host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
+
+		if !w.isShardSafeToDisruptHost(ctx, host) {
+			w.a.V(1).
+				M(host).F().
+				Warning("Host restart is deferred due to shard safety guard (no healthy peer). Host/shard/cluster: %d/%d/%s",
+					host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
+
 		w.a.V(1).
 			M(host).F().
 			Info("Host should be restarted, need to exclude. Host/shard/cluster: %d/%d/%s",
