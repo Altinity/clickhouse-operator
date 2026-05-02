@@ -143,7 +143,11 @@ func (c *Controller) poll(ctx context.Context, cr api.ICustomResource, f func(c 
 
 	for {
 		cur, err := c.kube.CR().Get(ctx, namespace, name)
-		if f(cur.(*apiChk.ClickHouseKeeperInstallation), err) {
+		var typed *apiChk.ClickHouseKeeperInstallation
+		if cur != nil {
+			typed, _ = cur.(*apiChk.ClickHouseKeeperInstallation)
+		}
+		if f(typed, err) {
 			// Continue polling
 			if util.IsContextDone(ctx) {
 				log.V(1).Info("Poll is aborted. Cr: %s ", cr.GetName())
