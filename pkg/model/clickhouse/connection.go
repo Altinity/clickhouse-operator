@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	goch "github.com/mailru/go-clickhouse/v2"
 
@@ -195,7 +196,7 @@ func (c *Connection) QueryContext(ctx context.Context, sql string) (*QueryResult
 	if !c.ensureConnected(ctx) {
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
 		c.l.V(1).F().Error(s)
-		return nil, fmt.Errorf(s)
+		return nil, errors.New(s)
 	}
 
 	if util.IsContextDone(ctx) {
@@ -251,7 +252,7 @@ func (c *Connection) Exec(_ctx context.Context, sql string, opts *QueryOptions) 
 		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
 		c.l.V(1).F().Error(s)
-		return fmt.Errorf(s)
+		return errors.New(s)
 	}
 
 	db := c.dbPrimary

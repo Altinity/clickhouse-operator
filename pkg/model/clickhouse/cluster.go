@@ -16,6 +16,7 @@ package clickhouse
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -93,7 +94,7 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error
 
 	str := fmt.Sprintf("FAILED to run query on all hosts %v", c.Hosts)
 	c.l.V(1).F().Error(str)
-	return nil, fmt.Errorf(str)
+	return nil, errors.New(str)
 }
 
 // ExecAll runs set of SQL queries on all endpoints of the cluster.
