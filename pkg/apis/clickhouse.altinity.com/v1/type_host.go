@@ -577,13 +577,13 @@ func (host *Host) HasDesiredStatefulSet() bool {
 }
 
 const (
-	ChDefaultPortName   = "port"
+	ChDefaultPortName   = "tcp-port"
 	ChDefaultPortNumber = int32(9000)
 
 	// ClickHouse open ports names and values
 	ChDefaultTCPPortName               = "tcp"
 	ChDefaultTCPPortNumber             = int32(9000)
-	ChDefaultTLSPortName               = "secureclient"
+	ChDefaultTLSPortName               = "tls-secureclient"
 	ChDefaultTLSPortNumber             = int32(9440)
 	ChDefaultHTTPPortName              = "http"
 	ChDefaultHTTPPortNumber            = int32(8123)
@@ -593,11 +593,11 @@ const (
 	ChDefaultInterserverHTTPPortNumber = int32(9009)
 
 	// Keeper open ports names and values
-	KpDefaultZKPortName         = "zk"
+	KpDefaultZKPortName         = "tcp-zk"
 	KpDefaultZKPortNumber       = int32(2181)
-	KpDefaultZKSecurePortName   = "zk-secure"
+	KpDefaultZKSecurePortName   = "tls-zk-secure"
 	KpDefaultZKSecurePortNumber = int32(2281)
-	KpDefaultRaftPortName       = "raft"
+	KpDefaultRaftPortName       = "tcp-raft"
 	KpDefaultRaftPortNumber     = int32(9444)
 )
 
