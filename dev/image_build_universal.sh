@@ -181,6 +181,8 @@ if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
     DOCKER_CMD="${DOCKER_CMD} --push"
 fi
 
+DOCKER_CMD_BASE="${DOCKER_CMD}"
+
 # Append tag, dockerfile and SRC_ROOT
 DOCKER_CMD="${DOCKER_CMD} --tag ${DOCKER_IMAGE} --file ${DOCKERFILE} ${SRC_ROOT}"
 
@@ -204,4 +206,27 @@ else
     echo "Docker image build has failed."
     echo "Abort"
     exit 1
+fi
+
+FIPS_BUILD="${FIPS_BUILD:-yes}"
+if [[ "${FIPS_BUILD}" == "yes" ]]; then
+    DOCKER_IMAGE_FIPS="${DOCKER_IMAGE}.fips"
+    DOCKER_CMD_FIPS="${DOCKER_CMD_BASE} --target image-fips --tag ${DOCKER_IMAGE_FIPS} --file ${DOCKERFILE} ${SRC_ROOT}"
+
+    echo ""
+    echo "########################################"
+    echo "Building FIPS variant: ${DOCKER_IMAGE_FIPS}"
+    echo "########################################"
+    echo "${DOCKER_CMD_FIPS}"
+    echo "Please, wait..."
+
+    if ${DOCKER_CMD_FIPS}; then
+        echo "OK. FIPS build successful."
+    else
+        echo "########################"
+        echo "ERROR."
+        echo "FIPS Docker image build has failed."
+        echo "Abort"
+        exit 1
+    fi
 fi

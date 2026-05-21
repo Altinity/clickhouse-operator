@@ -100,3 +100,10 @@ USER nobody
 ENTRYPOINT ["/clickhouse-operator"]
 CMD ["-logtostderr=true", "-v=1"]
 #CMD ["-alsologtostderr=true", "-v=1"]
+
+# ======================
+# ===== Image FIPS =====
+# ======================
+FROM image-prod AS image-fips
+RUN echo "Building FIPS image"
+ENV GODEBUG="fips140=only"
