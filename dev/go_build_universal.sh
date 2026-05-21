@@ -14,6 +14,7 @@ GOARCH=${GOARCH:-amd64}
 
 if CGO_ENABLED=0 GO111MODULE=on GOOS="${GOOS}" GOARCH="${GOARCH}" GOFIPS140=v1.0.0 go build \
     -mod="vendor" \
+    -tags netgo,osusergo \
     -a \
     -ldflags " \
         -X ${REPO}/pkg/version.Version=${VERSION} \
