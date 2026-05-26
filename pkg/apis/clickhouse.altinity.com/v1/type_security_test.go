@@ -84,9 +84,9 @@ func TestClusterSecurityNilSafeGetters(t *testing.T) {
 
 // TestClusterSecurityKubernetesTLSVerifyDefault locks in the back-compat
 // invariant: nil/empty defaults to permissive (the gate does NOT fire on
-// startup with no security block). Polarity discipline — Voice E BLOCKER 1
-// mitigation: assert positive equality with each enumerated value, not
-// inequality against the relaxed value, so a wrong-cell rewrite fails loudly.
+// startup with no security block). Polarity discipline: assert positive
+// equality with each enumerated value, not inequality against the relaxed
+// value, so a wrong-cell rewrite fails loudly.
 func TestClusterSecurityKubernetesTLSVerifyDefault(t *testing.T) {
 	// nil leaf → empty (permissive default — kubeconfig wins)
 	require.Equal(t, TLSVerify(""), (&ClusterSecurityKubernetesTLS{}).GetVerify())

@@ -283,37 +283,21 @@ spec:
                     Displayed in all .status.taskID* fields.
                     By default (if not filled) every update of CHI manifest will generate random taskID
                 stop: &TypeStringBool
-                  type: string
                   description: |
                     Allows to stop all ClickHouse clusters defined in a CHI.
                     Works as the following:
                      - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
                      - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
-                  enum:
-                    # List StringBoolXXX constants from model
-                    - ""
-                    - "0"
-                    - "1"
-                    - "False"
-                    - "false"
-                    - "True"
-                    - "true"
-                    - "No"
-                    - "no"
-                    - "Yes"
-                    - "yes"
-                    - "Off"
-                    - "off"
-                    - "On"
-                    - "on"
-                    - "Disable"
-                    - "disable"
-                    - "Enable"
-                    - "enable"
-                    - "Disabled"
-                    - "disabled"
-                    - "Enabled"
-                    - "enabled"
+                  # StringBool is polymorphic — accepts native YAML bool (true/false),
+                  # integer (0/1), or string from the recognized vocabulary
+                  # (true/True/TRUE, yes/Yes, on/On, 1, enable/enabled, and their
+                  # false/no/off/0/disable/disabled counterparts). Validation moves
+                  # into the operator: pkg/apis/common/types StringBool.UnmarshalJSON
+                  # normalizes input, IsValid() rejects garbage at normalize time.
+                  # Structural-schema rules don't natively support bool|int|string
+                  # union, so we use x-kubernetes-preserve-unknown-fields: true as
+                  # the documented escape hatch (k8s apiextensions.k8s.io/v1).
+                  x-kubernetes-preserve-unknown-fields: true
                 restart:
                   type: string
                   description: |
@@ -2097,37 +2081,21 @@ spec:
                     Displayed in all .status.taskID* fields.
                     By default (if not filled) every update of CHI manifest will generate random taskID
                 stop: &TypeStringBool
-                  type: string
                   description: |
                     Allows to stop all ClickHouse clusters defined in a CHI.
                     Works as the following:
                      - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
                      - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
-                  enum:
-                    # List StringBoolXXX constants from model
-                    - ""
-                    - "0"
-                    - "1"
-                    - "False"
-                    - "false"
-                    - "True"
-                    - "true"
-                    - "No"
-                    - "no"
-                    - "Yes"
-                    - "yes"
-                    - "Off"
-                    - "off"
-                    - "On"
-                    - "on"
-                    - "Disable"
-                    - "disable"
-                    - "Enable"
-                    - "enable"
-                    - "Disabled"
-                    - "disabled"
-                    - "Enabled"
-                    - "enabled"
+                  # StringBool is polymorphic — accepts native YAML bool (true/false),
+                  # integer (0/1), or string from the recognized vocabulary
+                  # (true/True/TRUE, yes/Yes, on/On, 1, enable/enabled, and their
+                  # false/no/off/0/disable/disabled counterparts). Validation moves
+                  # into the operator: pkg/apis/common/types StringBool.UnmarshalJSON
+                  # normalizes input, IsValid() rejects garbage at normalize time.
+                  # Structural-schema rules don't natively support bool|int|string
+                  # union, so we use x-kubernetes-preserve-unknown-fields: true as
+                  # the documented escape hatch (k8s apiextensions.k8s.io/v1).
+                  x-kubernetes-preserve-unknown-fields: true
                 restart:
                   type: string
                   description: |
@@ -3903,18 +3871,20 @@ spec:
                     ZooKeeper/Keeper-client TLS (zookeeper.tls.verify, zookeeper.tls.minVersion),
                     Kubernetes-client startup gate (kubernetes.tls.verify=Strict refuses an insecure kubeconfig; kubernetes.tls.minVersion is declared for shape uniformity but not yet enforced on the K8s API transport),
                     operator↔metrics-exporter IPC channel hardening (ipc.mode, ipc.bindHost, ipc.tokenPath).
-                    Strict FIPS mode — operator-wide master switch (fips.enforced): when enforced=yes the operator
-                    coerces all per-component knobs above to their Strict positions at startup
-                    (clickhouse.tls.verify=Strict, clickhouse.tls.minVersion=1.3, zookeeper.tls.verify=Strict,
-                    zookeeper.tls.minVersion=1.3, kubernetes.tls.verify=Strict, kubernetes.tls.minVersion=1.3,
-                    ipc.mode=Secure) and rejects CHIs that cannot be served in a FIPS-compatible posture
-                    (e.g. CHIs referencing plain-text external ZooKeeper). Independent of the Go runtime
-                    FIPS toolchain — when this operator binary is built with the FIPS-validated Go toolchain
-                    a future enhancement will OR runtime detection with this knob.
-                    FIPS image policy (fips.images.policy): orthogonal to fips.enforced. Permissive (default)
-                    accepts any image; Required refuses CRs whose CH/Keeper images lack the "fips" tag
-                    substring (admission) AND aborts running CRs whose `SELECT version()` lacks "fips"
-                    (post-Ready confirmation).
+                    Operator-wide master switch (security.policy): Permissive (default) preserves 0.27.0
+                    behavior; Enforced coerces all per-component knobs above to their Strict positions
+                    at startup (clickhouse.tls.verify=Strict, clickhouse.tls.minVersion=1.3,
+                    zookeeper.tls.verify=Strict, zookeeper.tls.minVersion=1.3,
+                    kubernetes.tls.verify=Strict, kubernetes.tls.minVersion=1.3, ipc.mode=Secure) and
+                    rejects CHIs that cannot be served in a FIPS-compatible posture (e.g. CHIs
+                    referencing plain-text external ZooKeeper). Independent of the Go runtime FIPS
+                    toolchain — when this operator binary is built with GOFIPS140=v1.0.0 (the Go FIPS
+                    module currently in CMVP review, not yet a completed validation) the startup gate
+                    ORs runtime detection with this knob.
+                    FIPS image policy (security.images.policy): orthogonal to security.policy.
+                    Permissive (default) accepts any image; Required refuses CRs whose CH/Keeper
+                    images lack the "fips" tag substring (admission) AND aborts running CRs whose
+                    `SELECT version()` lacks "fips" (post-Ready confirmation).
                     All fields default to nil — current behavior preserved on upgrade.
                     See docs/security_hardening.md for details.
                   x-kubernetes-preserve-unknown-fields: true
@@ -4027,33 +3997,15 @@ spec:
                           type: object
                           properties:
                             exclude:  &TypeStringBool
-                              type: string
                               description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be excluded from a ClickHouse cluster"
-                              enum:
-                                # List StringBoolXXX constants from model
-                                - ""
-                                - "0"
-                                - "1"
-                                - "False"
-                                - "false"
-                                - "True"
-                                - "true"
-                                - "No"
-                                - "no"
-                                - "Yes"
-                                - "yes"
-                                - "Off"
-                                - "off"
-                                - "On"
-                                - "on"
-                                - "Disable"
-                                - "disable"
-                                - "Enable"
-                                - "enable"
-                                - "Disabled"
-                                - "disabled"
-                                - "Enabled"
-                                - "enabled"
+                              # StringBool is polymorphic — accepts native YAML
+                              # bool (true/false), integer (0/1), or string from
+                              # the recognized vocabulary. Normalized by
+                              # pkg/apis/common/types StringBool.UnmarshalJSON.
+                              # Structural-schema rules don't natively support
+                              # bool|int|string union, so we use the documented
+                              # escape hatch x-kubernetes-preserve-unknown-fields.
+                              x-kubernetes-preserve-unknown-fields: true
                             queries:
                               <<: *TypeStringBool
                               description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
@@ -4618,37 +4570,17 @@ spec:
                     Displayed in all .status.taskID* fields.
                     By default (if not filled) every update of CHI manifest will generate random taskID
                 stop: &TypeStringBool
-                  type: string
                   description: |
                     Allows to stop all ClickHouse Keeper clusters defined in a CHK.
                     Works as the following:
                      - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
                      - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
-                  enum:
-                    # List StringBoolXXX constants from model
-                    - ""
-                    - "0"
-                    - "1"
-                    - "False"
-                    - "false"
-                    - "True"
-                    - "true"
-                    - "No"
-                    - "no"
-                    - "Yes"
-                    - "yes"
-                    - "Off"
-                    - "off"
-                    - "On"
-                    - "on"
-                    - "Disable"
-                    - "disable"
-                    - "Enable"
-                    - "enable"
-                    - "Disabled"
-                    - "disabled"
-                    - "Enabled"
-                    - "enabled"
+                  # StringBool is polymorphic — accepts native YAML bool (true/false),
+                  # integer (0/1), or string from the recognized vocabulary.
+                  # See pkg/apis/common/types/string_bool.go (UnmarshalJSON + IsValid).
+                  # Structural-schema rules don't natively support bool|int|string
+                  # union, so we use x-kubernetes-preserve-unknown-fields: true.
+                  x-kubernetes-preserve-unknown-fields: true
                 suspend:
                   <<: *TypeStringBool
                   description: |
@@ -6090,6 +6022,12 @@ data:
     ## values here to tighten the operator's outbound TLS posture; CHIs may further
     ## override per-cluster via spec.configuration.clusters[].security.
     ##
+    ## Three orthogonal axes govern this section:
+    ##   1. security.policy           — TLS-hardening master switch (Permissive | Enforced)
+    ##   2. security.fips.enforced    — FIPS cryptographic-module gate (bool)
+    ##   3. security.images.policy    — Workload image-tag governance   (Permissive | FIPSRequired)
+    ## Each axis is independent: enabling one does not enable the others.
+    ##
     ## See docs/chi-examples/70-chop-config.yaml for a fully-annotated example
     ## and docs/security_hardening.md for the design + per-knob semantics.
     ##
@@ -6128,26 +6066,41 @@ data:
         bindHost: ""
         # Defaults to /etc/clickhouse-operator-ipc/token
         tokenPath: ""
+      # Operator-wide TLS-hardening master switch. ONLY governs TLS posture across
+      # CH / ZK / K8s transports — NOT the FIPS cryptographic-module gate (see
+      # security.fips.enforced below for that, orthogonal axis).
+      #
+      # Permissive (default) preserves 0.27.0 behavior — no coercion, no rejection.
+      # Enforced coerces all TLS knobs above to their Strict positions at startup:
+      #   - clickhouse.tls.verify=Strict, clickhouse.tls.minVersion=1.3
+      #   - zookeeper.tls.verify=Strict,  zookeeper.tls.minVersion=1.3
+      #   - kubernetes.tls.verify=Strict, kubernetes.tls.minVersion=1.3
+      #   - ipc.mode=Secure
+      #   - clickhouse.access.scheme: http is coerced to https
+      # Enforced also rejects CHIs that cannot be served in a hardened posture
+      # (e.g. plaintext external ZooKeeper, ZK digest auth).
+      #
+      # Independent of the Go FIPS toolchain — works on non-FIPS builds for pure
+      # TLS hardening. Combine with security.fips.enforced=true for full FIPS
+      # cryptographic-module enforcement.
+      policy: Permissive
+      # FIPS cryptographic-module enforcement. Orthogonal to security.policy.
+      # Default operator and metrics-exporter images are FIPS-compatible —
+      # built with GOFIPS140=v1.0.0 and run with GODEBUG=fips140=on, so
+      # crypto/fips140.Enabled() returns true at runtime.
+      # When enforced=true, the operator Fatals at startup unless the binary
+      # reports crypto/fips140 Enabled — guards against accidentally running
+      # a non-FIPS rebuild in a hardened deployment.
       fips:
-        # Strict FIPS mode — operator-wide master switch. When enforced=yes
-        # the operator coerces all knobs above to their Strict positions at
-        # startup (clickhouse.tls.verify=Strict, clickhouse.tls.minVersion=1.3,
-        # zookeeper.tls.verify=Strict, zookeeper.tls.minVersion=1.3,
-        # kubernetes.tls.verify=Strict, kubernetes.tls.minVersion=1.3,
-        # ipc.mode=Secure) and rejects CHIs that cannot be served in a
-        # FIPS-compatible posture (e.g. CHIs referencing plain-text external
-        # ZooKeeper). Independent of the Go runtime FIPS toolchain — when
-        # this operator binary is built with the FIPS-validated Go toolchain
-        # a future enhancement will OR runtime detection with this knob.
-        enforced: "no"
-        images:
-          # Image-policy gate, orthogonal to `enforced`. Permissive (default)
-          # accepts any image; Required refuses CRs whose CH/Keeper images
-          # lack the "fips" tag substring (admission) AND aborts running CRs
-          # whose `SELECT version()` lacks "fips" (post-Ready confirmation).
-          # See docs/security_hardening.md → "FIPS image policy" for the full
-          # policy matrix + detection details + recovery procedure.
-          policy: Permissive
+        enforced: false
+      images:
+        # Workload image-tag governance gate. Today's only non-default value is
+        # FIPSRequired (admission rejects CRs whose CH/Keeper images lack 'fips'
+        # in tag; post-Ready SELECT version() must contain 'fips' or CR aborts).
+        # Orthogonal to security.policy and security.fips.enforced.
+        # See docs/security_hardening.md → "FIPS image policy" for the full
+        # policy matrix + detection details + recovery procedure.
+        policy: Permissive
     
     ################################################
     ##

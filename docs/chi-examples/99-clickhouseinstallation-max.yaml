@@ -198,7 +198,7 @@ spec:
           - sql:
               queries:
                 - "SYSTEM STOP REPLICATION QUEUES"
-            # `on:` is REQUIRED and non-empty. It lists the reconcile lifecycle events
+            # `events:` is REQUIRED and non-empty. It lists the reconcile lifecycle events
             # at which this hook fires; the hook is skipped on any reconcile whose
             # classifier does not emit at least one of the listed events.
             #
@@ -536,7 +536,7 @@ spec:
               - sql:
                   queries:
                     - "SYSTEM FLUSH LOGS"
-                # target and on are HookAction fields (siblings of sql:), not SQLHookAction
+                # target and events are HookAction fields (siblings of sql:), not SQLHookAction
                 # fields — they must be at the same indent level as `sql:` above.
                 target: AllHosts
                 events:

@@ -15,11 +15,6 @@
 package util
 
 import (
-	// #nosec
-	// G505 (CWE-327): Blocklisted import crypto/sha1: weak cryptographic primitive
-	// It is good enough for string ID
-	"crypto/sha1"
-	"encoding/hex"
 	"math/rand"
 	"time"
 )
@@ -43,32 +38,6 @@ func RandString(length int) string {
 // RandStringRange specifies random string with length in specified range
 func RandStringRange(minLength, maxLength int) string {
 	return RandString(rand.Intn(maxLength-minLength+1) + minLength)
-}
-
-// CreateStringID creates HEX hash ID out of a string.
-// In case maxHashLen == 0 the whole hash is returned
-func CreateStringID(str string, maxHashLen int) string {
-	// #nosec
-	// G401 (CWE-326): Use of weak cryptographic primitive
-	// It is good enough for string ID
-	sha := sha1.New()
-	sha.Write([]byte(str))
-	hash := hex.EncodeToString(sha.Sum(nil))
-
-	if maxHashLen == 0 {
-		// Explicitly requested to return everything
-		return hash
-	}
-
-	if maxHashLen >= len(hash) {
-		// Requested hash len is greater than we have
-		// Return whole hash - everything what we have
-		return hash
-	}
-
-	// Requested hash len is smaller that the hash
-	// Return last part of the hash
-	return hash[len(hash)-maxHashLen:]
 }
 
 // StringHead returns beginning of the string of requested length

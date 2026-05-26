@@ -62,13 +62,12 @@ type worker struct {
 // newWorker
 func (c *Controller) newWorker() *worker {
 	start := time.Now()
-	//kind := "ClickHouseKeeperInstallation"
-	//generateName := "chop-chk-"
-	//component := componentName
+	kind := "ClickHouseKeeperInstallation"
+	generateName := "chop-chk-"
+	component := componentName
 
 	announcer := a.NewAnnouncer(
-		//common.NewEventEmitter(c.kube.Event(), kind, generateName, component),
-		nil,
+		a.NewEventEmitter(c.kube.Event(), kind, generateName, component),
 		c.kube.CR(),
 	)
 

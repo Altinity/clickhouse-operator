@@ -45,6 +45,14 @@ type ConnectionParams struct {
 	// strict-verify behavior (the ZK client always provides RootCAs + ServerName).
 	// Set to true only when the cluster's security.zookeeper.verify is None.
 	InsecureSkipVerify bool
+
+	// RejectDigestAuth, when true, refuses to invoke zk.AddAuth with the
+	// "digest" scheme. The ZooKeeper digest scheme uses SHA-1 password
+	// hashing inside the vendored go-zookeeper library — under FIPS-compatible
+	// mode the operator must not exercise that path. Set true when chopconf
+	// security.policy=Enforced. Per the operator's FIPS scope specification
+	// (§2 line 46 / §3 step 3).
+	RejectDigestAuth bool
 }
 
 func BuildConnectionParams(_params ...*ConnectionParams) *ConnectionParams {

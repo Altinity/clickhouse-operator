@@ -27,7 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 )
 
-// withFIPSImagePolicy temporarily sets chop.Config().Security.FIPS.Images.Policy
+// withFIPSImagePolicy temporarily sets chop.Config().Security.Images.Policy
 // for the duration of a test case. Restores prior Security block on cleanup so
 // the package-global doesn't leak across cases (chop.New runs once in init()
 // in controller_test.go).
@@ -39,10 +39,8 @@ func withFIPSImagePolicy(t *testing.T, policy string) {
 
 	cfg.Security = api.OperatorConfigSecurity{}
 	if policy != "" {
-		cfg.Security.FIPS = &api.OperatorConfigSecurityFIPS{
-			Images: &api.OperatorConfigSecurityFIPSImages{
-				Policy: types.NewString(policy),
-			},
+		cfg.Security.Images = &api.OperatorConfigSecurityImages{
+			Policy: types.NewString(policy),
 		}
 	}
 }

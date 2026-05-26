@@ -54,6 +54,15 @@ func init() {
 
 // Run is an entry point of the application
 func Run() {
+	// ACVP responder trampoline: if argv[0] is *-acvp and the binary was
+	// built with -tags acvp_wrapper, hand control to the ACVP stdin/stdout
+	// responder before any operator-side initialization (flag.Parse, k8s
+	// client construction, signal handlers, goroutine launches). In default
+	// builds this is a no-op stub. See acvp_dispatch_{on,off}.go.
+	if TryACVPDispatch() {
+		return // unreachable: TryACVPDispatch calls os.Exit on dispatch
+	}
+
 	flag.Parse()
 
 	if versionRequest {

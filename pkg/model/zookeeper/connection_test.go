@@ -708,6 +708,31 @@ func newTestConnection(nodes api.ZookeeperNodes, client ZKClient, _params ...*Co
 	return conn
 }
 
+// TestShouldRejectAuthScheme pins the FIPS-mode predicate for ZK digest-auth
+// rejection. The check fires only when RejectDigestAuth=true AND the auth-file
+// scheme is "digest" (case-insensitive, since ZK scheme parsing is lowercased
+// elsewhere but auth files are user-edited). Every other combination — gate off,
+// non-digest scheme — must pass through so SASL/x509/ip/world keep working.
+func TestShouldRejectAuthScheme(t *testing.T) {
+	tests := []struct {
+		name         string
+		rejectDigest bool
+		scheme       string
+		want         bool
+	}{
+		{name: "FIPS on + digest lowercase → reject", rejectDigest: true, scheme: "digest", want: true},
+		{name: "FIPS on + DIGEST uppercase → reject (case-insensitive)", rejectDigest: true, scheme: "DIGEST", want: true},
+		{name: "FIPS on + sasl → pass", rejectDigest: true, scheme: "sasl", want: false},
+		{name: "FIPS off + digest → pass (gate disabled)", rejectDigest: false, scheme: "digest", want: false},
+		{name: "FIPS off + sasl → pass", rejectDigest: false, scheme: "sasl", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, shouldRejectAuthScheme(tt.rejectDigest, tt.scheme))
+		})
+	}
+}
+
 // MockZKClient is a mock implementation of the ZKClient interface for testing
 type MockZKClient struct {
 	mock.Mock

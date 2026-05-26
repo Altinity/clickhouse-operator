@@ -51,7 +51,7 @@ const (
 	// or key that the operator cannot read. Aborts rather than silently falling
 	// back to system roots — empty CA + Verify=Strict would refuse all dials.
 	StatusReasonRootCASecretUnresolved = "RootCASecretUnresolved"
-	// StatusReasonFIPSImagePolicyViolation: security.fips.images.policy=Required
+	// StatusReasonFIPSImagePolicyViolation: security.images.policy=Required
 	// rejected this CR because a ClickHouse/Keeper container image lacks the
 	// "fips" tag substring (admission gate) or the running binary's
 	// `SELECT version()` reply lacks "fips" (post-Ready gate). Separate from

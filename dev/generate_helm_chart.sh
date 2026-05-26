@@ -59,7 +59,9 @@ function main() {
   # process grafana dashboards
   readonly prom_ds='{"current":{"selected":false,"text":"","value":""},"hide":0,"includeAll":false,"multi":false,"name":"ds_prometheus","options":[],"query":"prometheus","queryValue":"","refresh":1,"regex":"","skipUrlSync":false,"type":"datasource"}'
   readonly files_dir="${chart_path}/files"
-  rm -f "${files_dir}/*"
+  # Glob must be UNQUOTED to expand; quoting the `*` treats it as a literal
+  # filename and leaves stale dashboards from a previous regen on disk.
+  rm -f "${files_dir}"/*
   for dashboard in "${dashboards_path}"/*.json; do
     local dashboard_name
     dashboard_name=$(basename "${dashboard}")

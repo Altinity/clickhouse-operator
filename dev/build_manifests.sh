@@ -1,10 +1,14 @@
 #!/bin/bash
+set -euo pipefail
 
 # Source configuration
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
-echo "VERBOSITY=${VERBOSITY}"
+# VERBOSITY is an optional knob — callers may run with `VERBOSITY=1 build_manifests.sh`
+# or leave it unset for default. Under `set -u` the bare `${VERBOSITY}` would abort,
+# so use the `:-` default-empty form.
+echo "VERBOSITY=${VERBOSITY:-}"
 
 # Build clickhouse-operator config files
 source "${MANIFESTS_ROOT}/builder/build-clickhouse-operator-configs.sh"

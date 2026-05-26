@@ -42,10 +42,8 @@ func withFIPSImagePolicy(t *testing.T, policy string) {
 
 	cfg.Security = chi.OperatorConfigSecurity{}
 	if policy != "" {
-		cfg.Security.FIPS = &chi.OperatorConfigSecurityFIPS{
-			Images: &chi.OperatorConfigSecurityFIPSImages{
-				Policy: types.NewString(policy),
-			},
+		cfg.Security.Images = &chi.OperatorConfigSecurityImages{
+			Policy: types.NewString(policy),
 		}
 	}
 }
@@ -159,6 +157,15 @@ func TestEnforceFIPSImagePolicy_CHK(t *testing.T) {
 // TestRejectFIPSBypass exercises the cluster-level bypass detector that fires
 // under FIPS strict mode for CHK. Mirrors the CHI test — semantics are identical
 // per the documented "CHK mirror" comment in normalizer.go.
+//
+// Scope note: same as the CHI mirror, this test covers only the two targets
+// reachable from chi.ClusterSecurity — clickhouse.tls.{verify,minVersion}
+// and zookeeper.tls.{verify,minVersion}. K8s-client TLS and clickhouse.access
+// .scheme are CHOP-config-scope-only by design (no per-CR/per-cluster field
+// on ClusterSecurity) and are covered separately by
+// pkg/chop/config_manager_test.go::TestK8sInsecureGate_Policy and
+// pkg/apis/clickhouse.altinity.com/v1/type_security_fips_test.go::
+// TestApplyFIPSStrict_CoercesHTTPSchemeUnderFIPS respectively.
 func TestRejectFIPSBypass(t *testing.T) {
 	build := func(ch *chi.ClusterSecurityClickHouseTLS, zk *chi.ClusterSecurityZookeeperTLS) *chi.ClusterSecurity {
 		s := &chi.ClusterSecurity{}

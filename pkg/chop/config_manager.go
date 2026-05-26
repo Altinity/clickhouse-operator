@@ -102,7 +102,7 @@ func (cm *ConfigManager) Init() error {
 	// CR-based merge (which requires a List over the kube wire) would defeat the
 	// purpose, since the ServiceAccount bearer token would already have crossed
 	// the unverified channel once. Users who place security.kubernetes.tls.verify=Strict
-	// (or security.fips.enforced=true, which one-way coerces verify to Strict) in a
+	// (or security.policy=Enforced, which one-way coerces verify to Strict) in a
 	// CR-based ChOpConfig accept that the file-based config still wins for the
 	// startup gate.
 	if lastKubeConfigInsecure && cm.fileConfig.RequiresStrictK8sTLS() {

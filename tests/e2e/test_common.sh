@@ -30,6 +30,15 @@ NO_CLEANUP="${NO_CLEANUP:-""}"
 
 # Minikube control — defaults set by callers (run_tests_*_local.sh), not here
 
+# FIPS-built operator/exporter images are the default for local e2e runs.
+# common_build_and_load_images calls dev/image_build_all_dev.sh, which sources
+# dev/go_build_config.sh (GOFIPS140=v1.0.0 default) and routes through
+# dev/image_build_universal.sh (passes --build-arg GOFIPS140 to docker). The
+# Dockerfile image-prod stage adds ENV GODEBUG=fips140=on (TLS filtering). The only build
+# path that produces a non-strict image is deploy/devspace/docker-build.sh
+# --debug=delve (target image-debug), which is not reachable from run_tests_*.
+# Regression coverage: tests/e2e/test_operator.py::test_010076.
+
 # =============================================================================
 # Image lists for preloading into minikube
 # =============================================================================
@@ -88,6 +97,7 @@ PRELOAD_IMAGES_KEEPER=(
     # ClickHouse Keeper versions
     "clickhouse/clickhouse-keeper:25.3"
     "clickhouse/clickhouse-keeper:25.8"
+    "clickhouse/clickhouse-keeper:latest-alpine"  # test_clickhouse_keeper_rescale (deploy/clickhouse-keeper/clickhouse-keeper-manually/...-for-test-only.yaml)
     "altinity/clickhouse-keeper:25.3.8.30001.altinityfips"
     # Zookeeper
     "docker.io/zookeeper:3.8.4"

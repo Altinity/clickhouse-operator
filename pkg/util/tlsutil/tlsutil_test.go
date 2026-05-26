@@ -19,27 +19,28 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // TestVersionUint16 covers every cell consumed by the ClickHouse client
 // (connection.go) and the ZooKeeper client (connection.go:324). Both paths feed
-// VersionUint16 the result of api.NewTLSMinVersion(...) — empty/unknown strings
-// MUST land on 0 (Go stdlib default — currently TLS 1.2) so the dial path keeps
+// VersionUint16 a plain string ("1.2"/"1.3"/...) — empty/unknown strings MUST
+// land on 0 (Go stdlib default — currently TLS 1.2) so the dial path keeps
 // working with no MinVersion set; flipping any cell silently re-floors every
 // outbound TLS connection in the operator.
+//
+// String literals (not the apis TLSMinVersion alias) on purpose: this package
+// is leaf-level and must not import pkg/apis.
 func TestVersionUint16(t *testing.T) {
 	cases := []struct {
 		name string
-		in   api.TLSMinVersion
+		in   string
 		want uint16
 	}{
-		{"1.2 → VersionTLS12", api.TLSMinVersion12, tls.VersionTLS12},
-		{"1.3 → VersionTLS13", api.TLSMinVersion13, tls.VersionTLS13},
-		{"empty → 0 (stdlib default)", api.TLSMinVersion(""), 0},
-		{"unknown value → 0 (fail-soft to stdlib default, not panic)", api.TLSMinVersion("9.9"), 0},
-		{"legacy lowercase tls1.2 → 0 (not normalized at this level)", api.TLSMinVersion("tls1.2"), 0},
+		{"1.2 → VersionTLS12", MinVersion12, tls.VersionTLS12},
+		{"1.3 → VersionTLS13", MinVersion13, tls.VersionTLS13},
+		{"empty → 0 (stdlib default)", "", 0},
+		{"unknown value → 0 (fail-soft to stdlib default, not panic)", "9.9", 0},
+		{"legacy lowercase tls1.2 → 0 (not normalized at this level)", "tls1.2", 0},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

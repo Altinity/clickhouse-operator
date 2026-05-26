@@ -114,6 +114,15 @@ spec:
   ## Keeper-client TLS under `zookeeper.tls.*`, Kubernetes-client toggles
   ## under `kubernetes.*`. IPC and FIPS are operator-internal — no CHI override.
   ##
+  ## Three orthogonal hardening axes live in this block:
+  ##   1. security.policy           — TLS-hardening master switch.
+  ##   2. security.fips.enforced    — FIPS cryptographic-module gate (Fatals
+  ##                                  at startup if binary lacks GOFIPS140).
+  ##   3. security.images.policy    — workload supply-chain gate (rejects
+  ##                                  CH/Keeper images that lack "fips" in
+  ##                                  their tag).
+  ## Each axis is opt-in and independent of the other two.
+  ##
   ################################################
   security:
     clickhouse:
@@ -220,26 +229,42 @@ spec:
       # via a Deployment volume override (no CRD field). See
       # docs/security_hardening.md → Externally-managed token (advanced).
       tokenPath: ""
+    # Axis 1 — Operator-wide TLS-hardening master switch. Permissive (default)
+    # preserves 0.27.0 behavior — no coercion, no rejection. Enforced coerces
+    # all transport knobs above to their Strict positions at startup
+    # (clickhouse.tls.verify=Strict, clickhouse.tls.minVersion=1.3,
+    # zookeeper.tls.verify=Strict, zookeeper.tls.minVersion=1.3,
+    # kubernetes.tls.verify=Strict, kubernetes.tls.minVersion=1.3,
+    # ipc.mode=Secure), re-registers the ClickHouse legacy TLS config to
+    # verifying mode (no InsecureSkipVerify), coerces clickhouse.access.scheme
+    # http→https, rejects ZK `digest:` auth files, and rejects CHIs that
+    # cannot be served in a FIPS-compatible posture (e.g. CHIs referencing
+    # plain-text external ZooKeeper). Transport hardening only — does NOT
+    # assert the binary is FIPS-linked; that is the orthogonal `fips.enforced`
+    # axis below.
+    policy: Permissive
+    # Axis 2 — FIPS cryptographic-module gate. Orthogonal to `policy`. When
+    # `enforced: true`, the operator Fatals at startup unless the binary was
+    # built with GOFIPS140 and crypto/fips140 reports Enabled (i.e. the
+    # process is running with GODEBUG=fips140=on or fips140=only). Also
+    # triggers the same TLS coercions as `policy: Enforced` — a FIPS-asserted
+    # operator necessarily wants verified TLS.
+    #
+    # The default `altinity/clickhouse-operator` and `altinity/metrics-exporter`
+    # images are FIPS 140-3 compatible (not certified): built with
+    # GOFIPS140=v1.0.0 and run with GODEBUG=fips140=on. Setting
+    # `enforced: true` asserts that posture at startup.
     fips:
-      # Strict FIPS mode — operator-wide master switch. When enforced=yes
-      # the operator coerces all knobs above to their Strict positions at
-      # startup (clickhouse.tls.verify=Strict, clickhouse.tls.minVersion=1.3,
-      # zookeeper.tls.verify=Strict, zookeeper.tls.minVersion=1.3,
-      # kubernetes.tls.verify=Strict, kubernetes.tls.minVersion=1.3,
-      # ipc.mode=Secure) and rejects CHIs that cannot be served in a
-      # FIPS-compatible posture (e.g. CHIs referencing plain-text external
-      # ZooKeeper). Independent of the Go runtime FIPS toolchain — when
-      # this operator binary is built with the FIPS-validated Go toolchain
-      # a future enhancement will OR runtime detection with this knob.
-      enforced: "no"
-      images:
-        # Image-policy gate, orthogonal to `enforced`. Permissive (default)
-        # accepts any image; Required refuses CRs whose CH/Keeper images
-        # lack the "fips" tag substring (admission) AND aborts running CRs
-        # whose `SELECT version()` lacks "fips" (post-Ready confirmation).
-        # See docs/security_hardening.md → "FIPS image policy" for the full
-        # policy matrix + detection details + recovery procedure.
-        policy: Permissive
+      enforced: false
+    images:
+      # Axis 3 — Workload supply-chain gate, orthogonal to `policy` and
+      # `fips.enforced`. Permissive (default) accepts any image; FIPSRequired
+      # refuses CRs whose CH/Keeper images lack the "fips" tag substring
+      # (admission) AND aborts running CRs whose `SELECT version()` lacks
+      # "fips" (post-Ready confirmation). See docs/security_hardening.md
+      # → "security.images.policy: FIPSRequired" for the full policy details
+      # and recovery procedure.
+      policy: Permissive
 
   ################################################
   ##
@@ -352,6 +377,23 @@ spec:
         #   none (default) — do nothing
         #   reconcile — trigger CHI reconcile
         onKeeperResourceUpdate: none
+
+    ################################################
+    ##
+    ## Auto-recovery from aborted reconcile
+    ##
+    ################################################
+    recovery:
+      from:
+        aborted:
+          # When a reconcile lands in status=Aborted (due to FIPS coercion
+          # conflict, plain-text ZK under FIPS, etc.), the operator can
+          # auto-recover when the CHI's pods transition NotReady→Ready.
+          # Values:
+          #   retry (default) — re-enqueue the CHI on pod-Ready transition.
+          #   none            — disable auto-recovery; operator user must
+          #                     edit the CR spec to retrigger normalize.
+          onPodReady: retry
 
   ################################################
   ##

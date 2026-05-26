@@ -66,6 +66,10 @@ func initClickHouse(ctx context.Context) {
 	log.V(1).F().Info("Config parsed:")
 	log.Info("\n" + chop.Config().String(true))
 
+	// Validate the runtime FIPS posture against chopconf security.policy.
+	// Fatals when chopconf requires FIPS but the binary/runtime can't deliver.
+	fipsGate()
+
 	// Provision the operator↔exporter IPC token. No-op in Plain mode (default).
 	// In Secure mode this writes a fresh random token to the shared-volume path
 	// before the metrics-exporter sidecar polls for it.

@@ -6,10 +6,13 @@
 set -e
 DOCKERFILE="${DOCKERFILE_DIR}/Dockerfile"
 
-DOCKERHUB_LOGIN="${DOCKERHUB_LOGIN}"
+DOCKERHUB_LOGIN="${DOCKERHUB_LOGIN:-}"
 DOCKERHUB_PUBLISH="${DOCKERHUB_PUBLISH:-"no"}"
 MINIKUBE="${MINIKUBE:-"no"}"
 MINIKUBE_PLATFORM="${MINIKUBE_PLATFORM:-""}"
+# Opt-in local release-evidence capture (SBOM, provenance, metadata + release_evidence.sh).
+# Default off to keep minikube/dev rebuilds fast.
+EVIDENCE="${EVIDENCE:-no}"
 
 # Source-dependent options
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
@@ -171,8 +174,17 @@ fi
 # Append VERSION and RELEASE
 DOCKER_CMD="${DOCKER_CMD} --build-arg VERSION=${VERSION:-dev} --build-arg GO_VERSION=${GO_VERSION}"
 
-# Append GC flags if present
-if [[ ! -z "${GCFLAGS}" ]]; then
+# Append GOFIPS140 build arg (sourced from go_build_config.sh, defaults to v1.0.0).
+# Pass empty string explicitly to disable FIPS for non-FIPS-target images.
+DOCKER_CMD="${DOCKER_CMD} --build-arg GOFIPS140=${GOFIPS140}"
+
+# Append GODEBUG_FIPS140 build arg (sourced from go_build_config.sh, default: only).
+# Selects runtime FIPS enforcement level baked into the image's ENV GODEBUG.
+DOCKER_CMD="${DOCKER_CMD} --build-arg GODEBUG_FIPS140=${GODEBUG_FIPS140}"
+
+# Append GC flags if present (default empty for set -u compat — GCFLAGS is
+# only set by callers building with debug/race instrumentation).
+if [[ -n "${GCFLAGS:-}" ]]; then
     DOCKER_CMD="${DOCKER_CMD} --build-arg GCFLAGS='${GCFLAGS}'"
 fi
 
@@ -181,7 +193,38 @@ if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
     DOCKER_CMD="${DOCKER_CMD} --push"
 fi
 
-DOCKER_CMD_BASE="${DOCKER_CMD}"
+# Append release-evidence build flags only when explicitly requested AND the build targets a real registry.
+# Registry-less local builds (MINIKUBE=yes or :dev tag) have no remote digest to attest, so skip.
+EVIDENCE_EFFECTIVE="no"
+if [[ "${EVIDENCE}" == "yes" ]]; then
+    if [[ "${MINIKUBE}" == "yes" ]]; then
+        echo "EVIDENCE=yes ignored: MINIKUBE=yes builds are registry-less (no remote digest to attest)." >&2
+    elif [[ "${DOCKER_IMAGE}" =~ :dev ]]; then
+        echo "EVIDENCE=yes ignored: DOCKER_IMAGE=${DOCKER_IMAGE} is a registry-less local dev tag." >&2
+    elif [[ "${DOCKERHUB_PUBLISH}" != "yes" ]]; then
+        echo "WARNING: EVIDENCE=yes requires DOCKERHUB_PUBLISH=yes; evidence capture needs a registry-pushed image. Skipping." >&2
+    else
+        EVIDENCE_EFFECTIVE="yes"
+    fi
+fi
+
+# Pre-flight: fail fast if EVIDENCE=yes but the post-build tools used by release_evidence.sh are missing.
+# Without this, the developer spends 5-10 min on a multi-arch buildx push only to hit:
+#   release_evidence: missing required tool: syft
+# 'docker' is already guarded upstream; only 'syft' and 'jq' need checking here.
+if [[ "${EVIDENCE_EFFECTIVE}" == "yes" ]]; then
+    for tool in syft jq; do
+        if ! command -v "${tool}" >/dev/null 2>&1; then
+            echo "ERROR: EVIDENCE=yes requires '${tool}' on PATH but it is not installed." >&2
+            case "${tool}" in
+                syft) echo "Install: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin" >&2 ;;
+                jq)   echo "Install: apt-get install -y jq  (or brew install jq)" >&2 ;;
+            esac
+            exit 1
+        fi
+    done
+    DOCKER_CMD="${DOCKER_CMD} --sbom=true --provenance=mode=max --metadata-file ${BIN_NAME:-image}-build-metadata.json"
+fi
 
 # Append tag, dockerfile and SRC_ROOT
 DOCKER_CMD="${DOCKER_CMD} --tag ${DOCKER_IMAGE} --file ${DOCKERFILE} ${SRC_ROOT}"
@@ -208,25 +251,11 @@ else
     exit 1
 fi
 
-FIPS_BUILD="${FIPS_BUILD:-yes}"
-if [[ "${FIPS_BUILD}" == "yes" ]]; then
-    DOCKER_IMAGE_FIPS="${DOCKER_IMAGE}.fips"
-    DOCKER_CMD_FIPS="${DOCKER_CMD_BASE} --target image-fips --tag ${DOCKER_IMAGE_FIPS} --file ${DOCKERFILE} ${SRC_ROOT}"
-
-    echo ""
-    echo "########################################"
-    echo "Building FIPS variant: ${DOCKER_IMAGE_FIPS}"
-    echo "########################################"
-    echo "${DOCKER_CMD_FIPS}"
-    echo "Please, wait..."
-
-    if ${DOCKER_CMD_FIPS}; then
-        echo "OK. FIPS build successful."
-    else
-        echo "########################"
-        echo "ERROR."
-        echo "FIPS Docker image build has failed."
-        echo "Abort"
-        exit 1
-    fi
+# Capture release evidence (SBOM/provenance/metadata) for the registry-pushed image.
+# Gated by EVIDENCE_EFFECTIVE=yes set above; this branch is dead for default callers.
+if [[ "${EVIDENCE_EFFECTIVE}" == "yes" ]]; then
+    echo "EVIDENCE=yes: capturing release evidence for ${DOCKER_IMAGE} into ${EVIDENCE_DIR:-./release-evidence}"
+    mkdir -p "${EVIDENCE_DIR:-./release-evidence}"
+    cp "${BIN_NAME:-image}-build-metadata.json" "${EVIDENCE_DIR:-./release-evidence}/"
+    "${CUR_DIR}/release_evidence.sh" "${DOCKER_IMAGE}" "${EVIDENCE_DIR:-./release-evidence}"
 fi

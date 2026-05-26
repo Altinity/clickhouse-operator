@@ -35,11 +35,11 @@ import (
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
+	commonfips "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/fips"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	utilfips "github.com/altinity/clickhouse-operator/pkg/util/fips"
 )
 
 // Normalizer specifies structures normalizer
@@ -641,8 +641,8 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *chi.ZookeeperConfig) *c
 	// FIPS strict: reject coordination endpoints that don't advertise TLS.
 	// "secure: true" is the enforced proxy for "FIPS-compatible Keeper over the
 	// ZK protocol with TLS" — raw plaintext ZooKeeper cannot be served under
-	// FIPS. The check fires only when chopconf has fips.enforced=true.
-	if chop.Config().Security.GetFIPS().IsEnforced() && (len(zk.Nodes) > 0) {
+	// FIPS. Fires under EITHER security.policy=Enforced OR security.fips.enforced=true.
+	if chop.Config().Security.RequiresHardening() && (len(zk.Nodes) > 0) {
 		for i := range zk.Nodes {
 			node := &zk.Nodes[i]
 			if !node.Secure.HasValue() || !node.Secure.Value() {
@@ -1079,7 +1079,7 @@ func (n *Normalizer) normalizeClusterReconcile(reconcile *chi.ClusterReconcile) 
 // (CHI-level merge already ran in InheritClusterSecurityFrom). Pattern mirrors
 // normalizeClusterReconcile. 3-level inheritance: CHOP-config → CHI → cluster.
 //
-// When chopconf has security.fips.enforced=yes, this also enforces FIPS posture
+// When chopconf has security.policy=Enforced, this also enforces FIPS posture
 // at the cluster level — cluster-level explicit Verify=None or MinVersion=1.2
 // would otherwise bypass the chopconf-level coercion. Bypass attempts trigger
 // the same ReconcileAbort path as the ZK gate.
@@ -1093,7 +1093,7 @@ func (n *Normalizer) normalizeClusterSecurity(security *chi.ClusterSecurity) *ch
 	security.ClickHouse = security.ClickHouse.MergeFrom(chopSecurity.GetClickHouse(), chi.MergeTypeFillEmptyValues)
 	security.Zookeeper = security.Zookeeper.MergeFrom(chopSecurity.GetZookeeper(), chi.MergeTypeFillEmptyValues)
 	n.resolveTLSRootCASecretRef(security.GetClickHouse().GetTLS())
-	if chopSecurity.GetFIPS().IsEnforced() {
+	if chopSecurity.RequiresHardening() {
 		n.rejectFIPSBypass(security)
 	}
 	return security
@@ -1163,62 +1163,22 @@ func (n *Normalizer) resolveTLSRootCASecretRef(tls *chi.ClusterSecurityClickHous
 // rejectFIPSBypass aborts the CR if the cluster's resolved Security explicitly
 // relaxes any of the FIPS-coerced knobs. CHOP-level applyFIPSStrict only
 // coerces operator-wide defaults; cluster.security and chi.spec.security can
-// still set Verify=None / MinVersion=1.2 / AllowInsecure=yes — under FIPS that
-// is a bypass attempt and must be refused.
+// still set Verify=None / MinVersion=1.2 / kubernetes.tls.verify=None — under
+// FIPS that is a bypass attempt and must be refused. Delegates to the shared
+// CHI/CHK helper so behavior cannot drift between the two normalizers.
 func (n *Normalizer) rejectFIPSBypass(security *chi.ClusterSecurity) {
 	target := n.req.GetTarget()
 	if target == nil {
 		return
 	}
-	abort := func(field, value string) {
-		target.EnsureStatus().ReconcileAbortWithReason(
-			chi.StatusReasonFIPSValidationFailed,
-			fmt.Sprintf("FIPS strict: %s=%s is not permitted; remove the field or set Strict", field, value),
-		)
-	}
-	// FIPS-compatible minVersion floor is TLS 1.2 per NIST SP 800-52 Rev 2.
-	// Cluster may explicitly state 1.2 or 1.3 without bypass; anything else
-	// (i.e. an unrecognized value that survived normalization) is a bypass.
-	minVersionBypass := func(v chi.TLSMinVersion) bool {
-		if v == "" {
-			return false
-		}
-		return (v != chi.TLSMinVersion12) && (v != chi.TLSMinVersion13)
-	}
-	verifyBypass := func(v chi.TLSVerify) bool {
-		// Anything other than Strict at cluster level is a downgrade attempt
-		// under FIPS — including explicit empty ("") and None.
-		return v != chi.TLSVerifyStrict
-	}
-	if tls := security.GetClickHouse().GetTLS(); tls != nil {
-		if verifyBypass(tls.GetVerify()) {
-			abort("cluster.security.clickhouse.tls.verify", string(tls.GetVerify()))
-			return
-		}
-		if minVersionBypass(tls.GetMinVersion()) {
-			abort("cluster.security.clickhouse.tls.minVersion", string(tls.GetMinVersion()))
-			return
-		}
-	}
-	if zk := security.GetZookeeper().GetTLS(); zk != nil {
-		if verifyBypass(zk.GetVerify()) {
-			abort("cluster.security.zookeeper.tls.verify", string(zk.GetVerify()))
-			return
-		}
-		if minVersionBypass(zk.GetMinVersion()) {
-			abort("cluster.security.zookeeper.tls.minVersion", string(zk.GetMinVersion()))
-			return
-		}
-	}
-	// Kubernetes-API-client TLS is operator-process-scoped (one client per
-	// operator pod, gated at startup against the file-based chopconf) — there
-	// is no per-CHI/cluster knob to bypass. Enforcement lives entirely on
-	// OperatorConfigSecurity.Kubernetes (see RequiresStrictK8sTLS).
+	commonfips.RejectFIPSBypass(security, func(reason, msg string) {
+		target.EnsureStatus().ReconcileAbortWithReason(reason, msg)
+	}, chi.StatusReasonFIPSValidationFailed)
 }
 
 // enforceFIPSImagePolicy aborts the CR at admission when chopconf has
-// security.fips.images.policy=Required and any host's resolved ClickHouse
-// container image lacks the "fips" tag substring. Orthogonal to fips.enforced
+// security.images.policy=Required and any host's resolved ClickHouse
+// container image lacks the "fips" tag substring. Orthogonal to security.policy
 // (config-side TLS strict mode) — the two posture knobs gate independently.
 //
 // Runs after finalize() so each host's PodTemplate reference has been resolved.
@@ -1227,33 +1187,22 @@ func (n *Normalizer) rejectFIPSBypass(security *chi.ClusterSecurity) {
 // Hosts with no PodTemplate at all use the default `clickhouse/clickhouse-server:latest`,
 // which by construction lacks "fips" — so they fail-closed under Required.
 func (n *Normalizer) enforceFIPSImagePolicy() {
-	if !chop.Config().Security.GetFIPS().GetImages().IsRequired() {
+	if !chop.Config().Security.GetImages().IsRequired() {
 		return
 	}
 	target := n.req.GetTarget()
 	if target == nil {
 		return
 	}
-	// First non-FIPS host aborts the CR; remaining hosts skip silently so the
-	// error stream carries one tagged entry per CR, not N (WalkHosts ignores
-	// callback errors, so a returned error wouldn't actually short-circuit).
-	aborted := false
-	target.WalkHosts(func(host *chi.Host) error {
-		if aborted {
-			return nil
-		}
-		image := resolveClickHouseImage(host)
-		if utilfips.ImageHasFIPSMarker(image) {
-			return nil
-		}
-		target.EnsureStatus().ReconcileAbortWithReason(
-			chi.StatusReasonFIPSImagePolicyViolation,
-			fmt.Sprintf("host %s container %q image %q lacks 'fips' tag substring (security.fips.images.policy=Required)",
-				host.GetName(), config.ClickHouseContainerName, image),
-		)
-		aborted = true
-		return nil
-	})
+	commonfips.EnforceFIPSImagePolicy(
+		target,
+		resolveClickHouseImage,
+		config.ClickHouseContainerName,
+		chi.StatusReasonFIPSImagePolicyViolation,
+		func(reason, msg string) {
+			target.EnsureStatus().ReconcileAbortWithReason(reason, msg)
+		},
+	)
 }
 
 // resolveClickHouseImage returns the image string the operator would deploy

@@ -51,17 +51,17 @@ func captureInsecure(conf *kuberest.Config, err error) (*kuberest.Config, error)
 // getKubeConfig creates kuberest.Config object based on current environment
 func getKubeConfig(kubeConfigFile, masterURL string) (*kuberest.Config, error) {
 	if len(kubeConfigFile) > 0 {
-		// kube config file specified as CLI flag
+		log.F().Info("kubeconfig auth source: --kubeconfig flag (%s)", kubeConfigFile)
 		return captureInsecure(kubeclientcmd.BuildConfigFromFlags(masterURL, kubeConfigFile))
 	}
 
 	if len(os.Getenv("KUBECONFIG")) > 0 {
-		// kube config file specified as ENV var
+		log.F().Info("kubeconfig auth source: KUBECONFIG env (%s)", os.Getenv("KUBECONFIG"))
 		return captureInsecure(kubeclientcmd.BuildConfigFromFlags(masterURL, os.Getenv("KUBECONFIG")))
 	}
 
 	if conf, err := kuberest.InClusterConfig(); err == nil {
-		// in-cluster configuration found
+		log.F().Info("kubeconfig auth source: in-cluster ServiceAccount")
 		return captureInsecure(conf, nil)
 	}
 
@@ -70,13 +70,13 @@ func getKubeConfig(kubeConfigFile, masterURL string) (*kuberest.Config, error) {
 		return nil, fmt.Errorf("user not found")
 	}
 
-	// OS user found. Parse ~/.kube/config file
-	conf, err := kubeclientcmd.BuildConfigFromFlags("", filepath.Join(usr.HomeDir, ".kube", "config"))
+	homeConfig := filepath.Join(usr.HomeDir, ".kube", "config")
+	conf, err := kubeclientcmd.BuildConfigFromFlags("", homeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("~/.kube/config not found")
 	}
 
-	// ~/.kube/config found
+	log.F().Info("kubeconfig auth source: %s", homeConfig)
 	return captureInsecure(conf, nil)
 }
 

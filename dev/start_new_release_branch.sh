@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Start new release branch
 

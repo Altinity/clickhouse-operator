@@ -71,6 +71,21 @@ func init() {
 
 // Run is an entry point of the application
 func Run() {
+	// ACVP responder trampoline: if argv[0] is *-acvp (e.g.
+	// metrics-exporter-acvp) and the binary was built with -tags acvp_wrapper,
+	// hand control to the ACVP stdin/stdout responder before any exporter-side
+	// initialization (chop.Config, k8s client construction, Prometheus HTTP
+	// endpoint, CHI discovery). In default builds this is a no-op stub that
+	// keeps the responder package out of the production binary. Mirror of the
+	// operator-side trampoline in cmd/operator/app/main.go. See
+	// acvp_dispatch_{on,off}.go. Note: flag.Parse runs in this package's
+	// init() and has already completed by the time Run() executes, but the
+	// ACVP responder ignores flags and only reads argv[0] / stdin, so the
+	// ordering is harmless.
+	if TryACVPDispatch() {
+		return // unreachable: TryACVPDispatch calls os.Exit on dispatch
+	}
+
 	if versionRequest {
 		fmt.Printf("%s\n", version.Version)
 		os.Exit(0)
@@ -95,6 +110,13 @@ func Run() {
 	// Create operator instance
 	chop.New(kubeClient, chopClient, chopConfigFile)
 	log.Info(chop.Config().String(true))
+
+	// Validate the runtime FIPS posture against chopconf security.policy.
+	// Same gate the operator binary runs; both share the chopconf singleton via
+	// the chop package, and the exporter ships in the same Pod / same image, so
+	// build-mode parity is guaranteed but the runtime mismatch (e.g. missing
+	// GODEBUG on the exporter container) is caught here.
+	fipsGate()
 
 	exporter := clickhouse.StartMetricsREST(
 		metricsEP,

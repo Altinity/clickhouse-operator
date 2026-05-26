@@ -1,0 +1,146 @@
+name: cosign_sign
+
+on:
+  workflow_run:
+    workflows: ['build_branch']
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      image_ref:
+        description: 'Full image ref to sign (e.g. docker.io/altinity/clickhouse-operator:0.27.1). Leave blank to sign release-file images.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  cosign_sign:
+    name: cosign_sign
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          # workflow_run defaults to the default branch, NOT the ref that built
+          # the images upstream, so `cat release` could read the wrong file.
+          # Pin to the head commit of the triggering run; fall back to
+          # github.sha for the workflow_dispatch path (no workflow_run context).
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Resolve image refs
+        id: refs
+        env:
+          DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
+          INPUT_IMAGE_REF: ${{ github.event.inputs.image_ref }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_IMAGE_REF}" ]; then
+            echo "Manual dispatch with explicit image_ref=${INPUT_IMAGE_REF}"
+            echo "images=${INPUT_IMAGE_REF}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${DOCKER_ORG}" ]; then
+            echo "secrets.DOCKER_ORG is not set (likely a fork). Skipping signing."
+            echo "images=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          export CHO_RELEASE=$(cat release)
+          echo "Resolved CHO_RELEASE=${CHO_RELEASE} DOCKER_ORG=${DOCKER_ORG}"
+          OP_IMG="docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE}"
+          ME_IMG="docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE}"
+          echo "images=${OP_IMG} ${ME_IMG}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve digests (sign immutable refs, not floating tags)
+        id: digests
+        if: ${{ steps.refs.outputs.images != '' }}
+        run: |
+          set -euo pipefail
+          # Sigstore convention: sign by digest so a future registry-side retag
+          # cannot leave the signature pointing at different bytes than what
+          # release-evidence captured. The tag is resolved to its current digest
+          # exactly once here, then every sign/verify step uses the immutable form.
+          refs=""
+          for img in ${{ steps.refs.outputs.images }}; do
+            base="${img%:*}"
+            digest=$(docker buildx imagetools inspect "${img}" --format '{{.Manifest.Digest}}')
+            if [[ ! "${digest}" =~ ^sha256: ]]; then
+              echo "failed to resolve digest for ${img}: got '${digest}'" >&2
+              exit 1
+            fi
+            pinned="${base}@${digest}"
+            echo "resolved ${img} -> ${pinned}"
+            refs="${refs} ${pinned}"
+          done
+          echo "pinned=${refs# }" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Docker Hub
+        # Keyless cosign still needs registry write access to push the signature
+        # OCI artifact alongside the image. Gated by the same images!='' check
+        # as the sign step so fork PRs (no DOCKER_* secrets) skip cleanly.
+        if: ${{ steps.refs.outputs.images != '' }}
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+        run: |
+          set -euo pipefail
+          echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin docker.io
+
+      - name: Sign images (keyless via Sigstore)
+        if: ${{ steps.refs.outputs.images != '' }}
+        run: |
+          set -euo pipefail
+          for img in ${{ steps.digests.outputs.pinned }}; do
+            echo "Signing ${img}"
+            cosign sign --yes "${img}"
+          done
+
+      - name: Verify signatures
+        if: ${{ steps.refs.outputs.images != '' }}
+        run: |
+          set -euo pipefail
+          for img in ${{ steps.digests.outputs.pinned }}; do
+            echo "Verifying ${img}"
+            cosign verify \
+              --certificate-identity-regexp "https://github.com/Altinity/clickhouse-operator/.*" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "${img}"
+          done
+
+      - name: Collect signature digests
+        if: ${{ steps.refs.outputs.images != '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p cosign-evidence
+          for img in ${{ steps.digests.outputs.pinned }}; do
+            safe=$(echo "${img}" | tr '/:@' '___')
+            echo "Capturing digest + signature payload for ${img}"
+            cosign triangulate "${img}" > "cosign-evidence/${safe}.sig-ref.txt"
+            # The "Verify signatures" step above already fails the job hard if
+            # any signature is bad. This re-run only captures the verify output
+            # as an evidence artifact, so `|| true` preserves partial evidence
+            # without re-asserting on an already-checked verify result.
+            cosign verify \
+              --certificate-identity-regexp "https://github.com/Altinity/clickhouse-operator/.*" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "${img}" > "cosign-evidence/${safe}.verify.json" 2>&1 || true
+          done
+          ls -la cosign-evidence/
+
+      - name: Upload cosign evidence artifact
+        if: ${{ steps.refs.outputs.images != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosign-evidence-${{ github.event.workflow_run.head_branch || github.ref_name }}
+          path: cosign-evidence/
+          retention-days: 365
+
+      - name: Skip notice
+        if: ${{ steps.refs.outputs.images == '' }}
+        run: echo "Nothing to sign (DOCKER_ORG not configured and no manual image_ref). Exiting cleanly."

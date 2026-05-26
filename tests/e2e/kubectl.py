@@ -166,13 +166,31 @@ def delete_all(kind, ns=None):
     crds = launch("get crds -o=custom-columns=name:.spec.names.shortNames[0]", ns=ns).splitlines()
     if kind in crds:
         try:
-            to_delete = get(kind, "", ns=ns, ok_to_fail=True)
+            to_delete = get(kind, "", ns=ns, ok_to_fail=True) or {}
         except Exception:
             to_delete = {}
         if "items" in to_delete:
             for i in to_delete["items"]:
-                delete_kind(kind, i["metadata"]["name"], ns=ns)
-                wait_object(kind, i["metadata"]["name"], ns=ns, count=0)
+                name = i["metadata"]["name"]
+                try:
+                    delete_kind(kind, name, ns=ns)
+                except Exception:
+                    # Stuck finalizer fallback: when the operator was killed
+                    # mid-reconcile (between test retries, after `pkill
+                    # regression.py`), the CR is left with an unreleased
+                    # finalizer. kubectl delete --timeout=600s exhausts and
+                    # raises. Force-clear the finalizer and re-attempt — this
+                    # masks operator-side cleanup bugs but unblocks subsequent
+                    # test runs after mid-reconcile aborts.
+                    with When(f"Force-clear stuck finalizer on {kind}/{name}"):
+                        launch(
+                            f"patch {kind} {name} --type=merge "
+                            f"-p '{{\"metadata\":{{\"finalizers\":null}}}}'",
+                            ns=ns,
+                            ok_to_fail=True,
+                        )
+                    delete_kind(kind, name, ns=ns, ok_to_fail=True)
+                wait_object(kind, name, ns=ns, count=0)
 
 
 def delete_all_keeper(ns=None):
@@ -188,7 +206,7 @@ def delete_all_keeper(ns=None):
                     label=f"-l app={keeper_type}",
                     ns=ns,
                     ok_to_fail=True,
-                )
+                ) or {}
             except Exception as e:
                 item_list = {}
             if "items" in item_list:

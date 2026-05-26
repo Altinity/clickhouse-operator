@@ -1,0 +1,173 @@
+# ACVP reproducibility check for the Go FIPS 140-3 cryptographic module.
+#
+# WHAT
+#   Builds the operator and metrics-exporter binaries with `GOFIPS140=v1.0.0`
+#   and `-tags acvp_wrapper`, then drives BoringSSL's `acvptool` against each
+#   binary's stdin/stdout `*-acvp` argv0 dispatch (see
+#   `cmd/operator/app/acvp_dispatch_on.go`). The driver script lives at
+#   `pkg/util/fips/acvp/run.sh` and pins both BoringSSL and
+#   `geomys/acvp-testdata` to specific commits so vector output is bit-for-bit
+#   reproducible.
+#
+# WHY BOTH BINARIES
+#   Each binary statically links its own copy of the Go FIPS module. The
+#   linker (with GOFIPS140 set) emits a per-binary self-test stamp and the
+#   ACVP responder is part of that linked artifact. We can only claim ACVP
+#   reproducibility for an image after running the test against the artifact
+#   that ships in that image — there is no single "operator image" that
+#   covers both; they are independently linked. Run both, gate the release
+#   on both.
+#
+# WHEN IT RUNS
+#   - workflow_dispatch (manual; for release evidence collection)
+#   - push to master
+#   - pull_request that touches the ACVP wrapper, the cmd/ entrypoints, the
+#     dockerfiles, or this workflow itself
+#
+# OUTPUTS
+#   Each job archives `acvp-evidence-<binary>-<sha>.tar.gz` containing the
+#   acvptool run log, pinned BoringSSL/testdata commit hashes, and the
+#   built binary's `go version -m` output. Per `docs/security_hardening.md`
+#   Release Gate item #12 (release evidence archival), this artifact is the
+#   reproducibility trail attached to the corresponding tagged release.
+#
+# FAILURE SEMANTICS
+#   A vector mismatch fails `pkg/util/fips/acvp/run.sh` with non-zero exit
+#   and the GitHub job fails. This is a hard CI gate when the workflow runs
+#   — a green run is required before tagging a FIPS-evidence release.
+
+name: acvp_test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+    paths:
+      - 'pkg/util/fips/acvp/**'
+      - 'cmd/operator/**'
+      - 'cmd/metrics_exporter/**'
+      - 'dockerfile/**'
+      - '.github/workflows/acvp_test.yaml'
+
+jobs:
+  acvp:
+    name: ACVP ${{ matrix.binary }}
+    runs-on: ubuntu-latest
+    # ACVP run pulls BoringSSL + testdata, builds Go binary, then streams a
+    # large vector set through stdin/stdout. Empirically ~15-25 min per
+    # binary on ubuntu-latest; cap at 60 to absorb network variance.
+    timeout-minutes: 60
+    strategy:
+      # Run both binaries even if one fails — partial evidence is still
+      # useful and the second job's failure isolates which binary regressed.
+      fail-fast: false
+      matrix:
+        include:
+          - binary: clickhouse-operator
+            cmd_path: ./cmd/operator/main.go
+          - binary: metrics-exporter
+            cmd_path: ./cmd/metrics_exporter/main.go
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          # Reuse the production Go version from go.mod so the ACVP run
+          # exercises the same toolchain that ships in the released image.
+          go-version-file: go.mod
+
+      - name: Resolve build configuration
+        id: cfg
+        run: |
+          set -euo pipefail
+          # Source the canonical build config so GOFIPS140 stays in sync with
+          # dev/image_build_universal.sh and the dockerfiles. Don't hard-code
+          # v1.0.0 here — single source of truth is dev/go_build_config.sh.
+          source ./dev/go_build_config.sh
+          echo "gofips140=${GOFIPS140}" >> "${GITHUB_OUTPUT}"
+          echo "go_version=${GO_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "git_sha=${GIT_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved: GOFIPS140=${GOFIPS140} GO_VERSION=${GO_VERSION} VERSION=${VERSION} GIT_SHA=${GIT_SHA}"
+
+      - name: Build ${{ matrix.binary }} with -tags acvp_wrapper
+        env:
+          # Match the dockerfile acvp-builder stage exactly: vendor mode,
+          # CGO off, GOFIPS140 set, acvp_wrapper tag. Any divergence here
+          # invalidates the reproducibility claim for the shipped image.
+          CGO_ENABLED: "0"
+          GO111MODULE: "on"
+          GOOS: linux
+          GOARCH: amd64
+          GOFIPS140: ${{ steps.cfg.outputs.gofips140 }}
+        run: |
+          set -euo pipefail
+          mkdir -p dev/bin
+          go build \
+            -mod=vendor \
+            -a \
+            -tags acvp_wrapper \
+            -o "dev/bin/${{ matrix.binary }}" \
+            ${{ matrix.cmd_path }}
+          # argv0 dispatch: the ACVP responder fires only when the basename
+          # ends in `-acvp` (see cmd/operator/app/acvp_dispatch_on.go).
+          ln -snvf "${{ matrix.binary }}" "dev/bin/${{ matrix.binary }}-acvp"
+          ls -la "dev/bin/"
+
+      - name: Confirm FIPS module is linked into the binary
+        run: |
+          set -euo pipefail
+          # `go version -m` prints the embedded build settings including the
+          # GOFIPS140 marker. Capturing this into evidence is cheap and proves
+          # the binary actually has the FIPS module statically linked rather
+          # than just having the env var set during build.
+          go version -m "dev/bin/${{ matrix.binary }}" | tee "dev/bin/${{ matrix.binary }}.gobuildinfo.txt"
+          grep -q "GOFIPS140" "dev/bin/${{ matrix.binary }}.gobuildinfo.txt" \
+            || { echo "ERROR: GOFIPS140 not present in build info — module not linked"; exit 1; }
+
+      - name: Run ACVP reproducibility driver
+        env:
+          # The driver writes its run report under this directory; the upload
+          # step then tarballs it. Keep the path stable across the matrix so
+          # the upload step doesn't need per-binary branching.
+          ACVP_REPORT_DIR: ${{ github.workspace }}/acvp-out
+          # Point the driver at the binary we just built rather than letting
+          # it rebuild — keeps the build/test artifact 1:1.
+          ACVP_BINARY: ${{ github.workspace }}/dev/bin/${{ matrix.binary }}-acvp
+        run: |
+          set -euo pipefail
+          mkdir -p "${ACVP_REPORT_DIR}"
+          # The driver is the source of truth for pinned commits and which
+          # vector set to run. This workflow intentionally stays thin so the
+          # same driver runs locally and in CI.
+          bash ./pkg/util/fips/acvp/run.sh
+
+      - name: Package ACVP evidence
+        if: always()
+        run: |
+          set -euo pipefail
+          # Always archive evidence — even on failure, the partial run log
+          # is what we need to triage which vector diverged.
+          mkdir -p acvp-evidence
+          tar -czf "acvp-evidence/acvp-evidence-${{ matrix.binary }}-${{ steps.cfg.outputs.git_sha }}.tar.gz" \
+            -C "${{ github.workspace }}" \
+            acvp-out \
+            "dev/bin/${{ matrix.binary }}.gobuildinfo.txt"
+          ls -la acvp-evidence/
+
+      - name: Upload ACVP evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          # Name encodes binary + commit so a release maintainer can map the
+          # artifact to a specific image digest without opening the tarball.
+          name: acvp-evidence-${{ matrix.binary }}-${{ steps.cfg.outputs.git_sha }}
+          path: acvp-evidence/*.tar.gz
+          if-no-files-found: error
+          # Release evidence is referenced from release notes — keep it for
+          # the full GitHub Actions max so links don't go stale during audit.
+          retention-days: 90

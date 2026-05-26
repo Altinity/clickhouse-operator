@@ -24,6 +24,12 @@ The Altinity Kubernetes Operator for ClickHouse creates, configures and manages 
 - ClickHouse cluster scaling including automatic schema propagation
 - ClickHouse version upgrades
 - Exporting ClickHouse metrics to Prometheus
+- FIPS 140-3 compatible operator + metrics-exporter images
+  (`GOFIPS140=v1.0.0`, `GODEBUG=fips140=on` by default) — see
+  [Security Hardening][security_hardening] for the FIPS scope, prerequisites,
+  and opt-in strict mode. An optional ACVP responder (NIST cryptographic
+  validation protocol) is available via `-tags acvp_wrapper` builds; see
+  [`pkg/util/fips/acvp/README.md`](./pkg/util/fips/acvp/README.md).
 
 ## Community
 

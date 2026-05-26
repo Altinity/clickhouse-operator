@@ -261,7 +261,9 @@ def make_http_get_request(host, port, path):
     return f"bash -c '{cmd}'"
 
 
-def get_metrics(operator_pod, operator_namespace=None, container="metrics-exporter", port="8888"):
+def get_metrics(operator_pod=None, operator_namespace=None, container="metrics-exporter", port="8888"):
+    if operator_pod is None:
+        operator_pod = kubectl.get_operator_pod()
     if operator_namespace is None:
         operator_namespace = current().context.operator_namespace
 

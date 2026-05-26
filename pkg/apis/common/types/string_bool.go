@@ -14,10 +14,60 @@
 
 package types
 
-import "strings"
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
 
 // StringBool defines string representation of a bool type
 type StringBool string
+
+// UnmarshalJSON accepts native JSON bool (true/false), integer (0/1), or string
+// ("true", "yes", "On", "enabled", "1", etc.) and normalizes to a canonical
+// string form. Lets users write `secure: true` (native YAML bool) or
+// `secure: "true"` (string) interchangeably in their CRs — kubectl converts
+// YAML to JSON before submitting, so this is the load-bearing surface.
+//
+// The CRD schema mirrors this polymorphism via `anyOf:[boolean,integer,string]`
+// at the &TypeStringBool anchor in deploy/builder/templates-install-bundle.
+func (s *StringBool) UnmarshalJSON(data []byte) error {
+	// null → leave at zero value (the parent's *StringBool stays nil-like)
+	str := string(data)
+	if str == "null" {
+		return nil
+	}
+	// String form ("true", "yes", "On", "1", etc.) — most common path through
+	// the legacy kubectl→sigs.k8s.io/yaml pipeline. Quotes are present in JSON.
+	if len(data) > 0 && data[0] == '"' {
+		var v string
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		*s = StringBool(v)
+		return nil
+	}
+	// Bool form (native YAML bool round-tripped to JSON bool by kubectl)
+	if str == "true" {
+		*s = StringBoolTrueFirstCapital
+		return nil
+	}
+	if str == "false" {
+		*s = StringBoolFalseFirstCapital
+		return nil
+	}
+	// Integer form (0/1 — the legacy ClickHouse-config vocabulary)
+	var n int
+	if err := json.Unmarshal(data, &n); err == nil {
+		if n == 0 {
+			*s = StringBool0
+		} else {
+			*s = StringBool1
+		}
+		return nil
+	}
+	return fmt.Errorf("StringBool: cannot unmarshal %s — expected bool, integer (0/1), or string", str)
+}
 
 // Set of string boolean constants
 const (

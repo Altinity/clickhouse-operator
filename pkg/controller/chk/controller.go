@@ -103,7 +103,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	w.reconcileCR(context.TODO(), nil, new)
+	w.reconcileCR(ctx, nil, new)
 
 	return ctrl.Result{}, nil
 }
@@ -160,11 +160,10 @@ func (c *Controller) poll(ctx context.Context, cr api.ICustomResource, f func(c 
 
 			// Go to next poll cycle, retry
 
-			if util.IsContextDone(ctx) {
+			if util.WaitContextDoneOrTimeout(ctx, 15*time.Second) {
 				log.V(1).Info("Poll is aborted before retry. CR: %s", cr.GetName())
 				return
 			}
-			time.Sleep(15 * time.Second)
 			continue
 		}
 
@@ -172,11 +171,10 @@ func (c *Controller) poll(ctx context.Context, cr api.ICustomResource, f func(c 
 
 		if f(chk, err) {
 			// Function says to continue polling
-			if util.IsContextDone(ctx) {
+			if util.WaitContextDoneOrTimeout(ctx, 15*time.Second) {
 				log.V(1).Info("Poll is aborted after polling fn. CR: %s", cr.GetName())
 				return
 			}
-			time.Sleep(15 * time.Second)
 		} else {
 			// Function says to stop polling
 			return

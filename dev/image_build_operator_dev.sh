@@ -10,6 +10,6 @@ source "${CUR_DIR}/go_build_config.sh"
 # Externally configurable build-dependent options
 TAG="${TAG:-"dev"}"
 DOCKER_IMAGE="altinity/clickhouse-operator:${TAG}"
-DOCKERHUB_LOGIN="${DOCKERHUB_LOGIN}"
+DOCKERHUB_LOGIN="${DOCKERHUB_LOGIN:-}"
 
 source "${CUR_DIR}/image_build_operator_universal.sh"

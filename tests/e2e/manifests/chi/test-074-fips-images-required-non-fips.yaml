@@ -6,7 +6,7 @@ spec:
   configuration:
     # No PodTemplate → host resolves to operator default image
     # (clickhouse/clickhouse-server:latest), which lacks the "fips" tag
-    # substring and MUST be rejected under security.fips.images.policy=Required.
+    # substring and MUST be rejected under security.images.policy=Required.
     clusters:
       - name: c1
         layout:

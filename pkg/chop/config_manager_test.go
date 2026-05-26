@@ -38,38 +38,50 @@ func TestErrInsecureKubeconfigRejected_IsSentinel(t *testing.T) {
 
 // TestK8sInsecureGate_Policy tables the gate predicate exercised by
 // ConfigManager.Init via OperatorConfig.RequiresStrictK8sTLS(). The predicate
-// must fire when EITHER security.kubernetes.tls.verify is Strict OR
-// security.fips.enforced is true (FIPS one-way coerces verify to Strict, so
-// the gate cannot wait for applyFIPSStrict to run on the file-based config).
+// must fire when ANY of these are true:
+//   - security.kubernetes.tls.verify is Strict (explicit per-component setting)
+//   - security.policy is Enforced (master coercion to Strict)
+//   - security.fips.enforced is true (FIPS master switch — also one-way coerces
+//     verify to Strict via applyEnforcedHardening)
+//
+// The gate cannot wait for applyEnforcedHardening to run on the file-based
+// config, so the predicate must see both switches directly.
 //
 // Each case asserts the rejection outcome directly against the inputs, so a
 // wrong-cell rewrite (e.g. swapping TLSVerifyStrict and TLSVerifyNone in the
-// predicate, or forgetting the FIPS branch) fails loudly.
+// predicate, or forgetting either the Policy or FIPS branch) fails loudly.
 func TestK8sInsecureGate_Policy(t *testing.T) {
 	strict := types.NewString(string(api.TLSVerifyStrict))
 	none := types.NewString(string(api.TLSVerifyNone))
+	enforced := types.NewString(string(api.SecurityPolicyEnforced))
 	fipsOn := &api.OperatorConfigSecurityFIPS{Enforced: types.NewStringBool(true)}
 	cases := []struct {
 		name           string
 		kubeInsecure   bool
 		verify         *types.String
+		policy         *types.String
 		fips           *api.OperatorConfigSecurityFIPS
 		expectRejected bool
 	}{
-		{"safe kubeconfig + nil verify + no FIPS", false, nil, nil, false},
-		{"safe kubeconfig + verify=Strict + no FIPS", false, strict, nil, false},
-		{"safe kubeconfig + FIPS enforced", false, nil, fipsOn, false},
-		{"insecure kubeconfig + nil verify + no FIPS (permissive default)", true, nil, nil, false},
-		{"insecure kubeconfig + verify=None + no FIPS (explicit permit)", true, none, nil, false},
-		{"insecure kubeconfig + verify=Strict + no FIPS (reject)", true, strict, nil, true},
-		{"insecure kubeconfig + nil verify + FIPS enforced (reject — FIPS coerces verify to Strict)", true, nil, fipsOn, true},
-		{"insecure kubeconfig + verify=None + FIPS enforced (reject — FIPS overrides)", true, none, fipsOn, true},
+		{"safe kubeconfig + nil verify + Permissive", false, nil, nil, nil, false},
+		{"safe kubeconfig + verify=Strict + Permissive", false, strict, nil, nil, false},
+		{"safe kubeconfig + Enforced", false, nil, enforced, nil, false},
+		{"safe kubeconfig + FIPS.enforced", false, nil, nil, fipsOn, false},
+		{"insecure kubeconfig + nil verify + Permissive (default)", true, nil, nil, nil, false},
+		{"insecure kubeconfig + verify=None + Permissive (explicit permit)", true, none, nil, nil, false},
+		{"insecure kubeconfig + verify=Strict + Permissive (reject)", true, strict, nil, nil, true},
+		{"insecure kubeconfig + nil verify + Enforced (reject — Policy coerces verify to Strict)", true, nil, enforced, nil, true},
+		{"insecure kubeconfig + verify=None + Enforced (reject — Policy overrides)", true, none, enforced, nil, true},
+		// FIPS branch — applyEnforcedHardening also fires on fips.enforced.
+		{"insecure kubeconfig + nil verify + FIPS.enforced (reject — FIPS coerces verify to Strict)", true, nil, nil, fipsOn, true},
+		{"insecure kubeconfig + verify=None + FIPS.enforced (reject — FIPS overrides)", true, none, nil, fipsOn, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			cfg := &api.OperatorConfig{
 				Security: api.OperatorConfigSecurity{
 					Kubernetes: &api.ClusterSecurityKubernetes{TLS: &api.ClusterSecurityKubernetesTLS{Verify: c.verify}},
+					Policy:     c.policy,
 					FIPS:       c.fips,
 				},
 			}

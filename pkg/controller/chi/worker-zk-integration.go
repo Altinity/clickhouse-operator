@@ -16,6 +16,7 @@ package chi
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
 )
@@ -54,11 +55,17 @@ func ensureZkPath(cluster *api.Cluster) {
 	zk := cluster.GetSecurity().GetZookeeper().GetTLS()
 	mv := zk.GetMinVersion()
 	verify := zk.GetVerify()
+	// FIPS-compatible mode rejects ZK digest-auth (SHA-1 password hashing
+	// inside the vendored go-zookeeper library). Pulled at dial-construction
+	// time so each connection inherits the chopconf decision atomically.
+	// Fires under EITHER security.policy=Enforced OR security.fips.enforced=true.
+	rejectDigest := chop.Config().Security.RequiresHardening()
 	var params *zookeeper.ConnectionParams
-	if (mv != "") || (verify == api.TLSVerifyNone) {
+	if (mv != "") || (verify == api.TLSVerifyNone) || rejectDigest {
 		params = &zookeeper.ConnectionParams{
 			MinTLSVersion:      string(mv),
 			InsecureSkipVerify: verify == api.TLSVerifyNone,
+			RejectDigestAuth:   rejectDigest,
 		}
 	}
 	conn := zookeeper.NewConnection(cluster.Zookeeper.Nodes, params)

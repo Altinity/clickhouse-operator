@@ -56,5 +56,6 @@ tests/image/cache
 CLAUDE.md
 AGENTS.md
 .claude
+.omc
 
 /.cr-release-packages

@@ -4,11 +4,10 @@ metadata:
   name: "test-074-fips-images-required-chopconf"
 spec:
   security:
-    fips:
-      # Image-policy gate. Required refuses CRs whose CH/Keeper images lack
-      # the "fips" tag substring (admission) AND aborts running CRs whose
-      # `SELECT version()` lacks "fips" (post-Ready confirmation).
-      # Orthogonal to fips.enforced — we keep TLS posture at default for
-      # this test so we can isolate the image-policy assertion.
-      images:
-        policy: Required
+    # Image-policy gate. FIPSRequired refuses CRs whose CH/Keeper images lack
+    # the "fips" tag substring (admission) AND aborts running CRs whose
+    # `SELECT version()` lacks "fips" (post-Ready confirmation).
+    # Orthogonal to security.policy — we keep TLS posture at Permissive for
+    # this test so we can isolate the image-policy assertion.
+    images:
+      policy: FIPSRequired

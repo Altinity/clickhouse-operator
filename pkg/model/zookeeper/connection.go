@@ -237,11 +237,30 @@ func (c *Connection) connectionAddAuth(ctx context.Context) {
 		log.Error("failed to parse auth file content, expected format <scheme>:<auth> but saw: %s", authInfo)
 		return
 	}
-	err = c.connection.AddAuth(authInfoParts[0], []byte(authInfoParts[1]))
+	scheme := authInfoParts[0]
+	// Reject ZK digest-auth under FIPS-compatible mode. The "digest" scheme
+	// in the vendored go-zookeeper library uses SHA-1 password hashing
+	// internally — strict FIPS runtime (`fips140=only`) would panic at
+	// use-time, and `fips140=on` filters approved primitives. The operator's
+	// FIPS scope specification (§2 line 46 / §3 step 3) requires an explicit
+	// decision; we reject here when chopconf signals FIPS. Non-digest schemes
+	// (sasl, x509, ip, world) are unaffected.
+	if shouldRejectAuthScheme(c.RejectDigestAuth, scheme) {
+		log.Error("zk auth scheme %q rejected under FIPS-compatible mode (security.policy=Enforced); use a non-digest scheme (sasl, x509) or disable FIPS", scheme)
+		return
+	}
+	err = c.connection.AddAuth(scheme, []byte(authInfoParts[1]))
 	if err != nil {
 		log.Error("failed to add auth to zk connection: %v", err)
 		return
 	}
+}
+
+// shouldRejectAuthScheme returns true when the FIPS-rejected ZK auth scheme
+// would be invoked. Pure function: extracted for testability of the predicate
+// (the call site is tightly coupled to a live ZK connection).
+func shouldRejectAuthScheme(rejectDigest bool, scheme string) bool {
+	return rejectDigest && strings.EqualFold(scheme, "digest")
 }
 
 func (c *Connection) connectionEventsProcessor(connection ZKClient, events <-chan zk.Event) {
@@ -321,7 +340,7 @@ func (c *Connection) connect(servers []string) (ZKClient, <-chan zk.Event, error
 			Certificates:       []tls.Certificate{cert},
 			RootCAs:            clientCertPool,
 			ServerName:         serverName,
-			MinVersion:         tlsutil.VersionUint16(api.NewTLSMinVersion(c.MinTLSVersion)),
+			MinVersion:         tlsutil.VersionUint16(c.MinTLSVersion),
 			InsecureSkipVerify: c.InsecureSkipVerify,
 		}
 

@@ -34,6 +34,15 @@ import (
 // const clickHouseDriverName = "clickhouse"
 const clickHouseDriverName = "chhttp"
 
+// init registers the legacy `tlsSettingsLegacy` DSN key with an insecure
+// TLS config for pre-0.27.1 back-compat. Under FIPS-enforced startup the
+// chop fipsGate (cmd/operator/app/fips_gate.go, cmd/metrics_exporter/app/
+// fips_gate.go) calls EnforceVerifiedLegacyTLS *before* any DB connect
+// is opened, re-registering the same key with a verifying config. This
+// invariant is load-bearing: any new caller that establishes a ClickHouse
+// connection before fipsGate runs would bypass the verified-TLS override.
+// Don't import this package from early-init paths (flag parsers, version
+// commands) without keeping the gate-first ordering intact.
 func init() {
 	setupTLSBasic()
 }
@@ -125,6 +134,33 @@ func setupTLSBasic() {
 	})
 }
 
+// EnforceVerifiedLegacyTLS re-registers the legacy tlsSettingsLegacy key with a
+// verifying tls.Config (system trust store, no InsecureSkipVerify). Called
+// from the FIPS startup gate when chopconf.security.policy=Enforced so any
+// DSN that didn't go through setupTLSAdvanced still gets verified TLS rather
+// than the default-insecure legacy registration. Pre-FIPS behavior preserved
+// by NOT calling this when FIPS is disabled.
+//
+// MinVersion is set explicitly to TLS 1.2 (the FIPS spec floor) rather than
+// relying on the Go stdlib default. 1.2 is chosen over 1.3 because this legacy
+// code path serves unkeyed DSNs that may target older ClickHouse servers;
+// users can raise the floor at the per-cluster security.clickhouse.tls.minVersion
+// knob without affecting this legacy fallback.
+func EnforceVerifiedLegacyTLS() {
+	goch.RegisterTLSConfig(tlsSettingsLegacy, legacyVerifiedTLSConfig())
+}
+
+// legacyVerifiedTLSConfig builds the verifying tls.Config that
+// EnforceVerifiedLegacyTLS registers. Extracted as a pure helper so unit tests
+// can pin the InsecureSkipVerify polarity and explicit MinVersion floor
+// without reaching into the driver's unexported registry.
+func legacyVerifiedTLSConfig() *tls.Config {
+	return &tls.Config{
+		InsecureSkipVerify: false,
+		MinVersion:         tls.VersionTLS12,
+	}
+}
+
 // setupTLSAdvanced builds and registers the tls.Config for this connection's
 // endpoint under a content-hash key (EndpointCredentials.TLSConfigKey). Two
 // endpoints with identical security knobs share one registered config; two
@@ -161,7 +197,7 @@ func (c *Connection) setupTLSAdvanced() {
 
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: insecure,
-		MinVersion:         tlsutil.VersionUint16(minVersion),
+		MinVersion:         tlsutil.VersionUint16(string(minVersion)),
 	}
 	if serverName != "" {
 		tlsConfig.ServerName = serverName

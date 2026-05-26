@@ -64,7 +64,7 @@ func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Hos
 }
 
 // enforceFIPSImagePolicyRuntime checks the running binary's `SELECT version()`
-// reply against security.fips.images.policy. Called after the host is alive
+// reply against security.images.policy. Called after the host is alive
 // and `version()` has been fetched. Returns common.ErrCRUDAbort when the CR
 // is aborted, so the error propagates to reconcile() which routes it through
 // markReconcileCompletedUnsuccessfully (the established abort persistence
@@ -78,7 +78,7 @@ func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Hos
 //
 // No-op (returns nil) when policy is Permissive or unset.
 func (w *worker) enforceFIPSImagePolicyRuntime(host *api.Host, version *swversion.SoftWareVersion) error {
-	if !chop.Config().Security.GetFIPS().GetImages().IsRequired() {
+	if !chop.Config().Security.GetImages().IsRequired() {
 		return nil
 	}
 	if version == nil {
@@ -89,7 +89,7 @@ func (w *worker) enforceFIPSImagePolicyRuntime(host *api.Host, version *swversio
 	}
 	host.GetCR().IEnsureStatus().ReconcileAbortWithReason(
 		api.StatusReasonFIPSImagePolicyViolation,
-		fmt.Sprintf("host %s SELECT version()=%q lacks 'fips' substring (security.fips.images.policy=Required)",
+		fmt.Sprintf("host %s SELECT version()=%q lacks 'fips' substring (security.images.policy=Required)",
 			host.GetName(), version.GetOriginal()),
 	)
 	return common.ErrCRUDAbort

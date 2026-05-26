@@ -4,6 +4,11 @@ metadata:
   name: "test-073-fips-strict-chopconf"
 spec:
   security:
+    # Master TLS switch — coerce per-component knobs + reject plain-text ZK.
+    policy: Enforced
+    # FIPS runtime gate — assert the operator binary was built with GOFIPS140
+    # and crypto/fips140 is Enabled at process start. Orthogonal to policy
+    # (transport hardening) but bundled here so the chopconf exercises both
+    # the TLS-coercion and FIPS-module-enforcement paths in one fixture.
     fips:
-      # Master switch — coerce per-component knobs + reject plain-text ZK.
-      enforced: "yes"
+      enforced: "true"

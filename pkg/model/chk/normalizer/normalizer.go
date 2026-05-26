@@ -15,7 +15,6 @@
 package normalizer
 
 import (
-	"fmt"
 	"strings"
 
 	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
@@ -31,10 +30,10 @@ import (
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
+	commonfips "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/fips"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
-	utilfips "github.com/altinity/clickhouse-operator/pkg/util/fips"
 )
 
 // Normalizer specifies structures normalizer
@@ -945,7 +944,7 @@ func (n *Normalizer) normalizeShardInternalReplication(shard *chk.ChkShard) {
 // (CHK-spec merge already ran in InheritClusterSecurityFrom). Pattern mirrors
 // normalizeClusterReconcile. 3-level inheritance: CHOP-config → CHK spec → cluster.
 //
-// When chopconf has security.fips.enforced=yes, this also enforces FIPS posture
+// When chopconf has security.policy=Enforced, this also enforces FIPS posture
 // at the cluster level — cluster-level explicit Verify=None or MinVersion=1.2
 // would otherwise bypass the chopconf-level coercion. Bypass attempts trigger
 // the same ReconcileAbort path as the CHI normalizer's gate.
@@ -958,101 +957,50 @@ func (n *Normalizer) normalizeClusterSecurity(security *chi.ClusterSecurity) *ch
 	chopSecurity := &chop.Config().Security
 	security.ClickHouse = security.ClickHouse.MergeFrom(chopSecurity.GetClickHouse(), chi.MergeTypeFillEmptyValues)
 	security.Zookeeper = security.Zookeeper.MergeFrom(chopSecurity.GetZookeeper(), chi.MergeTypeFillEmptyValues)
-	if chopSecurity.GetFIPS().IsEnforced() {
+	if chopSecurity.RequiresHardening() {
 		n.rejectFIPSBypass(security)
 	}
 	return security
 }
 
-// rejectFIPSBypass aborts the CHK if the cluster's resolved Security explicitly
-// relaxes any of the FIPS-coerced knobs. Same intent as the CHI normalizer:
-// CHOP-level applyFIPSStrict coerces operator-wide defaults; cluster-level
-// values can still set Verify=None / MinVersion=1.2 / AllowInsecure=yes, and
-// under FIPS that's a bypass attempt.
+// rejectFIPSBypass aborts the CHK if the cluster's resolved Security
+// explicitly relaxes any of the FIPS-coerced knobs. CHK mirror of the CHI
+// gate: CHOP-level applyFIPSStrict coerces operator-wide defaults; cluster-
+// level values can still set Verify=None / MinVersion<1.2 / kubernetes.tls.
+// verify=None, and under FIPS that's a bypass attempt. Delegates to the
+// shared CHI/CHK helper so behavior cannot drift between the two normalizers.
 func (n *Normalizer) rejectFIPSBypass(security *chi.ClusterSecurity) {
 	target := n.req.GetTarget()
 	if target == nil {
 		return
 	}
-	abort := func(field, value string) {
-		target.EnsureStatus().ReconcileAbortWithReason(
-			chk.StatusReasonFIPSValidationFailed,
-			fmt.Sprintf("FIPS strict: %s=%s is not permitted; remove the field or set Strict", field, value),
-		)
-	}
-	// FIPS-compatible minVersion floor is TLS 1.2 per NIST SP 800-52 Rev 2.
-	// Cluster may explicitly state 1.2 or 1.3 without bypass; anything else
-	// (i.e. an unrecognized value that survived normalization) is a bypass.
-	minVersionBypass := func(v chi.TLSMinVersion) bool {
-		if v == "" {
-			return false
-		}
-		return (v != chi.TLSMinVersion12) && (v != chi.TLSMinVersion13)
-	}
-	verifyBypass := func(v chi.TLSVerify) bool {
-		// Anything other than Strict at cluster level is a downgrade attempt
-		// under FIPS — including explicit empty ("") and None.
-		return v != chi.TLSVerifyStrict
-	}
-	if tls := security.GetClickHouse().GetTLS(); tls != nil {
-		if verifyBypass(tls.GetVerify()) {
-			abort("cluster.security.clickhouse.tls.verify", string(tls.GetVerify()))
-			return
-		}
-		if minVersionBypass(tls.GetMinVersion()) {
-			abort("cluster.security.clickhouse.tls.minVersion", string(tls.GetMinVersion()))
-			return
-		}
-	}
-	if zk := security.GetZookeeper().GetTLS(); zk != nil {
-		if verifyBypass(zk.GetVerify()) {
-			abort("cluster.security.zookeeper.tls.verify", string(zk.GetVerify()))
-			return
-		}
-		if minVersionBypass(zk.GetMinVersion()) {
-			abort("cluster.security.zookeeper.tls.minVersion", string(zk.GetMinVersion()))
-			return
-		}
-	}
-	// Kubernetes-API-client TLS is operator-process-scoped (one client per
-	// operator pod, gated at startup against the file-based chopconf) — there
-	// is no per-CHK knob to bypass. Enforcement lives entirely on
-	// OperatorConfigSecurity.Kubernetes (see RequiresStrictK8sTLS).
+	commonfips.RejectFIPSBypass(security, func(reason, msg string) {
+		target.EnsureStatus().ReconcileAbortWithReason(reason, msg)
+	}, chk.StatusReasonFIPSValidationFailed)
 }
 
 // enforceFIPSImagePolicy aborts the CHK at admission when chopconf has
-// security.fips.images.policy=Required and any host's resolved Keeper
+// security.images.policy=Required and any host's resolved Keeper
 // container image lacks the "fips" tag substring. CHK mirror of the CHI
 // gate — Altinity ships Keeper FIPS variants under the same `.altinityfips`
 // suffix convention as ClickHouse.
 func (n *Normalizer) enforceFIPSImagePolicy() {
-	if !chop.Config().Security.GetFIPS().GetImages().IsRequired() {
+	if !chop.Config().Security.GetImages().IsRequired() {
 		return
 	}
 	target := n.req.GetTarget()
 	if target == nil {
 		return
 	}
-	// First non-FIPS host aborts the CHK; remaining hosts skip silently so the
-	// error stream carries one tagged entry per CHK, not N (WalkHosts ignores
-	// callback errors, so a returned error wouldn't actually short-circuit).
-	aborted := false
-	target.WalkHosts(func(host *chi.Host) error {
-		if aborted {
-			return nil
-		}
-		image := resolveKeeperImage(host)
-		if utilfips.ImageHasFIPSMarker(image) {
-			return nil
-		}
-		target.EnsureStatus().ReconcileAbortWithReason(
-			chk.StatusReasonFIPSImagePolicyViolation,
-			fmt.Sprintf("host %s container %q image %q lacks 'fips' tag substring (security.fips.images.policy=Required)",
-				host.GetName(), chkConfig.KeeperContainerName, image),
-		)
-		aborted = true
-		return nil
-	})
+	commonfips.EnforceFIPSImagePolicy(
+		target,
+		resolveKeeperImage,
+		chkConfig.KeeperContainerName,
+		chk.StatusReasonFIPSImagePolicyViolation,
+		func(reason, msg string) {
+			target.EnsureStatus().ReconcileAbortWithReason(reason, msg)
+		},
+	)
 }
 
 // resolveKeeperImage returns the image string the operator would deploy for

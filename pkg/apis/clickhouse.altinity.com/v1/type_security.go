@@ -407,35 +407,32 @@ func (t *ClusterSecurityKubernetesTLS) GetMinVersion() TLSMinVersion {
 // they govern singletons inside the operator pod (the K8s API client, the
 // operator↔exporter loopback IPC, and the master FIPS switch).
 type OperatorConfigSecurity struct {
-	ClickHouse *ClusterSecurityClickHouse  `json:"clickhouse,omitempty" yaml:"clickhouse,omitempty"`
-	Zookeeper  *ClusterSecurityZookeeper   `json:"zookeeper,omitempty"  yaml:"zookeeper,omitempty"`
-	Kubernetes *ClusterSecurityKubernetes  `json:"kubernetes,omitempty" yaml:"kubernetes,omitempty"`
-	IPC        *OperatorConfigSecurityIPC  `json:"ipc,omitempty"        yaml:"ipc,omitempty"`
-	FIPS       *OperatorConfigSecurityFIPS `json:"fips,omitempty"       yaml:"fips,omitempty"`
+	ClickHouse *ClusterSecurityClickHouse    `json:"clickhouse,omitempty" yaml:"clickhouse,omitempty"`
+	Zookeeper  *ClusterSecurityZookeeper     `json:"zookeeper,omitempty"  yaml:"zookeeper,omitempty"`
+	Kubernetes *ClusterSecurityKubernetes    `json:"kubernetes,omitempty" yaml:"kubernetes,omitempty"`
+	IPC        *OperatorConfigSecurityIPC    `json:"ipc,omitempty"        yaml:"ipc,omitempty"`
+	Policy     *types.String                 `json:"policy,omitempty"     yaml:"policy,omitempty"`
+	Images     *OperatorConfigSecurityImages `json:"images,omitempty"     yaml:"images,omitempty"`
+	FIPS       *OperatorConfigSecurityFIPS   `json:"fips,omitempty"       yaml:"fips,omitempty"`
 }
 
-// OperatorConfigSecurityFIPS controls Strict FIPS mode operator-wide.
-// CHOP-config-only; no CHI override. When Enforced is true, the operator coerces
-// all per-component security toggles to their Strict positions at startup and
-// rejects CHIs that cannot be served in a FIPS-compatible posture (e.g. CHIs
-// referencing external ZooKeeper instead of FIPS-capable ClickHouse Keeper).
-//
-// Independent of the Go runtime FIPS toolchain (GOFIPS140 build flag). When the
-// operator binary is built with FIPS-validated crypto, the runtime can be
-// detected via crypto/fips140.Enforced() — wiring that detection in is a future
-// enhancement gated on the FIPS-build pipeline shipping first.
-type OperatorConfigSecurityFIPS struct {
-	Enforced *types.StringBool                 `json:"enforced,omitempty" yaml:"enforced,omitempty"`
-	Images   *OperatorConfigSecurityFIPSImages `json:"images,omitempty"   yaml:"images,omitempty"`
-}
-
-// OperatorConfigSecurityFIPSImages gates the operator against CHs/Keepers
-// whose container images aren't FIPS-built. Orthogonal to FIPS.Enforced —
-// users may run permissive TLS + strict image policy, or vice versa.
-type OperatorConfigSecurityFIPSImages struct {
+// OperatorConfigSecurityImages gates the operator against CHs/Keepers whose
+// container images aren't FIPS-built. Orthogonal to Policy — users may run
+// permissive TLS but strict image policy, or vice versa.
+type OperatorConfigSecurityImages struct {
 	// Policy selects Permissive (default) or Required. Valid values are
 	// FIPSImagePolicyPermissive and FIPSImagePolicyRequired.
 	Policy *types.String `json:"policy,omitempty" yaml:"policy,omitempty"`
+}
+
+// OperatorConfigSecurityFIPS controls FIPS cryptographic-module enforcement.
+// Orthogonal to security.policy (which governs transport hardening). When
+// Enforced is true, the operator Fatals at startup unless the binary was
+// built with GOFIPS140 and crypto/fips140 reports Enabled. Strict-runtime
+// disagreement (GODEBUG=fips140=only set, chopconf disabled) produces a
+// startup Warning, not a Fatal — see EvaluateGate.
+type OperatorConfigSecurityFIPS struct {
+	Enforced *types.StringBool `json:"enforced,omitempty" yaml:"enforced,omitempty"`
 }
 
 // OperatorConfigSecurityIPC controls the operator↔metrics-exporter REST
@@ -491,6 +488,43 @@ func (s *OperatorConfigSecurity) GetIPC() *OperatorConfigSecurityIPC {
 	return s.IPC
 }
 
+// GetPolicy returns the resolved SecurityPolicy. Defaults to
+// SecurityPolicyPermissive when unset so upgrades preserve 0.27.0 behavior.
+// Nil-safe.
+func (s *OperatorConfigSecurity) GetPolicy() SecurityPolicy {
+	if (s == nil) || (s.Policy == nil) || !s.Policy.HasValue() {
+		return SecurityPolicyPermissive
+	}
+	return normalizeSecurityPolicy(NewSecurityPolicy(s.Policy.Value()))
+}
+
+// IsEnforced reports whether security.policy is Enforced. Nil-safe.
+func (s *OperatorConfigSecurity) IsEnforced() bool {
+	return s.GetPolicy() == SecurityPolicyEnforced
+}
+
+// RequiresHardening returns true if any operator-wide hardening switch is on
+// (either security.policy=Enforced OR security.fips.enforced=true). Used to
+// gate per-CR security checks (plain-text ZK rejection, FIPS-bypass rejection,
+// ZK digest-auth rejection) so they fire under EITHER switch — the two
+// switches are orthogonal but the gates they trigger are the union (either
+// switch tightens the posture; neither should leave a documented gate open).
+// Nil-safe.
+func (s *OperatorConfigSecurity) RequiresHardening() bool {
+	if s == nil {
+		return false
+	}
+	return s.IsEnforced() || s.GetFIPS().IsEnforced()
+}
+
+// GetImages returns the Images sub-struct, nil-safe.
+func (s *OperatorConfigSecurity) GetImages() *OperatorConfigSecurityImages {
+	if s == nil {
+		return nil
+	}
+	return s.Images
+}
+
 // GetFIPS returns the FIPS sub-struct, nil-safe.
 func (s *OperatorConfigSecurity) GetFIPS() *OperatorConfigSecurityFIPS {
 	if s == nil {
@@ -499,26 +533,17 @@ func (s *OperatorConfigSecurity) GetFIPS() *OperatorConfigSecurityFIPS {
 	return s.FIPS
 }
 
-// IsEnforced reports whether Strict FIPS mode is requested. Nil-safe: nil
-// receiver returns false (default disabled).
+// IsEnforced reports whether security.fips.enforced=true is configured.
 func (f *OperatorConfigSecurityFIPS) IsEnforced() bool {
-	if (f == nil) || (f.Enforced == nil) || !f.Enforced.HasValue() {
+	if f == nil {
 		return false
 	}
-	return f.Enforced.Value()
-}
-
-// GetImages returns the Images sub-struct, nil-safe.
-func (f *OperatorConfigSecurityFIPS) GetImages() *OperatorConfigSecurityFIPSImages {
-	if f == nil {
-		return nil
-	}
-	return f.Images
+	return f.Enforced.IsTrue()
 }
 
 // GetPolicy returns the resolved FIPSImagePolicy. Defaults to
 // FIPSImagePolicyPermissive when unset so upgrades preserve current behavior.
-func (i *OperatorConfigSecurityFIPSImages) GetPolicy() FIPSImagePolicy {
+func (i *OperatorConfigSecurityImages) GetPolicy() FIPSImagePolicy {
 	if (i == nil) || (i.Policy == nil) || !i.Policy.HasValue() {
 		return FIPSImagePolicyPermissive
 	}
@@ -527,7 +552,7 @@ func (i *OperatorConfigSecurityFIPSImages) GetPolicy() FIPSImagePolicy {
 
 // IsRequired reports whether the image policy is Required. Nil-safe: nil
 // receiver returns false (default Permissive).
-func (i *OperatorConfigSecurityFIPSImages) IsRequired() bool {
+func (i *OperatorConfigSecurityImages) IsRequired() bool {
 	return i.GetPolicy() == FIPSImagePolicyRequired
 }
 

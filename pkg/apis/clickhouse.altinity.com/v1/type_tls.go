@@ -53,15 +53,33 @@ type IPCMode = types.String
 // ClickHouse / Keeper container images don't carry a FIPS marker. Same
 // aliasing convention as TLSVerify.
 //
-// Valid values: FIPSImagePolicyPermissive (default — any image accepted),
-// FIPSImagePolicyRequired (every CH/Keeper container image MUST have the
-// "fips" substring in its tag, AND the running binary's `SELECT version()`
-// reply MUST also carry "fips" once the pod is Ready).
+// Valid values: FIPSImagePolicyPermissive ("Permissive", default — any image
+// accepted), FIPSImagePolicyRequired ("FIPSRequired" — every CH/Keeper
+// container image MUST have the "fips" substring in its tag, AND the running
+// binary's `SELECT version()` reply MUST also carry "fips" once the pod is
+// Ready).
 //
 // Operator-process-scoped (CHOP-config only) — there is no CHI/cluster
-// override. Orthogonal to fips.enforced: a deployment may run with
+// override. Orthogonal to security.policy: a deployment may run with
 // permissive TLS but strict image policy, or vice versa.
 type FIPSImagePolicy = types.String
+
+// SecurityPolicy is the operator-wide master switch governing TLS/IPC
+// coercion and per-CR rejection of FIPS-incompatible postures. Replaces the
+// previous boolean toggle (never released). Same aliasing convention as
+// TLSVerify.
+//
+// Valid values: SecurityPolicyPermissive (default — preserves 0.27.0
+// behavior across every per-component knob) and SecurityPolicyEnforced
+// (coerces TLS verify/minVersion to Strict/1.3 across ClickHouse, ZooKeeper
+// and Kubernetes clients; coerces IPC to Secure; coerces clickhouse.access.scheme
+// http→https; rejects CHIs that reference plain-text external ZooKeeper or
+// otherwise downgrade per-cluster security; re-registers the legacy
+// ClickHouse TLS config to verifying mode).
+//
+// Operator-process-scoped (CHOP-config only); no CHI/cluster override.
+// Orthogonal to security.images.policy (FIPS image-tag gate).
+type SecurityPolicy = types.String
 
 const (
 	// TLSVerifyStrict verifies the peer certificate chain and hostname against
@@ -94,7 +112,21 @@ const (
 	// FIPSImagePolicyRequired refuses every CR whose CH/Keeper container image
 	// lacks the "fips" substring in its tag, AND aborts a running CR whose
 	// `SELECT version()` reply lacks "fips" once the pod is Ready.
-	FIPSImagePolicyRequired FIPSImagePolicy = "Required"
+	// Wire value "FIPSRequired" disambiguates from the older bare "Required"
+	// spelling (still accepted by normalizeFIPSImagePolicy as a defensive alias).
+	FIPSImagePolicyRequired FIPSImagePolicy = "FIPSRequired"
+
+	// SecurityPolicyPermissive disables all operator-wide coercion. Per-component
+	// security knobs retain whatever the user (or chopconf default) set;
+	// CHIs/CHKs reconcile regardless of FIPS posture. Default — preserves 0.27.0
+	// behavior on upgrade.
+	SecurityPolicyPermissive SecurityPolicy = "Permissive"
+	// SecurityPolicyEnforced coerces every per-component security toggle to its
+	// Strict position at startup, re-registers the legacy ClickHouse TLS config
+	// to verifying mode, and aborts CHIs/CHKs that cannot be served in a
+	// FIPS-compatible posture (e.g. plain-text external ZooKeeper, cluster-level
+	// verify=None overrides). Also coerces clickhouse.access.scheme http→https.
+	SecurityPolicyEnforced SecurityPolicy = "Enforced"
 )
 
 // NewTLSVerify builds a TLSVerify value from a plain string. Sibling of
@@ -116,6 +148,11 @@ func NewIPCMode(s string) IPCMode {
 // NewFIPSImagePolicy builds a FIPSImagePolicy value from a plain string.
 func NewFIPSImagePolicy(s string) FIPSImagePolicy {
 	return FIPSImagePolicy(s)
+}
+
+// NewSecurityPolicy builds a SecurityPolicy value from a plain string.
+func NewSecurityPolicy(s string) SecurityPolicy {
+	return SecurityPolicy(s)
 }
 
 // IPCDefaultTokenPath is the default shared-volume path the operator writes the
@@ -176,10 +213,32 @@ func normalizeIPCMode(m IPCMode) IPCMode {
 }
 
 // normalizeFIPSImagePolicy maps an arbitrarily-cased FIPSImagePolicy to normalized form.
+// The current wire value for "required" is "FIPSRequired"; the older bare
+// "Required" spelling (used by pre-release chopconfs on this branch) is also
+// accepted as a defensive alias so a stale config aborts on FIPS-incompatible
+// images rather than silently downgrading to Permissive.
 func normalizeFIPSImagePolicy(p FIPSImagePolicy) FIPSImagePolicy {
 	for _, normalized := range []FIPSImagePolicy{
 		FIPSImagePolicyPermissive,
 		FIPSImagePolicyRequired,
+	} {
+		if p.EqualFold(&normalized) {
+			return normalized
+		}
+	}
+	// Defensive legacy alias: "required" / "Required" / "REQUIRED" → FIPSImagePolicyRequired.
+	legacyRequired := FIPSImagePolicy("Required")
+	if p.EqualFold(&legacyRequired) {
+		return FIPSImagePolicyRequired
+	}
+	return p
+}
+
+// normalizeSecurityPolicy maps an arbitrarily-cased SecurityPolicy to normalized form.
+func normalizeSecurityPolicy(p SecurityPolicy) SecurityPolicy {
+	for _, normalized := range []SecurityPolicy{
+		SecurityPolicyPermissive,
+		SecurityPolicyEnforced,
 	} {
 		if p.EqualFold(&normalized) {
 			return normalized

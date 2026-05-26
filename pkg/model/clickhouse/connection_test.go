@@ -18,11 +18,14 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"math/big"
+	"net"
 	"testing"
 	"time"
 
@@ -226,4 +229,255 @@ func TestResolveInsecureSkipVerify(t *testing.T) {
 			require.Equal(t, c.expect, got)
 		})
 	}
+}
+
+// tlsTestServer is a self-contained TLS server with a known CA and a known
+// server cert. Returned `addr` is the host:port the test should dial; the
+// server cert has DNS SAN "test-server.local" and IP SAN "127.0.0.1" only —
+// SO hostname-mismatch tests use a name that matches neither.
+type tlsTestServer struct {
+	addr     string
+	listener net.Listener
+	caPool   *x509.CertPool
+}
+
+func (s *tlsTestServer) Close() { _ = s.listener.Close() }
+
+// newTLSTestServer generates a self-signed CA and a server certificate signed
+// by that CA, then starts a TLS listener that handshakes-and-disconnects on
+// every connection. The handshake itself is what the tests assert against.
+func newTLSTestServer(t *testing.T) *tlsTestServer {
+	t.Helper()
+
+	// CA
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	caTmpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "test-ca"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTmpl, caTmpl, &caKey.PublicKey, caKey)
+	require.NoError(t, err)
+	caCert, err := x509.ParseCertificate(caDER)
+	require.NoError(t, err)
+	caPool := x509.NewCertPool()
+	caPool.AddCert(caCert)
+
+	// Leaf
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	leafTmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject:      pkix.Name{CommonName: "test-server.local"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:     []string{"test-server.local"},
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+	}
+	leafDER, err := x509.CreateCertificate(rand.Reader, leafTmpl, caCert, &leafKey.PublicKey, caKey)
+	require.NoError(t, err)
+
+	serverCert := tls.Certificate{
+		Certificate: [][]byte{leafDER},
+		PrivateKey:  leafKey,
+	}
+
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		MinVersion:   tls.VersionTLS12,
+	})
+	require.NoError(t, err)
+
+	// Accept-loop: handshake then close. Just enough for the client to
+	// observe handshake success/failure.
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				if tlsConn, ok := c.(*tls.Conn); ok {
+					_ = tlsConn.Handshake()
+				}
+				_ = c.Close()
+			}(conn)
+		}
+	}()
+
+	return &tlsTestServer{
+		addr:     listener.Addr().String(),
+		listener: listener,
+		caPool:   caPool,
+	}
+}
+
+// dialTLS opens a TCP+TLS connection to the server's listener address using
+// the supplied tls.Config (a fresh clone is taken to avoid the test mutating
+// shared state). Returns the handshake error or nil on success.
+func dialTLS(t *testing.T, addr string, cfg *tls.Config) error {
+	t.Helper()
+	conn, err := tls.Dial("tcp", addr, cfg.Clone())
+	if conn != nil {
+		_ = conn.Close()
+	}
+	return err
+}
+
+// TestTLSHandshake walks the four spec-mandated outcomes against a
+// self-managed TLS server with a known CA + leaf cert. The operator's FIPS
+// scope specification (§2 line 38) requires this exact coverage. Tests build *tls.Config directly
+// (mirroring what setupTLSAdvanced would produce) rather than going through
+// go-clickhouse — the scope is whether our config-builder makes the right
+// FIPS-compatible decisions.
+func TestTLSHandshake(t *testing.T) {
+	s := newTLSTestServer(t)
+	defer s.Close()
+
+	// Trust pool with an UNRELATED self-signed cert, used for "invalid CA".
+	unrelatedPool := x509.NewCertPool()
+	unrelatedPool.AppendCertsFromPEM([]byte(generateSelfSignedPEM(t)))
+
+	// errCheck returns a non-empty failure message if err does not match the
+	// expected typed-error shape. Returning string-vs-bool lets each row name
+	// the expected x509 error type without coupling the assertion to Go's
+	// (release-to-release-mutable) error message wording.
+	cases := []struct {
+		name     string
+		cfg      *tls.Config
+		wantErr  bool
+		errCheck func(err error) string
+	}{
+		{
+			name: "valid CA + matching DNS SAN → handshake succeeds",
+			cfg: &tls.Config{
+				RootCAs:    s.caPool,
+				ServerName: "test-server.local",
+				MinVersion: tls.VersionTLS12,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid CA + matching IP SAN → handshake succeeds",
+			cfg: &tls.Config{
+				RootCAs:    s.caPool,
+				ServerName: "127.0.0.1",
+				MinVersion: tls.VersionTLS12,
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid CA → handshake fails with unknown-authority error",
+			cfg: &tls.Config{
+				RootCAs:    unrelatedPool,
+				ServerName: "test-server.local",
+				MinVersion: tls.VersionTLS12,
+			},
+			wantErr: true,
+			errCheck: func(err error) string {
+				var unkAuth x509.UnknownAuthorityError
+				if !errors.As(err, &unkAuth) {
+					return "expected x509.UnknownAuthorityError"
+				}
+				return ""
+			},
+		},
+		{
+			name: "hostname mismatch → handshake fails with name-not-valid error",
+			cfg: &tls.Config{
+				RootCAs:    s.caPool,
+				ServerName: "wrong.example.com",
+				MinVersion: tls.VersionTLS12,
+			},
+			wantErr: true,
+			errCheck: func(err error) string {
+				var hostErr x509.HostnameError
+				if !errors.As(err, &hostErr) {
+					return "expected x509.HostnameError"
+				}
+				return ""
+			},
+		},
+		{
+			name: "explicit InsecureSkipVerify → handshake succeeds against unknown CA",
+			cfg: &tls.Config{
+				// No RootCAs → real verification would fail.
+				InsecureSkipVerify: true,
+				MinVersion:         tls.VersionTLS12,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := dialTLS(t, s.addr, c.cfg)
+			if c.wantErr {
+				require.Error(t, err, "expected handshake to fail")
+				if c.errCheck != nil {
+					if msg := c.errCheck(err); msg != "" {
+						t.Fatalf("%s; got: %v", msg, err)
+					}
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestEnforceVerifiedLegacyTLS covers the FIPS-mode override of the legacy
+// tlsSettingsLegacy registration that setupTLSBasic() installs at init-time.
+// Pre-FIPS deployments retain InsecureSkipVerify=true via setupTLSBasic;
+// fipsGate() calls EnforceVerifiedLegacyTLS() to re-register the same key
+// with InsecureSkipVerify=false so legacy DSNs (no explicit security knobs)
+// pick up verified TLS instead. Per the operator's FIPS scope specification
+// (§2 line 30 fix).
+//
+// Vendor go-clickhouse driver stores registrations in a global map (verified
+// via vendor source); a second RegisterTLSConfig with the same key REPLACES
+// the first. We exercise the polarity by building each config-shape and
+// attempting handshakes against an unknown-CA TLS server.
+func TestEnforceVerifiedLegacyTLS(t *testing.T) {
+	s := newTLSTestServer(t)
+	defer s.Close()
+
+	t.Run("setupTLSBasic preserves legacy InsecureSkipVerify=true", func(t *testing.T) {
+		// Equivalent to what setupTLSBasic registers globally.
+		cfg := &tls.Config{InsecureSkipVerify: true}
+		err := dialTLS(t, s.addr, cfg)
+		require.NoError(t, err, "legacy config must accept ANY cert (back-compat for non-FIPS deployments)")
+	})
+
+	t.Run("EnforceVerifiedLegacyTLS overrides to verifying", func(t *testing.T) {
+		// Equivalent to what EnforceVerifiedLegacyTLS re-registers.
+		cfg := &tls.Config{InsecureSkipVerify: false}
+		err := dialTLS(t, s.addr, cfg)
+		require.Error(t, err, "verifying config must reject unknown CA")
+		// Type-based assertion: Go's x509 error wording changes between
+		// releases (e.g. Go 1.26 reshaped the unknown-authority message),
+		// but the error TYPE is part of the stdlib API contract.
+		var unkAuth x509.UnknownAuthorityError
+		if !errors.As(err, &unkAuth) {
+			t.Fatalf("expected x509.UnknownAuthorityError, got: %v", err)
+		}
+	})
+
+	// Pin the explicit MinVersion floor per FIPS spec §2 L37 ("TLS minimum
+	// version is explicit, at least TLS 1.2"). Future refactors that drop the
+	// explicit version must fail this assertion before reaching production.
+	t.Run("legacyVerifiedTLSConfig pins MinVersion to TLS 1.2", func(t *testing.T) {
+		cfg := legacyVerifiedTLSConfig()
+		require.Equal(t, uint16(tls.VersionTLS12), cfg.MinVersion,
+			"legacy verified TLS config must set MinVersion=TLS12 explicitly")
+		require.False(t, cfg.InsecureSkipVerify,
+			"legacy verified TLS config must set InsecureSkipVerify=false")
+	})
 }

@@ -61,6 +61,9 @@ func TestIPCModeNormalization(t *testing.T) {
 }
 
 func TestFIPSImagePolicyNormalization(t *testing.T) {
+	// Wire value for FIPSImagePolicyRequired is "FIPSRequired" (renamed from
+	// the pre-release bare "Required"). normalizeFIPSImagePolicy accepts the
+	// new spelling plus a defensive legacy alias for stale chopconfs.
 	cases := []struct {
 		in   string
 		want FIPSImagePolicy
@@ -68,6 +71,13 @@ func TestFIPSImagePolicyNormalization(t *testing.T) {
 		{"Permissive", FIPSImagePolicyPermissive},
 		{"permissive", FIPSImagePolicyPermissive},
 		{"PERMISSIVE", FIPSImagePolicyPermissive},
+		// New canonical wire value.
+		{"FIPSRequired", FIPSImagePolicyRequired},
+		{"fipsrequired", FIPSImagePolicyRequired},
+		{"FIPSREQUIRED", FIPSImagePolicyRequired},
+		// Defensive legacy alias for pre-release chopconfs — must still resolve
+		// to FIPSImagePolicyRequired so stale configs abort on FIPS-incompatible
+		// images rather than silently downgrading to Permissive.
 		{"Required", FIPSImagePolicyRequired},
 		{"required", FIPSImagePolicyRequired},
 		{"REQUIRED", FIPSImagePolicyRequired},
@@ -78,6 +88,11 @@ func TestFIPSImagePolicyNormalization(t *testing.T) {
 			require.Equal(t, string(c.want), string(got))
 		})
 	}
+	t.Run("canonical wire value is FIPSRequired", func(t *testing.T) {
+		// Pin the wire-value rename so a future revert to "Required" trips this
+		// assertion before it silently breaks serialized chopconfs in flight.
+		require.Equal(t, "FIPSRequired", string(FIPSImagePolicyRequired))
+	})
 	t.Run("unknown passes through", func(t *testing.T) {
 		got := normalizeFIPSImagePolicy(NewFIPSImagePolicy("Audit"))
 		require.Equal(t, "Audit", string(got))

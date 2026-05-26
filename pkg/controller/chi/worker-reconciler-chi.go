@@ -1022,7 +1022,7 @@ func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, mi
 
 func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *migrateTableOptions) error {
 	needMigrate := w.shouldMigrateTables(host, opts)
-	needFIPSCheck := chop.Config().Security.GetFIPS().GetImages().IsRequired()
+	needFIPSCheck := chop.Config().Security.GetImages().IsRequired()
 
 	if !needMigrate && !needFIPSCheck {
 		w.a.V(1).

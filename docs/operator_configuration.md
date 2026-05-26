@@ -214,5 +214,54 @@ spec:
 
 See [Keeper Reference](keeper_reference.md) for details on how CHI references CHK resources.
 
+## Security
+
+The `security:` block at the chopconf top level (sibling of `clickhouse:`) holds operator-wide hardening defaults across three orthogonal axes: transport hardening (`security.policy`), FIPS cryptographic-module enforcement (`security.fips.enforced`), and workload supply-chain gating (`security.images.policy`). Per-component sub-blocks under it cover ClickHouse-client TLS, ZooKeeper-client TLS, Kubernetes-client TLS, and the operator↔metrics-exporter IPC channel.
+
+```yaml
+spec:
+  security:
+    clickhouse:
+      tls:
+        verify: ""        # "Strict" | "None" | "" (inherit / legacy permissive)
+        minVersion: ""    # "1.2" | "1.3" | ""
+        serverName: ""
+        rootCA: ""
+        rootCASecretRef: { name: "", key: "" }
+    zookeeper:
+      tls:
+        verify: ""
+        minVersion: ""
+    kubernetes:
+      tls:
+        verify: ""        # gate against kubeconfig Insecure
+        minVersion: ""
+    ipc:
+      mode: "Plain"       # "Plain" | "Secure" (loopback + X-CHOP-Token)
+      bindHost: ""
+      tokenPath: ""
+    policy: Permissive    # "Permissive" (default) | "Enforced" — TLS-hardening master switch
+    fips:
+      enforced: false     # true Fatals at startup if binary lacks GOFIPS140; also coerces TLS knobs
+    images:
+      policy: Permissive  # "Permissive" | "FIPSRequired" — workload image-tag gate
+```
+
+Sub-blocks at a glance:
+
+| Block | Scope | Summary |
+|---|---|---|
+| `security.clickhouse.tls.{verify,minVersion,serverName,rootCA,rootCASecretRef}` | per-component, 3-level inheritance | Outbound TLS for operator→ClickHouse connections (schemer, health, metrics helpers). |
+| `security.zookeeper.tls.{verify,minVersion}` | per-component, 3-level inheritance | Verification + MinVersion for the ZK/Keeper client (cert/key/CA already wired separately). |
+| `security.kubernetes.tls.{verify,minVersion}` | operator-wide (chopconf only) | `verify=Strict` is a load-time gate against the kubeconfig's `Insecure` flag (rejects insecure kubeconfigs at startup). `minVersion` is declared + coerced under FIPS but not yet wired into the `rest.Config` transport — declared for shape symmetry; see `pkg/apis/clickhouse.altinity.com/v1/type_security.go` field doc. |
+| `security.ipc.{mode,bindHost,tokenPath}` | operator-wide | Hardens the `/chi` REST channel between operator and metrics-exporter sidecar. |
+| `security.policy` | operator-wide | TLS-hardening master switch: `Permissive` (default, preserves 0.27.0 behavior) or `Enforced` (coerce every TLS/IPC knob to Strict, reject FIPS-incompatible CRs). Transport hardening only — no longer Fatals on non-FIPS-built binaries. |
+| `security.fips.enforced` | operator-wide | FIPS cryptographic-module gate: `true` Fatals at startup unless the binary was built with `GOFIPS140` and `crypto/fips140` reports Enabled. Also triggers the same TLS coercions as `policy: Enforced`. Orthogonal to `security.policy`. |
+| `security.images.policy` | operator-wide | Workload supply-chain gate: `FIPSRequired` refuses CRs whose CH/Keeper images lack `fips` in their tag and aborts running CRs whose `SELECT version()` lacks `fips` (orthogonal to `security.policy` and `security.fips`). |
+
+The per-component TLS knobs `clickhouse.tls` and `zookeeper.tls` use 3-level inheritance — chopconf → CHI `spec.configuration.clusters[].security` → cluster — with empty/absent meaning "inherit from the next level up". `kubernetes.tls`, `security.ipc`, `security.policy`, `security.fips`, and `security.images` are operator-process-scoped and chopconf-only (no CHI override).
+
+See [security_hardening.md](security_hardening.md) for per-knob semantics, the orthogonal-axes posture table, FIPS coercion details, image-policy details, and the externally-managed-token (Secret-backed) GitOps pattern.
+
 [clickhouse-operator-install-bundle.yaml]: ../deploy/operator/clickhouse-operator-install-bundle.yaml
 [70-chop-config.yaml]: ./chi-examples/70-chop-config.yaml

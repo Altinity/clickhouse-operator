@@ -39,8 +39,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  # DNS would be like clickhouse-keeper-0.clickhouse-keepers.namespace.svc
-  name: clickhouse-keepers
+  # DNS would be like clickhouse-keeper-0.chkeepers.namespace.svc
+  # (shortened from clickhouse-keepers — setHostnameAsFQDN: true requires the
+  # FQDN ≤ 64 chars when test_keeper sets TEST_NAMESPACE=test-keeper)
+  name: chkeepers
   labels:
     app: clickhouse-keeper
 spec:
@@ -344,7 +346,7 @@ spec:
   selector:
     matchLabels:
       app: clickhouse-keeper
-  serviceName: clickhouse-keepers
+  serviceName: chkeepers
   replicas: 1
   podManagementPolicy: OrderedReady
   template:

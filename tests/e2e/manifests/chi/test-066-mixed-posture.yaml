@@ -24,6 +24,7 @@ spec:
             tls:
               verify: None
               minVersion: "1.2"
+              serverName: lax.example
         layout:
           shardsCount: 1
           replicasCount: 1

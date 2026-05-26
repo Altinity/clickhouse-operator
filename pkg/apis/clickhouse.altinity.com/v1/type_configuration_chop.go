@@ -1376,21 +1376,16 @@ func (c *OperatorConfig) normalize() {
 	c.normalizeSectionPod()
 	// FIPS coercion runs LAST so it overrides any user-specified per-component
 	// values for the knobs it tightens. Field-level overrides are logged.
-	c.applyFIPSStrict()
+	c.applyEnforcedHardening()
 }
 
-// applyFIPSStrict coerces the per-component security toggles (CH TLS verify+
-// minVersion, ZK TLS verify+minVersion, K8s TLS verify+minVersion, IPC mode) to their
-// Strict positions when security.fips.enforced is true. Coercion is one-way:
-// each tightened field is logged with its before/after value. No-op when
-// FIPS is not enforced.
-//
-// Runtime FIPS detection (crypto/fips140.Enforced()) is intentionally NOT
-// wired here — that requires the operator binary be built with the FIPS-
-// validated Go toolchain (GOFIPS140=v1.0.0), which is a separate track. Once
-// that ships, this function should OR runtime + config and coerce on either.
-func (c *OperatorConfig) applyFIPSStrict() {
-	if !c.Security.GetFIPS().IsEnforced() {
+// applyEnforcedHardening coerces transport/IPC knobs to their Strict
+// positions when EITHER security.policy=Enforced OR security.fips.enforced=true.
+// The FIPS cryptographic-module runtime gate (GOFIPS140 + crypto/fips140)
+// is handled separately in cmd/.../app/fips_gate.go and fires only on
+// fips.enforced=true.
+func (c *OperatorConfig) applyEnforcedHardening() {
+	if !c.Security.RequiresHardening() {
 		return
 	}
 	s := &c.Security
@@ -1400,28 +1395,41 @@ func (c *OperatorConfig) applyFIPSStrict() {
 	if s.ClickHouse.TLS == nil {
 		s.ClickHouse.TLS = &ClusterSecurityClickHouseTLS{}
 	}
-	coerceClickHouseTLSVerify(s.ClickHouse.TLS, TLSVerifyStrict, "security.clickhouse.tls.verify")
-	coerceClickHouseTLSMinVersion(s.ClickHouse.TLS, TLSMinVersion13, "security.clickhouse.tls.minVersion")
+	coerceTypedString(&s.ClickHouse.TLS.Verify, TLSVerifyStrict, "security.clickhouse.tls.verify")
+	coerceTypedString(&s.ClickHouse.TLS.MinVersion, TLSMinVersion13, "security.clickhouse.tls.minVersion")
 	if s.Zookeeper == nil {
 		s.Zookeeper = &ClusterSecurityZookeeper{}
 	}
 	if s.Zookeeper.TLS == nil {
 		s.Zookeeper.TLS = &ClusterSecurityZookeeperTLS{}
 	}
-	coerceZookeeperTLSVerify(s.Zookeeper.TLS, TLSVerifyStrict, "security.zookeeper.tls.verify")
-	coerceZookeeperTLSMinVersion(s.Zookeeper.TLS, TLSMinVersion13, "security.zookeeper.tls.minVersion")
+	coerceTypedString(&s.Zookeeper.TLS.Verify, TLSVerifyStrict, "security.zookeeper.tls.verify")
+	coerceTypedString(&s.Zookeeper.TLS.MinVersion, TLSMinVersion13, "security.zookeeper.tls.minVersion")
 	if s.Kubernetes == nil {
 		s.Kubernetes = &ClusterSecurityKubernetes{}
 	}
 	if s.Kubernetes.TLS == nil {
 		s.Kubernetes.TLS = &ClusterSecurityKubernetesTLS{}
 	}
-	coerceKubernetesTLSVerify(s.Kubernetes.TLS, TLSVerifyStrict, "security.kubernetes.tls.verify")
-	coerceKubernetesTLSMinVersion(s.Kubernetes.TLS, TLSMinVersion13, "security.kubernetes.tls.minVersion")
+	coerceTypedString(&s.Kubernetes.TLS.Verify, TLSVerifyStrict, "security.kubernetes.tls.verify")
+	coerceTypedString(&s.Kubernetes.TLS.MinVersion, TLSMinVersion13, "security.kubernetes.tls.minVersion")
 	if s.IPC == nil {
 		s.IPC = &OperatorConfigSecurityIPC{}
 	}
-	coerceIPCMode(s.IPC, IPCModeSecure, "security.ipc.mode")
+	coerceTypedString(&s.IPC.Mode, IPCModeSecure, "security.ipc.mode")
+
+	// Reject plain HTTP access to ClickHouse under FIPS-compatible mode
+	// (per the operator's FIPS scope specification, §2 line 36). `auto`
+	// (default) and `https` pass
+	// through unchanged — only an explicit `http` is coerced so a FIPS
+	// posture cannot silently fall back to unencrypted ClickHouse traffic.
+	// `auto` is preserved because the operator's per-host scheme resolution
+	// still chooses `https` when a TLS port is configured; coercing `auto`
+	// would also force HTTPS where no TLS port exists, breaking back-compat.
+	if strings.EqualFold(c.ClickHouse.Access.Scheme, ChSchemeHTTP) {
+		logFIPSCoercion("clickhouse.access.scheme", c.ClickHouse.Access.Scheme, ChSchemeHTTPS)
+		c.ClickHouse.Access.Scheme = ChSchemeHTTPS
+	}
 }
 
 // IsZero reports whether the Security struct has any populated sub-block.
@@ -1429,85 +1437,42 @@ func (s *OperatorConfigSecurity) IsZero() bool {
 	if s == nil {
 		return true
 	}
-	return (s.ClickHouse == nil) && (s.Zookeeper == nil) && (s.Kubernetes == nil) && (s.IPC == nil) && (s.FIPS == nil)
+	return (s.ClickHouse == nil) && (s.Zookeeper == nil) && (s.Kubernetes == nil) && (s.IPC == nil) && (s.Policy == nil) && (s.Images == nil) && (s.FIPS == nil)
 }
 
 // RequiresStrictK8sTLS reports whether the operator's resolved security posture
-// demands strict TLS verification on the Kubernetes-API client. True when EITHER
-// security.kubernetes.tls.verify is Strict OR security.fips.enforced is true —
-// FIPS one-way coerces verify to Strict, so the policy MUST fire even before
-// applyFIPSStrict has run. Callable on raw file-based config before normalize.
+// demands strict TLS verification on the Kubernetes-API client. True when ANY of:
+// security.kubernetes.tls.verify is Strict, security.policy is Enforced, or
+// security.fips.enforced is true — the latter two one-way coerce verify to
+// Strict via applyEnforcedHardening, so the predicate MUST fire even before
+// that coercion has run. Callable on raw file-based config before normalize.
 func (c *OperatorConfig) RequiresStrictK8sTLS() bool {
 	if c == nil {
 		return false
 	}
-	if c.Security.GetKubernetes().GetTLS().GetVerify() == TLSVerifyStrict {
-		return true
-	}
-	return c.Security.GetFIPS().IsEnforced()
+	return c.Security.RequiresHardening() ||
+		c.Security.GetKubernetes().GetTLS().GetVerify() == TLSVerifyStrict
 }
 
-func coerceClickHouseTLSVerify(t *ClusterSecurityClickHouseTLS, target TLSVerify, path string) {
-	prev := t.GetVerify()
-	if prev == target {
+// coerceTypedString one-way coerces a *types.String-valued config field (TLSVerify,
+// TLSMinVersion, IPCMode — all type aliases of types.String) to the FIPS-strict
+// target value and logs the change. Caller passes the address of the struct field
+// so the helper can mutate it in place; the path string is the human-readable
+// dotted-key for the audit log. Comparison is case-insensitive to match the
+// normalize* helpers in type_tls.go (so a user-written `verify: strict` is treated
+// as already-Strict and is not re-stamped). Replaces seven near-identical
+// per-field coerce helpers with one entry point, since all callsites collapse to
+// "mutate this *types.String field if it differs from a typed constant target".
+func coerceTypedString(field **types.String, target types.String, path string) {
+	prev := ""
+	if (*field) != nil && (*field).HasValue() {
+		prev = (*field).Value()
+	}
+	if strings.EqualFold(prev, string(target)) {
 		return
 	}
-	t.Verify = types.NewString(string(target))
-	logFIPSCoercion(path, string(prev), string(target))
-}
-
-func coerceClickHouseTLSMinVersion(t *ClusterSecurityClickHouseTLS, target TLSMinVersion, path string) {
-	prev := t.GetMinVersion()
-	if prev == target {
-		return
-	}
-	t.MinVersion = types.NewString(string(target))
-	logFIPSCoercion(path, string(prev), string(target))
-}
-
-func coerceZookeeperTLSVerify(z *ClusterSecurityZookeeperTLS, target TLSVerify, path string) {
-	prev := z.GetVerify()
-	if prev == target {
-		return
-	}
-	z.Verify = types.NewString(string(target))
-	logFIPSCoercion(path, string(prev), string(target))
-}
-
-func coerceZookeeperTLSMinVersion(z *ClusterSecurityZookeeperTLS, target TLSMinVersion, path string) {
-	prev := z.GetMinVersion()
-	if prev == target {
-		return
-	}
-	z.MinVersion = types.NewString(string(target))
-	logFIPSCoercion(path, string(prev), string(target))
-}
-
-func coerceKubernetesTLSVerify(t *ClusterSecurityKubernetesTLS, target TLSVerify, path string) {
-	prev := t.GetVerify()
-	if prev == target {
-		return
-	}
-	t.Verify = types.NewString(string(target))
-	logFIPSCoercion(path, string(prev), string(target))
-}
-
-func coerceKubernetesTLSMinVersion(t *ClusterSecurityKubernetesTLS, target TLSMinVersion, path string) {
-	prev := t.GetMinVersion()
-	if prev == target {
-		return
-	}
-	t.MinVersion = types.NewString(string(target))
-	logFIPSCoercion(path, string(prev), string(target))
-}
-
-func coerceIPCMode(i *OperatorConfigSecurityIPC, target IPCMode, path string) {
-	prev := i.GetMode()
-	if prev == target {
-		return
-	}
-	i.Mode = types.NewString(string(target))
-	logFIPSCoercion(path, string(prev), string(target))
+	*field = types.NewString(string(target))
+	logFIPSCoercion(path, prev, string(target))
 }
 
 func logFIPSCoercion(path, before, after string) {

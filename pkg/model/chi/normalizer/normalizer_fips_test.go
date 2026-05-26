@@ -36,7 +36,7 @@ func init() {
 	chop.New(nil, nil, "")
 }
 
-// withFIPSImagePolicy temporarily sets chop.Config().Security.FIPS.Images.Policy
+// withFIPSImagePolicy temporarily sets chop.Config().Security.Images.Policy
 // to the requested value, restoring the previous Security block on test cleanup.
 // Set policy="" to clear (Permissive default).
 func withFIPSImagePolicy(t *testing.T, policy string) {
@@ -47,10 +47,8 @@ func withFIPSImagePolicy(t *testing.T, policy string) {
 
 	cfg.Security = chi.OperatorConfigSecurity{}
 	if policy != "" {
-		cfg.Security.FIPS = &chi.OperatorConfigSecurityFIPS{
-			Images: &chi.OperatorConfigSecurityFIPSImages{
-				Policy: types.NewString(policy),
-			},
+		cfg.Security.Images = &chi.OperatorConfigSecurityImages{
+			Policy: types.NewString(policy),
 		}
 	}
 }
@@ -174,6 +172,24 @@ func TestEnforceFIPSImagePolicy(t *testing.T) {
 // (only when the field is set explicitly) is a downgrade attempt that must
 // abort the CR with `FIPSValidationFailed`. The first violation short-circuits
 // — subsequent fields are not evaluated in the same call.
+//
+// Scope note: this test deliberately covers only the two targets reachable
+// from chi.ClusterSecurity — clickhouse.tls.{verify,minVersion} and
+// zookeeper.tls.{verify,minVersion}. The remaining FIPS-relevant knobs are
+// out of scope at cluster level by design and are covered elsewhere:
+//   - kubernetes.tls.verify is operator-process-scoped (one kubeconfig per
+//     operator pod) and has no per-CR/per-cluster field on ClusterSecurity;
+//     enforcement lives on OperatorConfigSecurity.Kubernetes and is exercised
+//     by pkg/chop/config_manager_test.go::TestK8sInsecureGate_Policy.
+//   - clickhouse.access.scheme=http is a CHOP-config-only coercion (Path-A
+//     defaults flip http→https when FIPS strict is on) with no cluster-scope
+//     override surface; coverage is in
+//     pkg/apis/clickhouse.altinity.com/v1/type_security_fips_test.go::
+//     TestApplyFIPSStrict_CoercesHTTPSchemeUnderFIPS.
+//
+// Adding rows for those fields here would assert against struct shape that
+// the CRD does not expose, so the gap is intentional rather than a coverage
+// miss.
 func TestRejectFIPSBypass(t *testing.T) {
 	build := func(ch *chi.ClusterSecurityClickHouseTLS, zk *chi.ClusterSecurityZookeeperTLS) *chi.ClusterSecurity {
 		s := &chi.ClusterSecurity{}

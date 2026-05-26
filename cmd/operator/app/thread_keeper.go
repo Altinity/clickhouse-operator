@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	//	ctrl "sigs.k8s.io/controller-runtime/pkg/controller"
@@ -59,6 +60,13 @@ func initKeeper(ctx context.Context) error {
 			// in that case).
 			DefaultNamespaces: defaultNamespaces,
 		},
+		// Disable controller-runtime's built-in metrics listener. Default is ":8080" which
+		// would bind a third HTTP endpoint on the operator pod (not in any Service, not in
+		// any pod annotation, not in any containerPort) — an orphan reachable only by direct
+		// PodIP routing. The operator's own /metrics endpoint already lives at :9999 via
+		// pkg/metrics/operator, and the CHK reconcile counters worth exposing are surfaced
+		// through that path, not through controller-runtime's manager-default exposition.
+		Metrics: metricsserver.Options{BindAddress: "0"},
 	})
 	if err != nil {
 		logger.Error(err, "init keeper - unable to ctrlRuntime.NewManager")
