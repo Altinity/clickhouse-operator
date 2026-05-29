@@ -369,6 +369,7 @@ func TestResolveTLSRootCASecretRef(t *testing.T) {
 		}), tls)
 		require.Nil(t, target.Status)
 		require.Equal(t, "pem-content", tls.RootCA)
+		require.Nil(t, tls.RootCASecretRef, "resolver must clear ref after success")
 	})
 
 	t.Run("empty key — falls back to ca.crt", func(t *testing.T) {
@@ -382,6 +383,7 @@ func TestResolveTLSRootCASecretRef(t *testing.T) {
 		}), tls)
 		require.Nil(t, target.Status)
 		require.Equal(t, "ca-crt-content", tls.RootCA)
+		require.Nil(t, tls.RootCASecretRef, "resolver must clear ref after success")
 	})
 
 	t.Run("empty key — falls back to tls.crt when ca.crt absent", func(t *testing.T) {
@@ -395,6 +397,7 @@ func TestResolveTLSRootCASecretRef(t *testing.T) {
 		}), tls)
 		require.Nil(t, target.Status)
 		require.Equal(t, "tls-crt-content", tls.RootCA, "must fall back to tls.crt when ca.crt absent")
+		require.Nil(t, tls.RootCASecretRef, "resolver must clear ref after success")
 	})
 
 	t.Run("empty key — neither ca.crt nor tls.crt — RootCASecretUnresolved abort", func(t *testing.T) {

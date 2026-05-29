@@ -57,9 +57,9 @@ func serializeRepeatable(obj interface{}) []byte {
 // even from non-security code paths), the digest is produced by an inline
 // pure-Go implementation of the algorithm specified by FIPS PUB 180-4 §6.1.2
 // and RFC 3174, rather than by importing crypto/sha1. See
-// docs/security_hardening.md §3 ("FIPS Scope") for the rationale: this site
-// is documented as outside the FIPS cryptographic boundary because the
-// output is never used as a security primitive.
+// docs/security_hardening_fips.md § "Non-security hash exclusions" for the
+// rationale: this site is documented as outside the FIPS cryptographic
+// boundary because the output is never used as a security primitive.
 //
 // Byte-for-byte output equivalence with crypto/sha1 is preserved
 // intentionally so that existing `clickhouse.altinity.com/object-version`
@@ -96,7 +96,7 @@ func HashIntoIntTopped(b []byte, top int) int {
 // inlined deliberately to avoid importing crypto/sha1, which would otherwise
 // cause `GODEBUG=fips140=only` to panic on operator startup even though this
 // call site is documented as outside the FIPS cryptographic boundary (see
-// docs/security_hardening.md §3).
+// docs/security_hardening_fips.md § "Non-security hash exclusions").
 func objectVersionDigest(msg []byte) []byte {
 	// Initial state — FIPS PUB 180-4 §5.3.1 / RFC 3174 §6.1.
 	h := [5]uint32{

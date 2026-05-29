@@ -216,6 +216,24 @@ func (t *ClusterSecurityKubernetesTLS) MergeFrom(src *ClusterSecurityKubernetesT
 // MergeFrom merges src into t honoring _type. Nil-safe on both receiver and src.
 // MergeTypeFillEmptyValues preserves receiver values; MergeTypeOverrideByNonEmptyValues
 // overwrites with any field src explicitly sets.
+// isRootCAPairEmpty reports whether neither half of the (RootCA, RootCASecretRef)
+// pair is set on tls. An empty-name ref (`rootCASecretRef: {name: ""}`) is the
+// documented "explicit not-used" sentinel — it counts as unset here so that an
+// atomic-pair MergeFrom (FillEmpty or Override) does not treat a sentinel as a
+// blocker for inheritance or as a non-empty source.
+func isRootCAPairEmpty(tls *ClusterSecurityClickHouseTLS) bool {
+	if tls == nil {
+		return true
+	}
+	if tls.RootCA != "" {
+		return false
+	}
+	if (tls.RootCASecretRef != nil) && (tls.RootCASecretRef.Name != "") {
+		return false
+	}
+	return true
+}
+
 func (t *ClusterSecurityClickHouseTLS) MergeFrom(src *ClusterSecurityClickHouseTLS, _type MergeType) *ClusterSecurityClickHouseTLS {
 	if src == nil {
 		return t
@@ -230,10 +248,17 @@ func (t *ClusterSecurityClickHouseTLS) MergeFrom(src *ClusterSecurityClickHouseT
 		if t.ServerName == "" {
 			t.ServerName = src.ServerName
 		}
-		if t.RootCA == "" {
+		// RootCA and RootCASecretRef are mutually exclusive — propagate them
+		// as an atomic pair. If the receiver has neither, adopt src's pair;
+		// otherwise leave receiver alone. Filling each half independently
+		// (the prior behavior) could graft src's ref onto a receiver that
+		// already had inline RootCA, synthesizing a RootCAConflict on
+		// subsequent normalize (ancestor re-normalize via inheritance).
+		// An empty-name ref (`rootCASecretRef: {name: ""}`) is the documented
+		// "explicit not-used" sentinel — treat it as unset here so a child
+		// using the sentinel still inherits the parent's inline RootCA.
+		if isRootCAPairEmpty(t) {
 			t.RootCA = src.RootCA
-		}
-		if t.RootCASecretRef == nil {
 			t.RootCASecretRef = src.RootCASecretRef
 		}
 	case MergeTypeOverrideByNonEmptyValues:
@@ -246,10 +271,14 @@ func (t *ClusterSecurityClickHouseTLS) MergeFrom(src *ClusterSecurityClickHouseT
 		if src.ServerName != "" {
 			t.ServerName = src.ServerName
 		}
-		if src.RootCA != "" {
+		// Atomic-pair override: if src sets either half, both halves on the
+		// receiver are replaced together (the empty side of src clears the
+		// receiver's value). Replacing each half independently would let a
+		// receiver-inlined RootCA coexist with a src-supplied ref (or vice
+		// versa) and trip RootCAConflict downstream. An empty-name ref on
+		// src counts as "src has no ref" (sentinel semantics).
+		if !isRootCAPairEmpty(src) {
 			t.RootCA = src.RootCA
-		}
-		if src.RootCASecretRef != nil {
 			t.RootCASecretRef = src.RootCASecretRef
 		}
 	}

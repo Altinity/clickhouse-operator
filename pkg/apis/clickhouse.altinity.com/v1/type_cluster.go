@@ -139,6 +139,9 @@ func (cluster *Cluster) GetSecure() *types.StringBool {
 
 // GetSecret is a getter
 func (c *Cluster) GetSecret() *ClusterSecret {
+	if c == nil {
+		return nil
+	}
 	return c.Secret
 }
 

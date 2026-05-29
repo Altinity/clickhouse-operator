@@ -47,6 +47,7 @@ const (
 const (
 	StatusReasonFIPSValidationFailed     = chi.StatusReasonFIPSValidationFailed
 	StatusReasonFIPSImagePolicyViolation = chi.StatusReasonFIPSImagePolicyViolation
+	StatusReasonNoKeeperListener         = chi.StatusReasonNoKeeperListener
 )
 
 // Status defines status section of the custom resource.

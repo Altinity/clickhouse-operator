@@ -27,6 +27,7 @@ import (
 
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/util/fips"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
@@ -43,6 +44,13 @@ const (
 var (
 	// versionRequest defines request for clickhouse-operator version report. Operator should exit after version printed
 	versionRequest bool
+
+	// fipsInfoRequest dumps the binary's FIPS build + runtime posture
+	// (GOFIPS140, DefaultGODEBUG, fips140.Enabled/Enforced/Version, env
+	// GODEBUG, Go version, OS/arch) and exits. Mirror of the operator-side
+	// flag — same diagnostic available from the metrics-exporter container
+	// without a local `go version -m` toolchain.
+	fipsInfoRequest bool
 
 	// chopConfigFile defines path to clickhouse-operator config file to be used
 	chopConfigFile string
@@ -61,6 +69,7 @@ var (
 
 func init() {
 	flag.BoolVar(&versionRequest, "version", false, "Display clickhouse-operator version and exit")
+	flag.BoolVar(&fipsInfoRequest, "fips-info", false, "Display FIPS build/runtime info and exit (no Go toolchain required).")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
 	flag.StringVar(&kubeConfigFile, "kubeconfig", "", "Path to custom kubernetes config file. Makes sense if runs outside of the cluster only.")
 	flag.StringVar(&masterURL, "master", "", "The address of custom Kubernetes API server. Makes sense if runs outside of the cluster and not being specified in kube config file only.")
@@ -88,6 +97,11 @@ func Run() {
 
 	if versionRequest {
 		fmt.Printf("%s\n", version.Version)
+		os.Exit(0)
+	}
+
+	if fipsInfoRequest {
+		fips.PrintInfo(os.Stdout, "metrics-exporter", version.Version, version.GitSHA, version.BuiltAt)
 		os.Exit(0)
 	}
 

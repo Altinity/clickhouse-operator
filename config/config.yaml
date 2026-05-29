@@ -367,8 +367,8 @@ security:
     # FIPSRequired (admission rejects CRs whose CH/Keeper images lack 'fips'
     # in tag; post-Ready SELECT version() must contain 'fips' or CR aborts).
     # Orthogonal to security.policy and security.fips.enforced.
-    # See docs/security_hardening.md → "FIPS image policy" for the full
-    # policy matrix + detection details + recovery procedure.
+    # See docs/security_hardening_fips.md → "security.images.policy: FIPSRequired"
+    # for the full policy matrix + detection details + recovery procedure.
     policy: Permissive
 
 ################################################

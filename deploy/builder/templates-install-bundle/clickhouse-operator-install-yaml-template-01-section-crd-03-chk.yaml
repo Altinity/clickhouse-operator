@@ -529,6 +529,30 @@ spec:
                               then to operator-wide defaults in ClickHouseOperatorConfiguration. Symmetric
                               with chi.spec.configuration.clusters[].security. See docs/security_hardening.md.
                             x-kubernetes-preserve-unknown-fields: true
+                          insecure:
+                            <<: *TypeStringBool
+                            description: |
+                              optional, controls exposure of the plaintext Keeper
+                              client port (zk:2181). Defaults to "yes" (legacy
+                              behavior, byte-stable). Set to "no" to:
+                              - suppress zk:2181 from the per-cluster Service and
+                                from per-host StatefulSet container ports;
+                              - emit <tcp_port remove="1"/> in the per-host overlay
+                                so the Keeper process binds no plaintext listener at
+                                all (the liveness probe automatically falls back to
+                                `pgrep clickhouse-keeper` because 4LW does not work
+                                over TLS upstream).
+                              Must be paired with `secure: yes` — the normalizer
+                              aborts reconcile with reason NoKeeperListener when
+                              `insecure: no` is set without `secure: yes` (no
+                              client port would be emitted).
+                          secure:
+                            <<: *TypeStringBool
+                            description: |
+                              optional, open secure (TLS) Keeper client ports for this cluster.
+                              Translates into <secure>1</secure> in Raft server entries so peer
+                              Keeper instances dial each other over TLS. Mirrors the cluster.secure
+                              flag on CHI.
                           layout:
                             type: object
                             description: |
@@ -593,6 +617,11 @@ spec:
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           zkPort:
                                             type: integer
+                                            minimum: 1
+                                            maximum: 65535
+                                          zkPortSecure:
+                                            type: integer
+                                            description: "optional, secure (TLS) Keeper client port; emitted alongside zkPort when the cluster opts into secure mode"
                                             minimum: 1
                                             maximum: 65535
                                           raftPort:
@@ -668,6 +697,11 @@ spec:
                                 pattern: "^[a-zA-Z0-9-]{0,15}$"
                               zkPort:
                                 type: integer
+                                minimum: 1
+                                maximum: 65535
+                              zkPortSecure:
+                                type: integer
+                                description: "optional, secure (TLS) Keeper client port; emitted alongside zkPort when the cluster opts into secure mode"
                                 minimum: 1
                                 maximum: 65535
                               raftPort:

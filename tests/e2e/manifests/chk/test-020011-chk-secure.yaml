@@ -1,0 +1,34 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020011-secure
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    clusters:
+      - name: "keeper"
+        # cluster.secure=yes is the declarative TLS flag:
+        # - host.ZKPortSecure is filled with 2281 by the normalizer
+        # - CR-scope Service exposes the zk-secure:2281 port alongside zk:2181
+        # - Raft XML emits <secure>1</secure> per <server> entry so peer Keepers
+        #   know to dial each other over TLS
+        # The server-side <openSSL> XML and cert mounts are user-supplied;
+        # this test only asserts the operator-side declarative plumbing,
+        # not Keeper actually accepting TLS connections.
+        secure: "yes"
+        layout:
+          replicasCount: 1
+    settings:
+      logger/level: "information"
+      logger/console: "true"
+      listen_host: "0.0.0.0"
+      keeper_server/four_letter_word_white_list: "*"
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              image: "clickhouse/clickhouse-keeper:25.3"

@@ -1412,6 +1412,11 @@ func (in *HostPorts) DeepCopyInto(out *HostPorts) {
 		*out = new(types.Int32)
 		**out = **in
 	}
+	if in.ZKPortSecure != nil {
+		in, out := &in.ZKPortSecure, &out.ZKPortSecure
+		*out = new(types.Int32)
+		**out = **in
+	}
 	if in.RaftPort != nil {
 		in, out := &in.RaftPort, &out.RaftPort
 		*out = new(types.Int32)

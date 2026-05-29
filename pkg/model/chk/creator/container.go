@@ -104,6 +104,6 @@ func (cm *ContainerManager) newDefaultContainerKeeper(host *chi.Host) core.Conta
 		LivenessProbe:  cm.probe.CreateProbe(interfaces.ProbeDefaultLiveness, host),
 		ReadinessProbe: cm.probe.CreateProbe(interfaces.ProbeDefaultReadiness, host),
 	}
-	host.AppendSpecifiedPortsToContainer(&container)
+	appendHostExposedContainerPorts(&container, host)
 	return container
 }

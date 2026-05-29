@@ -13,5 +13,8 @@ spec:
   configuration:
     clusters:
       - name: keeper
+        # secure: "yes" so rejectFIPSInsecureKeeperCluster cannot fire; this
+        # isolates the test to its named intent (rejectFIPSBypass on verify=None).
+        secure: "yes"
         layout:
           replicasCount: 1

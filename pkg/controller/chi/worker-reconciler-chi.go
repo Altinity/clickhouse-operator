@@ -477,7 +477,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 }
 
 // hostRequiresStatefulSetRollout reports whether the current reconcile introduces a
-// container env-var change that an in-place software restart CANNOT carry. The #1963
+// container env-var change that an in-place software restart CANNOT carry. The motivating
 // scenario is adding a secret-backed env var alongside a config setting that reads it via
 // from_env="..." — a software restart brings the SAME pod back with the OLD env (k8s hasn't
 // rolled the template yet), so ClickHouse fails to resolve from_env and crashes. Deferring
@@ -491,11 +491,11 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 // reconcile — falsely skipping the software restart path for config-only changes (e.g.
 // macro substitution in test_010059), which ClickHouse depends on to pick up new settings.
 //
-// We restrict the comparison to Container.Env, which is the ACTUAL signal #1963 describes
-// and which is not subject to apiserver defaulting. Container image changes are already
-// handled upstream by shouldForceRestartHost / isImageChangeRequested. Other template
-// edits (command/args, volumes, probes) would either need their own case here or would
-// go through the normal rolling-update path — not this pre-rollout-restart gate.
+// We restrict the comparison to Container.Env, which is the ACTUAL signal — and which is
+// not subject to apiserver defaulting. Container image changes are already handled upstream
+// by shouldForceRestartHost / isImageChangeRequested. Other template edits (command/args,
+// volumes, probes) would either need their own case here or would go through the normal
+// rolling-update path — not this pre-rollout-restart gate.
 //
 // NOTE: this check intentionally lives outside shouldForceRestartHost because that predicate
 // is also consulted from the exclude-from-cluster path (worker-wait-exclude-include-restart.go)

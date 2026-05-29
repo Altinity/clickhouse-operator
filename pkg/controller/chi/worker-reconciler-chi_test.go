@@ -50,10 +50,11 @@ func hostWith(cur, desired *apps.StatefulSet) *api.Host {
 // the pre-rollout software restart in reconcileHostStatefulSet.
 //
 // The function is scoped narrowly on purpose — see its doc comment. These tests both
-// exercise the positive cases (env / image / volume changes force a rollout, fixing #1963)
-// AND the negative cases (probe / label / apiserver-defaulted differences do NOT force a
-// rollout, so config-only reconciles like test_010059's macro substitution still go
-// through the software-restart path that ClickHouse needs to pick up new settings).
+// exercise the positive cases (env / image / volume changes force a rollout, fixing the
+// secret-backed-env-var-with-from_env scenario) AND the negative cases (probe / label /
+// apiserver-defaulted differences do NOT force a rollout, so config-only reconciles like
+// test_010059's macro substitution still go through the software-restart path that
+// ClickHouse needs to pick up new settings).
 func TestHostRequiresStatefulSetRollout(t *testing.T) {
 	same := sts("altinity/clickhouse-server:25.8")
 	other := sts("altinity/clickhouse-server:25.8.16.10001.altinitystable")
@@ -78,7 +79,7 @@ func TestHostRequiresStatefulSetRollout(t *testing.T) {
 		require.False(t, hostRequiresStatefulSetRollout(hostWith(sts("a"), sts("a"))))
 	})
 
-	t.Run("different env var in container → true (#1963 scenario)", func(t *testing.T) {
+	t.Run("different env var in container → true (secret-backed env-var scenario)", func(t *testing.T) {
 		cur := sts("a")
 		desired := sts("a")
 		desired.Spec.Template.Spec.Containers[0].Env = []core.EnvVar{{
@@ -128,7 +129,7 @@ func TestHostRequiresStatefulSetRollout(t *testing.T) {
 		require.False(t, hostRequiresStatefulSetRollout(hostWith(cur, desired)))
 	})
 
-	t.Run("different command/args → false (not the #1963 signal; other reconcile paths cover it)", func(t *testing.T) {
+	t.Run("different command/args → false (not the env-var signal; other reconcile paths cover it)", func(t *testing.T) {
 		cur := sts("a")
 		desired := sts("a")
 		desired.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "sleep 90 && /entrypoint.sh"}

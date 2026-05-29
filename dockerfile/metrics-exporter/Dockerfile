@@ -96,7 +96,7 @@ ARG TARGETARCH
 ARG VERSION
 ARG GO_VERSION
 ARG GOFIPS140
-ARG GODEBUG_FIPS140=only
+ARG GODEBUG_FIPS140=off
 
 LABEL name="ClickHouse operator. Metrics exporter" \
       maintainer="Altinity <support@altinity.com>" \
@@ -153,7 +153,7 @@ ARG TARGETARCH
 ARG VERSION
 ARG GO_VERSION
 ARG GOFIPS140
-ARG GODEBUG_FIPS140=only
+ARG GODEBUG_FIPS140=off
 RUN echo "Building ACVP image"
 WORKDIR /
 USER nobody
@@ -164,8 +164,10 @@ LABEL altinity.fips.acvp.responder="true" \
       altinity.fips.acvp.binary="/metrics-exporter-acvp" \
       altinity.image.variant="acvp"
 
-# FIPS runtime mode for the ACVP responder. Defaults to `only` (strict) to
-# match image-prod; override at build time via --build-arg GODEBUG_FIPS140=on.
+# FIPS runtime mode for the ACVP responder. Inherits image-prod default (off).
+# ACVP runs typically override via --build-arg GODEBUG_FIPS140=only or `on` so
+# the responder exercises the FIPS module; the default-off image is non-FIPS-
+# active and inappropriate for ACVP evidence runs without an override.
 ENV GODEBUG="fips140=${GODEBUG_FIPS140}"
 
 # Overwrite the production binary with the acvp_wrapper-tagged build and copy
@@ -184,15 +186,18 @@ CMD ["-logtostderr=true", "-v=1"]
 # --target is not specified). MUST remain the final stage so production builds
 # stay free of the ACVP responder.
 FROM image-base AS image-prod
-ARG GODEBUG_FIPS140=only
+ARG GODEBUG_FIPS140=off
 RUN echo "Building PROD image"
 WORKDIR /
 USER nobody
 
 # FIPS runtime mode (paired with GOFIPS140 build-time linking). Build-arg
-# GODEBUG_FIPS140 selects the runtime enforcement level (only|on|off); see
-# dockerfile/operator/Dockerfile for the full rationale. Customers can override
-# at runtime via Pod env without rebuilding.
+# GODEBUG_FIPS140 selects the runtime enforcement level. Accepted values:
+# off (shipped default — module dormant), on (module active + TLS filtering),
+# only (strict; non-FIPS calls panic), debug (on + stderr logging). See
+# dockerfile/operator/Dockerfile and docs/security_hardening_fips.md § "Knobs"
+# for the full rationale. Customers can override at runtime via Pod env
+# without rebuilding.
 ENV GODEBUG="fips140=${GODEBUG_FIPS140}"
 
 # Run /metrics-exporter -alsologtostderr=true -v=1

@@ -1,0 +1,38 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020014-tls-only
+spec:
+  # TLS-only listener: insecure=no closes the plaintext zk:2181 port,
+  # secure=yes opens zk-secure:2281. This asserts the operator-side
+  # declarative plumbing under the strictest combination — exactly one
+  # Keeper client port emitted, and it is the TLS one.
+  #
+  # No user-supplied <openSSL> server XML is provided. The Keeper process
+  # will log a TLS-init error and skip binding tcp_port_secure, but the
+  # process itself stays up — the operator's pgrep-based liveness probe
+  # only checks process existence, so the pod still reaches Ready and
+  # the CHK reaches Completed. This is the same pattern as test-020011
+  # (declarative-only, no actual TLS handshake asserted).
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    clusters:
+      - name: "keeper"
+        insecure: "no"
+        secure: "yes"
+        layout:
+          replicasCount: 1
+    settings:
+      logger/level: "information"
+      logger/console: "true"
+      listen_host: "0.0.0.0"
+      keeper_server/four_letter_word_white_list: "*"
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              image: "clickhouse/clickhouse-keeper:25.3"

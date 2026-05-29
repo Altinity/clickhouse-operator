@@ -35,9 +35,9 @@ var regexpMD5TailUpper = regexp.MustCompile(`_[0-9A-F]{32}$`)
 // once the inline RFC 1321 implementation lands.
 //
 // FIPS scope: shell env-var disambiguation is explicitly outside the FIPS
-// cryptographic boundary (docs/security_hardening.md §3) — MD5 here is a
-// non-security deterministic ID, not a hash function in the cryptographic
-// sense. Byte-for-byte equality with crypto/md5 still matters because the
+// cryptographic boundary (docs/security_hardening_fips.md § "Non-security
+// hash exclusions") — MD5 here is a non-security deterministic ID, not a
+// hash function in the cryptographic sense. Byte-for-byte equality with crypto/md5 still matters because the
 // generated env var names feed into pod-spec hashes, and any drift would
 // trigger an unintended StatefulSet rollout on operator upgrade.
 //

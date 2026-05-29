@@ -489,6 +489,16 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 		*out = new(clickhousealtinitycomv1.ClusterSecurity)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Insecure != nil {
+		in, out := &in.Insecure, &out.Insecure
+		*out = new(types.StringBool)
+		**out = **in
+	}
+	if in.Secure != nil {
+		in, out := &in.Secure, &out.Secure
+		*out = new(types.StringBool)
+		**out = **in
+	}
 	if in.Layout != nil {
 		in, out := &in.Layout, &out.Layout
 		*out = new(ChkClusterLayout)

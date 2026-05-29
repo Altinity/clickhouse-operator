@@ -58,6 +58,12 @@ const (
 	// FIPSValidationFailed so dashboards can distinguish operator-config bypass
 	// from per-CR image-policy violations.
 	StatusReasonFIPSImagePolicyViolation = "FIPSImagePolicyViolation"
+	// StatusReasonNoKeeperListener: the CHK cluster has both insecure=no AND
+	// secure=no (or secure unset), so no client-facing Keeper port would be
+	// emitted onto the Service. The resulting CR would be unreachable to
+	// ClickHouse clients. Caught at admission to surface the misconfiguration
+	// instead of producing a silently-broken cluster.
+	StatusReasonNoKeeperListener = "NoKeeperListener"
 )
 
 // Status defines status section of the custom resource.

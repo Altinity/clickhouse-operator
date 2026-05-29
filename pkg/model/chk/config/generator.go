@@ -88,6 +88,9 @@ func (c *Generator) getRaftConfig(selector *config.HostSelector) string {
 			util.Iline(raft, i, "    <id>%d</id>", getServerId(host))
 			util.Iline(raft, i, "    <hostname>%s</hostname>", c.namer.Name(interfaces.NameInstanceHostname, host))
 			util.Iline(raft, i, "    <port>%d</port>", host.RaftPort.Value())
+			if host.IsSecure() {
+				util.Iline(raft, i, "    <secure>1</secure>")
+			}
 			util.Iline(raft, i, "</server>")
 			msg = fmt.Sprintf("Add host to RAFT servers: %s", host.GetName())
 		}
@@ -101,6 +104,50 @@ func (c *Generator) getRaftConfig(selector *config.HostSelector) string {
 // getHostServerId builds server id config for the host
 func (c *Generator) getHostServerId(host *chi.Host) string {
 	return chi.NewSettings().Set("keeper_server/server_id", chi.MustNewSettingScalarFromAny(getServerId(host))).ClickHouseConfig()
+}
+
+// getHostListenersOverride builds a per-host XML overlay that suppresses or
+// enables Keeper's client-facing listeners according to the resolved
+// host.IsInsecure() / host.IsSecure() pair. Emits nothing when the host stays
+// on the legacy default (insecure exposed, secure absent) so existing CHKs
+// see byte-identical configmap content on upgrade.
+//
+// Semantics:
+//   - host.IsInsecure() == false: drop `<tcp_port>` via the `remove="1"`
+//     preprocessor directive so the Keeper process binds no plaintext listener.
+//     The default overlay file
+//     (config/chk/keeper_config.d/01-keeper-01-default-config.xml)
+//     ships an unconditional `<tcp_port>2181</tcp_port>` — without this
+//     override the plaintext listener would still bind even after K8s-level
+//     closure of the Service port.
+//   - host.IsSecure() == true: emit `<tcp_port_secure>` so Keeper opens the
+//     TLS port. The user-supplied `<openSSL>` server XML (settings or files)
+//     is responsible for the TLS handshake; the operator just opens the port.
+//
+// The `remove="1"` attribute requires raw XML emission (Settings cannot
+// express XML attributes), so the body is hand-assembled and embedded.
+func (c *Generator) getHostListenersOverride(host *chi.Host) string {
+	if host == nil {
+		return ""
+	}
+	body := &bytes.Buffer{}
+	emit := false
+	// Indent 8 = children of <keeper_server> (depth 2: clickhouse/keeper_server/<child>).
+	// Matches the indent convention used by getRaftConfig for analogous depth.
+	if !host.IsInsecure() {
+		util.Iline(body, 8, `<tcp_port remove="1"/>`)
+		emit = true
+	}
+	if host.IsSecure() && host.ZKPortSecure.HasValue() {
+		util.Iline(body, 8, "<tcp_port_secure>%d</tcp_port_secure>", host.ZKPortSecure.Value())
+		emit = true
+	}
+	if !emit {
+		return ""
+	}
+	return chi.NewSettings().
+		Set("keeper_server", chi.MustNewSettingScalarFromAny(body).SetEmbed()).
+		ClickHouseConfig()
 }
 
 func getServerId(host *chi.Host) int {

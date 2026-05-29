@@ -29,6 +29,8 @@ type Cluster struct {
 	PDBMaxUnavailable *types.Int32             `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
 	Reconcile         *apiChi.ClusterReconcile `json:"reconcile,omitempty"         yaml:"reconcile,omitempty"`
 	Security          *apiChi.ClusterSecurity  `json:"security,omitempty"          yaml:"security,omitempty"`
+	Insecure          *types.StringBool        `json:"insecure,omitempty"          yaml:"insecure,omitempty"`
+	Secure            *types.StringBool        `json:"secure,omitempty"            yaml:"secure,omitempty"`
 	Layout            *ChkClusterLayout        `json:"layout,omitempty"            yaml:"layout,omitempty"`
 
 	Runtime ChkClusterRuntime `json:"-" yaml:"-"`
@@ -113,12 +115,18 @@ func (c *Cluster) GetSchemaPolicy() *apiChi.SchemaPolicy {
 
 // GetInsecure is a getter
 func (cluster *Cluster) GetInsecure() *types.StringBool {
-	return nil
+	if cluster == nil {
+		return nil
+	}
+	return cluster.Insecure
 }
 
 // GetSecure is a getter
 func (cluster *Cluster) GetSecure() *types.StringBool {
-	return nil
+	if cluster == nil {
+		return nil
+	}
+	return cluster.Secure
 }
 
 // GetSecret is a getter

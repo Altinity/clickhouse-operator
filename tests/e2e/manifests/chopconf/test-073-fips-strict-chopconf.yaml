@@ -5,10 +5,14 @@ metadata:
 spec:
   security:
     # Master TLS switch — coerce per-component knobs + reject plain-text ZK.
+    # The ZK rejection in normalizeConfigurationZookeeper is gated by
+    # RequiresHardening(), which fires on EITHER security.policy=Enforced OR
+    # security.fips.enforced=true; either knob is sufficient for this test.
+    # We use policy=Enforced alone — it does not depend on the operator
+    # binary's GOFIPS140 link status, so the chopconf works on both the
+    # default GODEBUG=fips140=off shipped image and on GODEBUG=fips140=on
+    # ACVP images. The dedicated FIPS-module-enforcement gate (chopconf
+    # security.fips.enforced=true on a non-GOFIPS-linked binary → Fatal) is
+    # covered by pkg/util/fips/gate_test.go's matrix; replicating it here as
+    # an e2e fixture is fragile against GODEBUG runtime defaults.
     policy: Enforced
-    # FIPS runtime gate — assert the operator binary was built with GOFIPS140
-    # and crypto/fips140 is Enabled at process start. Orthogonal to policy
-    # (transport hardening) but bundled here so the chopconf exercises both
-    # the TLS-coercion and FIPS-module-enforcement paths in one fixture.
-    fips:
-      enforced: "true"

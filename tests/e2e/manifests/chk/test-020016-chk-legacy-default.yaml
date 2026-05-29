@@ -1,0 +1,32 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020016-legacy
+spec:
+  # Back-compat sentinel: NEITHER cluster.secure NOR cluster.insecure
+  # is set. cluster.GetInsecure().IsFalse() is false (nil getter), so
+  # rejectNoKeeperListener() does NOT fire; cluster.GetSecure().Value()
+  # is false, so no zk-secure port and no <secure>1</secure> in Raft XML.
+  # Result must be byte-identical to the pre-knob baseline (matches
+  # test-020003-chk shape minus replica count). Any divergence here
+  # indicates a regression in the secure-flag normalizer's default path.
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    clusters:
+      - name: "keeper"
+        layout:
+          replicasCount: 1
+    settings:
+      logger/level: "information"
+      logger/console: "true"
+      listen_host: "0.0.0.0"
+      keeper_server/four_letter_word_white_list: "*"
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              image: "clickhouse/clickhouse-keeper:25.3"

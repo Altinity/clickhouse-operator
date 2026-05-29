@@ -32,7 +32,16 @@ jobs:
           export CHO_RELEASE=$(cat release)
           export GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
           export GOFIPS140=v1.0.0
-          export GODEBUG_FIPS140=only
+          # GODEBUG_FIPS140 selects the runtime FIPS enforcement level baked
+          # into the image's ENV GODEBUG. Accepted values:
+          #   off   — module not active (shipped default; preserves pre-0.27.1
+          #           runtime behavior on the GOFIPS140-linked binary)
+          #   on    — module active; TLS/cipher/sig filtering; non-FIPS calls
+          #           outside TLS still allowed
+          #   only  — strict; non-FIPS primitive calls panic at call time
+          #   debug — same as on + per-call stderr logging
+          # Override at runtime via Pod env without rebuilding.
+          export GODEBUG_FIPS140=off
 
           echo "${DOCKER_PASS}" | docker login -u $DOCKER_USER --password-stdin docker.io
           echo "Building operator image with SBOM + provenance + metadata capture"

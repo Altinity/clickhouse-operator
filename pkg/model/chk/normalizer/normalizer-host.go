@@ -75,11 +75,20 @@ func hostApplyHostTemplate(host *chi.Host, template *chi.HostTemplate) {
 }
 
 func hostApplyHostTemplatePortDistribution(host *chi.Host, template *chi.HostTemplate) {
+	// Secure-port template application is gated on host.IsSecure() so that
+	// hosts in non-secure clusters retain the byte-identical legacy Service
+	// shape on upgrade. An explicit template.Spec.ZKPortSecure on an
+	// insecure host is intentionally ignored (declare cluster.secure=yes
+	// to opt in).
+	hostSecure := host.IsSecure()
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {
 		case deployment.PortDistributionUnspecified:
 			if !host.ZKPort.HasValue() {
 				host.ZKPort = template.Spec.ZKPort
+			}
+			if hostSecure && !host.ZKPortSecure.HasValue() {
+				host.ZKPortSecure = template.Spec.ZKPortSecure
 			}
 			if !host.RaftPort.HasValue() {
 				host.RaftPort = template.Spec.RaftPort
@@ -91,6 +100,13 @@ func hostApplyHostTemplatePortDistribution(host *chi.Host, template *chi.HostTem
 					base = template.Spec.ZKPort.Value()
 				}
 				host.ZKPort = types.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
+			}
+			if hostSecure && !host.ZKPortSecure.HasValue() {
+				base := chi.KpDefaultZKSecurePortNumber
+				if template.Spec.ZKPortSecure.HasValue() {
+					base = template.Spec.ZKPortSecure.Value()
+				}
+				host.ZKPortSecure = types.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
 			if !host.RaftPort.HasValue() {
 				base := chi.KpDefaultRaftPortNumber
@@ -119,13 +135,17 @@ func hostEnsurePortValuesFromSettings(host *chi.Host, settings *chi.Settings, fi
 	// For intermittent (non-final) setup fallback values should be from "MustBeAssignedLater" family,
 	// because this is not final setup (just intermittent) and all these ports may be overwritten later
 	var (
-		fallbackZKPort   *types.Int32
-		fallbackRaftPort *types.Int32
+		fallbackZKPort       *types.Int32
+		fallbackZKPortSecure *types.Int32
+		fallbackRaftPort     *types.Int32
 	)
 
 	// On the other hand, for final setup we need to assign real numbers to ports
 	if final {
 		fallbackZKPort = types.NewInt32(chi.KpDefaultZKPortNumber)
+		if host.IsSecure() {
+			fallbackZKPortSecure = types.NewInt32(chi.KpDefaultZKSecurePortNumber)
+		}
 		fallbackRaftPort = types.NewInt32(chi.KpDefaultRaftPortNumber)
 	}
 
@@ -133,7 +153,26 @@ func hostEnsurePortValuesFromSettings(host *chi.Host, settings *chi.Settings, fi
 	// 2. Setup ports
 	//
 	host.ZKPort = types.EnsurePortValue(host.ZKPort, settings.GetZKPort(), fallbackZKPort)
+	// Secure ZK port is opt-in: the settings-supplied tcp_port_secure is only
+	// harvested when the host is configured for secure mode. Without this
+	// gate, a stray `keeper_server/tcp_port_secure` in settings would surface
+	// zk-secure on the Service even when cluster.secure is unset, breaking
+	// the byte-stability contract for non-adopters.
+	var zkPortSecureSetting *types.Int32
+	if host.IsSecure() {
+		zkPortSecureSetting = settings.GetZKPortSecure()
+	}
+	host.ZKPortSecure = types.EnsurePortValue(host.ZKPortSecure, zkPortSecureSetting, fallbackZKPortSecure)
 	host.RaftPort = types.EnsurePortValue(host.RaftPort, settings.GetRaftPort(), fallbackRaftPort)
+	// Final-pass invariant: host.ZKPortSecure.HasValue() iff host.IsSecure().
+	// A user-supplied per-host `zkPortSecure` in YAML on a non-secure cluster
+	// would otherwise leak `zk-secure` onto the Service (which gates on
+	// HasValue()) while Raft XML omits `<secure>1</secure>` (which gates on
+	// IsSecure()) — that asymmetry is corrected here so the two emitters
+	// agree.
+	if final && !host.IsSecure() {
+		host.ZKPortSecure = nil
+	}
 }
 
 // createHostsField

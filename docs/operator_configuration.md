@@ -261,7 +261,7 @@ Sub-blocks at a glance:
 
 The per-component TLS knobs `clickhouse.tls` and `zookeeper.tls` use 3-level inheritance — chopconf → CHI `spec.configuration.clusters[].security` → cluster — with empty/absent meaning "inherit from the next level up". `kubernetes.tls`, `security.ipc`, `security.policy`, `security.fips`, and `security.images` are operator-process-scoped and chopconf-only (no CHI override).
 
-See [security_hardening.md](security_hardening.md) for per-knob semantics, the orthogonal-axes posture table, FIPS coercion details, image-policy details, and the externally-managed-token (Secret-backed) GitOps pattern.
+See [security_hardening.md](security_hardening.md) for per-knob semantics, the `security.policy: Enforced` master switch, the orthogonal-axes posture table, and the externally-managed-token (Secret-backed) GitOps pattern. FIPS-specific controls (`security.fips.enforced` cryptographic-module gate, `security.images.policy: FIPSRequired` workload supply-chain gate, FIPS coercion details, ACVP responder, FIPS build and release evidence) are documented in [security_hardening_fips.md](security_hardening_fips.md).
 
 [clickhouse-operator-install-bundle.yaml]: ../deploy/operator/clickhouse-operator-install-bundle.yaml
 [70-chop-config.yaml]: ./chi-examples/70-chop-config.yaml

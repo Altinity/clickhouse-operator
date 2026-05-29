@@ -34,13 +34,20 @@ import (
 // binary can share it.
 func fipsGate() {
 	fipsEnforced := chop.Config().Security.GetFIPS().IsEnforced()
-	build, runtime := fips.Enabled(), fips.Enforced()
-	log.F().Info("FIPS: chopconf.fips.enforced=%t build.enabled=%t runtime.enforced=%t module=%s", fipsEnforced, build, runtime, fips.Version())
+	// buildLinked is the durable "GOFIPS140-linked" property derived from
+	// runtime/debug.BuildInfo settings — independent of GODEBUG runtime mode.
+	// fips.Enabled() ("module active right now") is reported in the banner
+	// for diagnostics but is NOT the gate input: under GODEBUG=fips140=off
+	// (the shipped default) Enabled() returns false even on a properly
+	// GOFIPS140-linked binary, which would Fatal the pod incorrectly.
+	buildLinked := fips.BuildSetting("GOFIPS140") != ""
+	moduleActive, runtime := fips.Enabled(), fips.Enforced()
+	log.F().Info("FIPS: chopconf.fips.enforced=%t build.linked=%t module.active=%t runtime.enforced=%t module=%s", fipsEnforced, buildLinked, moduleActive, runtime, fips.Version())
 	log.F().Info("FIPS env: GODEBUG=%q DefaultGODEBUG=%q GOFIPS140=%q",
 		fips.GODEBUGRaw(),
 		fips.BuildSetting("DefaultGODEBUG"),
 		fips.BuildSetting("GOFIPS140"))
-	err, warn := fips.EvaluateGate("clickhouse-operator", fipsEnforced, build, runtime, fips.BuildSetting("DefaultGODEBUG"))
+	err, warn := fips.EvaluateGate("clickhouse-operator", fipsEnforced, buildLinked, runtime, fips.BuildSetting("DefaultGODEBUG"))
 	if err != nil {
 		log.F().Fatal(err.Error())
 	}

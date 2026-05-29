@@ -95,7 +95,7 @@ ARG TARGETARCH
 ARG VERSION
 ARG GO_VERSION
 ARG GOFIPS140
-ARG GODEBUG_FIPS140=only
+ARG GODEBUG_FIPS140=off
 
 LABEL name="ClickHouse operator" \
       maintainer="Altinity <support@altinity.com>" \
@@ -152,7 +152,7 @@ ARG TARGETARCH
 ARG VERSION
 ARG GO_VERSION
 ARG GOFIPS140
-ARG GODEBUG_FIPS140=only
+ARG GODEBUG_FIPS140=off
 RUN echo "Building ACVP image"
 WORKDIR /
 USER nobody
@@ -163,8 +163,11 @@ LABEL altinity.fips.acvp.responder="true" \
       altinity.fips.acvp.binary="/clickhouse-operator-acvp" \
       altinity.image.variant="acvp"
 
-# FIPS runtime mode for the ACVP responder. Defaults to `only` (strict) to
-# match image-prod; override at build time via --build-arg GODEBUG_FIPS140=on.
+# FIPS runtime mode for the ACVP responder. Inherits image-prod default (off).
+# ACVP runs typically override via --build-arg GODEBUG_FIPS140=only (strict) or
+# `on` (permissive) at the dispatch level so the responder exercises the FIPS
+# module; the default-off image is non-FIPS-active and inappropriate for ACVP
+# evidence runs without an override.
 ENV GODEBUG="fips140=${GODEBUG_FIPS140}"
 
 # Overwrite the production binary with the acvp_wrapper-tagged build and copy
@@ -183,20 +186,29 @@ CMD ["-logtostderr=true", "-v=1"]
 # --target is not specified). MUST remain the final stage so production builds
 # stay free of the ACVP responder.
 FROM image-base AS image-prod
-ARG GODEBUG_FIPS140=only
+ARG GODEBUG_FIPS140=off
 RUN echo "Building PROD image"
 WORKDIR /
 USER nobody
 
 # FIPS runtime mode (paired with GOFIPS140 build-time linking). Build-arg
-# GODEBUG_FIPS140 selects the runtime enforcement level:
-#   only — strict: non-FIPS primitives panic at call time (shipped default)
-#   on   — permissive: TLS/cipher/signature filtering, non-FIPS calls allowed
-#   off  — Go runtime default (no FIPS gating)
+# GODEBUG_FIPS140 selects the runtime enforcement level. Accepted values:
+#   off   — FIPS module not active; standard stdlib crypto. SHIPPED DEFAULT.
+#           Preserves pre-0.27.1 runtime behavior even on the GOFIPS140-linked
+#           binary. Opt in to on/only at runtime via Pod env (no rebuild).
+#   on    — FIPS module active. TLS / cipher / signature / cert-chain
+#           selection filtered to FIPS-approved primitives. Direct calls into
+#           non-approved primitives outside the TLS layer remain callable.
+#   only  — Strictest. Same as `on` plus any direct invocation of a
+#           non-FIPS-approved primitive panics at call time. Best-effort
+#           per Go upstream; documented as not for general production but
+#           useful for CI gating.
+#   debug — Same as `on` plus per-call stderr logging. Verbose, diagnostic only.
 # Non-security SHA-1/MD5 usage in deterministic identifier hashing
-# (pkg/util/{hash,string,shell}.go) is implemented as inline pure-Go and does
-# NOT invoke crypto/sha1 or crypto/md5, so it runs cleanly under `only`. See
-# docs/security_hardening.md and docs/fips.md §3.
+# (pkg/util/{hash,shell}.go) is implemented as inline pure-Go and does NOT
+# invoke crypto/sha1 or crypto/md5, so the operator runs cleanly under all
+# four modes including `only`. See docs/security_hardening_fips.md §
+# "Non-security hash exclusions".
 # Customers can override at runtime via Pod env (e.g. kubectl set env
 # deploy/clickhouse-operator GODEBUG=fips140=on) without rebuilding.
 ENV GODEBUG="fips140=${GODEBUG_FIPS140}"

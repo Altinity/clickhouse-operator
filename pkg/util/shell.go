@@ -98,8 +98,9 @@ func IsShellEnvVarName(value string) bool {
 // This is an object/name-shortening function, NOT cryptographic protection.
 // MD5 is inlined here (rather than imported from crypto/md5) so the operator
 // can run under GODEBUG=fips140=only without panicking when this code path
-// fires. See docs/security_hardening.md §3 — env-var suffix generation is
-// explicitly outside the FIPS cryptographic boundary.
+// fires. See docs/security_hardening_fips.md § "Non-security hash exclusions"
+// — env-var suffix generation is explicitly outside the FIPS cryptographic
+// boundary.
 func envVarNameSuffixDigest(data []byte) [16]byte {
 	// RFC 1321 §3.3 — initial chaining values (little-endian words A,B,C,D).
 	a := uint32(0x67452301)

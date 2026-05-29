@@ -15,6 +15,7 @@
 package normalizer
 
 import (
+	"fmt"
 	"strings"
 
 	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
@@ -647,6 +648,8 @@ func (n *Normalizer) normalizeClusterStage2(cluster *chk.Cluster) *chk.Cluster {
 	cluster.PDBMaxUnavailable = n.normalizePDBMaxUnavailable(cluster.PDBMaxUnavailable)
 	cluster.Reconcile = n.normalizeClusterReconcile(cluster.Reconcile)
 	cluster.Security = n.normalizeClusterSecurity(cluster.Security)
+	n.rejectFIPSInsecureKeeperCluster(cluster)
+	n.rejectNoKeeperListener(cluster)
 
 	n.appendClusterSecretEnvVar(cluster)
 
@@ -961,6 +964,60 @@ func (n *Normalizer) normalizeClusterSecurity(security *chi.ClusterSecurity) *ch
 		n.rejectFIPSBypass(security)
 	}
 	return security
+}
+
+// rejectFIPSInsecureKeeperCluster aborts the CHK when chopconf hardening is
+// active and the cluster does not opt into the secure (TLS) Keeper port via
+// cluster.secure=yes. The predicate `!IsTrue()` catches both unset (nil) and
+// explicit-false. Companion to rejectFIPSBypass which polices the resolved
+// Security knobs; this gate polices the cluster-level secure opt-in.
+//
+// Scope note: this gate only refuses the spec at admission. It does not auto-
+// close the plain-text Keeper client port (host.ZKPort=2181 still emits onto
+// the Service even when this gate accepts a `secure: yes` cluster). Closing
+// the plain-text listener requires server-side Keeper TLS XML + cert mounts
+// which are user-supplied today; auto-closing is a follow-up.
+func (n *Normalizer) rejectFIPSInsecureKeeperCluster(cluster *chk.Cluster) {
+	if cluster == nil {
+		return
+	}
+	if !chop.Config().Security.RequiresHardening() {
+		return
+	}
+	if cluster.GetSecure().IsTrue() {
+		return
+	}
+	target := n.req.GetTarget()
+	if target == nil {
+		return
+	}
+	msg := fmt.Sprintf("cluster %q must declare secure=yes under FIPS hardening", cluster.GetName())
+	target.EnsureStatus().ReconcileAbortWithReason(chk.StatusReasonFIPSValidationFailed, msg)
+}
+
+// rejectNoKeeperListener aborts the CHK when the cluster opts out of BOTH the
+// insecure plaintext port (cluster.insecure=no) AND the secure TLS port
+// (cluster.secure unset or =no). Such a cluster would produce a Service with
+// no client-facing Keeper port — ClickHouse clients could not reach it. This
+// is a misconfiguration regardless of FIPS posture, so the gate is unconditional.
+func (n *Normalizer) rejectNoKeeperListener(cluster *chk.Cluster) {
+	if cluster == nil {
+		return
+	}
+	if cluster.GetSecure().IsTrue() {
+		return
+	}
+	// cluster.Insecure defaults to "yes" (legacy), so the only way to land here
+	// with no listener is an explicit `insecure: no` + no `secure: yes`.
+	if !cluster.GetInsecure().IsFalse() {
+		return
+	}
+	target := n.req.GetTarget()
+	if target == nil {
+		return
+	}
+	msg := fmt.Sprintf("cluster %q has both insecure=no and secure unset: no Keeper client port would be emitted", cluster.GetName())
+	target.EnsureStatus().ReconcileAbortWithReason(chk.StatusReasonNoKeeperListener, msg)
 }
 
 // rejectFIPSBypass aborts the CHK if the cluster's resolved Security

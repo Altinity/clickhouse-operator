@@ -28,6 +28,18 @@ func (w *worker) reconcileClusterZookeeperRootPath(cluster *api.Cluster) error {
 		return nil
 	}
 
+	// When the resolved ZK ensemble is TLS-only, the operator's
+	// plaintext go-zookeeper dial cannot reach it. The bundled client has no
+	// TLS-aware path-ensure today, so skip the precreation step and let the
+	// ClickHouse server itself create the root path on its first DDL — that
+	// dial happens inside ClickHouse over its (TLS-aware) Keeper client.
+	if clusterZookeeperRequiresTLSDial(cluster) {
+		w.a.V(1).M(cluster.GetCR()).F().
+			Info("Skip ZK root-path ensure for cluster %s/%s/%s: ensemble is TLS-only and the operator dial is plaintext",
+				cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName())
+		return nil
+	}
+
 	// Yes, we are expected to reconcile ZK path
 
 	w.a.V(1).
@@ -45,6 +57,24 @@ func (w *worker) reconcileClusterZookeeperRootPath(cluster *api.Cluster) error {
 		Info("ZK is configured for cluster %s/%s/%s", cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName())
 
 	return nil
+}
+
+// clusterZookeeperRequiresTLSDial reports whether any resolved ZK node is
+// marked Secure (port 2281 / zk-secure / explicit secure flag). The
+// go-zookeeper client embedded in the operator does not speak TLS without
+// CertFile/KeyFile material, which the operator does not provision today.
+// Callers that would otherwise open a plaintext socket should bail out and
+// rely on ClickHouse itself for the dial.
+func clusterZookeeperRequiresTLSDial(cluster *api.Cluster) bool {
+	if (cluster == nil) || cluster.Zookeeper.IsEmpty() {
+		return false
+	}
+	for _, node := range cluster.Zookeeper.Nodes {
+		if node.Secure.IsTrue() {
+			return true
+		}
+	}
+	return false
 }
 
 func ensureZkPath(cluster *api.Cluster) {

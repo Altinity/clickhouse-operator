@@ -1,0 +1,34 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020015-no-listener
+spec:
+  # Admission-gate fixture. cluster.insecure=no without an
+  # offsetting cluster.secure=yes would produce a CHK with no
+  # client-facing Keeper port — ClickHouse clients could not reach it.
+  # The normalizer's rejectNoKeeperListener gate fires unconditionally
+  # (no FIPS chopconf required) and aborts the CHK with
+  # StatusReasonNoKeeperListener. Pod is never scheduled.
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    clusters:
+      - name: "keeper"
+        insecure: "no"
+        # secure intentionally UNSET — pair `insecure: no` + secure-unset
+        # is the misconfiguration the gate must catch.
+        layout:
+          replicasCount: 1
+    settings:
+      logger/level: "information"
+      logger/console: "true"
+      listen_host: "0.0.0.0"
+      keeper_server/four_letter_word_white_list: "*"
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              image: "clickhouse/clickhouse-keeper:25.3"

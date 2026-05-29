@@ -1,12 +1,590 @@
-# Security hardening
+# ClickHouse operator hardening guide
 
-This document describes the per-component security toggles introduced in 0.27.1+.
-The toggles are opt-in: with no configuration changes the operator behaves
-exactly as in 0.26.x.
+## Overview
 
-Each toggle is independent — the operator does not infer one knob from another.
-This lets users harden one surface (e.g. ClickHouse client TLS) without
-disturbing others.
+This section provides an overview of the **clickhouse-operator** security model.
+
+With the default settings, the ClickHouse operator deploys ClickHouse with two users protected by network restriction rules to block unauthorized access.
+
+### The 'default' user
+
+The '**default**' user is used to connect to ClickHouse instance from a pod where it is running, and also for distributed queries. It is deployed with an **empty password** that was a long-time default for ClickHouse out-of-the-box installation.
+
+For security purposes, we recommend that you disable the `default` user altogether. As an example, create a file named `remove_default_user.xml` and place it in the `users.d` directory. This markup does the trick:
+
+```xml
+<clickhouse>
+   <users>
+      <default remove="1"/>
+   </users>
+</clickhouse>
+```
+
+However, if you do use the `default` user, the operator applies network security rules that restrict connections to the pods running the ClickHouse cluster, and nothing else.
+
+Before version **0.19.0**  `hostRegexp` was applied that captured pod names. This did not work correctly in some Kubernetes distributions, such as GKE. In later versions, the operator additionally applies a restrictive set of pod IP addresses and rebuilds this set if the IP address of a pod changes for whatever reason.
+
+The following `users.xml` is set up by operator for a cluster that has two nodes. In this configuration, a '**default**' user can not connect from outside of the cluster.
+
+```xml
+<users>
+  <default>
+    <networks>
+      <host_regexp>(chi-my-cluster-[^.]+\d+-\d+|clickhouse\-my-cluster\.test\.svc\.cluster\.local$</host_regexp>
+      <ip>::1</ip>
+      <ip>127.0.0.1</ip>
+      <ip>172.17.0.4</ip>
+      <ip>172.17.0.12</ip>
+    </networks>
+    <profile>default</profile>
+    <quota>default</quota>
+  </default>
+</users>
+```
+
+### The 'clickhouse_operator' user
+
+The '**clickhouse_operator**' user is used by the operator itself to perform DMLs when adding or removing ClickHouse replicas and shards, and also for collecting monitoring data. The **user** and **password** values are stored in a secret.
+
+The following example shows how **secret** is referenced in the **clickhouse_operator** configuration:
+
+```yaml
+clickhouse:
+  access:
+    secret:
+      # Empty `namespace` means that k8s secret would be looked
+      # in the same namespace where the operator's pod is running.
+      namespace: ""
+      name: "clickhouse-operator"
+```
+
+The following example shows a **secret**:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-operator
+type: Opaque
+stringData:
+  username: clickhouse_operator
+  password: chpassword
+```
+
+We recommend that you do not include the **user** and **password** within the operator configuration without a **secret**, though it is also supported.
+
+To change '**clickhouse_operator**' user password you can modify `etc-clickhouse-operator-files` configmap or create `ClickHouseOperatorConfiguration` object, then restart the operator to apply the change.
+
+See [operator configuration](https://github.com/Altinity/clickhouse-operator/blob/master/docs/operator_configuration.md) for more information about operator configuration files.
+
+The operator also protects access for the '**clickhouse\_operator**' user using an IP mask. When deploying a user into a ClickHouse server, access is restricted to the IP address of the pod where the operator is running, and nothing else. Therefore, the '**clickhouse_operator**' user can not be used outside of this pod.
+
+## Securing ClickHouse users
+
+More ClickHouse users can be created using SQL `CREATE USER` statement or in a dedicated section of `ClickHouseInstallation`.
+
+To make sure passwords are not exposed, for the `ClickHouseInstallation` the operator provides the following:
+
+### Using hashed passwords
+
+User passwords in `ClickHouseInstallation` can be specified in plain, as sha256 and double sha1 hashes.
+
+When a password is specified in plaintext, the operator hashes it when deploying to ClickHouse, but that is still left in unsecure plaintext format in the `ClickHouseInstallation`.
+
+Altinity recommends providing hashes explicitly as follows:
+
+```yaml
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    users:
+      user1/password: pwduser1  # This will be hashed in ClickHouse config files, but this NOT RECOMMENDED
+      user2/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
+      user3/password_double_sha1_hex: cbe205a7351dd15397bf423957559512bd4be395
+```
+
+### Using secrets
+
+The operator also allows user to specify passwords and password hashes in a Kubernetes secret as follows:
+
+```yaml
+spec:
+  configuration:
+    users:
+      user1/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse_secret
+            key: pwduser1
+      user2/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse_secret
+            key: pwduser2          
+      user3/password_double_sha1_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse_secret
+            key: pwduser3                
+```
+
+The following example refers to the secret:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-secret
+type: Opaque
+stringData:
+  pwduser1: pwduser1
+  pwduser2: e106728c3541ec3694822a29d4b8b5f1f473508adc148fcb58a60c42bcf3234c
+  pwduser3: cbe205a7351dd15397bf423957559512bd4be395
+
+```
+
+**DEPRECATED**: Since version 0.23.x the syntax to read passwords and password hashes from a secret using special 'k8s\_secret\_' and 'k8s\_secret\_env\_' prefixes is deprecated:
+
+```yaml
+spec:
+  configuration:
+    users:
+      user1/k8s_secret_password: clickhouse-secret/pwduser1
+      user2/k8s_secret_password_sha256_hex: clickhouse-secret/pwduser2
+      user3/k8s_secret_password_double_sha1_hex: clickhouse-secret/pwduser3
+```
+
+```yaml
+spec:
+  configuration:
+    users:
+      user1/k8s_secret_env_password: clickhouse-secret/pwduser1
+      user2/k8s_secret_env_password_sha256_hex: clickhouse-secret/pwduser2
+      user3/k8s_secret_env_password_double_sha1_hex: clickhouse-secret/pwduser3
+```
+
+### Securing the 'default' user
+
+While the '**default**' user is protected by network rules, passwordless operation is often not allowed by infosec teams. The password for the '**default**' user can be changed the same way as for other users. However, the '**default**' user is also used by ClickHouse to run distributed queries. If the password changes, distributed queries may stop working.
+
+To keep distributed queries running without exposing the password, configure ClickHouse to use a secret token for inter-cluster communications instead of 'default' user credentials.
+
+
+The operator supports the following:
+
+#### 'auto' token
+
+The following example shows how to let ClickHouse generate the secret token automatically. This is the simplest and recommended way.
+
+```
+spec:
+  configuration:
+    users:
+      default/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
+    clusters:
+      - name: default
+        secret:
+          auto: "true"
+```
+
+#### Custom token
+
+The following example shows how to define a token.
+
+```
+spec:
+  configuration:
+    users:
+      default/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
+    clusters:
+      - name: "default"
+        secret:
+          value: "my_secret"
+```
+
+#### Custom token from Kubernetes secret
+
+The following example shows how to define a token within a secret.
+
+```
+spec:
+  configuration:
+    users:
+      default/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
+    clusters:
+      - name: "default"
+        secret:
+          valueFrom:
+            secretKeyRef:
+              name: "secure-inter-cluster-communications"
+              key: "secret"
+```
+
+## Securing ClickHouse server settings
+
+Some ClickHouse server settings may contain sensitive data, for example, passwords or keys to access external systems. ClickHouse allows a user to keep connection information for external systems in [Named Collections](https://clickhouse.com/docs/en/operations/named-collections) defined by DDL, but sometimes it is more convenient to store keys in server configuration files. In order to do it securely, sensitive information needs to be stored in secrets.
+
+For example, in order to access S3 bucket one may define the following secret:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-credentials
+type: Opaque
+stringData:
+  AWS_SECRET_ACCESS_KEY: *****
+  AWS_ACCESS_KEY_ID: *****
+```
+
+Secret can be referred in ```ClickHouseInstallation``` as follows:
+
+```yaml
+spec:
+  configuration:
+    settings:
+      s3/my_bucket/endpoint: "https://my-bucket.s3.amazonaws.com/sample/"
+      s3/my_bucket/secret_access_key:
+        valueFrom:
+          secretKeyRef:
+            name: s3-credentials
+            key: AWS_SECRET_ACCESS_KEY
+      s3/my_bucket/access_key:
+        valueFrom:
+          secretKeyRef:
+            name: s3-credentials
+            key: AWS_ACCESS_KEY_ID
+```
+
+Under the hood, secrets settings are mapped to environment variables and referred in XML configuration files using ```from_env``` syntax. So the snippet above is equivalent to the following:
+
+```yaml
+spec:
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+          - name: clickhouse
+            image: altinity/clickhouse-server:24.3.12.76.altinitystable
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+  configuration:
+    files:
+      config.d/s3.xml: |
+        <clickhouse>
+          <s3>
+            <my_bucket>
+               <endpoint>https://my-bucket.s3.amazonaws.com/sample/</endpoint>
+               <access_key_id from_env="AWS_ACCESS_KEY_ID"></access_key_id>
+               <secret_access_key from_env="AWS_SECRET_ACCESS_KEY"></secret_access_key>
+            </my_bucket>
+          </s3>
+        </clickhouse>
+```
+
+## Securing the network
+
+This section covers how to secure your network.
+
+### Network Overview
+
+With default settings, the operator deploys pods and services that expose 3 ports:
+
+* 8123 -- HTTP interface
+* 9000 -- TCP interface
+* 9009 -- used for replication protocol between cluster nodes (HTTP)
+
+For every pod, there is one service created, and also load balancer service is created to access the cluster. Additional load balancers and custom services may be created using service templates.
+
+### Enabling secure connections to clickhouse-server
+
+[ClickHouse Network Hardening Guide](https://docs.altinity.com/operationsguide/security/clickhouse-hardening-guide/network-hardening/) describes steps required to secure ClickHouse server. Some of them are manual, others are outomated by operator.
+
+The ClickHouse HTTPS/TLS configuration requires the following steps:
+
+* Generate the following certificate files:
+
+  * `server.crt`
+  * `server.key`
+  * `dhparam.pem`
+
+* Add generated files into the `files` section of `ClickHouseInstallation`
+* Add **openSSL configuration** for the server (and client, if ClickHouse needs to connect to other nodes by SSL)
+* Enabling **secure ports** in a ClickHouse configuration
+* Defining a custom **podTemplate** with secure ports
+* Defining a custom **serviceTemplate** if needed
+
+The **podTemplate** is automated by the operator using a '**secure**' flag in the cluster definition rather than the user doing it.
+
+The following example shows a typical secure configuration:
+
+```yaml
+spec:
+  configuration:
+    clusters:
+    - name: default
+      secure: "yes"
+    settings:
+      tcp_port: 9000 # keep for localhost
+      tcp_port_secure: 9440
+      https_port: 8443
+    files:
+      openssl.xml: |
+        <clickhouse>
+          <openSSL>
+            <server>
+              <certificateFile>/etc/clickhouse-server/config.d/server.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/config.d/server.key</privateKeyFile>
+              <dhParamsFile>/etc/clickhouse-server/config.d/dhparam.pem</dhParamsFile>
+              <verificationMode>none</verificationMode>
+              <loadDefaultCAFile>true</loadDefaultCAFile>
+              <cacheSessions>true</cacheSessions>
+              <disableProtocols>sslv2,sslv3</disableProtocols>
+              <preferServerCiphers>true</preferServerCiphers>
+            </server>
+          </openSSL>
+        </clickhouse>
+      config.d/server.crt: |
+        ***
+
+      config.d/server.key: |
+        ***
+
+      config.d/dhparam.pem: |
+        ***
+
+```
+
+Certificate files can also be stored in secrets: 
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-certs
+type: Opaque
+stringData:
+  server.crt: |
+        ***
+
+  server.key: |
+        ***
+
+  dhparam.pem: |
+        ***
+```
+
+and referred as below:
+
+
+```yaml
+spec:
+  configuration:
+    files:
+      openssl.xml: |
+        <clickhouse>
+          <openSSL>
+            <server>
+              <certificateFile>/etc/clickhouse-server/secrets.d/server.crt/clickhouse-certs/server.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/secrets.d/server.key/clickhouse-certs/server.key</privateKeyFile>
+              <dhParamsFile>/etc/clickhouse-server/secrets.d/dhparam.pem/clickhouse-certs/dhparam.pem</dhParamsFile>
+              <verificationMode>none</verificationMode>
+              <loadDefaultCAFile>true</loadDefaultCAFile>
+              <cacheSessions>true</cacheSessions>
+              <disableProtocols>sslv2,sslv3</disableProtocols>
+              <preferServerCiphers>true</preferServerCiphers>
+            </server>
+          </openSSL>
+        </clickhouse>
+      server.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.crt
+      server.key:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.key
+      dhparam.pem:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: dhparam.pem
+
+```
+
+**NOTE**: secret files are mapped into `secrets.d` configuration folder using the following rule:
+ `/etc/clickhouse-server/secrets.d/<config_file_name>/<secret_name>/<secret_key>`.
+
+### Disabling insecure connections
+
+The operator automatically adjusts services used to access individual pods when '**secure**' flag is used. Additionally, '**inscure: "no"**' flag can be added as of version 0.21.x in order to disable insecure ports:
+
+```
+spec:
+  configuration:
+    clusters:
+    - name: default
+      secure: "yes"
+      insecure: "no"
+```
+
+That adjusts pod services properly, but it does not adjust load balancer service. In real environments, the load balancer is managed by a separate **serviceTemplate**. User must define the available ports explicitly.
+
+The following example shows how to define ports for load balancer service:
+
+```yaml
+spec:
+  templates:
+    serviceTemplates:
+      - generateName: clickhouse-{chi}
+        metadata:
+          annotations:
+           # cloud specific annotations to configure load balancer
+        name: default-service-template
+        spec:
+          ports:
+            - name: https
+              port: 8443
+            - name: secureclient
+              port: 9440
+          type: LoadBalancer
+```
+
+### Using secure connections for distributed queries
+
+If ClickHouse is configured using the '**secure**' flag as described above, secure connections for distributed installations are already enabled:
+
+```yaml
+spec:
+  configuration:
+    clusters:
+      - name: "default"
+        secure: "yes"
+        secret:
+          auto: "yes"
+```
+
+Under the hood operator changes **remote_servers** configuration automatically, providing a secure port and flag:
+
+```xml
+<shard>
+   <internal_replication>False</internal_replication>
+      <replica>
+          <host>***</host>
+          <port>9440</port>
+          <secure>1</secure>
+      </replica>
+   </shard>
+```
+
+It may also require an openSSL client configuration:
+
+```yaml
+spec:
+  configuration:
+    files:
+      openssl_client.xml: |
+        <clickhouse>
+          <openSSL>
+            <client>
+                <loadDefaultCAFile>true</loadDefaultCAFile>
+                <cacheSessions>true</cacheSessions>
+                <disableProtocols>sslv2,sslv3</disableProtocols>
+                <preferServerCiphers>true</preferServerCiphers>
+                <verificationMode>none</verificationMode>
+                <invalidCertificateHandler>
+                    <name>AcceptCertificateHandler</name>
+                </invalidCertificateHandler>
+            </client>
+          </openSSL>
+        </clickhouse>
+```
+
+**Note:** To secure connections for external users only, but keep inter-cluster communications insecure, instead of using the '**secure**' flag, specify the **podTemplate** explicitly and open the proper ports:
+
+```yaml
+spec:
+  templates:
+    podTemplates:
+    - name: default
+      containers:
+      - name: clickhouse-pod
+        image: altinity/clickhouse-server:24.3.12.76.altinitystable
+        ports:
+        - name: http
+          containerPort: 8123
+        - name: https
+          containerPort: 8443
+        - name: client
+          containerPort: 9000
+        - name: secureclient
+          containerPort: 9440
+        - name: interserver
+          containerPort: 9009
+```
+
+### Forcing HTTPS for operator connections
+
+To have ClickHouse use HTTPS, use following YAML example to set the operator configuration for the '**clickhouse_operator**' user. It switches all interactions with ClickHouse to HTTPS, including health checks.
+
+```yaml
+configuration:
+  access:
+    scheme: https
+    port: 8443
+```
+
+### Forcing HTTPS for replication
+
+To force ClickHouse replication to use HTTPS on a securerly configured `ClickHouseInstallation`, set the required ClickHouse ports as follows:
+
+```yaml
+spec:
+  configuration:
+    settings:
+      interserver_http_port: _removed_
+      interserver_https_port: 9009
+```
+
+### Forcing HTTPS for ZooKeeper
+
+**TODO**:
+
+- Coming soon
+
+---
+
+# Operator-side security toggles (added in 0.27.1)
+
+> The sections above document ClickHouse-side hardening (users, passwords,
+> secrets, network). The sections below document the per-component **operator-side**
+> security toggles introduced in 0.27.1 — TLS verification on the operator's
+> outbound clients (ClickHouse / ZooKeeper / Kubernetes API), the
+> operator↔metrics-exporter IPC channel, and the transport-hardening master
+> switch.
+>
+> FIPS-specific controls (the cryptographic-module gate, the workload-image
+> policy gate, the ACVP responder, the FIPS-built image, and per-release
+> evidence) are documented in
+> [`security_hardening_fips.md`](./security_hardening_fips.md).
+
+The toggles below are opt-in: with no configuration changes the operator behaves
+exactly as in 0.26.x. Each toggle is independent — the operator does not infer
+one knob from another. This lets users harden one surface (e.g. ClickHouse
+client TLS) without disturbing others.
 
 ## What is configurable
 
@@ -433,31 +1011,29 @@ confirm a setting took effect, grep the operator logs for the relevant marker �
 e.g. `TLS setup OK - root Cert registered (verify=Strict ...)` for TLS verify,
 or `IPC: Secure mode — provisioned token` for IPC mode.
 
-## Orthogonal hardening axes
 
-0.27.1 splits the operator's "hardening posture" into three orthogonal axes —
-each is its own chopconf knob, each is enabled independently, and each gates
-a distinct concern:
+## Hardening axes overview
 
-| Axis | Knob | Concern | Default |
+The operator's hardening posture splits across three orthogonal chopconf
+knobs. Only the transport-hardening axis is documented in detail below; the
+two FIPS axes live in [`security_hardening_fips.md`](./security_hardening_fips.md).
+
+| Axis | Knob | Concern | Detailed docs |
 |---|---|---|---|
-| Transport hardening | `security.policy` | TLS verification + IPC + scheme coercion across the operator's outbound clients (CH / ZK / K8s) | `Permissive` |
-| Cryptographic-module gate | `security.fips.enforced` | Runtime assertion that the operator binary links the Go FIPS 140-3 module (`GOFIPS140=v1.0.0`) and is running under `GODEBUG=fips140=only` (default) or `fips140=on` (escape hatch) | `false` |
-| Workload supply-chain gate | `security.images.policy` | Admission + post-Ready check that every CH/Keeper container image carries `fips` in its tag and reports `fips` in `SELECT version()` | `Permissive` |
+| Transport hardening | `security.policy` | TLS verification + IPC + scheme coercion across the operator's outbound clients (CH / ZK / K8s) | below |
+| Cryptographic-module gate | `security.fips.enforced` | Runtime assertion that the operator binary links the Go FIPS 140-3 module (`GOFIPS140=v1.0.0`) and is running under `GODEBUG=fips140=only` / `fips140=on` | [`security_hardening_fips.md`](./security_hardening_fips.md) |
+| Workload supply-chain gate | `security.images.policy` | Admission + post-Ready check that every CH/Keeper container image carries `fips` in its tag and reports `fips` in `SELECT version()` | [`security_hardening_fips.md`](./security_hardening_fips.md) |
 
 Each axis is opt-in and orthogonal — a deployment may enable any one, any two,
-or all three. The most common postures, expressed as a 2×2 over the two
-operator-runtime axes, with the workload axis flipped on or off independently:
+or all three. The 2×2 over the two operator-runtime axes (workload axis
+flipped on/off independently):
 
 | `security.policy` | `security.fips.enforced` | Operator posture |
 |---|---|---|
 | `Permissive` (default) | `false` (default) | Pre-0.27.1 behavior. No coercion, no FIPS gate, no image gate. |
-| `Enforced` | `false` | TLS-only hardening. Operator coerces every TLS knob to Strict + IPC to Secure + rejects plain-text external ZK + refuses ZK `digest:` auth + coerces `clickhouse.access.scheme` http→https. No assertion that the binary is FIPS-linked. |
-| `Permissive` | `true` | Pure FIPS module gate. Operator Fatals at startup if the binary is not `GOFIPS140`-built. ALSO triggers the same TLS coercions as Enforced (FIPS implies verified TLS) — see below. |
-| `Enforced` | `true` | Full operator-side FIPS posture: TLS hardening + cryptographic-module gate. |
-
-Set `security.images.policy: FIPSRequired` on top of any row above to add the
-workload supply-chain gate (refusing non-FIPS-tagged ClickHouse/Keeper images).
+| `Enforced` | `false` | TLS-only hardening (described below). |
+| `Permissive` | `true` | FIPS module gate — see [`security_hardening_fips.md`](./security_hardening_fips.md). |
+| `Enforced` | `true` | Full operator-side FIPS posture — see [`security_hardening_fips.md`](./security_hardening_fips.md). |
 
 ### `security.policy: Enforced` — TLS-hardening master switch
 
@@ -498,562 +1074,12 @@ operator's outbound TLS posture. When `Enforced` at startup, the operator:
 
 `security.policy: Enforced` no longer Fatals on a non-FIPS-built binary. It
 governs transport hardening only — the cryptographic-module assertion is a
-separate axis (`security.fips.enforced`, below).
-
-### `security.fips.enforced: true` — FIPS cryptographic-module gate
-
-`security.fips.enforced` (default `false`) is the runtime assertion that the
-operator binary was built with the Go FIPS 140-3 cryptographic module
-(`GOFIPS140=v1.0.0`) AND is running with `GODEBUG=fips140=only` (shipped
-default) or `fips140=on` (escape-hatch). The gate lives in `cmd/operator/app/fips_gate.go` (and the
-mirror in `cmd/metrics_exporter/app/fips_gate.go`); both binaries enforce it
-symmetrically because the metrics-exporter ships its own copy of the FIPS
-module.
-
-When `true` at startup:
-
-- If `crypto/fips140` reports not-Enabled (binary built without `GOFIPS140`),
-  the operator logs `Fatal` and exits. `security.policy: Enforced` alone does
-  NOT fire this gate.
-- Side-effect: triggers the same TLS coercions listed under
-  `security.policy: Enforced` above, AND re-registers the legacy ClickHouse
-  TLS config to verifying mode. Rationale: a FIPS-asserted operator
-  necessarily wants verified TLS — there is no realistic posture in which the
-  cryptographic-module gate is on while the operator dials with
-  `InsecureSkipVerify=true`.
-
-Setting `security.policy: Enforced` and `security.fips.enforced: true`
-together is supported and idempotent: the TLS coercions fire once, the
-FIPS-binary assertion fires once, and the operator logs both decisions.
-
-**Spec-deviation note**: the internal Altinity FIPS scope specification
-(§6 step 2) names this knob `operator.security.fips.enabled`. The operator
-ships it as `security.fips.enforced` because the gate Fatals at startup on
-mismatch — `enforced` more accurately describes the strict-failure semantics
-than
-`enabled` (which would suggest a soft toggle). The two names refer to the
-same control surface; this rename is a wording deviation only, not a
-behavioral one. Either-switch fan-out (TLS coercions firing when EITHER
-`security.policy=Enforced` OR `security.fips.enforced=true`) is implemented
-via the shared `OperatorConfigSecurity.RequiresHardening()` accessor so that
-the narrower `fips.enforced=true` posture is never weaker than the broader
-`policy=Enforced` posture at the per-CR gate level (plain-text ZK rejection,
-ZK digest-auth rejection, `rejectFIPSBypass`).
-
-### `security.images.policy: FIPSRequired` — workload supply-chain gate
-
-Orthogonal to the two operator-runtime axes above. This knob does NOT
-constrain the operator binary itself; it constrains the CH/Keeper container
-images the operator deploys.
-
-| `security.images.policy` | Effect |
-|---|---|
-| `Permissive` (default) | No image-tag gating. Any image accepted. |
-| `FIPSRequired` | Reject CRs whose CH/Keeper images lack `fips` in the tag (admission-time, in normalize). After the pod is Ready, also reject CRs whose `SELECT version()` reply lacks `fips`. Rejection lands the CR in `status: Aborted` with the bracketed reason `[FIPSImagePolicyViolation]`. |
-
-`FIPSRequired` is the current wire value; the older bare `Required` spelling
-(pre-0.27.1 internal usage, never released) is still accepted by the
-normalizer as a defensive alias but is not documented as a supported value.
-
-### Detection signals
-
-- **Admission (deploy-time)** — the operator's normalizer inspects each host's
-  resolved PodTemplate `spec.containers[clickhouse].image` (or `keeper` for CHK)
-  for the substring `fips` (case-insensitive) in the TAG portion of the
-  reference. Registry-path substrings don't count. Hosts with no PodTemplate
-  use the operator default `clickhouse/clickhouse-server:latest` (or the
-  Keeper equivalent), which by construction fails Required.
-- **Runtime (post-Ready)** — after the host responds to `SELECT version()`,
-  the operator checks the reply for the same substring. Altinity FIPS builds
-  bake the tag suffix (e.g. `.altinityfips`) into the binary's version
-  string. Fails OPEN on transient SQL errors — a query hiccup against a
-  running CR does NOT flip it to Aborted; the next reconcile re-evaluates.
-
-### Failure reason
-
-Reason tag `[FIPSImagePolicyViolation]` (distinct from
-`[FIPSValidationFailed]`) is prepended to `status.errors`. Dashboards grep
-either tag to distinguish operator-config bypass from per-CR image policy.
-
-### Recovery from `[FIPSImagePolicyViolation]`
-
-Edit the CHI/CHK to point at a FIPS-tagged image
-(`altinity/clickhouse-server:<ver>.altinityfips`,
-`altinity/clickhouse-keeper:<ver>.altinityfips`), then `kubectl apply`. The
-informer's `UpdateFunc` re-enqueues; normalize re-runs cleanly.
-
-Auto-recovery from pod-Ready transitions skips this reason (per
-`shouldTriggerAutoRecovery`) — a pod flip can't fix a manifest that pins the
-wrong image.
-
-### Recovery from `[FIPSValidationFailed]`
-
-The reason is encoded in `status.errors` (no first-class `reason` field; that
-would be a CRD schema change). Operators and dashboards grep the error stream
-for the bracketed tag:
-
-```bash
-kubectl get chi -o json | jq -r '.items[].status.errors[]? | select(startswith("[FIPSValidationFailed]"))'
-```
-
-Recovery is via spec edit: `kubectl apply` a corrected CHI (set `secure: true`
-on every ZK node, or remove the `zookeeper:` block and use a CHK reference).
-The informer's `UpdateFunc` re-enqueues the CR and normalize re-runs cleanly.
-Note: this recovery path does NOT depend on `recovery.from.aborted.onPodReady`
-— that path requires pod-readiness transitions, which never fire for CHIs
-rejected at the normalizer (pods are never created).
-
-### Out of scope for this knob
-
-- **Forcing `/metrics` HTTPS** — ticket bullet deferred to a follow-up PR.
-  Forcing HTTPS requires cert/key plumbing in the operator Deployment and a
-  conditional ServiceMonitor scheme block in the Helm chart; both are non-
-  trivial and break existing Prometheus scrape topology without warning.
-- **OperatorHub `features.operators.openshift.io/fips-compliant: "true"`
-  label** — Red Hat policy additionally requires a UBI-based image with
-  signing/attestation; the label stays `"false"` until that work lands. The
-  build itself is FIPS-enabled (see "FIPS build" below), but the label flip
-  is gated separately.
-- **ClickHouseKeeperInstallation (CHK) controller** — the security toggles
-  documented above apply to CHK as well via the shared ClusterSecurity type
-  (spec-level + cluster-level), with the same chopconf inheritance and FIPS
-  bypass-reject semantics. Symmetric Keeper-side TLS additions are tracked
-  separately.
-
-## ACVP (Automated Cryptographic Validation Protocol)
-
-### What ACVP is
-
-[ACVP](https://pages.nist.gov/ACVP/) is NIST's machine-readable protocol for
-streaming cryptographic test vectors at a module and comparing the responses
-against expected outputs. It is the wire format that the
-[CAVP](https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program)
-suite uses to drive algorithm testing, and CAVP results in turn feed the
-[CMVP](https://csrc.nist.gov/Projects/cryptographic-module-validation-program)
-certification process. The three are easy to confuse: CMVP certifies a module
-end-to-end, CAVP validates individual algorithms inside that module, and ACVP
-is the protocol the CAVP harness speaks to the implementation under test.
-
-The Go cryptographic module `crypto/fips140` v1.0.0 that the operator links
-against carries a CAVP algorithm-validation listing (A6650) and is on the
-CMVP In Process list as of Go's published documentation — full CMVP
-certification has not yet been issued. The operator therefore claims FIPS
-140-3 *compatibility* (uses a module that has cleared CAVP and is awaiting
-CMVP), not certification, and does not re-do upstream's algorithm-validation
-work. See `## FIPS build` below for the authoritative module status text.
-
-### Why an embedded wrapper
-
-Downstream auditors typically ask "can I re-run the vectors against the exact
-binary you shipped?" rather than "is your module certified?" — applications
-that consume a validated module are not themselves separately validated, but
-they still need to demonstrate that the binary in production exercises the
-validated module's code paths and produces bit-identical outputs for a fixed
-test vector set. The embedded ACVP wrapper exists to answer that question
-reproducibly: it lets anyone with the source replay the same vectors against
-the same binary and confirm the responder output matches a pinned reference.
-
-This is *supplementary evidence* for downstream audits, not a substitute for
-Go's upstream CMVP certification. The wrapper would surface a regression if a
-build accidentally swapped in a non-validated primitive or if a future Go
-toolchain upgrade altered the FIPS module's externally observable behaviour.
-
-### How to invoke
-
-The wrapper is gated behind a build tag so the default operator image does
-NOT ship the responder. To build and run it:
-
-```bash
-# Build with the wrapper compiled in
-go build -tags acvp_wrapper -o dev/bin/clickhouse-operator ./cmd/operator
-ln -snf clickhouse-operator dev/bin/clickhouse-operator-acvp
-
-# Drive the responder against BoringSSL's acvptool with pinned vectors
-bash pkg/util/fips/acvp/run.sh
-```
-
-The same trampoline pattern lives in `cmd/metrics_exporter/`, producing
-`metrics-exporter-acvp`. Each binary statically links its own copy of the Go
-FIPS module, so both must be exercised to claim reproducibility for both
-shipped images. The argv[0] dispatch (basename ending in `-acvp`) is the only
-runtime trigger — running the operator binary normally has no ACVP code path.
-
-### Scope — algorithms exercised
-
-The wrapper exercises only public `crypto/...` APIs from the Go standard
-library that map to FIPS-approved algorithms. The current vector set covers
-roughly 38 algorithm suites: SHA2 family, SHA3 family, SHAKE, HMAC, HKDF,
-PBKDF2, the DRBG random source, AES in CBC/CTR/GCM modes, CMAC, ECDSA,
-EdDSA (Ed25519), RSA (PKCS#1 v1.5 and PSS), and the TLS 1.2/1.3 KDFs.
-
-Two algorithms in the FIPS module are deliberately **excluded**:
-
-- **ML-KEM (FIPS 203)** — the Kyber-derived post-quantum KEM. Its
-  deterministic seed-based key generation entry point is internal to the Go
-  FIPS module and not surfaced through any public `crypto/...` API.
-- **ML-DSA (FIPS 204)** — the Dilithium-derived post-quantum signature
-  scheme. Same constraint as ML-KEM.
-
-A wrapper that drove these would have to import internal Go packages, which
-is unsupported and would break across toolchain upgrades. The pragmatic
-trade-off is to validate the broad classical-cryptography surface that the
-operator actually uses (TLS handshakes, HMAC, certificate verification, AES)
-and accept that the two post-quantum primitives carry only the upstream
-CMVP/CAVP evidence.
-
-### Security note — not a production binary
-
-The responder exposes raw cryptographic primitives over stdin: callers
-supply IVs directly, inject DRBG seed material, and observe per-primitive
-outputs without higher-level authentication. This is by design for the test
-harness, but it makes the `-acvp` binary unsuitable for production
-deployment. Mitigations:
-
-- The wrapper compiles only with the `acvp_wrapper` build tag. Default
-  images do NOT carry it.
-- A separate `image-acvp` Dockerfile stage is used for ACVP CI; that stage
-  is never tagged as the default `:latest` or `:<version>` image.
-- The argv[0] suffix check requires the binary to be invoked as
-  `*-acvp` — a binary built with the tag still runs as the normal operator
-  when launched as `clickhouse-operator`. This protects against accidental
-  dispatch but is NOT a security boundary on its own; the build-tag gating
-  is.
-
-### Where outputs land
-
-The [`acvp_test.yaml`](../.github/workflows/acvp_test.yaml) GitHub Actions
-workflow runs the driver against both binaries on every push to `master`
-and on PRs that touch the wrapper, the `cmd/` entrypoints, or the
-dockerfiles. Each run uploads `acvp-evidence-<binary>-<sha>.tar.gz`
-containing the BoringSSL `acvptool` run log, the pinned BoringSSL and
-testdata commits, and the binary's `go version -m` output. This artifact is
-the per-release reproducibility trail that the Release Gate item #12
-(release-evidence archival) expects — see `pkg/util/fips/acvp/README.md`
-for the wrapper's local-reproduction instructions and pinned upstream
-commits.
-
-## FIPS build
-
-Operator and metrics-exporter binaries are built with `GOFIPS140=v1.0.0`,
-linking the Go FIPS 140-3 cryptographic module (`crypto/fips140` v1.0.0).
-**Module status**: as of Go's published documentation, v1.0.0 is **in CMVP
-review** — it is **not** a completed CMVP-validated module. This operator
-therefore claims FIPS 140-3 *compatibility*, not certification. See the
-[Go FIPS 140-3 documentation](https://go.dev/doc/security/fips140) for the
-authoritative module status.
-
-This is not full product certification. The boundary is the operator and
-metrics-exporter binaries only — it does not cover ClickHouse server,
-ClickHouse Keeper, the Kubernetes API server, etcd, or any other component
-the operator talks to.
-
-Base image: `gcr.io/distroless/static-debian13` (distroless remains supported
-under FIPS — the Go FIPS module is statically linked into the binary, no
-glibc/OpenSSL dependency). Supported architectures: `linux/amd64`,
-`linux/arm64` (see `dockerfile/operator/Dockerfile` `image-base-amd64` /
-`image-base-arm64` stages).
-
-### Runtime mode
-
-The operator and metrics-exporter images ship with `GODEBUG=fips140=only` as the
-default since 0.27.1. This is the strictest mode: any invocation of a non-FIPS
-primitive panics at call time. TLS versions, cipher suites, signature
-algorithms, key exchanges, and certificate chains are filtered to FIPS-approved
-primitives. The operator's identifier-derivation code (object-version labels,
-env-var name disambiguation) uses inline pure-Go bitwise implementations that do
-not invoke `crypto/sha1` or `crypto/md5` and remain compatible — see
-"Non-security hash exclusions" below.
-
-| Mode | `GODEBUG` value | What it does | How to select |
-|---|---|---|---|
-| Strict (default) | `fips140=only` | Filters TLS as in `on` AND panics on any `crypto/...` call that touches a non-approved primitive | Shipped default in `altinity/clickhouse-operator:<version>` |
-| Permissive (escape hatch) | `fips140=on` | Filters TLS versions, cipher suites, signature algorithms, key exchanges, FIPS-compatible certificate chains; allows non-FIPS calls outside the TLS layer | `-e GODEBUG=fips140=on` at container start, OR Pod `env:`, OR rebuild with `--build-arg GODEBUG_FIPS140=on` |
-| Off (debug) | (unset / `fips140=off`) | Go runtime default; no FIPS gating | `-e GODEBUG=` |
-
-If the shipped strict default surfaces a regression in a customer's
-environment, the recommended escape hatch is `kubectl set env
-deploy/clickhouse-operator -n <ns> GODEBUG=fips140=on --containers='*'` — the
-operator pod rolls in ~30s and reconciliation resumes. Mirror the command for
-the metrics-exporter deployment when applicable. The default image is the
-only published image — there is no separate `:<version>`-suffixed FIPS build.
-
-### Knobs
-
-- Build-time: `GOFIPS140` in `dev/go_build_config.sh` (default `v1.0.0`).
-  Pass `GOFIPS140=` (empty) to opt out for local non-FIPS builds.
-- Build-time: `GODEBUG_FIPS140` in `dev/go_build_config.sh` (default `only`).
-  Sets the runtime mode baked into the image via the Dockerfile `ARG`
-  (`GODEBUG_FIPS140`). Override at build with `GODEBUG_FIPS140=on
-  ./dev/image_build_all.sh` or `docker buildx build --build-arg
-  GODEBUG_FIPS140=on …`.
-- Runtime: `ENV GODEBUG=fips140=${GODEBUG_FIPS140}` in each Dockerfile's
-  `image-prod` stage (resolves to `fips140=only` by default). Override at
-  container-run time with `-e GODEBUG=fips140=on` for the permissive mode
-  without rebuilding, or `-e GODEBUG=` to disable.
-- `security.policy` chopconf knob: when `Enforced`, the operator coerces
-  every per-component TLS toggle to Strict positions, rejects CHIs that
-  cannot be served in a FIPS-compatible posture, and re-registers the
-  ClickHouse legacy TLS config to verifying mode (no `InsecureSkipVerify`).
-  Transport-hardening only — does NOT assert that the binary was built with
-  `GOFIPS140`. For that, set the orthogonal `security.fips.enforced: true`.
-- `security.fips.enforced` chopconf knob: when `true`, the operator Fatals at
-  startup if the binary was not built with `GOFIPS140` and the runtime does
-  not report `crypto/fips140` Enabled. Also triggers the same TLS coercions
-  as `security.policy: Enforced` (a FIPS-asserted operator necessarily wants
-  verified TLS). Independent of `security.policy`.
-
-### Verify a built image
-
-```bash
-docker run --rm --entrypoint=/bin/sh altinity/clickhouse-operator:<tag> \
-    -c 'echo $GODEBUG'   # expect: fips140=only
-go version -m dev/bin/clickhouse-operator | grep GOFIPS140
-```
-
-The operator banner at startup also reports the module version:
-
-```
-FIPS: chopconf.policy=… build.enabled=… runtime.enforced=true module=v1.0.0
-FIPS env: GODEBUG=fips140=only DefaultGODEBUG=fips140=only GOFIPS140=v1.0.0
-```
-
-The second `FIPS env:` line is new in 0.27.1 and is emitted by both the operator
-and the metrics-exporter. It echoes the **raw** `GODEBUG` environment variable
-as the process sees it, alongside the `DefaultGODEBUG` and `GOFIPS140` build
-settings read from `runtime/debug.ReadBuildInfo`. This disambiguates two
-postures that otherwise produce identical `crypto/fips140.Enabled=true` and
-`runtime.enforced=false` interpretations in the first banner line:
-
-- **Case 1** — binary built with `GOFIPS140=v1.0.0`, container started with
-  `GODEBUG` unset → `FIPS env: GODEBUG= DefaultGODEBUG=fips140=only GOFIPS140=v1.0.0`.
-  The runtime is in strict `only` mode courtesy of the baked-in `DefaultGODEBUG`.
-- **Case 2** — binary built with `GOFIPS140=v1.0.0`, container started with
-  `-e GODEBUG=fips140=on` → `FIPS env: GODEBUG=fips140=on DefaultGODEBUG=fips140=only GOFIPS140=v1.0.0`.
-  The env override wins — the pod runs in permissive `on` mode.
-
-Reading the raw `GODEBUG` value is the recommended first step when triaging
-"is my pod actually in the FIPS mode I configured?" — a downstream override
-(`-e GODEBUG=` to disable, `-e GODEBUG=fips140=on` to relax) shows up
-verbatim in this line, whereas the first banner line only collapses the
-posture into Enabled/Enforced booleans.
-
-### E2E coverage
-
-`tests/e2e/test_operator.py::test_010076` reads the operator startup banner
-emitted by `cmd/operator/app/fips_gate.go` and fails the run if
-`build.enabled` reports `false`. The shipped image asserts the build linkage
-against the Go FIPS 140-3 module.
-
-`tests/e2e/test_operator.py::test_010078` verifies the strict-FIPS master
-switch cannot be subverted by a per-CHI override: it applies a CHI with
-`security.clickhouse.tls.verify: None` while the chopconf has
-`security.policy: Enforced`, and asserts the CHI lands in `status: Aborted`
-with `[FIPSValidationFailed]` in `status.errors` — admission rejects the
-weaker per-CHI knob rather than silently honoring it. A companion assertion
-greps the `FIPS env:` banner line and confirms the recorded `GODEBUG` /
-`DefaultGODEBUG` / `GOFIPS140` triple matches the deployed posture.
-
-Local e2e (`tests/e2e/run_tests_local.sh`) rebuilds operator + metrics-
-exporter via `dev/image_build_all_dev.sh`, which defaults `GOFIPS140=v1.0.0`
-and runs the `image-prod` Dockerfile stage. The `image-debug` stage
-(reachable only via `deploy/devspace/docker-build.sh --debug=delve`) does
-NOT set `GODEBUG` so delve can single-step crypto paths; that path is not
-reachable from `run_tests_*` and is excluded from CI.
-
-### Non-security hash exclusions (scanner allow-list)
-
-Per the FIPS scope document (§3 "Security-Sensitive Crypto Only"), the
-following sites are explicitly **outside the FIPS cryptographic boundary**.
-Both compute deterministic identifiers for K8s label uniqueness and shell
-env-var name disambiguation; they are NOT signatures, NOT MACs, NOT key
-derivation, NOT integrity proofs — just deterministic byte-mixing whose only
-contract is collision rarity and stability across releases.
-
-- `pkg/util/hash.go::HashIntoString` — produces the 40-char hex fingerprint
-  used by `Fingerprint()` and the K8s
-  `clickhouse.altinity.com/object-version` label value. The digest is
-  computed by an **inline pure-Go bitwise implementation** of the algorithm
-  specified by FIPS PUB 180-4 §6.1.2 / RFC 3174 — `crypto/sha1` is not
-  imported. The standard is cited only as a reference for byte-output
-  compatibility (existing labels stay byte-identical across the upgrade, no
-  StatefulSet rollout), not as a claim of cryptographic protection.
-- `pkg/util/shell.go::BuildShellEnvVarName` — appends a 32-char hex
-  uniqueness suffix when a generated env-var name exceeds the base length
-  budget. The suffix is computed by an **inline pure-Go bitwise
-  implementation** of the algorithm specified by RFC 1321 — `crypto/md5` is
-  not imported. As above, the RFC is cited only as a reference for
-  byte-output compatibility (existing env-var names stay byte-identical), not
-  as a claim of cryptographic protection.
-
-Because neither call site references `crypto/sha1` or `crypto/md5`, the
-operator binary runs cleanly under the strict `GODEBUG=fips140=only` runtime
-mode — which is the shipped default since 0.27.1. Customers who need to
-relax to the permissive `fips140=on` mode (e.g. for a downstream vendored
-dependency that touches a non-FIPS primitive in a code path not yet inlined)
-can set `-e GODEBUG=fips140=on` at container start or `kubectl set env
-deploy/clickhouse-operator GODEBUG=fips140=on`. The byte-identical output
-guarantee means changing the runtime mode never re-hashes a K8s object's
-label or env-var name on upgrade. Scanner reports against these two files
-are out of scope per the internal Altinity FIPS scope specification §3
-"Security-Sensitive Crypto Only".
-
-In addition, the following vendored telemetry libraries contain internal
-non-security hashing / sampling that is **outside the FIPS cryptographic
-boundary** per spec §4:
-
-- `vendor/github.com/prometheus/client_golang/**` — Prometheus client
-  internals (label-set cardinality hashing, histogram bucket selection).
-- `vendor/go.opentelemetry.io/**` — OpenTelemetry SDK internals (trace
-  sampling, span ID generation).
-
-Scanner reports against these vendor paths are out of scope.
-
-### Prerequisites for the deployment
-
-Under both `fips140=only` (default) and `fips140=on` (escape-hatch) modes, the
-runtime filters TLS chains for FIPS-approved primitives. The handshake fails
-at use time, not at load time, so a non-FIPS chain may sit dormant until the
-first dial.
-
-- **Kubeconfig CA**: must be signed with SHA-256 or later. SHA-1- or
-  MD5-signed CAs cause a TLS handshake failure the first time the operator
-  dials the API server. Modern managed K8s (EKS, GKE, AKS, OpenShift ≥4) is
-  fine; ad-hoc kind/k3s clusters with old certs may need rotation.
-- **ClickHouse server certificates** (when `security.clickhouse.tls.rootCA`
-  or `verify: Strict` is configured): same constraint.
-- **ZooKeeper / Keeper certificates** (when ZK TLS is enabled): same.
-- **The operator itself never generates or accepts SHA-1 in TLS**; the
-  prerequisite is about the certificates you point it at.
-
-- Code-side audit: `pkg/util/shell.go::BuildShellEnvVarName` and
-  `pkg/util/hash.go::HashIntoString` derive deterministic identifiers using
-  inline pure-Go bitwise implementations of the algorithms specified by
-  RFC 1321 and FIPS PUB 180-4 §6.1.2 / RFC 3174 respectively. Neither
-  imports `crypto/md5` or `crypto/sha1`. Documented as outside the FIPS
-  cryptographic boundary per the internal Altinity FIPS scope specification
-  §3; both the shipped `fips140=on` runtime and the strict opt-in
-  `fips140=only` override permit these paths (see
-  [Go FIPS 140-3 mode](https://go.dev/doc/security/fips140) for Go-side
-  runtime semantics).
-
-### ZooKeeper digest-auth policy
-
-The ZooKeeper `digest` authentication scheme hashes user:password pairs with
-SHA-1 inside the vendored `go-zookeeper` library. Under
-`security.policy: Enforced` the operator **rejects** `digest:` auth files
-(`pkg/model/zookeeper/connection.go::connectionAddAuth`) — the dial proceeds
-without auth and the operator logs an error pointing operators at non-digest
-schemes (`sasl`, `x509`). Deployments that must use ZooKeeper auth under FIPS
-should switch to one of those schemes; deployments that don't need ZooKeeper
-auth at all (the common case for in-cluster Keeper) are unaffected.
-
-### Default (non-FIPS) HTTPS posture is intentionally back-compat
-
-When `security.policy: Permissive` (the default), the legacy global TLS
-config registered at `pkg/model/clickhouse/connection.go::setupTLSBasic`
-keeps `InsecureSkipVerify=true` for ClickHouse DSNs that have no explicit
-security knobs set. This preserves pre-0.27.1 behavior for upgrades.
-`security.policy: Enforced` (or the orthogonal `security.fips.enforced: true`)
-triggers `EnforceVerifiedLegacyTLS()` to re-register the same key with verifying
-behavior. To enable verified TLS without flipping either master switch, set
-`security.clickhouse.tls.verify: Strict` at the chopconf or per-CHI level —
-`applyFIPSStrict` is not the only way to opt in.
-
-### Release evidence — image digest, SBOM, build logs
-
-Per the FIPS scope specification (Release Gate item #12, see the
-operator-side boundary documented in this file together with
-[Go FIPS 140-3 mode](https://go.dev/doc/security/fips140) for the Go-side
-runtime semantics), a FIPS-tagged release must archive "image digest, SBOM,
-build logs, and test report". The release pipeline now produces this
-evidence automatically; the subsections below describe what ships, how to
-verify it, and what is still planned.
-
-#### What ships per release (automated)
-
-Every tag-push build of `build_branch.yaml` uploads a
-`release-evidence-<version>` GitHub Actions artifact containing, for each
-of `clickhouse-operator` and `metrics-exporter`:
-
-- `<bin>__<version>.digest.txt` — sha256 manifest-list digest.
-- `<bin>__<version>.sbom.spdx.json` — syft SPDX-JSON SBOM of the image.
-- `<bin>__<version>.manifest.json` — multi-arch image manifest.
-- `<bin>-build-metadata.json` — the `buildx --metadata-file` output,
-  including SBOM digests, provenance hashes, and per-platform image IDs.
-
-In addition to the side-channel files, an inline SBOM and a SLSA provenance
-attestation are attached to the image manifest itself via
-`docker buildx --sbom=true --provenance=mode=max`, so anyone pulling the
-image can inspect them directly without the GitHub Actions artifact. The
-same trio of files is also uploaded to the matching GitHub Release page
-via `gh release upload`, so customers without access to the Actions tab
-can still fetch evidence by release tag.
-
-#### How to verify
-
-Pull the live manifest digest and compare it to the archived value:
-
-```bash
-docker buildx imagetools inspect altinity/clickhouse-operator:0.27.1 \
-  --format '{{.Manifest.Digest}}'
-# should equal the contents of clickhouse-operator__0.27.1.digest.txt
-```
-
-Diff a freshly generated SBOM against the shipped one:
-
-```bash
-syft altinity/clickhouse-operator:0.27.1 -o spdx-json > /tmp/now.json
-diff <(jq -S . /tmp/now.json) \
-     <(jq -S . release-evidence/clickhouse-operator__0.27.1.sbom.spdx.json)
-```
-
-Inspect the in-image provenance attestation:
-
-```bash
-docker buildx imagetools inspect altinity/clickhouse-operator:0.27.1 \
-  --format '{{json .Provenance}}'
-```
-
-TestFlows e2e reports remain a separate stream: each `run_tests.yaml` run
-keeps its `testflows.*.log`, operator pod logs, and event snapshot as the
-ordinary workflow artifacts. They are not bundled into
-`release-evidence-<version>` because they are produced by a different
-workflow with a different cadence.
-
-#### What is still pending
-
-Cosign signing now ships as a separate workflow
-(`.github/workflows/cosign_sign.yaml`) chained off `build_branch` via
-`workflow_run`, signing the immutable `<image>@sha256:...` digest (not the
-floating tag) via Sigstore keyless OIDC. Signatures are verified in the same
-job and the resulting evidence is uploaded as `cosign-evidence-<branch>`
-with 365-day retention.
-
-One follow-up remains:
-
-- **Reproducible builds**: `dev/go_build_universal.sh` does not currently
-  pass `-trimpath` or `-buildvcs=true`, and bit-identical multi-arch
-  builds are not enforced as a release-gate. The release-evidence
-  pipeline pins the resulting image by digest, which preserves
-  identity verifiability without requiring bit-reproducibility.
-
-#### Retention
-
-GitHub Actions retains tag-build evidence artifacts for 365 days and
-master-push evidence for 30 days. Customers whose compliance window is
-longer should pull the artifacts soon after release and mirror them into
-their own evidence store; the GitHub Release attachments share the
-retention of the release itself and serve as the longer-lived copy.
-
-#### PR-time validation
-
-`.github/workflows/release_evidence_smoketest.yaml` runs on every pull
-request that touches an evidence-relevant input (Dockerfiles, build
-scripts under `dev/`, and the release orchestrator). It exercises the
-digest, SBOM, manifest, and metadata steps end-to-end so the pipeline
-cannot silently regress between releases.
+separate axis (`security.fips.enforced`), documented in
+[`security_hardening_fips.md`](./security_hardening_fips.md).
 
 ## Related
 
-- See `docs/chi-examples/24-security-*.yaml` for concrete YAML examples.
-- See `docs/chi-examples/70-chop-config.yaml` for the chopconf surface.
+- FIPS-specific controls (cryptographic-module gate, image policy, ACVP, FIPS build, release evidence): [`security_hardening_fips.md`](./security_hardening_fips.md)
+- Per-release verification recipes (digest / SBOM / cosign): [`fips_evidence_verification.md`](./fips_evidence_verification.md)
+- Concrete YAML examples: `docs/chi-examples/24-security-*.yaml`
+- Operator-config surface: `docs/chi-examples/70-chop-config.yaml`

@@ -72,7 +72,8 @@ const (
 )
 
 const (
-	configServerId = "server-id"
-	configRaft     = "raft"
-	configSettings = "settings"
+	configServerId  = "server-id"
+	configRaft      = "raft"
+	configSettings  = "settings"
+	configListeners = "listeners"
 )

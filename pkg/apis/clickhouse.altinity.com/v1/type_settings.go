@@ -444,6 +444,11 @@ func (s *Settings) GetZKPort() *types.Int32 {
 	return s.getInt32Ptr("keeper_server/tcp_port")
 }
 
+// GetZKPortSecure gets Zookeeper secure (TLS) port from settings
+func (s *Settings) GetZKPortSecure() *types.Int32 {
+	return s.getInt32Ptr("keeper_server/tcp_port_secure")
+}
+
 // GetRaftPort gets Raft port from settings
 func (s *Settings) GetRaftPort() *types.Int32 {
 	return s.getInt32Ptr("keeper_server/raft_configuration/server/port")

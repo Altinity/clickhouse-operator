@@ -131,21 +131,25 @@ spec:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: requests.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_CPU_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: limits.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_MEM_REQUEST
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: requests.memory
+                  divisor: "1Mi"
             - name: OPERATOR_CONTAINER_MEM_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: limits.memory
+                  divisor: "1Mi"
             {{ with .Values.operator.env }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 9999
@@ -217,21 +221,25 @@ spec:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: requests.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_CPU_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: limits.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_MEM_REQUEST
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: requests.memory
+                  divisor: "1Mi"
             - name: OPERATOR_CONTAINER_MEM_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: limits.memory
+                  divisor: "1Mi"
             {{ with .Values.metrics.env }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 8888

@@ -31,13 +31,17 @@ import (
 // lives in pkg/util/fips.
 func fipsGate() {
 	fipsEnforced := chop.Config().Security.GetFIPS().IsEnforced()
-	build, runtime := fips.Enabled(), fips.Enforced()
-	log.F().Info("FIPS: chopconf.fips.enforced=%t build.enabled=%t runtime.enforced=%t module=%s", fipsEnforced, build, runtime, fips.Version())
+	// buildLinked is the durable "GOFIPS140-linked" property; see operator
+	// fips_gate.go for the rationale (Enabled() conflates linkage with the
+	// runtime-active state and would Fatal under shipped GODEBUG=fips140=off).
+	buildLinked := fips.BuildSetting("GOFIPS140") != ""
+	moduleActive, runtime := fips.Enabled(), fips.Enforced()
+	log.F().Info("FIPS: chopconf.fips.enforced=%t build.linked=%t module.active=%t runtime.enforced=%t module=%s", fipsEnforced, buildLinked, moduleActive, runtime, fips.Version())
 	log.F().Info("FIPS env: GODEBUG=%q DefaultGODEBUG=%q GOFIPS140=%q",
 		fips.GODEBUGRaw(),
 		fips.BuildSetting("DefaultGODEBUG"),
 		fips.BuildSetting("GOFIPS140"))
-	err, warn := fips.EvaluateGate("metrics-exporter", fipsEnforced, build, runtime, fips.BuildSetting("DefaultGODEBUG"))
+	err, warn := fips.EvaluateGate("metrics-exporter", fipsEnforced, buildLinked, runtime, fips.BuildSetting("DefaultGODEBUG"))
 	if err != nil {
 		log.F().Fatal(err.Error())
 	}

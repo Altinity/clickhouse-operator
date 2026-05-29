@@ -9,10 +9,10 @@
 # needs.
 #
 # Full BoringSSL acvptool reproducibility (vector-by-vector comparison
-# against geomys/acvp-testdata) lives in .github/workflows/acvp_test.yaml +
-# pkg/util/fips/acvp/run.sh — this script is the fast pre-flight that catches
-# build-tag / argv0-dispatch / FIPS-mode regressions before the heavier
-# workflow runs.
+# against geomys/acvp-testdata) lives in pkg/util/fips/acvp/run.sh and is
+# reproduced locally per release — this script is the fast pre-flight that
+# catches build-tag / argv0-dispatch / FIPS-mode regressions before the
+# heavier vector-roundtrip run.
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/test_common.sh"
 

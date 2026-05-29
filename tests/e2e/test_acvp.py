@@ -19,8 +19,8 @@ These scenarios exercise the full chain: build → argv0 dispatch → embedded
 wrapper → length-prefixed stdio protocol → algorithm handler → response.
 
 They do NOT replace the full BoringSSL acvptool reproducibility run driven by
-pkg/util/fips/acvp/run.sh — that lives in the .github/workflows/acvp_test.yaml
-CI workflow. The point of these e2e scenarios is to catch regressions in the
+pkg/util/fips/acvp/run.sh — that is reproduced locally on each release commit.
+The point of these e2e scenarios is to catch regressions in the
 operator's build wiring (build tag, symlink-style argv0 dispatch, FIPS-mode
 gating) before they reach a vector-roundtrip job that takes 15+ minutes.
 
@@ -174,7 +174,7 @@ def _acvp_smoke(binary_name, cmd_path):
         binary_path, build_err = _build_acvp_binary(cmd_path, binary_name)
         if binary_path is None:
             # Build failure is the scenario's failure mode — surface it so the
-            # CI workflow's acvp_test.yaml job catches the same regression.
+            # local pkg/util/fips/acvp/run.sh reproducer catches the same regression.
             assert False, error(f"ACVP-tagged build of {binary_name} failed: {build_err}")
 
     with When("Round-trip a getConfig request"):
