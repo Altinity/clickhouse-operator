@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"strings"
+	"time"
 
 	core "k8s.io/api/core/v1"
 
@@ -27,6 +28,14 @@ import (
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
+
+// stuckHostMinDelay floors the deferred-re-enqueue delay so a 1-second flap
+// can't produce an immediate reconcile.
+const stuckHostMinDelay = 5 * time.Second
+
+// stuckHostExtraDelay buffers threshold against apiserver/informer latency
+// so the eventual reconcile observes an up-to-date LastTransitionTime.
+const stuckHostExtraDelay = 2 * time.Second
 
 // normalizeTimeAbortReasons enumerates Aborted reasons that cannot recover via
 // pod transitions — the spec itself must be edited. Auto-recovery skips these
@@ -131,4 +140,105 @@ func isPodNotReadyToReadyTransition(oldPod, newPod *core.Pod) bool {
 	wasNotReady := k8s.PodHasNotReadyContainers(oldPod)
 	isReadyNow := !k8s.PodHasNotReadyContainers(newPod)
 	return wasNotReady && isReadyNow
+}
+
+// recoverCompletedReconcileOnPodNotReady is the symmetric counterpart of
+// recoverAbortedReconcileOnPodReady. It inspects a pod update event and schedules a
+// delayed CHI reconcile when a child pod of a Completed CHI transitions Ready → NotReady.
+// The delay equals the configured threshold (default 5m), so by the time the reconcile
+// fires, shouldForceRestartHost can observe a sustained Ready=False and decide whether
+// to restart the host.
+func (w *worker) recoverCompletedReconcileOnPodNotReady(ctx context.Context, oldPod, newPod *core.Pod) {
+	if !chop.Config().ShouldRecoverCompletedOnPodNotReady() {
+		return
+	}
+
+	if !isPodReadyToNotReadyTransition(oldPod, newPod) {
+		return
+	}
+
+	// Skip pods that are terminating — the Ready→NotReady flip is normal
+	// shutdown bookkeeping, not a host regression.
+	if newPod.GetDeletionTimestamp() != nil && !newPod.GetDeletionTimestamp().IsZero() {
+		return
+	}
+
+	// Skip pods already in a kubelet-driven failure mode (ImagePullBackOff,
+	// CrashLoopBackOff, Pending, etc.) — kubelet is handling those and an
+	// operator-driven StatefulSet rollout would just race it.
+	if podIsInKubeletFailureMode(newPod) {
+		return
+	}
+
+	cr, err := w.c.GetCR(&newPod.ObjectMeta)
+	if err != nil || cr == nil {
+		return
+	}
+
+	if !shouldTriggerStuckHostRecovery(cr) {
+		return
+	}
+
+	threshold := chop.Config().CompletedOnPodNotReadyThreshold()
+	delay := stuckHostScheduleDelay(newPod, threshold, time.Now())
+
+	w.a.V(1).M(cr).F().
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonStuckHostRecoveryTriggered).
+		Info(
+			"Stuck-host recovery scheduled: pod %s became NotReady while CHI %s/%s is Completed; "+
+				"re-enqueue in %s (threshold %s)",
+			newPod.Name, cr.Namespace, cr.Name, delay.Truncate(time.Second), threshold,
+		)
+
+	scheduled := cr
+	time.AfterFunc(delay, func() {
+		w.c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileAdd, nil, scheduled))
+	})
+}
+
+// shouldTriggerStuckHostRecovery reports whether the given CHI is a valid stuck-host
+// recovery target: status is Completed and the CHI is not being deleted.
+func shouldTriggerStuckHostRecovery(cr *api.ClickHouseInstallation) bool {
+	if cr == nil {
+		return false
+	}
+	status := cr.EnsureStatus()
+	if status.GetStatus() != api.StatusCompleted {
+		return false
+	}
+	if !cr.GetDeletionTimestamp().IsZero() {
+		return false
+	}
+	return true
+}
+
+// isPodReadyToNotReadyTransition reports whether the pod transitioned from "all containers
+// ready" to "some container not ready". The dual of isPodNotReadyToReadyTransition.
+func isPodReadyToNotReadyTransition(oldPod, newPod *core.Pod) bool {
+	if oldPod == nil || newPod == nil {
+		return false
+	}
+	wasReady := !k8s.PodHasNotReadyContainers(oldPod)
+	isNotReadyNow := k8s.PodHasNotReadyContainers(newPod)
+	return wasReady && isNotReadyNow
+}
+
+// stuckHostScheduleDelay computes how long to wait before firing the stuck-host
+// re-enqueue. It returns max(threshold − elapsed + extra, minDelay), clamped to
+// non-negative.
+func stuckHostScheduleDelay(newPod *core.Pod, threshold time.Duration, now time.Time) time.Duration {
+	elapsed := time.Duration(0)
+	if newPod != nil {
+		for _, cond := range newPod.Status.Conditions {
+			if cond.Type == core.PodReady && !cond.LastTransitionTime.IsZero() {
+				elapsed = now.Sub(cond.LastTransitionTime.Time)
+				break
+			}
+		}
+	}
+	delay := threshold - elapsed + stuckHostExtraDelay
+	if delay < stuckHostMinDelay {
+		delay = stuckHostMinDelay
+	}
+	return delay
 }

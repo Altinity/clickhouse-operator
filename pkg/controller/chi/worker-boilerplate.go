@@ -151,6 +151,8 @@ func (w *worker) processReconcilePod(ctx context.Context, cmd *cmd_queue.Reconci
 		// and re-enqueue the CHI for reconcile. Controlled by config option
 		// reconcile.recovery.from.aborted.onPodReady (default: retry).
 		w.recoverAbortedReconcileOnPodReady(ctx, cmd.Old, cmd.New)
+		// Symmetric path for Ready→NotReady on Completed CHIs.
+		w.recoverCompletedReconcileOnPodNotReady(ctx, cmd.Old, cmd.New)
 		return nil
 	case cmd_queue.ReconcileDelete:
 		w.a.V(1).M(cmd.Old).F().Info("Delete Pod. %s/%s", cmd.Old.Namespace, cmd.Old.Name)
