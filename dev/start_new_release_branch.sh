@@ -101,5 +101,9 @@ git -C "${SRC_ROOT}" commit -m "env: manifests"
 git -C "${SRC_ROOT}" add deploy/helm/
 git -C "${SRC_ROOT}" commit -m "env: helm chart"
 
+# Push new branch to altinity
+git push altinity
+
+# Repository status
 echo "git status:"
 git -C "${SRC_ROOT}" status
