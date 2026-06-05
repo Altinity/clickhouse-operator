@@ -54,6 +54,7 @@ The Altinity Kubernetes Operator for ClickHouse is a community effort sponsored 
    * [Setting up Zookeeper][zookeeper_setup]
  * [Persistent Storage Configuration][storage_configuration]
  * [Security Hardening][security_hardening]
+ * [FIPS configuration][fips_setup]
  * [ClickHouse Installation Custom Resource specification][crd_explained]
  
 **Maintenance tasks**
@@ -116,3 +117,5 @@ services related to ClickHouse and analytic applications on Kubernetes.
 [devspace_manual]: ./docs/devspace.md
 [all_docs_list]: ./docs/README.md
 [security_hardening]: ./docs/security_hardening.md
+[security_hardening_fips]: ./docs/security_hardening_fips.md
+[fips_setup]: ./docs/fips_setup.md
