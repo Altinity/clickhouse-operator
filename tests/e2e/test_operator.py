@@ -2275,47 +2275,6 @@ def test_010017(self):
         delete_test_namespace()
 
 
-@TestScenario
-@Name("test_010018. Test that server settings are applied before StatefulSet is started")
-# Obsolete, covered by test_016
-def test_010018(self):
-    create_shell_namespace_clickhouse_template()
-
-    chi = "test-018-configmap"
-    kubectl.create_and_check(
-        manifest="manifests/chi/test-018-configmap-1.yaml",
-        check={
-            "pod_count": 1,
-            "do_not_delete": 1,
-        },
-    )
-
-    with When("Update settings"):
-        kubectl.create_and_check(
-            manifest="manifests/chi/test-018-configmap-2.yaml",
-            check={
-                "pod_count": 1,
-                "do_not_delete": 1,
-            },
-        )
-
-        with Then("Configmap on the pod should be updated"):
-            for attempt in retries(timeout=180, delay=5):
-                with attempt:
-                    display_name = kubectl.launch(
-                        f'exec chi-{chi}-default-0-0-0 -- bash -c "grep display_name /etc/clickhouse-server/config.d/chop-generated-settings.xml"'
-                    )
-                    note(display_name)
-                    assert "new_display_name" in display_name
-            with Then("And ClickHouse should pick them up"):
-                macros = clickhouse.query(chi, "SELECT substitution from system.macros where macro = 'test'")
-                note(macros)
-                assert "new_test" == macros
-
-    with Finally("I clean up"):
-        delete_test_namespace()
-
-
 @TestCheck
 def test_019(self, step=1):
     util.require_keeper(keeper_type=self.context.keeper_type)
