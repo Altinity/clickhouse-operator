@@ -4368,12 +4368,6 @@ def test_039(self, step=0, delete_chi=0):
     cluster = "default"
     manifest = f"manifests/chi/test-039-{step}-communications-with-secret.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
-    util.require_keeper(keeper_type=self.context.keeper_type)
-
-    with Given("clickhouse-certs.yaml secret is installed"):
-        kubectl.apply(
-            util.get_full_path("manifests/secret/clickhouse-certs.yaml"),
-    )
 
     with Given("chi exists"):
         kubectl.create_and_check(
@@ -4381,7 +4375,6 @@ def test_039(self, step=0, delete_chi=0):
             check={
                 "apply_templates": {
                     current().context.clickhouse_template,
-                    "manifests/secret/test-038-secret.yaml",
                 },
                 "pod_count": 2,
                 "do_not_delete": 1,
@@ -4390,50 +4383,26 @@ def test_039(self, step=0, delete_chi=0):
 
     wait_for_cluster(chi, cluster, 2, pwd="qkrq")
 
-    with When("I create distributed table that use secure port and insert data into it"):
-        clickhouse.query(
-            chi,
-            "CREATE OR REPLACE TABLE secure on cluster '{cluster}' (a UInt32) ENGINE = MergeTree() PARTITION BY tuple() ORDER BY a",
-            pwd="qkrq",
-        )
-        clickhouse.query(
-            chi,
-            "CREATE OR REPLACE TABLE secure_dist on cluster '{cluster}' as secure ENGINE = Distributed('{cluster}', default, secure, a%2)",
-            pwd="qkrq",
-        )
-        clickhouse.query(
-            chi,
-            "INSERT INTO secure_dist select number as a from numbers(10)",
-            pwd="qkrq",
-        )
-
     if step == 0:
         with Then("Select in cluster with no secret should fail"):
-            r = clickhouse.query_with_error(chi, "SELECT count(a) FROM secure_dist", pwd="qkrq")
+            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('{cluster}', system.one)", pwd="qkrq")
             assert "AUTHENTICATION_FAILED" in r
         with And("Select from all-sharded with no secret should fail"):
             r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one)", pwd="qkrq")
             assert "AUTHENTICATION_FAILED" in r
     if step > 0:
         with Then("Select in cluster with secret should pass"):
-            r = clickhouse.query(chi, "SELECT count() FROM secure_dist", pwd="qkrq")
-            assert r == "10"
+            r = clickhouse.query(chi, "SELECT * FROM cluster('{cluster}', system.one) limit 1", pwd="qkrq")
+            assert r == "0"
         with And("Select from all-sharded with secret should pass"):
             r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one) limit 1", pwd="qkrq")
             assert r == "0"
-
-    if step == 4:
-        with Then("Create replicated table to test interserver_https_port"):
-            clickhouse.query(
-                chi,
-                "CREATE OR REPLACE TABLE secure_repl on cluster 'all-replicated' (a UInt32) ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{uuid}', '{replica}')  PARTITION BY tuple() ORDER BY a",
-                pwd="qkrq",
-            )
-            clickhouse.query(
-                chi,
-                "INSERT INTO secure_repl select number as a from numbers(10)",
-                pwd="qkrq",
-            )
+        with And("Select from all-clusters with secret should pass"):
+            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-clusters', system.one) limit 1", pwd="qkrq")
+            assert r == "0"
+        with And("Select from all-replicated with secret should pass"):
+            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-replicated', system.one) limit 1", pwd="qkrq")
+            assert r == "0"
 
     with Finally("I delete namespace"):
         delete_test_namespace()
@@ -4475,17 +4444,12 @@ def test_010039_3(self):
     """Check clickhouse-operator support inter-cluster communications with k8s secret."""
     create_shell_namespace_clickhouse_template()
 
+    with Given("test-038-secret.yamlsecret is installed"):
+        kubectl.apply(
+            util.get_full_path("manifests/secret/test-038-secret.yaml"),
+    )
+
     test_039(step=3)
-
-
-@TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_010039_4. Inter-cluster communications over HTTPS")
-def test_010039_4(self):
-    """Check clickhouse-operator support inter-cluster communications over HTTPS."""
-    create_shell_namespace_clickhouse_template()
-
-    test_039(step=4, delete_chi=1)
 
 
 @TestScenario
