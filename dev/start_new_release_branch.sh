@@ -69,6 +69,11 @@ esac
 read -p "Press enter to start new release"
 echo "Starting new release: ${NEW_RELEASE}"
 
+# Pull latest master
+git checkout master
+git pull
+git pull altinity master
+
 # Create release branch
 git branch "${NEW_RELEASE}"
 git checkout "${NEW_RELEASE}"
