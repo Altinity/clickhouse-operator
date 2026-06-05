@@ -7453,58 +7453,6 @@ def test_020011(self):
 
 
 @TestScenario
-@Name("test_020013. CHK without cluster.secure preserves insecure-only Service (back-compat)")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
-def test_020013(self):
-    """Back-compat regression sentinel. A CHK that does NOT declare
-    cluster.secure=yes (legacy default) must still reconcile to Completed
-    when no FIPS hardening is in effect. Proves the secure-flag normalizer
-    changes are dormant on non-adopters: no zk-secure port on the Service,
-    no <secure>1</secure> in Raft XML, and crExposesSecureZK()==false keeps
-    the emitted Service byte-identical to the legacy insecure-only shape.
-    """
-    create_shell_namespace_clickhouse_template()
-
-    chk_manifest = "manifests/chk/test-020013-chk-insecure-baseline.yaml"
-    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
-
-    with When("Apply CHK without cluster.secure (legacy default)"):
-        kubectl.create_and_check(
-            manifest=chk_manifest,
-            kind="chk",
-            check={
-                "pod_count": 1,
-                "chk_status": "Completed",
-                "do_not_delete": 1,
-            },
-        )
-
-    with Then("CR-scope Service exposes only zk:2181 (no zk-secure)"):
-        svc = kubectl.get("service", f"keeper-{chk}")
-        port_names = {p["name"] for p in svc["spec"]["ports"]}
-        assert "zk" in port_names, error(
-            f"expected plain zk port, got {port_names}"
-        )
-        assert "zk-secure" not in port_names, error(
-            f"zk-secure port must be absent without cluster.secure=yes; got {port_names}"
-        )
-
-    with And("Common ConfigMap raft XML omits <secure>1</secure>"):
-        cm = kubectl.get("configmap", f"chk-{chk}-common-configd")
-        data = cm.get("data", {})
-        assert "chop-generated-raft.xml" in data, error(
-            f"chop-generated-raft.xml missing; ConfigMap keys: {list(data.keys())}"
-        )
-        raft_xml = data["chop-generated-raft.xml"]
-        assert "<secure>1</secure>" not in raft_xml, error(
-            f"unexpected <secure>1</secure> in back-compat raft xml:\n{raft_xml}"
-        )
-
-    with Finally("I clean up"):
-        delete_test_namespace()
-
-
-@TestScenario
 @Name("test_020014. CHK cluster.insecure=no + secure=yes wires TLS-only listener and pgrep liveness fallback")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
 def test_020014(self):
@@ -7708,6 +7656,17 @@ def test_020016(self):
         assert "chop-generated-common-listeners.xml" not in data, error(
             "chop-generated-common-listeners.xml (plaintext-port removal) must be absent for a "
             f"legacy CHK; ConfigMap keys: {list(data.keys())}"
+        )
+
+    with And("Common ConfigMap raft XML omits <secure>1</secure>"):
+        cm = kubectl.get("configmap", f"chk-{chk}-common-configd")
+        data = cm.get("data", {})
+        assert "chop-generated-raft.xml" in data, error(
+            f"chop-generated-raft.xml missing; ConfigMap keys: {list(data.keys())}"
+        )
+        raft_xml = data["chop-generated-raft.xml"]
+        assert "<secure>1</secure>" not in raft_xml, error(
+            f"unexpected <secure>1</secure> in back-compat raft xml:\n{raft_xml}"
         )
 
     with And("Liveness probe uses bash /dev/tcp ruok (NOT pgrep fallback)"):
