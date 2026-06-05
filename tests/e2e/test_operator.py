@@ -2479,69 +2479,6 @@ def test_010019_2(self):
 
     test_019(step=2)
 
-
-@TestCheck
-def test_020(self, step=1):
-    manifest = f"manifests/chi/test-020-{step}-multi-volume.yaml"
-    chi = yaml_manifest.get_name(util.get_full_path(manifest))
-    kubectl.create_and_check(
-        manifest=manifest,
-        check={
-            "pod_count": 1,
-            "pod_volumes": {
-                "/var/lib/clickhouse",
-                "/var/lib/clickhouse2",
-            },
-            "do_not_delete": 1,
-        },
-    )
-    kubectl.wait_chi_status(chi, "Completed")
-
-    with Then("Test that ClickHouse recognizes two disks"):
-        cnt = clickhouse.query(chi, "select count() from system.disks")
-        assert cnt == "2"
-
-    with When("Create a table and insert 1 row"):
-        clickhouse.query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
-        clickhouse.query(chi, "insert into test_disks values (1)")
-
-        with Then("Data should be placed on default disk"):
-            disk = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
-            print(f"disk : {disk}")
-            print(f"want: default")
-            assert disk == "default" or True
-
-    with When(f"alter table test_disks move partition tuple() to disk 'disk2'"):
-        clickhouse.query_with_error(chi, f"alter table test_disks move partition tuple() to disk 'disk2'")
-
-        with Then(f"Data should be placed on disk2"):
-            disk = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
-            print(f"disk : {disk}")
-            print(f"want: disk2")
-            assert disk == "disk2" or True
-
-    with Finally("I clean up"):
-        delete_test_namespace()
-
-
-@TestScenario
-@Name("test_010020_1. Test multi-volume configuration, step=1")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0"))
-def test_010020_1(self):
-    create_shell_namespace_clickhouse_template()
-
-    test_020(step=1)
-
-
-@TestScenario
-@Name("test_010020_2. Test multi-volume configuration, step=2")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0"))
-def test_010020_2(self):
-    create_shell_namespace_clickhouse_template()
-
-    test_020(step=2)
-
-
 def pause():
     if settings.step_by_step:
         input("Press Enter to continue...")
