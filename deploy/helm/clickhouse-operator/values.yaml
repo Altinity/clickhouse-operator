@@ -147,6 +147,11 @@ podAnnotations:
   prometheus.io/scrape: 'true'
   clickhouse-operator-metrics/port: '9999'
   clickhouse-operator-metrics/scrape: 'true'
+# watchNamespaces -- namespaces where the operator watches for ClickHouseInstallation resources.
+# If empty, the operator watches only its own namespace (or all namespaces when running in kube-system).
+# Use [".*"] to watch all namespaces.
+# Example: watchNamespaces: ["clickhouse", "my-other-namespace"]
+watchNamespaces: []
 # nameOverride -- override name of the chart
 nameOverride: ""
 # fullnameOverride -- full name of the chart.
