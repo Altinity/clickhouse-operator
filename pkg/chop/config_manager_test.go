@@ -208,3 +208,39 @@ func TestFetchSecurityRootCAResolve_ClearOnFailure(t *testing.T) {
 		})
 	}
 }
+
+// TestResolveRootCAFromSecret covers the shared resolver used by both the
+// chopconf security.clickhouse.tls path and the clickhouse.access path:
+// inline-wins precedence, fail-open on every error (empty result, never panic),
+// and ca.crt -> tls.crt key defaulting.
+func TestResolveRootCAFromSecret(t *testing.T) {
+	fakeGet := func(want map[string][]byte, err error) secretDataGetter {
+		return func(ns, name string) (map[string][]byte, error) { return want, err }
+	}
+	tests := []struct {
+		name       string
+		secretName string
+		secretKey  string
+		operatorNs string
+		inline     string
+		get        secretDataGetter
+		wantRootCA string
+	}{
+		{name: "empty name sentinel — no-op", secretName: "", operatorNs: "op", get: fakeGet(nil, nil), wantRootCA: ""},
+		{name: "inline wins over secret", secretName: "ca", operatorNs: "op", inline: "INLINE", get: fakeGet(map[string][]byte{"ca.crt": []byte("FROM-SECRET")}, nil), wantRootCA: "INLINE"},
+		{name: "nil getter — fail open, empty", secretName: "ca", operatorNs: "op", get: nil, wantRootCA: ""},
+		{name: "empty namespace — fail open, empty", secretName: "ca", operatorNs: "", get: fakeGet(map[string][]byte{"ca.crt": []byte("X")}, nil), wantRootCA: ""},
+		{name: "default key ca.crt", secretName: "ca", operatorNs: "op", get: fakeGet(map[string][]byte{"ca.crt": []byte("CA-PEM")}, nil), wantRootCA: "CA-PEM"},
+		{name: "default key falls back to tls.crt", secretName: "ca", operatorNs: "op", get: fakeGet(map[string][]byte{"tls.crt": []byte("TLS-PEM")}, nil), wantRootCA: "TLS-PEM"},
+		{name: "explicit key wins over ca.crt", secretName: "ca", secretKey: "custom", operatorNs: "op", get: fakeGet(map[string][]byte{"custom": []byte("CUSTOM"), "ca.crt": []byte("WRONG")}, nil), wantRootCA: "CUSTOM"},
+		{name: "key missing — fail open, empty", secretName: "ca", operatorNs: "op", get: fakeGet(map[string][]byte{"other": []byte("...")}, nil), wantRootCA: ""},
+		{name: "fetch error — fail open, empty", secretName: "ca", operatorNs: "op", get: fakeGet(nil, errors.New("boom")), wantRootCA: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			inline := tc.inline
+			resolveRootCAFromSecret(&inline, tc.secretName, tc.secretKey, tc.operatorNs, "test clickhouse.access", tc.get)
+			require.Equal(t, tc.wantRootCA, inline, "rootCA")
+		})
+	}
+}
