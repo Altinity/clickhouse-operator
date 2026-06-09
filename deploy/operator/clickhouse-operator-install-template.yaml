@@ -5661,7 +5661,16 @@ data:
         # located in 'clickhouse.configuration.file.path.user' folder
         username: ""
         password: ""
+        # Inline PEM CA bundle the operator uses to verify ClickHouse server TLS.
         rootCA: ""
+        # Alternate source for rootCA — a Secret in the operator's namespace.
+        # Mutually exclusive with the inline rootCA above (inline wins). Empty
+        # `name` = not used (no-op). When `key` is empty, the operator tries
+        # "ca.crt" then "tls.crt". Resolved once at config load (an operator
+        # restart picks up a rotated Secret).
+        rootCASecretRef:
+          name: ""
+          key: ""
     
         # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
         # Can be used instead of explicitly specified username and password available in sections:
