@@ -379,6 +379,17 @@ type OperatorConfigClickHouse struct {
 		Username string `json:"username,omitempty" yaml:"username,omitempty"`
 		Password string `json:"password,omitempty" yaml:"password,omitempty"`
 		RootCA   string `json:"rootCA,omitempty"   yaml:"rootCA,omitempty"`
+		// RootCASecretRef sources the RootCA PEM bundle from a Kubernetes Secret in
+		// the operator's pod namespace, resolved once at config load. Inline RootCA
+		// above wins if both are set; empty Name = unused; Key defaults to `ca.crt`
+		// then `tls.crt`. Mirrors the surface of security.clickhouse.tls.rootCASecretRef.
+		// Deliberately a plain value struct, NOT *core.SecretKeySelector: this Access
+		// block is an anonymous struct, and a heap-bearing pointer field here would
+		// break deepcopy generation (out.Access = in.Access stays a valid shallow copy).
+		RootCASecretRef struct {
+			Name string `json:"name,omitempty" yaml:"name,omitempty"`
+			Key  string `json:"key,omitempty"  yaml:"key,omitempty"`
+		} `json:"rootCASecretRef,omitempty" yaml:"rootCASecretRef,omitempty"`
 
 		// Location of k8s Secret with username and password to be used by the operator to connect to ClickHouse instances
 		// Can be used instead of explicitly specified (above) username and password
