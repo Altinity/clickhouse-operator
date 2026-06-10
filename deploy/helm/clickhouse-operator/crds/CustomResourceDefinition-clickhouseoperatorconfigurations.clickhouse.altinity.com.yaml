@@ -167,6 +167,16 @@ spec:
                         rootCA:
                           type: string
                           description: "Root certificate authority that clients use when verifying server certificates. Used for https connection to ClickHouse"
+                        rootCASecretRef:
+                          type: object
+                          description: "Reference to a k8s Secret (in the operator namespace) holding the PEM root certificate authority used when verifying ClickHouse server certificates over https. Alternate source for rootCA; mutually exclusive with the inline rootCA above (inline wins)."
+                          properties:
+                            name:
+                              type: string
+                              description: "Name of the k8s Secret holding the PEM CA bundle. Empty name = not used"
+                            key:
+                              type: string
+                              description: "Key within the Secret whose value is the PEM CA bundle. When empty, the operator tries 'ca.crt' then 'tls.crt'"
                         secret:
                           type: object
                           properties:
