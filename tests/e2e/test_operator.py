@@ -6858,6 +6858,133 @@ def test_010072(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+@TestScenario
+@Tags("HEAVY")
+@Requirements(RQ_SRS_026_ClickHouseOperator_EnableHttps("1.0"))
+@Name("test_010080. Operator clickhouse.access.rootCASecretRef sources ClickHouse-TLS rootCA from a Secret")
+def test_010080(self):
+    """Verify the operator sources its own ClickHouse-TLS rootCA from a Kubernetes
+    Secret via `clickhouse.access.rootCASecretRef`, end to end:
+      - POSITIVE: the correct secret CA + verify:Strict lets the operator connect
+        over verified TLS (chi_clickhouse_metric_fetch_errors == 0).
+      - NEGATIVE: a wrong secret CA + verify:Strict fails chain verification
+        (== 1) — proving the secret-sourced CA is actually used, not bypassed.
+      - FAIL-OPEN: a non-existent secret ref does not crashloop the operator; it
+        keeps running and reconciling.
+    """
+    create_shell_namespace_clickhouse_template()
+    operator_namespace = current().context.operator_namespace
+
+    chi_manifest = "manifests/chi/test-034-https.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
+    good_chopconf = "manifests/chopconf/test-010080-chopconf-good.yaml"
+    wrong_chopconf = "manifests/chopconf/test-010080-chopconf-wrong.yaml"
+    missing_chopconf = "manifests/chopconf/test-010080-chopconf-missing.yaml"
+
+    with Given("a TLS secret whose SANs match this namespace's ClickHouse pods is installed"):
+        # Generates `clickhouse-certs` (server cert + ca.crt) signed by a CA whose
+        # SANs cover chi-<chi>-default-0-N — required so verify:Strict can pass.
+        # replicas=2 over-covers test-034-https's single-replica layout (harmless);
+        # keep it >= the manifest's replicasCount so every dialed pod is in the SAN set.
+        create_tls_secret_for_fips_hosts(chi=chi, chk=chi, replicas=2)
+
+    with And("the correct CA is published as a Secret in the OPERATOR namespace"):
+        # access.rootCASecretRef resolves in the operator's OWN namespace, which is
+        # not necessarily the CHI/test namespace where clickhouse-certs was created.
+        # Publish the generated CA explicitly in operator_namespace so the positive
+        # arm never depends on operator_namespace == test_namespace.
+        kubectl.launch(
+            "create secret generic test-010080-correct-ca "
+            f"--from-file=ca.crt={current().context.tls['ca_crt']}",
+            ns=operator_namespace,
+        )
+
+    with And("an unrelated (wrong) CA secret is installed in the operator namespace"):
+        kubectl.apply(
+            util.get_full_path("manifests/secret/test-010080-wrong-ca.yaml"),
+            operator_namespace,
+        )
+
+    with When("the HTTPS ClickHouse CHI is deployed"):
+        kubectl.create_and_check(
+            manifest=chi_manifest,
+            check={
+                "apply_templates": {current().context.clickhouse_template},
+                "object_counts": {"statefulset": 1, "pod": 1, "service": 2},
+                "do_not_delete": 1,
+            },
+            timeout=600,
+        )
+
+    with When("operator access.rootCASecretRef points at the correct CA secret (verify=Strict)"):
+        util.apply_operator_config(good_chopconf)
+        kubectl.wait_chi_status(chi, "Completed")
+
+    with Then("POSITIVE: operator connects over verified TLS using the secret CA (fetch_errors=0)"):
+        # Larger retry budget: after the operator restart the metrics-exporter must
+        # re-discover the CHI and complete a first successful verified-TLS scrape;
+        # the default ~105s window is occasionally too short under post-reset load.
+        check_metrics_monitoring(
+            operator_namespace=operator_namespace,
+            operator_pod=kubectl.get_operator_pod(ns=operator_namespace),
+            expect_pattern=f'^chi_clickhouse_metric_fetch_errors{{[^}}]*chi="{chi}"[^}}]*}} 0$',
+            max_retries=12,
+        )
+
+    with When("operator access.rootCASecretRef is switched to the WRONG CA secret"):
+        # Remove the previous chopconf first: the operator merges ALL chopconf CRs
+        # in its namespace, so a stale one would shadow the new ref.
+        kubectl.delete(util.get_full_path(good_chopconf, lookup_in_host=False), operator_namespace)
+        util.apply_operator_config(wrong_chopconf)
+
+    with Then("NEGATIVE: verification fails with the wrong secret CA (fetch_errors=1)"):
+        check_metrics_monitoring(
+            operator_namespace=operator_namespace,
+            operator_pod=kubectl.get_operator_pod(ns=operator_namespace),
+            expect_pattern=f'^chi_clickhouse_metric_fetch_errors{{[^}}]*chi="{chi}"[^}}]*}} 1$',
+            max_retries=12,
+        )
+
+    with When("operator access.rootCASecretRef points at a NON-EXISTENT secret"):
+        kubectl.delete(util.get_full_path(wrong_chopconf, lookup_in_host=False), operator_namespace)
+        util.apply_operator_config(missing_chopconf)
+
+    with Then("FAIL-OPEN: operator stays Running and keeps reconciling (no crashloop on a bad ref)"):
+        operator_pod = kubectl.get_operator_pod(ns=operator_namespace)
+        kubectl.wait_pod_status(operator_pod, "Running", ns=operator_namespace)
+        kubectl.wait_chi_status(chi, "Completed")
+        with By("operator logged the fail-open Warning instead of crashing on the unresolvable ref"):
+            logs = kubectl.launch(
+                f"logs {operator_pod} -c clickhouse-operator",
+                ns=operator_namespace,
+                ok_to_fail=True,
+            )
+            assert "ignoring ref" in logs, error(
+                "expected a fail-open Warning ('ignoring ref') for the missing rootCASecretRef secret"
+            )
+        with By("operator still fetches metrics (fail-open degrades to no-CA, never breaks the operator)"):
+            # missing_chopconf leaves verify default (not Strict), so the operator
+            # connects with the unresolved/empty CA and keeps working — fetch_errors=0.
+            check_metrics_monitoring(
+                operator_namespace=operator_namespace,
+                operator_pod=operator_pod,
+                expect_pattern=f'^chi_clickhouse_metric_fetch_errors{{[^}}]*chi="{chi}"[^}}]*}} 0$',
+                max_retries=12,
+            )
+
+    with Finally("I clean up"):
+        # Delete ALL chopconf variants, not just the last one: an early failure
+        # (positive/negative arm) leaves an earlier chopconf applied, and the
+        # operator merges every chopconf CR in its namespace — a leftover would
+        # carry a stale access.rootCASecretRef into later tests.
+        for chopconf in (good_chopconf, wrong_chopconf, missing_chopconf):
+            kubectl.delete(util.get_full_path(chopconf, lookup_in_host=False), operator_namespace, ok_to_fail=True)
+        util.restart_operator()
+        kubectl.launch("delete secret test-010080-wrong-ca", ns=operator_namespace, ok_to_fail=True)
+        kubectl.launch("delete secret test-010080-correct-ca", ns=operator_namespace, ok_to_fail=True)
+        delete_test_namespace()
+
+
 #
 # Keeper tests section
 #
