@@ -1,0 +1,36 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-035-sustained-not-ready
+spec:
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    podTemplates:
+      - name: readiness-flap
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: altinity/clickhouse-server:25.8.16.10001.altinitystable
+            - name: readiness-flap
+              image: altinity/clickhouse-server:25.8.16.10001.altinitystable
+              command:
+                - "/bin/bash"
+                - "-c"
+                - "touch /tmp/ready; while true; do sleep 5; done"
+              readinessProbe:
+                exec:
+                  command:
+                    - "/bin/bash"
+                    - "-c"
+                    - "test -f /tmp/ready"
+                initialDelaySeconds: 1
+                periodSeconds: 2
+                failureThreshold: 1
+  defaults:
+    templates:
+      podTemplate: readiness-flap
