@@ -3755,6 +3755,94 @@ def test_010035_1(self):
 
 
 @TestScenario
+@Tags("HEAVY")
+@Name("test_010035_2. Auto-recovery from sustained NotReady pod")
+def test_010035_2(self):
+    """Verify that a Completed CHI is recovered when one of its pod containers
+    stays NotReady without crashing.
+
+    Scenario:
+      1. Create a CHI with a dummy sidecar container guarded by a readiness file
+      2. Wait for the CHI and pod to become Ready
+      3. Remove the readiness file from the dummy container
+      4. The pod stays Ready=False while containers keep running
+      5. Operator detects sustained NotReady and recreates the pod
+    """
+    create_shell_namespace_clickhouse_template()
+
+    manifest = "manifests/chi/test-035-2-sustained-not-ready.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
+    pod = f"chi-{chi}-{cluster}-0-0-0"
+    dummy_container = "readiness-flap"
+
+    with When("I create CHI with a dummy readiness-gated container"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "object_counts": {"statefulset": 1, "pod": 1, "service": 2},
+                "do_not_delete": 1,
+            },
+        )
+
+        with And("Pod should initially be Ready"):
+            for i in range(1, 30):
+                pod_ready = kubectl.get_condition_status(pod, "Ready")
+                dummy_ready = kubectl.get_container_status(pod, 1)
+                if pod_ready == "True" and dummy_ready == "true":
+                    break
+                retry_sleep(i, 2, f"pod Ready={pod_ready}, {dummy_container} ready={dummy_ready}")
+
+            assert pod_ready == "True", error(f"expected pod {pod} to be Ready, got Ready={pod_ready}")
+            assert dummy_ready == "true", error(
+                f"expected container {dummy_container} to be Ready, got ready={dummy_ready}"
+            )
+
+    old_uid = kubectl.get_field("pod", pod, ".metadata.uid")
+    assert old_uid, error(f"pod {pod} does not exist")
+
+    with When("I make the dummy container NotReady without crashing it"):
+        kubectl.launch(f"exec {pod} -c {dummy_container} -- rm -f /tmp/ready")
+
+        with Then("The dummy container and the pod should become NotReady"):
+            for i in range(1, 30):
+                pod_ready = kubectl.get_condition_status(pod, "Ready")
+                dummy_ready = kubectl.get_container_status(pod, 1)
+                if pod_ready == "False" and dummy_ready == "false":
+                    break
+                retry_sleep(i, 2, f"pod Ready={pod_ready}, {dummy_container} ready={dummy_ready}")
+
+            assert pod_ready == "False", error(f"expected pod {pod} to be NotReady, got Ready={pod_ready}")
+            assert dummy_ready == "false", error(
+                f"expected container {dummy_container} to be NotReady, got ready={dummy_ready}"
+            )
+
+        with Then("Operator should recreate the pod after sustained NotReady timeout"):
+            start_time = time.time()
+            new_uid = old_uid
+            pod_ready = kubectl.get_condition_status(pod, "Ready")
+
+            while time.time() - start_time < 420:
+                new_uid = kubectl.get_field("pod", pod, ".metadata.uid")
+                pod_ready = kubectl.get_condition_status(pod, "Ready")
+                if new_uid != old_uid and pod_ready == "True":
+                    break
+                retry_sleep(
+                    int((time.time() - start_time) / 5) + 1,
+                    5,
+                    f"pod uid={new_uid}, Ready={pod_ready}",
+                )
+
+            assert new_uid != old_uid, error(
+                f"expected operator to recreate pod {pod} within sustained NotReady timeout"
+            )
+            assert pod_ready == "True", error(f"expected recreated pod {pod} to become Ready, got {pod_ready}")
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_EnableHttps("1.0"))
 @Name("test_010034. Check HTTPS support for health check")
 def test_010034(self):

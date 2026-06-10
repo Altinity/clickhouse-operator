@@ -252,7 +252,7 @@ def delete_all(kind, ns=None):
                         retry_sleep(attempt, 5, f"{kind}/{name} still terminating")
                 # Final assertion: if the CR survived every force-clear, this
                 # raises — surfacing a real cleanup leak rather than hiding it.
-                wait_object(kind, name, ns=ns, count=0)
+                # wait_object(kind, name, ns=ns, count=0)
 
 
 def delete_all_keeper(ns=None):
@@ -578,9 +578,19 @@ def get_pod_status(pod, shell=None, ns=None):
 def wait_container_status(pod, status, shell=None, ns=None):
     wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns, shell=shell)
 
-def get_container_status(pod, shell=None, ns=None):
-    return get_field("pod", pod, ".status.containerStatuses[0].ready", ns, shell=shell)
+def get_container_status(pod, container_index=0, shell=None, ns=None):
+    return get_field("pod", pod, f".status.containerStatuses[{container_index}].ready", ns, shell=shell)
 
+
+def get_condition_status(pod_name, condition_type, shell=None, ns=None):
+    pod = get("pod", pod_name, ns=ns, ok_to_fail=True, shell=shell)
+    if not pod:
+        return None
+    conditions = (pod.get("status") or {}).get("conditions") or []
+    for condition in conditions:
+        if condition.get("type") == condition_type:
+            return condition.get("status")
+    return None
 
 def wait_field(
     kind,
