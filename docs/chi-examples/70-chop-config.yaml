@@ -82,6 +82,22 @@ spec:
         name: ""
       # Port where to connect to ClickHouse instances to
       port: 8123
+      # `rootCA`: inline PEM CA bundle the operator uses to verify the ClickHouse
+      # server certificate when connecting over https (scheme: https, or auto when
+      # only TLS ports are open). Verification is enforced when TLS hardening is
+      # opted in — security.clickhouse.tls.verify: Strict, or a non-empty
+      # minVersion/serverName; otherwise the CA is loaded but verification stays
+      # relaxed for backward compatibility.
+      rootCA: ""
+      # `rootCASecretRef`: alternate source — read the PEM CA from a Kubernetes
+      # Secret in the operator's own namespace instead of inlining it above. The
+      # operator resolves it into `rootCA` once at config load (rotate the Secret +
+      # restart the operator to pick up a new CA). Mutually exclusive with the
+      # inline `rootCA` above (inline wins). Empty `name` = not used. When `key` is
+      # empty, the operator tries "ca.crt" then "tls.crt".
+      rootCASecretRef:
+        name: ""
+        key: ""
 
     ################################################
     ##
