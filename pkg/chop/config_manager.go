@@ -489,12 +489,10 @@ func (cm *ConfigManager) fetchSecurityRootCA() {
 	fetchSecurityRootCAResolve(cm.config.Security.GetClickHouse().GetTLS(), ns, cm.getSecretData)
 }
 
-// fetchAccessRootCA resolves a chopconf-level clickhouse.access.rootCASecretRef to
-// an inline clickhouse.access.rootCA at config-load time, in the operator's pod
-// namespace (operator-scoped, like fetchSecurityRootCA). Inline rootCA wins. On
-// any failure the inline value is left empty and a Warning is logged (fail-open:
-// a typo'd Secret must not crash the operator or block reconciles). This is the
-// operator counterpart of the security.clickhouse.tls.rootCASecretRef path.
+// fetchAccessRootCA resolves clickhouse.access.rootCASecretRef into the inline
+// clickhouse.access.rootCA via the shared resolver (see resolveRootCAFromSecret).
+// Unlike the security path it does not clear the ref afterwards: Access.RootCASecretRef
+// is read only here and never flows into per-CHI merges, so there is nothing to clear.
 func (cm *ConfigManager) fetchAccessRootCA() {
 	ns, _ := cm.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
 	access := &cm.config.ClickHouse.Access
