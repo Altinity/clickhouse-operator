@@ -65,6 +65,15 @@ const (
 	// reconcile was aborted, on observing a recovery signal (e.g. a pod became Ready).
 	EventReasonAutoRecoveryTriggered = "AutoRecoveryTriggered"
 
+	// EventReasonStuckHostRecoveryTriggered fires when the operator re-enqueues a
+	// Completed CHI for reconcile because one of its hosts has been Ready=False for
+	// longer than the configured threshold.
+	EventReasonStuckHostRecoveryTriggered = "StuckHostRecoveryTriggered"
+
+	// EventReasonHostStuckNotReady fires when shouldForceRestartHost decides to force
+	// a host restart because the pod has been Ready=False past the configured threshold.
+	EventReasonHostStuckNotReady = "HostStuckNotReady"
+
 	// EventReasonKeeperUpdateNoEndpointChange fires when the operator observes a referenced
 	// CHK reconcile completing but decides not to trigger a CHI reconcile because the resolved
 	// zookeeper endpoints have not changed.

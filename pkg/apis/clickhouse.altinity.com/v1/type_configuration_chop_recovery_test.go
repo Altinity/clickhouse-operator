@@ -16,6 +16,7 @@ package v1
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -56,4 +57,67 @@ func TestShouldRecoverAbortedOnPodReady(t *testing.T) {
 func TestRecoveryActionConstants(t *testing.T) {
 	require.Equal(t, "none", RecoveryActionNone)
 	require.Equal(t, "retry", RecoveryActionRetry)
+}
+
+// TestShouldRecoverCompletedOnPodNotReady verifies the accessor's behavior across the
+// full matrix of possible values for reconcile.recovery.from.completed.onPodNotReady.
+// Mirrors TestShouldRecoverAbortedOnPodReady so symmetric config keys behave identically.
+func TestShouldRecoverCompletedOnPodNotReady(t *testing.T) {
+	tests := []struct {
+		name         string
+		onPodNotRdy  *types.String
+		expected     bool
+	}{
+		{"nil defaults to retry (close the gap by default)", nil, true},
+		{"empty string defaults to retry", types.NewString(""), true},
+		{"retry lowercase", types.NewString("retry"), true},
+		{"Retry mixed case", types.NewString("Retry"), true},
+		{"RETRY upper case", types.NewString("RETRY"), true},
+		{"none lowercase — opt-out", types.NewString("none"), false},
+		{"None mixed case", types.NewString("None"), false},
+		{"NONE upper case", types.NewString("NONE"), false},
+		{"unknown value treated as no-retry (fail safe)", types.NewString("bogus"), false},
+		{"whitespace-only treated as no-retry", types.NewString("  "), false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &OperatorConfig{}
+			c.Reconcile.Recovery.From.Completed.OnPodNotReady = tc.onPodNotRdy
+			require.Equal(t, tc.expected, c.ShouldRecoverCompletedOnPodNotReady())
+		})
+	}
+}
+
+// TestCompletedOnPodNotReadyThreshold verifies the threshold parser. Unparseable,
+// empty, and non-positive values must fall back to the package default — operators
+// who *really* want to disable the safety net should use onPodNotReady=none, not
+// pass a malformed duration.
+func TestCompletedOnPodNotReadyThreshold(t *testing.T) {
+	tests := []struct {
+		name     string
+		raw      *types.String
+		expected time.Duration
+	}{
+		{"nil falls back to default", nil, defaultCompletedOnPodNotReadyThreshold},
+		{"empty falls back to default", types.NewString(""), defaultCompletedOnPodNotReadyThreshold},
+		{"whitespace falls back to default", types.NewString("   "), defaultCompletedOnPodNotReadyThreshold},
+		{"unparseable falls back to default", types.NewString("five minutes"), defaultCompletedOnPodNotReadyThreshold},
+		{"zero falls back to default (don't accidentally disable)",
+			types.NewString("0s"), defaultCompletedOnPodNotReadyThreshold},
+		{"negative falls back to default", types.NewString("-30s"), defaultCompletedOnPodNotReadyThreshold},
+		{"30 seconds — aggressive", types.NewString("30s"), 30 * time.Second},
+		{"5 minutes — the documented default in string form",
+			types.NewString("5m"), 5 * time.Minute},
+		{"1 hour — conservative", types.NewString("1h"), time.Hour},
+		{"complex duration: 1h30m", types.NewString("1h30m"), 90 * time.Minute},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &OperatorConfig{}
+			c.Reconcile.Recovery.From.Completed.OnPodNotReadyThreshold = tc.raw
+			require.Equal(t, tc.expected, c.CompletedOnPodNotReadyThreshold())
+		})
+	}
 }

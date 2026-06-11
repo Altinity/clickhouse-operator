@@ -145,3 +145,186 @@ func TestShouldTriggerAutoRecovery(t *testing.T) {
 		})
 	}
 }
+
+// TestIsPodReadyToNotReadyTransition verifies the dual of isPodNotReadyToReadyTransition:
+// fires only on Ready→NotReady, mirrors the same nil/edge-case handling.
+func TestIsPodReadyToNotReadyTransition(t *testing.T) {
+	tests := []struct {
+		name     string
+		old, new *core.Pod
+		expected bool
+	}{
+		{"nil old", nil, pod(false), false},
+		{"nil new", pod(true), nil, false},
+		{"both nil", nil, nil, false},
+		{"ready → not ready (the target case)", pod(true), pod(false), true},
+		{"ready → ready (no transition)", pod(true), pod(true), false},
+		{"not ready → ready (wrong direction, handled by sibling)", pod(false), pod(true), false},
+		{"not ready → not ready", pod(false), pod(false), false},
+		{"multi-container: all ready → one not ready", multiContainerPod(true, true), multiContainerPod(false, true), true},
+		{"multi-container: one not ready → all ready", multiContainerPod(true, false), multiContainerPod(true, true), false},
+		{"multi-container: all ready → all ready", multiContainerPod(true, true), multiContainerPod(true, true), false},
+		{"empty statuses → not ready (fires; empty counts as ready)",
+			&core.Pod{}, pod(false), true},
+		{"12-container pod: last flips to not ready",
+			multiContainerPod(true, true, true, true, true, true, true, true, true, true, true, true),
+			multiContainerPod(true, true, true, true, true, true, true, true, true, true, true, false),
+			true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isPodReadyToNotReadyTransition(tc.old, tc.new)
+			require.Equal(t, tc.expected, got)
+		})
+	}
+}
+
+// TestShouldTriggerStuckHostRecovery verifies the CR-state gate used by
+// recoverCompletedReconcileOnPodNotReady.
+func TestShouldTriggerStuckHostRecovery(t *testing.T) {
+	makeCR := func(status string, deleting bool) *api.ClickHouseInstallation {
+		cr := &api.ClickHouseInstallation{
+			ObjectMeta: meta.ObjectMeta{Name: "chi", Namespace: "ns"},
+		}
+		cr.EnsureStatus().Status = status
+		if deleting {
+			now := meta.NewTime(time.Now())
+			cr.ObjectMeta.DeletionTimestamp = &now
+		}
+		return cr
+	}
+
+	tests := []struct {
+		name     string
+		cr       *api.ClickHouseInstallation
+		expected bool
+	}{
+		{"nil CR — reject", nil, false},
+		// The target case: Completed CHI whose host has just regressed.
+		{"Completed, not deleting — accept (the target case)", makeCR(api.StatusCompleted, false), true},
+		// Aborted is the sibling path's responsibility; firing stuck-host recovery on it
+		// would double-enqueue with recoverAbortedReconcileOnPodReady once the pod
+		// eventually becomes Ready again.
+		{"Aborted — reject (handled by sibling recoverAbortedReconcileOnPodReady path)",
+			makeCR(api.StatusAborted, false), false},
+		// InProgress means a reconcile is already in flight; let it observe the pod state
+		// on its own rather than racing another enqueue.
+		{"InProgress — reject (reconcile already running)", makeCR(api.StatusInProgress, false), false},
+		{"Terminating — reject", makeCR(api.StatusTerminating, false), false},
+		{"Completed but being deleted — reject", makeCR(api.StatusCompleted, true), false},
+		// Fresh CR with no status field set yet — happens between Create and the first
+		// status update by the operator.
+		{"empty status (fresh CR) — reject", makeCR("", false), false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, shouldTriggerStuckHostRecovery(tc.cr))
+		})
+	}
+}
+
+// TestStuckHostScheduleDelay verifies the delay computation for the deferred re-enqueue.
+// The helper is pure (clock + threshold injected as args), so we can exercise the
+// boundary conditions without time-mocking the rest of the controller.
+func TestStuckHostScheduleDelay(t *testing.T) {
+	now := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
+
+	// podWithReadyTransition builds a pod whose PodReady condition transitioned at the
+	// given offset from "now". Negative offset means the transition is in the past.
+	podWithReadyTransition := func(offset time.Duration) *core.Pod {
+		return &core.Pod{
+			Status: core.PodStatus{
+				Conditions: []core.PodCondition{
+					{Type: core.PodReady, Status: core.ConditionFalse,
+						LastTransitionTime: meta.NewTime(now.Add(offset))},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name      string
+		pod       *core.Pod
+		threshold time.Duration
+		// expected delay must satisfy lo <= got <= hi (small tolerance for arithmetic).
+		expectMin time.Duration
+		expectMax time.Duration
+	}{
+		{
+			// Fresh transition: full threshold + small extra padding for apiserver
+			// catch-up. With threshold=5m and elapsed=0, delay should be ~5m02s.
+			name:      "fresh transition: schedule full threshold + extra",
+			pod:       podWithReadyTransition(0),
+			threshold: 5 * time.Minute,
+			expectMin: 5*time.Minute + stuckHostExtraDelay - time.Second,
+			expectMax: 5*time.Minute + stuckHostExtraDelay + time.Second,
+		},
+		{
+			// Already half-elapsed: remaining ~2.5m + extra.
+			name:      "half-elapsed: schedule the remainder",
+			pod:       podWithReadyTransition(-150 * time.Second),
+			threshold: 5 * time.Minute,
+			expectMin: 150*time.Second + stuckHostExtraDelay - time.Second,
+			expectMax: 150*time.Second + stuckHostExtraDelay + time.Second,
+		},
+		{
+			// Threshold already past at schedule time (e.g. operator restart after
+			// long outage): clamp to stuckHostMinDelay rather than firing instantly,
+			// so a single quick flap doesn't produce an immediate restart.
+			name:      "threshold already past: clamp to minDelay",
+			pod:       podWithReadyTransition(-10 * time.Minute),
+			threshold: 5 * time.Minute,
+			expectMin: stuckHostMinDelay,
+			expectMax: stuckHostMinDelay,
+		},
+		{
+			// Nil pod: no LastTransitionTime info → treat as elapsed=0 → full threshold.
+			name:      "nil pod: full threshold",
+			pod:       nil,
+			threshold: 5 * time.Minute,
+			expectMin: 5*time.Minute + stuckHostExtraDelay,
+			expectMax: 5*time.Minute + stuckHostExtraDelay,
+		},
+		{
+			// Pod has no PodReady condition (very early in lifecycle): elapsed=0.
+			name:      "pod missing PodReady condition: full threshold",
+			pod:       &core.Pod{Status: core.PodStatus{Conditions: []core.PodCondition{}}},
+			threshold: 5 * time.Minute,
+			expectMin: 5*time.Minute + stuckHostExtraDelay,
+			expectMax: 5*time.Minute + stuckHostExtraDelay,
+		},
+		{
+			// Zero LastTransitionTime (apiserver hasn't stamped it yet): treat as
+			// elapsed=0, schedule full threshold.
+			name: "zero LastTransitionTime: full threshold",
+			pod: &core.Pod{
+				Status: core.PodStatus{
+					Conditions: []core.PodCondition{
+						{Type: core.PodReady, Status: core.ConditionFalse},
+					},
+				},
+			},
+			threshold: 5 * time.Minute,
+			expectMin: 5*time.Minute + stuckHostExtraDelay,
+			expectMax: 5*time.Minute + stuckHostExtraDelay,
+		},
+		{
+			// Threshold smaller than minDelay: minDelay still floors the result.
+			name:      "tiny threshold: clamp to minDelay",
+			pod:       podWithReadyTransition(0),
+			threshold: 1 * time.Second,
+			expectMin: stuckHostMinDelay,
+			expectMax: stuckHostMinDelay,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := stuckHostScheduleDelay(tc.pod, tc.threshold, now)
+			require.GreaterOrEqual(t, got, tc.expectMin, "delay below expected minimum")
+			require.LessOrEqual(t, got, tc.expectMax, "delay above expected maximum")
+		})
+	}
+}

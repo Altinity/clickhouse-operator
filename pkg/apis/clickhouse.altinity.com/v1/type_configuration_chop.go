@@ -58,10 +58,14 @@ const (
 	// OnConfigurationChangeRestart means exit the process so the pod restarts with the new config.
 	OnConfigurationChangeRestart = "restart"
 
-	// RecoveryActionNone means do nothing, CHI stays Aborted.
+	// RecoveryActionNone means do nothing, CHI stays in its current state.
 	RecoveryActionNone = "none"
 	// RecoveryActionRetry means re-enqueue CHI for reconcile (default).
 	RecoveryActionRetry = "retry"
+
+	// defaultCompletedOnPodNotReadyThreshold is the minimum time a pod must remain in
+	// Ready=False before the operator considers the host stuck and re-enqueues a reconcile
+	defaultCompletedOnPodNotReadyThreshold = 5 * time.Minute
 
 	// Default values for ClickHouse user configuration
 	// 1. user/profile
@@ -587,6 +591,8 @@ type OperatorConfigReconcileRecovery struct {
 type OperatorConfigReconcileRecoveryFrom struct {
 	// Aborted scope — recovery from Status=Aborted.
 	Aborted OperatorConfigReconcileRecoveryScope `json:"aborted,omitempty" yaml:"aborted,omitempty"`
+	// Completed scope — recovery from Status=Completed when a child pod regresses to Ready=False
+	Completed OperatorConfigReconcileRecoveryCompletedScope `json:"completed,omitempty" yaml:"completed,omitempty"`
 	// Future: Failed, Broken, etc.
 }
 
@@ -599,6 +605,21 @@ type OperatorConfigReconcileRecoveryScope struct {
 	//   "none"                  — do nothing, CHI stays in the state
 	OnPodReady *types.String `json:"onPodReady,omitempty" yaml:"onPodReady,omitempty"`
 	// Future: OnKeeperReady, OnOperatorRestart.
+}
+
+// OperatorConfigReconcileRecoveryCompletedScope holds the event→action mappings for the
+// Completed scope.
+type OperatorConfigReconcileRecoveryCompletedScope struct {
+	// OnPodNotReady controls reaction when a pod belonging to a Completed CHI flips
+	// Ready=True → Ready=False and stays NotReady for at least OnPodNotReadyThreshold:
+	//   nil / "retry" (default) — re-enqueue CHI for reconcile so shouldForceRestartHost
+	//                             can decide whether to restart the host
+	//   "none"                  — do nothing, host stays Ready=False until external action
+	OnPodNotReady *types.String `json:"onPodNotReady,omitempty" yaml:"onPodNotReady,omitempty"`
+	// OnPodNotReadyThreshold is the minimum duration a pod must remain in Ready=False
+	// before this scope fires. Accepts any time.ParseDuration string (default "5m"
+	// when unset, empty, or unparseable).
+	OnPodNotReadyThreshold *types.String `json:"onPodNotReadyThreshold,omitempty" yaml:"onPodNotReadyThreshold,omitempty"`
 }
 
 type OperatorConfigReconcileRuntime struct {
@@ -1641,6 +1662,35 @@ func (c *OperatorConfig) ShouldRecoverAbortedOnPodReady() bool {
 		return true
 	}
 	return value == RecoveryActionRetry
+}
+
+// ShouldRecoverCompletedOnPodNotReady reports whether the operator should re-enqueue a
+// CHI reconcile when a pod belonging to a Completed CHI flips to Ready=False and stays
+// there for longer than CompletedOnPodNotReadyThreshold. Default is to retry.
+// Backed by reconcile.recovery.from.completed.onPodNotReady config key.
+func (c *OperatorConfig) ShouldRecoverCompletedOnPodNotReady() bool {
+	value := strings.ToLower(c.Reconcile.Recovery.From.Completed.OnPodNotReady.String())
+	if value == "" {
+		// Default behavior — retry
+		return true
+	}
+	return value == RecoveryActionRetry
+}
+
+// CompletedOnPodNotReadyThreshold returns the minimum duration a pod must remain in
+// Ready=False before the Completed recovery scope fires. Falls back to the package
+// default (5m) if the config value is unset, empty, or unparseable.
+// Backed by reconcile.recovery.from.completed.onPodNotReadyThreshold config key.
+func (c *OperatorConfig) CompletedOnPodNotReadyThreshold() time.Duration {
+	raw := strings.TrimSpace(c.Reconcile.Recovery.From.Completed.OnPodNotReadyThreshold.String())
+	if raw == "" {
+		return defaultCompletedOnPodNotReadyThreshold
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return defaultCompletedOnPodNotReadyThreshold
+	}
+	return d
 }
 
 // IsNamespaceWatched returns whether specified namespace is in a list of watched
