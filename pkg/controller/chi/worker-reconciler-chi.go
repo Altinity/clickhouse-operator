@@ -111,6 +111,8 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		w.a.M(new).F().Info("CR has reconcile work - continue reconcile")
 	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
+	case w.crHasHostNeedingStuckRecovery(ctx, new):
+		w.a.M(new).F().Info("CR has a sustained-NotReady host - continue reconcile for stuck-host recovery")
 	default:
 		w.a.M(new).F().Info("No reconcile work - abort reconcile")
 		metrics.CRReconcilesCompleted(ctx, new)
@@ -534,7 +536,14 @@ func hostRequiresStatefulSetRollout(host *api.Host) bool {
 func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
 	w.a.V(1).M(host).F().Info("Reconcile host. Force restart: %s", host.GetName())
 
-	if host.IsStopped() || (w.hostSoftwareRestart(ctx, host) != nil) {
+	// A sustained-NotReady pod won't be healed by an in-place software restart: the
+	// unreadiness may originate outside ClickHouse, and hostSoftwareRestart's readiness
+	// wait would just time out before falling back to scale-down. Recreate the pod
+	// directly (scale-down here, scale-up by the caller's StatefulSet reconcile).
+	stuckNotReady := chop.Config().ShouldRecoverCompletedOnPodNotReady() &&
+		w.isPodSustainedNotReady(ctx, host, chop.Config().CompletedOnPodNotReadyThreshold())
+
+	if host.IsStopped() || stuckNotReady || (w.hostSoftwareRestart(ctx, host) != nil) {
 		_ = w.hostScaleDown(ctx, host, opts)
 	}
 
