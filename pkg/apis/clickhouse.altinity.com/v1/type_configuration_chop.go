@@ -611,10 +611,12 @@ type OperatorConfigReconcileRecoveryScope struct {
 // Completed scope.
 type OperatorConfigReconcileRecoveryCompletedScope struct {
 	// OnPodNotReady controls reaction when a pod belonging to a Completed CHI flips
-	// Ready=True → Ready=False and stays NotReady for at least OnPodNotReadyThreshold:
-	//   nil / "retry" (default) — re-enqueue CHI for reconcile so shouldForceRestartHost
-	//                             can decide whether to restart the host
-	//   "none"                  — do nothing, host stays Ready=False until external action
+	// Ready=True → Ready=False and stays NotReady for at least OnPodNotReadyThreshold.
+	// OFF by default (opt-in), unlike the Aborted scope's OnPodReady — force-recreating a
+	// Completed CHI's pod is destructive (can interrupt replica recovery; single-replica downtime):
+	//   nil / "none" (default) — do nothing, host stays Ready=False until external action
+	//   "retry"                — re-enqueue CHI for reconcile so shouldForceRestartHost
+	//                            can decide whether to restart the host
 	OnPodNotReady *types.String `json:"onPodNotReady,omitempty" yaml:"onPodNotReady,omitempty"`
 	// OnPodNotReadyThreshold is the minimum duration a pod must remain in Ready=False
 	// before this scope fires. Accepts any time.ParseDuration string (default "5m"
@@ -1666,14 +1668,13 @@ func (c *OperatorConfig) ShouldRecoverAbortedOnPodReady() bool {
 
 // ShouldRecoverCompletedOnPodNotReady reports whether the operator should re-enqueue a
 // CHI reconcile when a pod belonging to a Completed CHI flips to Ready=False and stays
-// there for longer than CompletedOnPodNotReadyThreshold. Default is to retry.
+// there for longer than CompletedOnPodNotReadyThreshold. Default is OFF: force-recreating
+// a Completed CHI's pod is destructive (it can interrupt a replica's in-progress recovery
+// and means hard downtime for a single-replica shard), so this is opt-in — only an explicit
+// onPodNotReady: retry enables it. Unlike the Aborted scope, which retries by default.
 // Backed by reconcile.recovery.from.completed.onPodNotReady config key.
 func (c *OperatorConfig) ShouldRecoverCompletedOnPodNotReady() bool {
 	value := strings.ToLower(c.Reconcile.Recovery.From.Completed.OnPodNotReady.String())
-	if value == "" {
-		// Default behavior — retry
-		return true
-	}
 	return value == RecoveryActionRetry
 }
 
