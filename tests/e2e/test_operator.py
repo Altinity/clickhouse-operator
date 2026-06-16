@@ -3770,6 +3770,10 @@ def test_010035_2(self):
     """
     create_shell_namespace_clickhouse_template()
 
+    with Given("operator config sets a short sustained-NotReady recovery threshold"):
+        # Default is 5m; shorten so the recreate happens well within the 420s window.
+        util.apply_operator_config("manifests/chopconf/test-035-2-sustained-not-ready.yaml")
+
     manifest = "manifests/chi/test-035-2-sustained-not-ready.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
@@ -3839,6 +3843,95 @@ def test_010035_2(self):
             assert pod_ready == "True", error(f"expected recreated pod {pod} to become Ready, got {pod_ready}")
 
     with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Tags("HEAVY")
+@Name("test_010035_3. Opt-out: pod left alone when sustained-NotReady recovery onPodNotReady=none")
+def test_010035_3(self):
+    """Verify that a Completed CHI's sustained-NotReady pod is NOT recreated when
+    recovery is disabled (onPodNotReady=none). The inverse of test_010035_2 — proves
+    the off-by-default opt-out knob is honored even with an aggressive 30s threshold.
+
+    Scenario:
+      1. Operator config opts OUT (onPodNotReady=none) with a short 30s threshold
+      2. Create a CHI with a dummy sidecar container guarded by a readiness file
+      3. Remove the readiness file — the pod stays Ready=False
+      4. The operator must leave the pod alone (same UID) well past the threshold
+    """
+    create_shell_namespace_clickhouse_template()
+    operator_namespace = current().context.operator_namespace
+    chopconf = "manifests/chopconf/test-035-3-opt-out.yaml"
+
+    with Given("operator config disables sustained-NotReady recovery (onPodNotReady=none)"):
+        util.apply_operator_config(chopconf)
+
+    manifest = "manifests/chi/test-035-2-sustained-not-ready.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
+    pod = f"chi-{chi}-{cluster}-0-0-0"
+    dummy_container = "readiness-flap"
+
+    with When("I create CHI with a dummy readiness-gated container"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "object_counts": {"statefulset": 1, "pod": 1, "service": 2},
+                "do_not_delete": 1,
+            },
+        )
+
+        with And("Pod should initially be Ready"):
+            for i in range(1, 30):
+                pod_ready = kubectl.get_condition_status(pod, "Ready")
+                dummy_ready = kubectl.get_container_status(pod, 1)
+                if pod_ready == "True" and dummy_ready == "true":
+                    break
+                retry_sleep(i, 2, f"pod Ready={pod_ready}, {dummy_container} ready={dummy_ready}")
+
+            assert pod_ready == "True", error(f"expected pod {pod} to be Ready, got Ready={pod_ready}")
+
+    old_uid = kubectl.get_field("pod", pod, ".metadata.uid")
+    assert old_uid, error(f"pod {pod} does not exist")
+
+    with When("I make the dummy container NotReady without crashing it"):
+        kubectl.launch(f"exec {pod} -c {dummy_container} -- rm -f /tmp/ready")
+
+        with Then("The pod should become NotReady"):
+            for i in range(1, 30):
+                pod_ready = kubectl.get_condition_status(pod, "Ready")
+                if pod_ready == "False":
+                    break
+                retry_sleep(i, 2, f"pod Ready={pod_ready}")
+
+            assert pod_ready == "False", error(f"expected pod {pod} to be NotReady, got Ready={pod_ready}")
+
+        with Then("Operator must NOT recreate the pod (recovery disabled)"):
+            # Watch well past the 30s threshold; if recovery were (wrongly) enabled it
+            # would have recreated the pod by now. The UID must stay constant.
+            start_time = time.time()
+            pod_ready = kubectl.get_condition_status(pod, "Ready")
+            while time.time() - start_time < 120:
+                new_uid = kubectl.get_field("pod", pod, ".metadata.uid")
+                assert new_uid == old_uid, error(
+                    f"pod {pod} was recreated (uid {old_uid}->{new_uid}) despite onPodNotReady=none"
+                )
+                pod_ready = kubectl.get_condition_status(pod, "Ready")
+                retry_sleep(
+                    int((time.time() - start_time) / 5) + 1,
+                    5,
+                    f"pod uid={new_uid}, Ready={pod_ready} (expect unchanged)",
+                )
+
+            assert pod_ready == "False", error(
+                f"expected pod {pod} to stay NotReady when recovery disabled, got Ready={pod_ready}"
+            )
+
+    with Finally("I clean up"):
+        with By("resetting ClickHouseOperatorConfiguration to default"):
+            kubectl.delete(util.get_full_path(chopconf, lookup_in_host=False), operator_namespace)
+            util.restart_operator()
         delete_test_namespace()
 
 
