@@ -539,7 +539,8 @@ reconcile:
     # is in that state. Multi-scope design anticipates future states beyond Aborted
     # (e.g. Failed, Broken).
     from:
-      # Recovery from Status=Aborted
+      # Recovery for a CHI whose .status.status is Aborted (reconcile did not complete)
+      # when one of its host pods transitions to Ready — auto-resumes the reconcile.
       aborted:
         # Action when a pod belonging to an Aborted CHI transitions to Ready:
         #   retry (default) — re-enqueue the CHI for reconcile
@@ -548,6 +549,21 @@ reconcile:
         # Future events (not yet implemented):
         #   onKeeperReady: retry       — retry when a referenced CHK becomes ready
         #   onOperatorRestart: retry   — sweep Aborted CHIs on operator startup
+      # Recovery for a CHI whose .status.status is Completed (fully reconciled) when one
+      # of its host pods regresses to Ready=False and stays NotReady (sustained) without
+      # crashing — auto-heals stuck hosts.
+      completed:
+        # Action when a Completed CHI's pod flips Ready=True -> Ready=False and
+        # stays NotReady for at least onPodNotReadyThreshold:
+        #   none (default) — do nothing
+        #   retry          — re-enqueue the CHI so the stuck host is force-restarted
+        # OFF by default: force-recreating a Completed CHI's pod is destructive — it can
+        # interrupt a replica's in-progress recovery and means hard downtime for a
+        # single-replica shard. Opt in with `retry` only where that trade-off is acceptable.
+        onPodNotReady: none
+        # Minimum duration a pod must stay Ready=False before recovery fires, once enabled
+        # (Go duration string; default 5m). Raise it for slow-recovering replicas.
+        onPodNotReadyThreshold: 5m
       # Future scopes (not yet implemented):
       # failed:
       #   onPodReady: retry
