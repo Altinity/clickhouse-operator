@@ -867,13 +867,21 @@ def fips_assert_replicas_healthy(
         binary = "clickhouse"
         container = "clickhouse"
         tls_ports = {8443, 9440, 9010, 7171}
+        plaintext_ports = set()
     elif kind == "chk":
         pods = sorted(kubectl.get_chk_pod_names(workload))
         binary = "clickhouse-keeper"
         container = "clickhouse-keeper"
-        tls_ports = {2281, 9444, 9182}
+        # 2281 = secure ZK client, 9444 = Raft. 9182 is the Keeper /ready HTTP control
+        # endpoint: intentionally PLAINTEXT (health/quorum probe, carries no secrets) and
+        # unaffected by the secure/insecure knobs — an allowed listener, NOT a TLS port.
+        # It must stay in the allow-set or the "only approved ports" check flags it.
+        tls_ports = {2281, 9444}
+        plaintext_ports = {9182}
     else:
         raise ValueError(f"unsupported workload kind: {kind}")
+
+    allowed_ports = tls_ports | plaintext_ports
 
     note(f"{kind.upper()} pods: {pods}")
     assert len(pods) == expected_count, error(
@@ -888,7 +896,7 @@ def fips_assert_replicas_healthy(
         )
         fips_assert_only_tls_ports(
             pod=pod,
-            required=tls_ports,
+            required=allowed_ports,
             container=container,
             max_iters=30,
             sleep_s=2,
