@@ -64,12 +64,12 @@ func TestRecoveryActionConstants(t *testing.T) {
 // Mirrors TestShouldRecoverAbortedOnPodReady so symmetric config keys behave identically.
 func TestShouldRecoverCompletedOnPodNotReady(t *testing.T) {
 	tests := []struct {
-		name         string
-		onPodNotRdy  *types.String
-		expected     bool
+		name        string
+		onPodNotRdy *types.String
+		expected    bool
 	}{
-		{"nil defaults to retry (close the gap by default)", nil, true},
-		{"empty string defaults to retry", types.NewString(""), true},
+		{"nil defaults to off (opt-in only — destructive recreate)", nil, false},
+		{"empty string defaults to off", types.NewString(""), false},
 		{"retry lowercase", types.NewString("retry"), true},
 		{"Retry mixed case", types.NewString("Retry"), true},
 		{"RETRY upper case", types.NewString("RETRY"), true},
