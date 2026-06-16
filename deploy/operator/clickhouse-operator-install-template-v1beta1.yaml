@@ -4148,6 +4148,28 @@ spec:
                                 - "none"
                                 - "Retry"
                                 - "retry"
+                        completed:
+                          type: object
+                          description: "Recovery from Status=Completed when a child pod regresses to Ready=False and stays NotReady"
+                          properties:
+                            onPodNotReady:
+                              type: string
+                              description: |
+                                Reaction when a pod belonging to a Completed CHI flips Ready=True -> Ready=False
+                                and stays NotReady for at least onPodNotReadyThreshold. OFF by default — opt-in only,
+                                because force-recreating the pod is destructive (can interrupt replica recovery;
+                                hard downtime for a single-replica shard).
+                                  none (default) — do nothing
+                                  retry — re-enqueue the CHI for reconcile (force-restart the stuck host)
+                              enum:
+                                - ""
+                                - "None"
+                                - "none"
+                                - "Retry"
+                                - "retry"
+                            onPodNotReadyThreshold:
+                              type: string
+                              description: "Minimum duration a pod must stay Ready=False before recovery fires (Go duration string, e.g. '5m'; default 5m)"
             annotation:
               type: object
               description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
@@ -6016,6 +6038,20 @@ data:
             # Future events (not yet implemented):
             #   onKeeperReady: retry       — retry when a referenced CHK becomes ready
             #   onOperatorRestart: retry   — sweep Aborted CHIs on operator startup
+          # Recovery from Status=Completed when a host pod regresses to Ready=False
+          # and stays NotReady (sustained) without crashing — auto-heals stuck hosts.
+          completed:
+            # Action when a Completed CHI's pod flips Ready=True -> Ready=False and
+            # stays NotReady for at least onPodNotReadyThreshold:
+            #   none (default) — do nothing
+            #   retry          — re-enqueue the CHI so the stuck host is force-restarted
+            # OFF by default: force-recreating a Completed CHI's pod is destructive — it can
+            # interrupt a replica's in-progress recovery and means hard downtime for a
+            # single-replica shard. Opt in with `retry` only where that trade-off is acceptable.
+            onPodNotReady: none
+            # Minimum duration a pod must stay Ready=False before recovery fires, once enabled
+            # (Go duration string; default 5m). Raise it for slow-recovering replicas.
+            onPodNotReadyThreshold: 5m
           # Future scopes (not yet implemented):
           # failed:
           #   onPodReady: retry
