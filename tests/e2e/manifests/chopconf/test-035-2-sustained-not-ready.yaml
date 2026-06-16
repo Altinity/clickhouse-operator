@@ -1,0 +1,14 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-035-2-sustained-not-ready"
+spec:
+  reconcile:
+    recovery:
+      from:
+        # Recovery is OFF by default, so the test must explicitly opt in with
+        # onPodNotReady: retry. Shorten the sustained-NotReady threshold from the 5m
+        # default so the recovery fires within the test's 420s window.
+        completed:
+          onPodNotReady: retry
+          onPodNotReadyThreshold: 30s
