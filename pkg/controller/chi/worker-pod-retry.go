@@ -212,6 +212,30 @@ func shouldTriggerStuckHostRecovery(cr *api.ClickHouseInstallation) bool {
 	return true
 }
 
+// crHasHostNeedingStuckRecovery reports whether the CR is a stuck-host recovery target
+// (Completed, not deleting, feature enabled) with at least one host whose pod has been
+// NotReady past the configured threshold. reconcileCR uses this to proceed past the
+// "no reconcile work" gate: a sustained-NotReady pod is live runtime state that never
+// surfaces as an ActionPlan diff or object drift, so without this the delayed recovery
+// reconcile self-aborts before shouldForceRestartHost is ever consulted.
+func (w *worker) crHasHostNeedingStuckRecovery(ctx context.Context, cr *api.ClickHouseInstallation) bool {
+	if !chop.Config().ShouldRecoverCompletedOnPodNotReady() {
+		return false
+	}
+	if !shouldTriggerStuckHostRecovery(cr) {
+		return false
+	}
+	threshold := chop.Config().CompletedOnPodNotReadyThreshold()
+	found := false
+	cr.WalkHosts(func(host *api.Host) error {
+		if !found && w.isPodSustainedNotReady(ctx, host, threshold) {
+			found = true
+		}
+		return nil
+	})
+	return found
+}
+
 // isPodReadyToNotReadyTransition reports whether the pod transitioned from "all containers
 // ready" to "some container not ready". The dual of isPodNotReadyToReadyTransition.
 func isPodReadyToNotReadyTransition(oldPod, newPod *core.Pod) bool {
