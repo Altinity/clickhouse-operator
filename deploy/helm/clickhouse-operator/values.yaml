@@ -816,6 +816,20 @@ configs:
               # Future events (not yet implemented):
               #   onKeeperReady: retry       — retry when a referenced CHK becomes ready
               #   onOperatorRestart: retry   — sweep Aborted CHIs on operator startup
+            # Recovery from Status=Completed when a host pod regresses to Ready=False
+            # and stays NotReady (sustained) without crashing — auto-heals stuck hosts.
+            completed:
+              # Action when a Completed CHI's pod flips Ready=True -> Ready=False and
+              # stays NotReady for at least onPodNotReadyThreshold:
+              #   none (default) — do nothing
+              #   retry          — re-enqueue the CHI so the stuck host is force-restarted
+              # OFF by default: force-recreating a Completed CHI's pod is destructive — it can
+              # interrupt a replica's in-progress recovery and means hard downtime for a
+              # single-replica shard. Opt in with `retry` only where that trade-off is acceptable.
+              onPodNotReady: none
+              # Minimum duration a pod must stay Ready=False before recovery fires, once enabled
+              # (Go duration string; default 5m). Raise it for slow-recovering replicas.
+              onPodNotReadyThreshold: 5m
             # Future scopes (not yet implemented):
             # failed:
             #   onPodReady: retry
