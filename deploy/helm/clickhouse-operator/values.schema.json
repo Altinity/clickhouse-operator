@@ -710,6 +710,12 @@
                 "annotations": {
                     "type": "object"
                 },
+                "podAnnotations": {
+                    "type": "object"
+                },
+                "podSecurityContext": {
+                    "type": "object"
+                },
                 "containerSecurityContext": {
                     "type": "object"
                 }

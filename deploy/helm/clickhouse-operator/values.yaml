@@ -38,6 +38,17 @@ crdHook:
   affinity: {}
   # crdHook.annotations -- additional annotations for CRD installation job
   annotations: {}
+  # crdHook.podAnnotations -- additional annotations for CRD installation job pod template
+  # useful to opt out of service mesh injection, e.g. `sidecar.istio.io/inject: "false"`
+  podAnnotations: {}
+  # crdHook.podSecurityContext -- pod-level security context for CRD installation job
+  # required by some admission policies (e.g. Kyverno `restrict-seccomp-strict`)
+  # check `kubectl explain pod.spec.securityContext` for details
+  podSecurityContext: {}
+  #  runAsNonRoot: true
+  #  runAsUser: 1000
+  #  seccompProfile:
+  #    type: RuntimeDefault
   # crdHook.containerSecurityContext -- container security context for CRD installation job
   # check `kubectl explain pod.spec.containers.securityContext` for details
   containerSecurityContext: {}

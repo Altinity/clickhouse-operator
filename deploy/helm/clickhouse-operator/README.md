@@ -83,6 +83,8 @@ crdHook:
 | crdHook.image.tag | string | `"latest"` | image tag for CRD installation job |
 | crdHook.imagePullSecrets | list | `[]` | image pull secrets for CRD installation job possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |
 | crdHook.nodeSelector | object | `{}` | node selector for CRD installation job |
+| crdHook.podAnnotations | object | `{}` | additional annotations for CRD installation job pod template useful to opt out of service mesh injection, e.g. `sidecar.istio.io/inject: "false"` |
+| crdHook.podSecurityContext | object | `{}` | pod-level security context for CRD installation job required by some admission policies (e.g. Kyverno `restrict-seccomp-strict`) check `kubectl explain pod.spec.securityContext` for details |
 | crdHook.resources | object | `{}` | resource limits and requests for CRD installation job |
 | crdHook.tolerations | list | `[]` | tolerations for CRD installation job |
 | dashboards.additionalLabels | object | `{"grafana_dashboard":""}` | labels to add to a secret with dashboards |
