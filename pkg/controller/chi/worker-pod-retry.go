@@ -50,7 +50,7 @@ var normalizeTimeAbortReasons = []string{
 
 // recoverAbortedReconcileOnPodReady inspects a pod update event and re-enqueues the parent
 // CHI for reconcile when the pod transitioned NotReady → Ready and the CHI is Aborted.
-// Controlled by reconcile.recovery.from.aborted.onPodReady config option (default: retry).
+// Controlled by reconcile.recovery.onStatus.aborted.onPodReady config option (default: retry).
 // The decision to re-enqueue is based on the CHI's Status alone, not on ActionPlan —
 // see shouldTriggerAutoRecovery for the rationale.
 func (w *worker) recoverAbortedReconcileOnPodReady(ctx context.Context, oldPod, newPod *core.Pod) {
