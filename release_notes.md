@@ -1,3 +1,7 @@
+## Release 0.27.2
+### Behavior Changes
+* **Backward-incompatible config rename** in `ClickHouseOperatorConfiguration`: `reconcile.recovery.from.{aborted,completed}` → `reconcile.recovery.onStatus.{aborted,completed}`. The `from` grouping level is removed; the per-status scopes and their action keys (`onPodReady`/`onPodNotReady`/`onPodNotReadyThreshold`) are unchanged. The obsolete `from` key is silently ignored on load. **If you set `reconcile.recovery.from.aborted.onPodReady: none` on 0.27.0/0.27.1 to disable Aborted auto-recovery, re-apply it as `reconcile.recovery.onStatus.aborted.onPodReady: none`** — otherwise the default (`retry`) silently re-enables it. The `completed` scope (sustained-NotReady host recovery) is new in 0.27.2 and off by default. See [docs/operator_upgrade.md](docs/operator_upgrade.md).
+
 ## Release 0.27.1
 ### Behavior Changes
 * `StatefulSet` create returning `AlreadyExists` (e.g. due to a stale informer cache or a prior failed delete) is no longer silently treated as a successful create. The reconciler now propagates the recreate sentinel so the host correctly enters the recreate path. See https://github.com/Altinity/clickhouse-operator/pull/1993.

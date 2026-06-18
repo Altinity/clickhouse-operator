@@ -137,7 +137,7 @@ kubectl get chi -o json | jq -r '.items[].status.errors[]? | select(startswith("
 Recovery is via spec edit: `kubectl apply` a corrected CHI (set `secure: true`
 on every ZK node, or remove the `zookeeper:` block and use a CHK reference).
 The informer's `UpdateFunc` re-enqueues the CR and normalize re-runs cleanly.
-Note: this recovery path does NOT depend on `recovery.from.aborted.onPodReady`
+Note: this recovery path does NOT depend on `recovery.onStatus.aborted.onPodReady`
 — that path requires pod-readiness transitions, which never fire for CHIs
 rejected at the normalizer (pods are never created).
 
