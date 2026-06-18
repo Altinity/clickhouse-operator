@@ -540,12 +540,13 @@ reconcile:
   ##
   ################################################
   recovery:
-    # Recovery scopes keyed by CHI state being recovered from.
+    # Recovery scopes keyed by the CHI .status.status they apply to.
     # Each scope contains on<Event>: <action> mappings that apply while the CHI
-    # is in that state. Multi-scope design anticipates future states beyond Aborted
+    # is in that status. Multi-scope design anticipates future states beyond Aborted
     # (e.g. Failed, Broken).
-    from:
-      # Recovery from Status=Aborted
+    onStatus:
+      # Recovery for a CHI whose .status.status is Aborted (reconcile did not complete)
+      # when one of its host pods transitions to Ready — auto-resumes the reconcile.
       aborted:
         # Action when a pod belonging to an Aborted CHI transitions to Ready:
         #   retry (default) — re-enqueue the CHI for reconcile
@@ -554,8 +555,9 @@ reconcile:
         # Future events (not yet implemented):
         #   onKeeperReady: retry       — retry when a referenced CHK becomes ready
         #   onOperatorRestart: retry   — sweep Aborted CHIs on operator startup
-      # Recovery from Status=Completed when a host pod regresses to Ready=False
-      # and stays NotReady (sustained) without crashing — auto-heals stuck hosts.
+      # Recovery for a CHI whose .status.status is Completed (fully reconciled) when one
+      # of its host pods regresses to Ready=False and stays NotReady (sustained) without
+      # crashing — auto-heals stuck hosts.
       completed:
         # Action when a Completed CHI's pod flips Ready=True -> Ready=False and
         # stays NotReady for at least onPodNotReadyThreshold:
@@ -574,7 +576,7 @@ reconcile:
       # broken:
       #   onPodReady: retry
 
-    # Future global policy knobs (not yet implemented) — flat peers of `from`,
+    # Future global policy knobs (not yet implemented) — flat peers of `onStatus`,
     # apply across all recovery scopes:
     #
     # Global kill-switch for auto-recovery:
