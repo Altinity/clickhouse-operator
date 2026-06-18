@@ -576,22 +576,22 @@ type OperatorConfigReconcile struct {
 }
 
 // OperatorConfigReconcileRecovery specifies auto-recovery behavior for reconcile.
-// Event→action mappings are scoped by the CHI state we recover FROM (under .From).
+// Event→action mappings are scoped by the CHI status they apply to (under .OnStatus).
 // Global policy knobs (future: retries, backoff, cooldown, enabled) sit as flat peers
-// of .From at this level. Multi-scope design anticipates future states beyond Aborted
+// of .OnStatus at this level. Multi-scope design anticipates future states beyond Aborted
 // (e.g. Failed, Broken).
 type OperatorConfigReconcileRecovery struct {
-	// From maps the CHI state we recover from (e.g. aborted) to event→action mappings.
-	From OperatorConfigReconcileRecoveryFrom `json:"from,omitempty" yaml:"from,omitempty"`
+	// OnStatus maps a CHI status (e.g. aborted, completed) to event→action mappings
+	// that apply while the CHI is in that status.
+	OnStatus OperatorConfigReconcileRecoveryOnStatus `json:"onStatus,omitempty" yaml:"onStatus,omitempty"`
 }
 
-// OperatorConfigReconcileRecoveryFrom groups recovery-event mappings by the CHI state
-// being recovered from. Each sub-field is a scope whose keys are on<Event> recovery
-// triggers.
-type OperatorConfigReconcileRecoveryFrom struct {
-	// Aborted scope — recovery from Status=Aborted.
+// OperatorConfigReconcileRecoveryOnStatus groups recovery-event mappings by the CHI status
+// they apply to. Each sub-field is a scope whose keys are on<Event> recovery triggers.
+type OperatorConfigReconcileRecoveryOnStatus struct {
+	// Aborted scope — recovery while Status=Aborted.
 	Aborted OperatorConfigReconcileRecoveryScope `json:"aborted,omitempty" yaml:"aborted,omitempty"`
-	// Completed scope — recovery from Status=Completed when a child pod regresses to Ready=False
+	// Completed scope — recovery while Status=Completed when a child pod regresses to Ready=False
 	Completed OperatorConfigReconcileRecoveryCompletedScope `json:"completed,omitempty" yaml:"completed,omitempty"`
 	// Future: Failed, Broken, etc.
 }
@@ -1656,9 +1656,9 @@ func (c *OperatorConfig) RestartOnOperatorConfigurationChange() bool {
 
 // ShouldRecoverAbortedOnPodReady reports whether the operator should re-enqueue a CHI
 // reconcile when a pod belonging to an Aborted CHI transitions to Ready. Default is to retry.
-// Backed by reconcile.recovery.from.aborted.onPodReady config key.
+// Backed by reconcile.recovery.onStatus.aborted.onPodReady config key.
 func (c *OperatorConfig) ShouldRecoverAbortedOnPodReady() bool {
-	value := strings.ToLower(c.Reconcile.Recovery.From.Aborted.OnPodReady.String())
+	value := strings.ToLower(c.Reconcile.Recovery.OnStatus.Aborted.OnPodReady.String())
 	if value == "" {
 		// Default behavior — retry
 		return true
@@ -1672,18 +1672,18 @@ func (c *OperatorConfig) ShouldRecoverAbortedOnPodReady() bool {
 // a Completed CHI's pod is destructive (it can interrupt a replica's in-progress recovery
 // and means hard downtime for a single-replica shard), so this is opt-in — only an explicit
 // onPodNotReady: retry enables it. Unlike the Aborted scope, which retries by default.
-// Backed by reconcile.recovery.from.completed.onPodNotReady config key.
+// Backed by reconcile.recovery.onStatus.completed.onPodNotReady config key.
 func (c *OperatorConfig) ShouldRecoverCompletedOnPodNotReady() bool {
-	value := strings.ToLower(c.Reconcile.Recovery.From.Completed.OnPodNotReady.String())
+	value := strings.ToLower(c.Reconcile.Recovery.OnStatus.Completed.OnPodNotReady.String())
 	return value == RecoveryActionRetry
 }
 
 // CompletedOnPodNotReadyThreshold returns the minimum duration a pod must remain in
 // Ready=False before the Completed recovery scope fires. Falls back to the package
 // default (5m) if the config value is unset, empty, or unparseable.
-// Backed by reconcile.recovery.from.completed.onPodNotReadyThreshold config key.
+// Backed by reconcile.recovery.onStatus.completed.onPodNotReadyThreshold config key.
 func (c *OperatorConfig) CompletedOnPodNotReadyThreshold() time.Duration {
-	raw := strings.TrimSpace(c.Reconcile.Recovery.From.Completed.OnPodNotReadyThreshold.String())
+	raw := strings.TrimSpace(c.Reconcile.Recovery.OnStatus.Completed.OnPodNotReadyThreshold.String())
 	if raw == "" {
 		return defaultCompletedOnPodNotReadyThreshold
 	}

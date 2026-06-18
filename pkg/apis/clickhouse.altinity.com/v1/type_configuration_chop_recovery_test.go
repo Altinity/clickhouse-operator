@@ -24,7 +24,7 @@ import (
 )
 
 // TestShouldRecoverAbortedOnPodReady verifies the accessor's behavior across the
-// full matrix of possible values for reconcile.recovery.from.aborted.onPodReady.
+// full matrix of possible values for reconcile.recovery.onStatus.aborted.onPodReady.
 func TestShouldRecoverAbortedOnPodReady(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -46,7 +46,7 @@ func TestShouldRecoverAbortedOnPodReady(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &OperatorConfig{}
-			c.Reconcile.Recovery.From.Aborted.OnPodReady = tc.onReady
+			c.Reconcile.Recovery.OnStatus.Aborted.OnPodReady = tc.onReady
 			require.Equal(t, tc.expected, c.ShouldRecoverAbortedOnPodReady())
 		})
 	}
@@ -60,7 +60,7 @@ func TestRecoveryActionConstants(t *testing.T) {
 }
 
 // TestShouldRecoverCompletedOnPodNotReady verifies the accessor's behavior across the
-// full matrix of possible values for reconcile.recovery.from.completed.onPodNotReady.
+// full matrix of possible values for reconcile.recovery.onStatus.completed.onPodNotReady.
 // Mirrors TestShouldRecoverAbortedOnPodReady so symmetric config keys behave identically.
 func TestShouldRecoverCompletedOnPodNotReady(t *testing.T) {
 	tests := []struct {
@@ -83,7 +83,7 @@ func TestShouldRecoverCompletedOnPodNotReady(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &OperatorConfig{}
-			c.Reconcile.Recovery.From.Completed.OnPodNotReady = tc.onPodNotRdy
+			c.Reconcile.Recovery.OnStatus.Completed.OnPodNotReady = tc.onPodNotRdy
 			require.Equal(t, tc.expected, c.ShouldRecoverCompletedOnPodNotReady())
 		})
 	}
@@ -116,7 +116,7 @@ func TestCompletedOnPodNotReadyThreshold(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &OperatorConfig{}
-			c.Reconcile.Recovery.From.Completed.OnPodNotReadyThreshold = tc.raw
+			c.Reconcile.Recovery.OnStatus.Completed.OnPodNotReadyThreshold = tc.raw
 			require.Equal(t, tc.expected, c.CompletedOnPodNotReadyThreshold())
 		})
 	}
