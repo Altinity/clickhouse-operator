@@ -518,7 +518,7 @@
                                         "recovery": {
                                             "type": "object",
                                             "properties": {
-                                                "from": {
+                                                "onStatus": {
                                                     "type": "object",
                                                     "properties": {
                                                         "aborted": {
@@ -527,6 +527,18 @@
                                                                 "onPodReady": {
                                                                     "type": "string",
                                                                     "enum": ["", "none", "None", "retry", "Retry"]
+                                                                }
+                                                            }
+                                                        },
+                                                        "completed": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "onPodNotReady": {
+                                                                    "type": "string",
+                                                                    "enum": ["", "none", "None", "retry", "Retry"]
+                                                                },
+                                                                "onPodNotReadyThreshold": {
+                                                                    "type": "string"
                                                                 }
                                                             }
                                                         }
