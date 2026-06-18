@@ -6338,9 +6338,7 @@ def test_010065_0(self):
 @TestScenario
 @Tags("HEAVY")
 @Name("test_010065. FIPS IPC Secure mode: operator↔exporter token-protected channel")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_FIPS_Connect_Operator_IPCSecure("1.0")
-)
+@Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
 def test_010065(self):
     """Verify clickhouse.security.ipc.mode=Secure activates token-based auth
     on the operator↔metrics-exporter /chi REST channel without breaking the
