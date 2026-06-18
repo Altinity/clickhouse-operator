@@ -5,7 +5,7 @@ metadata:
 spec:
   reconcile:
     recovery:
-      from:
+      onStatus:
         # Explicit opt-out: even with an aggressive 30s threshold, onPodNotReady=none
         # must leave a sustained-NotReady pod alone (no force-recreate). Isolates the
         # on/off knob from the threshold — proves the default-off contract.

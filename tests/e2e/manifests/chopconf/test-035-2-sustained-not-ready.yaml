@@ -5,7 +5,7 @@ metadata:
 spec:
   reconcile:
     recovery:
-      from:
+      onStatus:
         # Recovery is OFF by default, so the test must explicitly opt in with
         # onPodNotReady: retry. Shorten the sustained-NotReady threshold from the 5m
         # default so the recovery fires within the test's 420s window.

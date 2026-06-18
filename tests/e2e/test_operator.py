@@ -3714,7 +3714,7 @@ def test_010035(self):
 @Name("test_010035_1. Opt-out: CHI stays Aborted when auto-recovery onPodReady=none")
 def test_010035_1(self):
     """Opt-out path: Verify that when the operator is configured with
-    reconcile.recovery.from.aborted.onPodReady=none, the CHI stays Aborted
+    reconcile.recovery.onStatus.aborted.onPodReady=none, the CHI stays Aborted
     even after the pod becomes Ready — no automatic recovery.
 
     This is the inverse of test_010035 and validates that the opt-out knob works.
