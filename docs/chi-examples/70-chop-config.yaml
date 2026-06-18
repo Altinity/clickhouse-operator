@@ -400,7 +400,7 @@ spec:
     ##
     ################################################
     recovery:
-      from:
+      onStatus:
         aborted:
           # When a reconcile lands in status=Aborted (due to FIPS coercion
           # conflict, plain-text ZK under FIPS, etc.), the operator can
