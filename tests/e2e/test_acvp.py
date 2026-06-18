@@ -45,8 +45,10 @@ from testflows.asserts import error
 
 from requirements.fips import (
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Exporter_ConfigGeneration,
+    RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Exporter_SHA2256AFT,
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Exporter_WrapperIntegration,
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Operator_ConfigGeneration,
+    RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Operator_SHA2256AFT,
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Operator_WrapperIntegration,
 )
 
@@ -248,6 +250,7 @@ def _acvp_smoke(binary_name, cmd_path):
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Operator_WrapperIntegration("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Operator_ConfigGeneration("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Operator_SHA2256AFT("1.0"),
 )
 def test_acvp_operator(self):
     """Build operator with -tags acvp_wrapper and verify the embedded ACVP
@@ -265,6 +268,7 @@ def test_acvp_operator(self):
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Exporter_WrapperIntegration("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Exporter_ConfigGeneration("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Exporter_SHA2256AFT("1.0"),
 )
 def test_acvp_metrics_exporter(self):
     """Mirror of test_acvp_operator for the metrics-exporter binary. Both
