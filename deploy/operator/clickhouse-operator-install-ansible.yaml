@@ -311,8 +311,10 @@ spec:
                     In case 'RollingUpdate' specified, the operator will always restart ClickHouse pods during reconcile.
                     This options is used in rare cases when force restart is required and is typically removed after the use in order to avoid unneeded restarts.
                   enum:
+                    # both humped and all-lowercase accepted
                     - ""
                     - "RollingUpdate"
+                    - "rollingupdate"
                 suspend:
                   <<: *TypeStringBool
                   description: |
@@ -349,7 +351,9 @@ spec:
                         Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                       enum:
                         - ""
+                        - "Auto"
                         - "auto"
+                        - "Manual"
                         - "manual"
                     chiSelector:
                       type: object
@@ -370,9 +374,12 @@ spec:
                         Possible values:
                          - wait - should wait to exclude host, complete queries and include host back into the cluster
                          - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                        (case-insensitive)
                       enum:
                         - ""
+                        - "Wait"
                         - "wait"
+                        - "NoWait"
                         - "nowait"
                     configMapPropagationTimeout:
                       type: integer
@@ -396,12 +403,14 @@ spec:
                           properties:
                             statefulSet: &TypeObjectsCleanup
                               type: string
-                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default (case-insensitive)"
                               enum:
-                                # List ObjectsCleanupXXX constants from model
+                                # List ObjectsCleanupXXX constants from model (both humped and all-lowercase accepted)
                                 - ""
                                 - "Retain"
+                                - "retain"
                                 - "Delete"
+                                - "delete"
                             pvc:
                               type: string
                               <<: *TypeObjectsCleanup
@@ -506,8 +515,11 @@ spec:
                                 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
                               enum:
                                 - ""
+                                - "Abort"
                                 - "abort"
+                                - "Delete"
                                 - "delete"
+                                - "Ignore"
                                 - "ignore"
                         update:
                           type: object
@@ -533,8 +545,11 @@ spec:
                                 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
                               enum:
                                 - ""
+                                - "Abort"
                                 - "abort"
+                                - "Rollback"
                                 - "rollback"
+                                - "Ignore"
                                 - "ignore"
                         recreate:
                           type: object
@@ -549,7 +564,9 @@ spec:
                                 2. recreate - proceed and recreate StatefulSet.
                               enum:
                                 - ""
+                                - "Abort"
                                 - "abort"
+                                - "Recreate"
                                 - "recreate"
                             onUpdateFailure:
                               type: string
@@ -560,7 +577,9 @@ spec:
                                 2. recreate - proceed and recreate StatefulSet.
                               enum:
                                 - ""
+                                - "Abort"
                                 - "abort"
+                                - "Recreate"
                                 - "recreate"
                     host: &TypeReconcileHost
                       type: object
@@ -885,20 +904,24 @@ spec:
                       properties:
                         provisioner: &TypePVCProvisioner
                           type: string
-                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator"
+                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator (case-insensitive)"
                           enum:
                             - ""
                             - "StatefulSet"
+                            - "statefulset"
                             - "Operator"
+                            - "operator"
                         reclaimPolicy: &TypePVCReclaimPolicy
                           type: string
                           description: |
-                            defines behavior of `PVC` deletion.
+                            defines behavior of `PVC` deletion (case-insensitive).
                             `Delete` by default, if `Retain` specified then `PVC` will be kept when deleting StatefulSet
                           enum:
                             - ""
                             - "Retain"
+                            - "retain"
                             - "Delete"
+                            - "delete"
                     templates: &TypeTemplateNames
                       type: object
                       description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
@@ -989,9 +1012,9 @@ spec:
                             serviceType:
                               type: string
                               description: |
-                                how to discover keeper endpoints:
-                                  replicas (default) — enumerate per-host services, one ZK node per keeper replica
-                                  service — use the CR-level headless service as a single ZK node entry
+                                how to discover keeper endpoints (case-insensitive):
+                                  Replicas (default) — enumerate per-host services, one ZK node per keeper replica
+                                  Service — use the CR-level headless service as a single ZK node entry
                               enum:
                                 - ""
                                 - "Replicas"
@@ -1137,21 +1160,26 @@ spec:
                             properties:
                               replica:
                                 type: string
-                                description: "how schema is propagated within a replica"
+                                description: "how schema is propagated within a replica (case-insensitive)"
                                 enum:
-                                  # List SchemaPolicyReplicaXXX constants from model
+                                  # List SchemaPolicyReplicaXXX constants from model (both humped and all-lowercase accepted)
                                   - ""
                                   - "None"
+                                  - "none"
                                   - "All"
+                                  - "all"
                               shard:
                                 type: string
-                                description: "how schema is propagated between shards"
+                                description: "how schema is propagated between shards (case-insensitive)"
                                 enum:
-                                  # List SchemaPolicyShardXXX constants from model
+                                  # List SchemaPolicyShardXXX constants from model (both humped and all-lowercase accepted)
                                   - ""
                                   - "None"
+                                  - "none"
                                   - "All"
+                                  - "all"
                                   - "DistributedTablesOnly"
+                                  - "distributedtablesonly"
                           insecure:
                             <<: *TypeStringBool
                             description: optional, open insecure ports for cluster, defaults to "yes"
@@ -1521,10 +1549,12 @@ spec:
                                   type: string
                                   description: "type of distribution, when `Unspecified` (default value) then all listen ports on clickhouse-server configuration in all Pods will have the same value, when `ClusterScopeIndex` then ports will increment to offset from base value depends on shard and replica index inside cluster with combination of `chi.spec.templates.podTemlates.spec.HostNetwork` it allows setup ClickHouse cluster inside Kubernetes and provide access via external network bypass Kubernetes internal network"
                                   enum:
-                                    # List PortDistributionXXX constants
+                                    # List PortDistributionXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "ClusterScopeIndex"
+                                    - "clusterscopeindex"
                           spec:
                             # Host
                             type: object
@@ -1625,9 +1655,12 @@ spec:
                             type: string
                             description: "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
                             enum:
+                              # both humped and all-lowercase accepted
                               - ""
                               - "Unspecified"
+                              - "unspecified"
                               - "OnePerHost"
+                              - "oneperhost"
                           podDistribution:
                             type: array
                             description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
@@ -1641,35 +1674,56 @@ spec:
                                   type: string
                                   description: "you can define multiple affinity policy types"
                                   enum:
-                                    # List PodDistributionXXX constants
+                                    # List PodDistributionXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "ClickHouseAntiAffinity"
+                                    - "clickhouseantiaffinity"
                                     - "ShardAntiAffinity"
+                                    - "shardantiaffinity"
                                     - "ReplicaAntiAffinity"
+                                    - "replicaantiaffinity"
                                     - "AnotherNamespaceAntiAffinity"
+                                    - "anothernamespaceantiaffinity"
                                     - "AnotherClickHouseInstallationAntiAffinity"
+                                    - "anotherclickhouseinstallationantiaffinity"
                                     - "AnotherClusterAntiAffinity"
+                                    - "anotherclusterantiaffinity"
                                     - "MaxNumberPerNode"
+                                    - "maxnumberpernode"
                                     - "NamespaceAffinity"
+                                    - "namespaceaffinity"
                                     - "ClickHouseInstallationAffinity"
+                                    - "clickhouseinstallationaffinity"
                                     - "ClusterAffinity"
+                                    - "clusteraffinity"
                                     - "ShardAffinity"
+                                    - "shardaffinity"
                                     - "ReplicaAffinity"
+                                    - "replicaaffinity"
                                     - "PreviousTailAffinity"
+                                    - "previoustailaffinity"
                                     - "CircularReplication"
+                                    - "circularreplication"
                                 scope:
                                   type: string
                                   description: "scope for apply each podDistribution"
                                   enum:
-                                    # list PodDistributionScopeXXX constants
+                                    # list PodDistributionScopeXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "Shard"
+                                    - "shard"
                                     - "Replica"
+                                    - "replica"
                                     - "Cluster"
+                                    - "cluster"
                                     - "ClickHouseInstallation"
+                                    - "clickhouseinstallation"
                                     - "Namespace"
+                                    - "namespace"
                                 number:
                                   type: integer
                                   description: "define, how much ClickHouse Pods could be inside selected scope with selected distribution type"
@@ -1797,10 +1851,11 @@ spec:
                         description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clickhouse-operator`"
                       useType:
                         type: string
-                        description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit`"
+                        description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit` (case-insensitive)"
                         enum:
-                          # List useTypeXXX constants from model
+                          # List useTypeXXX constants from model (both humped and all-lowercase accepted)
                           - ""
+                          - "Merge"
                           - "merge"
 ---
 # Template Parameters:
@@ -2109,8 +2164,10 @@ spec:
                     In case 'RollingUpdate' specified, the operator will always restart ClickHouse pods during reconcile.
                     This options is used in rare cases when force restart is required and is typically removed after the use in order to avoid unneeded restarts.
                   enum:
+                    # both humped and all-lowercase accepted
                     - ""
                     - "RollingUpdate"
+                    - "rollingupdate"
                 suspend:
                   <<: *TypeStringBool
                   description: |
@@ -2147,7 +2204,9 @@ spec:
                         Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                       enum:
                         - ""
+                        - "Auto"
                         - "auto"
+                        - "Manual"
                         - "manual"
                     chiSelector:
                       type: object
@@ -2168,9 +2227,12 @@ spec:
                         Possible values:
                          - wait - should wait to exclude host, complete queries and include host back into the cluster
                          - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                        (case-insensitive)
                       enum:
                         - ""
+                        - "Wait"
                         - "wait"
+                        - "NoWait"
                         - "nowait"
                     configMapPropagationTimeout:
                       type: integer
@@ -2194,12 +2256,14 @@ spec:
                           properties:
                             statefulSet: &TypeObjectsCleanup
                               type: string
-                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default (case-insensitive)"
                               enum:
-                                # List ObjectsCleanupXXX constants from model
+                                # List ObjectsCleanupXXX constants from model (both humped and all-lowercase accepted)
                                 - ""
                                 - "Retain"
+                                - "retain"
                                 - "Delete"
+                                - "delete"
                             pvc:
                               type: string
                               <<: *TypeObjectsCleanup
@@ -2304,8 +2368,11 @@ spec:
                                 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
                               enum:
                                 - ""
+                                - "Abort"
                                 - "abort"
+                                - "Delete"
                                 - "delete"
+                                - "Ignore"
                                 - "ignore"
                         update:
                           type: object
@@ -2331,8 +2398,11 @@ spec:
                                 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
                               enum:
                                 - ""
+                                - "Abort"
                                 - "abort"
+                                - "Rollback"
                                 - "rollback"
+                                - "Ignore"
                                 - "ignore"
                         recreate:
                           type: object
@@ -2347,7 +2417,9 @@ spec:
                                 2. recreate - proceed and recreate StatefulSet.
                               enum:
                                 - ""
+                                - "Abort"
                                 - "abort"
+                                - "Recreate"
                                 - "recreate"
                             onUpdateFailure:
                               type: string
@@ -2358,7 +2430,9 @@ spec:
                                 2. recreate - proceed and recreate StatefulSet.
                               enum:
                                 - ""
+                                - "Abort"
                                 - "abort"
+                                - "Recreate"
                                 - "recreate"
                     host: &TypeReconcileHost
                       type: object
@@ -2683,20 +2757,24 @@ spec:
                       properties:
                         provisioner: &TypePVCProvisioner
                           type: string
-                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator"
+                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator (case-insensitive)"
                           enum:
                             - ""
                             - "StatefulSet"
+                            - "statefulset"
                             - "Operator"
+                            - "operator"
                         reclaimPolicy: &TypePVCReclaimPolicy
                           type: string
                           description: |
-                            defines behavior of `PVC` deletion.
+                            defines behavior of `PVC` deletion (case-insensitive).
                             `Delete` by default, if `Retain` specified then `PVC` will be kept when deleting StatefulSet
                           enum:
                             - ""
                             - "Retain"
+                            - "retain"
                             - "Delete"
+                            - "delete"
                     templates: &TypeTemplateNames
                       type: object
                       description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
@@ -2787,9 +2865,9 @@ spec:
                             serviceType:
                               type: string
                               description: |
-                                how to discover keeper endpoints:
-                                  replicas (default) — enumerate per-host services, one ZK node per keeper replica
-                                  service — use the CR-level headless service as a single ZK node entry
+                                how to discover keeper endpoints (case-insensitive):
+                                  Replicas (default) — enumerate per-host services, one ZK node per keeper replica
+                                  Service — use the CR-level headless service as a single ZK node entry
                               enum:
                                 - ""
                                 - "Replicas"
@@ -2935,21 +3013,26 @@ spec:
                             properties:
                               replica:
                                 type: string
-                                description: "how schema is propagated within a replica"
+                                description: "how schema is propagated within a replica (case-insensitive)"
                                 enum:
-                                  # List SchemaPolicyReplicaXXX constants from model
+                                  # List SchemaPolicyReplicaXXX constants from model (both humped and all-lowercase accepted)
                                   - ""
                                   - "None"
+                                  - "none"
                                   - "All"
+                                  - "all"
                               shard:
                                 type: string
-                                description: "how schema is propagated between shards"
+                                description: "how schema is propagated between shards (case-insensitive)"
                                 enum:
-                                  # List SchemaPolicyShardXXX constants from model
+                                  # List SchemaPolicyShardXXX constants from model (both humped and all-lowercase accepted)
                                   - ""
                                   - "None"
+                                  - "none"
                                   - "All"
+                                  - "all"
                                   - "DistributedTablesOnly"
+                                  - "distributedtablesonly"
                           insecure:
                             <<: *TypeStringBool
                             description: optional, open insecure ports for cluster, defaults to "yes"
@@ -3319,10 +3402,12 @@ spec:
                                   type: string
                                   description: "type of distribution, when `Unspecified` (default value) then all listen ports on clickhouse-server configuration in all Pods will have the same value, when `ClusterScopeIndex` then ports will increment to offset from base value depends on shard and replica index inside cluster with combination of `chi.spec.templates.podTemlates.spec.HostNetwork` it allows setup ClickHouse cluster inside Kubernetes and provide access via external network bypass Kubernetes internal network"
                                   enum:
-                                    # List PortDistributionXXX constants
+                                    # List PortDistributionXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "ClusterScopeIndex"
+                                    - "clusterscopeindex"
                           spec:
                             # Host
                             type: object
@@ -3423,9 +3508,12 @@ spec:
                             type: string
                             description: "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
                             enum:
+                              # both humped and all-lowercase accepted
                               - ""
                               - "Unspecified"
+                              - "unspecified"
                               - "OnePerHost"
+                              - "oneperhost"
                           podDistribution:
                             type: array
                             description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
@@ -3439,35 +3527,56 @@ spec:
                                   type: string
                                   description: "you can define multiple affinity policy types"
                                   enum:
-                                    # List PodDistributionXXX constants
+                                    # List PodDistributionXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "ClickHouseAntiAffinity"
+                                    - "clickhouseantiaffinity"
                                     - "ShardAntiAffinity"
+                                    - "shardantiaffinity"
                                     - "ReplicaAntiAffinity"
+                                    - "replicaantiaffinity"
                                     - "AnotherNamespaceAntiAffinity"
+                                    - "anothernamespaceantiaffinity"
                                     - "AnotherClickHouseInstallationAntiAffinity"
+                                    - "anotherclickhouseinstallationantiaffinity"
                                     - "AnotherClusterAntiAffinity"
+                                    - "anotherclusterantiaffinity"
                                     - "MaxNumberPerNode"
+                                    - "maxnumberpernode"
                                     - "NamespaceAffinity"
+                                    - "namespaceaffinity"
                                     - "ClickHouseInstallationAffinity"
+                                    - "clickhouseinstallationaffinity"
                                     - "ClusterAffinity"
+                                    - "clusteraffinity"
                                     - "ShardAffinity"
+                                    - "shardaffinity"
                                     - "ReplicaAffinity"
+                                    - "replicaaffinity"
                                     - "PreviousTailAffinity"
+                                    - "previoustailaffinity"
                                     - "CircularReplication"
+                                    - "circularreplication"
                                 scope:
                                   type: string
                                   description: "scope for apply each podDistribution"
                                   enum:
-                                    # list PodDistributionScopeXXX constants
+                                    # list PodDistributionScopeXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "Shard"
+                                    - "shard"
                                     - "Replica"
+                                    - "replica"
                                     - "Cluster"
+                                    - "cluster"
                                     - "ClickHouseInstallation"
+                                    - "clickhouseinstallation"
                                     - "Namespace"
+                                    - "namespace"
                                 number:
                                   type: integer
                                   description: "define, how much ClickHouse Pods could be inside selected scope with selected distribution type"
@@ -3595,10 +3704,11 @@ spec:
                         description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clickhouse-operator`"
                       useType:
                         type: string
-                        description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit`"
+                        description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit` (case-insensitive)"
                         enum:
-                          # List useTypeXXX constants from model
+                          # List useTypeXXX constants from model (both humped and all-lowercase accepted)
                           - ""
+                          - "Merge"
                           - "merge"
 ---
 # Template Parameters:
@@ -3920,9 +4030,12 @@ spec:
                               - ReadOnStart. Accept CHIT updates on the operators start only.
                               - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
                           enum:
+                            # both humped and all-lowercase accepted
                             - ""
                             - "ReadOnStart"
+                            - "readonstart"
                             - "ApplyOnNextReconcile"
+                            - "applyonnextreconcile"
                         path:
                           type: string
                           description: "Path to folder where ClickHouseInstallationTemplate .yaml manifests are located."
@@ -4647,9 +4760,12 @@ spec:
                         Possible values:
                          - wait - should wait to exclude host, complete queries and include host back into the cluster
                          - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                        (case-insensitive)
                       enum:
                         - ""
+                        - "Wait"
                         - "wait"
+                        - "NoWait"
                         - "nowait"
                     configMapPropagationTimeout:
                       type: integer
@@ -4673,12 +4789,14 @@ spec:
                           properties:
                             statefulSet: &TypeObjectsCleanup
                               type: string
-                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default (case-insensitive)"
                               enum:
-                                # List ObjectsCleanupXXX constants from model
+                                # List ObjectsCleanupXXX constants from model (both humped and all-lowercase accepted)
                                 - ""
                                 - "Retain"
+                                - "retain"
                                 - "Delete"
+                                - "delete"
                             pvc:
                               type: string
                               <<: *TypeObjectsCleanup
@@ -4737,20 +4855,24 @@ spec:
                       properties:
                         provisioner: &TypePVCProvisioner
                           type: string
-                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator"
+                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator (case-insensitive)"
                           enum:
                             - ""
                             - "StatefulSet"
+                            - "statefulset"
                             - "Operator"
+                            - "operator"
                         reclaimPolicy: &TypePVCReclaimPolicy
                           type: string
                           description: |
-                            defines behavior of `PVC` deletion.
+                            defines behavior of `PVC` deletion (case-insensitive).
                             `Delete` by default, if `Retain` specified then `PVC` will be kept when deleting StatefulSet
                           enum:
                             - ""
                             - "Retain"
+                            - "retain"
                             - "Delete"
+                            - "delete"
                     templates: &TypeTemplateNames
                       type: object
                       description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
@@ -5015,10 +5137,12 @@ spec:
                                   type: string
                                   description: "type of distribution, when `Unspecified` (default value) then all listen ports on clickhouse-server configuration in all Pods will have the same value, when `ClusterScopeIndex` then ports will increment to offset from base value depends on shard and replica index inside cluster with combination of `chi.spec.templates.podTemlates.spec.HostNetwork` it allows setup ClickHouse cluster inside Kubernetes and provide access via external network bypass Kubernetes internal network"
                                   enum:
-                                    # List PortDistributionXXX constants
+                                    # List PortDistributionXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "ClusterScopeIndex"
+                                    - "clusterscopeindex"
                           spec:
                             # Host
                             type: object
@@ -5092,9 +5216,12 @@ spec:
                             type: string
                             description: "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
                             enum:
+                              # both humped and all-lowercase accepted
                               - ""
                               - "Unspecified"
+                              - "unspecified"
                               - "OnePerHost"
+                              - "oneperhost"
                           podDistribution:
                             type: array
                             description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
@@ -5108,35 +5235,56 @@ spec:
                                   type: string
                                   description: "you can define multiple affinity policy types"
                                   enum:
-                                    # List PodDistributionXXX constants
+                                    # List PodDistributionXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "ClickHouseAntiAffinity"
+                                    - "clickhouseantiaffinity"
                                     - "ShardAntiAffinity"
+                                    - "shardantiaffinity"
                                     - "ReplicaAntiAffinity"
+                                    - "replicaantiaffinity"
                                     - "AnotherNamespaceAntiAffinity"
+                                    - "anothernamespaceantiaffinity"
                                     - "AnotherClickHouseInstallationAntiAffinity"
+                                    - "anotherclickhouseinstallationantiaffinity"
                                     - "AnotherClusterAntiAffinity"
+                                    - "anotherclusterantiaffinity"
                                     - "MaxNumberPerNode"
+                                    - "maxnumberpernode"
                                     - "NamespaceAffinity"
+                                    - "namespaceaffinity"
                                     - "ClickHouseInstallationAffinity"
+                                    - "clickhouseinstallationaffinity"
                                     - "ClusterAffinity"
+                                    - "clusteraffinity"
                                     - "ShardAffinity"
+                                    - "shardaffinity"
                                     - "ReplicaAffinity"
+                                    - "replicaaffinity"
                                     - "PreviousTailAffinity"
+                                    - "previoustailaffinity"
                                     - "CircularReplication"
+                                    - "circularreplication"
                                 scope:
                                   type: string
                                   description: "scope for apply each podDistribution"
                                   enum:
-                                    # list PodDistributionScopeXXX constants
+                                    # list PodDistributionScopeXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "Shard"
+                                    - "shard"
                                     - "Replica"
+                                    - "replica"
                                     - "Cluster"
+                                    - "cluster"
                                     - "ClickHouseInstallation"
+                                    - "clickhouseinstallation"
                                     - "Namespace"
+                                    - "namespace"
                                 number:
                                   type: integer
                                   description: "define, how much ClickHouse Pods could be inside selected scope with selected distribution type"
@@ -5690,8 +5838,8 @@ data:
         # Possible values for 'scheme' are:
         #   1. http - force http to be used to connect to ClickHouse instances
         #   2. https - force https to be used to connect to ClickHouse instances
-        #   3. auto - either http or https is selected based on open ports
-        scheme: "auto"
+        #   3. Auto - either http or https is selected based on open ports
+        scheme: "Auto"
         # ClickHouse credentials (username, password and port) to be used by the operator to connect to ClickHouse instances.
         # These credentials are used for:
         #   1. Metrics requests
