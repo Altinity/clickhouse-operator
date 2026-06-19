@@ -46,22 +46,25 @@ const (
 	// a referenced ClickHouseKeeper to become ready during CHI reconcile.
 	defaultKeeperReadyTimeout = 120
 
+	// Consts below use the canonical humped form; the CRD also accepts all-lowercase and
+	// the accessors compare case-insensitively (EqualFold).
+
 	// KeeperOnResourceUpdateNone means do nothing when referenced CHK changes (default).
-	KeeperOnResourceUpdateNone = "none"
+	KeeperOnResourceUpdateNone = "None"
 	// KeeperOnResourceUpdateReconcile means trigger CHI reconcile when referenced CHK changes.
-	KeeperOnResourceUpdateReconcile = "reconcile"
+	KeeperOnResourceUpdateReconcile = "Reconcile"
 
 	// OnConfigurationChangeNone means ignore ClickHouseOperatorConfiguration changes (default).
-	OnConfigurationChangeNone = "none"
+	OnConfigurationChangeNone = "None"
 	// OnConfigurationChangeIgnore is an alias for OnConfigurationChangeNone.
-	OnConfigurationChangeIgnore = "ignore"
+	OnConfigurationChangeIgnore = "Ignore"
 	// OnConfigurationChangeRestart means exit the process so the pod restarts with the new config.
-	OnConfigurationChangeRestart = "restart"
+	OnConfigurationChangeRestart = "Restart"
 
 	// RecoveryActionNone means do nothing, CHI stays in its current state.
-	RecoveryActionNone = "none"
+	RecoveryActionNone = "None"
 	// RecoveryActionRetry means re-enqueue CHI for reconcile (default).
-	RecoveryActionRetry = "retry"
+	RecoveryActionRetry = "Retry"
 
 	// defaultCompletedOnPodNotReadyThreshold is the minimum time a pod must remain in
 	// Ready=False before the operator considers the host stuck and re-enqueues a reconcile
@@ -83,8 +86,9 @@ const (
 	ChSchemeHTTP = "http"
 	// ChSchemeHTTPS specifies HTTPS access scheme
 	ChSchemeHTTPS = "https"
-	// ChSchemeAuto specifies that operator has to decide itself should https or http be used
-	ChSchemeAuto = "auto"
+	// ChSchemeAuto specifies that operator has to decide itself should https or http be used.
+	// Humped canonical form; the normalizer folds any casing (auto/Auto) to this.
+	ChSchemeAuto = "Auto"
 
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
@@ -142,44 +146,77 @@ const (
 	PasswordReplacer = "***"
 )
 
+// StatefulSet failure-action consts use the canonical humped form; the CRD also accepts
+// all-lowercase and the normalizer folds any casing to these via util.FoldEnum.
 const (
 	// What to do in case StatefulSet can't reach new Generation - abort CHI reconcile
-	OnStatefulSetCreateFailureActionAbort = "abort"
+	OnStatefulSetCreateFailureActionAbort = "Abort"
 
 	// What to do in case StatefulSet can't reach new Generation - delete newly created problematic StatefulSet
-	OnStatefulSetCreateFailureActionDelete = "delete"
+	OnStatefulSetCreateFailureActionDelete = "Delete"
 
 	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
-	OnStatefulSetCreateFailureActionIgnore = "ignore"
+	OnStatefulSetCreateFailureActionIgnore = "Ignore"
 )
 
 const (
 	// What to do in case StatefulSet can't reach new Generation - abort CHI reconcile
-	OnStatefulSetUpdateFailureActionAbort = "abort"
+	OnStatefulSetUpdateFailureActionAbort = "Abort"
 
 	// What to do in case StatefulSet can't reach new Generation - delete Pod and rollback StatefulSet to previous Generation
 	// Pod would be recreated by StatefulSet based on rollback-ed configuration
-	OnStatefulSetUpdateFailureActionRollback = "rollback"
+	OnStatefulSetUpdateFailureActionRollback = "Rollback"
 
 	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
-	OnStatefulSetUpdateFailureActionIgnore = "ignore"
+	OnStatefulSetUpdateFailureActionIgnore = "Ignore"
 )
 
 const (
 	// What to do in case StatefulSet needs to be recreated due to PVC data loss or missing volumes
 	// Abort - Loss: abort CHI reconcile
-	OnStatefulSetRecreateOnDataLossActionAbort = "abort"
+	OnStatefulSetRecreateOnDataLossActionAbort = "Abort"
 
 	// Recreate - Loss: proceed and recreate StatefulSet
-	OnStatefulSetRecreateOnDataLossActionRecreate = "recreate"
+	OnStatefulSetRecreateOnDataLossActionRecreate = "Recreate"
 
 	// What to do in case StatefulSet needs to be recreated due to update failure or StatefulSet not ready
 	// Abort - Failure: abort CHI reconcile
-	OnStatefulSetRecreateOnUpdateFailureActionAbort = "abort"
+	OnStatefulSetRecreateOnUpdateFailureActionAbort = "Abort"
 
 	// Recreate - Failure: proceed and recreate StatefulSet
-	OnStatefulSetRecreateOnUpdateFailureActionRecreate = "recreate"
+	OnStatefulSetRecreateOnUpdateFailureActionRecreate = "Recreate"
 )
+
+// Canonical (humped) candidate lists for the StatefulSet failure-action enums. OnDataLoss and
+// OnUpdateFailure share the Abort/Recreate set. The Normalize* helpers fold any accepted casing
+// to the canonical const; an unrecognized value passes through so the caller's default applies.
+var (
+	onStatefulSetCreateFailureActions = []string{
+		OnStatefulSetCreateFailureActionAbort, OnStatefulSetCreateFailureActionDelete, OnStatefulSetCreateFailureActionIgnore,
+	}
+	onStatefulSetUpdateFailureActions = []string{
+		OnStatefulSetUpdateFailureActionAbort, OnStatefulSetUpdateFailureActionRollback, OnStatefulSetUpdateFailureActionIgnore,
+	}
+	onStatefulSetRecreateActions = []string{
+		OnStatefulSetRecreateOnDataLossActionAbort, OnStatefulSetRecreateOnDataLossActionRecreate,
+	}
+)
+
+// NormalizeOnStatefulSetCreateFailureAction folds any accepted casing to its canonical const.
+func NormalizeOnStatefulSetCreateFailureAction(value string) string {
+	return util.FoldEnum(value, onStatefulSetCreateFailureActions...)
+}
+
+// NormalizeOnStatefulSetUpdateFailureAction folds any accepted casing to its canonical const.
+func NormalizeOnStatefulSetUpdateFailureAction(value string) string {
+	return util.FoldEnum(value, onStatefulSetUpdateFailureActions...)
+}
+
+// NormalizeOnStatefulSetRecreateAction folds any accepted casing to its canonical const
+// (used for both onDataLoss and onUpdateFailure, which share the Abort/Recreate set).
+func NormalizeOnStatefulSetRecreateAction(value string) string {
+	return util.FoldEnum(value, onStatefulSetRecreateActions...)
+}
 
 const (
 	defaultMaxReplicationDelay = 10
@@ -1221,22 +1258,27 @@ func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
 		c.Reconcile.StatefulSet.Update.PollInterval = defaultStatefulSetUpdatePollInterval
 	}
 
-	// Default action on Create/Update failure - to keep system in previous state
+	// Default action on Create/Update failure - to keep system in previous state.
+	// Fold any accepted casing to the canonical const first, then default if empty.
 
 	// Default Create Failure action - delete
+	c.Reconcile.StatefulSet.Create.OnFailure = NormalizeOnStatefulSetCreateFailureAction(c.Reconcile.StatefulSet.Create.OnFailure)
 	if c.Reconcile.StatefulSet.Create.OnFailure == "" {
 		c.Reconcile.StatefulSet.Create.OnFailure = OnStatefulSetCreateFailureActionDelete
 	}
 
 	// Default Updated Failure action - revert
+	c.Reconcile.StatefulSet.Update.OnFailure = NormalizeOnStatefulSetUpdateFailureAction(c.Reconcile.StatefulSet.Update.OnFailure)
 	if c.Reconcile.StatefulSet.Update.OnFailure == "" {
 		c.Reconcile.StatefulSet.Update.OnFailure = OnStatefulSetUpdateFailureActionRollback
 	}
 
 	// Default Recreate actions - recreate
+	c.Reconcile.StatefulSet.Recreate.OnDataLoss = NormalizeOnStatefulSetRecreateAction(c.Reconcile.StatefulSet.Recreate.OnDataLoss)
 	if c.Reconcile.StatefulSet.Recreate.OnDataLoss == "" {
 		c.Reconcile.StatefulSet.Recreate.OnDataLoss = OnStatefulSetRecreateOnDataLossActionRecreate
 	}
+	c.Reconcile.StatefulSet.Recreate.OnUpdateFailure = NormalizeOnStatefulSetRecreateAction(c.Reconcile.StatefulSet.Recreate.OnUpdateFailure)
 	if c.Reconcile.StatefulSet.Recreate.OnUpdateFailure == "" {
 		c.Reconcile.StatefulSet.Recreate.OnUpdateFailure = OnStatefulSetRecreateOnUpdateFailureActionRecreate
 	}
@@ -1273,7 +1315,9 @@ func (c *OperatorConfig) normalizeSectionClickHouseAccess() {
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
-	switch strings.ToLower(c.ClickHouse.Access.Scheme) {
+	// Fold any accepted casing (http/HTTP, https/HTTPS, auto/Auto) to the canonical const,
+	// falling back to the default scheme for unrecognized values.
+	switch util.FoldEnum(c.ClickHouse.Access.Scheme, ChSchemeHTTP, ChSchemeHTTPS, ChSchemeAuto) {
 	case ChSchemeHTTP:
 		c.ClickHouse.Access.Scheme = ChSchemeHTTP
 	case ChSchemeHTTPS:
@@ -1651,19 +1695,19 @@ func (c *OperatorConfig) copyWithHiddenCredentials() *OperatorConfig {
 // RestartOnOperatorConfigurationChange reports whether the operator process should exit when
 // ClickHouseOperatorConfiguration changes (so the pod restarts).
 func (c *OperatorConfig) RestartOnOperatorConfigurationChange() bool {
-	return strings.ToLower(c.Watch.Configuration.OnChange.String()) == OnConfigurationChangeRestart
+	return c.Watch.Configuration.OnChange.EqualFoldString(OnConfigurationChangeRestart)
 }
 
 // ShouldRecoverAbortedOnPodReady reports whether the operator should re-enqueue a CHI
 // reconcile when a pod belonging to an Aborted CHI transitions to Ready. Default is to retry.
 // Backed by reconcile.recovery.onStatus.aborted.onPodReady config key.
 func (c *OperatorConfig) ShouldRecoverAbortedOnPodReady() bool {
-	value := strings.ToLower(c.Reconcile.Recovery.OnStatus.Aborted.OnPodReady.String())
-	if value == "" {
+	onPodReady := c.Reconcile.Recovery.OnStatus.Aborted.OnPodReady
+	if onPodReady.Value() == "" {
 		// Default behavior — retry
 		return true
 	}
-	return value == RecoveryActionRetry
+	return onPodReady.EqualFoldString(RecoveryActionRetry)
 }
 
 // ShouldRecoverCompletedOnPodNotReady reports whether the operator should re-enqueue a
@@ -1674,8 +1718,7 @@ func (c *OperatorConfig) ShouldRecoverAbortedOnPodReady() bool {
 // onPodNotReady: retry enables it. Unlike the Aborted scope, which retries by default.
 // Backed by reconcile.recovery.onStatus.completed.onPodNotReady config key.
 func (c *OperatorConfig) ShouldRecoverCompletedOnPodNotReady() bool {
-	value := strings.ToLower(c.Reconcile.Recovery.OnStatus.Completed.OnPodNotReady.String())
-	return value == RecoveryActionRetry
+	return c.Reconcile.Recovery.OnStatus.Completed.OnPodNotReady.EqualFoldString(RecoveryActionRetry)
 }
 
 // CompletedOnPodNotReadyThreshold returns the minimum duration a pod must remain in

@@ -52,11 +52,12 @@ func TestShouldRecoverAbortedOnPodReady(t *testing.T) {
 	}
 }
 
-// TestRecoveryActionConstants documents the stable enum values published in the CRD.
-// Changes here would break users' CHOPCONF CRs.
+// TestRecoveryActionConstants documents the canonical (humped) enum values. The CRD also
+// accepts the all-lowercase forms, and the accessors compare case-insensitively (EqualFold),
+// so existing lowercase CHOPCONF CRs keep working.
 func TestRecoveryActionConstants(t *testing.T) {
-	require.Equal(t, "none", RecoveryActionNone)
-	require.Equal(t, "retry", RecoveryActionRetry)
+	require.Equal(t, "None", RecoveryActionNone)
+	require.Equal(t, "Retry", RecoveryActionRetry)
 }
 
 // TestShouldRecoverCompletedOnPodNotReady verifies the accessor's behavior across the

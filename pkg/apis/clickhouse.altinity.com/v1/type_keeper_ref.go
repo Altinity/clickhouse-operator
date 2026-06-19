@@ -14,14 +14,16 @@
 
 package v1
 
+import "github.com/altinity/clickhouse-operator/pkg/util"
+
 // KeeperServiceType describes how keeper endpoints are discovered for a KeeperRef.
 type KeeperServiceType string
 
 const (
 	// KeeperServiceTypeReplicas discovers per-host services, one ZK node per keeper replica.
-	KeeperServiceTypeReplicas KeeperServiceType = "replicas"
+	KeeperServiceTypeReplicas KeeperServiceType = "Replicas"
 	// KeeperServiceTypeService uses the CR-level headless service as a single ZK node entry.
-	KeeperServiceTypeService KeeperServiceType = "service"
+	KeeperServiceTypeService KeeperServiceType = "Service"
 )
 
 // IsEmpty returns true if no service type is set.
@@ -36,9 +38,9 @@ type KeeperRef struct {
 	// Namespace is the namespace of the CHK resource. Defaults to the CHI namespace if omitted.
 	// +optional
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	// ServiceType controls how keeper endpoints are discovered:
-	//   "replicas" (default) — enumerate per-host services, one ZK node per keeper replica
-	//   "service"            — use the CR-level headless service as a single ZK node entry
+	// ServiceType controls how keeper endpoints are discovered (case-insensitive):
+	//   "Replicas" (default) — enumerate per-host services, one ZK node per keeper replica
+	//   "Service"            — use the CR-level headless service as a single ZK node entry
 	// +optional
 	ServiceType KeeperServiceType `json:"serviceType,omitempty" yaml:"serviceType,omitempty"`
 }
@@ -61,10 +63,18 @@ func (r *KeeperRef) GetNamespace(defaultNamespace string) string {
 	return r.Namespace
 }
 
-// GetServiceType returns the service type, defaulting to replicas if empty.
+// GetServiceType returns the service type, defaulting to Replicas if empty. The raw value
+// is read un-normalized from the spec, so fold any accepted casing to the canonical const;
+// an unrecognized value passes through unchanged so the resolver can report it as invalid.
 func (r *KeeperRef) GetServiceType() KeeperServiceType {
 	if r == nil || r.ServiceType.IsEmpty() {
 		return KeeperServiceTypeReplicas
 	}
-	return r.ServiceType
+	return KeeperServiceType(
+		util.FoldEnum(
+			string(r.ServiceType),
+			string(KeeperServiceTypeReplicas),
+			string(KeeperServiceTypeService),
+		),
+	)
 }
