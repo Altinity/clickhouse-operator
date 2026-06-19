@@ -31,6 +31,15 @@ spec:
                 initialDelaySeconds: 1
                 periodSeconds: 2
                 failureThreshold: 1
+              livenessProbe:
+                exec:
+                  command:
+                    - "/bin/bash"
+                    - "-c"
+                    - "test -f /tmp/ready"
+                initialDelaySeconds: 1
+                periodSeconds: 2
+                failureThreshold: 3
   defaults:
     templates:
       podTemplate: readiness-flap

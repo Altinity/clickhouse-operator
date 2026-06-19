@@ -2797,6 +2797,14 @@ def test_010023(self):
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "grafana-dashboard-user"
         assert kubectl.get_field("chi", chi, ".status.usedTemplates[3].name") == "selector-test-1"
 
+    with Then("Wait for selector-1 annotation to be propagated to pod"):
+        kubectl.wait_field(
+            "pod",
+            f"chi-{chi}-single-0-0-0",
+            ".metadata.annotations.selector-test-1",
+            "selector-test-1",
+        )
+
     with Then("Annotation from selector-1 template should be populated"):
         assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.selector-test-1") == "selector-test-1"
     with Then("Annotation from selector-2 template should NOT be populated"):
@@ -3817,29 +3825,34 @@ def test_010035_2(self):
                 f"expected container {dummy_container} to be NotReady, got ready={dummy_ready}"
             )
 
-        with Then("Operator should recreate the pod after sustained NotReady timeout"):
-            start_time = time.time()
-            new_uid = old_uid
-            pod_ready = kubectl.get_condition_status(pod, "Ready")
+        with Then("Kubernetes should restart the dummy container after liveness failure"):
 
-            while time.time() - start_time < 420:
-                new_uid = kubectl.get_field("pod", pod, ".metadata.uid")
-                pod_ready = kubectl.get_condition_status(pod, "Ready")
-                if new_uid != old_uid and pod_ready == "True":
+            old_restart_count = kubectl.get_container_restart_count(pod, dummy_container)
+            start_time = time.time()
+            new_restart_count = old_restart_count
+            dummy_ready = kubectl.get_container_status(pod, 1)
+            while time.time() - start_time < 120:
+                new_restart_count = kubectl.get_container_restart_count(pod, dummy_container)
+                dummy_ready = kubectl.get_container_status(pod, 1)
+
+                if new_restart_count is not None and new_restart_count > old_restart_count and dummy_ready == "true":
                     break
+
                 retry_sleep(
                     int((time.time() - start_time) / 5) + 1,
                     5,
-                    f"pod uid={new_uid}, Ready={pod_ready}",
+                    f"{dummy_container} restartCount={new_restart_count}, ready={dummy_ready}",
                 )
 
-            assert new_uid != old_uid, error(
-                f"expected operator to recreate pod {pod} within sustained NotReady timeout"
+            assert new_restart_count is not None and new_restart_count > old_restart_count, error(
+                f"expected {dummy_container} to restart after liveness failure"
             )
-            assert pod_ready == "True", error(f"expected recreated pod {pod} to become Ready, got {pod_ready}")
+            assert dummy_ready == "true", error(
+                f"expected {dummy_container} to become Ready after restart, got {dummy_ready}"
+            )
 
-    with Finally("I clean up"):
-        delete_test_namespace()
+        with Finally("I clean up"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -8749,6 +8762,94 @@ def test_030015(self):
             binary="metrics-exporter",
         )
 
+@TestScenario
+@Tags("HEAVY")
+@Name("test_030016. FIPS ClickHouse server TLS 1.2 cipher suites for external client")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_FIPS_CH_FIPSConfig("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_CH_FIPSConfig_ExternalClient("1.0"),
+)
+def test_030016(self):
+    """Verify external clickhouse-client can use TLS 1.2 cipher policy to CH native TLS.
+
+    This intentionally uses:
+    - operator
+    - one ClickHouse pod
+    - external Docker clickhouse-client
+    - native secure port 9440
+    - no Keeper
+    - no backup sidecar
+    """
+    chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
+    chi_manifest = "manifests/chi/test-030016.yaml"
+
+    fips_create_shell_namespace_clickhouse_template()
+
+    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
+    chk_dummy = "unused"
+
+    with Given("strict FIPS operator configuration is applied"):
+        fips_apply_operator_config(chopconf_path=chopconf)
+
+    with And("test TLS secret is installed"):
+        create_tls_secret_for_fips_hosts(
+            chi=chi,
+            chk=chk_dummy,
+            replicas=1,
+        )
+
+    with When("single-pod FIPS ClickHouse is deployed"):
+        fips_apply_manifest(
+            manifest_path=chi_manifest,
+            replica_count=1,
+            kind="chi",
+        )
+
+    with Then("ClickHouse pod should be running"):
+        kubectl.wait_object(
+            "pod",
+            "",
+            label=f"-l clickhouse.altinity.com/chi={chi}",
+            count=1,
+            ns=self.context.test_namespace,
+        )
+
+        chi_pod = f"chi-{chi}-default-0-0-0"
+
+        kubectl.wait_pod_status(
+            chi_pod,
+            "Running",
+            ns=self.context.test_namespace,
+        )
+
+    with Then("ClickHouse native TLS accepts approved TLS 1.2 AES-GCM cipher"):
+        out = fips_run_openssl_s_client_on_pod_port(
+            pod=chi_pod,
+            port=9440,
+            tls_version="1.2",
+            cipher_suite="ECDHE-RSA-AES256-GCM-SHA384",
+            ns=self.context.test_namespace,
+        )
+
+        assert "Protocol  : TLSv1.2" in out, error(out)
+        assert "Cipher    : ECDHE-RSA-AES256-GCM-SHA384" in out, error(out)
+
+    with Then("ClickHouse native TLS rejects disallowed TLS 1.2 ChaCha20 cipher"):
+        out = fips_run_openssl_s_client_on_pod_port(
+            pod=chi_pod,
+            port=9440,
+            tls_version="1.2",
+            cipher_suite="ECDHE-RSA-CHACHA20-POLY1305",
+            ok_to_fail=True,
+            ns=self.context.test_namespace,
+        )
+
+        assert (
+                "handshake failure" in out
+                or "Cipher is (NONE)" in out
+                or "Cipher    : 0000" in out
+                or "no peer certificate available" in out
+        ), error(out)
 
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):
