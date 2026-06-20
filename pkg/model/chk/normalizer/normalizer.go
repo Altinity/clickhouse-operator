@@ -35,6 +35,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Normalizer specifies structures normalizer
@@ -268,6 +269,9 @@ func (n *Normalizer) normalizeDefaults(defaults *chi.Defaults) *chi.Defaults {
 	if defaults.StorageManagement == nil {
 		defaults.StorageManagement = chi.NewStorageManagement()
 	}
+	// Fold casing + validate the default StorageManagement (provisioner/reclaimPolicy),
+	// matching the CHI normalizer — previously left un-normalized at the defaults level.
+	templates.NormalizeStorageManagement(defaults.StorageManagement)
 	// Ensure field
 	if defaults.Templates == nil {
 		//defaults.Templates = api.NewChiTemplateNames()
@@ -342,16 +346,13 @@ func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiRec
 		reconcile = chi.NewChiReconcile().SetDefaults()
 	}
 
-	// Policy
-	switch strings.ToLower(reconcile.GetPolicy()) {
-	case strings.ToLower(chi.ReconcilingPolicyWait):
-		// Known value, overwrite it to ensure case-ness
+	// Policy — fold any accepted casing to the canonical const; unknown values fall back to default.
+	switch util.FoldEnum(reconcile.GetPolicy(), chi.ReconcilingPolicyWait, chi.ReconcilingPolicyNoWait) {
+	case chi.ReconcilingPolicyWait:
 		reconcile.SetPolicy(chi.ReconcilingPolicyWait)
-	case strings.ToLower(chi.ReconcilingPolicyNoWait):
-		// Known value, overwrite it to ensure case-ness
+	case chi.ReconcilingPolicyNoWait:
 		reconcile.SetPolicy(chi.ReconcilingPolicyNoWait)
 	default:
-		// Unknown value, fallback to default
 		reconcile.SetPolicy(chi.ReconcilingPolicyUnspecified)
 	}
 
@@ -393,7 +394,8 @@ func (n *Normalizer) normalizeReconcileRuntime(runtime chi.ReconcileRuntime) chi
 }
 
 func (n *Normalizer) normalizeReconcileStatefulSet(sts chi.ReconcileStatefulSet) chi.ReconcileStatefulSet {
-	// Create
+	// Create — fold casing to canonical const, then default if empty.
+	sts.Create.OnFailure = chi.NormalizeOnStatefulSetCreateFailureAction(sts.Create.OnFailure)
 	if sts.Create.OnFailure == "" {
 		sts.Create.OnFailure = chi.OnStatefulSetCreateFailureActionDelete
 	}
@@ -404,13 +406,16 @@ func (n *Normalizer) normalizeReconcileStatefulSet(sts chi.ReconcileStatefulSet)
 	if sts.Update.PollInterval == 0 {
 		sts.Update.PollInterval = defaultStatefulSetUpdatePollInterval
 	}
+	sts.Update.OnFailure = chi.NormalizeOnStatefulSetUpdateFailureAction(sts.Update.OnFailure)
 	if sts.Update.OnFailure == "" {
 		sts.Update.OnFailure = chi.OnStatefulSetUpdateFailureActionRollback
 	}
 	// Recreate
+	sts.Recreate.OnDataLoss = chi.NormalizeOnStatefulSetRecreateAction(sts.Recreate.OnDataLoss)
 	if sts.Recreate.OnDataLoss == "" {
 		sts.Recreate.OnDataLoss = chi.OnStatefulSetRecreateOnDataLossActionRecreate
 	}
+	sts.Recreate.OnUpdateFailure = chi.NormalizeOnStatefulSetRecreateAction(sts.Recreate.OnUpdateFailure)
 	if sts.Recreate.OnUpdateFailure == "" {
 		sts.Recreate.OnUpdateFailure = chi.OnStatefulSetRecreateOnUpdateFailureActionRecreate
 	}
@@ -460,15 +465,13 @@ func (n *Normalizer) normalizeCleanup(str *string, value string) {
 	if str == nil {
 		return
 	}
-	switch strings.ToLower(*str) {
-	case strings.ToLower(chi.ObjectsCleanupRetain):
-		// Known value, overwrite it to ensure case-ness
+	// Fold any accepted casing to the canonical const; unknown values fall back to the supplied default.
+	switch util.FoldEnum(*str, chi.ObjectsCleanupRetain, chi.ObjectsCleanupDelete) {
+	case chi.ObjectsCleanupRetain:
 		*str = chi.ObjectsCleanupRetain
-	case strings.ToLower(chi.ObjectsCleanupDelete):
-		// Known value, overwrite it to ensure case-ness
+	case chi.ObjectsCleanupDelete:
 		*str = chi.ObjectsCleanupDelete
 	default:
-		// Unknown value, fallback to default
 		*str = value
 	}
 }

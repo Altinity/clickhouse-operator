@@ -238,14 +238,15 @@ func (n *Normalizer) normalizeStop(stop *types.StringBool) *types.StringBool {
 
 // normalizeRestart normalizes .spec.restart
 func (n *Normalizer) normalizeRestart(restart *types.String) *types.String {
-	switch strings.ToLower(restart.Value()) {
-	case strings.ToLower(chi.RestartRollingUpdate):
-		// Known value, overwrite it to ensure case-ness
+	// Fold any accepted casing to the canonical const; anything else becomes empty.
+	// Kept as a switch so future restart policies are just new cases.
+	switch util.FoldEnum(restart.Value(), chi.RestartRollingUpdate) {
+	case chi.RestartRollingUpdate:
 		return types.NewString(chi.RestartRollingUpdate)
+	default:
+		// Unknown value - just use empty
+		return nil
 	}
-
-	// In case it is unknown value - just use empty
-	return nil
 }
 
 // normalizeTroubleshoot normalizes .spec.stop
@@ -302,6 +303,10 @@ func (n *Normalizer) normalizeDefaults(defaults *chi.Defaults) *chi.Defaults {
 	if defaults.StorageManagement == nil {
 		defaults.StorageManagement = chi.NewStorageManagement()
 	}
+	// Fold casing + validate the default StorageManagement (provisioner/reclaimPolicy).
+	// This path was previously left un-normalized, so a lowercase reclaimPolicy at the
+	// defaults level was written verbatim into the PVC label.
+	templates.NormalizeStorageManagement(defaults.StorageManagement)
 	// Ensure field
 	if defaults.Templates == nil {
 		//defaults.Templates = api.NewChiTemplateNames()
@@ -359,15 +364,11 @@ func (n *Normalizer) normalizeTemplating(templating *chi.ChiTemplating) *chi.Chi
 	if templating == nil {
 		templating = chi.NewChiTemplating()
 	}
-	switch strings.ToLower(templating.GetPolicy()) {
-	case strings.ToLower(chi.TemplatingPolicyAuto):
-		// Known value, overwrite it to ensure case-ness
+	// Fold any accepted casing to the canonical const; unknown values fall back to the default.
+	switch util.FoldEnum(templating.GetPolicy(), chi.TemplatingPolicyAuto, chi.TemplatingPolicyManual) {
+	case chi.TemplatingPolicyAuto:
 		templating.SetPolicy(chi.TemplatingPolicyAuto)
-	case strings.ToLower(chi.TemplatingPolicyManual):
-		// Known value, overwrite it to ensure case-ness
-		templating.SetPolicy(chi.TemplatingPolicyManual)
 	default:
-		// Unknown value, fallback to default
 		templating.SetPolicy(chi.TemplatingPolicyManual)
 	}
 	return templating
@@ -399,16 +400,13 @@ func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiRec
 		reconcile = chi.NewChiReconcile().SetDefaults()
 	}
 
-	// Policy
-	switch strings.ToLower(reconcile.GetPolicy()) {
-	case strings.ToLower(chi.ReconcilingPolicyWait):
-		// Known value, overwrite it to ensure case-ness
+	// Policy — fold any accepted casing to the canonical const; unknown values fall back to default.
+	switch util.FoldEnum(reconcile.GetPolicy(), chi.ReconcilingPolicyWait, chi.ReconcilingPolicyNoWait) {
+	case chi.ReconcilingPolicyWait:
 		reconcile.SetPolicy(chi.ReconcilingPolicyWait)
-	case strings.ToLower(chi.ReconcilingPolicyNoWait):
-		// Known value, overwrite it to ensure case-ness
+	case chi.ReconcilingPolicyNoWait:
 		reconcile.SetPolicy(chi.ReconcilingPolicyNoWait)
 	default:
-		// Unknown value, fallback to default
 		reconcile.SetPolicy(chi.ReconcilingPolicyUnspecified)
 	}
 
@@ -450,7 +448,8 @@ func (n *Normalizer) normalizeReconcileRuntime(runtime chi.ReconcileRuntime) chi
 }
 
 func (n *Normalizer) normalizeReconcileStatefulSet(sts chi.ReconcileStatefulSet) chi.ReconcileStatefulSet {
-	// Create
+	// Create — fold casing to canonical const, then default if empty.
+	sts.Create.OnFailure = chi.NormalizeOnStatefulSetCreateFailureAction(sts.Create.OnFailure)
 	if sts.Create.OnFailure == "" {
 		sts.Create.OnFailure = chi.OnStatefulSetCreateFailureActionDelete
 	}
@@ -461,13 +460,16 @@ func (n *Normalizer) normalizeReconcileStatefulSet(sts chi.ReconcileStatefulSet)
 	if sts.Update.PollInterval == 0 {
 		sts.Update.PollInterval = defaultStatefulSetUpdatePollInterval
 	}
+	sts.Update.OnFailure = chi.NormalizeOnStatefulSetUpdateFailureAction(sts.Update.OnFailure)
 	if sts.Update.OnFailure == "" {
 		sts.Update.OnFailure = chi.OnStatefulSetUpdateFailureActionRollback
 	}
 	// Recreate
+	sts.Recreate.OnDataLoss = chi.NormalizeOnStatefulSetRecreateAction(sts.Recreate.OnDataLoss)
 	if sts.Recreate.OnDataLoss == "" {
 		sts.Recreate.OnDataLoss = chi.OnStatefulSetRecreateOnDataLossActionRecreate
 	}
+	sts.Recreate.OnUpdateFailure = chi.NormalizeOnStatefulSetRecreateAction(sts.Recreate.OnUpdateFailure)
 	if sts.Recreate.OnUpdateFailure == "" {
 		sts.Recreate.OnUpdateFailure = chi.OnStatefulSetRecreateOnUpdateFailureActionRecreate
 	}
@@ -505,15 +507,13 @@ func (n *Normalizer) normalizeCleanup(str *string, value string) {
 	if str == nil {
 		return
 	}
-	switch strings.ToLower(*str) {
-	case strings.ToLower(chi.ObjectsCleanupRetain):
-		// Known value, overwrite it to ensure case-ness
+	// Fold any accepted casing to the canonical const; unknown values fall back to the supplied default.
+	switch util.FoldEnum(*str, chi.ObjectsCleanupRetain, chi.ObjectsCleanupDelete) {
+	case chi.ObjectsCleanupRetain:
 		*str = chi.ObjectsCleanupRetain
-	case strings.ToLower(chi.ObjectsCleanupDelete):
-		// Known value, overwrite it to ensure case-ness
+	case chi.ObjectsCleanupDelete:
 		*str = chi.ObjectsCleanupDelete
 	default:
-		// Unknown value, fallback to default
 		*str = value
 	}
 }
@@ -973,30 +973,20 @@ func (n *Normalizer) normalizeClusterSchemaPolicy(policy *chi.SchemaPolicy) *chi
 		policy = chi.NewClusterSchemaPolicy()
 	}
 
-	switch strings.ToLower(policy.Replica) {
-	case strings.ToLower(schemer.SchemaPolicyReplicaNone):
-		// Known value, overwrite it to ensure case-ness
+	// Fold any accepted casing to the canonical const; unknown values fall back to the default.
+	switch util.FoldEnum(policy.Replica, schemer.SchemaPolicyReplicaNone, schemer.SchemaPolicyReplicaAll) {
+	case schemer.SchemaPolicyReplicaNone:
 		policy.Replica = schemer.SchemaPolicyReplicaNone
-	case strings.ToLower(schemer.SchemaPolicyReplicaAll):
-		// Known value, overwrite it to ensure case-ness
-		policy.Replica = schemer.SchemaPolicyReplicaAll
 	default:
-		// Unknown value, fallback to default
 		policy.Replica = schemer.SchemaPolicyReplicaAll
 	}
 
-	switch strings.ToLower(policy.Shard) {
-	case strings.ToLower(schemer.SchemaPolicyShardNone):
-		// Known value, overwrite it to ensure case-ness
+	switch util.FoldEnum(policy.Shard, schemer.SchemaPolicyShardNone, schemer.SchemaPolicyShardAll, schemer.SchemaPolicyShardDistributedTablesOnly) {
+	case schemer.SchemaPolicyShardNone:
 		policy.Shard = schemer.SchemaPolicyShardNone
-	case strings.ToLower(schemer.SchemaPolicyShardAll):
-		// Known value, overwrite it to ensure case-ness
-		policy.Shard = schemer.SchemaPolicyShardAll
-	case strings.ToLower(schemer.SchemaPolicyShardDistributedTablesOnly):
-		// Known value, overwrite it to ensure case-ness
+	case schemer.SchemaPolicyShardDistributedTablesOnly:
 		policy.Shard = schemer.SchemaPolicyShardDistributedTablesOnly
 	default:
-		// unknown value, fallback to default
 		policy.Shard = schemer.SchemaPolicyShardAll
 	}
 
