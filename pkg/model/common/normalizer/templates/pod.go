@@ -125,6 +125,11 @@ func normalizePodDistribution(replicasCount int, podDistribution *api.PodDistrib
 		podDistribution.TopologyKey = defaultTopologyKey
 	}
 
+	// Fold any accepted casing to the canonical const so the switch below (and downstream
+	// affinity builders) can compare with plain ==.
+	podDistribution.Type = deployment.NormalizePodDistributionType(podDistribution.Type)
+	podDistribution.Scope = deployment.NormalizePodDistributionScope(podDistribution.Scope)
+
 	switch podDistribution.Type {
 	case
 		deployment.PodDistributionUnspecified,
