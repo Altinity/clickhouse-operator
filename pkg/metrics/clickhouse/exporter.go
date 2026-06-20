@@ -120,10 +120,10 @@ func (e *Exporter) newHostFetcher(host *metrics.WatchedHost) *MetricsFetcher {
 	case api.ChSchemeAuto:
 		switch {
 		case types.IsPortAssigned(host.HTTPPort):
-			clusterConnectionParams.Scheme = "http"
+			clusterConnectionParams.Scheme = api.ChSchemeHTTP
 			clusterConnectionParams.Port = int(host.HTTPPort)
 		case types.IsPortAssigned(host.HTTPSPort):
-			clusterConnectionParams.Scheme = "https"
+			clusterConnectionParams.Scheme = api.ChSchemeHTTPS
 			clusterConnectionParams.Port = int(host.HTTPSPort)
 		}
 	case api.ChSchemeHTTP:
