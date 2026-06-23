@@ -8419,9 +8419,6 @@ def test_030008(self):
     chi_permissive = yaml_manifest.get_name(
         util.get_full_path(chi_permissive_manifest)
     )
-    chi_backup_non_fips = yaml_manifest.get_name(
-        util.get_full_path(chi_backup_non_fips_manifest)
-    )
 
     with Given("FIPS image policy Required is applied"):
         util.apply_operator_config(chopconf)
@@ -8568,7 +8565,7 @@ def test_030008(self):
             ok_to_fail=True,
         )
 
-        fips_apply_operator_config(chopconf_path=chi_permissive_chopconf)
+        util.apply_operator_config(chi_permissive_chopconf)
 
     with And("a non-fips CHI is applied under Permissive policy"):
         fips_apply_manifest_raw(manifest_path=chi_permissive_manifest)
