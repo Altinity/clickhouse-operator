@@ -3390,6 +3390,7 @@ def test_090099(self):
 @TestScenario
 @Name("test_010031. Test excludeFromPropagationAnnotations work")
 def test_010031(self):
+    self.context.skip_fips = True
     create_shell_namespace_clickhouse_template()
 
     chi_manifest = "manifests/chi/test-031-wo-tpl.yaml"
@@ -7720,10 +7721,10 @@ def test_030001(self):
     op_bin = self.context.fips_op_bin
     me_bin = self.context.fips_me_bin
 
-    with When("check go version -m <binary> version for operator"):
+    with Then("check go version -m <binary> version for operator"):
         check_binary_go_version(binary_path=op_bin, version=gofips140_needle)
 
-    with Then("check runtime FIPS modes for operator"):
+    with And("check runtime FIPS modes for operator"):
         check_fips_runtime_modes(
             binary_path=op_bin,
             binary="clickhouse-operator",
@@ -7732,7 +7733,7 @@ def test_030001(self):
             godebug_default=godebug_default,
         )
 
-    with When("check go version -m <binary> version for metrics exporter"):
+    with Then("check go version -m <binary> version for metrics exporter"):
         check_binary_go_version(binary_path=me_bin, version=gofips140_needle)
 
     with And("check runtime FIPS modes for metrics-exporter"):
@@ -7806,7 +7807,7 @@ def test_030003(self):
             kind="chk",
         )
 
-    with Then("Keeper cluster passes essential FIPS checks"):
+    with Then("check Keeper cluster passes essential FIPS checks"):
         chk_pods = run_chk_fips_checks(workload=chk, replica_count=2)
 
     with When("FIPS ClickHouse is deployed with TLS settings"):
@@ -7889,14 +7890,14 @@ def test_030004(self):
     with And("external ClickHouse client container is started"):
         start_external_ch_container()
 
-    with And("FIPS ClickHouse Keeper is deployed with TLS settings"):
+    with When("FIPS ClickHouse Keeper is deployed with TLS settings"):
         fips_apply_manifest(
             manifest_path=chk_manifest,
             replica_count=2,
             kind="chk",
         )
 
-    with When("FIPS ClickHouse is deployed with 2 replicas"):
+    with And("FIPS ClickHouse is deployed with 2 replicas"):
         chi_manifest_2 = fips_edit_manifest(
             source_manifest=chi_manifest,
             replicas_count=2,
@@ -7909,19 +7910,19 @@ def test_030004(self):
             apply_templates=[backup_template],
         )
 
-    with Then("2-replica cluster passes essential FIPS checks"):
+    with Then("check 2-replica cluster passes essential FIPS checks"):
         chi_pods = run_chi_fips_checks(
             workload=chi,
             replica_count=2,
         )
 
-    with And("clickhouse-backup sidecar passes essential FIPS checks"):
+    with And("check clickhouse-backup sidecar passes essential FIPS checks"):
         run_backup_fips_checks(
             workload=chi,
             replica_count=2,
         )
 
-    with And("ReplicatedMergeTree data converges across 2 replicas"):
+    with And("check ReplicatedMergeTree data converges across 2 replicas"):
         fips_check_replication_across_replicas(chi_pods=chi_pods)
 
     with When("CHI is upscaled to 3 replicas"):
@@ -7936,19 +7937,19 @@ def test_030004(self):
             kind="chi",
         )
 
-    with Then("3-replica cluster passes essential FIPS checks"):
+    with Then("check 3-replica cluster passes essential FIPS checks"):
         chi_pods = run_chi_fips_checks(
             workload=chi,
             replica_count=3,
         )
 
-    with And("clickhouse-backup sidecar passes essential FIPS checks"):
+    with And("check clickhouse-backup sidecar passes essential FIPS checks"):
         run_backup_fips_checks(
             workload=chi,
             replica_count=3,
         )
 
-    with And("ReplicatedMergeTree data converges across 3 replicas"):
+    with And("check ReplicatedMergeTree data converges across 3 replicas"):
         fips_check_replication_across_replicas(
             chi_pods=chi_pods,
             table="repl_scale_test_3",
@@ -8380,12 +8381,6 @@ def test_030008(self):
     )
     chi_permissive_manifest = (
         "manifests/chi/test-030008-permissive-non-fips.yaml"
-    )
-    backup_non_fips_template = (
-        "manifests/chit/test-030008-backup-non-fips-template.yaml"
-    )
-    chi_backup_non_fips_manifest = (
-        "manifests/chi/test-030003.yaml"
     )
 
 
