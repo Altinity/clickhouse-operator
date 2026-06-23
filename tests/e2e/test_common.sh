@@ -48,19 +48,31 @@ NO_CLEANUP="${NO_CLEANUP:-""}"
 #   - tests/e2e/manifests/chit/tpl-clickhouse-stable.yaml   (default CLICKHOUSE_TEMPLATE)
 #   - tests/e2e/manifests/chit/tpl-clickhouse-23.3.yaml     (clickhouse_template_old)
 #   - tests/e2e/manifests/chk/*.yaml                  (keeper tests, incl. FIPS)
-# Intentionally EXCLUDED from preload:
-#   - clickhouse/clickhouse-server:24.3-broken / :24.822   (meant-to-fail rollback tests)
-#   - yandex/clickhouse-server:*                           (opt-in via CLICKHOUSE_TEMPLATE)
-#   - altinity/clickhouse-server:22.8.15.25.altinitystable (only in optional tpl-clickhouse-22.8.yaml)
-# Quick audit:
-#   grep -rhE "image:[[:space:]]+[a-zA-Z0-9._/-]+:[a-zA-Z0-9._-]+" tests/e2e/manifests/ | sort -u
+# Intentionally EXCLUDED from preload (verified — do not re-add):
+#   - Meant-to-fail / decoy images (preloading them would defeat the test that rejects them):
+#       clickhouse/clickhouse-server:24.3-broken / :24.822     (rollback tests)
+#       altinity/clickhouse-server:*.altinityfips-decoy        (test-030008-runtime-decoy)
+#       clickhouse/clickhouse-keeper:latest                    (test-020010 non-FIPS rejection)
+#   - Opt-in CLICKHOUSE_TEMPLATE overrides, not run by default (manifests/chit/tpl-clickhouse-*.yaml):
+#       clickhouse/clickhouse-server:21.3 / 21.8 / 22.1 / 22.2 / 22.3 / 22.6 / 22.7
+#       altinity/clickhouse-server:22.8.15.25.altinitystable   (tpl-clickhouse-22.8.yaml)
+#       yandex/clickhouse-server:*
+# Audit coverage (every default-suite image is listed below):
+#   comm -23 <(grep -rhoE "(clickhouse|altinity)/clickhouse-(server|keeper):[A-Za-z0-9._-]+" tests/e2e/manifests/ | sort -u) \
+#            <(grep -oE "(clickhouse|altinity)/clickhouse-(server|keeper):[A-Za-z0-9._-]+" tests/e2e/test_common.sh | sort -u)
 
-PRELOAD_IMAGES_OPERATOR=(
+# Single canonical preload list shared by ALL suites (operator, metrics, keeper).
+# One list, not per-suite lists: a per-suite list silently drifts from the manifests
+# another suite uses (e.g. the metrics suite once omitted server:24.3/24.8 that
+# test-017-multi-version needs, cold-pulling them on every fresh minikube and timing
+# out). Preloading the full set everywhere is cheap — common_preload_images runs in
+# parallel and skips images already present — and removes that whole class of flake.
+PRELOAD_IMAGES_ALL=(
     # ClickHouse server versions used in manifests and templates
     "clickhouse/clickhouse-server:23.3"        # clickhouse_template_old + older-version compat tests
     "clickhouse/clickhouse-server:23.8"
-    "clickhouse/clickhouse-server:24.3"        # also base for 24.3-broken rollback tests
-    "clickhouse/clickhouse-server:24.8"
+    "clickhouse/clickhouse-server:24.3"        # also base for 24.3-broken rollback tests; test-017-multi-version (metrics)
+    "clickhouse/clickhouse-server:24.8"        # test-017-multi-version (metrics)
     "clickhouse/clickhouse-server:25.3"
     "clickhouse/clickhouse-server:25.8"
     "clickhouse/clickhouse-server:latest"
@@ -68,9 +80,10 @@ PRELOAD_IMAGES_OPERATOR=(
     "altinity/clickhouse-server:25.8.16.10001.altinitystable"  # default clickhouse_template
     "altinity/clickhouse-server:25.8.16.10002.altinitystable"  # test_010035 auto-recovery upgrade target (manifests/chi/test-035-auto-recovery-2.yaml)
     "altinity/clickhouse-server:25.3.8.30001.altinityfips"     # FIPS CHI (e.g. manifests/chk/test-020008-chi-fips.yaml)
-    # ClickHouse Keeper versions used in operator tests (test_010063, test_020008, ...)
+    # ClickHouse Keeper versions
     "clickhouse/clickhouse-keeper:25.3"
     "clickhouse/clickhouse-keeper:25.8"
+    "clickhouse/clickhouse-keeper:latest-alpine"  # test_clickhouse_keeper_rescale (deploy/clickhouse-keeper/clickhouse-keeper-manually/...-for-test-only.yaml)
     "altinity/clickhouse-keeper:25.3.8.30001.altinityfips"
     # Zookeeper
     "docker.io/zookeeper:3.8.4"
@@ -79,35 +92,6 @@ PRELOAD_IMAGES_OPERATOR=(
     "nginx:latest"
     "altinity/clickhouse-backup:stable"
     "altinity/clickhouse-backup:2.4.15"
-)
-
-PRELOAD_IMAGES_KEEPER=(
-    # ClickHouse server versions
-    "clickhouse/clickhouse-server:23.3"
-    "clickhouse/clickhouse-server:23.8"
-    "clickhouse/clickhouse-server:24.3"
-    "clickhouse/clickhouse-server:24.8"
-    "clickhouse/clickhouse-server:25.3"
-    "clickhouse/clickhouse-server:25.8"
-    "clickhouse/clickhouse-server:latest"
-    # Altinity builds
-    "altinity/clickhouse-server:25.8.16.10001.altinitystable"  # default clickhouse_template
-    "altinity/clickhouse-server:25.8.16.10002.altinitystable"  # test_010035 auto-recovery upgrade target
-    "altinity/clickhouse-server:25.3.8.30001.altinityfips"     # FIPS CHI (manifests/chk/test-020008-chi-fips.yaml)
-    # ClickHouse Keeper versions
-    "clickhouse/clickhouse-keeper:25.3"
-    "clickhouse/clickhouse-keeper:25.8"
-    "clickhouse/clickhouse-keeper:latest-alpine"  # test_clickhouse_keeper_rescale (deploy/clickhouse-keeper/clickhouse-keeper-manually/...-for-test-only.yaml)
-    "altinity/clickhouse-keeper:25.3.8.30001.altinityfips"
-    # Zookeeper
-    "docker.io/zookeeper:3.8.4"
-)
-
-PRELOAD_IMAGES_METRICS=(
-    "clickhouse/clickhouse-server:23.3"
-    "clickhouse/clickhouse-server:25.3"
-    "clickhouse/clickhouse-server:latest"
-    "altinity/clickhouse-server:25.8.16.10001.altinitystable"  # default clickhouse_template
 )
 
 # =============================================================================
@@ -144,7 +128,7 @@ function common_minikube_reset() {
 
 # Pull images and load them into minikube in parallel.
 # Only runs if MINIKUBE_PRELOAD_IMAGES is set.
-# Usage: common_preload_images "${PRELOAD_IMAGES_OPERATOR[@]}"
+# Usage: common_preload_images "${PRELOAD_IMAGES_ALL[@]}"
 function common_preload_images() {
     if [[ -n "${MINIKUBE_PRELOAD_IMAGES}" ]]; then
         echo "pre-load images into minikube (parallel)"
