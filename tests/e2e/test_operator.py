@@ -661,7 +661,7 @@ def test_010009_1(self, version_from="0.26.3", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
-    self.context.skip_fips = True
+    self.context.skip_fips = True  # avoids setting GODEBUG to fips enforced for this test
 
     with Check("Test simple chi for operator upgrade"):
         test_operator_upgrade(
