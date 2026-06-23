@@ -27,7 +27,7 @@
 ## Introduction
 
 This test plan covers FIPS 140-3 compatibility testing for the
-**clickhouse-operator**, **metrics-exporter**, and **clickhouse-backup**
+**clickhouse-operator** and **metrics-exporter**
 components used within ClickHouse deployments.
 
 The goal is to verify that FIPS-enabled components:
@@ -234,7 +234,8 @@ Therefore:
 
 ## clickhouse-backup Sidecar
 
-**Objective:** Verify clickhouse-backup sidecar operates correctly in FIPS mode and uses FIPS-compliant TLS for ClickHouse backup and restore operations.
+**Objective:** Verify clickhouse-backup sidecar operates correctly alongside the FIPS enforced ClickHouse server and the 
+keeper deployed by the operator.
 
 **Connection Overview:**
 
@@ -242,7 +243,6 @@ Therefore:
 | --------- | ------------------------------------ | ---------------- | ------------ | ------------------------------ |
 | Outbound  | ClickHouse Server                    | HTTPS/native TLS | 8443/9440    | Yes, via ClickHouse TLS config |
 | Inbound   | Backup API                           | HTTPS            | 7171         | Yes                            |
-| Storage   | Local mounted ClickHouse data volume | filesystem       | N/A          | N/A                            |
 
 | Test Assertion               | Description                                                                 | Expected Result                                 |
 |------------------------------|-----------------------------------------------------------------------------| ----------------------------------------------- |
@@ -377,9 +377,6 @@ Therefore:
 
 **Exporter to ClickHouse Server**
 
-> TLS supported via `chop.Config()`, but `ChSchemeAuto` prefers HTTP if both ports available.
-> Must configure `scheme: https` explicitly for FIPS compliance.
-
 | Test Assertion | Description | Expected Result |
 |----------------|-------------|-----------------|
 | Exporter FIPS cipher to CH | Exporter queries with FIPS-approved cipher | Connection succeeds |
@@ -463,7 +460,7 @@ This scenario validates that both containers in the operator pod can negotiate a
 
 | Excluded Target                        | Reason                                                                                                                                                                                                                        |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ClickHouse Keeper / CHK                | The operator does not normally establish a runtime TLS client session to ClickHouse Keeper. CHK is only deployed because the CHI manifest depends on Keeper. Keeper TLS is covered by real CHK listener/configuration checks. |
+| ClickHouse Keeper                 | The operator does not normally establish a runtime TLS client session to ClickHouse Keeper. CHK is only deployed because the CHI manifest depends on Keeper. Keeper TLS is covered by real CHK listener/configuration checks. |
 | Operator metrics `:9999`               | Plain HTTP Prometheus endpoint; outside FIPS TLS scope by documented boundary.                                                                                                                                                |
 | Exporter metrics `:8888`               | Plain HTTP Prometheus/IPC endpoint; outside FIPS TLS scope by documented boundary.                                                                                                                                            |
 

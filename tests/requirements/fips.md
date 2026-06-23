@@ -99,8 +99,6 @@ plaintext HTTP regardless of the secure/insecure knobs and is outside the FIPS T
 
 ## Configuration Requirements
 
-Plain HTTP/TCP on any external connection is a configuration error for FIPS compliance.
-
 ### RQ.SRS-026.ClickHouseOperator.FIPS.HTTPPorts
 version: 1.0
 
@@ -115,7 +113,7 @@ version: 1.0
 Each shipped pod binary — `clickhouse-operator` and `metrics-exporter` — SHALL satisfy all of the following:
 
 * Both binaries SHALL be built with `GOFIPS140=v1.0.0` (or `certified`); `go version -m` on each binary SHALL show the `GOFIPS140` build setting when the binary is inspectable.
-* Each binary SHALL identify itself as a FIPS build via `--version` output, `--fips-info`, or startup logs containing a FIPS indicator.
+* Each binary SHALL identify itself as a FIPS build via `--fips-info` and startup logs containing a FIPS indicator.
 * Each binary SHALL report `crypto/fips140.Version()` equal to `v1.0.0` (for example via `--fips-info` or in-process inspection).
 * Each binary SHALL report `crypto/fips140.Enabled()` equal to `true` when FIPS mode is active per `GODEBUG=fips140`.
 
