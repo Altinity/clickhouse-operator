@@ -1,5 +1,13 @@
 ## Release 0.27.2
+### New Features
+* **Keeper split client/peer Services** ([#1982](https://github.com/Altinity/clickhouse-operator/issues/1982)). Each `ClickHouseKeeper` host now exposes two headless Services instead of one:
+  * a **peer** Service (unchanged name) with `publishNotReadyAddresses: true` — used for intra-Keeper Raft traffic and the StatefulSet pod DNS, so Raft peers can reach each other before pods are `Ready` and bootstrap quorum;
+  * a **client** Service (`<peer>-client`) with `publishNotReadyAddresses: false` — used by ClickHouse, so clients only ever resolve `Ready` Keeper nodes and never connect to a node still starting up.
+
+  A user-supplied `replicaServiceTemplate` still produces a single Service (the split applies only to the operator's default Services).
+
 ### Behavior Changes
+* **One-time ClickHouse rolling restart on upgrade for CHI→CHK keeper references** ([#1982](https://github.com/Altinity/clickhouse-operator/issues/1982)). A `ClickHouseInstallation` that references a `ClickHouseKeeper` via a `keeper:` ref (the default `serviceType: Replicas`) now resolves to the new ready-only Keeper **client** Service. The first reconcile after upgrade rewrites the CHI's `<zookeeper>` endpoints from `chk-…` to `chk-…-client`, which the operator treats as a configuration change requiring a restart — so **every ClickHouse pod of an affected CHI restarts once**. This is a one-time event; the resolved endpoints are stable afterwards. No action required.
 * **Backward-incompatible config rename** in `ClickHouseOperatorConfiguration`: `reconcile.recovery.from.{aborted,completed}` → `reconcile.recovery.onStatus.{aborted,completed}`. The `from` grouping level is removed; the per-status scopes and their action keys (`onPodReady`/`onPodNotReady`/`onPodNotReadyThreshold`) are unchanged. The obsolete `from` key is silently ignored on load. **If you set `reconcile.recovery.from.aborted.onPodReady: none` on 0.27.0/0.27.1 to disable Aborted auto-recovery, re-apply it as `reconcile.recovery.onStatus.aborted.onPodReady: none`** — otherwise the default (`retry`) silently re-enables it. The `completed` scope (sustained-NotReady host recovery) is new in 0.27.2 and off by default. See [docs/operator_upgrade.md](docs/operator_upgrade.md).
 
 ## Release 0.27.1
