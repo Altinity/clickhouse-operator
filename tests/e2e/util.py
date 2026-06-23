@@ -286,6 +286,26 @@ def get_metrics(operator_pod=None, operator_namespace=None, container="metrics-e
         ns=operator_namespace,
     )
 
+def _apply_operator_godebug(shell=None):
+    mode = getattr(current().context, "fips140_mode", None)
+    if not mode:
+        return
+
+    ns = current().context.operator_namespace
+    expected = f"fips140={mode}"
+
+    kubectl.launch(
+        "set env deployment/clickhouse-operator "
+        f"--overwrite GODEBUG={expected}",
+        ns=ns,
+        shell=shell,
+    )
+    kubectl.launch(
+        "rollout status deployment/clickhouse-operator",
+        ns=ns,
+        timeout=600,
+        shell=shell,
+    )
 
 def install_operator_if_not_exist(
     reinstall=False,
@@ -323,6 +343,9 @@ def install_operator_if_not_exist(
                 shell=shell
             )
         set_operator_version(current().context.operator_version, shell=shell)
+
+    if not hasattr(current().context, "skip_fips"):
+        _apply_operator_godebug(shell=shell)
 
 
 def install_operator_version(version, shell=None):
