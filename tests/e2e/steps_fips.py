@@ -272,43 +272,6 @@ def fips_assert_fips_enforced_coercion_in_logs(self, logs):
     )
 
 
-@TestStep(Given)
-def fips_apply_operator_godebug(self):
-    """Apply suite-configured GODEBUG=fips140=<mode> on the operator deployment."""
-    mode = self.context.fips140_mode
-
-    ns = current().context.operator_namespace
-    expected = f"fips140={mode}"
-    # One patch for both containers (kubectl set env defaults to --containers='*',
-    # and the operator Deployment has exactly clickhouse-operator + metrics-exporter).
-    # Two separate per-container edits produced two ReplicaSet revisions racing each
-    # other, so `rollout status` could latch onto an intermediate revision while the
-    # final pod was still cache-syncing -- one of the test_030008 restart-storm races.
-    kubectl.launch(
-        "set env deployment/clickhouse-operator "
-        f"--overwrite GODEBUG={expected}",
-        ns=ns,
-    )
-    kubectl.launch(
-        "rollout status deployment/clickhouse-operator",
-        ns=ns,
-        timeout=600,
-    )
-
-@TestStep(Given)
-def fips_apply_operator_config(self, chopconf_path):
-    """Apply a ClickHouseOperatorConfiguration and restart the operator."""
-    util.apply_operator_config(chopconf_path)
-    fips_apply_operator_godebug()
-
-
-@TestStep(Given)
-def fips_create_shell_namespace_clickhouse_template(self):
-    """Create test namespace and apply suite-configured operator GODEBUG."""
-    create_shell_namespace_clickhouse_template()
-    fips_apply_operator_godebug()
-
-
 @TestStep(When)
 def fips_apply_manifest_raw(self, manifest_path):
     """Apply a CHI/CHK manifest without waiting for reconcile."""

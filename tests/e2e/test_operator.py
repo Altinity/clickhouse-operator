@@ -661,6 +661,8 @@ def test_010009_1(self, version_from="0.26.3", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
+    self.context.skip_fips = True
+
     with Check("Test simple chi for operator upgrade"):
         test_operator_upgrade(
             manifest="manifests/chi/test-009-operator-upgrade-1.yaml",
@@ -676,6 +678,8 @@ def test_010009_1(self, version_from="0.26.3", version_to=None):
 def test_010009_2(self, version_from="0.26.3", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
+
+    self.context.skip_fips = True
 
     with Check("Test advanced chi for operator upgrade"):
         test_operator_upgrade(
@@ -7776,7 +7780,7 @@ def test_030003(self):
     chk_manifest = "manifests/chk/test-030003.yaml"
     backup_template = "manifests/chit/test-030003-backup-template.yaml"
 
-    fips_create_shell_namespace_clickhouse_template()
+    create_shell_namespace_clickhouse_template()
 
     chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
     chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
@@ -7784,7 +7788,7 @@ def test_030003(self):
     chi_replica_count = 2
 
     with Given("strict FIPS operator configuration is applied"):
-        fips_apply_operator_config(chopconf_path=chopconf)
+        util.apply_operator_config(chopconf)
 
     with Check("operator pod passes essential FIPS checks"):
         run_operator_fips_checks()
@@ -7871,7 +7875,7 @@ def test_030004(self):
     chk_manifest = "manifests/chk/test-030003.yaml"
     backup_template = "manifests/chit/test-030003-backup-template.yaml"
 
-    fips_create_shell_namespace_clickhouse_template()
+    create_shell_namespace_clickhouse_template()
 
     chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
     chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
@@ -8018,7 +8022,7 @@ def test_030005(self):
     chk_manifest = "manifests/chk/test-030003.yaml"
     backup_template = "manifests/chit/test-030003-backup-template.yaml"
 
-    fips_create_shell_namespace_clickhouse_template()
+    create_shell_namespace_clickhouse_template()
 
     chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
     chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
@@ -8193,11 +8197,11 @@ def test_030006(self):
         "manifests/chopconf/test-030006-chopconf.yaml"
     )
 
-    fips_create_shell_namespace_clickhouse_template()
+    create_shell_namespace_clickhouse_template()
     operator_namespace = self.context.operator_namespace
 
     with Given("FIPS chopconf with relaxed verify and IPC is applied"):
-        fips_apply_operator_config(chopconf_path=chopconf)
+        util.apply_operator_config(chopconf)
 
     with When("operator startup logs are fetched"):
         operator_pod = kubectl.get_operator_pod(ns=operator_namespace)
@@ -8237,10 +8241,10 @@ def test_030007(self):
         "manifests/chk/test-020009-chk-fips-bypass-rejected.yaml"
     )
 
-    fips_create_shell_namespace_clickhouse_template()
+    create_shell_namespace_clickhouse_template()
 
     with Given("strict FIPS operator configuration is applied"):
-        fips_apply_operator_config(chopconf_path=chopconf)
+        util.apply_operator_config(chopconf)
 
     with When("CHI references plain-text external ZooKeeper"):
         chi_zk = yaml_manifest.get_name(util.get_full_path(chi_zk_rejected))
@@ -8385,7 +8389,7 @@ def test_030008(self):
     )
 
 
-    fips_create_shell_namespace_clickhouse_template()
+    create_shell_namespace_clickhouse_template()
 
     chi_non_fips = yaml_manifest.get_name(
         util.get_full_path(chi_non_fips_manifest)
@@ -8420,7 +8424,7 @@ def test_030008(self):
     )
 
     with Given("FIPS image policy Required is applied"):
-        fips_apply_operator_config(chopconf_path=chopconf)
+        util.apply_operator_config(chopconf)
 
     with When("CHI with non-fips image tag is applied"):
         fips_apply_manifest_raw(manifest_path=chi_non_fips_manifest)
@@ -8593,14 +8597,14 @@ def test_030009(self):
     chk_tls12_manifest = "manifests/chk/test-030009-chk-tls12-only.yaml"
     chk_manifest = "manifests/chk/test-030003.yaml"
 
-    fips_create_shell_namespace_clickhouse_template()
+    create_shell_namespace_clickhouse_template()
 
     chi_tls12 = yaml_manifest.get_name(util.get_full_path(chi_tls12_manifest))
     chk_tls12 = yaml_manifest.get_name(util.get_full_path(chk_tls12_manifest))
     chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
 
     with Given("strict FIPS operator configuration is applied"):
-        fips_apply_operator_config(chopconf_path=chopconf)
+        util.apply_operator_config(chopconf)
 
     with And("test TLS secret is installed"):
         create_tls_secret_for_fips_hosts(chi=chi_tls12, chk=chk)
@@ -8664,13 +8668,13 @@ def test_030010(self):
     chk_manifest = "manifests/chk/test-030003.yaml"
     backup_template = "manifests/chit/test-030003-backup-template.yaml"
 
-    fips_create_shell_namespace_clickhouse_template()
+    create_shell_namespace_clickhouse_template()
 
     chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
     chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
 
     with Given("strict FIPS operator configuration is applied"):
-        fips_apply_operator_config(chopconf_path=chopconf)
+        util.apply_operator_config(chopconf)
 
     with And("test TLS secret is installed"):
         create_tls_secret_for_fips_hosts(chi=chi, chk=chk)
@@ -8783,13 +8787,13 @@ def test_030016(self):
     chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
     chi_manifest = "manifests/chi/test-030016.yaml"
 
-    fips_create_shell_namespace_clickhouse_template()
+    create_shell_namespace_clickhouse_template()
 
     chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
     chk_dummy = "unused"
 
     with Given("strict FIPS operator configuration is applied"):
-        fips_apply_operator_config(chopconf_path=chopconf)
+        util.apply_operator_config(chopconf)
 
     with And("test TLS secret is installed"):
         create_tls_secret_for_fips_hosts(
