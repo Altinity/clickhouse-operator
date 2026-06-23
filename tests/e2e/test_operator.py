@@ -3833,34 +3833,29 @@ def test_010035_2(self):
                 f"expected container {dummy_container} to be NotReady, got ready={dummy_ready}"
             )
 
-        with Then("Kubernetes should restart the dummy container after liveness failure"):
-
-            old_restart_count = kubectl.get_container_restart_count(pod, dummy_container)
+        with Then("Operator should recreate the pod after sustained NotReady timeout"):
             start_time = time.time()
-            new_restart_count = old_restart_count
-            dummy_ready = kubectl.get_container_status(pod, 1)
-            while time.time() - start_time < 120:
-                new_restart_count = kubectl.get_container_restart_count(pod, dummy_container)
-                dummy_ready = kubectl.get_container_status(pod, 1)
+            new_uid = old_uid
+            pod_ready = kubectl.get_condition_status(pod, "Ready")
 
-                if new_restart_count is not None and new_restart_count > old_restart_count and dummy_ready == "true":
+            while time.time() - start_time < 420:
+                new_uid = kubectl.get_field("pod", pod, ".metadata.uid")
+                pod_ready = kubectl.get_condition_status(pod, "Ready")
+                if new_uid != old_uid and pod_ready == "True":
                     break
-
                 retry_sleep(
                     int((time.time() - start_time) / 5) + 1,
                     5,
-                    f"{dummy_container} restartCount={new_restart_count}, ready={dummy_ready}",
+                    f"pod uid={new_uid}, Ready={pod_ready}",
                 )
 
-            assert new_restart_count is not None and new_restart_count > old_restart_count, error(
-                f"expected {dummy_container} to restart after liveness failure"
+            assert new_uid != old_uid, error(
+                f"expected operator to recreate pod {pod} within sustained NotReady timeout"
             )
-            assert dummy_ready == "true", error(
-                f"expected {dummy_container} to become Ready after restart, got {dummy_ready}"
-            )
+            assert pod_ready == "True", error(f"expected recreated pod {pod} to become Ready, got {pod_ready}")
 
-        with Finally("I clean up"):
-            delete_test_namespace()
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 
 @TestScenario
