@@ -83,6 +83,9 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	case interfaces.NameStatefulSetService:
 		host := params[0].(*api.Host)
 		return n.createStatefulSetServiceName(host)
+	case interfaces.NameStatefulSetServiceClient:
+		host := params[0].(*api.Host)
+		return n.createStatefulSetServiceClientName(host)
 	case interfaces.NamePodHostname:
 		host := params[0].(*api.Host)
 		return n.createPodHostname(host)

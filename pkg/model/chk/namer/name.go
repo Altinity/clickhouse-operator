@@ -174,6 +174,14 @@ func (n *Namer) createStatefulSetServiceName(host *api.Host) string {
 	return n.macro.Scope(host).Line(pattern)
 }
 
+// createStatefulSetServiceClientName returns the name of the client-facing per-host Service —
+// the StatefulSet Service name plus a "-client" suffix. The client Service publishes only Ready
+// Keeper endpoints (publishNotReadyAddresses=false) so ClickHouse never resolves a not-yet-Ready
+// node; the peer Service (createStatefulSetServiceName) keeps the bare name for Raft and pod DNS.
+func (n *Namer) createStatefulSetServiceClientName(host *api.Host) string {
+	return n.createStatefulSetServiceName(host) + statefulSetClientServiceNameSuffix
+}
+
 // createPodHostname returns a hostname of a Pod of a ClickHouse instance.
 // Is supposed to be used where network connection to a Pod is required.
 // NB: right now Pod's hostname points to a Service, through which Pod can be accessed.

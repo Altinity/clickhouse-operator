@@ -72,7 +72,7 @@ func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...an
 		var host *chi.Host
 		if len(params) > 0 {
 			host = params[0].(*chi.Host)
-			return []*core.Service{m.createServiceHost(host)}
+			return m.createServiceHost(host)
 		}
 	}
 	panic("unknown service type")
@@ -272,33 +272,59 @@ func (m *ServiceManager) createServiceShard(shard chi.IShard) *core.Service {
 	return nil
 }
 
-// createServiceHost creates new core.Service for specified host
-func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
+// createServiceHost builds the per-host (replica-level) Services for a Keeper host.
+//
+// When the user supplies a replicaServiceTemplate it is honored as-is (single Service) — the
+// user is in full control and back-compat is preserved.
+//
+// Otherwise two operator-managed headless Services are emitted (issue #1982):
+//   - peer   : intra-keeper Raft + StatefulSet pod DNS. publishNotReadyAddresses=true so Raft
+//     peers can reach each other BEFORE pods are Ready and bootstrap quorum. Keeps the existing
+//     NameStatefulSetService name + LabelServiceHost label → byte-identical to the pre-split
+//     layout, no pod re-roll, and the Raft <hostname>/STS serviceName binding is unchanged.
+//   - client : ClickHouse-facing. publishNotReadyAddresses=false so DNS only resolves Ready
+//     Keeper nodes; raft port omitted. The keeper-ref resolver selects this tier via
+//     LabelServiceHostClient so clients never connect to a not-yet-Ready Keeper.
+func (m *ServiceManager) createServiceHost(host *chi.Host) []*core.Service {
 	if host.IsZero() {
 		return nil
 	}
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return creator.CreateServiceFromTemplate(
-			template,
-			host.GetRuntime().GetAddress().GetNamespace(),
-			m.namer.Name(interfaces.NameStatefulSetService, host),
-			m.tagger.Label(interfaces.LabelServiceHost, host),
-			m.tagger.Annotate(interfaces.AnnotateServiceHost, host),
-			m.tagger.Selector(interfaces.SelectorHostScope, host),
-			m.or.CreateOwnerReferences(m.cr),
-			m.macro.Scope(host),
-			m.labeler,
-		)
+		return []*core.Service{
+			creator.CreateServiceFromTemplate(
+				template,
+				host.GetRuntime().GetAddress().GetNamespace(),
+				m.namer.Name(interfaces.NameStatefulSetService, host),
+				m.tagger.Label(interfaces.LabelServiceHost, host),
+				m.tagger.Annotate(interfaces.AnnotateServiceHost, host),
+				m.tagger.Selector(interfaces.SelectorHostScope, host),
+				m.or.CreateOwnerReferences(m.cr),
+				m.macro.Scope(host),
+				m.labeler,
+			),
+		}
 	}
 
-	// Create default Service
-	// We do not have .templates.ServiceTemplate specified or it is incorrect
+	// No user template - emit the two default per-host Services.
+	peer := m.buildDefaultHostService(host,
+		m.namer.Name(interfaces.NameStatefulSetService, host), interfaces.LabelServiceHost,
+		true /* publishNotReady */, true /* includeRaftPort */)
+	client := m.buildDefaultHostService(host,
+		m.namer.Name(interfaces.NameStatefulSetServiceClient, host), interfaces.LabelServiceHostClient,
+		false /* publishNotReady */, false /* includeRaftPort */)
+	return []*core.Service{peer, client}
+}
+
+// buildDefaultHostService builds one operator-managed headless per-host Service. publishNotReady
+// toggles ServiceSpec.PublishNotReadyAddresses; includeRaftPort keeps the Raft port (peer) or
+// drops it (client, which only needs the ZK client ports).
+func (m *ServiceManager) buildDefaultHostService(host *chi.Host, name string, label interfaces.LabelType, publishNotReady, includeRaftPort bool) *core.Service {
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            m.namer.Name(interfaces.NameStatefulSetService, host),
+			Name:            name,
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          m.macro.Scope(host).Map(m.tagger.Label(interfaces.LabelServiceHost, host)),
+			Labels:          m.macro.Scope(host).Map(m.tagger.Label(label, host)),
 			Annotations:     m.macro.Scope(host).Map(m.tagger.Annotate(interfaces.AnnotateServiceHost, host)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
@@ -306,10 +332,10 @@ func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 			Selector:                 m.tagger.Selector(interfaces.SelectorHostScope, host),
 			ClusterIP:                TemplateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
-			PublishNotReadyAddresses: true,
+			PublishNotReadyAddresses: publishNotReady,
 		},
 	}
-	appendHostExposedPorts(svc, host)
+	appendHostExposedPorts(svc, host, includeRaftPort)
 	m.labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }
@@ -320,9 +346,13 @@ func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 // matching per-host XML overlay emits <tcp_port remove="1"/> so the Keeper
 // process binds no plaintext listener at all; liveness probe falls back to
 // pgrep. Other ports (zk-secure, raft) flow through unchanged.
-func appendHostExposedPorts(svc *core.Service, host *chi.Host) {
+func appendHostExposedPorts(svc *core.Service, host *chi.Host, includeRaftPort bool) {
 	host.WalkSpecifiedPorts(func(name string, port *types.Int32, protocol core.Protocol) bool {
 		if (name == chi.KpDefaultZKPortName) && !host.IsInsecure() {
+			return false
+		}
+		// The client-facing Service omits the Raft port — clients only use the ZK client ports.
+		if (name == chi.KpDefaultRaftPortName) && !includeRaftPort {
 			return false
 		}
 		svc.Spec.Ports = append(svc.Spec.Ports, core.ServicePort{
