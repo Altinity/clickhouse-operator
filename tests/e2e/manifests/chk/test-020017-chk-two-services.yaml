@@ -1,0 +1,28 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020017
+spec:
+  # No replicaServiceTemplate is declared, so the operator emits the two default
+  # per-host Services (issue #1982): a peer/Raft Service (publishNotReadyAddresses=true)
+  # and a client-facing Service (publishNotReadyAddresses=false, "-client" suffix).
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    clusters:
+      - name: "keeper"
+        layout:
+          replicasCount: 1
+    settings:
+      logger/level: "information"
+      logger/console: "true"
+      listen_host: "0.0.0.0"
+      keeper_server/four_letter_word_white_list: "*"
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              image: "clickhouse/clickhouse-keeper:25.8"
