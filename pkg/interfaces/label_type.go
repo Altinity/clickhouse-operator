@@ -22,10 +22,11 @@ const (
 	LabelConfigMapHost        LabelType = "Label cm host"
 	LabelConfigMapStorage     LabelType = "Label cm storage"
 
-	LabelServiceCR      LabelType = "Label svc chi"
-	LabelServiceCluster LabelType = "Label svc cluster"
-	LabelServiceShard   LabelType = "Label svc shard"
-	LabelServiceHost    LabelType = "Label svc host"
+	LabelServiceCR         LabelType = "Label svc chi"
+	LabelServiceCluster    LabelType = "Label svc cluster"
+	LabelServiceShard      LabelType = "Label svc shard"
+	LabelServiceHost       LabelType = "Label svc host"
+	LabelServiceHostClient LabelType = "Label svc host client"
 
 	LabelExistingPV  LabelType = "Label existing pv"
 	LabelNewPVC      LabelType = "Label new pvc"
