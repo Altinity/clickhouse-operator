@@ -6252,6 +6252,16 @@ def test_010063(self):
             out = clickhouse.query(chi, "SELECT path FROM system.zookeeper WHERE path = '/' limit 1", pod=pod_name)
             assert out == '/', error(f"ZooKeeper should be accessible from {pod_name}")
 
+    with And("CHI resolves the keeper CLIENT tier, not the not-ready peer tier (issue #1982)"):
+        # The CHK exposes a ready-only client Service (…-client, publishNotReadyAddresses=false)
+        # alongside the peer/Raft Service. The keeper-ref resolver MUST hand ClickHouse the client
+        # tier so queries never hit a not-yet-Ready Keeper. Proven here by the resolved
+        # chop-generated-zookeeper.xml referencing the -client Service FQDN.
+        zk_xml = kubectl.get("configmap", f"chi-{chi}-deploy-confd-default-0-0")["data"]["chop-generated-zookeeper.xml"]
+        assert "-client." in zk_xml, error(
+            f"CHI <zookeeper> must resolve to the ready-only client Service (…-client); got:\n{zk_xml}"
+        )
+
     with When("Rescale Keeper to 3 nodes"):
         kubectl.create_and_check(
             manifest=chk_manifest_3nodes,
@@ -7886,6 +7896,82 @@ def test_020016(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
+@TestScenario
+@Name("test_020017. CHK emits two per-host Services (peer + client) with split readiness")
+@Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
+def test_020017(self):
+    """issue #1982. A CHK with no replicaServiceTemplate must emit TWO
+    per-host headless Services:
+      - peer/Raft Service `chk-{chk}-{cluster}-{host}`: publishNotReadyAddresses=true
+        (Raft peers must reach each other before pods are Ready to bootstrap quorum),
+        retains the raft port, carries the Service=host tier label.
+      - client Service `chk-{chk}-{cluster}-{host}-client`: publishNotReadyAddresses=false
+        (ClickHouse clients must resolve only Ready Keeper nodes), drops the raft port,
+        carries the Service=host-client tier label that the keeper-ref resolver selects.
+    The peer name/label are byte-identical to the pre-split layout so the Raft <hostname>
+    and StatefulSet serviceName bindings are unchanged on upgrade.
+    """
+    create_shell_namespace_clickhouse_template()
+
+    chk_manifest = "manifests/chk/test-020017-chk-two-services.yaml"
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
+    cluster = "keeper"
+    host = "0-0"
+    service_label = "clickhouse-keeper.altinity.com/Service"
+    peer_name = f"chk-{chk}-{cluster}-{host}"
+    client_name = f"{peer_name}-client"
+
+    with Given("Install CHK with no replicaServiceTemplate"):
+        kubectl.create_and_check(
+            manifest=chk_manifest,
+            kind="chk",
+            check={
+                "pod_count": 1,
+                "chk_status": "Completed",
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then(f"Peer/Raft Service {peer_name} publishes not-ready addresses and keeps the raft port"):
+        peer = kubectl.get("service", peer_name)
+        assert peer["spec"]["clusterIP"] == "None", error(f"peer Service must be headless; got {peer['spec'].get('clusterIP')}")
+        assert peer["spec"].get("publishNotReadyAddresses") is True, error(
+            f"peer Service must set publishNotReadyAddresses=true; got {peer['spec'].get('publishNotReadyAddresses')}"
+        )
+        peer_ports = {p["name"] for p in peer["spec"]["ports"]}
+        assert "raft" in peer_ports, error(f"peer Service must expose the raft port; got {peer_ports}")
+        assert peer["metadata"]["labels"].get(service_label) == "host", error(
+            f"peer Service must carry Service=host label; got {peer['metadata']['labels'].get(service_label)}"
+        )
+
+    with And(f"Client Service {client_name} resolves only Ready endpoints and drops the raft port"):
+        client = kubectl.get("service", client_name)
+        assert client["spec"]["clusterIP"] == "None", error(f"client Service must be headless; got {client['spec'].get('clusterIP')}")
+        # publishNotReadyAddresses=false is the JSON zero value and is omitted by the apiserver.
+        assert client["spec"].get("publishNotReadyAddresses", False) is False, error(
+            f"client Service must NOT publish not-ready addresses; got {client['spec'].get('publishNotReadyAddresses')}"
+        )
+        client_ports = {p["name"] for p in client["spec"]["ports"]}
+        assert "raft" not in client_ports, error(f"client Service must NOT expose the raft port; got {client_ports}")
+        assert client["metadata"]["labels"].get(service_label) == "host-client", error(
+            f"client Service must carry Service=host-client label (resolver tier selector); "
+            f"got {client['metadata']['labels'].get(service_label)}"
+        )
+
+    with And("The keeper-ref resolver can select the client tier by label"):
+        # The CHI <zookeeper> resolver lists per-host Services by the host-client label.
+        out = kubectl.launch(
+            f"get service -l clickhouse-keeper.altinity.com/chk={chk},{service_label}=host-client "
+            f"-o jsonpath='{{.items[*].metadata.name}}'"
+        )
+        assert client_name in out, error(f"host-client label selector must return {client_name}; got {out}")
+
+    with Then("Delete CHK"):
+        kubectl.delete_chk(chk)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 
 @TestScenario
