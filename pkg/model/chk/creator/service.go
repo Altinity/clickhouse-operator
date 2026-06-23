@@ -214,7 +214,7 @@ func crExposesSecureZK(cr chi.ICustomResource) bool {
 	}
 	exposed := false
 	cr.WalkHosts(func(h *chi.Host) error {
-		if h != nil && h.ZKPortSecure.HasValue() {
+		if (h != nil) && h.ZKPortSecure.HasValue() {
 			exposed = true
 		}
 		return nil
