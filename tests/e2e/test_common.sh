@@ -156,11 +156,24 @@ function common_preload_images() {
 
 # Build operator + metrics-exporter docker images and load them into minikube
 function common_build_and_load_images() {
+    # settings.py resolves the operator version from the `release` file, so the
+    # e2e install path requests altinity/clickhouse-operator:<release>. The build
+    # always tags images :dev, so without retagging an IfNotPresent install pulls
+    # the PUBLISHED <release> image from the registry instead of the freshly-built
+    # local one -- silently testing the wrong binary. Retag the local :dev build
+    # to :<release> and load that too, so the suite exercises local changes.
+    local release
+    release="$(tr -d ' \r\n\t' < "${COMMON_DIR}/../../release")"
     echo "Build" && \
     VERBOSITY="${VERBOSITY}" "${COMMON_DIR}/../../dev/image_build_all_dev.sh" && \
+    echo "Retag local :dev build as :${release} (match install version)" && \
+    docker tag "${OPERATOR_DOCKER_REPO}:dev" "${OPERATOR_DOCKER_REPO}:${release}" && \
+    docker tag "${METRICS_EXPORTER_DOCKER_REPO}:dev" "${METRICS_EXPORTER_DOCKER_REPO}:${release}" && \
     echo "Load images" && \
-    minikube image load "${OPERATOR_IMAGE}" && \
-    minikube image load "${METRICS_EXPORTER_IMAGE}" && \
+    minikube image load "${OPERATOR_DOCKER_REPO}:dev" && \
+    minikube image load "${METRICS_EXPORTER_DOCKER_REPO}:dev" && \
+    minikube image load "${OPERATOR_DOCKER_REPO}:${release}" --overwrite=true && \
+    minikube image load "${METRICS_EXPORTER_DOCKER_REPO}:${release}" --overwrite=true && \
     echo "Images prepared"
 }
 
