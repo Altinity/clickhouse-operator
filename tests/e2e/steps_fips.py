@@ -1933,9 +1933,13 @@ def fips_wait_table_removed_from_dropped_tables(
         f"{database}.{table} still present in system.dropped_tables after {timeout}s"
     )
 
-@TestStep(Then)
-def check_fips_cast_failure(self, binary_path, binary, cast_name="HMAC-SHA2-256"):
-    """Assert binary exits non-zero when FIPS CAST is forced to fail."""
+@TestStep(When)
+def run_binary_with_forced_fips_cast_failure(
+    self,
+    binary_path,
+    cast_name,
+):
+    """Run binary with GODEBUG forcing the named FIPS CAST/PCT to fail."""
     result = subprocess.run(
         [
             "env",
@@ -1948,16 +1952,36 @@ def check_fips_cast_failure(self, binary_path, binary, cast_name="HMAC-SHA2-256"
         check=False,
     )
 
+    return result
+
+
+@TestStep(Check)
+def check_fips_cast_failure_result(
+    self,
+    result,
+    binary,
+    cast_name,
+    failure_kind="CAST",
+):
+    """Assert binary exits non-zero with the expected forced FIPS CAST/PCT failure."""
     output = f"{result.stdout}\n{result.stderr}"
 
     assert result.returncode != 0, error(
-        f"{binary}: expected CAST failure exit, got {result.returncode}\n{output}"
+        f"{binary}: expected {failure_kind} failure exit, got {result.returncode}\n{output}"
     )
+
     assert f"FIPS 140-3 self-test failed: {cast_name}" in output, error(
-        f"{binary}: expected CAST failure for {cast_name}\n{output}"
+        f"{binary}: expected {failure_kind} failure for {cast_name}\n{output}"
     )
-    assert "simulated CAST failure" in output, error(
-        f"{binary}: expected simulated CAST failure message\n{output}"
+
+    expected_simulated_message = (
+        "simulated PCT failure"
+        if "PCT" in cast_name or failure_kind == "PCT"
+        else "simulated CAST failure"
+    )
+
+    assert expected_simulated_message in output, error(
+        f"{binary}: expected {expected_simulated_message!r}\n{output}"
     )
 
 def _free_local_port():
@@ -1976,29 +2000,31 @@ def check_fips_integrity_failure(self, binary_path, binary_label):
     match = re.search(r"\.go\.fipsinfo\s+\w+\s+\w+\s+([0-9a-fA-F]+)", readelf_out)
     assert match, error(f"{binary_label}: .go.fipsinfo section not found in ELF headers")
 
-    section_offset = int(match.group(1), 16)
-    hmac_byte_offset = section_offset + 16
+    with Given("I edit the binary to corrupt the .go.fipsinfo HMAC"):
+        section_offset = int(match.group(1), 16)
+        hmac_byte_offset = section_offset + 16
 
-    corrupted_bin = f"{binary_path}.corrupted"
-    shutil.copy2(binary_path, corrupted_bin)
+        corrupted_bin = f"{binary_path}.corrupted"
+        shutil.copy2(binary_path, corrupted_bin)
 
-    with open(corrupted_bin, "rb+") as f:
-        f.seek(hmac_byte_offset)
-        original_byte = f.read(1)
-        corrupted_byte = bytes([original_byte[0] ^ 0xFF])
-        f.seek(hmac_byte_offset)
-        f.write(corrupted_byte)
+        with open(corrupted_bin, "rb+") as f:
+            f.seek(hmac_byte_offset)
+            original_byte = f.read(1)
+            corrupted_byte = bytes([original_byte[0] ^ 0xFF])
+            f.seek(hmac_byte_offset)
+            f.write(corrupted_byte)
 
-    result = subprocess.run(
-        [corrupted_bin, "--version"],
-        env={"GODEBUG": "fips140=on"},
-        capture_output=True,
-        text=True,
-        check=False
-    )
+    with When("I execute --version on a corrupted bin file"):
+        result = subprocess.run(
+            [corrupted_bin, "--version"],
+            env={"GODEBUG": "fips140=on"},
+            capture_output=True,
+            text=True,
+            check=False
+        )
 
-    output = f"{result.stdout}\n{result.stderr}"
-    note(output)
+        output = f"{result.stdout}\n{result.stderr}"
+        note(output)
 
     with Then("the process must terminate with a verification mismatch panic"):
         assert result.returncode != 0, error(
