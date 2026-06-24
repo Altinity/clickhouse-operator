@@ -3419,8 +3419,25 @@ def test_010031(self):
                 f.write(yaml.dump_all(manifest_yaml).encode())
                 util.install_operator_if_not_exist(reinstall=True, manifest=f.name)
 
-    with And("Restart operator"):
-        util.restart_operator(ns=current().context.operator_namespace)
+    with And("Restart operator until it actually loaded the custom annotation-exclude config"):
+        # The operator parses config.yaml only at startup. The reinstall above
+        # applies the custom ConfigMap (annotation.exclude=[excl]), but kubelet
+        # syncs the projected ConfigMap volume lazily (~60s), so a restart that
+        # races that sync reads the stale default (empty exclude) and wrongly
+        # propagates 'excl'. Restart until the operator's boot-time config dump
+        # shows the exclude actually loaded, instead of asserting on a coin-flip.
+        op_ns = current().context.operator_namespace
+        start = time.time()
+        loaded = False
+        while time.time() - start < 180:
+            util.restart_operator(ns=op_ns)
+            op_pod = kubectl.get_operator_pod(ns=op_ns)
+            logs = kubectl.launch(f"logs {op_pod} -c clickhouse-operator", ns=op_ns, ok_to_fail=True)
+            if re.search(r"^\s*-\s*excl\s*$", logs, re.M):
+                loaded = True
+                break
+            time.sleep(10)
+        assert loaded, error("operator never loaded annotation.exclude=[excl] from the custom config")
 
     with When("I apply chi"):
         kubectl.create_and_check(chi_manifest, check={"do_not_delete": 1})
