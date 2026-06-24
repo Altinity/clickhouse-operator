@@ -43,14 +43,14 @@ spec:
               <dhParamsFile>/etc/clickhouse-server/secrets.d/dhparam.pem/clickhouse-certs/dhparam.pem</dhParamsFile>
               <!-- Server-auth TLS only: clients validate this certificate; the server does not require client certificates (not mTLS). -->
               <verificationMode>none</verificationMode>
-              <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1</disableProtocols>
+              <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1,tlsv1_2</disableProtocols>
               <cipherSuites>TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384</cipherSuites>
             </server>
             <client>
               <caConfig>/etc/clickhouse-server/secrets.d/ca.crt/clickhouse-certs/ca.crt</caConfig>
               <loadDefaultCAFile>false</loadDefaultCAFile>
               <verificationMode>strict</verificationMode>
-              <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1</disableProtocols>
+              <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1,tlsv1_2</disableProtocols>
               <cipherSuites>TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384</cipherSuites>
             </client>
           </openSSL>

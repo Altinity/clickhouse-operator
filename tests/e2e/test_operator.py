@@ -7851,8 +7851,8 @@ def test_030003(self):
             chk_pods=chk_pods,
         )
 
-    with Check("rejected TLS protocol and cipher combinations fail negotiation"):
-        fips_assert_rejected_tls_probes(
+    with Check("all rejected TLS protocol and cipher cases fail on every FIPS TLS endpoint"):
+        fips_assert_all_rejected_tls_cases_on_all_endpoints(
             chi_pods=chi_pods,
             chk_pods=chk_pods,
         )
@@ -8831,7 +8831,7 @@ def test_030016(self):
             ns=self.context.test_namespace,
         )
 
-    with Check("ClickHouse native TLS accepts the approved TLS 1.2 AES-GCM cipher"):
+    with Then("check ClickHouse native TLS accepts the approved TLS 1.2 AES-GCM cipher"):
         out = fips_run_openssl_s_client_on_pod_port(
             pod=chi_pod,
             port=9440,
@@ -8843,7 +8843,7 @@ def test_030016(self):
         assert "Protocol  : TLSv1.2" in out, error(out)
         assert "Cipher    : ECDHE-RSA-AES256-GCM-SHA384" in out, error(out)
 
-    with Check("ClickHouse native TLS rejects the disallowed TLS 1.2 ChaCha20 cipher"):
+    with Then("check ClickHouse native TLS rejects the disallowed TLS 1.2 ChaCha20 cipher"):
         out = fips_run_openssl_s_client_on_pod_port(
             pod=chi_pod,
             port=9440,
@@ -8873,7 +8873,7 @@ def cleanup_chis(self):
 
 
 @TestModule
-@Name("test_operator")
+@Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"),
               RQ_SRS_026_ClickHouseOperator("1.0"))
 def test(self):

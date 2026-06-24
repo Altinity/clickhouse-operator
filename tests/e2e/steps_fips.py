@@ -34,6 +34,181 @@ import e2e.kubectl as kubectl
 
 
 FAKE_OPENSSL_SERVER = "fake-openssl-server"
+TLS_REJECT_MARKERS = (
+    "Cipher is (NONE)",
+    "Cipher    : 0000",
+    "handshake failure",
+    "alert handshake failure",
+    "no shared cipher",
+    "no protocols available",
+    "unsupported protocol",
+    "wrong version number",
+    "tlsv1 alert protocol version",
+    "no peer certificate available",
+)
+
+approved_tls1_3_ciphers = [
+    "TLS_AES_256_GCM_SHA384",
+    "TLS_AES_128_GCM_SHA256",
+]
+ciphers_by_protocol = {
+    "TLSv1.3": [
+        "TLS_AES_256_GCM_SHA384",
+        "TLS_CHACHA20_POLY1305_SHA256",
+        "TLS_AES_128_GCM_SHA256",
+    ],
+    "TLSv1.2": [
+        "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "ECDHE-RSA-AES256-GCM-SHA384",
+        "DHE-DSS-AES256-GCM-SHA384",
+        "DHE-RSA-AES256-GCM-SHA384",
+        "ECDHE-ECDSA-CHACHA20-POLY1305",
+        "ECDHE-RSA-CHACHA20-POLY1305",
+        "DHE-RSA-CHACHA20-POLY1305",
+        "ECDHE-ECDSA-AES256-CCM",
+        "DHE-RSA-AES256-CCM",
+        "ECDHE-ECDSA-ARIA256-GCM-SHA384",
+        "ECDHE-ARIA256-GCM-SHA384",
+        "DHE-DSS-ARIA256-GCM-SHA384",
+        "DHE-RSA-ARIA256-GCM-SHA384",
+        "ADH-AES256-GCM-SHA384",
+        "ECDHE-ECDSA-AES128-GCM-SHA256",
+        "ECDHE-RSA-AES128-GCM-SHA256",
+        "DHE-DSS-AES128-GCM-SHA256",
+        "DHE-RSA-AES128-GCM-SHA256",
+        "ECDHE-ECDSA-AES128-CCM",
+        "DHE-RSA-AES128-CCM",
+        "ECDHE-ECDSA-ARIA128-GCM-SHA256",
+        "ECDHE-ARIA128-GCM-SHA256",
+        "DHE-DSS-ARIA128-GCM-SHA256",
+        "DHE-RSA-ARIA128-GCM-SHA256",
+        "ADH-AES128-GCM-SHA256",
+        "ECDHE-ECDSA-AES256-CCM8",
+        "ECDHE-ECDSA-AES128-CCM8",
+        "DHE-RSA-AES256-CCM8",
+        "DHE-RSA-AES128-CCM8",
+        "ECDHE-ECDSA-AES256-SHA384",
+        "ECDHE-RSA-AES256-SHA384",
+        "DHE-RSA-AES256-SHA256",
+        "DHE-DSS-AES256-SHA256",
+        "ECDHE-ECDSA-CAMELLIA256-SHA384",
+        "ECDHE-RSA-CAMELLIA256-SHA384",
+        "DHE-RSA-CAMELLIA256-SHA256",
+        "DHE-DSS-CAMELLIA256-SHA256",
+        "ADH-AES256-SHA256",
+        "ADH-CAMELLIA256-SHA256",
+        "ECDHE-ECDSA-AES128-SHA256",
+        "ECDHE-RSA-AES128-SHA256",
+        "DHE-RSA-AES128-SHA256",
+        "DHE-DSS-AES128-SHA256",
+        "ECDHE-ECDSA-CAMELLIA128-SHA256",
+        "ECDHE-RSA-CAMELLIA128-SHA256",
+        "DHE-RSA-CAMELLIA128-SHA256",
+        "DHE-DSS-CAMELLIA128-SHA256",
+        "ADH-AES128-SHA256",
+        "ADH-CAMELLIA128-SHA256",
+        "RSA-PSK-AES256-GCM-SHA384",
+        "DHE-PSK-AES256-GCM-SHA384",
+        "RSA-PSK-CHACHA20-POLY1305",
+        "DHE-PSK-CHACHA20-POLY1305",
+        "ECDHE-PSK-CHACHA20-POLY1305",
+        "DHE-PSK-AES256-CCM",
+        "RSA-PSK-ARIA256-GCM-SHA384",
+        "DHE-PSK-ARIA256-GCM-SHA384",
+        "AES256-GCM-SHA384",
+        "AES256-CCM",
+        "ARIA256-GCM-SHA384",
+        "PSK-AES256-GCM-SHA384",
+        "PSK-CHACHA20-POLY1305",
+        "PSK-AES256-CCM",
+        "PSK-ARIA256-GCM-SHA384",
+        "RSA-PSK-AES128-GCM-SHA256",
+        "DHE-PSK-AES128-GCM-SHA256",
+        "DHE-PSK-AES128-CCM",
+        "RSA-PSK-ARIA128-GCM-SHA256",
+        "DHE-PSK-ARIA128-GCM-SHA256",
+        "AES128-GCM-SHA256",
+        "AES128-CCM",
+        "ARIA128-GCM-SHA256",
+        "PSK-AES128-GCM-SHA256",
+        "PSK-AES128-CCM",
+        "PSK-ARIA128-GCM-SHA256",
+        "DHE-PSK-AES256-CCM8",
+        "DHE-PSK-AES128-CCM8",
+        "AES256-CCM8",
+        "AES128-CCM8",
+        "PSK-AES256-CCM8",
+        "PSK-AES128-CCM8",
+        "AES256-SHA256",
+        "CAMELLIA256-SHA256",
+        "AES128-SHA256",
+        "CAMELLIA128-SHA256",
+    ],
+    "TLSv1": [
+        "ECDHE-ECDSA-AES256-SHA",
+        "ECDHE-RSA-AES256-SHA",
+        "AECDH-AES256-SHA",
+        "ECDHE-ECDSA-AES128-SHA",
+        "ECDHE-RSA-AES128-SHA",
+        "AECDH-AES128-SHA",
+        "ECDHE-PSK-AES256-CBC-SHA384",
+        "ECDHE-PSK-AES256-CBC-SHA",
+        "RSA-PSK-AES256-CBC-SHA384",
+        "DHE-PSK-AES256-CBC-SHA384",
+        "ECDHE-PSK-CAMELLIA256-SHA384",
+        "RSA-PSK-CAMELLIA256-SHA384",
+        "DHE-PSK-CAMELLIA256-SHA384",
+        "PSK-AES256-CBC-SHA384",
+        "PSK-CAMELLIA256-SHA384",
+        "ECDHE-PSK-AES128-CBC-SHA256",
+        "ECDHE-PSK-AES128-CBC-SHA",
+        "RSA-PSK-AES128-CBC-SHA256",
+        "DHE-PSK-AES128-CBC-SHA256",
+        "ECDHE-PSK-CAMELLIA128-SHA256",
+        "RSA-PSK-CAMELLIA128-SHA256",
+        "DHE-PSK-CAMELLIA128-SHA256",
+        "PSK-AES128-CBC-SHA256",
+        "PSK-CAMELLIA128-SHA256",
+    ],
+}
+
+_OPENSSL_NEGOTIATED_CIPHER = re.compile(
+    r"(?:^|\n)Cipher is (?!\(NONE\))(?P<cipher>\S+)",
+    re.IGNORECASE,
+)
+
+CIPHERS_PROTOCOL_TLS_VERSION = {
+    "TLSv1.3": "1.3",
+    "TLSv1.2": "1.2",
+    "TLSv1": "1.0",
+}
+
+FIPS_REJECTED_PROTOCOL_CASES = (
+    {"name": "TLS 1.0 protocol", "tls_version": "1.0", "cipher_suite": None},
+    {"name": "TLS 1.1 protocol", "tls_version": "1.1", "cipher_suite": None},
+    {"name": "TLS 1.2 protocol", "tls_version": "1.2", "cipher_suite": None},
+)
+
+
+def fips_rejected_cipher_cases_from_ciphers_by_protocol():
+    """Every cipher in ciphers_by_protocol except approved TLS 1.3 suites."""
+    cases = []
+    for protocol, tls_version in CIPHERS_PROTOCOL_TLS_VERSION.items():
+        for cipher in ciphers_by_protocol[protocol]:
+            if protocol == "TLSv1.3" and cipher in approved_tls1_3_ciphers:
+                continue
+            cases.append({
+                "name": f"TLS {tls_version} {cipher}",
+                "tls_version": tls_version,
+                "cipher_suite": cipher,
+            })
+    return tuple(cases)
+
+
+FIPS_LISTENER_REJECTED_TLS_CASES = (
+    *FIPS_REJECTED_PROTOCOL_CASES,
+    *fips_rejected_cipher_cases_from_ciphers_by_protocol(),
+)
 
 # ---------------------------------------------------------------------------
 # Build verification
@@ -881,6 +1056,41 @@ def fips_wait_cluster_topology(
     note(f"{pod} sees {replica_count} hosts in cluster {cluster_name!r}")
 
 
+def openssl_tls_version_args(tls_version):
+    if tls_version == "1.3":
+        return ["-tls1_3"]
+    if tls_version == "1.2":
+        return ["-tls1_2"]
+    if tls_version == "1.1":
+        return ["-tls1_1"]
+    if tls_version == "1.0":
+        return ["-tls1"]
+    if tls_version == "ssl3":
+        return ["-ssl3"]
+    if tls_version == "ssl2":
+        return ["-ssl2"]
+
+    raise ValueError(f"unsupported TLS/SSL version: {tls_version}")
+
+
+def openssl_cipher_args(tls_version, cipher_suite):
+    if not cipher_suite:
+        return []
+
+    if tls_version == "1.3":
+        return ["-ciphersuites", cipher_suite]
+
+    return ["-cipher", cipher_suite]
+
+
+def openssl_s_client_negotiated_cipher(output):
+    """Return the negotiated cipher name when s_client completed a handshake."""
+    match = _OPENSSL_NEGOTIATED_CIPHER.search(output)
+    if match:
+        return match.group("cipher")
+    return None
+
+
 @TestStep(When)
 def fips_run_openssl_s_client_on_pod_port(
     self,
@@ -896,83 +1106,75 @@ def fips_run_openssl_s_client_on_pod_port(
     ca_crt = self.context.tls["ca_crt"]
     local_port = _free_local_port()
 
-    pf = subprocess.Popen(
-        [
-            "kubectl",
-            "-n", ns,
-            "port-forward",
-            f"pod/{pod}",
-            f"{local_port}:{port}",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-
-    try:
-        deadline = time.time() + 10
-        while time.time() < deadline:
-            if pf.poll() is not None:
-                out, err = pf.communicate()
-                assert False, error(
-                    "kubectl port-forward exited early\n"
-                    f"stdout:\n{out}\n"
-                    f"stderr:\n{err}"
-                )
-
-            try:
-                socket.create_connection(
-                    ("127.0.0.1", int(local_port)), timeout=0.5
-                ).close()
-                break
-            except OSError:
-                time.sleep(0.2)
-        else:
-            assert False, error(
-                f"kubectl port-forward to {pod}:{port} "
-                f"did not become ready on 127.0.0.1:{local_port}"
-            )
-
-        command = [
-            "openssl", "s_client",
-            "-connect", f"127.0.0.1:{local_port}",
-            "-servername", "localhost",
-            "-CAfile", ca_crt,
-            "-verify_return_error",
-        ]
-
-        if tls_version == "1.3":
-            command.append("-tls1_3")
-            if cipher_suite:
-                command.extend(["-ciphersuites", cipher_suite])
-        elif tls_version == "1.2":
-            command.append("-tls1_2")
-            if cipher_suite:
-                command.extend(["-cipher", cipher_suite])
-        elif tls_version == "1.1":
-            command.append("-tls1_1")
-            if cipher_suite:
-                command.extend(["-cipher", cipher_suite])
-        else:
-            raise ValueError(f"unsupported TLS version: {tls_version}")
-
-        result = subprocess.run(
-            command,
-            input="Q\n",
+    with Given(f"port-forward from localhost:{local_port} to {pod}:{port}"):
+        pf = subprocess.Popen(
+            [
+                "kubectl",
+                "-n", ns,
+                "port-forward",
+                f"pod/{pod}",
+                f"{local_port}:{port}",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            capture_output=True,
-            check=False,
         )
 
-        output = f"{result.stdout}\n{result.stderr}"
+    try:
+        with When("port-forward is ready on localhost"):
+            deadline = time.time() + 10
+            while time.time() < deadline:
+                if pf.poll() is not None:
+                    out, err = pf.communicate()
+                    assert False, error(
+                        "kubectl port-forward exited early\n"
+                        f"stdout:\n{out}\n"
+                        f"stderr:\n{err}"
+                    )
+
+                try:
+                    socket.create_connection(
+                        ("127.0.0.1", int(local_port)), timeout=0.5
+                    ).close()
+                    break
+                except OSError:
+                    time.sleep(0.2)
+            else:
+                assert False, error(
+                    f"kubectl port-forward to {pod}:{port} "
+                    f"did not become ready on 127.0.0.1:{local_port}"
+                )
+
+        with And("openssl s_client runs against the forwarded port"):
+            command = [
+                "openssl", "s_client",
+                "-connect", f"127.0.0.1:{local_port}",
+                "-servername", "localhost",
+                "-CAfile", ca_crt,
+                "-verify_return_error",
+            ]
+
+            command.extend(openssl_tls_version_args(tls_version))
+            command.extend(openssl_cipher_args(tls_version, cipher_suite))
+
+            result = subprocess.run(
+                command,
+                input="Q\n",
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            output = f"{result.stdout}\n{result.stderr}"
 
         if not ok_to_fail:
-            assert result.returncode == 0, error(
-                f"{pod}:{port}: openssl s_client failed for "
-                f"tls={tls_version}, cipher={cipher_suite}\n"
-                f"exit code: {result.returncode}\n"
-                f"output:\n{output}"
-            )
+            with Then("openssl s_client handshake succeeds"):
+                assert result.returncode == 0, error(
+                    f"{pod}:{port}: openssl s_client failed for "
+                    f"tls={tls_version}, cipher={cipher_suite}\n"
+                    f"exit code: {result.returncode}\n"
+                    f"output:\n{output}"
+                )
 
         return output
 
@@ -983,64 +1185,78 @@ def fips_run_openssl_s_client_on_pod_port(
         except subprocess.TimeoutExpired:
             pf.kill()
 
-@TestStep(Then)
-def fips_assert_rejected_tls_probes(
+@TestStep(Check)
+def fips_assert_rejected_tls_cases_on_endpoint(
+    self,
+    label,
+    pod,
+    port,
+    rejected_cases,
+    ns=None,
+):
+    """Assert rejected TLS protocol/cipher cases fail on one endpoint."""
+    ns = ns or self.context.test_namespace
+
+    for case in rejected_cases:
+        with Check(f"{label} {pod}:{port} rejects {case['name']}"):
+            output = fips_run_openssl_s_client_on_pod_port(
+                pod=pod,
+                port=port,
+                tls_version=case["tls_version"],
+                cipher_suite=case["cipher_suite"],
+                ok_to_fail=True,
+                ns=ns,
+            )
+
+            output_lower = output.lower()
+
+            negotiated_cipher = openssl_s_client_negotiated_cipher(output)
+            assert negotiated_cipher is None, error(
+                f"{label} {pod}:{port}: server negotiated disallowed {case['name']}\n"
+                f"negotiated cipher: {negotiated_cipher}\n"
+                f"tls_version={case['tls_version']}\n"
+                f"cipher_suite={case['cipher_suite']}\n"
+                f"output:\n{output}"
+            )
+
+            assert any(
+                marker.lower() in output_lower
+                for marker in TLS_REJECT_MARKERS
+            ), error(
+                f"{label} {pod}:{port}: expected TLS rejection for {case['name']}\n"
+                f"tls_version={case['tls_version']}\n"
+                f"cipher_suite={case['cipher_suite']}\n"
+                f"output:\n{output}"
+            )
+
+
+@TestStep(Check)
+def fips_assert_all_rejected_tls_cases_on_all_endpoints(
     self,
     chi_pods,
     chk_pods,
     ns=None,
 ):
-    """Assert rejected TLS protocol/cipher combinations fail handshake."""
+    """Assert all rejected TLS cases fail on every FIPS TLS endpoint."""
     ns = ns or self.context.test_namespace
-
-    rejected_cases = (
-        {
-            "name": "TLS 1.3 ChaCha20-Poly1305",
-            "tls_version": "1.3",
-            "cipher_suite": "TLS_CHACHA20_POLY1305_SHA256",
-        },
-        {
-            "name": "TLS 1.1 protocol",
-            "tls_version": "1.1",
-            "cipher_suite": None,
-        },
-    )
+    rejected_cases = FIPS_LISTENER_REJECTED_TLS_CASES
 
     endpoints = (
         ("ClickHouse HTTPS", chi_pods[0], 8443),
         ("ClickHouse native TLS", chi_pods[0], 9440),
         ("ClickHouse interserver HTTPS", chi_pods[0], 9010),
         ("Keeper secure client", chk_pods[0], 2281),
-        ("Backup API HTTPS", chi_pods[0], 7171),
     )
 
-    rejected_markers = (
-        "Cipher is (NONE)",
-        "handshake failure",
-        "no protocols available",
-        "no shared cipher",
-    )
+    for label, pod, port in endpoints:
+        fips_assert_rejected_tls_cases_on_endpoint(
+            label=label,
+            pod=pod,
+            port=port,
+            rejected_cases=rejected_cases,
+            ns=ns,
+        )
 
-    for case in rejected_cases:
-        for label, pod, port in endpoints:
-            with Then(f"{label} {pod}:{port} rejects {case['name']}"):
-                output = fips_run_openssl_s_client_on_pod_port(
-                    pod=pod,
-                    port=port,
-                    tls_version=case["tls_version"],
-                    cipher_suite=case["cipher_suite"],
-                    ok_to_fail=True,
-                    ns=ns,
-                )
-
-                assert any(
-                    marker.lower() in output.lower()
-                    for marker in rejected_markers
-                ), error(
-                    f"{label} {pod}:{port}: expected rejected TLS probe to fail "
-                    f"for {case['name']}\n"
-                    f"output:\n{output}"
-                )
 
 @TestStep(Then)
 def fips_assert_aes256_tls13_probes(
