@@ -8714,12 +8714,6 @@ def test_030010(self):
 )
 def test_030011(self):
     """Verify that corrupting the embedded FIPS HMAC causes binaries to panic at startup.
-
-    Procedure:
-    1. Extract FIPS binaries from release images.
-    2. Locate the '.go.fipsinfo' ELF section.
-    3. Flip bits in the HMAC header.
-    4. Verify the binary panics with 'fips140: verification mismatch'.
     """
     with Given("operator and metrics-exporter binaries are extracted"):
         fips_extract_shipped_binaries()
@@ -8780,14 +8774,6 @@ def test_030015(self):
 )
 def test_030016(self):
     """Verify external clickhouse-client can use TLS 1.2 cipher policy to CH native TLS.
-
-    This intentionally uses:
-    - operator
-    - one ClickHouse pod
-    - external Docker clickhouse-client
-    - native secure port 9440
-    - no Keeper
-    - no backup sidecar
     """
     chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
     chi_manifest = "manifests/chi/test-030016.yaml"
