@@ -210,6 +210,17 @@ FIPS_LISTENER_REJECTED_TLS_CASES = (
     *fips_rejected_cipher_cases_from_ciphers_by_protocol(),
 )
 
+FIPS_OPERATOR_APPROVED_TLS13_CIPHER = "TLS_AES_256_GCM_SHA384"
+FIPS_OPERATOR_APPROVED_TLS13_CIPHER_SUITES = ":".join(approved_tls1_3_ciphers)
+
+OPERATOR_CONTAINER_TLS_FAILURE_NEEDLES = (
+    "handshake failure",
+    "no shared cipher",
+    "alert handshake failure",
+    "TLS connect error",
+    "HTTP:000",
+)
+
 # ---------------------------------------------------------------------------
 # Build verification
 # ---------------------------------------------------------------------------
@@ -1081,6 +1092,44 @@ def openssl_cipher_args(tls_version, cipher_suite):
         return ["-ciphersuites", cipher_suite]
 
     return ["-cipher", cipher_suite]
+
+
+def fake_openssl_s_server_command(tls_version="1.3", cipher_suite=None):
+    """Build ``openssl s_server`` argv for the fake TLS server pod."""
+    command = [
+        "openssl", "s_server",
+        "-accept", "18443",
+        "-cert", "/tls/server.crt",
+        "-key", "/tls/server.key",
+    ]
+    command.extend(openssl_tls_version_args(tls_version))
+    command.extend(openssl_cipher_args(tls_version, cipher_suite))
+    command.extend(["-www", "-state"])
+    return command
+
+
+def curl_tls_version_args(tls_version, cipher_suite=None):
+    """Build curl TLS version/cipher flags for operator-container probes."""
+    if tls_version == "1.3":
+        args = ["--tlsv1.3"]
+        if cipher_suite:
+            args.extend(["--tls13-ciphers", cipher_suite])
+        return args
+
+    if tls_version == "1.2":
+        # --tlsv1.2 alone is a minimum; cap the max so curl cannot upgrade to 1.3.
+        args = ["--tls-max", "1.2", "--tlsv1.2"]
+    elif tls_version == "1.1":
+        args = ["--tls-max", "1.1", "--tlsv1.1"]
+    elif tls_version == "1.0":
+        args = ["--tls-max", "1.0", "--tlsv1.0"]
+    else:
+        raise ValueError(f"unsupported TLS version for curl: {tls_version}")
+
+    if cipher_suite:
+        args.extend(["--ciphers", cipher_suite])
+
+    return args
 
 
 def openssl_s_client_negotiated_cipher(output):
@@ -2433,11 +2482,18 @@ def fips_delete_fake_openssl_server(self, ns=None):
 
 
 @TestStep(Given)
-def fips_create_fake_openssl_server(self, cipher_suite, ns=None):
-    """Create fake TLS 1.3 server restricted to one cipher suite."""
+def fips_create_fake_openssl_server(self, ns=None):
+    """Create fake TLS 1.3 server offering only FIPS-approved cipher suites."""
     ns = ns or current().context.test_namespace
 
     fips_delete_fake_openssl_server(ns=ns)
+
+    server_command = " ".join(
+        shlex.quote(arg) for arg in fake_openssl_s_server_command(
+            tls_version="1.3",
+            cipher_suite=FIPS_OPERATOR_APPROVED_TLS13_CIPHER_SUITES,
+        )
+    )
 
     manifest = f"""
 apiVersion: v1
@@ -2454,14 +2510,7 @@ spec:
     command: ["sh", "-lc"]
     args:
     - |
-      openssl s_server \\
-        -accept 18443 \\
-        -cert /tls/server.crt \\
-        -key /tls/server.key \\
-        -tls1_3 \\
-        -ciphersuites {cipher_suite} \\
-        -www \\
-        -state
+      {server_command}
     ports:
     - containerPort: 18443
     volumeMounts:
@@ -2506,23 +2555,26 @@ spec:
 
 
 @TestStep(When)
-def fips_curl_tls13_from_operator_container(
+def fips_curl_tls_from_operator_container(
     self,
     container,
     url,
-    cipher_suite,
+    tls_version="1.3",
+    cipher_suite=None,
     ns=None,
 ):
-    """Run curl from one operator pod container with forced TLS 1.3 cipher."""
+    """Run curl from one operator pod container with forced TLS version/cipher."""
     ns = ns or current().context.operator_namespace
     operator_pod = kubectl.get_operator_pod(ns=ns)
+    curl_tls_flags = " ".join(
+        shlex.quote(arg) for arg in curl_tls_version_args(tls_version, cipher_suite)
+    )
 
     return kubectl.launch(
         f"exec {operator_pod} -c {container} -- "
         "sh -c '"
         "curl -k -sS -v "
-        "--tlsv1.3 "
-        f"--tls13-ciphers {cipher_suite} "
+        f"{curl_tls_flags} "
         f"{url} "
         "-o /dev/null "
         "-w \"HTTP:%{http_code}\" "
@@ -2533,35 +2585,96 @@ def fips_curl_tls13_from_operator_container(
     )
 
 
+@TestStep(When)
+def fips_curl_tls13_from_operator_container(
+    self,
+    container,
+    url,
+    cipher_suite,
+    ns=None,
+):
+    """Run curl from one operator pod container with forced TLS 1.3 cipher."""
+    return fips_curl_tls_from_operator_container(
+        container=container,
+        url=url,
+        tls_version="1.3",
+        cipher_suite=cipher_suite,
+        ns=ns,
+    )
+
+
+@TestStep(Then)
+def fips_assert_operator_containers_tls_fails(
+    self,
+    url,
+    tls_version="1.3",
+    cipher_suite=None,
+    case_name=None,
+    ns=None,
+):
+    """Assert both operator pod containers fail with the requested TLS probe."""
+    ns = ns or current().context.operator_namespace
+    label = case_name or cipher_suite or f"TLS {tls_version} protocol"
+
+    for container in ("clickhouse-operator", "metrics-exporter"):
+        with Then(f"{container} fails to negotiate {label} to {url}"):
+            out = fips_curl_tls_from_operator_container(
+                container=container,
+                url=url,
+                tls_version=tls_version,
+                cipher_suite=cipher_suite,
+                ns=ns,
+            )
+
+            assert any(
+                needle in out for needle in OPERATOR_CONTAINER_TLS_FAILURE_NEEDLES
+            ), error(
+                f"{container}: expected TLS handshake failure for {label}\n{out}"
+            )
+
+
 @TestStep(Then)
 def fips_assert_operator_containers_tls13_fails(
     self,
     url,
     cipher_suite,
+    case_name=None,
     ns=None,
 ):
     """Assert both operator pod containers fail with the requested TLS 1.3 cipher."""
-    ns = ns or current().context.operator_namespace
-
-    failure_needles = (
-        "handshake failure",
-        "no shared cipher",
-        "alert handshake failure",
-        "TLS connect error",
-        "HTTP:000",
+    fips_assert_operator_containers_tls_fails(
+        url=url,
+        tls_version="1.3",
+        cipher_suite=cipher_suite,
+        case_name=case_name,
+        ns=ns,
     )
 
-    for container in ("clickhouse-operator", "metrics-exporter"):
-        with Then(f"{container} fails to negotiate {cipher_suite} to {url}"):
-            out = fips_curl_tls13_from_operator_container(
-                container=container,
-                url=url,
-                cipher_suite=cipher_suite,
-                ns=ns,
-            )
 
-            assert any(needle in out for needle in failure_needles), error(
-                f"{container}: expected TLS handshake failure for {cipher_suite}\n{out}"
+@TestStep(Check)
+def fips_assert_rejected_tls_cases_on_fake_openssl_server(
+    self,
+    rejected_cases=None,
+    ns=None,
+):
+    """Assert operator clients fail all rejected TLS probes against approved fake server."""
+    operator_ns = current().context.operator_namespace
+    fake_url = f"https://{FAKE_OPENSSL_SERVER}:8443/ping"
+    rejected_cases = rejected_cases or FIPS_LISTENER_REJECTED_TLS_CASES
+
+    with Given(
+        "fake OpenSSL server offers only approved TLS 1.3 AES-GCM cipher suites"
+    ):
+        fips_create_fake_openssl_server(ns=ns)
+
+    for case in rejected_cases:
+        with Check(f"operator clients fail {case['name']} against approved-only fake server"):
+            fips_assert_operator_containers_tls_fails(
+                url=fake_url,
+                tls_version=case["tls_version"],
+                cipher_suite=case["cipher_suite"],
+                case_name=case["name"],
+                ns=operator_ns,
             )
 
 
@@ -2570,28 +2683,15 @@ def fips_assert_connection_rejected_on_non_approved_cipher(
     self,
     ns=None,
 ):
-    """Assert fake ChaCha-only TLS server rejects approved AES-only clients.
+    """Assert operator clients fail all rejected TLS probes against approved fake server.
 
-    This is the synthetic negative control for rejected cipher behavior.
+    Deploy one fake ``openssl s_server`` pod that offers only the approved TLS 1.3
+    AES-GCM cipher suites, then verify both operator containers fail every rejected
+    protocol/cipher client probe from ``FIPS_LISTENER_REJECTED_TLS_CASES``.
     """
     ns = ns or current().context.test_namespace
 
-    approved_cipher = "TLS_AES_256_GCM_SHA384"
-    rejected_cipher = "TLS_CHACHA20_POLY1305_SHA256"
-    fake_url = f"https://{FAKE_OPENSSL_SERVER}:8443/ping"
-
-    with Given("fake OpenSSL server offers only non-approved ChaCha TLS 1.3 cipher"):
-        fips_create_fake_openssl_server(
-            cipher_suite=rejected_cipher,
-            ns=ns,
-        )
-
-    with Then("operator pod containers restricted to approved AES-256 fail the handshake"):
-        fips_assert_operator_containers_tls13_fails(
-            url=fake_url,
-            cipher_suite=approved_cipher,
-            ns=ns,
-        )
-
-    with Finally("delete fake OpenSSL server"):
+    try:
+        fips_assert_rejected_tls_cases_on_fake_openssl_server(ns=ns)
+    finally:
         fips_delete_fake_openssl_server(ns=ns)

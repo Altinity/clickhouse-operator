@@ -8703,7 +8703,7 @@ def test_030010(self):
             chi_pod=chi_pods[0],
         )
 
-    with Check("operator pod containers restricted to AES-256 fail against a ChaCha-only TLS server"):
+    with Check("operator pod containers fail all rejected TLS protocol/cipher probes against an approved-only fake server"):
         fips_assert_connection_rejected_on_non_approved_cipher()
 
 
