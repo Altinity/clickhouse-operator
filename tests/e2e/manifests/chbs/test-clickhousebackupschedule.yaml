@@ -1,0 +1,11 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackupSchedule"
+metadata:
+  name: test-backup-schedule
+spec:
+  clickHouseInstallation: test-cluster-for-backups
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  backupTemplate:
+    backupNamePrefix: e2e-scheduled
+    replicaSelection: FirstPerShard

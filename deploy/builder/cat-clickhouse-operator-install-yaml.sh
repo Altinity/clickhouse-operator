@@ -154,6 +154,14 @@ if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
         OPERATOR_VERSION="${OPERATOR_VERSION}"    \
         envsubst
+
+    # Render Backup CRDs (ClickHouseBackup, ClickHouseBackupSchedule, ClickHouseRestore)
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-01-section-crd-04-backup.yaml"
+    ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
+    render_separator
+    cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
+        OPERATOR_VERSION="${OPERATOR_VERSION}"    \
+        envsubst
 fi
 
 if [[ "${MANIFEST_PRINT_RBAC_CLUSTERED}" == "yes" || "${MANIFEST_PRINT_RBAC_NAMESPACED}" == "yes" ]]; then

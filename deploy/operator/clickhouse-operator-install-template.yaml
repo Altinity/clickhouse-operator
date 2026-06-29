@@ -5387,6 +5387,423 @@ spec:
 ---
 # Template Parameters:
 #
+# OPERATOR_VERSION=0.28.0
+#
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhousebackups.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.28.0
+spec:
+  group: clickhouse.altinity.com
+  scope: Namespaced
+  names:
+    kind: ClickHouseBackup
+    singular: clickhousebackup
+    plural: clickhousebackups
+    shortNames:
+      - chb
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: installation
+          type: string
+          description: Target ClickHouseInstallation
+          jsonPath: .spec.clickHouseInstallation
+        - name: backup
+          type: string
+          description: Remote backup name
+          jsonPath: .status.backupName
+        - name: phase
+          type: string
+          description: Backup phase
+          jsonPath: .status.phase
+        - name: duration
+          type: integer
+          description: Backup duration (seconds)
+          jsonPath: .status.durationSeconds
+        - name: age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          description: "ClickHouseBackup defines a one-off backup of a ClickHouseInstallation driven by clickhouse-backup"
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - clickHouseInstallation
+              properties:
+                clickHouseInstallation:
+                  type: string
+                  description: "Name of the target ClickHouseInstallation in the same namespace"
+                backupName:
+                  type: string
+                  description: "Optional explicit remote backup name; generated when empty"
+                schemaOnly:
+                  type: boolean
+                  description: "Back up table/database definitions only (no data)"
+                replicaSelection:
+                  type: string
+                  description: "Which replicas to back up"
+                  enum:
+                    - FirstPerShard
+                    - AllReplicas
+                image:
+                  type: string
+                  description: "Optional container image override for the trigger job"
+                clickHouseCredentialsSecretName:
+                  type: string
+                  description: "Optional Secret with CLICKHOUSE_USER/CLICKHOUSE_PASSWORD"
+                tables:
+                  type: string
+                  description: "Optional clickhouse-backup --tables pattern to back up only matching tables"
+                partitions:
+                  type: array
+                  nullable: true
+                  items:
+                    type: string
+                  description: "Optional partition ids to back up"
+                diffFromRemote:
+                  type: string
+                  description: "Existing remote backup name to make this an incremental backup"
+                keepLastRemote:
+                  type: integer
+                  format: int32
+                  description: "Keep only the N most recent remote backups (retention)"
+                verify:
+                  type: boolean
+                  description: "Run a verification job after the backup to confirm it is restorable"
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                backupName:
+                  type: string
+                jobName:
+                  type: string
+                startTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                completionTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                durationSeconds:
+                  type: integer
+                  format: int64
+                conditions:
+                  type: array
+                  nullable: true
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      observedGeneration:
+                        type: integer
+                        format: int64
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhousebackupschedules.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.28.0
+spec:
+  group: clickhouse.altinity.com
+  scope: Namespaced
+  names:
+    kind: ClickHouseBackupSchedule
+    singular: clickhousebackupschedule
+    plural: clickhousebackupschedules
+    shortNames:
+      - chbs
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: installation
+          type: string
+          description: Target ClickHouseInstallation
+          jsonPath: .spec.clickHouseInstallation
+        - name: schedule
+          type: string
+          description: Cron schedule
+          jsonPath: .spec.schedule
+        - name: suspend
+          type: boolean
+          description: Whether the schedule is suspended
+          jsonPath: .spec.suspend
+        - name: last-schedule
+          type: date
+          jsonPath: .status.lastScheduleTime
+        - name: age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          description: "ClickHouseBackupSchedule defines a recurring backup of a ClickHouseInstallation"
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - clickHouseInstallation
+                - schedule
+              properties:
+                clickHouseInstallation:
+                  type: string
+                  description: "Name of the target ClickHouseInstallation in the same namespace"
+                schedule:
+                  type: string
+                  description: "Cron schedule in standard Kubernetes CronJob format"
+                suspend:
+                  type: boolean
+                  description: "Pause creation of new backup jobs"
+                concurrencyPolicy:
+                  type: string
+                  description: "How to treat concurrent executions"
+                  enum:
+                    - Allow
+                    - Forbid
+                    - Replace
+                startingDeadlineSeconds:
+                  type: integer
+                  format: int64
+                successfulJobsHistoryLimit:
+                  type: integer
+                  format: int32
+                failedJobsHistoryLimit:
+                  type: integer
+                  format: int32
+                backupTemplate:
+                  type: object
+                  description: "Backup specification stamped out on each scheduled run"
+                  properties:
+                    backupNamePrefix:
+                      type: string
+                    schemaOnly:
+                      type: boolean
+                    replicaSelection:
+                      type: string
+                      enum:
+                        - FirstPerShard
+                        - AllReplicas
+                    image:
+                      type: string
+                    clickHouseCredentialsSecretName:
+                      type: string
+                    tables:
+                      type: string
+                    partitions:
+                      type: array
+                      nullable: true
+                      items:
+                        type: string
+                    keepLastRemote:
+                      type: integer
+                      format: int32
+            status:
+              type: object
+              properties:
+                cronJobName:
+                  type: string
+                lastScheduleTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                conditions:
+                  type: array
+                  nullable: true
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      observedGeneration:
+                        type: integer
+                        format: int64
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhouserestores.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.28.0
+spec:
+  group: clickhouse.altinity.com
+  scope: Namespaced
+  names:
+    kind: ClickHouseRestore
+    singular: clickhouserestore
+    plural: clickhouserestores
+    shortNames:
+      - chr
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: installation
+          type: string
+          description: Target ClickHouseInstallation
+          jsonPath: .spec.clickHouseInstallation
+        - name: backup
+          type: string
+          description: Remote backup name being restored
+          jsonPath: .spec.backupName
+        - name: phase
+          type: string
+          description: Restore phase
+          jsonPath: .status.phase
+        - name: duration
+          type: integer
+          description: Restore duration (seconds)
+          jsonPath: .status.durationSeconds
+        - name: age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          description: "ClickHouseRestore defines a one-off restore of a remote backup into a ClickHouseInstallation"
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - clickHouseInstallation
+                - backupName
+              properties:
+                clickHouseInstallation:
+                  type: string
+                  description: "Name of the target ClickHouseInstallation in the same namespace (a fresh, empty installation is recommended)"
+                backupName:
+                  type: string
+                  description: "Remote backup to restore"
+                schemaOnly:
+                  type: boolean
+                  description: "Restore table/database definitions only (no data)"
+                overwrite:
+                  type: boolean
+                  description: "Allow restoring over existing, non-empty tables. When false (default) the restore is refused if target tables already contain data"
+                validateTopology:
+                  type: boolean
+                  description: "When true (default) the restore validates the target cluster topology is reachable before touching data"
+                image:
+                  type: string
+                  description: "Optional container image override for the restore job"
+                clickHouseCredentialsSecretName:
+                  type: string
+                  description: "Optional Secret with CLICKHOUSE_USER/CLICKHOUSE_PASSWORD"
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                jobName:
+                  type: string
+                startTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                completionTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                durationSeconds:
+                  type: integer
+                  format: int64
+                conditions:
+                  type: array
+                  nullable: true
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      observedGeneration:
+                        type: integer
+                        format: int64
+---
+# Template Parameters:
+#
 # COMMENT=
 # NAMESPACE=${OPERATOR_NAMESPACE}
 # NAME=clickhouse-operator
@@ -5641,6 +6058,60 @@ rules:
       - get
       - update
       - patch
+      - create
+      - delete
+
+  # clickhouse backup - related resources
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhousebackups
+      - clickhousebackupschedules
+      - clickhouserestores
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+      - update
+      - create
+      - delete
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhousebackups/finalizers
+      - clickhousebackupschedules/finalizers
+      - clickhouserestores/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhousebackups/status
+      - clickhousebackupschedules/status
+      - clickhouserestores/status
+    verbs:
+      - get
+      - update
+      - patch
+      - create
+      - delete
+
+  #
+  # batch.* resources - backup/restore Jobs and CronJobs
+  #
+
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+      - cronjobs
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+      - update
       - create
       - delete
 ---

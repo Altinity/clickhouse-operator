@@ -1,0 +1,20 @@
+# One-off restore of a remote backup.
+#
+# Recommended: restore into a FRESH, empty ClickHouseInstallation (here "backup-demo-restored"),
+# which must also run the clickhouse-backup sidecar and point at the same remote storage.
+#
+# The operator's restore Job:
+#   1. validates every target host is reachable (validateTopology),
+#   2. refuses to overwrite a non-empty target unless overwrite=true,
+#   3. restores schema on all replicas, then data on the first replica of each shard;
+#      native replication synchronizes the remaining replicas.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseRestore"
+metadata:
+  name: restore-demo
+spec:
+  clickHouseInstallation: backup-demo-restored
+  backupName: nightly-20260628-020000
+  schemaOnly: false
+  overwrite: false          # set true to drop & recreate existing tables
+  validateTopology: true
