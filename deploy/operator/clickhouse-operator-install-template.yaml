@@ -6179,6 +6179,16 @@ data:
             # a.k.a replication lag - calculated as "MAX(absolute_delay) FROM system.replicas"
             # is within this specified delay (in seconds)
             delay: 10
+            # Optional replicated-host catch-up gate before advancing to the next host.
+            # Disabled by default to preserve existing reconcile behavior.
+            sync:
+              enabled: "false"
+              mode: "lightweight"
+              timeout: 0
+              onTimeout: "abort"
+              health:
+                pollInterval: 10
+                successThreshold: 6
           probes:
             # Whether the operator during host launch procedure should wait for startup probe to succeed.
             # In case probe is unspecified wait is assumed to be completed successfully.

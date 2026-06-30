@@ -16,16 +16,20 @@ package chi
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	common "github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -145,6 +149,13 @@ func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
 
+	case chop.Config().Reconcile.Host.Wait.Replicas.Sync.IsEnabled() && host.IsForceReplicaCatchUp():
+		w.a.V(1).
+			M(host).F().
+			Info("Force replica catch-up after data loss. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return true
+
 	case host.IsFirstInCluster():
 		w.a.V(1).
 			M(host).F().
@@ -191,6 +202,21 @@ func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 	return false
 }
 
+func healthWindowStep(counter int, ok bool, threshold int) (int, bool) {
+	if !ok {
+		return 0, false
+	}
+	counter++
+	return counter, counter >= threshold
+}
+
+func onSoftTimeout(onTimeout string) (advance bool, pushMarker bool, err error) {
+	if onTimeout == "proceed" {
+		return true, false, nil
+	}
+	return false, false, common.ErrCRUDAbort
+}
+
 // includeHost includes host back into all activities - such as cluster, service, etc
 func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 	w.a.V(1).
@@ -200,6 +226,7 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 
 	// w.includeHostIntoClickHouseCluster(ctx, host)
 	w.ascendHostInClickHouseCluster(ctx, host)
+	syncGateEnabled := chop.Config().Reconcile.Host.Wait.Replicas.Sync.IsEnabled()
 	err := w.catchReplicationLag(ctx, host)
 	if err == nil {
 		w.a.V(1).
@@ -212,6 +239,9 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 			M(host).F().
 			Warning("Will NOT include host into cluster due to replication lag. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		if syncGateEnabled {
+			return err
+		}
 	}
 
 	return nil
@@ -330,7 +360,34 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error 
 	// Host is alive but catching up - add to monitoring so metrics are collected during the wait
 	w.addHostToMonitoring(host)
 
-	err := w.waitHostHasNoReplicationDelay(ctx, host)
+	var err error
+	if chop.Config().Reconcile.Host.Wait.Replicas.Sync.IsEnabled() {
+		var caughtUp bool
+		caughtUp, err = w.runReplicaSyncGate(ctx, host)
+		if err == nil {
+			w.a.V(1).
+				M(host).F().
+				WithEvent(host.GetCR(), a.EventActionReconcile, replicaSyncGateEventReason(caughtUp)).
+				Info("Wait for host to catch replication lag - %s "+
+					"Host/shard/cluster: %d/%d/%s",
+					replicaSyncGateResultLabel(caughtUp),
+					host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName,
+				)
+		} else {
+			w.a.V(1).
+				M(host).F().
+				WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileFailed).
+				Info("Wait for host to catch replication lag - FAILED "+
+					"Host/shard/cluster: %d/%d/%s"+
+					"err: %v ",
+					host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName,
+					err,
+				)
+		}
+		return err
+	}
+
+	err = w.waitHostHasNoReplicationDelay(ctx, host)
 	if err == nil {
 		w.a.V(1).
 			M(host).F().
@@ -354,6 +411,117 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error 
 	}
 
 	return err
+}
+
+func (w *worker) runReplicaSyncGate(ctx context.Context, host *api.Host) (bool, error) {
+	syncConfig := chop.Config().Reconcile.Host.Wait.Replicas.Sync
+	clusterSchemer := w.ensureClusterSchemer(host)
+	hostFQDN := w.c.namer.Name(interfaces.NameFQDN, host)
+	deadline := syncGateDeadline(syncConfig.GetTimeout())
+
+	failSoft := func(reason string) (bool, error) {
+		advance, _, err := onSoftTimeout(syncConfig.GetOnTimeout())
+		if advance {
+			w.a.M(host).F().Warning("sync gate %s; proceeding without caught-up marker (onTimeout=proceed)", reason)
+		}
+		return false, err
+	}
+	classifyErr := func(err error) (bool, error) {
+		if err == nil {
+			return false, nil
+		}
+		if contextError := ctx.Err(); contextError != nil {
+			return false, contextError
+		}
+		if errors.Is(err, schemer.ErrGateDeadline) {
+			return failSoft("timed out")
+		}
+		return false, err
+	}
+
+	if err := clusterSchemer.HostAsyncLoadBarrier(ctx, host, deadline); err != nil {
+		return classifyErr(err)
+	}
+	replicatedObjects, err := clusterSchemer.PeerReplicatedObjectCount(ctx, host, deadline)
+	if err != nil {
+		return classifyErr(err)
+	}
+	if replicatedObjects == 0 {
+		host.GetCR().IEnsureStatus().PushHostReplicaCaughtUp(hostFQDN)
+		return true, nil
+	}
+	if err := clusterSchemer.HostSyncReplicatedObjects(ctx, host, deadline); err != nil {
+		return classifyErr(err)
+	}
+
+	healthCounter := 0
+	for {
+		ok, hardFail, healthErr := w.syncHealthOK(ctx, host, deadline)
+		if healthErr != nil {
+			return classifyErr(healthErr)
+		}
+
+		remaining := time.Until(deadline)
+		var done bool
+		var hardDeadline bool
+		healthCounter, done, hardDeadline = syncGateHealthStep(healthCounter, ok, hardFail, syncConfig.GetSuccessThreshold(), remaining)
+		if hardDeadline {
+			return false, syncGateHardFailError(host)
+		}
+		if done {
+			host.GetCR().IEnsureStatus().PushHostReplicaCaughtUp(hostFQDN)
+			return true, nil
+		}
+
+		if remaining <= 0 {
+			return failSoft("health window not satisfied")
+		}
+		sleepDuration := time.Duration(syncConfig.GetPollInterval()) * time.Second
+		if sleepDuration > remaining {
+			sleepDuration = remaining
+		}
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		case <-time.After(sleepDuration):
+			if hardFail && !time.Now().Before(deadline) {
+				return false, syncGateHardFailError(host)
+			}
+		}
+	}
+}
+
+func syncGateHealthStep(counter int, ok bool, hardFail bool, threshold int, remaining time.Duration) (int, bool, bool) {
+	if hardFail {
+		return 0, false, remaining <= 0
+	}
+	nextCounter, done := healthWindowStep(counter, ok, threshold)
+	return nextCounter, done, false
+}
+
+func syncGateHardFailError(host *api.Host) error {
+	return fmt.Errorf("host %s readonly or session-expired; refusing to advance", host.GetName())
+}
+
+func replicaSyncGateEventReason(caughtUp bool) string {
+	if caughtUp {
+		return a.EventReasonReconcileCompleted
+	}
+	return a.EventReasonReconcileProceed
+}
+
+func replicaSyncGateResultLabel(caughtUp bool) string {
+	if caughtUp {
+		return "COMPLETED"
+	}
+	return "PROCEEDED without caught-up marker"
+}
+
+func syncGateDeadline(timeoutSeconds int) time.Time {
+	if timeoutSeconds <= 0 {
+		return time.Now().Add(time.Hour * 24 * 365 * 100)
+	}
+	return time.Now().Add(time.Duration(timeoutSeconds) * time.Second)
 }
 
 // shouldExcludeHost determines whether host to be excluded from cluster before reconcile

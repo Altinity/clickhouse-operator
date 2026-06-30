@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -178,6 +179,45 @@ func (w *worker) doesHostHaveNoReplicationDelay(ctx context.Context, host *api.H
 	delay, _ := w.ensureClusterSchemer(host).HostMaxReplicaDelay(ctx, host)
 	log.V(1).Info("replication lag %d host: %s", delay, host.GetName())
 	return delay <= chop.Config().Reconcile.Host.Wait.Replicas.Delay.IntValue()
+}
+
+func (w *worker) syncHealthOK(ctx context.Context, host *api.Host, deadline time.Time) (ok bool, hardFail bool, err error) {
+	clusterSchemer := w.ensureClusterSchemer(host)
+	readHealth := func(read func(context.Context, *api.Host) (int, error)) (int, bool, error) {
+		if contextError := ctx.Err(); contextError != nil {
+			return 0, false, contextError
+		}
+		queryCtx, cancel := context.WithDeadline(ctx, deadline)
+		defer cancel()
+		healthValue, queryErr := read(queryCtx, host)
+		if contextError := ctx.Err(); contextError != nil {
+			return 0, false, contextError
+		}
+		if queryCtx.Err() != nil || errors.Is(queryErr, context.DeadlineExceeded) {
+			return 0, true, nil
+		}
+		if queryErr != nil {
+			return 0, false, queryErr
+		}
+		return healthValue, false, nil
+	}
+
+	readonly, notReady, err := readHealth(clusterSchemer.HostMaxIsReadonly)
+	if err != nil || notReady {
+		return false, false, err
+	}
+	sessionExpired, notReady, err := readHealth(clusterSchemer.HostMaxIsSessionExpired)
+	if err != nil || notReady {
+		return false, false, err
+	}
+	replicaDelay, notReady, err := readHealth(clusterSchemer.HostMaxReplicaDelay)
+	if err != nil || notReady {
+		return false, false, err
+	}
+	if readonly != 0 || sessionExpired != 0 {
+		return false, true, nil
+	}
+	return replicaDelay <= chop.Config().Reconcile.Host.Wait.Replicas.Delay.IntValue(), false, nil
 }
 
 // isCHIProcessedOnTheSameIP checks whether it is just a restart of the operator on the same IP

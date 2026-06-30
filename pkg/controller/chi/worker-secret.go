@@ -25,8 +25,8 @@ import (
 
 // reconcileSecret reconciles core.Secret
 func (w *worker) reconcileSecret(ctx context.Context, cr api.ICustomResource, secret *core.Secret) error {
-	w.a.V(2).M(cr).S().Info(secret.Name)
-	defer w.a.V(2).M(cr).E().Info(secret.Name)
+	w.a.V(2).M(cr).S().Info("%s", secret.Name)
+	defer w.a.V(2).M(cr).E().Info("%s", secret.Name)
 
 	// Check whether this object already exists
 	if _, err := w.c.getSecret(ctx, secret); err == nil {

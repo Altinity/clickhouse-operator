@@ -1,0 +1,17 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "sync-gate"
+spec:
+  reconcile:
+    host:
+      wait:
+        replicas:
+          sync:
+            enabled: "true"
+            mode: "lightweight"
+            timeout: 120
+            onTimeout: "abort"
+            health:
+              pollInterval: 5
+              successThreshold: 3
