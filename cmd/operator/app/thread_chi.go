@@ -56,7 +56,7 @@ func initClickHouse(ctx context.Context) {
 	}
 
 	// Initialize k8s API clients
-	kubeClient, extClient, chopClient, dynamicClient := chop.GetClientset(kubeConfigFile, masterURL)
+	kubeClient, extClient, chopClient, dynamicClient := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
 
 	// Create operator instance. The chopconf load inside chop.New gates on
 	// clickhouse.security.kubernetes.allowInsecure BEFORE the first network call,

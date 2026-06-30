@@ -15,7 +15,9 @@
 package chop
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -30,6 +32,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	"github.com/altinity/clickhouse-operator/pkg/util/tlsutil"
 )
 
 // lastKubeConfigInsecure records whether the most recently loaded kubeconfig
@@ -80,8 +83,11 @@ func getKubeConfig(kubeConfigFile, masterURL string) (*kuberest.Config, error) {
 	return captureInsecure(conf, nil)
 }
 
-// GetClientset gets k8s API clients - both kube native client and our custom client
-func GetClientset(kubeConfigFile, masterURL string) (
+// GetClientset gets k8s API clients - both kube native client and our custom client.
+// chopConfigFile supplies the file-based chopconf path used to resolve the K8s-API
+// TLS minVersion floor before the first network call (same timing as the
+// insecure-kubeconfig gate in ConfigManager.Init).
+func GetClientset(kubeConfigFile, masterURL, chopConfigFile string) (
 	*kube.Clientset,
 	*apiextensions.Clientset,
 	*chopclientset.Clientset,
@@ -91,6 +97,10 @@ func GetClientset(kubeConfigFile, masterURL string) (
 	if err != nil {
 		log.F().Fatal("Unable to build kubeconf: %s", err.Error())
 		os.Exit(1)
+	}
+
+	if minVer := tlsutil.VersionUint16(string(resolveK8sTLSMinVersion(chopConfigFile))); minVer != 0 {
+		applyK8sClientTLSMinVersion(kubeConfig, minVer)
 	}
 
 	// Layer on k8s client rate limiting overrides if specified in CHOP config.
@@ -138,4 +148,38 @@ func GetClientset(kubeConfigFile, masterURL string) (
 	}
 
 	return kubeClientset, apiextensionsClientset, chopClientset, dynamicClientset
+}
+
+// resolveK8sTLSMinVersion reads the file-based chopconf and returns the effective
+// K8s-API TLS floor ("1.2"|"1.3"|""). Uses a nil-client ConfigManager because
+// file loading never touches the API. Errors yield "" (no floor).
+func resolveK8sTLSMinVersion(chopConfigFile string) string {
+	cm := newConfigManager(nil, nil, chopConfigFile)
+	fileConfig, err := cm.getFileBasedConfig(chopConfigFile)
+	if err != nil || fileConfig == nil {
+		return ""
+	}
+	return string(fileConfig.ResolveK8sTLSMinVersion())
+}
+
+// applyK8sClientTLSMinVersion stamps MinVersion onto the rest.Config transport
+// via rest.Config.Wrap, preserving client-go's TLS/proxy/HTTP2 setup. Warns if
+// the built RoundTripper is not *http.Transport.
+func applyK8sClientTLSMinVersion(cfg *kuberest.Config, minVer uint16) {
+	cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		t, ok := rt.(*http.Transport)
+		if !ok {
+			log.F().Warning(
+				"k8s client TLS minVersion floor requested (0x%04x) but transport is %T, not *http.Transport — floor NOT applied",
+				minVer, rt,
+			)
+			return rt
+		}
+		if t.TLSClientConfig == nil {
+			t.TLSClientConfig = &tls.Config{}
+		}
+		t.TLSClientConfig.MinVersion = minVer
+		log.F().Info("k8s client TLS minVersion floor applied: 0x%04x", minVer)
+		return rt
+	})
 }
