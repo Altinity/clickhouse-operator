@@ -8845,7 +8845,7 @@ def test_030008(self):
         load_result = None
         if tag_result.returncode == 0:
             load_result = subprocess.run(
-                ["minikube", "image", "load", decoy_tag],
+                ["minikube", "image", "load", decoy_tag, "-p", self.context.minikube_profile],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -9202,28 +9202,36 @@ def test(self):
 
     # define values for Operator upgrade test (test_009)
 
-    with Pool(int(os.environ.get("POOL_SIZE", 3))) as pool:
-        # Front-load HEAVY scenarios (chopconf->operator restart, scaling,
-        # multi-deploy). sorted() is stable, so the key (0 for HEAVY, else 1)
-        # moves heavy tests to the front while preserving the natural per-group
-        # (0100xx/0200xx/0300xx) source order within each bucket — slow tests
-        # start early AND lead within each group, grabbing pool workers instead
-        # of trickling in at the tail (where retries serialize). Order-only:
-        # membership and the NO_PARALLEL exclusion are unaffected.
-        parallel_scenarios = [
-            scenario
-            for scenario in loads(current_module(), Scenario, Suite)
-            if not (hasattr(scenario, "tags") and ("NO_PARALLEL" in scenario.tags))
-        ]
-        parallel_scenarios.sort(
-            key=lambda s: 0 if (hasattr(s, "tags") and ("HEAVY" in s.tags)) else 1
-        )
-        for scenario in parallel_scenarios:
-            Scenario(run=scenario, parallel=True, executor=pool)
-        join()
+    # E2E_PHASE routes the two test groups to separate clusters for a dual-cluster
+    # run: "parallel" runs only the concurrent pool, "serial" runs only the
+    # NO_PARALLEL scenarios. Unset/"" runs BOTH passes — the single-cluster default,
+    # byte-identical to before this gate existed.
+    e2e_phase = os.environ.get("E2E_PHASE", "")
 
-    # Sequential pass: intentionally NOT reordered — test_090099 (CRD deletion)
-    # must run last, after test_010036 / the upgrade tests.
-    for scenario in loads(current_module(), Scenario, Suite):
-        if hasattr(scenario, "tags") and ("NO_PARALLEL" in scenario.tags):
-            Scenario(run=scenario)
+    if e2e_phase in ("", "parallel"):
+        with Pool(int(os.environ.get("POOL_SIZE", 3))) as pool:
+            # Front-load HEAVY scenarios (chopconf->operator restart, scaling,
+            # multi-deploy). sorted() is stable, so the key (0 for HEAVY, else 1)
+            # moves heavy tests to the front while preserving the natural per-group
+            # (0100xx/0200xx/0300xx) source order within each bucket — slow tests
+            # start early AND lead within each group, grabbing pool workers instead
+            # of trickling in at the tail (where retries serialize). Order-only:
+            # membership and the NO_PARALLEL exclusion are unaffected.
+            parallel_scenarios = [
+                scenario
+                for scenario in loads(current_module(), Scenario, Suite)
+                if not (hasattr(scenario, "tags") and ("NO_PARALLEL" in scenario.tags))
+            ]
+            parallel_scenarios.sort(
+                key=lambda s: 0 if (hasattr(s, "tags") and ("HEAVY" in s.tags)) else 1
+            )
+            for scenario in parallel_scenarios:
+                Scenario(run=scenario, parallel=True, executor=pool)
+            join()
+
+    if e2e_phase in ("", "serial"):
+        # Sequential pass: intentionally NOT reordered — test_090099 (CRD deletion)
+        # must run last, after test_010036 / the upgrade tests.
+        for scenario in loads(current_module(), Scenario, Suite):
+            if hasattr(scenario, "tags") and ("NO_PARALLEL" in scenario.tags):
+                Scenario(run=scenario)

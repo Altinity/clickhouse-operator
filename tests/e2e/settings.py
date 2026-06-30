@@ -57,13 +57,6 @@ clickhouse_template = (
     os.getenv("CLICKHOUSE_TEMPLATE")
     if "CLICKHOUSE_TEMPLATE" in os.environ else
     "manifests/chit/tpl-clickhouse-stable.yaml"
-    # "manifests/chit/tpl-clickhouse-19.17.yaml"
-    # "manifests/chit/tpl-clickhouse-20.3.yaml"
-    # "manifests/chit/tpl-clickhouse-20.8.yaml"
-    # "manifests/chit/tpl-clickhouse-21.3.yaml"
-    # "manifests/chit/tpl-clickhouse-21.8.yaml"
-    # "manifests/chit/tpl-clickhouse-22.3.yaml"
-    # "manifests/chit/tpl-clickhouse-22.8.yaml"
     # "manifests/chit/tpl-clickhouse-23.3.yaml"
     # "manifests/chit/tpl-clickhouse-23.8.yaml"
 )

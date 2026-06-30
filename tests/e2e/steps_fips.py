@@ -62,29 +62,42 @@ def fips_extract_shipped_binaries(self):
         f"{self.context.operator_version}"
     )
 
-    extract_dir = tempfile.mkdtemp(prefix="fips-shipped-bin-")
-    op_bin = os.path.join(extract_dir, "clickhouse-operator")
-    me_bin = os.path.join(extract_dir, "metrics-exporter")
-    suffix = uuid.uuid1().hex[:8]
-
-    for image, image_path, dest, label in (
-        (operator_image, "/clickhouse-operator", op_bin, f"cho-verify-{suffix}"),
-        (
-            metrics_exporter_image,
-            "/metrics-exporter",
-            me_bin,
-            f"me-verify-{suffix}",
-        ),
-    ):
-        container_name = shlex.quote(label)
-        kubectl.run_shell(f"docker create --name {container_name} {shlex.quote(image)}")
+    # Concurrent FIPS tests all extract via the host docker daemon at once; under that
+    # contention the docker create/cp calls intermittently fail mid-extraction (seen as
+    # a transient IndexError under POOL_SIZE=25). Retry the whole extraction — each
+    # attempt uses a fresh tempdir + uuid-suffixed containers, so it is idempotent.
+    attempts = 4
+    for attempt in range(1, attempts + 1):
+        extract_dir = tempfile.mkdtemp(prefix="fips-shipped-bin-")
+        op_bin = os.path.join(extract_dir, "clickhouse-operator")
+        me_bin = os.path.join(extract_dir, "metrics-exporter")
+        suffix = uuid.uuid1().hex[:8]
         try:
-            kubectl.run_shell(
-                f"docker cp {container_name}:{shlex.quote(image_path)} {shlex.quote(dest)}"
-            )
-        finally:
-            kubectl.run_shell(f"docker rm {container_name}", ok_to_fail=True)
-        os.chmod(dest, 0o755)
+            for image, image_path, dest, label in (
+                (operator_image, "/clickhouse-operator", op_bin, f"cho-verify-{suffix}"),
+                (
+                    metrics_exporter_image,
+                    "/metrics-exporter",
+                    me_bin,
+                    f"me-verify-{suffix}",
+                ),
+            ):
+                container_name = shlex.quote(label)
+                kubectl.run_shell(f"docker create --name {container_name} {shlex.quote(image)}")
+                try:
+                    kubectl.run_shell(
+                        f"docker cp {container_name}:{shlex.quote(image_path)} {shlex.quote(dest)}"
+                    )
+                finally:
+                    kubectl.run_shell(f"docker rm {container_name}", ok_to_fail=True)
+                os.chmod(dest, 0o755)
+            break
+        except Exception as exc:
+            shutil.rmtree(extract_dir, ignore_errors=True)
+            if attempt == attempts:
+                raise
+            note(f"FIPS binary extraction failed ({type(exc).__name__}: {exc}); retry {attempt}/{attempts - 1}")
+            time.sleep(attempt * 3)
 
     self.context.fips_extract_dir = extract_dir
     self.context.fips_op_bin = op_bin
@@ -564,6 +577,7 @@ def fips_ch_external_secure_query(self, pod, sql, ns=None):
     pf = subprocess.Popen(
         [
             "kubectl",
+            *self.context.kubectl_context_args,
             "-n", ns,
             "port-forward",
             f"pod/{pod}",
@@ -899,6 +913,7 @@ def fips_run_openssl_s_client_on_pod_port(
     pf = subprocess.Popen(
         [
             "kubectl",
+            *self.context.kubectl_context_args,
             "-n", ns,
             "port-forward",
             f"pod/{pod}",
@@ -1086,6 +1101,7 @@ def fips_curl_pod_port(self, pod, port, path="/", ns=None):
     pf = subprocess.Popen(
         [
             "kubectl",
+            *self.context.kubectl_context_args,
             "-n", ns,
             "port-forward",
             f"pod/{pod}",

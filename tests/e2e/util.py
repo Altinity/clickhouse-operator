@@ -64,7 +64,14 @@ def restart_operator(ns=None, timeout=600, shell=None):
     pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     old_pod_name = pod["metadata"]["name"]
     old_pod_ip = pod["status"]["podIP"]
-    kubectl.launch(f"delete pod {old_pod_name}", ns=ns, timeout=timeout, shell=shell)
+    # --ignore-not-found: when called via apply_operator_config(), the just-applied
+    # chopconf makes the operator self-restart (watch.configuration.onChange=restart),
+    # replacing this pod before we delete it -> `delete pod <old>` would hit NotFound.
+    # That is the desired end state (the restart already happened), so a missing pod is
+    # success. Using --ignore-not-found rather than ok_to_fail tolerates ONLY that race
+    # while still surfacing a genuine delete failure (RBAC, wrong namespace) as an error.
+    # The rollout-status wait below remains the real readiness gate.
+    kubectl.launch(f"delete pod {old_pod_name} --ignore-not-found", ns=ns, timeout=timeout, shell=shell)
     kubectl.wait_object("pod", name="", ns=ns, label=operator_label, shell=shell)
     pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     new_pod_name = pod["metadata"]["name"]
