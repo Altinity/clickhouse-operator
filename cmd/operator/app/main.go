@@ -24,9 +24,12 @@ import (
 	"syscall"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	metricspprof "github.com/altinity/clickhouse-operator/pkg/metrics/pprof"
 	"github.com/altinity/clickhouse-operator/pkg/util/fips"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
+
+const defaultPprofEndpoint = "127.0.0.1:6060"
 
 // CLI parameter variables
 var (
@@ -42,6 +45,12 @@ var (
 	// debugRequest defines request for clickhouse-operator debug run
 	debugRequest bool
 
+	// pprofRequest enables a loopback-only pprof endpoint.
+	pprofRequest bool
+
+	// pprofEndpoint defines pprof listen address.
+	pprofEndpoint string
+
 	// chopConfigFile defines path to clickhouse-operator config file to be used
 	chopConfigFile string
 
@@ -56,8 +65,10 @@ func init() {
 	flag.BoolVar(&versionRequest, "version", false, "Display clickhouse-operator version and exit")
 	flag.BoolVar(&fipsInfoRequest, "fips-info", false, "Display FIPS build/runtime info and exit (no Go toolchain required).")
 	flag.BoolVar(&debugRequest, "debug", false, "Debug run")
+	flag.BoolVar(&pprofRequest, "pprof", false, "Enable loopback-only pprof server for heap, allocs, and goroutine profiles.")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
 	flag.StringVar(&masterURL, "master", "", "The address of custom Kubernetes API server. Makes sense if runs outside of the cluster and not being specified in kube config file only.")
+	flag.StringVar(&pprofEndpoint, "pprof-endpoint", defaultPprofEndpoint, "The loopback-only pprof endpoint.")
 }
 
 // Run is an entry point of the application
@@ -87,6 +98,12 @@ func Run() {
 	defer log.E().P()
 
 	log.F().Info("Starting clickhouse-operator. Version:%s GitSHA:%s BuiltAt:%s", version.Version, version.GitSHA, version.BuiltAt)
+	if pprofRequest {
+		if err := metricspprof.StartServer(pprofEndpoint); err != nil {
+			log.Fatalf("Unable to start pprof server at %s: %v", pprofEndpoint, err)
+		}
+		log.Warning("pprof server enabled at %s; expose it only with kubectl port-forward", pprofEndpoint)
+	}
 
 	// Create main context with cancel
 	ctx, cancelFunc := context.WithCancel(context.Background())

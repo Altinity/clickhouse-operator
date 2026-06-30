@@ -106,8 +106,9 @@ func serveMetrics(addr, path string) {
 	handler := promhttp.HandlerFor(prom.DefaultGatherer, promhttp.HandlerOpts{
 		ErrorHandling: promhttp.ContinueOnError,
 	})
-	http.Handle(path, handler)
-	err := http.ListenAndServe(addr, nil)
+	mux := http.NewServeMux()
+	mux.Handle(path, handler)
+	err := http.ListenAndServe(addr, mux)
 	if err != nil {
 		fmt.Printf("error serving http: %v", err)
 	}

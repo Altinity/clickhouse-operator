@@ -192,9 +192,16 @@ func StartMetricsREST(
 		log.Infof("IPC: Secure mode — binding /chi to %s, requiring %s header", ipc.BindHost, api.IPCHeaderToken)
 	}
 
-	// Setup HTTP handlers
-	http.Handle(metricsPath, promhttp.Handler())
-	http.Handle(chiListPath, chiHandler)
+	// Setup HTTP handlers on private muxes so unrelated DefaultServeMux
+	// registrations are never exposed on public metrics listeners.
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle(metricsPath, promhttp.Handler())
+	if metricsAddress == chiListAddress {
+		metricsMux.Handle(chiListPath, chiHandler)
+	}
+
+	chiMux := http.NewServeMux()
+	chiMux.Handle(chiListPath, chiHandler)
 
 	// Start HTTP servers. Prometheus /metrics ALWAYS binds the original address
 	// (typically all-interfaces) so ServiceMonitor scrapes from outside the Pod
@@ -204,9 +211,9 @@ func StartMetricsREST(
 	// listener — instead the middleware enforces remoteAddr=loopback at request
 	// time. If a custom config splits the two addresses, the /chi listener is
 	// bound to BindHost in Secure mode.
-	go http.ListenAndServe(metricsAddress, nil)
+	go http.ListenAndServe(metricsAddress, metricsMux)
 	if metricsAddress != chiListAddress {
-		go http.ListenAndServe(ipc.secureBindAddress(chiListAddress), nil)
+		go http.ListenAndServe(ipc.secureBindAddress(chiListAddress), chiMux)
 	}
 
 	return exporter
