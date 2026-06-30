@@ -53,10 +53,6 @@ NO_CLEANUP="${NO_CLEANUP:-""}"
 #       clickhouse/clickhouse-server:24.3-broken / :24.822     (rollback tests)
 #       altinity/clickhouse-server:*.altinityfips-decoy        (test-030008-runtime-decoy)
 #       clickhouse/clickhouse-keeper:latest                    (test-020010 non-FIPS rejection)
-#   - Opt-in CLICKHOUSE_TEMPLATE overrides, not run by default (manifests/chit/tpl-clickhouse-*.yaml):
-#       clickhouse/clickhouse-server:21.3 / 21.8 / 22.1 / 22.2 / 22.3 / 22.6 / 22.7
-#       altinity/clickhouse-server:22.8.15.25.altinitystable   (tpl-clickhouse-22.8.yaml)
-#       yandex/clickhouse-server:*
 # Audit coverage (every default-suite image is listed below):
 #   comm -23 <(grep -rhoE "(clickhouse|altinity)/clickhouse-(server|keeper):[A-Za-z0-9._-]+" tests/e2e/manifests/ | sort -u) \
 #            <(grep -oE "(clickhouse|altinity)/clickhouse-(server|keeper):[A-Za-z0-9._-]+" tests/e2e/test_common.sh | sort -u)
@@ -92,6 +88,7 @@ PRELOAD_IMAGES_ALL=(
     "nginx:latest"
     "altinity/clickhouse-backup:stable"
     "altinity/clickhouse-backup:2.4.15"
+    "altinity/clickhouse-backup:2.7.0-fips"  # FIPS backup sidecar (manifests/chit/test-030003-backup-template.yaml; test_030003/030004 run_backup_fips_checks)
 )
 
 # =============================================================================
@@ -135,9 +132,11 @@ function common_preload_images() {
         local pids=()
         for image in "$@"; do
             (
-                docker pull -q "${image}" && \
-                echo "pushing ${image} to minikube" && \
-                minikube image load "${image}" --overwrite=false --daemon=true && \
+                docker pull -q "${image}" && echo "pushing ${image} to minikube" || exit 1
+                # Load into each target profile (default: single "minikube").
+                for p in ${MINIKUBE_PROFILES:-minikube}; do
+                    minikube image load "${image}" -p "${p}" --overwrite=false --daemon=true || exit 1
+                done
                 echo "done: ${image}"
             ) &
             pids+=($!)
@@ -168,12 +167,18 @@ function common_build_and_load_images() {
     VERBOSITY="${VERBOSITY}" "${COMMON_DIR}/../../dev/image_build_all_dev.sh" && \
     echo "Retag local :dev build as :${release} (match install version)" && \
     docker tag "${OPERATOR_DOCKER_REPO}:dev" "${OPERATOR_DOCKER_REPO}:${release}" && \
-    docker tag "${METRICS_EXPORTER_DOCKER_REPO}:dev" "${METRICS_EXPORTER_DOCKER_REPO}:${release}" && \
-    echo "Load images" && \
-    minikube image load "${OPERATOR_DOCKER_REPO}:dev" && \
-    minikube image load "${METRICS_EXPORTER_DOCKER_REPO}:dev" && \
-    minikube image load "${OPERATOR_DOCKER_REPO}:${release}" --overwrite=true && \
-    minikube image load "${METRICS_EXPORTER_DOCKER_REPO}:${release}" --overwrite=true && \
+    docker tag "${METRICS_EXPORTER_DOCKER_REPO}:dev" "${METRICS_EXPORTER_DOCKER_REPO}:${release}" || return 1
+    # Load into each target minikube profile. MINIKUBE_PROFILES defaults to the
+    # single "minikube" profile, so `-p minikube` is a no-op equivalent to the
+    # prior un-profiled load; dual-cluster sets MINIKUBE_PROFILES="k8s-par k8s-seq".
+    local p
+    for p in ${MINIKUBE_PROFILES:-minikube}; do
+        echo "Load images into minikube profile ${p}" && \
+        minikube image load "${OPERATOR_DOCKER_REPO}:dev" -p "${p}" && \
+        minikube image load "${METRICS_EXPORTER_DOCKER_REPO}:dev" -p "${p}" && \
+        minikube image load "${OPERATOR_DOCKER_REPO}:${release}" -p "${p}" --overwrite=true && \
+        minikube image load "${METRICS_EXPORTER_DOCKER_REPO}:${release}" -p "${p}" --overwrite=true || return 1
+    done
     echo "Images prepared"
 }
 
@@ -181,6 +186,18 @@ function common_build_and_load_images() {
 # Usage: common_run_test_script "run_tests_operator.sh"
 function common_run_test_script() {
     local script="${1}"
+    # Forward the dual-cluster envs ONLY when set & non-empty. settings.py reads
+    # KUBECTL_CMD via `"KUBECTL_CMD" in os.environ` (not `:-default`), so forwarding
+    # an empty value would wrongly blank the kubectl command for a single-cluster run.
+    # These go through `env`, NOT the assignment-prefix below: bash recognizes
+    # `VAR=val` prefixes only as literal parse-time tokens, so a `"${arr[@]}"` that
+    # expands to `POOL_SIZE=25 ...` would be treated as the COMMAND, not assignments.
+    # `env` interprets its `VAR=val` arguments correctly (and is a no-op when empty).
+    local -a extra_env=()
+    local v
+    for v in KUBECTL_CMD POOL_SIZE MINIKUBE_PROFILE MINIKUBE_PROFILES E2E_PHASE TF_LOG TRIM_RESULTS; do
+        [[ -n "${!v:-}" ]] && extra_env+=("${v}=${!v}")
+    done
     OPERATOR_DOCKER_REPO="${OPERATOR_DOCKER_REPO}" \
     METRICS_EXPORTER_DOCKER_REPO="${METRICS_EXPORTER_DOCKER_REPO}" \
     OPERATOR_VERSION="${OPERATOR_VERSION}" \
@@ -191,5 +208,5 @@ function common_run_test_script() {
     KUBECTL_MODE="${KUBECTL_MODE}" \
     RUN_ALL="${RUN_ALL}" \
     NO_CLEANUP="${NO_CLEANUP}" \
-    "${COMMON_DIR}/${script}"
+    env "${extra_env[@]}" "${COMMON_DIR}/${script}"
 }
