@@ -857,9 +857,11 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		return err
 	}
 	if err := w.reconcileHostMain(ctx, host); err != nil {
+		// Domain/schema failure: keep status as Requested (excluded from remote_servers)
+		// and do not include the host into cluster activities.
 		return err
 	}
-	// Host is now added and functional
+	// Host STS is up and schema migration (if required) succeeded — safe to include.
 
 	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
@@ -984,18 +986,18 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Warning("Reconcile Host Main - unable to reconcile PVC. Host: %s Err: %v", host.GetName(), err)
 	}
 
-	// Finalize main reconcile with domain activities
+	// Finalize main reconcile with domain activities (schema migration, FIPS checks).
+	// Schema/domain failures must fail this host's reconcile so we do not:
+	//   1. flip status Requested → Created (which re-includes the host in remote_servers),
+	//   2. call includeHost / mark the host ready for Distributed traffic,
+	// while local tables are still missing. Callers of reconcileHost only include
+	// the host after reconcileHostMain returns nil.
 	if err := w.reconcileHostMainDomain(ctx, host, migrateTableOpts); err != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host Main - unable to reconcile domain reconcile. Host: %s Err: %v", host.GetName(), err)
-		// Propagate abort signals (e.g. runtime FIPS image-policy violation) so
-		// reconcile() routes them through markReconcileCompletedUnsuccessfully,
-		// which persists StatusAborted via updateCRObjectStatus. Other errors
-		// stay logged but non-fatal — preserves pre-existing tolerance.
-		if errors.Is(err, common.ErrCRUDAbort) {
-			return err
-		}
+		return err
 	}
 
 	return nil

@@ -71,27 +71,36 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api
 	// schemer silently skips CREATE. Peers hold the truth.
 	peers := s.Names(interfaces.NameFQDNs, host, api.Cluster{}, true)
 
-	databaseNames, createDatabaseSQLs := debugCreateSQLs(
-		s.QueryUnzip2Columns(
-			ctx,
-			peers,
-			s.sqlCreateDatabaseReplicated(host.Runtime.Address.ClusterName),
-		),
+	databaseNames, createDatabaseSQLs, err := s.QueryUnzip2Columns(
+		ctx,
+		peers,
+		s.sqlCreateDatabaseReplicated(host.Runtime.Address.ClusterName),
 	)
-	tableNames, createTableSQLs := debugCreateSQLs(
-		s.QueryUnzipAndApplyUUIDs(
-			ctx,
-			peers,
-			s.sqlCreateTableReplicated(host.Runtime.Address.ClusterName),
-		),
+	databaseNames, createDatabaseSQLs = debugCreateSQLs(databaseNames, createDatabaseSQLs, err)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tableNames, createTableSQLs, err := s.QueryUnzipAndApplyUUIDs(
+		ctx,
+		peers,
+		s.sqlCreateTableReplicated(host.Runtime.Address.ClusterName),
 	)
-	functionNames, createFunctionSQLs := debugCreateSQLs(
-		s.QueryUnzip2Columns(
-			ctx,
-			peers,
-			s.sqlCreateFunction(host.Runtime.Address.ClusterName),
-		),
+	tableNames, createTableSQLs = debugCreateSQLs(tableNames, createTableSQLs, err)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	functionNames, createFunctionSQLs, err := s.QueryUnzip2Columns(
+		ctx,
+		peers,
+		s.sqlCreateFunction(host.Runtime.Address.ClusterName),
 	)
+	functionNames, createFunctionSQLs = debugCreateSQLs(functionNames, createFunctionSQLs, err)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return util.ConcatSlices([][]string{databaseNames, tableNames, functionNames}),
 		util.ConcatSlices([][]string{createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
 		nil

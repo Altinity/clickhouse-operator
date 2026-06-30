@@ -53,7 +53,7 @@ func (c *Cluster) SetClusterConnectionParams(clusterConnectionParams *clickhouse
 func (c *Cluster) queryUnzipColumns(ctx context.Context, hosts []string, sql string, columns ...*[]string) error {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("ctx is done")
-		return nil
+		return ctx.Err()
 	}
 
 	if len(hosts) == 0 {
@@ -61,12 +61,16 @@ func (c *Cluster) queryUnzipColumns(ctx context.Context, hosts []string, sql str
 		return nil
 	}
 
-	// Fetch data from any of specified hosts
+	// Fetch data from any of specified hosts. Propagate failures so schema migration
+	// cannot silently treat "could not discover objects" as "nothing to create".
 	query, err := c.SetHosts(hosts).QueryAny(ctx, sql)
 	if err != nil {
-		return nil
+		return err
 	}
 	if query == nil {
+		if util.IsContextDone(ctx) {
+			return ctx.Err()
+		}
 		return nil
 	}
 

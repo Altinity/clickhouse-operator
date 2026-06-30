@@ -86,23 +86,24 @@ func (s *ClusterSchemer) createTablesSQLs(
 	replicatedCreateSQLs []string,
 	distributedObjectNames []string,
 	distributedCreateSQLs []string,
+	err error,
 ) {
-	if names, sql, err := s.getReplicatedObjectsSQLs(ctx, host); err == nil {
-		replicatedObjectNames = names
-		replicatedCreateSQLs = sql
+	replicatedObjectNames, replicatedCreateSQLs, err = s.getReplicatedObjectsSQLs(ctx, host)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
-	if names, sql, err := s.getDistributedObjectsSQLs(ctx, host); err == nil {
-		distributedObjectNames = names
-		distributedCreateSQLs = sql
+	distributedObjectNames, distributedCreateSQLs, err = s.getDistributedObjectsSQLs(ctx, host)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
-	return
+	return replicatedObjectNames, replicatedCreateSQLs, distributedObjectNames, distributedCreateSQLs, nil
 }
 
 // HostCreateTables creates tables on a new host
 func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("ctx is done")
-		return nil
+		return ctx.Err()
 	}
 
 	log.V(1).M(host).F().S().Info("Migrating schema objects to host %s", host.Runtime.Address.HostName)
@@ -111,29 +112,29 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.Host) e
 	replicatedObjectNames,
 		replicatedCreateSQLs,
 		distributedObjectNames,
-		distributedCreateSQLs := s.createTablesSQLs(ctx, host)
+		distributedCreateSQLs,
+		err := s.createTablesSQLs(ctx, host)
+	if err != nil {
+		log.V(1).M(host).F().Error("Failed to discover schema objects for host %s: %v", host.Runtime.Address.HostName, err)
+		return err
+	}
 
-	var err1 error
 	if len(replicatedCreateSQLs) > 0 {
 		log.V(1).M(host).F().Info("Creating replicated objects at %s: %v", host.Runtime.Address.HostName, replicatedObjectNames)
 		log.V(2).M(host).F().Info("\n%v", replicatedCreateSQLs)
-		err1 = s.ExecHost(ctx, host, replicatedCreateSQLs,
-			clickhouse.NewQueryOptions().SetRetry(true).SetLogQueries(true))
+		if err := s.ExecHost(ctx, host, replicatedCreateSQLs,
+			clickhouse.NewQueryOptions().SetRetry(true).SetLogQueries(true)); err != nil {
+			return err
+		}
 	}
 
-	var err2 error
 	if len(distributedCreateSQLs) > 0 {
 		log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Runtime.Address.HostName, distributedObjectNames)
 		log.V(2).M(host).F().Info("\n%v", distributedCreateSQLs)
-		err2 = s.ExecHost(ctx, host, distributedCreateSQLs,
-			clickhouse.NewQueryOptions().SetRetry(true).SetLogQueries(true))
-	}
-
-	if err2 != nil {
-		return err2
-	}
-	if err1 != nil {
-		return err1
+		if err := s.ExecHost(ctx, host, distributedCreateSQLs,
+			clickhouse.NewQueryOptions().SetRetry(true).SetLogQueries(true)); err != nil {
+			return err
+		}
 	}
 
 	return nil
