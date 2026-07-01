@@ -360,6 +360,8 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 	cr.GetRuntime().UnlockCommonConfig()
 
 	w.includeAllHostsIntoCluster(ctx, cr)
+	w.restartCreatedHosts(ctx, cr)
+
 	return err
 }
 
@@ -368,6 +370,34 @@ func (w *worker) includeAllHostsIntoCluster(ctx context.Context, cr *api.ClickHo
 	cr.WalkHosts(func(host *api.Host) error {
 		if host.ShouldIncludeIntoCluster() {
 			_ = w.waitHostIsInCluster(ctx, host)
+		}
+		return nil
+	})
+}
+
+// restartCreatedHosts restarts, once, each host that was created during the current reconcile.
+func (w *worker) restartCreatedHosts(ctx context.Context, cr *api.ClickHouseInstallation) {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("Reconcile is aborted. Restart created hosts: %s ", cr.GetName())
+		return
+	}
+
+	cr.WalkHosts(func(host *api.Host) error {
+		// Only hosts created during this reconcile
+		if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusCreated) {
+			return nil
+		}
+		// Skip single-host clusters - remote_servers references only localhost, which always resolves
+		if host.GetCluster().HostsCount() < 2 {
+			w.a.V(1).M(host).F().Info("Skip post-include restart of created host in single-host cluster. Host: %s", host.GetName())
+			return nil
+		}
+
+		w.a.V(1).M(host).F().Info("Restart created host after final remote_servers propagation. Host: %s", host.GetName())
+		w.task.WaitForConfigMapPropagation(ctx, host)
+
+		if err := w.hostSoftwareRestart(ctx, host); err != nil {
+			w.a.V(1).M(host).F().Warning("Failed to restart created host after final remote_servers propagation. Host: %s err: %v", host.GetName(), err)
 		}
 		return nil
 	})
