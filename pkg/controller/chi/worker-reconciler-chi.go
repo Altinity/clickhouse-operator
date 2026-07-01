@@ -358,6 +358,13 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 	cr.GetRuntime().UnlockCommonConfig()
 
 	w.includeAllHostsIntoCluster(ctx, cr)
+
+	// Now that the final remote_servers (referencing all hosts) has been published and
+	// propagated, restart hosts that were created during THIS reconcile so their boot
+	// picks up the fully-defined cluster - closing the race where a freshly-created host
+	// starts before remote_servers lists all of its peers.
+	w.restartCreatedHosts(ctx, cr)
+
 	return err
 }
 
@@ -366,6 +373,52 @@ func (w *worker) includeAllHostsIntoCluster(ctx context.Context, cr *api.ClickHo
 	cr.WalkHosts(func(host *api.Host) error {
 		if host.ShouldIncludeIntoCluster() {
 			_ = w.waitHostIsInCluster(ctx, host)
+		}
+		return nil
+	})
+}
+
+// restartCreatedHosts restarts, once, each host that was created during the current reconcile.
+//
+// Ordering matters: this runs AFTER includeAllHostsIntoCluster(), i.e. after the final
+// remote_servers (with all hosts) has been published and propagated. The post-restart boot
+// therefore always loads with the complete cluster defined.
+//
+// Scope/safety:
+//   - Only hosts with reconcile status ObjectStatusCreated (i.e. newly created this reconcile)
+//     are restarted, so the existing replica(s) keep serving - no client-visible downtime.
+//   - Single-host clusters are skipped: their remote_servers only references localhost, which
+//     always resolves, so there is nothing to close a race against.
+//   - Idempotent / one-shot: a created host gains an ancestor on the next reconcile and becomes
+//     ObjectStatusSame, so it is never restarted again here (no restart loop).
+func (w *worker) restartCreatedHosts(ctx context.Context, cr *api.ClickHouseInstallation) {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("Reconcile is aborted. Restart created hosts: %s ", cr.GetName())
+		return
+	}
+
+	cr.WalkHosts(func(host *api.Host) error {
+		// Only hosts created during this reconcile
+		if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusCreated) {
+			return nil
+		}
+		// Skip single-host clusters - remote_servers references only localhost, which always resolves
+		if host.GetCluster().HostsCount() < 2 {
+			w.a.V(1).M(host).F().
+				Info("Skip post-include restart of created host in single-host cluster. Host: %s", host.GetName())
+			return nil
+		}
+
+		w.a.V(1).M(host).F().
+			Info("Restart created host after final remote_servers propagation. Host: %s", host.GetName())
+
+		// Ensure the final common ConfigMap has propagated to this host before restarting,
+		// so the post-restart boot loads the fully-defined cluster.
+		w.task.WaitForConfigMapPropagation(ctx, host)
+
+		if err := w.hostSoftwareRestart(ctx, host); err != nil {
+			w.a.V(1).M(host).F().
+				Warning("Failed to restart created host after final remote_servers propagation. Host: %s err: %v", host.GetName(), err)
 		}
 		return nil
 	})
