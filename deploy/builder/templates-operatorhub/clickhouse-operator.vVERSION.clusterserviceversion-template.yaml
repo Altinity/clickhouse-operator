@@ -1291,10 +1291,12 @@ spec:
                             containerName: clickhouse-operator
                             resource: limits.memory
                             divisor: "1Mi"
-                      - name: WATCH_NAMESPACE
+                      # Honor the OperatorGroup's target namespaces so every advertised
+                      # installMode works (AllNamespaces sends an empty string = watch all).
+                      - name: WATCH_NAMESPACES
                         valueFrom:
                           fieldRef:
-                            fieldPath: metadata.namespace
+                            fieldPath: metadata.annotations['olm.targetNamespaces']
                     image: docker.io/altinity/clickhouse-operator:${OPERATOR_VERSION}
                     imagePullPolicy: Always
                     name: clickhouse-operator
