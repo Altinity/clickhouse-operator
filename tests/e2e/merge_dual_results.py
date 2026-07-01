@@ -23,7 +23,7 @@ RESULT = re.compile(r"\[\s*(OK|Fail|Error|Skip)\s*\]\s+(/regression/\S*/test_\S.
 STEP = re.compile(r"(\d+)\s+steps?\s+\(([^)]*)\)")
 TOTAL = re.compile(r"Total time\s+(.+)")
 BREAKDOWN = re.compile(r"(\d+)\s+(ok|failed|skipped|errored)")
-PASS_SYMBOL, FAIL_SYMBOL = "✔", "✘"  # ✔ ✘
+PASS_SYMBOL, FAIL_SYMBOL = "✔", "✘"
 
 
 def transform(raw):
