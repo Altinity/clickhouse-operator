@@ -1565,11 +1565,17 @@ func (c *OperatorConfig) applyEnvVarParams() {
 		c.Watch.Namespaces.Include = types.NewStrings([]string{ns})
 	}
 
-	if nss := os.Getenv(deployment.WATCH_NAMESPACES); len(nss) > 0 {
-		// We have WATCH_NAMESPACES explicitly specified
-		if namespaces := c.splitNamespaces(nss); len(namespaces) > 0 {
-			c.Watch.Namespaces.Include = types.NewStrings(namespaces)
+	// LookupEnv, not Getenv+len: OLM's AllNamespaces mode sets WATCH_NAMESPACES to an empty
+	// string (present-but-empty), which must mean watch-all - distinct from a non-OLM deploy
+	// that leaves it unset. Present-and-empty is coerced to the watch-all pattern so it does
+	// not fall through to applyDefaultWatchNamespace()'s own-namespace inference. Supersedes
+	// the singular WATCH_NAMESPACE above.
+	if nss, ok := os.LookupEnv(deployment.WATCH_NAMESPACES); ok {
+		namespaces := c.splitNamespaces(nss)
+		if len(namespaces) == 0 {
+			namespaces = []string{".*"}
 		}
+		c.Watch.Namespaces.Include = types.NewStrings(namespaces)
 	}
 
 	if nss := os.Getenv(deployment.WATCH_NAMESPACES_EXCLUDE); len(nss) > 0 {
