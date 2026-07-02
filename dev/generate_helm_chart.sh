@@ -290,7 +290,14 @@ function update_configmap_resource() {
   yq e -i '.metadata.namespace |= "{{ include \"altinity-clickhouse-operator.namespace\" . }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
   yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
-  yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${camel_cased_name}"') | nindent 2 }}"' "${file}"
+  if [ "${name}" = "etc-clickhouse-operator-files" ]; then
+    # The operator config ConfigMap needs watchNamespaces wired in. Use the
+    # configmap-files helper (which patches watch.namespaces.include from the
+    # top-level watchNamespaces value) instead of the generic configmap-data.
+    yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-files\" (list . .Values.configs.files .Values.watchNamespaces) | nindent 2 }}"' "${file}"
+  else
+    yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${camel_cased_name}"') | nindent 2 }}"' "${file}"
+  fi
 
   if [ -z "${data}" ]; then
     yq e -i '.configs.'"${camel_cased_name}"' |= null' "${values_yaml}"
