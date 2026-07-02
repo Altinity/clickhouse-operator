@@ -70,7 +70,9 @@ func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResour
 
 func (c *CR) getCR(ctx context.Context, namespace, name string) (*api.ClickHouseInstallation, error) {
 	ctx = k8sCtx(ctx)
-	return c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
+	return getWithRetry(ctx, func() (*api.ClickHouseInstallation, error) {
+		return c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
+	})
 }
 
 func (c *CR) getCM(ctx context.Context, chi api.ICustomResource) (*core.ConfigMap, error) {

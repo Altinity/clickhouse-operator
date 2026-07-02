@@ -45,7 +45,9 @@ func (c *PDB) Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*pol
 
 func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error) {
 	ctx = k8sCtx(ctx)
-	return c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).Get(ctx, name, controller.NewGetOptions())
+	return getWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
+		return c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).Get(ctx, name, controller.NewGetOptions())
+	})
 }
 
 func (c *PDB) Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {

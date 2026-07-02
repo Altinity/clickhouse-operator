@@ -65,7 +65,9 @@ func (c *Secret) Get(ctx context.Context, params ...any) (*core.Secret, error) {
 		}
 	}
 	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, controller.NewGetOptions())
+	return getWithRetry(ctx, func() (*core.Secret, error) {
+		return c.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, controller.NewGetOptions())
+	})
 }
 
 func (c *Secret) Create(ctx context.Context, svc *core.Secret) (*core.Secret, error) {
