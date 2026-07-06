@@ -463,6 +463,12 @@ func (cluster *Cluster) HostsCount() int {
 	return count
 }
 
+// IsSingleNode reports whether the cluster has fewer than two hosts (i.e. no replication/sharding
+// peers). remote_servers on such a cluster references only localhost, which always resolves.
+func (cluster *Cluster) IsSingleNode() bool {
+	return cluster.HostsCount() < 2
+}
+
 func (cluster *Cluster) IsZero() bool {
 	return cluster == nil
 }
