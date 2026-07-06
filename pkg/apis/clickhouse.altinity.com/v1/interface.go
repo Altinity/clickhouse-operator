@@ -135,6 +135,7 @@ type ICluster interface {
 	WalkHosts(func(host *Host) error) []error
 
 	HostsCount() int
+	IsSingleNode() bool
 
 	FindShard(needle interface{}) IShard
 	FindHost(needleShard interface{}, needleHost interface{}) *Host
