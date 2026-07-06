@@ -17,7 +17,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	//	ctrl "sigs.k8s.io/controller-runtime/pkg/controller"
+	ctrlController "sigs.k8s.io/controller-runtime/pkg/controller"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
@@ -84,6 +84,9 @@ func initKeeper(ctx context.Context) error {
 			builder.WithPredicates(keeperPredicate()),
 		).
 		Owns(&apps.StatefulSet{}).
+		WithOptions(ctrlController.Options{
+			MaxConcurrentReconciles: chop.Config().Reconcile.Runtime.ReconcileCHKsThreadsNumber,
+		}).
 		Complete(
 			&controller.Controller{
 				Client:    manager.GetClient(),

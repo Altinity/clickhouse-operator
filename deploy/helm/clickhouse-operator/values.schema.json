@@ -480,6 +480,9 @@
                                                 "reconcileCHIsThreadsNumber": {
                                                     "type": "integer"
                                                 },
+                                                "reconcileCHKsThreadsNumber": {
+                                                    "type": "integer"
+                                                },
                                                 "reconcileShardsMaxConcurrencyPercent": {
                                                     "type": "integer"
                                                 },
