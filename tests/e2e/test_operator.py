@@ -7204,6 +7204,111 @@ def test_010080(self):
         delete_test_namespace()
 
 
+@TestScenario
+@Tags("HEAVY")
+@Name("test_010081. Scaled-up replica ends up with a working Distributed table (issue #2013)")
+def test_010081(self):
+    """Issue #2013: a replica added to an existing cluster used to boot before the full remote_servers
+    was published, so a cluster-dependent object (Distributed / DICTIONARY / refreshable MV) failed its
+    async startup load with CLUSTER_DOESNT_EXIST and never recovered. The operator now detects that
+    terminal failure on the newly-added host and restarts it once (against the complete remote_servers)
+    to re-run the loaders. This asserts the user-visible OUTCOME: after scale-up the Distributed table
+    resolves on the new replica with no CLUSTER_DOESNT_EXIST. It also asserts the invariant that the
+    pre-existing replica is never restarted. (restartCount on the new replica is conditional - the
+    restart only fires when the boot-before-config race actually occurred - so it is logged, not
+    asserted; the functional outcome is the reliable guard.)"""
+    create_shell_namespace_clickhouse_template()
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    chi = "test-081-scaleup"
+    cluster = "default"
+    existing_replica = f"chi-{chi}-{cluster}-0-0-0"
+    new_replica = f"chi-{chi}-{cluster}-0-1-0"
+
+    with Given("A single-replica cluster"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-081-scaleup-cluster-objects-1.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("A cluster-dependent Distributed table with data (the #2013 object class)"):
+        clickhouse.query(chi, "CREATE TABLE test_081_local (a UInt32) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY a")
+        clickhouse.query(chi, "CREATE TABLE test_081_dist AS test_081_local Engine = Distributed('default', default, test_081_local, rand())")
+        clickhouse.query(chi, "INSERT INTO test_081_local SELECT number FROM numbers(10)")
+
+    with When("The cluster is scaled up to two replicas"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-081-scaleup-cluster-objects-2.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("The Distributed table resolves on the new replica with no CLUSTER_DOESNT_EXIST"):
+        # The reload/restart path may still be settling right after Completed; give it a few tries.
+        out = ""
+        for i in range(1, 10):
+            out = clickhouse.query_with_error(chi, "SELECT count() FROM test_081_dist", host=new_replica)
+            if "CLUSTER_DOESNT_EXIST" not in out and "Exception" not in out and "error" not in out.lower():
+                break
+            retry_sleep(i, 5)
+        assert "CLUSTER_DOESNT_EXIST" not in out, error(
+            f"Distributed table on the new replica {new_replica} stuck at CLUSTER_DOESNT_EXIST (#2013): {out}"
+        )
+        assert "Exception" not in out and "error" not in out.lower(), error(
+            f"Distributed query on the new replica {new_replica} failed: {out}"
+        )
+        print(f"new replica Distributed count()={out}; new-replica restartCount={_operator_pod_container_restart_total(new_replica)}")
+
+    with And("The pre-existing replica is NOT restarted"):
+        existing_restarts = _operator_pod_container_restart_total(existing_replica)
+        assert existing_restarts == 0, error(
+            f"pre-existing replica {existing_replica} must not be restarted on scale-up, "
+            f"but restartCount={existing_restarts}"
+        )
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_010081_2. Fresh multi-replica install does not trigger the scale-up restart (issue #2013 gate)")
+def test_010081_2(self):
+    """Guards the scale-up gate: a fresh multi-replica install has every host as ObjectStatusCreated
+    too, but restartNewlyAddedHosts must skip them - doubly so: IsInNewCluster() is true for a
+    brand-new cluster, and there are no pre-existing cluster-dependent objects, so no host records a
+    CLUSTER_DOESNT_EXIST failure. Neither host may be restarted."""
+    create_shell_namespace_clickhouse_template()
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    chi = "test-081-scaleup"
+    cluster = "default"
+
+    with Given("A fresh two-replica cluster"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-081-scaleup-cluster-objects-2.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Neither replica is restarted (the scale-up restart is gated to existing clusters)"):
+        for replica in (0, 1):
+            pod = f"chi-{chi}-{cluster}-0-{replica}-0"
+            restarts = _operator_pod_container_restart_total(pod)
+            assert restarts == 0, error(
+                f"fresh-install replica {pod} must not be restarted, but restartCount={restarts}"
+            )
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
 #
 # Keeper tests section
 #
