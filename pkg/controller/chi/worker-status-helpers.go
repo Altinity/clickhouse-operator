@@ -275,6 +275,18 @@ func (w *worker) getRemoteServersGeneratorOptions() *commonConfig.HostSelector {
 	// Base model specifies to exclude:
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
+	//
+	// Excluding newly-added (ObjectStatusRequested) hosts is DELIBERATE, not incidental: a host
+	// whose StatefulSet does not exist yet is an unreachable cluster member, and remote_servers
+	// lives in the single COMMON ConfigMap mounted by every pod. Advertising a not-yet-created
+	// host would hand every existing pod a cluster definition pointing at a host that cannot be
+	// reached, breaking cluster-wide operations during the reconcile window (existing replicas'
+	// Distributed queries, ON CLUSTER DDL, and the operator's own clusterAllReplicas/remote()
+	// schema-migration and health queries). The new host is added to remote_servers only in the
+	// final phase, once its StatefulSet exists. Do NOT drop this to "seed" the full topology into
+	// the preliminary ConfigMap: because the ConfigMap is shared, that necessarily re-advertises
+	// the not-yet-created host to existing pods. Newly-added hosts recover their cluster-dependent
+	// objects via the post-publish restart in restartNewlyAddedHosts, never by seeding.
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
 		types.NewReconcileAttributes().
 			SetStatus(types.ObjectStatusRequested).
