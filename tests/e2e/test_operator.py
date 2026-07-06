@@ -9232,7 +9232,7 @@ def cleanup_chis(self):
 
 
 @TestModule
-@Name("test_operator")
+@Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"),
               RQ_SRS_026_ClickHouseOperator("1.0"))
 def test(self):

@@ -31,18 +31,9 @@ def get_shell(self, timeout=600):
 def create_test_namespace(self, force=False):
     """Create unique test namespace for test."""
 
-    # Derive prefix from scenario id: test_010001, test_010006_2, test_039, etc.
-    # Nested TestStep names may not contain ". ", so slicing on ". " is unsafe.
-    match = re.search(r"test_\d+(?:_\d+)?", self.name)
-    assert match, error(f"cannot derive namespace prefix from test name: {self.name!r}")
+    random_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
 
-    random_namespace = (
-        match.group(0).replace("_", "-")
-        + "-"
-        + str(uuid.uuid1())
-    )
-
-    if not force:  # (self.cflags & PARALLEL) and not force:
+    if not force: # (self.cflags & PARALLEL) and not force:
         self.context.test_namespace = random_namespace
 
     self.context.operator_namespace = self.context.test_namespace
