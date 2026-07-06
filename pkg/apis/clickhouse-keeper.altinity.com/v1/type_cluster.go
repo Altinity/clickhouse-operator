@@ -417,6 +417,11 @@ func (cluster *Cluster) HostsCount() int {
 	return count
 }
 
+// IsSingleNode reports whether the cluster has fewer than two hosts.
+func (cluster *Cluster) IsSingleNode() bool {
+	return cluster.HostsCount() < 2
+}
+
 func (cluster *Cluster) IsZero() bool {
 	return cluster == nil
 }
