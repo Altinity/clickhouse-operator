@@ -4019,6 +4019,11 @@ spec:
                       minimum: 1
                       maximum: 65535
                       description: "How many goroutines will be used to reconcile CHIs in parallel, 10 by default"
+                    reconcileCHKsThreadsNumber:
+                      type: integer
+                      minimum: 1
+                      maximum: 65535
+                      description: "How many goroutines will be used to reconcile CHKs in parallel, 1 by default"
                     reconcileShardsThreadsNumber:
                       type: integer
                       minimum: 1
@@ -6051,6 +6056,8 @@ data:
       runtime:
         # Max number of concurrent CHI reconciles in progress
         reconcileCHIsThreadsNumber: 10
+        # Max number of concurrent CHK reconciles in progress
+        reconcileCHKsThreadsNumber: 1
 
         # The operator reconciles shards concurrently in each CHI with the following limitations:
         #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently

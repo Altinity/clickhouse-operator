@@ -115,6 +115,10 @@ const (
 	// Used in case no other specified in config
 	defaultReconcileCHIsThreadsNumber = 1
 
+	// defaultReconcileCHKsThreadsNumber specifies default number of CHK controller threads running concurrently.
+	// Used in case no other specified in config
+	defaultReconcileCHKsThreadsNumber = 1
+
 	// defaultReconcileShardsThreadsNumber specifies the default number of threads usable for concurrent shard reconciliation
 	// within a single cluster reconciliation. Defaults to 1, which means strictly sequential shard reconciliation.
 	defaultReconcileShardsThreadsNumber = 1
@@ -663,6 +667,7 @@ type OperatorConfigReconcileRecoveryCompletedScope struct {
 
 type OperatorConfigReconcileRuntime struct {
 	ReconcileCHIsThreadsNumber           int `json:"reconcileCHIsThreadsNumber"           yaml:"reconcileCHIsThreadsNumber"`
+	ReconcileCHKsThreadsNumber           int `json:"reconcileCHKsThreadsNumber"           yaml:"reconcileCHKsThreadsNumber"`
 	ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
 	ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
 
@@ -1398,6 +1403,9 @@ func (c *OperatorConfig) normalizeSectionReconcileRuntime() {
 	}
 	if c.Reconcile.Runtime.ReconcileCHIsThreadsNumber == 0 {
 		c.Reconcile.Runtime.ReconcileCHIsThreadsNumber = defaultReconcileCHIsThreadsNumber
+	}
+	if c.Reconcile.Runtime.ReconcileCHKsThreadsNumber == 0 {
+		c.Reconcile.Runtime.ReconcileCHKsThreadsNumber = defaultReconcileCHKsThreadsNumber
 	}
 	if c.Reconcile.Runtime.ReconcileShardsThreadsNumber == 0 {
 		c.Reconcile.Runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
