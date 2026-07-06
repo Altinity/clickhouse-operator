@@ -7643,34 +7643,12 @@ def test_020005(self):
             },
         )
 
+    with Then("Confirm all CHK pods are ready"):
+        kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-0-0', '.status.containerStatuses[0].ready', 'true', retries=10)
+        kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-1-0', '.status.containerStatuses[0].ready', 'true', retries=10)
+        kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-2-0', '.status.containerStatuses[0].ready', 'true', retries=10)
+
     check_replication(chi, {0, 1}, 2)
-
-    # TODO: This does not work now
-    # with Then("Kill first pod to switch the leader"):
-    #    kubectl.launch(f"delete pod chk-test-052-chk-keeper-0-0-0")
-    #    time.sleep(10)
-
-    # with Then("Force leader to be on the first node only"):
-    #    kubectl.create_and_check(
-    #        manifest="manifests/chk/test-052-chk-rescale-1.1.yaml", kind="chk",
-    #        check={
-    #            "pod_count": 3,
-    #            "do_not_delete": 1,
-    #        },
-    #    )
-
-    # check_replication(chi, {0,1}, 3)
-
-
-    # with Then("Remove other nodes from the raft configuration"):
-    #    kubectl.create_and_check(
-    #        manifest="manifests/chk/test-052-chk-rescale-1.2.yaml", kind="chk",
-    #        check={
-    #            "do_not_delete": 1,
-    #        },
-    #    )
-
-    # check_replication(chi, {0,1}, 4)
 
     with Then("Rescale CHK back to 1 replica"):
         kubectl.create_and_check(
