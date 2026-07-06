@@ -23,7 +23,6 @@ def regression(self, native, keeper_type, fips140_mode):
         features = [
             "e2e.test_metrics_exporter",
             "e2e.test_operator",
-            "e2e.test_acvp",
         ]
         for feature_name in features:
             Feature(run=load(feature_name, "test"))

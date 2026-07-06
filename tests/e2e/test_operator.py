@@ -8018,10 +8018,10 @@ def test_030001(self):
     op_bin = self.context.fips_op_bin
     me_bin = self.context.fips_me_bin
 
-    with Then("check go version -m <binary> version for operator"):
+    with Check("operator binary embeds GOFIPS140 build metadata"):
         check_binary_go_version(binary_path=op_bin, version=gofips140_needle)
 
-    with And("check runtime FIPS modes for operator"):
+    with Check("operator reports expected runtime FIPS modes"):
         check_fips_runtime_modes(
             binary_path=op_bin,
             binary="clickhouse-operator",
@@ -8030,10 +8030,10 @@ def test_030001(self):
             godebug_default=godebug_default,
         )
 
-    with Then("check go version -m <binary> version for metrics exporter"):
+    with Check("metrics-exporter binary embeds GOFIPS140 build metadata"):
         check_binary_go_version(binary_path=me_bin, version=gofips140_needle)
 
-    with And("check runtime FIPS modes for metrics-exporter"):
+    with Check("metrics-exporter reports expected runtime FIPS modes"):
         check_fips_runtime_modes(
             binary_path=me_bin,
             binary="metrics-exporter",
@@ -8091,23 +8091,23 @@ def test_030003(self):
     with Check("operator pod passes essential FIPS checks"):
         run_operator_fips_checks()
 
-    with When("test TLS secret is installed"):
+    with Given("test TLS secret is installed for ClickHouse and Keeper hosts"):
         create_tls_secret_for_fips_hosts(chi=chi, chk=chk)
 
     with And("external ClickHouse client container is started"):
         start_external_ch_container()
 
-    with And("FIPS ClickHouse Keeper is deployed with TLS settings"):
+    with When("FIPS ClickHouse Keeper is deployed with TLS settings"):
         fips_apply_manifest(
             manifest_path=chk_manifest,
             replica_count=2,
             kind="chk",
         )
 
-    with Then("check Keeper cluster passes essential FIPS checks"):
+    with Then("Keeper cluster passes essential FIPS checks"):
         chk_pods = run_chk_fips_checks(workload=chk, replica_count=2)
 
-    with When("FIPS ClickHouse is deployed with TLS settings"):
+    with When("FIPS ClickHouse is deployed with TLS settings and backup template"):
         fips_apply_manifest(
             manifest_path=chi_manifest,
             replica_count=chi_replica_count,
@@ -8115,31 +8115,31 @@ def test_030003(self):
             apply_templates=[backup_template],
         )
 
-    with Check("operator outbound connections to CHI and CHK after reconcile"):
+    with Check("operator uses TLS-compliant outbound paths after reconcile"):
         run_operator_reconcile_fips_checks()
 
-    with Check("metrics-exporter discovers ClickHouse using HTTPS"):
+    with Check("metrics-exporter discovers ClickHouse through HTTPS"):
         check_metrics_exporter_discovers_clickhouse_https()
 
-    with Check("ClickHouse replicas connect to Keeper using secure client port"):
+    with Check("ClickHouse replicas use Keeper secure client port"):
         check_clickhouse_uses_secure_keeper_port(chi=chi)
 
-    with Then("check ClickHouse cluster passes essential FIPS checks"):
+    with Then("ClickHouse cluster passes essential FIPS checks"):
         chi_pods = run_chi_fips_checks(
             workload=chi,
             replica_count=chi_replica_count,
         )
 
-    with And("clickhouse-backup sidecar passes essential FIPS checks"):
+    with Then("clickhouse-backup sidecar passes essential FIPS checks"):
         backup_pods = run_backup_fips_checks(
             workload=chi,
             replica_count=chi_replica_count,
         )
 
-    with Check("ReplicatedMergeTree data converges over the TLS setup"):
+    with Check("ReplicatedMergeTree data converges over TLS"):
         fips_check_replication_across_replicas(chi_pods=chi_pods)
 
-    with Check("backup and restore succeeds through HTTPS API"):
+    with Check("backup and restore succeed through HTTPS API"):
         check_clickhouse_backup_restore_roundtrip_https(pod=backup_pods[0])
 
     with Check("approved AES-256 TLS 1.3 cipher is negotiated"):
@@ -8148,10 +8148,10 @@ def test_030003(self):
             chk_pods=chk_pods,
         )
 
-    with Check("rejected TLS protocol and cipher combinations are not negotiated"):
-        fips_assert_rejected_tls_probes(
+    with Check("all rejected TLS protocol and cipher cases fail on every FIPS TLS endpoint"):
+        fips_assert_all_rejected_tls_cases_on_all_endpoints(
             chi_pods=chi_pods,
-            chk_pods=chk_pods
+            chk_pods=chk_pods,
         )
 
 @TestScenario
@@ -8181,7 +8181,7 @@ def test_030004(self):
     with Given("strict FIPS operator configuration is applied"):
         util.apply_operator_config(chopconf)
 
-    with And("test TLS secret covers up to 3 CHI replicas"):
+    with And("test TLS secret covers up to 3 CHI and CHK replicas"):
         create_tls_secret_for_fips_hosts(chi=chi, chk=chk, replicas=3)
 
     with And("external ClickHouse client container is started"):
@@ -8194,7 +8194,7 @@ def test_030004(self):
             kind="chk",
         )
 
-    with And("FIPS ClickHouse is deployed with 2 replicas"):
+    with And("FIPS ClickHouse is deployed with 2 replicas and backup sidecars"):
         chi_manifest_2 = fips_edit_manifest(
             source_manifest=chi_manifest,
             replicas_count=2,
@@ -8207,19 +8207,19 @@ def test_030004(self):
             apply_templates=[backup_template],
         )
 
-    with Then("check 2-replica cluster passes essential FIPS checks"):
+    with Then("2-replica ClickHouse cluster passes essential FIPS checks"):
         chi_pods = run_chi_fips_checks(
             workload=chi,
             replica_count=2,
         )
 
-    with And("check clickhouse-backup sidecar passes essential FIPS checks"):
+    with Check("clickhouse-backup sidecars pass essential FIPS checks"):
         run_backup_fips_checks(
             workload=chi,
             replica_count=2,
         )
 
-    with And("check ReplicatedMergeTree data converges across 2 replicas"):
+    with Check("ReplicatedMergeTree data converges across 2 replicas"):
         fips_check_replication_across_replicas(chi_pods=chi_pods)
 
     with When("CHI is upscaled to 3 replicas"):
@@ -8234,19 +8234,19 @@ def test_030004(self):
             kind="chi",
         )
 
-    with Then("check 3-replica cluster passes essential FIPS checks"):
+    with Then("3-replica ClickHouse cluster passes essential FIPS checks"):
         chi_pods = run_chi_fips_checks(
             workload=chi,
             replica_count=3,
         )
 
-    with And("check clickhouse-backup sidecar passes essential FIPS checks"):
+    with Check("clickhouse-backup sidecars pass essential FIPS checks"):
         run_backup_fips_checks(
             workload=chi,
             replica_count=3,
         )
 
-    with And("check ReplicatedMergeTree data converges across 3 replicas"):
+    with Check("ReplicatedMergeTree data converges across 3 replicas"):
         fips_check_replication_across_replicas(
             chi_pods=chi_pods,
             table="repl_scale_test_3",
@@ -8264,19 +8264,19 @@ def test_030004(self):
             kind="chi",
         )
 
-    with Then("single-replica cluster passes essential FIPS checks"):
+    with Check("single-replica ClickHouse cluster passes essential FIPS checks"):
         run_chi_fips_checks(
             workload=chi,
             replica_count=1,
         )
 
-    with And("clickhouse-backup sidecar passes essential FIPS checks"):
+    with Check("clickhouse-backup sidecar passes essential FIPS checks"):
         run_backup_fips_checks(
             workload=chi,
             replica_count=1,
         )
 
-    with When("CHI OpenSSL cipher suites are updated"):
+    with When("CHI OpenSSL cipher suites are updated to allow only AES-128 TLS 1.3"):
         chi_manifest_update = fips_edit_manifest(
             source_manifest=chi_manifest,
             replicas_count=1,
@@ -8291,7 +8291,7 @@ def test_030004(self):
             apply_templates=[backup_template],
         )
 
-    with Then("removed ClickHouse cipher is no longer negotiated"):
+    with Check("removed AES-256 TLS 1.3 cipher is rejected on ClickHouse native TLS port"):
         chi_pods = sorted(kubectl.get_pod_names(chi))
 
         check_tls13_cipher_fails(
@@ -8328,7 +8328,7 @@ def test_030005(self):
     with Given("strict FIPS operator configuration is applied"):
         util.apply_operator_config(chopconf)
 
-    with And("test TLS secret covers up to 3 CHI and CHK replicas"):
+    with And("TLS secret covers up to 3 CHI and CHK replicas"):
         create_tls_secret_for_fips_hosts(chi=chi, chk=chk, replicas=3)
 
     with And("external ClickHouse client container is started"):
@@ -8346,13 +8346,13 @@ def test_030005(self):
             kind="chk",
         )
 
-    with Then("2-replica Keeper cluster passes essential FIPS checks"):
+    with Check("2-replica Keeper cluster passes essential FIPS checks"):
         run_chk_fips_checks(
             workload=chk,
             replica_count=2,
         )
 
-    with And("FIPS ClickHouse is deployed with 2 replicas"):
+    with When("FIPS ClickHouse is deployed with 2 replicas"):
         chi_manifest_2 = fips_edit_manifest(
             source_manifest=chi_manifest,
             replicas_count=2,
@@ -8365,22 +8365,22 @@ def test_030005(self):
             apply_templates=[backup_template],
         )
 
-    with And("2-replica ClickHouse cluster passes essential FIPS checks"):
+    with Then("2-replica ClickHouse cluster passes essential FIPS checks"):
         chi_pods = run_chi_fips_checks(
             workload=chi,
             replica_count=2,
         )
 
-    with And("clickhouse-backup sidecar passes essential FIPS checks"):
+    with Check("clickhouse-backup sidecars pass essential FIPS checks"):
         run_backup_fips_checks(
             workload=chi,
             replica_count=2,
         )
 
-    with And("ReplicatedMergeTree data converges across 2 ClickHouse replicas"):
+    with Check("ReplicatedMergeTree data converges across 2 ClickHouse replicas"):
         fips_check_replication_across_replicas(chi_pods=chi_pods)
 
-    with When("CHK is upscaled to 3 replicas"):
+    with When("Keeper is upscaled to 3 replicas"):
         chk_manifest_3 = fips_edit_manifest(
             source_manifest=chk_manifest,
             replicas_count=3,
@@ -8392,31 +8392,31 @@ def test_030005(self):
             kind="chk",
         )
 
-    with Then("3-replica Keeper cluster passes essential FIPS checks"):
+    with Check("3-replica Keeper cluster passes essential FIPS checks"):
         run_chk_fips_checks(
             workload=chk,
             replica_count=3,
         )
 
-    with And("ClickHouse remains healthy after Keeper upscale"):
+    with Then("ClickHouse cluster remains healthy after Keeper upscale"):
         chi_pods = run_chi_fips_checks(
             workload=chi,
             replica_count=2,
         )
 
-    with And("clickhouse-backup sidecar passes essential FIPS checks"):
+    with Check("clickhouse-backup sidecars pass essential FIPS checks after Keeper upscale"):
         run_backup_fips_checks(
             workload=chi,
             replica_count=2,
         )
 
-    with And("ReplicatedMergeTree data still converges after Keeper upscale"):
+    with Check("ReplicatedMergeTree data converges after Keeper upscale"):
         fips_check_replication_across_replicas(
             chi_pods=chi_pods,
             table="repl_chk_scale_test_3",
         )
 
-    with When("CHK is downscaled to 1 replica"):
+    with When("Keeper is downscaled to 1 replica"):
         chk_manifest_1 = fips_edit_manifest(
             source_manifest=chk_manifest,
             replicas_count=1,
@@ -8428,31 +8428,31 @@ def test_030005(self):
             kind="chk",
         )
 
-    with Then("single-replica Keeper cluster passes essential FIPS checks"):
+    with Check("single-replica Keeper cluster passes essential FIPS checks"):
         run_chk_fips_checks(
             workload=chk,
             replica_count=1,
         )
 
-    with And("ClickHouse remains healthy after Keeper downscale"):
+    with Then("ClickHouse cluster remains healthy after Keeper downscale"):
         chi_pods = run_chi_fips_checks(
             workload=chi,
             replica_count=2,
         )
 
-    with And("clickhouse-backup sidecar passes essential FIPS checks"):
+    with Check("clickhouse-backup sidecars pass essential FIPS checks after Keeper downscale"):
         run_backup_fips_checks(
             workload=chi,
             replica_count=2,
         )
 
-    with And("ReplicatedMergeTree data still converges after Keeper downscale"):
+    with Check("ReplicatedMergeTree data converges after Keeper downscale"):
         fips_check_replication_across_replicas(
             chi_pods=chi_pods,
             table="repl_chk_scale_test_1",
         )
 
-    with When("CHK OpenSSL cipher suites are updated"):
+    with When("Keeper OpenSSL cipher suites are updated"):
         chk_manifest_update = fips_edit_manifest(
             source_manifest=chk_manifest,
             replicas_count=1,
@@ -8466,7 +8466,7 @@ def test_030005(self):
             kind="chk",
         )
 
-    with Then("removed Keeper cipher is no longer negotiated"):
+    with Check("removed Keeper TLS 1.3 cipher is no longer negotiated"):
         chi_pods = sorted(kubectl.get_pod_names(chi))
         chk_pods = kubectl.get_chk_pod_names(chk)
 
@@ -8544,89 +8544,89 @@ def test_030007(self):
     with Given("strict FIPS operator configuration is applied"):
         util.apply_operator_config(chopconf)
 
-    with When("CHI references plain-text external ZooKeeper"):
+    with When("CHI with plain-text external ZooKeeper is applied"):
         chi_zk = yaml_manifest.get_name(util.get_full_path(chi_zk_rejected))
         fips_apply_manifest_raw(manifest_path=chi_zk_rejected)
 
-    with Then("CHI is aborted with FIPSValidationFailed"):
+    with Check("CHI is aborted with FIPSValidationFailed and no StatefulSet is created"):
         fips_assert_chi_aborted(
             chi=chi_zk,
             reason="FIPSValidationFailed",
             expect_no_sts=True,
         )
 
-    with When("CHI sets external ZooKeeper secure=false explicitly"):
+    with When("CHI with external ZooKeeper secure=false is applied"):
         chi_zk_explicit = yaml_manifest.get_name(
             util.get_full_path(chi_zk_rejected_explicit_false)
         )
         fips_apply_manifest_raw(manifest_path=chi_zk_rejected_explicit_false)
 
-    with Then("CHI is aborted with FIPSValidationFailed"):
+    with Check("CHI is aborted with FIPSValidationFailed and no StatefulSet is created"):
         fips_assert_chi_aborted(
             chi=chi_zk_explicit,
             reason="FIPSValidationFailed",
             expect_no_sts=True,
         )
 
-    with When("CHI sets spec.security.clickhouse.tls.verify=None"):
+    with When("CHI with spec.security.clickhouse.tls.verify=None is applied"):
         chi_bypass = yaml_manifest.get_name(
             util.get_full_path(chi_bypass_rejected)
         )
         fips_apply_manifest_raw(manifest_path=chi_bypass_rejected)
 
-    with Then("CHI is aborted with FIPSValidationFailed"):
+    with Check("CHI is aborted with FIPSValidationFailed and no StatefulSet is created"):
         fips_assert_chi_aborted(
             chi=chi_bypass,
             reason="FIPSValidationFailed",
             expect_no_sts=True,
         )
 
-    with When("CHI sets cluster.security.clickhouse.tls.verify=None"):
+    with When("CHI with cluster.security.clickhouse.tls.verify=None is applied"):
         chi_cluster_bypass = yaml_manifest.get_name(
             util.get_full_path(chi_cluster_verify_none)
         )
         fips_apply_manifest_raw(manifest_path=chi_cluster_verify_none)
 
-    with Then("CHI is aborted with FIPSValidationFailed"):
+    with Check("CHI is aborted with FIPSValidationFailed and no StatefulSet is created"):
         fips_assert_chi_aborted(
             chi=chi_cluster_bypass,
             reason="FIPSValidationFailed",
             expect_no_sts=True,
         )
 
-    with When("CHI sets clickhouse.tls.minVersion to an invalid value"):
+    with When("CHI with invalid clickhouse.tls.minVersion is applied"):
         chi_minversion = yaml_manifest.get_name(
             util.get_full_path(chi_invalid_minversion)
         )
         fips_apply_manifest_raw(manifest_path=chi_invalid_minversion)
 
-    with Then("CHI is aborted with FIPSValidationFailed"):
+    with Check("CHI is aborted with FIPSValidationFailed and no StatefulSet is created"):
         fips_assert_chi_aborted(
             chi=chi_minversion,
             reason="FIPSValidationFailed",
             expect_no_sts=True,
         )
 
-    with When("CHI sets zookeeper.tls.verify=None"):
+    with When("CHI with zookeeper.tls.verify=None is applied"):
         chi_zk_verify = yaml_manifest.get_name(
             util.get_full_path(chi_zk_verify_none)
         )
         fips_apply_manifest_raw(manifest_path=chi_zk_verify_none)
 
-    with Then("CHI is aborted with FIPSValidationFailed"):
+    with Check("CHI is aborted with FIPSValidationFailed and no StatefulSet is created"):
         fips_assert_chi_aborted(
             chi=chi_zk_verify,
             reason="FIPSValidationFailed",
             expect_no_sts=True,
         )
 
-    with When("CHK sets spec-level security bypass"):
+    with When("CHK with spec-level security bypass is applied"):
         chk_bypass = yaml_manifest.get_name(
             util.get_full_path(chk_bypass_rejected)
         )
         fips_apply_manifest_raw(manifest_path=chk_bypass_rejected)
 
-    with Then("CHK is aborted with FIPSValidationFailed"):
+    with Check("CHK is aborted with FIPSValidationFailed and no StatefulSet is created"):
         fips_assert_chk_aborted(
             chk=chk_bypass,
             reason="FIPSValidationFailed",
@@ -8712,13 +8712,13 @@ def test_030008(self):
         util.get_full_path(chi_permissive_manifest)
     )
 
-    with Given("FIPS image policy Required is applied"):
+    with Given("FIPSRequired image policy is applied"):
         util.apply_operator_config(chopconf)
 
-    with When("CHI with non-fips image tag is applied"):
+    with When("CHI with non-FIPS image tag is applied"):
         fips_apply_manifest_raw(manifest_path=chi_non_fips_manifest)
 
-    with Then("CHI is aborted at admission with FIPSImagePolicyViolation"):
+    with Check("CHI is aborted with leading FIPSImagePolicyViolation and no StatefulSet is created"):
         fips_assert_chi_aborted(
             chi=chi_non_fips,
             reason="FIPSImagePolicyViolation",
@@ -8726,17 +8726,17 @@ def test_030008(self):
             expect_reason_leading=True,
         )
 
-    with When("CHK with non-fips image tag is applied"):
+    with When("CHK with non-FIPS image tag is applied"):
         fips_apply_manifest_raw(manifest_path=chk_non_fips_manifest)
 
-    with Then("CHK is aborted at admission with FIPSImagePolicyViolation"):
+    with Check("CHK is aborted with FIPSImagePolicyViolation and no StatefulSet is created"):
         fips_assert_chk_aborted(
             chk=chk_non_fips,
             reason="FIPSImagePolicyViolation",
             expect_no_sts=True,
         )
 
-    with And("aborted non-fips CHK is deleted before switching image policy"):
+    with When("aborted non-FIPS CHK is deleted before switching image policy"):
         kubectl.launch(
             f"delete chk {chk_non_fips}",
             ns=self.context.test_namespace,
@@ -8744,7 +8744,7 @@ def test_030008(self):
             ok_to_fail=True,
         )
 
-    with When("CHI with two non-fips replicas is applied"):
+    with When("CHI with two non-FIPS replicas is applied"):
         fips_apply_manifest_raw(manifest_path=chi_shortcircuit_manifest)
 
     with Then("CHI is aborted with a single FIPSImagePolicyViolation"):
@@ -8763,17 +8763,17 @@ def test_030008(self):
     with When("CHI with digest-only image reference is applied"):
         fips_apply_manifest_raw(manifest_path=chi_digest_only_manifest)
 
-    with Then("CHI is aborted because digest-only is not detected as FIPS"):
+    with Check("CHI is aborted with FIPSImagePolicyViolation and no StatefulSet is created"):
         fips_assert_chi_aborted(
             chi=chi_digest_only,
             reason="FIPSImagePolicyViolation",
             expect_no_sts=True,
         )
 
-    with When("CHI with fips in registry hostname but not in tag is applied"):
+    with When("CHI with fips only in registry hostname is applied"):
         fips_apply_manifest_raw(manifest_path=chi_registry_path_manifest)
 
-    with Then("CHI is aborted because registry path does not satisfy FIPS tag detection"):
+    with Check("CHI is aborted with FIPSImagePolicyViolation and no StatefulSet is created"):
         fips_assert_chi_aborted(
             chi=chi_registry_path,
             reason="FIPSImagePolicyViolation",
@@ -8787,29 +8787,29 @@ def test_030008(self):
             kind="chi",
         )
 
-    with Then("CHI reconciles without image policy violation"):
+    with Then("check CHI has no FIPSImagePolicyViolation after reconcile"):
         errors = kubectl.get_field("chi", chi_fips, ".status.errors")
         assert "FIPSImagePolicyViolation" not in errors, error(
             f"unexpected FIPSImagePolicyViolation in status.errors, got {errors}"
         )
 
-    with When("CHI with fips-suffix tag is applied"):
+    with When("CHI with fips-suffix image tag is applied"):
         fips_apply_manifest_raw(manifest_path=chi_fips_suffix_manifest)
 
-    with Then("CHI passes image-policy admission because tag contains fips"):
+    with Check("CHI is admitted because the image tag contains fips"):
         fips_assert_chi_admitted(chi=chi_fips_suffix)
 
-    with And("fips-suffix CHI is deleted after admission-only check"):
-        fips_cleanup_admission_only_chi(chi=chi_fips_suffix)
+    with Finally("fips-suffix CHI admission-only resources are deleted"):
+        cleanup_admission_only_chi(chi=chi_fips_suffix)
 
-    with When("CHI with uppercase FIPS tag is applied"):
+    with When("CHI with uppercase FIPS image tag is applied"):
         fips_apply_manifest_raw(manifest_path=chi_case_insensitive_manifest)
 
-    with Then("CHI passes image-policy admission because tag detection is case-insensitive"):
+    with Check("CHI is admitted because image tag detection is case-insensitive"):
         fips_assert_chi_admitted(chi=chi_case_insensitive)
 
-    with And("case-insensitive CHI is deleted after admission-only check"):
-        fips_cleanup_admission_only_chi(chi=chi_case_insensitive)
+    with Finally("case-insensitive CHI admission-only resources are deleted"):
+        cleanup_admission_only_chi(chi=chi_case_insensitive)
 
     with When("runtime decoy image alias is prepared"):
         decoy_tag = "altinity/clickhouse-server:25.8.16.10002.altinityfips-decoy"
@@ -8839,10 +8839,10 @@ def test_030008(self):
                 f"minikube image load failed ({load_result.stderr.strip()})"
             )
         else:
-            with When("CHI with fips tag but non-fips binary is applied"):
+            with When("CHI with FIPS-looking tag but non-FIPS binary is applied"):
                 fips_apply_manifest_raw(manifest_path=chi_runtime_decoy_manifest)
 
-            with Then("CHI is aborted at runtime with FIPSImagePolicyViolation"):
+            with Then("check CHI is aborted at runtime with FIPSImagePolicyViolation"):
                 kubectl.wait_chi_status(chi_decoy, "Aborted")
                 errors = kubectl.get_field("chi", chi_decoy, ".status.errors")
                 assert "FIPSImagePolicyViolation" in errors, error(
@@ -8859,10 +8859,10 @@ def test_030008(self):
 
         util.apply_operator_config(chi_permissive_chopconf)
 
-    with And("a non-fips CHI is applied under Permissive policy"):
+    with When("non-FIPS CHI is applied under Permissive policy"):
         fips_apply_manifest_raw(manifest_path=chi_permissive_manifest)
 
-    with Then("non-fips CHI is admitted without FIPSImagePolicyViolation"):
+    with Check("non-FIPS CHI is admitted without FIPSImagePolicyViolation"):
         fips_assert_chi_admitted(chi=chi_permissive)
 
 
@@ -8898,40 +8898,40 @@ def test_030009(self):
     with And("test TLS secret is installed"):
         create_tls_secret_for_fips_hosts(chi=chi_tls12, chk=chk)
 
-    with And("normal CHK is applied"):
+    with And("TLS 1.3-capable Keeper cluster is deployed"):
         fips_apply_manifest(
             manifest_path=chk_manifest,
             replica_count=2,
             kind="chk",
         )
 
-    with Then("normal CHK becomes healthy"):
+    with Check("TLS 1.3-capable Keeper cluster passes essential FIPS checks"):
         run_chk_fips_checks(
             workload=chk,
             replica_count=2,
         )
 
-    with When("CHI server disables TLS 1.3"):
+    with When("TLS 1.2-only CHI is applied"):
         fips_apply_manifest(
             manifest_path=chi_tls12_manifest,
             kind="chi",
             expected_status="InProgress",
         )
 
-    with Then("operator rejects CHI because TLS 1.3 cannot be negotiated"):
+    with Check("operator and metrics-exporter reject CHI because TLS 1.3 cannot be negotiated"):
         fips_assert_chi_tls_rejected(
             chi=chi_tls12,
             min_version="1.3",
         )
 
-    with When("CHK server disables TLS 1.3"):
+    with When("TLS 1.2-only CHK is applied"):
         fips_apply_manifest(
             manifest_path=chk_tls12_manifest,
             kind="chk",
             expected_status="InProgress",
         )
 
-    with Then("operator rejects CHK because TLS 1.3 cannot be negotiated"):
+    with Check("operator rejects CHK because TLS 1.3 cannot be negotiated"):
         fips_assert_chk_tls_rejected(
             chk=chk_tls12,
             min_version="1.3",
@@ -8939,70 +8939,105 @@ def test_030009(self):
 
 @TestScenario
 @Tags("HEAVY")
-@Name("test_030010. FIPS synthetic TLS cipher validation: K8s API and CHI HTTPS")
+@Name("test_030017. FIPS host-run TLS cipher probes against local openssl s_server")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_FIPS_TLS_ApprovedCiphers("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_TLS_RejectedCiphers("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_Connect_Operator_KubernetesAPI("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_Connect_Operator_ClickHouse("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_Connect_Exporter_KubernetesAPI("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_Connect_Exporter_ClickHouse("1.0"),
 )
-def test_030010(self):
-    """Supplementary synthetic AES-256 TLS 1.3 cipher smoke.
+def test_030017(self):
+    """Host-run FIPS TLS probes — no real Kubernetes.
 
-    This scenario proves that both containers in the operator pod can negotiate
-    TLS 1.3 with TLS_AES_256_GCM_SHA384 against real Kubernetes API and real
-    ClickHouse HTTPS endpoints.
+    Operator → ClickHouse: fake_k8s + openssl s_server (:8443) +
+    clickhouse-operator. fake_k8s drives reconcile until Ping hits s_server.
+
+    Operator → Kubernetes API (cipher matrix): fake kubeconfig → openssl
+    s_server as the API TLS peer.
+
+    Metrics-exporter → ClickHouse: host-run exporter, POST /chi with
+    127.0.0.1:<port>, GET /metrics — no k8s, no fake_k8s.
+
+    Metrics-exporter → Kubernetes API (cipher matrix): fake kubeconfig →
+    openssl s_server as the API TLS peer.
     """
 
-    chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
-    chi_manifest = "manifests/chi/test-030003.yaml"
-    chk_manifest = "manifests/chk/test-030003.yaml"
-    backup_template = "manifests/chit/test-030003-backup-template.yaml"
+    with Given("operator and metrics-exporter binaries are extracted from shipped images"):
+        fips_extract_shipped_binaries()
 
-    create_shell_namespace_clickhouse_template()
+    with And("local OpenSSL TLS material is prepared"):
+        prepare_local_openssl_tls_material()
 
-    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
-    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
+    with And("strict FIPS operator config is prepared for host-run probes"):
+        prepare_local_strict_operator_config()
 
-    with Given("strict FIPS operator configuration is applied"):
-        util.apply_operator_config(chopconf)
+    config_path = self.context.fips_local_strict_config_path
+    op_bin = self.context.fips_op_bin
+    me_bin = self.context.fips_me_bin
 
-    with And("test TLS secret is installed"):
-        create_tls_secret_for_fips_hosts(chi=chi, chk=chk)
-
-    with And("FIPS ClickHouse Keeper is deployed as CHI dependency"):
-        fips_apply_manifest(
-            manifest_path=chk_manifest,
-            replica_count=2,
-            kind="chk",
+    with Check("clickhouse-operator approved TLS 1.3 ciphers against local fake k8s API"):
+        assert_local_fake_k8s_approved_tls_cases(
+            binary_label="clickhouse-operator",
+            binary_path=op_bin,
+            config_path=config_path,
         )
 
-    with When("FIPS ClickHouse is deployed with TLS settings"):
-        fips_apply_manifest(
-            manifest_path=chi_manifest,
-            replica_count=2,
-            kind="chi",
-            apply_templates=[backup_template],
+    with Check("clickhouse-operator rejected TLS probes against local fake k8s API"):
+        assert_local_fake_k8s_rejected_tls_cases(
+            binary_label="clickhouse-operator",
+            binary_path=op_bin,
+            config_path=config_path,
         )
 
-    with Then("ClickHouse cluster pods are ready"):
-        kubectl.wait_chi_status(chi, "Completed")
-        kubectl.wait_objects(
-            chi,
-            {
-                "statefulset": 2,
-                "pod": 2,
-                "service": 3,
-            },
-        )
-        chi_pods = sorted(kubectl.get_pod_names(chi))
-
-    with Then("operator pod containers negotiate AES-256 TLS 1.3 to K8s and CHI"):
-        check_synthetic_tls13_smoke_from_operator_pod(
-            chi_pod=chi_pods[0],
+    with Check("metrics-exporter approved TLS 1.3 ciphers against local fake k8s API"):
+        assert_local_fake_k8s_approved_tls_cases(
+            binary_label="metrics-exporter",
+            binary_path=me_bin,
+            config_path=config_path,
         )
 
-    with Then("operator pod containers reject fake openSSL server with non approved cipher"):
-        fips_assert_connection_rejected_on_non_approved_cipher()
+    with Check("metrics-exporter rejected TLS probes against local fake k8s API"):
+        assert_local_fake_k8s_rejected_tls_cases(
+            binary_label="metrics-exporter",
+            binary_path=me_bin,
+            config_path=config_path,
+        )
 
+    with Given("host-run fake_k8s for operator ClickHouse TLS probes"):
+        start_hostrun_operator_fake_k8s_session()
+    try:
+        with Check("clickhouse-operator approved TLS 1.3 ciphers against openssl s_server"):
+            assert_local_fake_clickhouse_approved_tls_cases(
+                binary_label="clickhouse-operator",
+                binary_path=op_bin,
+                probe_target="operator",
+            )
+
+        with Check("clickhouse-operator rejected TLS probes against openssl s_server"):
+            assert_local_fake_clickhouse_rejected_tls_cases(
+                binary_label="clickhouse-operator",
+                binary_path=op_bin,
+                probe_target="operator",
+            )
+    finally:
+        with Finally("stop host-run fake_k8s"):
+            stop_hostrun_operator_fake_k8s_session()
+
+    with Check("metrics-exporter approved TLS 1.3 ciphers against openssl s_server"):
+        assert_local_fake_clickhouse_approved_tls_cases(
+            binary_label="metrics-exporter",
+            binary_path=me_bin,
+            probe_target="metrics-exporter",
+        )
+
+    with Check("metrics-exporter rejected TLS probes against openssl s_server"):
+        assert_local_fake_clickhouse_rejected_tls_cases(
+            binary_label="metrics-exporter",
+            binary_path=me_bin,
+            probe_target="metrics-exporter",
+        )
 
 @TestScenario
 @Name("test_030011. FIPS Integrity check: detect binary tampering")
@@ -9011,23 +9046,17 @@ def test_030010(self):
 )
 def test_030011(self):
     """Verify that corrupting the embedded FIPS HMAC causes binaries to panic at startup.
-
-    Procedure:
-    1. Extract FIPS binaries from release images.
-    2. Locate the '.go.fipsinfo' ELF section.
-    3. Flip bits in the HMAC header.
-    4. Verify the binary panics with 'fips140: verification mismatch'.
     """
     with Given("operator and metrics-exporter binaries are extracted"):
         fips_extract_shipped_binaries()
 
-    with Then("clickhouse-operator detects tampering"):
+    with Check("clickhouse-operator detects tampering"):
         check_fips_integrity_failure(
             binary_path=self.context.fips_op_bin,
             binary_label="clickhouse-operator"
         )
 
-    with And("metrics-exporter detects tampering"):
+    with Check("metrics-exporter detects tampering"):
         check_fips_integrity_failure(
             binary_path=self.context.fips_me_bin,
             binary_label="metrics-exporter"
@@ -9041,19 +9070,40 @@ def test_030011(self):
 )
 def test_030015(self):
     """Verify forced FIPS CAST failure terminates each shipped binary independently."""
-    fips_extract_shipped_binaries()
 
-    with Then("clickhouse-operator terminates with CAST failure"):
-        check_fips_cast_failure(
-            binary_path=self.context.fips_op_bin,
-            binary="clickhouse-operator",
-        )
+    CAST_FAILURE_CASES = (
+        "AES-CBC",
+        "CTR_DRBG",
+        "CounterKDF",
+        "HKDF-SHA2-256",
+        "HMAC-SHA2-256",
+        "SHA2-256",
+        "SHA2-512",
+        "TLSv1.2-SHA2-256",
+        "TLSv1.3-SHA2-256",
+        "cSHAKE128",
+    )
 
-    with Then("metrics-exporter terminates with CAST failure"):
-        check_fips_cast_failure(
-            binary_path=self.context.fips_me_bin,
-            binary="metrics-exporter",
-        )
+    with Given("operator and metrics-exporter binaries are extracted"):
+        fips_extract_shipped_binaries()
+
+    for binary, binary_path in (
+            ("clickhouse-operator", self.context.fips_op_bin),
+            ("metrics-exporter", self.context.fips_me_bin),
+    ):
+        for cast_name in CAST_FAILURE_CASES:
+            with When(f"{binary} is run with forced FIPS CAST failure {cast_name}"):
+                result = run_binary_with_forced_fips_cast_failure(
+                    binary_path=binary_path,
+                    cast_name=cast_name,
+                )
+
+            with Check(f"{binary} terminates with FIPS CAST failure {cast_name}"):
+                check_fips_cast_failure_result(
+                    result=result,
+                    binary=binary,
+                    cast_name=cast_name,
+                )
 
 @TestScenario
 @Tags("HEAVY")
@@ -9064,14 +9114,6 @@ def test_030015(self):
 )
 def test_030016(self):
     """Verify external clickhouse-client can use TLS 1.2 cipher policy to CH native TLS.
-
-    This intentionally uses:
-    - operator
-    - one ClickHouse pod
-    - external Docker clickhouse-client
-    - native secure port 9440
-    - no Keeper
-    - no backup sidecar
     """
     chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
     chi_manifest = "manifests/chi/test-030016.yaml"
@@ -9084,7 +9126,7 @@ def test_030016(self):
     with Given("strict FIPS operator configuration is applied"):
         util.apply_operator_config(chopconf)
 
-    with And("test TLS secret is installed"):
+    with And("test TLS secret is installed for the single CHI pod"):
         create_tls_secret_for_fips_hosts(
             chi=chi,
             chk=chk_dummy,
@@ -9098,7 +9140,7 @@ def test_030016(self):
             kind="chi",
         )
 
-    with Then("ClickHouse pod should be running"):
+    with Then("single ClickHouse pod is running"):
         kubectl.wait_object(
             "pod",
             "",
@@ -9115,7 +9157,7 @@ def test_030016(self):
             ns=self.context.test_namespace,
         )
 
-    with Then("ClickHouse native TLS accepts approved TLS 1.2 AES-GCM cipher"):
+    with Then("check ClickHouse native TLS accepts the approved TLS 1.2 AES-GCM cipher"):
         out = fips_run_openssl_s_client_on_pod_port(
             pod=chi_pod,
             port=9440,
@@ -9127,7 +9169,7 @@ def test_030016(self):
         assert "Protocol  : TLSv1.2" in out, error(out)
         assert "Cipher    : ECDHE-RSA-AES256-GCM-SHA384" in out, error(out)
 
-    with Then("ClickHouse native TLS rejects disallowed TLS 1.2 ChaCha20 cipher"):
+    with Then("check ClickHouse native TLS rejects the disallowed TLS 1.2 ChaCha20 cipher"):
         out = fips_run_openssl_s_client_on_pod_port(
             pod=chi_pod,
             port=9440,
@@ -9144,6 +9186,39 @@ def test_030016(self):
                 or "no peer certificate available" in out
         ), error(out)
 
+@TestScenario
+@Name("test_030018. ACVP responder smoke test: clickhouse-operator binary")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Operator_WrapperIntegration("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Operator_ConfigGeneration("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Operator_SHA2256AFT("1.0"),
+)
+def test_030018(self):
+    """Build operator with -tags acvp_wrapper and verify the embedded ACVP
+    responder answers getConfig + SHA2-256 AFT correctly.
+
+    Companion to test_acvp_metrics_exporter — both binaries embed the same
+    pkg/util/fips/acvp package under the build tag, so we run each independently
+    to confirm the argv0 dispatch fires in each binary's main path.
+    """
+    acvp_smoke("clickhouse-operator", "./cmd/operator")
+
+
+@TestScenario
+@Name("test_030019. ACVP responder smoke test: metrics-exporter binary")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Exporter_WrapperIntegration("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Exporter_ConfigGeneration("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Exporter_SHA2256AFT("1.0"),
+)
+def test_030019(self):
+    """Mirror of test_030019 for the metrics-exporter binary. Both
+    binaries ship the same FIPS module statically linked; this scenario
+    confirms metrics-exporter's argv0 dispatch is wired identically so a
+    regression in either binary's main path is caught.
+    """
+    acvp_smoke("metrics-exporter", "./cmd/metrics_exporter")
+
 def cleanup_chis(self):
     with Given("Cleanup CHIs"):
         ns = kubectl.get("ns", name="", ns="--all-namespaces", ok_to_fail=True)
@@ -9157,7 +9232,7 @@ def cleanup_chis(self):
 
 
 @TestModule
-@Name("e2e.test_operator")
+@Name("test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"),
               RQ_SRS_026_ClickHouseOperator("1.0"))
 def test(self):
