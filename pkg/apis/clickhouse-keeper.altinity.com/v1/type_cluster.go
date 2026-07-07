@@ -417,7 +417,7 @@ func (cluster *Cluster) HostsCount() int {
 	return count
 }
 
-// IsSingleNode reports whether the cluster has fewer than two hosts.
+// IsSingleNode reports whether the cluster has fewer than two hosts (i.e. no Raft quorum peers).
 func (cluster *Cluster) IsSingleNode() bool {
 	return cluster.HostsCount() < 2
 }
