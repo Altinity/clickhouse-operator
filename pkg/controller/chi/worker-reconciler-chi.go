@@ -467,6 +467,16 @@ func (w *worker) hostHitClusterDoesNotExist(ctx context.Context, host *api.Host)
 	n, err := w.ensureClusterSchemer(host).HostClusterDoesNotExistErrorCount(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Warning("Cannot read CLUSTER_DOESNT_EXIST error count on newly-added host; skipping restart. Host: %s err: %v", host.GetName(), err)
+	}
+	return clusterDoesNotExistErrorIndicatesRestart(n, err)
+}
+
+// clusterDoesNotExistErrorIndicatesRestart maps a CLUSTER_DOESNT_EXIST error-count read to the
+// #2013 restart decision. A read error is inconclusive and yields false (skip) - safer to leave a
+// healthy/syncing host alone than to restart on an unreliable read; only a positive count (the
+// terminal load-failure signal) yields true.
+func clusterDoesNotExistErrorIndicatesRestart(n int, err error) bool {
+	if err != nil {
 		return false
 	}
 	return n > 0
