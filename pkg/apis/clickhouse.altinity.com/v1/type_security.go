@@ -63,10 +63,8 @@ type ClusterSecurityKubernetes struct {
 }
 
 // ClusterSecurityKubernetesTLS holds knobs for the operator's outbound
-// Kubernetes API client. The k8s client-go respects whatever's in the
-// kubeconfig; the operator never builds the kubeconfig's tls.Config itself,
-// so these knobs are evaluated as a LOAD-TIME GATE — the operator refuses
-// to start with a kubeconfig that doesn't meet the requested posture.
+// Kubernetes API client. Verify is a load-time gate against the kubeconfig's
+// Insecure flag; MinVersion is applied to the client transport by GetClientset.
 type ClusterSecurityKubernetesTLS struct {
 	// Verify gates startup against the kubeconfig's TLSClientConfig.Insecure
 	// field. Valid values are TLSVerifyStrict and TLSVerifyNone.
@@ -77,12 +75,8 @@ type ClusterSecurityKubernetesTLS struct {
 	// override the kubeconfig; it only refuses to load an insecure one.
 	Verify *types.String `json:"verify,omitempty"     yaml:"verify,omitempty"`
 	// MinVersion floors TLS at the named protocol version. Valid values are
-	// TLSMinVersion12 and TLSMinVersion13. Nil = Go stdlib default.
-	//
-	// Declared for shape symmetry with ClickHouse/Zookeeper and coerced under
-	// FIPS, but not yet enforced on the operator's K8s API transport — a future
-	// enhancement will wire it into rest.Config when the operator wraps the
-	// kubeconfig with stricter TLS settings.
+	// TLSMinVersion12 and TLSMinVersion13. Nil = Go stdlib default. Coerced to
+	// 1.3 under FIPS/Enforced; applied on the K8s API transport by GetClientset.
 	MinVersion *types.String `json:"minVersion,omitempty" yaml:"minVersion,omitempty"`
 }
 
@@ -420,8 +414,7 @@ func (t *ClusterSecurityKubernetesTLS) GetVerify() TLSVerify {
 }
 
 // GetMinVersion returns the resolved TLSMinVersion for the operator's K8s client.
-// Nil-safe; returns empty value when unset. Declared for shape consistency and
-// FIPS coercion uniformity — not yet wired into the K8s API transport.
+// Nil-safe; returns empty value when unset.
 func (t *ClusterSecurityKubernetesTLS) GetMinVersion() TLSMinVersion {
 	if (t == nil) || (t.MinVersion == nil) || !t.MinVersion.HasValue() {
 		return TLSMinVersion("")

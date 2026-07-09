@@ -1530,6 +1530,20 @@ func (c *OperatorConfig) RequiresStrictK8sTLS() bool {
 		c.Security.GetKubernetes().GetTLS().GetVerify() == TLSVerifyStrict
 }
 
+// ResolveK8sTLSMinVersion returns the K8s-API TLS floor for GetClientset. Under
+// hardened posture (policy=Enforced or fips.enforced) returns TLSMinVersion13;
+// otherwise security.kubernetes.tls.minVersion. Callable on raw file-based config
+// before applyEnforcedHardening runs. Empty = Go stdlib default.
+func (c *OperatorConfig) ResolveK8sTLSMinVersion() TLSMinVersion {
+	if c == nil {
+		return TLSMinVersion("")
+	}
+	if c.Security.RequiresHardening() {
+		return TLSMinVersion13
+	}
+	return c.Security.GetKubernetes().GetTLS().GetMinVersion()
+}
+
 // coerceTypedString one-way coerces a *types.String-valued config field (TLSVerify,
 // TLSMinVersion, IPCMode — all type aliases of types.String) to the FIPS-strict
 // target value and logs the change. Caller passes the address of the struct field
