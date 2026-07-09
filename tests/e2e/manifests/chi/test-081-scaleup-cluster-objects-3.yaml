@@ -20,4 +20,4 @@ spec:
       - name: default
         layout:
           shardsCount: 1
-          replicasCount: 1
+          replicasCount: 3
