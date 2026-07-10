@@ -283,7 +283,7 @@ spec:
                     Per-component security toggles for outbound connections the operator establishes:
                     ClickHouse-client TLS (clickhouse.tls.verify, clickhouse.tls.minVersion, clickhouse.tls.serverName, clickhouse.tls.rootCA, clickhouse.tls.rootCASecretRef),
                     ZooKeeper/Keeper-client TLS (zookeeper.tls.verify, zookeeper.tls.minVersion),
-                    Kubernetes-client startup gate (kubernetes.tls.verify=Strict refuses an insecure kubeconfig; kubernetes.tls.minVersion is declared for shape uniformity but not yet enforced on the K8s API transport),
+                    Kubernetes-client TLS (kubernetes.tls.verify=Strict refuses an insecure kubeconfig at startup; kubernetes.tls.minVersion floors the K8s API client transport, coerced to 1.3 under FIPS/Enforced),
                     operator↔metrics-exporter IPC channel hardening (ipc.mode, ipc.bindHost, ipc.tokenPath).
                     Operator-wide master switch (security.policy): Permissive (default) preserves 0.27.0
                     behavior; Enforced coerces all per-component knobs above to their Strict positions
