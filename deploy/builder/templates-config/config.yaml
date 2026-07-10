@@ -329,7 +329,7 @@ security:
     tls:
       # Strict refuses an insecure kubeconfig at startup
       verify: ""
-      # Reserved — not yet enforced on K8s API transport
+      # Floors the K8s API client transport TLS version; coerced to 1.3 under FIPS/Enforced
       minVersion: ""
   ipc:
     # Plain (default) | Secure (loopback + X-CHOP-Token)
