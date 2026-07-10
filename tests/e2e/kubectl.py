@@ -366,7 +366,7 @@ def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None):
         raise ValueError(f"Failed to parse JSON from: {stripped}") from e
 
 
-def get_container_restart_count(pod, container, ns=None, shell=None):
+def get_container_restart_count(pod_name, container=None, ns=None, shell=None):
     """restartCount of a single named container in a pod; None if pod/container absent.
 
     Name-scoped on purpose: callers detecting a SPECIFIC container's in-place
@@ -374,13 +374,16 @@ def get_container_restart_count(pod, container, ns=None, shell=None):
     container restarts). Parses the pod JSON in Python to avoid the jsonpath
     quoting hazard of an inline `[?(@.name=="...")]` filter.
     """
-    pod_obj = get("pod", pod, ns=ns, ok_to_fail=True, shell=shell)
-    if not pod_obj:
+    pod = get("pod", pod_name, ns=ns, ok_to_fail=True, shell=shell)
+    if not pod:
         return None
-    statuses = (pod_obj.get("status") or {}).get("containerStatuses") or []
-    for cs in statuses:
-        if cs.get("name") == container:
-            return int(cs.get("restartCount") or 0)
+    statuses = (pod.get("status") or {}).get("containerStatuses") or []
+    if container != None:
+        for cs in statuses:
+            if cs.get("name") == container:
+                return int(cs.get("restartCount") or 0)
+    else:
+        return sum(int(cs.get("restartCount") or 0) for cs in statuses)
     return None
 
 
