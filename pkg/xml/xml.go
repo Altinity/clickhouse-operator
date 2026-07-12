@@ -254,5 +254,15 @@ func (n *xmlNode) writeTag(w io.Writer, indent uint8, attributes string, openTag
 
 // writeValue prints XML value into io.Writer
 func (n *xmlNode) writeValue(w io.Writer, value string) {
-	util.Fprintf(w, "%s", value)
+	// Element text is injected verbatim by default, which produces invalid
+	// XML when a value contains the reserved characters &, < or > (e.g. a
+	// generated password). Escape those so the rendered document stays
+	// well-formed. 	, \n and \r are intentionally left untouched to keep
+	// existing multi-line values working.
+	escaped := strings.NewReplacer(
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
+	).Replace(value)
+	util.Fprintf(w, "%s", escaped)
 }
