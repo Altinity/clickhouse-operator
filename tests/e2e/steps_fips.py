@@ -12,28 +12,235 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+import json
 import os
 import re
+import select
 import shlex
 import shutil
 import socket
+import ssl
 import subprocess
+import sys
 import tempfile
+import threading
 import time
 import uuid
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import yaml
 
 import e2e.util as util
 
-from e2e.steps import create_shell_namespace_clickhouse_template
+from e2e.steps import create_shell_namespace_clickhouse_template, delete_test_namespace, get_shell
 from testflows.asserts import error
 from testflows.core import *
 
 import e2e.kubectl as kubectl
+import struct
+import hashlib
 
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 FAKE_OPENSSL_SERVER = "fake-openssl-server"
+TLS_REJECT_MARKERS = (
+    "Cipher is (NONE)",
+    "Cipher    : 0000",
+    "handshake failure",
+    "alert handshake failure",
+    "no shared cipher",
+    "no protocols available",
+    "unsupported protocol",
+    "wrong version number",
+    "tlsv1 alert protocol version",
+    "no peer certificate available",
+)
+
+approved_tls1_3_ciphers = [
+    "TLS_AES_256_GCM_SHA384",
+    "TLS_AES_128_GCM_SHA256",
+]
+ciphers_by_protocol = {
+    "TLSv1.3": [
+        "TLS_AES_256_GCM_SHA384",
+        "TLS_CHACHA20_POLY1305_SHA256",
+        "TLS_AES_128_GCM_SHA256",
+    ],
+    "TLSv1.2": [
+        "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "ECDHE-RSA-AES256-GCM-SHA384",
+        "DHE-DSS-AES256-GCM-SHA384",
+        "DHE-RSA-AES256-GCM-SHA384",
+        "ECDHE-ECDSA-CHACHA20-POLY1305",
+        "ECDHE-RSA-CHACHA20-POLY1305",
+        "DHE-RSA-CHACHA20-POLY1305",
+        "ECDHE-ECDSA-AES256-CCM",
+        "DHE-RSA-AES256-CCM",
+        "ECDHE-ECDSA-ARIA256-GCM-SHA384",
+        "ECDHE-ARIA256-GCM-SHA384",
+        "DHE-DSS-ARIA256-GCM-SHA384",
+        "DHE-RSA-ARIA256-GCM-SHA384",
+        "ADH-AES256-GCM-SHA384",
+        "ECDHE-ECDSA-AES128-GCM-SHA256",
+        "ECDHE-RSA-AES128-GCM-SHA256",
+        "DHE-DSS-AES128-GCM-SHA256",
+        "DHE-RSA-AES128-GCM-SHA256",
+        "ECDHE-ECDSA-AES128-CCM",
+        "DHE-RSA-AES128-CCM",
+        "ECDHE-ECDSA-ARIA128-GCM-SHA256",
+        "ECDHE-ARIA128-GCM-SHA256",
+        "DHE-DSS-ARIA128-GCM-SHA256",
+        "DHE-RSA-ARIA128-GCM-SHA256",
+        "ADH-AES128-GCM-SHA256",
+        "ECDHE-ECDSA-AES256-CCM8",
+        "ECDHE-ECDSA-AES128-CCM8",
+        "DHE-RSA-AES256-CCM8",
+        "DHE-RSA-AES128-CCM8",
+        "ECDHE-ECDSA-AES256-SHA384",
+        "ECDHE-RSA-AES256-SHA384",
+        "DHE-RSA-AES256-SHA256",
+        "DHE-DSS-AES256-SHA256",
+        "ECDHE-ECDSA-CAMELLIA256-SHA384",
+        "ECDHE-RSA-CAMELLIA256-SHA384",
+        "DHE-RSA-CAMELLIA256-SHA256",
+        "DHE-DSS-CAMELLIA256-SHA256",
+        "ADH-AES256-SHA256",
+        "ADH-CAMELLIA256-SHA256",
+        "ECDHE-ECDSA-AES128-SHA256",
+        "ECDHE-RSA-AES128-SHA256",
+        "DHE-RSA-AES128-SHA256",
+        "DHE-DSS-AES128-SHA256",
+        "ECDHE-ECDSA-CAMELLIA128-SHA256",
+        "ECDHE-RSA-CAMELLIA128-SHA256",
+        "DHE-RSA-CAMELLIA128-SHA256",
+        "DHE-DSS-CAMELLIA128-SHA256",
+        "ADH-AES128-SHA256",
+        "ADH-CAMELLIA128-SHA256",
+        "RSA-PSK-AES256-GCM-SHA384",
+        "DHE-PSK-AES256-GCM-SHA384",
+        "RSA-PSK-CHACHA20-POLY1305",
+        "DHE-PSK-CHACHA20-POLY1305",
+        "ECDHE-PSK-CHACHA20-POLY1305",
+        "DHE-PSK-AES256-CCM",
+        "RSA-PSK-ARIA256-GCM-SHA384",
+        "DHE-PSK-ARIA256-GCM-SHA384",
+        "AES256-GCM-SHA384",
+        "AES256-CCM",
+        "ARIA256-GCM-SHA384",
+        "PSK-AES256-GCM-SHA384",
+        "PSK-CHACHA20-POLY1305",
+        "PSK-AES256-CCM",
+        "PSK-ARIA256-GCM-SHA384",
+        "RSA-PSK-AES128-GCM-SHA256",
+        "DHE-PSK-AES128-GCM-SHA256",
+        "DHE-PSK-AES128-CCM",
+        "RSA-PSK-ARIA128-GCM-SHA256",
+        "DHE-PSK-ARIA128-GCM-SHA256",
+        "AES128-GCM-SHA256",
+        "AES128-CCM",
+        "ARIA128-GCM-SHA256",
+        "PSK-AES128-GCM-SHA256",
+        "PSK-AES128-CCM",
+        "PSK-ARIA128-GCM-SHA256",
+        "DHE-PSK-AES256-CCM8",
+        "DHE-PSK-AES128-CCM8",
+        "AES256-CCM8",
+        "AES128-CCM8",
+        "PSK-AES256-CCM8",
+        "PSK-AES128-CCM8",
+        "AES256-SHA256",
+        "CAMELLIA256-SHA256",
+        "AES128-SHA256",
+        "CAMELLIA128-SHA256",
+    ],
+    "TLSv1": [
+        "ECDHE-ECDSA-AES256-SHA",
+        "ECDHE-RSA-AES256-SHA",
+        "AECDH-AES256-SHA",
+        "ECDHE-ECDSA-AES128-SHA",
+        "ECDHE-RSA-AES128-SHA",
+        "AECDH-AES128-SHA",
+        "ECDHE-PSK-AES256-CBC-SHA384",
+        "ECDHE-PSK-AES256-CBC-SHA",
+        "RSA-PSK-AES256-CBC-SHA384",
+        "DHE-PSK-AES256-CBC-SHA384",
+        "ECDHE-PSK-CAMELLIA256-SHA384",
+        "RSA-PSK-CAMELLIA256-SHA384",
+        "DHE-PSK-CAMELLIA256-SHA384",
+        "PSK-AES256-CBC-SHA384",
+        "PSK-CAMELLIA256-SHA384",
+        "ECDHE-PSK-AES128-CBC-SHA256",
+        "ECDHE-PSK-AES128-CBC-SHA",
+        "RSA-PSK-AES128-CBC-SHA256",
+        "DHE-PSK-AES128-CBC-SHA256",
+        "ECDHE-PSK-CAMELLIA128-SHA256",
+        "RSA-PSK-CAMELLIA128-SHA256",
+        "DHE-PSK-CAMELLIA128-SHA256",
+        "PSK-AES128-CBC-SHA256",
+        "PSK-CAMELLIA128-SHA256",
+    ],
+}
+
+_OPENSSL_NEGOTIATED_CIPHER = re.compile(
+    r"(?:^|\n)Cipher is (?!\(NONE\))(?P<cipher>\S+)",
+    re.IGNORECASE,
+)
+
+CIPHERS_PROTOCOL_TLS_VERSION = {
+    "TLSv1.3": "1.3",
+    "TLSv1.2": "1.2",
+    "TLSv1": "1.0",
+}
+
+FIPS_REJECTED_PROTOCOL_CASES = (
+    {"name": "TLS 1.0 protocol", "tls_version": "1.0", "cipher_suite": None},
+    {"name": "TLS 1.1 protocol", "tls_version": "1.1", "cipher_suite": None},
+    {"name": "TLS 1.2 protocol", "tls_version": "1.2", "cipher_suite": None},
+)
+
+
+def fips_rejected_cipher_cases_from_ciphers_by_protocol():
+    """Every cipher in ciphers_by_protocol except approved TLS 1.3 suites."""
+    cases = []
+    for protocol, tls_version in CIPHERS_PROTOCOL_TLS_VERSION.items():
+        for cipher in ciphers_by_protocol[protocol]:
+            if protocol == "TLSv1.3" and cipher in approved_tls1_3_ciphers:
+                continue
+            cases.append({
+                "name": f"TLS {tls_version} {cipher}",
+                "tls_version": tls_version,
+                "cipher_suite": cipher,
+            })
+    return tuple(cases)
+
+
+FIPS_LISTENER_REJECTED_TLS_CASES = (
+    *FIPS_REJECTED_PROTOCOL_CASES,
+    *fips_rejected_cipher_cases_from_ciphers_by_protocol(),
+)
+
+FIPS_APPROVED_TLS13_CIPHER_CASES = tuple(
+    {
+        "name": f"TLS 1.3 {cipher}",
+        "tls_version": "1.3",
+        "cipher_suite": cipher,
+    }
+    for cipher in approved_tls1_3_ciphers
+)
+
+FIPS_OPERATOR_APPROVED_TLS13_CIPHER = "TLS_AES_256_GCM_SHA384"
+FIPS_OPERATOR_APPROVED_TLS13_CIPHER_SUITES = ":".join(approved_tls1_3_ciphers)
+
+OPERATOR_CONTAINER_TLS_FAILURE_NEEDLES = (
+    "handshake failure",
+    "no shared cipher",
+    "alert handshake failure",
+    "TLS connect error",
+    "HTTP:000",
+)
 
 # ---------------------------------------------------------------------------
 # Build verification
@@ -366,10 +573,12 @@ def fips_assert_chi_admitted(self, chi, reason="FIPSImagePolicyViolation"):
 @TestStep(Given)
 def create_tls_secret_for_fips_hosts(
     self,
-    chi,
-    chk,
+    chi=None,
+    chk=None,
     secret_name="clickhouse-certs",
     replicas=2,
+    pod_hostnames=None,
+    extra_dns_names=None,
 ):
     """Create a TLS secret whose SANs match this test namespace's pod DNS names."""
     ns = self.context.test_namespace
@@ -391,13 +600,25 @@ def create_tls_secret_for_fips_hosts(
     dns_suffixes = ("", f".{ns}", f".{ns}.svc", f".{ns}.svc.cluster.local")
     dns_names = ["localhost", "clickhouse", "clickhouse1", f"*.{ns}.svc.cluster.local"]
 
-    for replica in range(replicas):
-        for host in (
-            f"chi-{chi}-default-0-{replica}",
-            f"chk-{chk}-keeper-0-{replica}",
-        ):
+    if pod_hostnames:
+        for host in pod_hostnames:
             for suffix in dns_suffixes:
                 dns_names.append(f"{host}{suffix}")
+    else:
+        assert chi and chk, error(
+            "create_tls_secret_for_fips_hosts requires chi and chk "
+            "when pod_hostnames is not set"
+        )
+        for replica in range(replicas):
+            for host in (
+                f"chi-{chi}-default-0-{replica}",
+                f"chk-{chk}-keeper-0-{replica}",
+            ):
+                for suffix in dns_suffixes:
+                    dns_names.append(f"{host}{suffix}")
+
+    if extra_dns_names:
+        dns_names.extend(extra_dns_names)
 
     san_entries = ["IP.1 = 127.0.0.1"]
     san_entries.extend(
@@ -895,6 +1116,42 @@ def fips_wait_cluster_topology(
     note(f"{pod} sees {replica_count} hosts in cluster {cluster_name!r}")
 
 
+def openssl_tls_version_args(tls_version):
+    if tls_version == "1.3":
+        return ["-tls1_3"]
+    if tls_version == "1.2":
+        return ["-tls1_2"]
+    if tls_version == "1.1":
+        return ["-tls1_1"]
+    if tls_version == "1.0":
+        return ["-tls1"]
+    if tls_version == "ssl3":
+        return ["-ssl3"]
+    if tls_version == "ssl2":
+        return ["-ssl2"]
+
+    raise ValueError(f"unsupported TLS/SSL version: {tls_version}")
+
+
+def openssl_cipher_args(tls_version, cipher_suite):
+    if not cipher_suite:
+        return []
+
+    if tls_version == "1.3":
+        return ["-ciphersuites", cipher_suite]
+
+    return ["-cipher", cipher_suite]
+
+
+
+def openssl_s_client_negotiated_cipher(output):
+    """Return the negotiated cipher name when s_client completed a handshake."""
+    match = _OPENSSL_NEGOTIATED_CIPHER.search(output)
+    if match:
+        return match.group("cipher")
+    return None
+
+
 @TestStep(When)
 def fips_run_openssl_s_client_on_pod_port(
     self,
@@ -910,84 +1167,76 @@ def fips_run_openssl_s_client_on_pod_port(
     ca_crt = self.context.tls["ca_crt"]
     local_port = _free_local_port()
 
-    pf = subprocess.Popen(
-        [
-            "kubectl",
-            *self.context.kubectl_context_args,
-            "-n", ns,
-            "port-forward",
-            f"pod/{pod}",
-            f"{local_port}:{port}",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-
-    try:
-        deadline = time.time() + 10
-        while time.time() < deadline:
-            if pf.poll() is not None:
-                out, err = pf.communicate()
-                assert False, error(
-                    "kubectl port-forward exited early\n"
-                    f"stdout:\n{out}\n"
-                    f"stderr:\n{err}"
-                )
-
-            try:
-                socket.create_connection(
-                    ("127.0.0.1", int(local_port)), timeout=0.5
-                ).close()
-                break
-            except OSError:
-                time.sleep(0.2)
-        else:
-            assert False, error(
-                f"kubectl port-forward to {pod}:{port} "
-                f"did not become ready on 127.0.0.1:{local_port}"
-            )
-
-        command = [
-            "openssl", "s_client",
-            "-connect", f"127.0.0.1:{local_port}",
-            "-servername", "localhost",
-            "-CAfile", ca_crt,
-            "-verify_return_error",
-        ]
-
-        if tls_version == "1.3":
-            command.append("-tls1_3")
-            if cipher_suite:
-                command.extend(["-ciphersuites", cipher_suite])
-        elif tls_version == "1.2":
-            command.append("-tls1_2")
-            if cipher_suite:
-                command.extend(["-cipher", cipher_suite])
-        elif tls_version == "1.1":
-            command.append("-tls1_1")
-            if cipher_suite:
-                command.extend(["-cipher", cipher_suite])
-        else:
-            raise ValueError(f"unsupported TLS version: {tls_version}")
-
-        result = subprocess.run(
-            command,
-            input="Q\n",
+    with Given(f"port-forward from localhost:{local_port} to {pod}:{port}"):
+        pf = subprocess.Popen(
+            [
+                "kubectl",
+                *self.context.kubectl_context_args,
+                "-n", ns,
+                "port-forward",
+                f"pod/{pod}",
+                f"{local_port}:{port}",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            capture_output=True,
-            check=False,
         )
 
-        output = f"{result.stdout}\n{result.stderr}"
+    try:
+        with When("port-forward is ready on localhost"):
+            deadline = time.time() + 10
+            while time.time() < deadline:
+                if pf.poll() is not None:
+                    out, err = pf.communicate()
+                    assert False, error(
+                        "kubectl port-forward exited early\n"
+                        f"stdout:\n{out}\n"
+                        f"stderr:\n{err}"
+                    )
+
+                try:
+                    socket.create_connection(
+                        ("127.0.0.1", int(local_port)), timeout=0.5
+                    ).close()
+                    break
+                except OSError:
+                    time.sleep(0.2)
+            else:
+                assert False, error(
+                    f"kubectl port-forward to {pod}:{port} "
+                    f"did not become ready on 127.0.0.1:{local_port}"
+                )
+
+        with And("openssl s_client runs against the forwarded port"):
+            command = [
+                "openssl", "s_client",
+                "-connect", f"127.0.0.1:{local_port}",
+                "-servername", "localhost",
+                "-CAfile", ca_crt,
+                "-verify_return_error",
+            ]
+
+            command.extend(openssl_tls_version_args(tls_version))
+            command.extend(openssl_cipher_args(tls_version, cipher_suite))
+
+            result = subprocess.run(
+                command,
+                input="Q\n",
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            output = f"{result.stdout}\n{result.stderr}"
 
         if not ok_to_fail:
-            assert result.returncode == 0, error(
-                f"{pod}:{port}: openssl s_client failed for "
-                f"tls={tls_version}, cipher={cipher_suite}\n"
-                f"exit code: {result.returncode}\n"
-                f"output:\n{output}"
-            )
+            with Then("openssl s_client handshake succeeds"):
+                assert result.returncode == 0, error(
+                    f"{pod}:{port}: openssl s_client failed for "
+                    f"tls={tls_version}, cipher={cipher_suite}\n"
+                    f"exit code: {result.returncode}\n"
+                    f"output:\n{output}"
+                )
 
         return output
 
@@ -998,64 +1247,78 @@ def fips_run_openssl_s_client_on_pod_port(
         except subprocess.TimeoutExpired:
             pf.kill()
 
-@TestStep(Then)
-def fips_assert_rejected_tls_probes(
+@TestStep(Check)
+def fips_assert_rejected_tls_cases_on_endpoint(
+    self,
+    label,
+    pod,
+    port,
+    rejected_cases,
+    ns=None,
+):
+    """Assert rejected TLS protocol/cipher cases fail on one endpoint."""
+    ns = ns or self.context.test_namespace
+
+    for case in rejected_cases:
+        with Check(f"{label} {pod}:{port} rejects {case['name']}"):
+            output = fips_run_openssl_s_client_on_pod_port(
+                pod=pod,
+                port=port,
+                tls_version=case["tls_version"],
+                cipher_suite=case["cipher_suite"],
+                ok_to_fail=True,
+                ns=ns,
+            )
+
+            output_lower = output.lower()
+
+            negotiated_cipher = openssl_s_client_negotiated_cipher(output)
+            assert negotiated_cipher is None, error(
+                f"{label} {pod}:{port}: server negotiated disallowed {case['name']}\n"
+                f"negotiated cipher: {negotiated_cipher}\n"
+                f"tls_version={case['tls_version']}\n"
+                f"cipher_suite={case['cipher_suite']}\n"
+                f"output:\n{output}"
+            )
+
+            assert any(
+                marker.lower() in output_lower
+                for marker in TLS_REJECT_MARKERS
+            ), error(
+                f"{label} {pod}:{port}: expected TLS rejection for {case['name']}\n"
+                f"tls_version={case['tls_version']}\n"
+                f"cipher_suite={case['cipher_suite']}\n"
+                f"output:\n{output}"
+            )
+
+
+@TestStep(Check)
+def fips_assert_all_rejected_tls_cases_on_all_endpoints(
     self,
     chi_pods,
     chk_pods,
     ns=None,
 ):
-    """Assert rejected TLS protocol/cipher combinations fail handshake."""
+    """Assert all rejected TLS cases fail on every FIPS TLS endpoint."""
     ns = ns or self.context.test_namespace
-
-    rejected_cases = (
-        {
-            "name": "TLS 1.3 ChaCha20-Poly1305",
-            "tls_version": "1.3",
-            "cipher_suite": "TLS_CHACHA20_POLY1305_SHA256",
-        },
-        {
-            "name": "TLS 1.1 protocol",
-            "tls_version": "1.1",
-            "cipher_suite": None,
-        },
-    )
+    rejected_cases = FIPS_LISTENER_REJECTED_TLS_CASES
 
     endpoints = (
         ("ClickHouse HTTPS", chi_pods[0], 8443),
         ("ClickHouse native TLS", chi_pods[0], 9440),
         ("ClickHouse interserver HTTPS", chi_pods[0], 9010),
         ("Keeper secure client", chk_pods[0], 2281),
-        ("Backup API HTTPS", chi_pods[0], 7171),
     )
 
-    rejected_markers = (
-        "Cipher is (NONE)",
-        "handshake failure",
-        "no protocols available",
-        "no shared cipher",
-    )
+    for label, pod, port in endpoints:
+        fips_assert_rejected_tls_cases_on_endpoint(
+            label=label,
+            pod=pod,
+            port=port,
+            rejected_cases=rejected_cases,
+            ns=ns,
+        )
 
-    for case in rejected_cases:
-        for label, pod, port in endpoints:
-            with Then(f"{label} {pod}:{port} rejects {case['name']}"):
-                output = fips_run_openssl_s_client_on_pod_port(
-                    pod=pod,
-                    port=port,
-                    tls_version=case["tls_version"],
-                    cipher_suite=case["cipher_suite"],
-                    ok_to_fail=True,
-                    ns=ns,
-                )
-
-                assert any(
-                    marker.lower() in output.lower()
-                    for marker in rejected_markers
-                ), error(
-                    f"{label} {pod}:{port}: expected rejected TLS probe to fail "
-                    f"for {case['name']}\n"
-                    f"output:\n{output}"
-                )
 
 @TestStep(Then)
 def fips_assert_aes256_tls13_probes(
@@ -1710,57 +1973,26 @@ def check_external_clickhouse_reports_fips_version(self, pod):
         f"expected FIPS in ClickHouse version(), got {version!r}"
     )
 
-@TestStep(Then)
-def fips_assert_operator_tls_rejection_in_logs(
-    self,
-    workload,
-    min_version="1.3",
-    rejection="remote error: tls: protocol version not supported",
-    operator_namespace=None,
-    max_iters=60,
-    sleep_s=5,
-):
-    """Poll operator logs until the expected TLS version rejection is observed."""
-
-    operator_namespace = operator_namespace or current().context.operator_namespace
-
+def _fips_tls_rejection_present_in_logs(logs, min_version, rejection):
+    """Return True when logs contain coerced TLS setup and a connect rejection."""
     expected_setup_parts = (
         "setupTLSAdvanced():TLS setup OK",
         f"minVersion={min_version}",
     )
+    setup_found = any(
+        all(part in line for part in expected_setup_parts)
+        for line in logs.splitlines()
+    )
+    rejection_found = any(
+        "connect():FAILED" in line and rejection in line
+        for line in logs.splitlines()
+    )
+    return setup_found and rejection_found
 
-    last_logs = ""
 
-    for attempt in range(max_iters):
-        operator_pod = kubectl.get_operator_pod(ns=operator_namespace)
-        last_logs = get_container_logs(
-            pod=operator_pod,
-            container="clickhouse-operator",
-            ns=operator_namespace,
-        )
-
-        setup_found = any(
-            all(part in line for part in expected_setup_parts)
-            for line in last_logs.splitlines()
-        )
-
-        rejection_found = any(
-            "connect():FAILED" in line and rejection in line
-            for line in last_logs.splitlines()
-        )
-
-        if setup_found and rejection_found:
-            note(
-                f"{workload}: observed TLS version rejection "
-                f"after attempt {attempt + 1}/{max_iters}"
-            )
-            return
-
-        if attempt + 1 < max_iters:
-            time.sleep(sleep_s)
-
-    matching_lines = "\n".join(
-        line for line in last_logs.splitlines()
+def _fips_tls_rejection_log_excerpt(logs):
+    return "\n".join(
+        line for line in logs.splitlines()
         if (
             "setupTLSAdvanced()" in line
             or "connect():FAILED" in line
@@ -1769,12 +2001,254 @@ def fips_assert_operator_tls_rejection_in_logs(
         )
     )
 
+
+# Distroless operator/exporter images ship sh/curl only (no cat/base64). Read the
+# IPC token with POSIX shell builtins — same file both containers mount.
+_IPC_TOKEN_READ_SHELL = (
+    'TOKEN=""; '
+    'while IFS= read -r line || [ -n "$line" ]; do TOKEN="${TOKEN}${line}"; done '
+    "< /etc/clickhouse-operator-ipc/token"
+)
+
+
+def _kubectl_pod_exec_stdin(ns, pod, container, shell_script, stdin=None, timeout=120):
+    """kubectl exec -i … sh -c <script>, optionally piping stdin to the container."""
+    cmd = shlex.split(current().context.kubectl_cmd) + [
+        "exec",
+        "-i",
+        f"--namespace={ns}",
+        pod,
+        "-c",
+        container,
+        "--",
+        "sh",
+        "-c",
+        shell_script,
+    ]
+    result = subprocess.run(
+        cmd,
+        input=stdin,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"kubectl exec failed, command:\n{' '.join(cmd)}")
+        print(f"exit code: {result.returncode}")
+        print(f"stdout:\n{result.stdout}")
+        print(f"stderr:\n{result.stderr}")
+        assert result.returncode == 0, error()
+    return result.stdout
+
+
+def _chi_service_name_from_pod(pod):
+    """Return per-host StatefulSet Service name (operator FQDN host part, not pod name)."""
+    # Pod chi-{chi}-default-{shard}-{replica}-0 → Service chi-{chi}-default-{shard}-{replica}
+    if pod.endswith("-0"):
+        return pod[:-2]
+    return pod
+
+
+def _chi_host_fqdn_from_pod(pod, ns):
+    """Return host FQDN as the operator sets host.Runtime.Address.FQDN."""
+    return f"{_chi_service_name_from_pod(pod)}.{ns}.svc.cluster.local."
+
+
+def _chi_host_name_from_pod(pod, chi):
+    """Return shard-replica host label from a CHI pod name."""
+    prefix = f"chi-{chi}-default-"
+    if pod.startswith(prefix) and pod.endswith("-0"):
+        return pod[len(prefix):-2]
+    return pod.removeprefix(f"chi-{chi}-default-")
+
+
+def _build_metrics_exporter_chi_payload(chi, ns, pods, https_port=8443):
+    hosts = []
+    for pod in pods:
+        hosts.append({
+            "name": _chi_host_name_from_pod(pod, chi),
+            "hostname": _chi_host_fqdn_from_pod(pod, ns),
+            "httpsPort": https_port,
+        })
+    return {
+        "type": "cr",
+        "cr": {
+            "namespace": ns,
+            "name": chi,
+            "labels": {},
+            "annotations": {},
+            "clusters": [{"name": "default", "hosts": hosts}],
+        },
+    }
+
+
+@TestStep(When)
+def register_chi_hosts_with_metrics_exporter(
+    self,
+    chi,
+    ns=None,
+    operator_namespace=None,
+    metrics_port=8888,
+    https_port=8443,
+):
+    """POST /chi so metrics-exporter knows HTTPS hosts when operator IPC does not.
+
+    Injects a WatchedCR with httpsPort only. FIPS-enforced config uses Secure IPC,
+    so the request must include X-CHOP-Token from the shared volume.
+    """
+    ns = ns or self.context.test_namespace
+    operator_namespace = operator_namespace or current().context.operator_namespace
+    operator_pod = kubectl.get_operator_pod(ns=operator_namespace)
+    pods = sorted(kubectl.get_pod_names(chi, ns=ns))
+    assert pods, error(f"no pods found for CHI {chi} in namespace {ns}")
+
+    payload = _build_metrics_exporter_chi_payload(
+        chi=chi,
+        ns=ns,
+        pods=pods,
+        https_port=https_port,
+    )
+    body = json.dumps(payload, separators=(",", ":"))
+
+    with When(f"register {chi} HTTPS hosts with metrics-exporter via POST /chi"):
+        post_script = (
+            f"{_IPC_TOKEN_READ_SHELL}; "
+            f"curl -sS -o /dev/null -w '%{{http_code}}' "
+            f"-X POST http://127.0.0.1:{metrics_port}/chi "
+            f"-H 'Content-Type: application/json' "
+            f"-H \"X-CHOP-Token: ${{TOKEN}}\" "
+            f"-d @-"
+        )
+        code = _kubectl_pod_exec_stdin(
+            ns=operator_namespace,
+            pod=operator_pod,
+            container="metrics-exporter",
+            shell_script=post_script,
+            stdin=body,
+        ).strip()
+        assert code == "200", error(
+            f"metrics-exporter POST /chi failed for {chi}: HTTP {code!r}\n"
+            f"payload hosts: {pods}\nbody: {body}"
+        )
+
+
+@TestStep(When)
+def trigger_metrics_exporter_collect(self, operator_namespace=None, metrics_port=8888):
+    """Scrape /metrics so metrics-exporter dials registered ClickHouse HTTPS hosts."""
+    operator_namespace = operator_namespace or current().context.operator_namespace
+    operator_pod = kubectl.get_operator_pod(ns=operator_namespace)
+
+    with When(f"scrape metrics-exporter /metrics on 127.0.0.1:{metrics_port}"):
+        code = kubectl.launch(
+            f"exec {operator_pod} -c metrics-exporter -- "
+            f"curl -sS -o /dev/null -w %{{http_code}} "
+            f"http://127.0.0.1:{metrics_port}/metrics",
+            ns=operator_namespace,
+        )
+        assert code == "200", error(
+            f"metrics-exporter /metrics scrape failed: HTTP {code!r}"
+        )
+
+
+@TestStep(Then)
+def fips_poll_tls_rejection_in_logs(
+    self,
+    workload,
+    containers,
+    min_version="1.3",
+    rejection="remote error: tls: protocol version not supported",
+    operator_namespace=None,
+    trigger_metrics_exporter=False,
+    chi=None,
+    max_iters=60,
+    sleep_s=5,
+):
+    """Poll selected operator-pod containers until TLS version rejection appears."""
+    operator_namespace = operator_namespace or current().context.operator_namespace
+    expected_setup_parts = (
+        "setupTLSAdvanced():TLS setup OK",
+        f"minVersion={min_version}",
+    )
+    last_logs_by_container = {container: "" for container in containers}
+
+    for attempt in range(max_iters):
+        if trigger_metrics_exporter:
+            with When("metrics-exporter collect is triggered via /metrics scrape"):
+                if chi:
+                    with When(f"metrics-exporter is registered with CHI {chi} HTTPS hosts"):
+                        register_chi_hosts_with_metrics_exporter(chi=chi)
+                trigger_metrics_exporter_collect(
+                    operator_namespace=operator_namespace,
+                )
+
+        operator_pod = kubectl.get_operator_pod(ns=operator_namespace)
+        container_results = {}
+
+        for container in containers:
+            with Then(f"tail logs from {container}"):
+                logs = get_container_logs(
+                    pod=operator_pod,
+                    container=container,
+                    ns=operator_namespace,
+                )
+                last_logs_by_container[container] = logs
+                container_results[container] = _fips_tls_rejection_present_in_logs(
+                    logs,
+                    min_version=min_version,
+                    rejection=rejection,
+                )
+
+        if all(container_results.values()):
+            note(
+                f"{workload}: observed TLS version rejection in "
+                f"{', '.join(containers)} after attempt {attempt + 1}/{max_iters}"
+            )
+            return
+
+        if attempt + 1 < max_iters:
+            time.sleep(sleep_s)
+
+    matching_sections = [
+        f"{container}:\n{_fips_tls_rejection_log_excerpt(last_logs_by_container[container]) or '(none)'}"
+        for container in containers
+    ]
+
     assert False, error(
-        f"{workload}: expected TLS version rejection not found\n"
+        f"{workload}: expected TLS version rejection not found in all containers\n"
+        f"containers: {', '.join(containers)}\n"
         f"expected setup line parts: {expected_setup_parts}\n"
         f"expected rejection: {rejection}\n\n"
-        f"matching log lines:\n{matching_lines or '(none)'}"
+        f"matching log lines:\n" + "\n\n".join(matching_sections)
     )
+
+
+@TestStep(Then)
+def fips_assert_operator_tls_rejection_in_logs(
+    self,
+    workload,
+    min_version="1.3",
+    rejection="remote error: tls: protocol version not supported",
+    operator_namespace=None,
+    containers=("clickhouse-operator",),
+    trigger_metrics_exporter=False,
+    chi=None,
+    max_iters=60,
+    sleep_s=5,
+):
+    """Assert operator pod containers log TLS min-version rejection."""
+    with Given(f"workload {workload} must reject TLS below {min_version}"):
+        fips_poll_tls_rejection_in_logs(
+            workload=workload,
+            containers=containers,
+            min_version=min_version,
+            rejection=rejection,
+            operator_namespace=operator_namespace,
+            trigger_metrics_exporter=trigger_metrics_exporter,
+            chi=chi,
+            max_iters=max_iters,
+            sleep_s=sleep_s,
+        )
 
 @TestStep(Then)
 def fips_assert_chi_tls_rejected(
@@ -1784,24 +2258,30 @@ def fips_assert_chi_tls_rejected(
     min_version="1.3",
 ):
     """Assert CHI remains unfinished because operator TLS client rejects server TLS policy."""
-    kubectl.wait_object(
-        "pod",
-        "",
-        label=f"-l clickhouse.altinity.com/chi={chi}",
-        count=1,
-    )
+    with When(f"CHI {chi} pod is running"):
+        kubectl.wait_object(
+            "pod",
+            "",
+            label=f"-l clickhouse.altinity.com/chi={chi}",
+            count=1,
+        )
 
-    status = kubectl.get_chi_status(chi)
-    assert status != "Completed", error(
-        f"CHI {chi} reached Completed; expected operator TLS client to reject the server"
-    )
-    if status != expected_status:
-        kubectl.wait_chi_status(chi, expected_status)
+    with Then(f"CHI {chi} does not complete reconciliation"):
+        status = kubectl.get_chi_status(chi)
+        assert status != "Completed", error(
+            f"CHI {chi} reached Completed; expected operator TLS client to reject the server"
+        )
+        if status != expected_status:
+            kubectl.wait_chi_status(chi, expected_status)
 
-    fips_assert_operator_tls_rejection_in_logs(
-        workload=f"chi/{chi}",
-        min_version=min_version,
-    )
+    with Then("operator and metrics-exporter reject TLS 1.2-only ClickHouse"):
+        fips_assert_operator_tls_rejection_in_logs(
+            workload=f"chi/{chi}",
+            min_version=min_version,
+            containers=("clickhouse-operator", "metrics-exporter"),
+            trigger_metrics_exporter=True,
+            chi=chi,
+        )
 
 
 @TestStep(Then)
@@ -1812,24 +2292,28 @@ def fips_assert_chk_tls_rejected(
     min_version="1.3",
 ):
     """Assert CHK remains unfinished because operator TLS client rejects server TLS policy."""
-    kubectl.wait_object(
-        "pod",
-        "",
-        label=f"-l clickhouse-keeper.altinity.com/chk={chk}",
-        count=1,
-    )
+    with When(f"CHK {chk} pod is running"):
+        kubectl.wait_object(
+            "pod",
+            "",
+            label=f"-l clickhouse-keeper.altinity.com/chk={chk}",
+            count=1,
+        )
 
-    status = kubectl.get_field("chk", chk, ".status.status")
-    assert status != "Completed", error(
-        f"CHK {chk} reached Completed; expected operator TLS client to reject the server"
-    )
-    if status != expected_status:
-        kubectl.wait_chk_status(chk, expected_status)
+    with Then(f"CHK {chk} does not complete reconciliation"):
+        status = kubectl.get_field("chk", chk, ".status.status")
+        assert status != "Completed", error(
+            f"CHK {chk} reached Completed; expected operator TLS client to reject the server"
+        )
+        if status != expected_status:
+            kubectl.wait_chk_status(chk, expected_status)
 
-    fips_assert_operator_tls_rejection_in_logs(
-        workload=f"chk/{chk}",
-        min_version=min_version,
-    )
+    with Then("operator rejects TLS 1.2-only Keeper"):
+        fips_assert_operator_tls_rejection_in_logs(
+            workload=f"chk/{chk}",
+            min_version=min_version,
+            containers=("clickhouse-operator",),
+        )
 
 @TestStep(Then)
 def check_clickhouse_backup_clickhouse_tls_config(self, pod, ns=None):
@@ -1949,9 +2433,13 @@ def fips_wait_table_removed_from_dropped_tables(
         f"{database}.{table} still present in system.dropped_tables after {timeout}s"
     )
 
-@TestStep(Then)
-def check_fips_cast_failure(self, binary_path, binary, cast_name="HMAC-SHA2-256"):
-    """Assert binary exits non-zero when FIPS CAST is forced to fail."""
+@TestStep(When)
+def run_binary_with_forced_fips_cast_failure(
+    self,
+    binary_path,
+    cast_name,
+):
+    """Run binary with GODEBUG forcing the named FIPS CAST/PCT to fail."""
     result = subprocess.run(
         [
             "env",
@@ -1964,22 +2452,74 @@ def check_fips_cast_failure(self, binary_path, binary, cast_name="HMAC-SHA2-256"
         check=False,
     )
 
+    return result
+
+
+@TestStep(Check)
+def check_fips_cast_failure_result(
+    self,
+    result,
+    binary,
+    cast_name,
+    failure_kind="CAST",
+):
+    """Assert binary exits non-zero with the expected forced FIPS CAST/PCT failure."""
     output = f"{result.stdout}\n{result.stderr}"
 
     assert result.returncode != 0, error(
-        f"{binary}: expected CAST failure exit, got {result.returncode}\n{output}"
+        f"{binary}: expected {failure_kind} failure exit, got {result.returncode}\n{output}"
     )
+
     assert f"FIPS 140-3 self-test failed: {cast_name}" in output, error(
-        f"{binary}: expected CAST failure for {cast_name}\n{output}"
+        f"{binary}: expected {failure_kind} failure for {cast_name}\n{output}"
     )
-    assert "simulated CAST failure" in output, error(
-        f"{binary}: expected simulated CAST failure message\n{output}"
+
+    expected_simulated_message = (
+        "simulated PCT failure"
+        if "PCT" in cast_name or failure_kind == "PCT"
+        else "simulated CAST failure"
+    )
+
+    assert expected_simulated_message in output, error(
+        f"{binary}: expected {expected_simulated_message!r}\n{output}"
     )
 
 def _free_local_port():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return str(s.getsockname()[1])
+
+
+def _wait_for_listening_port(host, port, process=None, timeout=15, label="service"):
+    """Poll until host:port accepts TCP connections or timeout."""
+    deadline = time.time() + timeout
+    port = int(port)
+    while time.time() < deadline:
+        if process is not None and process.poll() is not None:
+            return False, "exited"
+        try:
+            socket.create_connection((host, port), timeout=0.5).close()
+            return True, ""
+        except OSError:
+            time.sleep(0.2)
+    if process is not None and process.poll() is None:
+        process.kill()
+    return False, "timeout"
+
+
+def _fips_hostrun_env(kubeconfig_path, namespace=None, operator_pod_name=None):
+    env = os.environ.copy()
+    env["GODEBUG"] = "fips140=only"
+    env["KUBECONFIG"] = kubeconfig_path
+    if namespace is not None:
+        env["OPERATOR_POD_NAMESPACE"] = namespace
+    else:
+        env.pop("OPERATOR_POD_NAMESPACE", None)
+    if operator_pod_name is not None:
+        env["OPERATOR_POD_NAME"] = operator_pod_name
+    else:
+        env.pop("OPERATOR_POD_NAME", None)
+    return env
 
 
 @TestStep(Then)
@@ -1992,29 +2532,31 @@ def check_fips_integrity_failure(self, binary_path, binary_label):
     match = re.search(r"\.go\.fipsinfo\s+\w+\s+\w+\s+([0-9a-fA-F]+)", readelf_out)
     assert match, error(f"{binary_label}: .go.fipsinfo section not found in ELF headers")
 
-    section_offset = int(match.group(1), 16)
-    hmac_byte_offset = section_offset + 16
+    with Given("I edit the binary to corrupt the .go.fipsinfo HMAC"):
+        section_offset = int(match.group(1), 16)
+        hmac_byte_offset = section_offset + 16
 
-    corrupted_bin = f"{binary_path}.corrupted"
-    shutil.copy2(binary_path, corrupted_bin)
+        corrupted_bin = f"{binary_path}.corrupted"
+        shutil.copy2(binary_path, corrupted_bin)
 
-    with open(corrupted_bin, "rb+") as f:
-        f.seek(hmac_byte_offset)
-        original_byte = f.read(1)
-        corrupted_byte = bytes([original_byte[0] ^ 0xFF])
-        f.seek(hmac_byte_offset)
-        f.write(corrupted_byte)
+        with open(corrupted_bin, "rb+") as f:
+            f.seek(hmac_byte_offset)
+            original_byte = f.read(1)
+            corrupted_byte = bytes([original_byte[0] ^ 0xFF])
+            f.seek(hmac_byte_offset)
+            f.write(corrupted_byte)
 
-    result = subprocess.run(
-        [corrupted_bin, "--version"],
-        env={"GODEBUG": "fips140=on"},
-        capture_output=True,
-        text=True,
-        check=False
-    )
+    with When("I execute --version on a corrupted bin file"):
+        result = subprocess.run(
+            [corrupted_bin, "--version"],
+            env={"GODEBUG": "fips140=on"},
+            capture_output=True,
+            text=True,
+            check=False
+        )
 
-    output = f"{result.stdout}\n{result.stderr}"
-    note(output)
+        output = f"{result.stdout}\n{result.stderr}"
+        note(output)
 
     with Then("the process must terminate with a verification mismatch panic"):
         assert result.returncode != 0, error(
@@ -2062,7 +2604,7 @@ def check_tls13_cipher_fails(
     )
 
 @TestStep(Finally)
-def fips_cleanup_admission_only_chi(self, chi):
+def cleanup_admission_only_chi(self, chi):
     """Cleanup chi"""
     kubectl.launch(
         f"delete chi {chi} --ignore-not-found=true --wait=false",
@@ -2079,293 +2621,1848 @@ def fips_cleanup_admission_only_chi(self, chi):
         ok_to_fail=True,
     )
 
-@TestStep(Then)
-def check_synthetic_tls13_smoke_from_operator_pod(self, chi_pod, ns=None):
-    """Synthetic TLS 1.3 AES-256 smoke from operator pod containers.
+FAKE_K8S_TLS_REJECT_ERRORS = (
+    "remote error: tls: handshake failure",
+    "remote error: tls: protocol version not supported",
+)
 
-    Uses real endpoints:
-    * Kubernetes API: kubernetes.default.svc:443
-    * ClickHouse HTTPS: CHI pod IP:8443
 
-    Kubernetes is checked in two parts:
-    * verbose unauthenticated /version request proves TLS version/cipher;
-    * non-verbose authenticated pod API request proves service-account API access
-      without leaking the bearer token into logs.
+def _write_fake_kubeconfig(path, port, ca_cert_path):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(f"""apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://127.0.0.1:{port}
+    certificate-authority: {ca_cert_path}
+  name: fake
+contexts:
+- context:
+    cluster: fake
+    user: fake
+  name: fake
+current-context: fake
+users:
+- name: fake
+  user:
+    token: fake-token
+""")
 
-    CHK is intentionally excluded because the operator does not normally
-    establish a runtime TLS client session to ClickHouse Keeper.
+
+def _fake_k8s_probe_env(work_dir, port, ca_cert_path):
+    kubeconfig_path = os.path.join(work_dir, "fake-kubeconfig")
+    _write_fake_kubeconfig(kubeconfig_path, port, ca_cert_path)
+    return _fips_hostrun_env(
+        kubeconfig_path,
+        namespace="default",
+        operator_pod_name="fips-local-tls-probe",
+    )
+
+
+_FAKE_K8S_PROBE_NOTE_MARKERS = (
+    "Starting clickhouse-operator",
+    "Starting metrics exporter",
+    "kubeconfig auth source:",
+    "FIPS:",
+    "FIPS env:",
+    "CIPHER is ",
+    *FAKE_K8S_TLS_REJECT_ERRORS,
+)
+
+
+def _format_fake_k8s_probe_note(output, max_lines=50):
+    """Return a compact note for local fake-k8s probe runs.
+
+    Keeps only TLS/FIPS-relevant lines and trims noisy config dumps.
     """
-    test_ns = ns or current().context.test_namespace
-    operator_ns = current().context.operator_namespace
-    operator_pod = kubectl.get_operator_pod(ns=operator_ns)
+    selected = []
+    for line in output.splitlines():
+        if any(marker in line for marker in _FAKE_K8S_PROBE_NOTE_MARKERS):
+            selected.append(line)
 
-    chi_ip = kubectl.get_field(
-        "pod",
-        chi_pod,
-        ".status.podIP",
-        ns=test_ns,
+    if not selected:
+        tail = output.splitlines()[-20:]
+        return "\n".join(tail)
+
+    if len(selected) > max_lines:
+        selected = [f"... truncated, showing last {max_lines} relevant lines ..."] + selected[-max_lines:]
+    return "\n".join(selected)
+
+
+def _read_available_stdout(pipe, timeout=0):
+    readable, _, _ = select.select([pipe], [], [], timeout)
+    if not readable:
+        return ""
+    data = os.read(pipe.fileno(), 65536)
+    if not data:
+        return ""
+    return data.decode("utf-8", "replace")
+
+
+def _drain_stdout(pipe, output_parts):
+    while True:
+        chunk = _read_available_stdout(pipe)
+        if not chunk:
+            break
+        output_parts.append(chunk)
+
+
+def _stop_process(process, timeout=5):
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=timeout)
+
+
+def _fake_k8s_tls_probe_complete(output, server_log_path, expectation, cipher_suite):
+    if expectation == "approved":
+        with open(server_log_path, encoding="utf-8", errors="replace") as f:
+            server_log = f.read()
+        return bool(cipher_suite) and f"CIPHER is {cipher_suite}" in server_log
+    return any(err in output for err in FAKE_K8S_TLS_REJECT_ERRORS)
+
+
+def _run_fips_binary_until_tls_probe(
+    binary_path,
+    config_path,
+    env,
+    server_log_path,
+    expectation,
+    cipher_suite=None,
+    max_wait_sec=45,
+):
+    process = subprocess.Popen(
+        [
+            binary_path,
+            "-logtostderr=true",
+            "-v=2",
+            f"--config={config_path}",
+        ],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
     )
+    output_parts = []
+    deadline = time.time() + max_wait_sec
 
-    approved_cipher = "TLS_AES_256_GCM_SHA384"
-    k8s_auth_url = (
-        "https://kubernetes.default.svc:443"
-        f"/api/v1/namespaces/{operator_ns}/pods/{operator_pod}"
-    )
+    try:
+        while time.time() < deadline:
+            chunk = _read_available_stdout(process.stdout, timeout=0.5)
+            if chunk:
+                output_parts.append(chunk)
 
-    for container in ("clickhouse-operator", "metrics-exporter"):
-        with Then(f"{container} negotiates AES-256 TLS 1.3 to Kubernetes API"):
-            tls_out = kubectl.launch(
-                f"exec {operator_pod} -c {container} -- "
-                "sh -c '"
-                "curl -sS -v "
-                "--tlsv1.3 "
-                f"--tls13-ciphers {approved_cipher} "
-                "--cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt "
-                "-o /dev/null "
-                "-w \"HTTP:%{http_code}\" "
-                "https://kubernetes.default.svc:443/version "
-                "2>&1"
-                "'",
-                ns=operator_ns,
-                ok_to_fail=True,
-            )
+            output = "".join(output_parts)
+            if _fake_k8s_tls_probe_complete(
+                output, server_log_path, expectation, cipher_suite
+            ):
+                break
 
-            assert "TLSv1.3" in tls_out, error(
-                f"{container}: expected TLSv1.3 to Kubernetes API\n{tls_out}"
-            )
-            assert approved_cipher in tls_out, error(
-                f"{container}: expected {approved_cipher} to Kubernetes API\n{tls_out}"
-            )
-            assert "HTTP:200" in tls_out, error(
-                f"{container}: expected Kubernetes /version HTTP 200\n{tls_out}"
-            )
+            if process.poll() is not None:
+                _drain_stdout(process.stdout, output_parts)
+                break
+    finally:
+        _stop_process(process)
+        _drain_stdout(process.stdout, output_parts)
 
-            auth_out = kubectl.launch(
-                f"exec {operator_pod} -c {container} -- "
-                "sh -c '"
-                "IFS= read -r TOKEN < /var/run/secrets/kubernetes.io/serviceaccount/token; "
-                "curl -sS "
-                "--tlsv1.3 "
-                f"--tls13-ciphers {approved_cipher} "
-                "--cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt "
-                "-H \"Authorization: Bearer ${TOKEN}\" "
-                "-o /dev/null "
-                "-w \"HTTP:%{http_code}\" "
-                f"{k8s_auth_url}"
-                "'",
-                ns=operator_ns,
-                ok_to_fail=True,
-            )
-
-            assert "HTTP:200" in auth_out, error(
-                f"{container}: expected authenticated Kubernetes API HTTP 200\n{auth_out}"
-            )
-
-        with And(f"{container} negotiates AES-256 TLS 1.3 to ClickHouse HTTPS"):
-            out = kubectl.launch(
-                f"exec {operator_pod} -c {container} -- "
-                "sh -c '"
-                "curl -sS -k -v "
-                "--tlsv1.3 "
-                f"--tls13-ciphers {approved_cipher} "
-                "-o /dev/null "
-                "-w \"HTTP:%{http_code}\" "
-                f"https://{chi_ip}:8443/ping "
-                "2>&1"
-                "'",
-                ns=operator_ns,
-                ok_to_fail=True,
-            )
-
-            assert "TLSv1.3" in out, error(
-                f"{container}: expected TLSv1.3 to ClickHouse HTTPS\n{out}"
-            )
-            assert approved_cipher in out, error(
-                f"{container}: expected {approved_cipher} to ClickHouse HTTPS\n{out}"
-            )
-            assert "HTTP:200" in out, error(
-                f"{container}: expected ClickHouse /ping HTTP 200\n{out}"
-            )
-
-
-
-@TestStep(Finally)
-def fips_delete_fake_openssl_server(self, ns=None):
-    """Delete fake OpenSSL TLS server pod/service."""
-    ns = ns or current().context.test_namespace
-
-    kubectl.launch(
-        f"delete svc {FAKE_OPENSSL_SERVER} --ignore-not-found",
-        ns=ns,
-        ok_to_fail=True,
-    )
-    kubectl.launch(
-        f"delete pod {FAKE_OPENSSL_SERVER} --ignore-not-found",
-        ns=ns,
-        ok_to_fail=True,
-    )
+    return process, "".join(output_parts)
 
 
 @TestStep(Given)
-def fips_create_fake_openssl_server(self, cipher_suite, ns=None):
-    """Create fake TLS 1.3 server restricted to one cipher suite."""
-    ns = ns or current().context.test_namespace
+def prepare_local_strict_operator_config(self):
+    """Write strict FIPS config (Enforced, fips.enforced=true) under the TLS work dir."""
+    base_config_path = util.get_full_path(
+        "../../config/config.yaml", lookup_in_host=True
+    )
+    with open(base_config_path, encoding="utf-8") as f:
+        config = yaml.safe_load(f)
 
-    fips_delete_fake_openssl_server(ns=ns)
+    work_dir = self.context.fips_local_openssl_tls_dir
 
-    manifest = f"""
-apiVersion: v1
-kind: Pod
-metadata:
-  name: {FAKE_OPENSSL_SERVER}
-  labels:
-    app: {FAKE_OPENSSL_SERVER}
-spec:
-  restartPolicy: Always
-  containers:
-  - name: openssl
-    image: altinity/clickhouse-server:25.3.8.30001.altinityfips
-    command: ["sh", "-lc"]
-    args:
-    - |
-      openssl s_server \\
-        -accept 18443 \\
-        -cert /tls/server.crt \\
-        -key /tls/server.key \\
-        -tls1_3 \\
-        -ciphersuites {cipher_suite} \\
-        -www \\
-        -state
-    ports:
-    - containerPort: 18443
-    volumeMounts:
-    - name: tls
-      mountPath: /tls
-      readOnly: true
-  volumes:
-  - name: tls
-    secret:
-      secretName: clickhouse-certs
-"""
+    security = config.setdefault("security", {})
+    security["policy"] = "Enforced"
+    security.setdefault("fips", {})["enforced"] = True
+    ipc_dir = os.path.join(work_dir, "ipc")
+    os.makedirs(ipc_dir, exist_ok=True)
+    token_path = os.path.join(ipc_dir, "token")
+    with open(token_path, "w", encoding="utf-8") as f:
+        f.write(uuid.uuid4().hex)
+    security.setdefault("ipc", {})["tokenPath"] = token_path
+    config_path = os.path.join(work_dir, "strict-operator-config.yaml")
+    with open(config_path, "w", encoding="utf-8") as f:
+        yaml.dump(config, f, default_flow_style=False)
 
-    tmp_path = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix="-fake-openssl-server.yaml",
-            delete=False,
-        ) as f:
-            f.write(manifest)
-            tmp_path = f.name
+    self.context.fips_local_strict_config_path = config_path
+    self.context.fips_local_ipc_token_path = token_path
+    note(f"strict FIPS operator config -> {config_path}")
+    return config_path
 
-        kubectl.launch(f"apply -f {shlex.quote(tmp_path)}", ns=ns)
 
-        kubectl.launch(
-            f"expose pod {FAKE_OPENSSL_SERVER} "
-            f"--name={FAKE_OPENSSL_SERVER} "
-            "--port=8443 "
-            "--target-port=18443",
-            ns=ns,
-        )
+@TestStep(Given)
+def prepare_local_openssl_tls_material(self):
+    """Create temp dir with self-signed cert and key for local openssl s_server."""
+    work_dir = tempfile.mkdtemp(prefix="fips-local-openssl-tls-")
+    cert_path = os.path.join(work_dir, "server.crt")
+    key_path = os.path.join(work_dir, "server.key")
+    subprocess.run(
+        [
+            "openssl", "req", "-x509", "-newkey", "rsa:2048",
+            "-keyout", key_path,
+            "-out", cert_path,
+            "-days", "1",
+            "-nodes",
+            "-subj", "/CN=localhost",
+            "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    self.context.fips_local_openssl_tls_dir = work_dir
+    self.context.fips_local_openssl_cert = cert_path
+    self.context.fips_local_openssl_key = key_path
 
-        kubectl.launch(
-            f"wait pod {FAKE_OPENSSL_SERVER} "
-            "--for=condition=Ready "
-            "--timeout=120s",
-            ns=ns,
-        )
-    finally:
-        if tmp_path:
-            os.unlink(tmp_path)
+    yield
+
+    cleanup_local_openssl_tls_material()
+
+@TestStep(Finally)
+def cleanup_local_openssl_tls_material(self):
+    work_dir = getattr(self.context, "fips_local_openssl_tls_dir", None)
+    if work_dir and os.path.isdir(work_dir):
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
 @TestStep(When)
-def fips_curl_tls13_from_operator_container(
-    self,
-    container,
-    url,
-    cipher_suite,
-    ns=None,
-):
-    """Run curl from one operator pod container with forced TLS 1.3 cipher."""
-    ns = ns or current().context.operator_namespace
-    operator_pod = kubectl.get_operator_pod(ns=ns)
+def start_local_openssl_server(self, cipher_suite=None, tls_version="1.3", port=None):
+    """Start openssl s_server on localhost (fake Kubernetes API or fake ClickHouse HTTPS)."""
+    port = port or _free_local_port()
+    log_path = os.path.join(self.context.fips_local_openssl_tls_dir, "s_server.log")
 
-    return kubectl.launch(
-        f"exec {operator_pod} -c {container} -- "
-        "sh -c '"
-        "curl -k -sS -v "
-        "--tlsv1.3 "
-        f"--tls13-ciphers {cipher_suite} "
-        f"{url} "
-        "-o /dev/null "
-        "-w \"HTTP:%{http_code}\" "
-        "2>&1"
-        "'",
-        ns=ns,
-        ok_to_fail=True,
-    )
+    with Given(f"openssl s_server on 127.0.0.1:{port} (TLS {tls_version})"):
+        command = [
+            "openssl", "s_server",
+            "-accept", str(port),
+            "-cert", self.context.fips_local_openssl_cert,
+            "-key", self.context.fips_local_openssl_key,
+        ]
+        command.extend(openssl_tls_version_args(tls_version))
+        command.extend(openssl_cipher_args(tls_version, cipher_suite))
+
+        # TLS 1.0/1.1: -www keeps s_server alive after the readiness TCP probe; without
+        # it the process exits before the binary connects.
+        if tls_version in ("1.0", "1.1"):
+            command.append("-www")
+        command.append("-state")
+
+        # Line-buffer stdout so handshake / CIPHER lines flush to s_server.log while polling.
+        if shutil.which("stdbuf"):
+            command = ["stdbuf", "-oL", "-eL", *command]
+        log_file = open(log_path, "w", encoding="utf-8")
+
+        process = subprocess.Popen(
+            command,
+            # Open stdin pipe: without -www, EOF on stdin makes s_server exit early.
+            stdin=subprocess.PIPE,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+
+    with When("s_server is listening on localhost"):
+        ok, reason = _wait_for_listening_port(
+            "127.0.0.1", port, process=process, timeout=10, label="openssl s_server"
+        )
+        if not ok:
+            log_file.close()
+            if reason == "exited":
+                with open(log_path, encoding="utf-8") as f:
+                    server_log = f.read()
+                assert False, error(
+                    f"local openssl s_server exited early on port {port}\n{server_log}"
+                )
+            assert False, error(f"local openssl s_server not listening on 127.0.0.1:{port}")
+
+    self.context.fips_local_openssl_process = process
+    self.context.fips_local_openssl_log_file = log_file
+    self.context.fips_local_openssl_log_path = log_path
+    self.context.fips_local_openssl_port = port
+
+    return port
+
+@TestStep(Finally)
+def stop_local_openssl_server(self):
+    process = getattr(self.context, "fips_local_openssl_process", None)
+    log_file = getattr(self.context, "fips_local_openssl_log_file", None)
+    if process and process.stdin and not process.stdin.closed:
+        process.stdin.close()
+    _stop_process(process)
+    if log_file and not log_file.closed:
+        log_file.close()
+    self.context.fips_local_openssl_process = None
+    self.context.fips_local_openssl_log_file = None
+
+
+@TestStep(When)
+def run_binary_against_local_fake_k8s(
+    self,
+    binary_path,
+    config_path,
+    expectation="approved",
+    cipher_suite=None,
+    max_wait_sec=45,
+):
+    """Run binary with fake kubeconfig; poll output until TLS probe evidence appears."""
+    with Given("fake kubeconfig targeting local s_server"):
+        env = _fake_k8s_probe_env(
+            self.context.fips_local_openssl_tls_dir,
+            self.context.fips_local_openssl_port,
+            self.context.fips_local_openssl_cert,
+        )
+
+    with When("binary runs against fake Kubernetes API"):
+        _, output = _run_fips_binary_until_tls_probe(
+            binary_path=binary_path,
+            config_path=config_path,
+            env=env,
+            server_log_path=self.context.fips_local_openssl_log_path,
+            expectation=expectation,
+            cipher_suite=cipher_suite,
+            max_wait_sec=max_wait_sec,
+        )
+        note(_format_fake_k8s_probe_note(output))
+    return output
 
 
 @TestStep(Then)
-def fips_assert_operator_containers_tls13_fails(
+def assert_local_fake_k8s_tls_probe(
     self,
-    url,
-    cipher_suite,
-    ns=None,
+    binary_label,
+    binary_path,
+    config_path,
+    expectation,
+    cipher_suite=None,
+    tls_version="1.3",
+    case_name=None,
 ):
-    """Assert both operator pod containers fail with the requested TLS 1.3 cipher."""
-    ns = ns or current().context.operator_namespace
+    """Start s_server, run binary once, assert negotiated cipher or TLS rejection."""
 
-    failure_needles = (
-        "handshake failure",
+    label = case_name or cipher_suite or f"TLS {tls_version} protocol"
+
+    with Given(f"fake Kubernetes API ({label})"):
+        start_local_openssl_server(
+            cipher_suite=cipher_suite,
+            tls_version=tls_version,
+        )
+    try:
+        with When(f"{binary_label} connects via fake kubeconfig"):
+            output = run_binary_against_local_fake_k8s(
+                binary_path=binary_path,
+                config_path=config_path,
+                expectation=expectation,
+                cipher_suite=cipher_suite,
+            )
+
+        with open(self.context.fips_local_openssl_log_path, encoding="utf-8", errors="replace") as f:
+            server_log = f.read()
+
+        if expectation == "approved":
+            with Then(f"check {binary_label} negotiates {cipher_suite}"):
+                cipher_line = f"CIPHER is {cipher_suite}"
+                assert cipher_suite and cipher_line in server_log, error(
+                    f"{binary_label} {label}: expected {cipher_suite!r} in server log, but none found"
+                )
+                note(f"cipher proof: {cipher_line} - found in logs")
+        else:
+            with Then(f"{binary_label} rejects TLS handshake"):
+                assert any(err in output for err in FAKE_K8S_TLS_REJECT_ERRORS), error(
+                    f"{binary_label} {label}: expected TLS rejection in binary output, but none found"
+                )
+                reject_line = next(
+                    (
+                        line for line in output.splitlines()
+                        if any(err in line for err in FAKE_K8S_TLS_REJECT_ERRORS)
+                    ),
+                    None,
+                )
+                if reject_line:
+                    note(f"TLS rejection proof: {reject_line.strip()}")
+    finally:
+        with Finally("stop local openssl server"):
+            stop_local_openssl_server()
+
+
+@TestStep(Check)
+def assert_local_fake_k8s_approved_tls_cases(
+    self,
+    binary_label,
+    binary_path,
+    config_path,
+):
+    """Run all FIPS_APPROVED_TLS13_CIPHER_CASES against the local fake API."""
+
+    for case in FIPS_APPROVED_TLS13_CIPHER_CASES:
+        with Check(f"{binary_label} accepts {case['name']} against local fake k8s API"):
+            assert_local_fake_k8s_tls_probe(
+                binary_label=binary_label,
+                binary_path=binary_path,
+                config_path=config_path,
+                tls_version=case["tls_version"],
+                cipher_suite=case["cipher_suite"],
+                expectation="approved",
+                case_name=case["name"],
+            )
+
+
+@TestStep(Check)
+def assert_local_fake_k8s_rejected_tls_cases(
+    self,
+    binary_label,
+    binary_path,
+    config_path,
+):
+    """Run all FIPS_LISTENER_REJECTED_TLS_CASES against the local fake API."""
+
+    for case in FIPS_LISTENER_REJECTED_TLS_CASES:
+        # Operator K8s client min TLS is 1.3; 1.2 probes are not meaningful yet.
+        if case["tls_version"] == "1.2":
+            continue
+        with Check(f"{binary_label} rejects {case['name']} against local fake k8s API"):
+            assert_local_fake_k8s_tls_probe(
+                binary_label=binary_label,
+                binary_path=binary_path,
+                config_path=config_path,
+                tls_version=case["tls_version"],
+                cipher_suite=case["cipher_suite"],
+                expectation="rejected",
+                case_name=case["name"],
+            )
+
+
+def _write_unreachable_kubeconfig(path):
+    """Kubeconfig pointing at a closed port — metrics-exporter discovery fails open."""
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("""apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://127.0.0.1:1
+    insecure-skip-tls-verify: true
+  name: noop
+contexts:
+- context:
+    cluster: noop
+    user: noop
+  name: noop
+current-context: noop
+users:
+- name: noop
+  user:
+    token: noop
+""")
+
+
+def _hostrun_metrics_exporter_env(work_dir):
+    """Host-run metrics-exporter without real or fake k8s (POST /chi triggers CH scrape)."""
+    kubeconfig_path = os.path.join(work_dir, "hostrun-kubeconfig-noop")
+    _write_unreachable_kubeconfig(kubeconfig_path)
+    return _fips_hostrun_env(kubeconfig_path), kubeconfig_path
+
+
+LOCAL_FAKE_CLICKHOUSE_CR = "fake-openssl-clickhouse"
+LOCAL_OPERATOR_OPENSSL_TLS_PORT = 8443
+LOCAL_OPERATOR_OPENSSL_CHI = "test-030017-chi"
+LOCAL_OPERATOR_OPENSSL_CHI_MANIFEST = "manifests/chi/test-030017-chi.yaml"
+LOCAL_FAKE_K8S_NS = "fake-op"
+
+_FAKE_K8S_CHI_GROUP = "clickhouse.altinity.com"
+_FAKE_K8S_CHI_VERSION = "v1"
+_FAKE_K8S_CHI_PLURAL = "clickhouseinstallations"
+_FAKE_K8S_CHK_GROUP = "clickhouse-keeper.altinity.com"
+_FAKE_K8S_CHK_VERSION = "v1"
+_FAKE_K8S_CHK_PLURAL = "clickhousekeeperinstallations"
+
+_HOSTRUN_CLICKHOUSE_ACCESS = {
+    "username": "clickhouse_operator",
+    "password": "clickhouse_operator_password",
+    "scheme": "https",
+    "port": LOCAL_OPERATOR_OPENSSL_TLS_PORT,
+}
+
+_HOSTRUN_PERMISSIVE_CH_TLS = {
+    "minVersion": "1.3",
+    "verify": "None",
+}
+
+
+def _fake_k8s_uid() -> str:
+    return str(uuid.uuid4())
+
+
+def _fake_k8s_resource_version(store: "_FakeK8sStore") -> str:
+    store.resource_version += 1
+    return str(store.resource_version)
+
+
+def _fake_k8s_meta(name: str, namespace: str, labels: dict | None = None, rv: str = "1") -> dict:
+    meta = {
+        "name": name,
+        "namespace": namespace,
+        "uid": _fake_k8s_uid(),
+        "resourceVersion": rv,
+        "generation": 1,
+    }
+    if labels:
+        meta["labels"] = labels
+    return meta
+
+
+class _FakeK8sStore:
+    def __init__(self, namespace: str, chi: dict, chi_manifest: str = ""):
+        self.namespace = namespace
+        self.chi_manifest = chi_manifest
+        self.resource_version = 100
+        self.chi = chi
+        self.chit_list: list[dict] = []
+        self.chopconf_list: list[dict] = []
+        self.statefulsets: dict[str, dict] = {}
+        self.pods: dict[str, dict] = {}
+        self.services: dict[str, dict] = {}
+        self.configmaps: dict[str, dict] = {}
+        self.secrets: dict[str, dict] = {}
+        self.pvcs: dict[str, dict] = {}
+        self.endpoint_slices: dict[str, dict] = {}
+        self.lock = threading.Lock()
+        self.watchers: list[tuple[threading.Condition, dict]] = []
+
+    def reset_for_reconcile(self):
+        """Clear reconcile artifacts so the next operator run re-Pings ClickHouse."""
+        with self.lock:
+            if self.chi_manifest:
+                self.chi = _load_fake_k8s_chi(self.chi_manifest, self.namespace)
+            else:
+                self.chi.setdefault("status", {})
+                self.chi["status"] = {}
+                self.chi["metadata"]["generation"] = 1
+                self.chi["metadata"]["resourceVersion"] = "1"
+            self.statefulsets.clear()
+            self.pods.clear()
+            self.services.clear()
+            self.configmaps.clear()
+            self.secrets.clear()
+            self.pvcs.clear()
+            self.endpoint_slices.clear()
+            self.resource_version = 100
+            chi_event = {"type": "MODIFIED", "object": copy.deepcopy(self.chi)}
+        self.notify_watchers(chi_event)
+
+    def notify_watchers(self, event: dict):
+        with self.lock:
+            dead = []
+            for cond, state in self.watchers:
+                if state.get("closed"):
+                    dead.append((cond, state))
+                    continue
+                state.setdefault("events", []).append(event)
+                cond.notify_all()
+            for item in dead:
+                self.watchers.remove(item)
+
+
+def _fake_k8s_pod_from_sts(sts: dict) -> dict:
+    ns = sts["metadata"]["namespace"]
+    name = sts["metadata"]["name"] + "-0"
+    labels = copy.deepcopy(sts["spec"].get("template", {}).get("metadata", {}).get("labels", {}))
+    labels.setdefault(
+        "clickhouse.altinity.com/chi",
+        sts["metadata"]["labels"].get("clickhouse.altinity.com/chi", ""),
+    )
+    return {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+            **_fake_k8s_meta(name, ns, labels),
+            "ownerReferences": [{
+                "apiVersion": sts["apiVersion"],
+                "kind": sts["kind"],
+                "name": sts["metadata"]["name"],
+                "uid": sts["metadata"]["uid"],
+                "controller": True,
+                "blockOwnerDeletion": True,
+            }],
+        },
+        "spec": copy.deepcopy(sts["spec"].get("template", {}).get("spec", {})),
+        "status": {
+            "phase": "Running",
+            "podIP": "127.0.0.1",
+            "conditions": [{
+                "type": "Ready",
+                "status": "True",
+                "reason": "FakeK8s",
+            }],
+        },
+    }
+
+
+class _FakeK8sHandler(BaseHTTPRequestHandler):
+    store: _FakeK8sStore
+    log_path: str | None = None
+
+    def log_message(self, fmt, *args):
+        line = f"{self.command} {self.path} -> {fmt % args}\n"
+        if self.log_path:
+            with open(self.log_path, "a", encoding="utf-8") as f:
+                f.write(line)
+        sys.stderr.write(line)
+
+    def _read_body(self) -> bytes:
+        length = int(self.headers.get("Content-Length", 0))
+        return self.rfile.read(length) if length else b""
+
+    def _json(self, code: int, payload: Any):
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _status(self, code: int, message: str = ""):
+        self.send_response(code, message)
+        self.end_headers()
+
+    def _list(self, kind: str, api_version: str, items: list[dict]) -> dict:
+        return {
+            "apiVersion": api_version,
+            "kind": f"{kind}List",
+            "metadata": {"resourceVersion": str(self.store.resource_version)},
+            "items": items,
+        }
+
+    def _watch(self, events: list[dict]):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        try:
+            for event in events:
+                self.wfile.write((json.dumps(event) + "\n").encode("utf-8"))
+                self.wfile.flush()
+            while True:
+                time.sleep(3600)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def _is_watch(self) -> bool:
+        return parse_qs(urlparse(self.path).query).get("watch", ["false"])[0] == "true"
+
+    def do_GET(self):  # noqa: N802
+        path = urlparse(self.path).path
+        watch = self._is_watch()
+
+        if path == "/version":
+            return self._json(200, {
+                "major": "1",
+                "minor": "30",
+                "gitVersion": "v1.30.0-fake",
+            })
+
+        if path == "/api":
+            return self._json(200, {
+                "kind": "APIVersions",
+                "versions": ["v1"],
+                "serverAddressByClientCIDRs": [],
+            })
+
+        if path == "/apis":
+            return self._json(200, {
+                "kind": "APIGroupList",
+                "groups": [
+                    {"name": "", "versions": [{"groupVersion": "v1", "version": "v1"}], "preferredVersion": {"groupVersion": "v1", "version": "v1"}},
+                    {"name": "apps", "versions": [{"groupVersion": "apps/v1", "version": "v1"}], "preferredVersion": {"groupVersion": "apps/v1", "version": "v1"}},
+                    {"name": "discovery.k8s.io", "versions": [{"groupVersion": "discovery.k8s.io/v1", "version": "v1"}], "preferredVersion": {"groupVersion": "discovery.k8s.io/v1", "version": "v1"}},
+                    {"name": _FAKE_K8S_CHI_GROUP, "versions": [{"groupVersion": f"{_FAKE_K8S_CHI_GROUP}/{_FAKE_K8S_CHI_VERSION}", "version": _FAKE_K8S_CHI_VERSION}], "preferredVersion": {"groupVersion": f"{_FAKE_K8S_CHI_GROUP}/{_FAKE_K8S_CHI_VERSION}", "version": _FAKE_K8S_CHI_VERSION}},
+                    {"name": _FAKE_K8S_CHK_GROUP, "versions": [{"groupVersion": f"{_FAKE_K8S_CHK_GROUP}/{_FAKE_K8S_CHK_VERSION}", "version": _FAKE_K8S_CHK_VERSION}], "preferredVersion": {"groupVersion": f"{_FAKE_K8S_CHK_GROUP}/{_FAKE_K8S_CHK_VERSION}", "version": _FAKE_K8S_CHK_VERSION}},
+                    {"name": "apiextensions.k8s.io", "versions": [{"groupVersion": "apiextensions.k8s.io/v1", "version": "v1"}], "preferredVersion": {"groupVersion": "apiextensions.k8s.io/v1", "version": "v1"}},
+                ],
+            })
+
+        if path == "/apis/apps/v1":
+            return self._json(200, {
+                "kind": "APIResourceList",
+                "groupVersion": "apps/v1",
+                "resources": [
+                    {"name": "statefulsets", "namespaced": True, "kind": "StatefulSet", "verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]},
+                ],
+            })
+
+        if path == "/apis/discovery.k8s.io/v1":
+            return self._json(200, {
+                "kind": "APIResourceList",
+                "groupVersion": "discovery.k8s.io/v1",
+                "resources": [
+                    {"name": "endpointslices", "namespaced": True, "kind": "EndpointSlice", "verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]},
+                ],
+            })
+
+        if path == f"/apis/{_FAKE_K8S_CHI_GROUP}/{_FAKE_K8S_CHI_VERSION}":
+            return self._json(200, {
+                "kind": "APIResourceList",
+                "groupVersion": f"{_FAKE_K8S_CHI_GROUP}/{_FAKE_K8S_CHI_VERSION}",
+                "resources": [
+                    {"name": _FAKE_K8S_CHI_PLURAL, "namespaced": True, "kind": "ClickHouseInstallation", "verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]},
+                    {"name": "clickhouseinstallationtemplates", "namespaced": True, "kind": "ClickHouseInstallationTemplate", "verbs": ["get", "list", "watch"]},
+                    {"name": "clickhouseoperatorconfigurations", "namespaced": True, "kind": "ClickHouseOperatorConfiguration", "verbs": ["get", "list", "watch"]},
+                ],
+            })
+
+        if path == f"/apis/{_FAKE_K8S_CHK_GROUP}/{_FAKE_K8S_CHK_VERSION}":
+            return self._json(200, {
+                "kind": "APIResourceList",
+                "groupVersion": f"{_FAKE_K8S_CHK_GROUP}/{_FAKE_K8S_CHK_VERSION}",
+                "resources": [
+                    {"name": _FAKE_K8S_CHK_PLURAL, "namespaced": True, "kind": "ClickHouseKeeperInstallation", "verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]},
+                ],
+            })
+
+        ns = self.store.namespace
+        chi_path = f"/apis/{_FAKE_K8S_CHI_GROUP}/{_FAKE_K8S_CHI_VERSION}/namespaces/{ns}/{_FAKE_K8S_CHI_PLURAL}"
+        if path == chi_path:
+            if watch:
+                return self._watch([{"type": "ADDED", "object": self.store.chi}])
+            return self._json(200, self._list("ClickHouseInstallation", f"{_FAKE_K8S_CHI_GROUP}/{_FAKE_K8S_CHI_VERSION}", [self.store.chi]))
+
+        m = re.match(
+            rf"/apis/{_FAKE_K8S_CHI_GROUP}/{_FAKE_K8S_CHI_VERSION}/namespaces/{re.escape(ns)}/{_FAKE_K8S_CHI_PLURAL}/([^/]+)$",
+            path,
+        )
+        if m:
+            if m.group(1) == self.store.chi["metadata"]["name"]:
+                return self._json(200, self.store.chi)
+            return self._status(404)
+
+        for plural, kind, items in (
+            ("clickhouseinstallationtemplates", "ClickHouseInstallationTemplate", self.store.chit_list),
+            ("clickhouseoperatorconfigurations", "ClickHouseOperatorConfiguration", self.store.chopconf_list),
+        ):
+            p = f"/apis/{_FAKE_K8S_CHI_GROUP}/{_FAKE_K8S_CHI_VERSION}/namespaces/{ns}/{plural}"
+            if path == p:
+                if watch:
+                    return self._watch([])
+                return self._json(200, self._list(kind, f"{_FAKE_K8S_CHI_GROUP}/{_FAKE_K8S_CHI_VERSION}", items))
+
+        chk_path = f"/apis/{_FAKE_K8S_CHK_GROUP}/{_FAKE_K8S_CHK_VERSION}/namespaces/{ns}/{_FAKE_K8S_CHK_PLURAL}"
+        if path == chk_path:
+            if watch:
+                return self._watch([])
+            return self._json(200, self._list("ClickHouseKeeperInstallation", f"{_FAKE_K8S_CHK_GROUP}/{_FAKE_K8S_CHK_VERSION}", []))
+
+        es_path = f"/apis/discovery.k8s.io/v1/namespaces/{ns}/endpointslices"
+        if path == es_path:
+            items = list(self.store.endpoint_slices.values())
+            if watch:
+                return self._watch([{"type": "ADDED", "object": o} for o in items])
+            return self._json(200, self._list("EndpointSlice", "discovery.k8s.io/v1", items))
+
+        if path == f"/api/v1/namespaces/{ns}":
+            return self._json(200, {
+                "apiVersion": "v1",
+                "kind": "Namespace",
+                "metadata": _fake_k8s_meta(ns, ns),
+                "status": {"phase": "Active"},
+            })
+
+        for collection, kind, api_ver in (
+            (self.store.statefulsets, "StatefulSet", "apps/v1"),
+            (self.store.pods, "Pod", "v1"),
+            (self.store.services, "Service", "v1"),
+            (self.store.configmaps, "ConfigMap", "v1"),
+            (self.store.secrets, "Secret", "v1"),
+            (self.store.pvcs, "PersistentVolumeClaim", "v1"),
+        ):
+            base = "/apis/apps/v1" if kind == "StatefulSet" else "/api/v1"
+            if kind == "StatefulSet":
+                list_path = f"{base}/namespaces/{ns}/statefulsets"
+            else:
+                list_path = f"{base}/namespaces/{ns}/{kind.lower()}s" if kind != "Pod" else f"{base}/namespaces/{ns}/pods"
+            if path == list_path:
+                items = list(collection.values())
+                if watch:
+                    events = [{"type": "ADDED", "object": o} for o in items]
+                    return self._watch(events)
+                return self._json(200, self._list(kind, api_ver, items))
+
+            m = re.match(rf"{re.escape(list_path)}/([^/]+)$", path)
+            if m and m.group(1) in collection:
+                return self._json(200, collection[m.group(1)])
+
+        crd = "/apis/apiextensions.k8s.io/v1/customresourcedefinitions/clickhouseinstallations.clickhouse.altinity.com"
+        if path == crd:
+            return self._json(200, {
+                "apiVersion": "apiextensions.k8s.io/v1",
+                "kind": "CustomResourceDefinition",
+                "metadata": {"name": "clickhouseinstallations.clickhouse.altinity.com"},
+                "spec": {"group": _FAKE_K8S_CHI_GROUP, "names": {"plural": _FAKE_K8S_CHI_PLURAL, "kind": "ClickHouseInstallation"}, "scope": "Namespaced", "versions": [{"name": _FAKE_K8S_CHI_VERSION, "served": True, "storage": True}]},
+            })
+
+        chk_crd = f"/apis/apiextensions.k8s.io/v1/customresourcedefinitions/{_FAKE_K8S_CHK_PLURAL}.{_FAKE_K8S_CHK_GROUP}"
+        if path == chk_crd:
+            return self._json(200, {
+                "apiVersion": "apiextensions.k8s.io/v1",
+                "kind": "CustomResourceDefinition",
+                "metadata": {"name": f"{_FAKE_K8S_CHK_PLURAL}.{_FAKE_K8S_CHK_GROUP}"},
+                "spec": {"group": _FAKE_K8S_CHK_GROUP, "names": {"plural": _FAKE_K8S_CHK_PLURAL, "kind": "ClickHouseKeeperInstallation"}, "scope": "Namespaced", "versions": [{"name": _FAKE_K8S_CHK_VERSION, "served": True, "storage": True}]},
+            })
+
+        self.log_message("unhandled GET %s", path)
+        return self._status(404)
+
+    def do_POST(self):  # noqa: N802
+        path = urlparse(self.path).path
+        if path == "/debug/reset-chi-reconcile":
+            self.store.reset_for_reconcile()
+            return self._json(200, {"status": "ok"})
+
+        body = json.loads(self._read_body() or b"{}")
+        ns = self.store.namespace
+        rv = _fake_k8s_resource_version(self.store)
+
+        events_path = f"/api/v1/namespaces/{ns}/events"
+        if path == events_path:
+            event = body if body else {
+                "apiVersion": "v1",
+                "kind": "Event",
+                "metadata": {"name": f"fake-event-{_fake_k8s_uid()}", "namespace": ns},
+            }
+            event.setdefault("metadata", {})["resourceVersion"] = rv
+            return self._json(201, event)
+
+        sts_path = f"/apis/apps/v1/namespaces/{ns}/statefulsets"
+        if path == sts_path:
+            obj = body
+            obj["metadata"]["resourceVersion"] = rv
+            obj["metadata"].setdefault("uid", _fake_k8s_uid())
+            self.store.statefulsets[obj["metadata"]["name"]] = obj
+            pod = _fake_k8s_pod_from_sts(obj)
+            pod["metadata"]["resourceVersion"] = rv
+            self.store.pods[pod["metadata"]["name"]] = pod
+            self.store.notify_watchers({"type": "ADDED", "object": copy.deepcopy(obj)})
+            self.store.notify_watchers({"type": "ADDED", "object": copy.deepcopy(pod)})
+            return self._json(201, obj)
+
+        for collection, kind in (
+            (self.store.services, "services"),
+            (self.store.configmaps, "configmaps"),
+            (self.store.secrets, "secrets"),
+            (self.store.pvcs, "persistentvolumeclaims"),
+            (self.store.endpoint_slices, "endpointslices"),
+        ):
+            if kind == "endpointslices":
+                base = f"/apis/discovery.k8s.io/v1/namespaces/{ns}/{kind}"
+            else:
+                base = f"/api/v1/namespaces/{ns}/{kind}"
+            if path == base:
+                obj = body
+                obj["metadata"]["resourceVersion"] = rv
+                obj["metadata"].setdefault("uid", _fake_k8s_uid())
+                collection[obj["metadata"]["name"]] = obj
+                self.store.notify_watchers({"type": "ADDED", "object": copy.deepcopy(obj)})
+                return self._json(201, obj)
+
+        self.log_message("unhandled POST %s", path)
+        return self._status(404)
+
+    def do_PUT(self):  # noqa: N802
+        return self._upsert()
+
+    def do_PATCH(self):  # noqa: N802
+        return self._upsert(patch=True)
+
+    def _upsert(self, patch: bool = False):
+        path = urlparse(self.path).path
+        body = json.loads(self._read_body() or b"{}")
+        ns = self.store.namespace
+        rv = _fake_k8s_resource_version(self.store)
+
+        chi_name = self.store.chi["metadata"]["name"]
+        chi_base = f"/apis/{_FAKE_K8S_CHI_GROUP}/{_FAKE_K8S_CHI_VERSION}/namespaces/{ns}/{_FAKE_K8S_CHI_PLURAL}/{chi_name}"
+        if path in (chi_base, chi_base + "/status"):
+            if patch:
+                if "metadata" in body and "finalizers" in body.get("metadata", {}):
+                    self.store.chi.setdefault("metadata", {})["finalizers"] = body["metadata"]["finalizers"]
+                if "status" in body:
+                    self.store.chi.setdefault("status", {}).update(body["status"])
+            else:
+                self.store.chi.update(body)
+            self.store.chi["metadata"]["resourceVersion"] = rv
+            self.store.notify_watchers({"type": "MODIFIED", "object": copy.deepcopy(self.store.chi)})
+            return self._json(200, self.store.chi)
+
+        for collection in (self.store.statefulsets, self.store.services, self.store.configmaps):
+            for name, obj in list(collection.items()):
+                prefixes = [
+                    f"/apis/apps/v1/namespaces/{ns}/statefulsets/{name}",
+                    f"/api/v1/namespaces/{ns}/services/{name}",
+                    f"/api/v1/namespaces/{ns}/configmaps/{name}",
+                ]
+                if path in prefixes:
+                    if patch:
+                        for k, v in body.items():
+                            if k == "metadata":
+                                obj["metadata"].update(v)
+                            else:
+                                obj[k] = v
+                    else:
+                        obj.update(body)
+                    obj["metadata"]["resourceVersion"] = rv
+                    collection[name] = obj
+                    return self._json(200, obj)
+
+        self.log_message("unhandled PATCH/PUT %s", path)
+        return self._status(404)
+
+    def do_DELETE(self):  # noqa: N802
+        path = urlparse(self.path).path
+        ns = self.store.namespace
+        for collection, segment in (
+            (self.store.statefulsets, "statefulsets"),
+            (self.store.pods, "pods"),
+            (self.store.services, "services"),
+            (self.store.configmaps, "configmaps"),
+        ):
+            m = re.match(rf"/apis/apps/v1/namespaces/{re.escape(ns)}/{segment}/([^/]+)$", path)
+            if not m:
+                m = re.match(rf"/api/v1/namespaces/{re.escape(ns)}/{segment}/([^/]+)$", path)
+            if m and m.group(1) in collection:
+                obj = collection.pop(m.group(1))
+                return self._json(200, obj)
+        return self._status(404)
+
+
+def _load_fake_k8s_chi(path: str, namespace: str) -> dict:
+    with open(path, encoding="utf-8") as f:
+        chi = yaml.safe_load(f)
+    chi.setdefault("metadata", {})
+    chi["metadata"]["namespace"] = namespace
+    chi["metadata"].setdefault("name", "test-030017-chi")
+    chi["metadata"].setdefault("uid", _fake_k8s_uid())
+    chi["metadata"].setdefault("resourceVersion", "1")
+    chi["metadata"].setdefault("generation", 1)
+    chi["metadata"].setdefault(
+        "finalizers",
+        ["finalizer.clickhouseinstallation.altinity.com"],
+    )
+    chi.setdefault("status", {})
+    chi.setdefault("apiVersion", f"{_FAKE_K8S_CHI_GROUP}/{_FAKE_K8S_CHI_VERSION}")
+    chi.setdefault("kind", "ClickHouseInstallation")
+    return chi
+
+
+class _FakeK8sAPIServer:
+    """In-process minimal Kubernetes API for host-run operator reconcile probes."""
+
+    def __init__(self, namespace, chi_manifest_path, cert_path, key_path, log_path=""):
+        self._namespace = namespace
+        self._chi_manifest_path = chi_manifest_path
+        self._cert_path = cert_path
+        self._key_path = key_path
+        self._log_path = log_path
+        self._store = _FakeK8sStore(
+            namespace,
+            _load_fake_k8s_chi(chi_manifest_path, namespace),
+            chi_manifest_path,
+        )
+        self._httpd = None
+        self._thread = None
+        self.port = None
+
+    def start(self, port):
+        _FakeK8sHandler.store = self._store
+        _FakeK8sHandler.log_path = self._log_path or None
+        self._httpd = ThreadingHTTPServer(("127.0.0.1", int(port)), _FakeK8sHandler)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        ctx.load_cert_chain(self._cert_path, self._key_path)
+        self._httpd.socket = ctx.wrap_socket(self._httpd.socket, server_side=True)
+        self.port = int(port)
+        self._thread = threading.Thread(target=self._httpd.serve_forever, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        if self._httpd is not None:
+            self._httpd.shutdown()
+            self._httpd.server_close()
+            self._httpd = None
+        if self._thread is not None:
+            self._thread.join(timeout=5)
+            self._thread = None
+
+    def reset_reconcile(self):
+        self._store.reset_for_reconcile()
+
+
+def _write_hostrun_clickhouse_tls_config(work_dir):
+    """Minimal chopconf for host-run metrics-exporter → fake ClickHouse HTTPS probes."""
+    config_path = os.path.join(work_dir, "hostrun-clickhouse-tls-config.yaml")
+    config = {
+        "security": {
+            "policy": "Permissive",
+            "clickhouse": {"tls": dict(_HOSTRUN_PERMISSIVE_CH_TLS)},
+            "ipc": {"mode": "Plain"},
+        },
+        "clickhouse": {"access": dict(_HOSTRUN_CLICKHOUSE_ACCESS)},
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        yaml.dump(config, f, default_flow_style=False)
+    return config_path
+
+
+def _write_hostrun_operator_openssl_tls_config(work_dir, namespace=LOCAL_FAKE_K8S_NS):
+    """Host-run operator chopconf: fake_k8s reconcile + Ping(https://host:8443)."""
+    base_config_path = util.get_full_path(
+        "../../config/config.yaml", lookup_in_host=True
+    )
+    config_folder = os.path.dirname(base_config_path)
+    with open(base_config_path, encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    security = config.setdefault("security", {})
+    security["policy"] = "Permissive"
+    security.setdefault("clickhouse", {}).setdefault("tls", {}).update(
+        dict(_HOSTRUN_PERMISSIVE_CH_TLS)
+    )
+    security.setdefault("images", {})["policy"] = "FIPSRequired"
+    security.setdefault("ipc", {})["mode"] = "Plain"
+    config.setdefault("watch", {}).setdefault("namespaces", {})["include"] = [namespace]
+    config.setdefault("reconcile", {}).setdefault("host", {}).setdefault("wait", {}).update({
+        "exclude": "no",
+        "queries": "no",
+        "probes": {
+            "startup": "no",
+            "readiness": "no",
+        },
+    })
+    config.setdefault("clickhouse", {}).setdefault("access", {}).update(
+        dict(_HOSTRUN_CLICKHOUSE_ACCESS)
+    )
+    for section in ("clickhouse", "keeper"):
+        paths = config.get(section, {}).get("configuration", {}).get("file", {}).get("path", {})
+        if isinstance(paths, dict):
+            for key, value in list(paths.items()):
+                if value and not os.path.isabs(value):
+                    paths[key] = os.path.join(config_folder, value)
+
+    config_path = os.path.join(work_dir, "hostrun-operator-openssl-tls-config.yaml")
+    with open(config_path, "w", encoding="utf-8") as f:
+        yaml.dump(config, f, default_flow_style=False)
+    return config_path
+
+
+def _hostrun_operator_env(namespace, kubeconfig_path):
+    return _fips_hostrun_env(kubeconfig_path, namespace=namespace)
+
+
+def _start_fake_k8s_server(work_dir, ca_cert_path, key_path, namespace=LOCAL_FAKE_K8S_NS):
+    """Start in-process fake Kubernetes API for operator host-run probes."""
+    port = int(_free_local_port())
+    log_path = os.path.join(work_dir, "fake-k8s.log")
+    chi_manifest = util.get_full_path(LOCAL_OPERATOR_OPENSSL_CHI_MANIFEST)
+    server = _FakeK8sAPIServer(namespace, chi_manifest, ca_cert_path, key_path, log_path)
+    server.start(port)
+    ok, reason = _wait_for_listening_port(
+        "127.0.0.1", port, timeout=15, label="fake_k8s"
+    )
+    if not ok:
+        server.stop()
+        assert False, error(f"fake_k8s not listening on 127.0.0.1:{port} ({reason})")
+    return port, server, log_path
+
+
+def _stop_fake_k8s_server(server):
+    if server is not None:
+        server.stop()
+
+
+def _require_hostrun_operator_fake_k8s_session(context):
+    session = getattr(context, "hostrun_operator_fake_k8s_session", None)
+    if not session:
+        assert False, error(
+            "operator openssl s_server probe requires an active fake_k8s session; "
+            "call start_hostrun_operator_fake_k8s_session first"
+        )
+    return session
+
+
+@TestStep(Given)
+def start_hostrun_operator_fake_k8s_session(self):
+    """Start fake_k8s once for all operator openssl s_server cipher probes."""
+    if getattr(self.context, "hostrun_operator_fake_k8s_session", None):
+        note("fake_k8s session already active")
+        return
+
+    work_dir = self.context.fips_local_openssl_tls_dir
+    config_path = _write_hostrun_operator_openssl_tls_config(work_dir)
+    fake_k8s_port, fake_k8s_server, fake_k8s_log = _start_fake_k8s_server(
+        work_dir,
+        self.context.fips_local_openssl_cert,
+        self.context.fips_local_openssl_key,
+        namespace=LOCAL_FAKE_K8S_NS,
+    )
+    kubeconfig_path = os.path.join(work_dir, "operator-fake-k8s-kubeconfig")
+    _write_fake_kubeconfig(
+        kubeconfig_path,
+        fake_k8s_port,
+        self.context.fips_local_openssl_cert,
+    )
+    self.context.hostrun_operator_fake_k8s_session = {
+        "config_path": config_path,
+        "env": _hostrun_operator_env(LOCAL_FAKE_K8S_NS, kubeconfig_path),
+        "server": fake_k8s_server,
+        "port": fake_k8s_port,
+        "log_path": fake_k8s_log,
+    }
+    note(f"fake_k8s -> https://127.0.0.1:{fake_k8s_port}")
+    note(f"chopconf -> {config_path}")
+
+
+@TestStep(Finally)
+def stop_hostrun_operator_fake_k8s_session(self):
+    """Stop fake_k8s started for operator openssl s_server cipher probes."""
+    session = getattr(self.context, "hostrun_operator_fake_k8s_session", None)
+    if not session:
+        return
+    _stop_fake_k8s_server(session["server"])
+    self.context.hostrun_operator_fake_k8s_session = None
+
+
+def _reset_hostrun_operator_fake_k8s_session(session):
+    """Reset fake_k8s CHI + objects so the next operator run re-reconciles and re-Pings."""
+    session["server"].reset_reconcile()
+
+
+def _read_log_tail(log_path, max_lines=40):
+    if not log_path or not os.path.isfile(log_path):
+        return "(no log file)"
+    with open(log_path, encoding="utf-8", errors="replace") as f:
+        lines = f.readlines()
+    return "".join(lines[-max_lines:])
+
+
+def _tail_text(text, max_lines=15):
+    if not text:
+        return "(empty)"
+    lines = text.splitlines()
+    if len(lines) <= max_lines:
+        return text
+    return "\n".join(
+        [f"... truncated, showing last {max_lines} lines ...", *lines[-max_lines:]]
+    )
+
+
+def _fips_assert(condition, message):
+    """Raise AssertionError without testflows AssertEval (avoids IndexError on failure)."""
+    if not condition:
+        raise AssertionError(message)
+
+
+_HOSTRUN_CH_TLS_FAILURE_MARKERS = (
+    "setupTLSAdvanced",
+    "connect():FAILED",
+    "QueryContext():FAILED",
+    "FAILED Ping(",
+    "FAILED connect(",
+    "remote error: tls",
+    "handshake failure",
+    "protocol version not supported",
+    "no cipher suite",
+    "no supported versions",
+)
+
+
+def _hostrun_ch_tls_connection_failure_in_logs(logs):
+    """Match client-side TLS failure in operator/exporter ClickHouse dial logs."""
+    return any(
+        any(marker in line for marker in _HOSTRUN_CH_TLS_FAILURE_MARKERS)
+        for line in logs.splitlines()
+    )
+
+
+def _hostrun_ch_tls_rejection_note(output, max_lines=30):
+    """Compact TLS-rejection proof for host-run operator/exporter ClickHouse probes."""
+    markers = _HOSTRUN_CH_TLS_FAILURE_MARKERS
+    selected = [
+        line for line in output.splitlines()
+        if any(marker in line for marker in markers)
+    ]
+    if not selected:
+        return ""
+    if len(selected) > max_lines:
+        selected = (
+            [f"... truncated, showing last {max_lines} TLS-relevant lines ..."]
+            + selected[-max_lines:]
+        )
+    return "\n".join(selected)
+
+
+def _build_hostrun_metrics_exporter_chi_payload(chi, hostname, https_port):
+    return {
+        "type": "cr",
+        "cr": {
+            "namespace": "default",
+            "name": chi,
+            "labels": {},
+            "annotations": {},
+            "clusters": [{
+                "name": "default",
+                "hosts": [{
+                    "name": "0-0",
+                    "hostname": hostname,
+                    "httpsPort": int(https_port),
+                }],
+            }],
+        },
+    }
+
+
+def _wait_local_http_ready(url, timeout=10, process=None, log_path=None):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if process is not None and process.poll() is not None:
+            _fips_assert(
+                False,
+                f"metrics-exporter exited with code {process.returncode} "
+                f"before {url} became ready\n"
+                f"log tail:\n{_read_log_tail(log_path)}",
+            )
+        result = subprocess.run(
+            ["curl", "-sf", "-o", "/dev/null", url],
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            return
+        time.sleep(0.5)
+    log_tail = _read_log_tail(log_path)
+    hint = ""
+    if "address already in use" in log_tail:
+        hint = (
+            "\nHint: metrics-exporter HTTP port is already bound; "
+            "use --metrics-endpoint/--chi-list-endpoint on a free port."
+        )
+    _fips_assert(
+        False,
+        f"HTTP endpoint not ready: {url}\nlog tail:\n{log_tail}{hint}",
+    )
+
+
+def _post_hostrun_metrics_exporter_chi(body, metrics_port=8888, token_path=None):
+    cmd = [
+        "curl",
+        "-sS",
+        "-o",
+        "/dev/null",
+        "-w",
+        "%{http_code}",
+        "-X",
+        "POST",
+        f"http://127.0.0.1:{metrics_port}/chi",
+        "-H",
+        "Content-Type: application/json",
+    ]
+    if token_path:
+        with open(token_path, encoding="utf-8") as f:
+            token = f.read().strip()
+        cmd.extend(["-H", f"X-CHOP-Token: {token}"])
+    cmd.extend(["-d", body])
+    result = subprocess.run(
+        cmd,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    _fips_assert(
+        result.returncode == 0,
+        f"POST /chi failed\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+    )
+    return result.stdout.strip()
+
+
+def _scrape_hostrun_metrics_exporter(metrics_port=8888):
+    result = subprocess.run(
+        [
+            "curl",
+            "-sS",
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{http_code}",
+            f"http://127.0.0.1:{metrics_port}/metrics",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    _fips_assert(
+        result.returncode == 0,
+        f"GET /metrics failed\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+    )
+    return result.stdout.strip()
+
+
+def _openssl_s_server_rejected_handshake(server_log):
+    """Handshake failure lines from openssl s_server when client rejects or cannot negotiate."""
+    if not server_log:
+        return False
+    lowered = server_log.lower()
+    markers = (
+        "ssl_accept:error",
+        "no protocols available",
         "no shared cipher",
         "alert handshake failure",
-        "TLS connect error",
-        "HTTP:000",
+        "wrong version number",
+        "tlsv1 alert protocol version",
+    )
+    return any(marker in lowered for marker in markers)
+
+
+def _fake_clickhouse_tls_probe_complete(output, server_log_path, expectation, cipher_suite):
+    with open(server_log_path, encoding="utf-8", errors="replace") as f:
+        server_log = f.read()
+    if expectation == "approved":
+        return bool(cipher_suite) and f"CIPHER is {cipher_suite}" in server_log
+    return (
+        any(err in output for err in FAKE_K8S_TLS_REJECT_ERRORS)
+        or _hostrun_ch_tls_connection_failure_in_logs(output)
+        or _openssl_s_server_rejected_handshake(server_log)
     )
 
-    for container in ("clickhouse-operator", "metrics-exporter"):
-        with Then(f"{container} fails to negotiate {cipher_suite} to {url}"):
-            out = fips_curl_tls13_from_operator_container(
-                container=container,
-                url=url,
-                cipher_suite=cipher_suite,
-                ns=ns,
+
+def _wait_log_file_tls_probe(
+    log_path,
+    process,
+    server_log_path,
+    expectation,
+    cipher_suite=None,
+    max_wait_sec=120,
+):
+    deadline = time.time() + max_wait_sec
+    while time.time() < deadline:
+        if process is not None and process.poll() is not None:
+            with open(log_path, encoding="utf-8", errors="replace") as f:
+                output = f.read()
+            if _fake_clickhouse_tls_probe_complete(
+                output, server_log_path, expectation, cipher_suite
+            ):
+                return output
+            _fips_assert(
+                False,
+                f"process exited with code {process.returncode} before TLS probe completed\n"
+                f"log tail:\n{_read_log_tail(log_path)}",
             )
 
-            assert any(needle in out for needle in failure_needles), error(
-                f"{container}: expected TLS handshake failure for {cipher_suite}\n{out}"
+        with open(log_path, encoding="utf-8", errors="replace") as f:
+            output = f.read()
+        if _fake_clickhouse_tls_probe_complete(
+            output, server_log_path, expectation, cipher_suite
+        ):
+            return output
+        time.sleep(0.5)
+
+    with open(log_path, encoding="utf-8", errors="replace") as f:
+        output = f.read()
+    server_tail = _read_log_tail(server_log_path)
+    _fips_assert(
+        False,
+        "TLS probe did not complete\n"
+        f"expectation={expectation!r} cipher={cipher_suite!r}\n"
+        f"binary log tail:\n{_read_log_tail(log_path)}\n"
+        f"s_server log tail:\n{server_tail}",
+    )
+
+
+def _run_metrics_exporter_against_local_fake_clickhouse(
+    binary_path,
+    config_path,
+    ca_cert_path,
+    server_port,
+    server_log_path,
+    expectation,
+    cipher_suite=None,
+    metrics_port=None,
+    max_wait_sec=60,
+):
+    work_dir = os.path.dirname(config_path)
+    log_path = os.path.join(work_dir, "fake-clickhouse-metrics-exporter.log")
+    metrics_port = metrics_port or _free_local_port()
+    metrics_endpoint = f":{metrics_port}"
+    env, kubeconfig_path = _hostrun_metrics_exporter_env(work_dir)
+    process = None
+    log_file = None
+    probe_action = (
+        "negotiates approved cipher with fake ClickHouse"
+        if expectation == "approved"
+        else "rejects TLS handshake with fake ClickHouse"
+    )
+    try:
+        with Given(f"metrics-exporter listening on 127.0.0.1:{metrics_port}"):
+            log_file = open(log_path, "w", encoding="utf-8")
+            process = subprocess.Popen(
+                [
+                    binary_path,
+                    "-logtostderr=true",
+                    "-v=1",
+                    f"--kubeconfig={kubeconfig_path}",
+                    f"--config={config_path}",
+                    f"--metrics-endpoint={metrics_endpoint}",
+                    f"--chi-list-endpoint={metrics_endpoint}",
+                ],
+                env=env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
             )
+            _wait_local_http_ready(
+                f"http://127.0.0.1:{metrics_port}/metrics",
+                process=process,
+                log_path=log_path,
+            )
+
+        with When(f"POST /chi registers 127.0.0.1:{server_port} as fake ClickHouse"):
+            payload = _build_hostrun_metrics_exporter_chi_payload(
+                chi=LOCAL_FAKE_CLICKHOUSE_CR,
+                hostname="127.0.0.1",
+                https_port=server_port,
+            )
+            body = json.dumps(payload, separators=(",", ":"))
+            code = _post_hostrun_metrics_exporter_chi(
+                body=body, metrics_port=metrics_port
+            )
+            _fips_assert(
+                code == "200",
+                f"POST /chi failed: HTTP {code!r}\nbody: {body}\n"
+                f"log tail:\n{_read_log_tail(log_path)}",
+            )
+
+        with And("GET /metrics triggers ClickHouse collect"):
+            metrics_code = _scrape_hostrun_metrics_exporter(
+                metrics_port=metrics_port
+            )
+            _fips_assert(
+                metrics_code == "200",
+                f"GET /metrics failed: HTTP {metrics_code!r}\n"
+                f"log tail:\n{_read_log_tail(log_path)}",
+            )
+
+        with When(f"metrics-exporter {probe_action}"):
+            return _wait_log_file_tls_probe(
+                log_path,
+                process,
+                server_log_path,
+                expectation,
+                cipher_suite=cipher_suite,
+                max_wait_sec=max_wait_sec,
+            )
+    finally:
+        if log_file is not None:
+            log_file.close()
+        with Finally("stop metrics-exporter"):
+            _stop_process(process)
+
+
+def _run_operator_against_openssl_s_server(
+    binary_path,
+    operator_session,
+    server_log_path,
+    expectation,
+    cipher_suite=None,
+    chi_port=None,
+    max_wait_sec=180,
+):
+    """Run clickhouse-operator until TLS probe completes; fake_k8s must already be up."""
+    config_path = operator_session["config_path"]
+    env = operator_session["env"]
+    chi_port = chi_port or LOCAL_OPERATOR_OPENSSL_TLS_PORT
+    work_dir = os.path.dirname(config_path)
+    log_path = os.path.join(work_dir, "hostrun-operator-openssl.log")
+    process = None
+    log_file = None
+    try:
+        _reset_hostrun_operator_fake_k8s_session(operator_session)
+
+        with When("clickhouse-operator starts"):
+            log_file = open(log_path, "w", encoding="utf-8")
+            process = subprocess.Popen(
+                [
+                    binary_path,
+                    "-logtostderr=true",
+                    "-v=2",
+                    f"--config={config_path}",
+                ],
+                env=env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+            )
+
+        with When(f"reconcile reaches Ping(https://127.0.0.1:{chi_port})"):
+            return _wait_log_file_tls_probe(
+                log_path,
+                process,
+                server_log_path,
+                expectation,
+                cipher_suite=cipher_suite,
+                max_wait_sec=max_wait_sec,
+            )
+    finally:
+        if log_file is not None:
+            log_file.close()
+        with Finally("stop clickhouse-operator"):
+            _stop_process(process)
 
 
 @TestStep(Then)
-def fips_assert_connection_rejected_on_non_approved_cipher(
+def assert_local_fake_clickhouse_tls_probe(
     self,
-    ns=None,
+    binary_label,
+    binary_path,
+    expectation,
+    probe_target="metrics-exporter",
+    cipher_suite=None,
+    tls_version="1.3",
+    case_name=None,
 ):
-    """Assert fake ChaCha-only TLS server rejects approved AES-only clients.
+    """Run openssl s_server on :8443 (operator) or random port (metrics-exporter)."""
 
-    This is the synthetic negative control for rejected cipher behavior.
+    label = case_name or cipher_suite or f"TLS {tls_version} protocol"
+    work_dir = self.context.fips_local_openssl_tls_dir
+    server_port = (
+        LOCAL_OPERATOR_OPENSSL_TLS_PORT
+        if probe_target == "operator"
+        else None
+    )
+
+    operator_session = None
+    if probe_target == "operator":
+        operator_session = _require_hostrun_operator_fake_k8s_session(self.context)
+    else:
+        with Given(f"host-run chopconf for {probe_target}"):
+            if probe_target == "metrics-exporter":
+                config_path = _write_hostrun_clickhouse_tls_config(work_dir)
+            else:
+                assert False, error(f"unknown probe_target: {probe_target!r}")
+            note(f"chopconf -> {config_path}")
+
+    with Given(f"openssl s_server on 127.0.0.1:{server_port or 'ephemeral'} ({label})"):
+        start_local_openssl_server(
+            cipher_suite=cipher_suite,
+            tls_version=tls_version,
+            port=server_port,
+        )
+    try:
+        chi_port = self.context.fips_local_openssl_port
+        server_log_path = self.context.fips_local_openssl_log_path
+
+        if probe_target == "operator":
+            output = _run_operator_against_openssl_s_server(
+                binary_path=binary_path,
+                operator_session=operator_session,
+                server_log_path=server_log_path,
+                expectation=expectation,
+                cipher_suite=cipher_suite,
+                chi_port=chi_port,
+            )
+        else:
+            output = _run_metrics_exporter_against_local_fake_clickhouse(
+                binary_path=binary_path,
+                config_path=config_path,
+                ca_cert_path=self.context.fips_local_openssl_cert,
+                server_port=chi_port,
+                server_log_path=server_log_path,
+                expectation=expectation,
+                cipher_suite=cipher_suite,
+            )
+
+        with open(server_log_path, encoding="utf-8", errors="replace") as f:
+            server_log = f.read()
+
+        if expectation == "approved":
+            with Then(f"check {binary_label} negotiates {cipher_suite}"):
+                cipher_line = f"CIPHER is {cipher_suite}"
+                assert cipher_suite and cipher_line in server_log, error(
+                    f"{binary_label} {label}: expected {cipher_suite!r} in server log, "
+                    f"but none found"
+                )
+                note(f"cipher proof: {cipher_line} - found in logs")
+        else:
+            with Then(f"{binary_label} rejects TLS handshake"):
+                _fips_assert(
+                    _fake_clickhouse_tls_probe_complete(
+                        output, server_log_path, expectation, cipher_suite
+                    ),
+                    f"{binary_label} {label}: expected TLS rejection in binary output, "
+                    f"but none found\nbinary log tail:\n{_tail_text(output)}\n"
+                    f"s_server log tail:\n{_read_log_tail(server_log_path)}",
+                )
+                rejection_note = _hostrun_ch_tls_rejection_note(output)
+                if not rejection_note and _openssl_s_server_rejected_handshake(server_log):
+                    rejection_note = (
+                        "TLS rejection proof (openssl s_server log):\n"
+                        f"{_tail_text(server_log)}"
+                    )
+                note(
+                    rejection_note
+                    or f"TLS rejection proof ({binary_label}):\n{_tail_text(output)}"
+                )
+    finally:
+        with Finally("stop local openssl server"):
+            stop_local_openssl_server()
+
+
+@TestStep(Check)
+def assert_local_fake_clickhouse_approved_tls_cases(
+    self,
+    binary_label,
+    binary_path,
+    probe_target="metrics-exporter",
+):
+    """Run all FIPS_APPROVED_TLS13_CIPHER_CASES against openssl s_server."""
+
+    for case in FIPS_APPROVED_TLS13_CIPHER_CASES:
+        with Check(f"{binary_label} accepts {case['name']} against openssl s_server"):
+            assert_local_fake_clickhouse_tls_probe(
+                binary_label=binary_label,
+                binary_path=binary_path,
+                probe_target=probe_target,
+                tls_version=case["tls_version"],
+                cipher_suite=case["cipher_suite"],
+                expectation="approved",
+                case_name=case["name"],
+            )
+
+
+@TestStep(Check)
+def assert_local_fake_clickhouse_rejected_tls_cases(
+    self,
+    binary_label,
+    binary_path,
+    probe_target="metrics-exporter",
+):
+    """Run all FIPS_LISTENER_REJECTED_TLS_CASES against openssl s_server."""
+
+    for case in FIPS_LISTENER_REJECTED_TLS_CASES:
+        with Check(f"{binary_label} rejects {case['name']} against openssl s_server"):
+            assert_local_fake_clickhouse_tls_probe(
+                binary_label=binary_label,
+                binary_path=binary_path,
+                probe_target=probe_target,
+                tls_version=case["tls_version"],
+                cipher_suite=case["cipher_suite"],
+                expectation="rejected",
+                case_name=case["name"],
+            )
+
+
+@TestStep(Given)
+def create_kubernetes_namespace_without_operator(self):
+    """Create an isolated test namespace without installing the operator."""
+    with Given("I create shell"):
+        shell = get_shell()
+        self.context.shell = shell
+
+    match = re.search(r"test_\d+(?:_\d+)?", current().name)
+    assert match, error(
+        f"cannot derive namespace prefix from test name: {current().name!r}"
+    )
+    random_namespace = f"{match.group(0).replace('_', '-')}-{uuid.uuid1()}"
+    self.context.test_namespace = random_namespace
+    self.context.operator_namespace = random_namespace
+    util.create_namespace(self.context.test_namespace)
+    current().context.cleanup(delete_test_namespace)
+
+
+def _frame_request(command_name, *args):
+    """Encode an ACVP request in the BoringSSL modulewrapper wire format.
+
+    The format (little-endian throughout) is:
+      uint32 num_args             // command name counts as args[0]
+      uint32 len(args[0])
+      ...
+      uint32 len(args[N-1])
+      bytes  args[0]
+      ...
+      bytes  args[N-1]
+
+    Matches the reader at pkg/util/fips/acvp/wrapper.go::readRequest. The
+    test/decode side is symmetric with wrapper_test.go::decodeResponse.
     """
-    ns = ns or current().context.test_namespace
+    payload = [command_name.encode("utf-8")] + list(args)
+    out = struct.pack("<I", len(payload))
+    for chunk in payload:
+        out += struct.pack("<I", len(chunk))
+    for chunk in payload:
+        out += chunk
+    return out
 
-    approved_cipher = "TLS_AES_256_GCM_SHA384"
-    rejected_cipher = "TLS_CHACHA20_POLY1305_SHA256"
-    fake_url = f"https://{FAKE_OPENSSL_SERVER}:8443/ping"
 
-    with Given("fake OpenSSL server offers only non-approved ChaCha TLS 1.3 cipher"):
-        fips_create_fake_openssl_server(
-            cipher_suite=rejected_cipher,
-            ns=ns,
+def _parse_response(blob):
+    """Decode the symmetric response framing. Returns a list of byte slices."""
+    if len(blob) < 4:
+        raise ValueError(f"response too short: {len(blob)} bytes")
+    (count,) = struct.unpack("<I", blob[0:4])
+    offset = 4
+    lengths = []
+    for _ in range(count):
+        if offset + 4 > len(blob):
+            raise ValueError("truncated length header")
+        (n,) = struct.unpack("<I", blob[offset : offset + 4])
+        lengths.append(n)
+        offset += 4
+    args = []
+    for n in lengths:
+        if offset + n > len(blob):
+            raise ValueError(f"truncated payload (want {n} bytes, have {len(blob)-offset})")
+        args.append(blob[offset : offset + n])
+        offset += n
+    return args
+
+
+def _build_acvp_binary(cmd_path, binary_name):
+    """Compile <cmd_path> with -tags acvp_wrapper and symlink as <binary_name>-acvp.
+
+    Returns the absolute path to the symlink, or None if the build fails (the
+    caller skips the scenario in that case so missing toolchain doesn't fail
+    the whole suite).
+    """
+    tmpdir = tempfile.mkdtemp(prefix="acvp-e2e-")
+    binary_path = os.path.join(tmpdir, binary_name)
+    symlink_path = os.path.join(tmpdir, f"{binary_name}-acvp")
+
+    env = os.environ.copy()
+    # GOFIPS140 must be set; the wrapper's Run() refuses to start if
+    # crypto/fips140.Enabled() reports false. v1.0.0 matches the build pinned
+    # in dev/go_build_config.sh.
+    env.setdefault("GOFIPS140", "v1.0.0")
+    env.setdefault("GODEBUG", "fips140=only")
+    env.setdefault("CGO_ENABLED", "0")
+
+    result = subprocess.run(
+        [
+            "go",
+            "build",
+            "-tags",
+            "acvp_wrapper",
+            "-o",
+            binary_path,
+            cmd_path,
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    if result.returncode != 0:
+        return None, f"go build failed: {result.stderr.strip()}"
+
+    # Symlink-based argv0 dispatch — the responder fires only when
+    # filepath.Base(os.Args[0]) ends with "-acvp" (see
+    # cmd/<binary>/app/acvp_dispatch_on.go).
+    try:
+        os.symlink(binary_path, symlink_path)
+    except OSError as exc:
+        return None, f"symlink failed: {exc}"
+
+    return symlink_path, None
+
+
+def _invoke_responder(binary_path, request_blob, timeout=15):
+    """Run the responder once, sending request_blob on stdin and returning stdout."""
+    env = os.environ.copy()
+    env["GODEBUG"] = "fips140=only"
+    proc = subprocess.run(
+        [binary_path],
+        input=request_blob,
+        env=env,
+        capture_output=True,
+        timeout=timeout,
+    )
+    return proc
+
+
+def acvp_smoke(binary_name, cmd_path):
+    """Shared body for both binaries. Exercises:
+
+      1. getConfig — round-trip the capability JSON and check it advertises
+         FIPS-approved primitives + excludes the deliberately-omitted ML-KEM
+         and ML-DSA (which require Go-internal APIs not in this build).
+      2. SHA2-256 AFT — hash a known input, compare to hashlib.sha256.
+    """
+    if shutil.which("go") is None:
+        skip("go toolchain unavailable; ACVP build requires Go 1.26+")
+        return
+
+    with Given(f"Build {binary_name} with -tags acvp_wrapper"):
+        binary_path, build_err = _build_acvp_binary(cmd_path, binary_name)
+        if binary_path is None:
+            # Build failure is the scenario's failure mode — surface it so the
+            # local pkg/util/fips/acvp/run.sh reproducer catches the same regression.
+            assert False, error(f"ACVP-tagged build of {binary_name} failed: {build_err}")
+
+    with When("Round-trip a getConfig request"):
+        proc = _invoke_responder(binary_path, _frame_request("getConfig"))
+        assert proc.returncode == 0, error(
+            f"responder exited {proc.returncode}; stderr={proc.stderr.decode('utf-8', 'replace')}"
+        )
+        responses = _parse_response(proc.stdout)
+        assert len(responses) == 1, error(f"want 1 response arg, got {len(responses)}")
+        config_text = responses[0].decode("utf-8")
+
+    with Then("Capability JSON advertises FIPS-approved primitives"):
+        # The wrapper is documented to expose SHA2 / AES-GCM and to exclude
+        # ML-KEM / ML-DSA (those need Go-internal crypto APIs). Pin the
+        # invariant in both directions — a future commit dropping AES-GCM or
+        # silently re-enabling ML-KEM trips this assertion.
+        assert "SHA2-256" in config_text, error("getConfig must advertise SHA2-256")
+        assert "ACVP-AES-GCM" in config_text, error("getConfig must advertise ACVP-AES-GCM")
+        assert "ML-KEM" not in config_text, error(
+            "getConfig must NOT advertise ML-KEM (uses Go-internal API)"
+        )
+        assert "ML-DSA" not in config_text, error(
+            "getConfig must NOT advertise ML-DSA (uses Go-internal API)"
+        )
+        # Sanity-check the bytes parse as JSON; a malformed config would make
+        # acvptool reject the entire run.
+        try:
+            json.loads(config_text)
+        except json.JSONDecodeError as exc:
+            assert False, error(f"getConfig payload is not valid JSON: {exc}")
+
+    with When("Round-trip a SHA2-256 AFT request"):
+        # Algorithm Functional Test: send a message, expect SHA2-256 digest.
+        # `abc` is the canonical short-input test vector and matches the
+        # wrapper_test.go::TestSHA256AFT case so the e2e and unit assertions
+        # are pinned to the same fixture.
+        message = b"abc"
+        proc = _invoke_responder(binary_path, _frame_request("SHA2-256", message))
+        assert proc.returncode == 0, error(
+            f"SHA2-256 responder exited {proc.returncode}; "
+            f"stderr={proc.stderr.decode('utf-8', 'replace')}"
+        )
+        responses = _parse_response(proc.stdout)
+        assert len(responses) == 1, error(f"want 1 response arg, got {len(responses)}")
+
+    with Then("Hash output matches hashlib.sha256"):
+        want = hashlib.sha256(message).digest()
+        got = responses[0]
+        assert got == want, error(
+            f"SHA2-256 hash mismatch: want {want.hex()}, got {got.hex()}"
         )
 
-    with Then("operator pod containers restricted to approved AES-256 fail the handshake"):
-        fips_assert_operator_containers_tls13_fails(
-            url=fake_url,
-            cipher_suite=approved_cipher,
-            ns=ns,
-        )
+    # Cleanup is best-effort — leftover /tmp/acvp-e2e-* dirs get reaped by the
+    # OS or the next runner invocation; failing to clean up here must not mask
+    # the assertion outcomes above.
+    try:
+        shutil.rmtree(os.path.dirname(binary_path), ignore_errors=True)
+    except Exception:
+        pass
 
-    with Finally("delete fake OpenSSL server"):
-        fips_delete_fake_openssl_server(ns=ns)

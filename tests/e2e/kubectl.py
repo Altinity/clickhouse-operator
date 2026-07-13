@@ -111,10 +111,11 @@ def run_shell(cmd, timeout=600, ok_to_fail=False, shell=None, retry_transient=Fa
         assert code == 0, error()
 
 
-def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None):
+def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None, wait=True):
     with When(f"Delete {kind} {name}"):
+        wait_flag = "" if wait else "--wait=false"
         launch(
-            f"delete {kind} {name} -v 5 --now --timeout=600s",
+            f"delete {kind} {name} -v 5 --now --timeout=600s {wait_flag}".strip(),
             ns=ns,
             timeout=600,
             ok_to_fail=ok_to_fail,
@@ -233,7 +234,7 @@ def delete_all(kind, ns=None):
                 # OR mid-restart — e.g. chopconf onChange=restart in test_030008)
                 # makes `kubectl delete --timeout` exit non-zero; we recover via
                 # the force-clear loop below, so this must not raise here.
-                delete_kind(kind, name, ns=ns, ok_to_fail=True)
+                delete_kind(kind, name, ns=ns, ok_to_fail=True, wait=False)
                 # Stuck/re-attached finalizer recovery. The operator can RE-ATTACH
                 # a finalizer after a clear while it is restarting, so a single
                 # wait_object would race the restart and raise. Re-clear + re-delete
@@ -244,7 +245,7 @@ def delete_all(kind, ns=None):
                     if get_count(kind, name=name, ns=ns) == 0:
                         break
                     force_clear_finalizers(kind, name, ns=ns)
-                    delete_kind(kind, name, ns=ns, ok_to_fail=True)
+                    delete_kind(kind, name, ns=ns, ok_to_fail=True, wait=False)
                     # Only sleep if another re-check follows; skip on the last
                     # attempt so a genuinely-stuck CR hits the final wait_object
                     # (the authoritative leak assertion) without an extra wait.
