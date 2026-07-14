@@ -254,7 +254,7 @@ def test(self):
         self.context.test_namespace = "test"
         self.context.operator_namespace = "test"
         # Metrics-exporter functional suite is not a FIPS test — its FIPS posture is
-        # covered by test_acvp. Skip the global GODEBUG=fips140=only override so the
+        # covered by the ACVP scenarios test_030018/test_030019. Skip the global GODEBUG=fips140=only override so the
         # operator/exporter deployment is not forced into strict FIPS mode here.
         self.context.skip_fips = True
     with Given("I create shell"):
