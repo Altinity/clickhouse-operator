@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Python 3.8: postpone annotation evaluation so PEP-604 unions (X | None) and
+# PEP-585 builtin generics (list[dict]) in this file don't fail at import time.
+from __future__ import annotations
+
 import copy
 import json
 import os
@@ -59,9 +63,35 @@ TLS_REJECT_MARKERS = (
     "no peer certificate available",
 )
 
+# Server-originated evidence read BACK from the peer. A client-side local refusal
+# (OpenSSL 3.x / hardened openssl.cnf MinProtocol floor) never sends a ClientHello
+# and cannot produce these.
+TLS_SERVER_REJECT_MARKERS = (
+    "sslv3 alert",
+    "tlsv1 alert",
+    "alert handshake failure",
+    "alert protocol version",
+    "no shared cipher",
+    "ssl alert number",
+)
+
 approved_tls1_3_ciphers = [
     "TLS_AES_256_GCM_SHA384",
     "TLS_AES_128_GCM_SHA256",
+]
+# TLS 1.2 suites permitted by Go's native FIPS 140-3 module
+# (crypto/tls/defaults_fips140.go `allowedCipherSuitesFIPS`, the set clickhouse-backup's
+# GOFIPS140=v1.0.0 build negotiates). OpenSSL names for the six Go suites; a Go-FIPS
+# server offers only these at TLS 1.2, so they are ACCEPTED, not rejected. Kept separate
+# from approved_tls1_3_ciphers because only clickhouse-backup (Go, MinVersion 1.2) uses
+# them -- the OpenSSL-backed ClickHouse/Keeper listeners are pinned to TLS 1.3.
+approved_tls1_2_ciphers = [
+    "ECDHE-RSA-AES128-GCM-SHA256",
+    "ECDHE-RSA-AES256-GCM-SHA384",
+    "ECDHE-ECDSA-AES128-GCM-SHA256",
+    "ECDHE-ECDSA-AES256-GCM-SHA384",
+    "ECDHE-RSA-AES128-SHA256",
+    "ECDHE-ECDSA-AES128-SHA256",
 ]
 ciphers_by_protocol = {
     "TLSv1.3": [
@@ -220,6 +250,21 @@ def fips_rejected_cipher_cases_from_ciphers_by_protocol():
 FIPS_LISTENER_REJECTED_TLS_CASES = (
     *FIPS_REJECTED_PROTOCOL_CASES,
     *fips_rejected_cipher_cases_from_ciphers_by_protocol(),
+)
+
+# clickhouse-backup's Go FIPS runtime pins ciphers but keeps stdlib default
+# MinVersion (TLS 1.2), so at TLS 1.2 it ACCEPTS any FIPS-approved suite it can
+# negotiate: bare `-tls1_2` (default → an approved suite) and any explicit cipher
+# in approved_tls1_2_ciphers (the RSA server cert negotiates the ECDHE-RSA ones;
+# the ECDHE-ECDSA ones fail as "no shared cipher" but are excluded too so the sweep
+# stays cert-agnostic). Every non-approved 1.2 cipher and all legacy protocols
+# (1.0/1.1) stay in the rejected set.
+FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES = tuple(
+    case for case in FIPS_LISTENER_REJECTED_TLS_CASES
+    if not (
+        case["tls_version"] == "1.2"
+        and (case["cipher_suite"] is None or case["cipher_suite"] in approved_tls1_2_ciphers)
+    )
 )
 
 FIPS_APPROVED_TLS13_CIPHER_CASES = tuple(
@@ -1134,6 +1179,19 @@ def openssl_tls_version_args(tls_version):
 
 
 def openssl_cipher_args(tls_version, cipher_suite):
+    # TLS 1.0/1.1 cipher suites are all SHA1/RSA-based and sit below the host
+    # openssl's default SECLEVEL=2 floor, so s_server has no cipher it is allowed
+    # to offer and aborts the handshake with an internal_error alert (SSL alert 80)
+    # instead of the expected protocol_version alert (SSL alert 70). A min-1.3
+    # client (the Go FIPS client under test) then sees `remote error: tls: internal
+    # error`, which is NOT a rejection marker -> false FAIL. Drop to SECLEVEL=0 for
+    # the legacy protocols so the server genuinely offers TLS 1.0/1.1: the min-1.3
+    # client now gets the clean `protocol version not supported` alert (already a
+    # marker), while a peer that wrongly ACCEPTED the legacy protocol would complete
+    # the handshake -- so this preserves the rejection assertion with no false pass.
+    if tls_version in ("1.0", "1.1"):
+        return ["-cipher", f"{cipher_suite or 'DEFAULT'}@SECLEVEL=0"]
+
     if not cipher_suite:
         return []
 
@@ -1281,15 +1339,28 @@ def fips_assert_rejected_tls_cases_on_endpoint(
                 f"output:\n{output}"
             )
 
-            assert any(
-                marker.lower() in output_lower
-                for marker in TLS_REJECT_MARKERS
-            ), error(
-                f"{label} {pod}:{port}: expected TLS rejection for {case['name']}\n"
-                f"tls_version={case['tls_version']}\n"
-                f"cipher_suite={case['cipher_suite']}\n"
-                f"output:\n{output}"
-            )
+            if case["tls_version"] in ("1.0", "1.1"):
+                # Downgrade cases: host openssl may refuse the legacy protocol
+                # LOCALLY and never contact the server -> a client-side refusal
+                # must NOT count as a pass. Require a SERVER-originated alert;
+                # else skip (an actually-accepting server is already caught above
+                # by the negotiated_cipher assert).
+                if not any(m in output_lower for m in TLS_SERVER_REJECT_MARKERS):
+                    skip(
+                        f"{label} {pod}:{port}: no server-side rejection alert for "
+                        f"{case['name']} - host openssl likely refused locally "
+                        f"(no ClientHello reached the server)\noutput:\n{output}"
+                    )
+            else:
+                assert any(
+                    marker.lower() in output_lower
+                    for marker in TLS_REJECT_MARKERS
+                ), error(
+                    f"{label} {pod}:{port}: expected TLS rejection for {case['name']}\n"
+                    f"tls_version={case['tls_version']}\n"
+                    f"cipher_suite={case['cipher_suite']}\n"
+                    f"output:\n{output}"
+                )
 
 
 @TestStep(Check)
@@ -1301,21 +1372,21 @@ def fips_assert_all_rejected_tls_cases_on_all_endpoints(
 ):
     """Assert all rejected TLS cases fail on every FIPS TLS endpoint."""
     ns = ns or self.context.test_namespace
-    rejected_cases = FIPS_LISTENER_REJECTED_TLS_CASES
 
     endpoints = (
-        ("ClickHouse HTTPS", chi_pods[0], 8443),
-        ("ClickHouse native TLS", chi_pods[0], 9440),
-        ("ClickHouse interserver HTTPS", chi_pods[0], 9010),
-        ("Keeper secure client", chk_pods[0], 2281),
+        ("ClickHouse HTTPS", chi_pods[0], 8443, FIPS_LISTENER_REJECTED_TLS_CASES),
+        ("ClickHouse native TLS", chi_pods[0], 9440, FIPS_LISTENER_REJECTED_TLS_CASES),
+        ("ClickHouse interserver HTTPS", chi_pods[0], 9010, FIPS_LISTENER_REJECTED_TLS_CASES),
+        ("Keeper secure client", chk_pods[0], 2281, FIPS_LISTENER_REJECTED_TLS_CASES),
+        ("Backup API HTTPS", chi_pods[0], 7171, FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES),
     )
 
-    for label, pod, port in endpoints:
+    for label, pod, port, endpoint_rejected_cases in endpoints:
         fips_assert_rejected_tls_cases_on_endpoint(
             label=label,
             pod=pod,
             port=port,
-            rejected_cases=rejected_cases,
+            rejected_cases=endpoint_rejected_cases,
             ns=ns,
         )
 
@@ -2060,7 +2131,8 @@ def _chi_host_name_from_pod(pod, chi):
     prefix = f"chi-{chi}-default-"
     if pod.startswith(prefix) and pod.endswith("-0"):
         return pod[len(prefix):-2]
-    return pod.removeprefix(f"chi-{chi}-default-")
+    # str.removeprefix is 3.9+; this repo runs Python 3.8.
+    return pod[len(prefix):] if pod.startswith(prefix) else pod
 
 
 def _build_metrics_exporter_chi_payload(chi, ns, pods, https_port=8443):
@@ -3027,8 +3099,9 @@ def assert_local_fake_k8s_rejected_tls_cases(
     """Run all FIPS_LISTENER_REJECTED_TLS_CASES against the local fake API."""
 
     for case in FIPS_LISTENER_REJECTED_TLS_CASES:
-        # Operator K8s client min TLS is 1.3; 1.2 probes are not meaningful yet.
-        if case["tls_version"] == "1.2":
+        # Operator K8s client min TLS is 1.3 (PR #2020). Skip 1.2 *cipher* cases,
+        # but keep the single 1.2 *protocol* case as a live negative probe.
+        if case["tls_version"] == "1.2" and case["cipher_suite"] is not None:
             continue
         with Check(f"{binary_label} rejects {case['name']} against local fake k8s API"):
             assert_local_fake_k8s_tls_probe(

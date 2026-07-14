@@ -9268,11 +9268,12 @@ def test_030016(self):
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Operator_ConfigGeneration("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Operator_SHA2256AFT("1.0"),
 )
+@Tags("NO_PARALLEL")
 def test_030018(self):
     """Build operator with -tags acvp_wrapper and verify the embedded ACVP
     responder answers getConfig + SHA2-256 AFT correctly.
 
-    Companion to test_acvp_metrics_exporter — both binaries embed the same
+    Companion to test_030019 — both binaries embed the same
     pkg/util/fips/acvp package under the build tag, so we run each independently
     to confirm the argv0 dispatch fires in each binary's main path.
     """
@@ -9286,8 +9287,9 @@ def test_030018(self):
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Exporter_ConfigGeneration("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_ACVP_Exporter_SHA2256AFT("1.0"),
 )
+@Tags("NO_PARALLEL")
 def test_030019(self):
-    """Mirror of test_030019 for the metrics-exporter binary. Both
+    """Mirror of test_030018 for the metrics-exporter binary. Both
     binaries ship the same FIPS module statically linked; this scenario
     confirms metrics-exporter's argv0 dispatch is wired identically so a
     regression in either binary's main path is caught.

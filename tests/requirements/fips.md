@@ -87,8 +87,8 @@ The goal is to verify that FIPS-enabled builds of the operator and metrics-expor
 - Use FIPS-compliant TLS for all outbound connections
 
 Autotests that trace to these requirements live in
-[`tests/e2e/test_operator.py`](../e2e/test_operator.py) and
-[`tests/e2e/test_acvp.py`](../e2e/test_acvp.py).
+[`tests/e2e/test_operator.py`](../e2e/test_operator.py) (ACVP responder smokes
+run there as test_030018/test_030019).
 
 **Boundary:** The operator and metrics-exporter run in the same pod. Internal IPC between
 them is localhost HTTP and is not subject to FIPS TLS requirements. The Prometheus metrics
