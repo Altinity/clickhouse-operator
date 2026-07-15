@@ -3955,7 +3955,7 @@ spec:
                       items:
                         type: string
                       description: |
-                        List of regexps to match ClickHouse metrics to exclude from export.
+                        List of regexps to match ClickHouse metrics to exclude from collection/export.
                         Regexps match internal metric names before Prometheus normalization and prefixing.
             security:
               type: object
@@ -6150,7 +6150,7 @@ data:
         # Multiple tables can be matched using regexp. Matched tables are merged using merge() table function.
         # Default is "^(metrics|custom_metrics)$" which fetches from both system.metrics and system.custom_metrics.
         tablesRegexp: "^(metrics|custom_metrics)$"
-        # List of regexps to match ClickHouse metrics to exclude from export.
+        # List of regexps to match ClickHouse metrics to exclude from collection/export.
         # Regexps match internal metric names before Prometheus normalization and prefixing.
         # Default is the per-CPU OS metrics filter shown below; set to [] to disable.
         excludeRegexp:

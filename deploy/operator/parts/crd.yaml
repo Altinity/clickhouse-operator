@@ -8525,7 +8525,7 @@ spec:
                           items:
                             type: string
                           description: |
-                            List of regexps to match ClickHouse metrics to exclude from export.
+                            List of regexps to match ClickHouse metrics to exclude from collection/export.
                             Regexps match internal metric names before Prometheus normalization and prefixing.
                 security:
                   type: object
