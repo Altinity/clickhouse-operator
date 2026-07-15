@@ -200,8 +200,15 @@ func (f *MetricsFetcher) getClickHouseQueryMetrics(ctx context.Context) (Table, 
 	)
 }
 
+// appendMetricRow adds a scanned system-metrics row to the buffer, dropping excluded
+// names first. This is a memory pre-filter on the highest-cardinality fetch path (the
+// system.metrics/asynchronous_metrics UNION, whose per-CPU OS series scale with core
+// count) so excluded rows never enter the in-memory Table. Names synthesized by the
+// other query paths (parts, mutations, disks, replicas) never reach this scan, so the
+// writer-side filter stays authoritative for those; where both paths see a name the
+// filter is identical, so re-checking writer-side is idempotent.
 func (f *MetricsFetcher) appendMetricRow(data *Table, metric, value, description, _type string) {
-	if f.metricsFilter != nil && f.metricsFilter.IsExcluded(metric) {
+	if IsExcluded(f.metricsFilter, metric) {
 		return
 	}
 	*data = append(*data, []string{metric, value, description, _type})
