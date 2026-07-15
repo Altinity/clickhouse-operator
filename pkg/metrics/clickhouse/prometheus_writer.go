@@ -263,9 +263,11 @@ func (w *CHIPrometheusWriter) writeSingleMetricToPrometheus(
 	value string,
 	metricLabels map[string]string,
 ) {
-	// Nil-guard: a writer constructed via struct literal without setting metricsFilter
-	// would panic on dispatch; treat nil interface as "no exclusions" (no-op filter).
-	if (w.metricsFilter != nil) && w.metricsFilter.IsExcluded(name) {
+	// Writer-side filter is authoritative for metric names synthesized outside the
+	// metrics scan (table parts, mutations, disks, replicas) — these never reach
+	// appendMetricRow. Names that do flow through the scan are already filtered
+	// fetch-side; re-checking here is idempotent. See appendMetricRow.
+	if IsExcluded(w.metricsFilter, name) {
 		return
 	}
 
