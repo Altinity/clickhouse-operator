@@ -139,8 +139,12 @@ Arguments (list): root context, configs.files, watchNamespaces list
 {{- $files := deepCopy (index . 1) -}}
 {{- $watchNamespaces := index . 2 -}}
 {{- if $watchNamespaces -}}
-  {{- $namespaces := index (index (index $files "config.yaml") "watch") "namespaces" -}}
-  {{- $_ := set $namespaces "include" $watchNamespaces -}}
+  {{- $namespaces := dig "watch" "namespaces" "" (index $files "config.yaml") -}}
+  {{- if kindIs "map" $namespaces -}}
+    {{- $_ := set $namespaces "include" $watchNamespaces -}}
+  {{- else -}}
+    {{- fail "watchNamespaces is set but configs.files.\"config.yaml\".watch.namespaces is missing or null; cannot apply the namespace filter" -}}
+  {{- end -}}
 {{- end -}}
 {{- include "altinity-clickhouse-operator.configmap-data" (list $root $files) -}}
 {{- end -}}

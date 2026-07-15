@@ -271,6 +271,17 @@ function update_configmap_resource() {
   local data
   data=$(yq e '.data' "${file}")
   
+  local name_suffix="${name/etc-clickhouse-operator-/}"
+  local name_suffix="${name_suffix/etc-keeper-operator-/keeper-}"
+  local camel_cased_name
+  camel_cased_name=$(to_camel_case "${name_suffix}")
+
+  # The operator config ConfigMap gets special handling: fullname substitution,
+  # config.yaml block-scalar → map conversion (so the configmap-files helper can
+  # patch the nested watch.namespaces.include), and the configmap-files helper
+  # (which wires in the top-level watchNamespaces value). Every other ConfigMap
+  # uses the generic configmap-data helper.
+  local data_helper
   if [ "${name}" = "etc-clickhouse-operator-files" ]; then
     local search='name: "clickhouse-operator"'
     local replace="name: '{{ include \"altinity-clickhouse-operator.fullname\" . }}'"
@@ -279,25 +290,17 @@ function update_configmap_resource() {
     search='config.yaml: |'
     replace='config.yaml:'
     data=${data/"${search}"/"${replace}"}
-  fi
 
-  local name_suffix="${name/etc-clickhouse-operator-/}"
-  local name_suffix="${name_suffix/etc-keeper-operator-/keeper-}"
-  local camel_cased_name
-  camel_cased_name=$(to_camel_case "${name_suffix}")
+    data_helper='{{ include "altinity-clickhouse-operator.configmap-files" (list . .Values.configs.files .Values.watchNamespaces) | nindent 2 }}'
+  else
+    data_helper='{{ include "altinity-clickhouse-operator.configmap-data" (list . .Values.configs.'"${camel_cased_name}"') | nindent 2 }}'
+  fi
 
   yq e -i '.metadata.name |= "{{ printf \"%s-'"${name_suffix}"'\" (include \"altinity-clickhouse-operator.fullname\" .) }}"' "${file}"
   yq e -i '.metadata.namespace |= "{{ include \"altinity-clickhouse-operator.namespace\" . }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
   yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
-  if [ "${name}" = "etc-clickhouse-operator-files" ]; then
-    # The operator config ConfigMap needs watchNamespaces wired in. Use the
-    # configmap-files helper (which patches watch.namespaces.include from the
-    # top-level watchNamespaces value) instead of the generic configmap-data.
-    yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-files\" (list . .Values.configs.files .Values.watchNamespaces) | nindent 2 }}"' "${file}"
-  else
-    yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${camel_cased_name}"') | nindent 2 }}"' "${file}"
-  fi
+  data_helper="${data_helper}" yq e -i '.data |= strenv(data_helper)' "${file}"
 
   if [ -z "${data}" ]; then
     yq e -i '.configs.'"${camel_cased_name}"' |= null' "${values_yaml}"

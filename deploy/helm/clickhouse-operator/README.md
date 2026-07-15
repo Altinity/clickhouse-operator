@@ -140,5 +140,5 @@ crdHook:
 | serviceMonitor.operatorMetrics.scrapeTimeout | string | `""` |  |
 | tolerations | list | `[]` | tolerations for scheduler pod assignment, check `kubectl explain pod.spec.tolerations` for details |
 | topologySpreadConstraints | list | `[]` |  |
-| watchNamespaces | list | `[]` | namespaces where the operator watches for ClickHouseInstallation resources. If empty, the operator watches only its own namespace (or all namespaces when running in kube-system). Use [".*"] to watch all namespaces. Example: watchNamespaces: ["clickhouse", "my-other-namespace"] |
+| watchNamespaces | list | `[]` | namespaces where the operator watches for ClickHouseInstallation resources. Sets config.yaml watch.namespaces.include (the exclude list is not exposed here). If empty, the operator watches only its own namespace (or all namespaces when running in kube-system). Use [".*"] to watch all namespaces. Entries are regexps and are Helm-templated, so avoid a literal "{{" in a namespace/regexp. Example: watchNamespaces: ["clickhouse", "my-other-namespace"] |
 
