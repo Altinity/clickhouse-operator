@@ -135,6 +135,7 @@ func (e *Exporter) newHostFetcher(host *metrics.WatchedHost) *MetricsFetcher {
 	return NewMetricsFetcher(
 		clusterConnectionParams.NewEndpointConnectionParams(host.Hostname),
 		chop.Config().ClickHouse.Metrics.TablesRegexp,
+		e.metricsFilter,
 	)
 }
 
