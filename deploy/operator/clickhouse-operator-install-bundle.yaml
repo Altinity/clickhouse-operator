@@ -6371,7 +6371,7 @@ data:
         reconcileCHIsThreadsNumber: 10
         # Max number of concurrent CHK reconciles in progress
         reconcileCHKsThreadsNumber: 1
-
+    
         # The operator reconciles shards concurrently in each CHI with the following limitations:
         #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
         #      can not be greater than 'reconcileShardsThreadsNumber'.
