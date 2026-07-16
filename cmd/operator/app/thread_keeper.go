@@ -77,6 +77,9 @@ func initKeeper(ctx context.Context) error {
 	// Uses the same kubeConfigFile/masterURL package vars as the CHI thread.
 	_, extClient, _, _ := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
 
+	maxConcurrentReconciles := chop.Config().Reconcile.Runtime.ReconcileCHKsThreadsNumber
+	logger.Info("init keeper - CHK controller concurrency", "maxConcurrentReconciles", maxConcurrentReconciles)
+
 	err = ctrlRuntime.
 		NewControllerManagedBy(manager).
 		For(
@@ -85,15 +88,15 @@ func initKeeper(ctx context.Context) error {
 		).
 		Owns(&apps.StatefulSet{}).
 		WithOptions(ctrlController.Options{
-			MaxConcurrentReconciles: chop.Config().Reconcile.Runtime.ReconcileCHKsThreadsNumber,
+			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
 		Complete(
-			&controller.Controller{
-				Client:    manager.GetClient(),
-				APIReader: manager.GetAPIReader(),
-				Scheme:    manager.GetScheme(),
-				ExtClient: extClient,
-			},
+			controller.NewController(
+				manager.GetClient(),
+				manager.GetAPIReader(),
+				manager.GetScheme(),
+				extClient,
+			),
 		)
 	if err != nil {
 		logger.Error(err, "init keeper - unable to ctrlRuntime.NewControllerManagedBy")
