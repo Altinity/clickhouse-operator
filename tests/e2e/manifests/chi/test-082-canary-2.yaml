@@ -1,0 +1,30 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-082-canary
+  labels:
+    clickhouse.altinity.com/chi: test-082-canary
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 3
+          replicasCount: 2
+          replicas:
+           - shards:
+             - {}
+             - templates:
+                 podTemplate: test-26.3
+               settings:
+                 macros/canary: canary
+
+  templates:
+    podTemplates:
+    - name: test-26.3
+      spec:
+        containers:
+        - name: clickhouse-pod
+          image: clickhouse/clickhouse-server:26.3

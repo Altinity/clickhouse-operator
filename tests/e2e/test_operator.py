@@ -7279,6 +7279,153 @@ def test_010081(self):
         delete_test_namespace()
 
 
+@TestScenario
+@Tags("HEAVY")
+@Name("test_010082. Canary deployment")
+def test_010082(self):
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-082-canary"
+    cluster = "default"
+    canary_node = f"chi-{chi}-{cluster}-1-0-0"
+    default_version = current().context.clickhouse_version
+    canary_version = "clickhouse/clickhouse-server:26.3"
+
+    with Given("A cluster with 3 shards and 2 replicas"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-082-canary.yaml",
+            check={
+                "pod_count": 6,
+                "pod_image": default_version,
+                "do_not_delete": 1,
+            },
+        )
+
+        pod_start_times = {}
+        pod_restart_counts = {}
+        for shard in (0, 1, 2):
+            for replica in (0, 1):
+                pod = f"chi-{chi}-{cluster}-{shard}-{replica}-0"
+                pod_start_times[pod] = kubectl.get_field("pod", pod, ".status.startTime")
+
+    with When("Canary deployment is applied to 1-0 host"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-082-canary-2.yaml",
+            check={
+                "pod_count": 6,
+                "do_not_delete": 1,
+            },
+        )
+
+        with Then("Canary pod should run a different ClickHouse version"):
+            image = kubectl.get_pod_image(chi, pod_name=canary_node)
+            assert image == canary_version, error(
+                    f"canary pod {canary_node} must run {canary_version}, but image={image}"
+            )
+
+        with Then("Canary pod should have different ClickHouse settings"):
+            out = clickhouse.query_with_error(chi, "select substitution from system.macros where macro='canary'", host = canary_node)
+            assert out == "canary", error(
+                    f"canary pod {canary_node} must contain macro 'canary'"
+            )
+
+        with And("Other pods run the same version as before and were not restarted"):
+            for pod, start_time in pod_start_times.items():
+                if pod == canary_node:
+                    continue
+                image = kubectl.get_pod_image(chi, pod_name=pod)
+                assert image == default_version, error(
+                    f"non-canary pod {pod} must keep default image {default_version}, but image={image}"
+                )
+                new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
+                assert start_time == new_start_time, error(
+                    f"non-canary pod {pod} must not be recreated, "
+                    f"but startTime changed from {start_time} to {new_start_time}"
+                )
+                restarts = kubectl.get_container_restart_count(pod) or 0
+                assert restarts == 0, error(
+                    f"non-canary pod {pod} must not be restarted, "
+                    f"but restartCount changed from {pod_restart_counts[pod]} to {restarts}"
+                )
+
+
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+@TestScenario
+@Tags("HEAVY")
+@Name("test_010082_1. Canary deployment using CHIT injection")
+def test_010082_1(self):
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-082-canary"
+    cluster = "default"
+    canary_node = f"chi-{chi}-{cluster}-1-0-0"
+    default_version = current().context.clickhouse_version
+    canary_version = "clickhouse/clickhouse-server:26.3"
+
+    with Given("A cluster with 3 shards and 2 replicas"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-082-canary.yaml",
+            check={
+                "pod_count": 6,
+                "pod_image": default_version,
+                "do_not_delete": 1,
+            },
+        )
+
+        pod_start_times = {}
+        for shard in (0, 1, 2):
+            for replica in (0, 1):
+                pod = f"chi-{chi}-{cluster}-{shard}-{replica}-0"
+                pod_start_times[pod] = kubectl.get_field("pod", pod, ".status.startTime")
+
+    with When("Canary deployment is applied to 1-0 host using CHIT injection"):
+        with Then("Apply CHIT with canary update"):
+            kubectl.apply(util.get_full_path("manifests/chit/test-082-canary.yaml"))
+        with Then("Force CHI reconcile to pick it up"):
+            kubectl.force_chi_reconcile(chi, "apply canary")
+
+        with Then("Template is applied"):
+            used_templates = kubectl.get("chi", chi)["status"]["usedTemplates"]
+            print(used_templates)
+            assert "test-082-canary" in str(used_templates)
+
+        with Then("Canary pod should run a different ClickHouse version"):
+            image = kubectl.get_pod_image(chi, pod_name=canary_node)
+            assert image == canary_version, error(
+                    f"canary pod {canary_node} must run {canary_version}, but image={image}"
+            )
+
+        with Then("Canary pod should have different ClickHouse settings"):
+            out = clickhouse.query_with_error(chi, "select substitution from system.macros where macro='canary'", host = canary_node)
+            assert out == "canary", error(
+                    f"canary pod {canary_node} must contain macro 'canary'"
+            )
+
+        with And("Other pods run the same version as before and were not restarted"):
+            for pod, start_time in pod_start_times.items():
+                if pod == canary_node:
+                    continue
+                image = kubectl.get_pod_image(chi, pod_name=pod)
+                assert image == default_version, error(
+                    f"non-canary pod {pod} must keep default image {default_version}, but image={image}"
+                )
+                new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
+                assert start_time == new_start_time, error(
+                    f"non-canary pod {pod} must not be recreated, "
+                    f"but startTime changed from {start_time} to {new_start_time}"
+                )
+                restarts = kubectl.get_container_restart_count(pod) or 0
+                assert restarts == 0, error(
+                    f"non-canary pod {pod} must not be restarted, "
+                    f"but restartCount changed from {pod_restart_counts[pod]} to {restarts}"
+                )
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
 #
 # Keeper tests section
 #
