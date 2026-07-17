@@ -952,8 +952,10 @@ def force_reconcile(name, kind, taskID, ns=None, shell=None):
         # InProgress poll. The accept-set on the Completed wait below tolerates
         # either "already Completed" or "InProgress → Completed" transitions.
         if kind == "chi":
+            wait_chi_status(name, "InProgress", ns=ns, shell=shell)
             wait_chi_status(name, "Completed", ns=ns, shell=shell)
         elif kind == "chk":
+            wait_chk_status(name, "InProgress", ns=ns, shell=shell)
             wait_chk_status(name, "Completed", ns=ns, shell=shell)
         else:
             assert kind == "chi" or kind == "chk"
