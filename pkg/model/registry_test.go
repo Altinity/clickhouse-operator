@@ -70,18 +70,18 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 	go func() {
 		startWg.Done()
 		startWg.Wait() // Block until the other goroutine has begun execution
-		reg.RegisterConfigMap(testCmA)
-		reg.RegisterPVC(testPvcA)
+		reg.RegisterConfigMap(&testCmA)
+		reg.RegisterPVC(&testPvcA)
 		doneWg.Done()
 	}()
 
 	go func() {
 		startWg.Done()
 		startWg.Wait() // Block until the other goroutine has begun execution
-		reg.RegisterConfigMap(testCmA)
-		reg.RegisterConfigMap(testCmAOtherNamespace)
-		reg.RegisterConfigMap(testCmB)
-		reg.RegisterPVC(testPvcB)
+		reg.RegisterConfigMap(&testCmA)
+		reg.RegisterConfigMap(&testCmAOtherNamespace)
+		reg.RegisterConfigMap(&testCmB)
+		reg.RegisterPVC(&testPvcB)
 		doneWg.Done()
 	}()
 
@@ -101,7 +101,7 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 		&testPvcA:              PVC,
 		&testPvcB:              PVC,
 	} {
-		if got := reg.hasEntity(expectedEntityType, *expectedMetaObj); !got {
+		if got := reg.hasEntity(expectedEntityType, expectedMetaObj); !got {
 			t.Errorf(
 				"Expected registry to contain entity type %s:{Namespace = %s, Name = %s}",
 				expectedEntityType,
@@ -117,20 +117,20 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 
 	go func() {
 		startWg.Done()
-		startWg.Wait()                                     // Block until the other goroutine has begun execution
-		reg.RegisterPVC(testPvcD)                          // Add a net-new PVC (both goroutines)
-		reg.deleteEntity(ConfigMap, testCmAOtherNamespace) // Delete testCmAOtherNamespace (only this goroutine)
-		reg.deleteEntity(ConfigMap, testCmB)               // Delete testCmB (both goroutines)
+		startWg.Wait()                                      // Block until the other goroutine has begun execution
+		reg.RegisterPVC(&testPvcD)                          // Add a net-new PVC (both goroutines)
+		reg.deleteEntity(ConfigMap, &testCmAOtherNamespace) // Delete testCmAOtherNamespace (only this goroutine)
+		reg.deleteEntity(ConfigMap, &testCmB)               // Delete testCmB (both goroutines)
 		doneWg.Done()
 	}()
 
 	go func() {
 		startWg.Done()
-		startWg.Wait()                       // Block until the other goroutine has begun execution
-		reg.RegisterPVC(testPvcC)            // Add a net-new PVC (only this goroutine)
-		reg.RegisterPVC(testPvcD)            // Add a net-new PVC (both goroutines)
-		reg.deleteEntity(ConfigMap, testCmB) // Delete testCmB (both goroutines)
-		reg.deleteEntity(PVC, testPvcB)      // Delete testPvcB (only this goroutine)
+		startWg.Wait()                        // Block until the other goroutine has begun execution
+		reg.RegisterPVC(&testPvcC)            // Add a net-new PVC (only this goroutine)
+		reg.RegisterPVC(&testPvcD)            // Add a net-new PVC (both goroutines)
+		reg.deleteEntity(ConfigMap, &testCmB) // Delete testCmB (both goroutines)
+		reg.deleteEntity(PVC, &testPvcB)      // Delete testPvcB (only this goroutine)
 		doneWg.Done()
 	}()
 
@@ -152,7 +152,7 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 		&testPvcC: PVC,       // We added testPvcC (one of the goroutines)
 		&testPvcD: PVC,       // We added testPvcD (both goroutines tried)
 	} {
-		if got := reg.hasEntity(expectedEntityType, *expectedMetaObj); !got {
+		if got := reg.hasEntity(expectedEntityType, expectedMetaObj); !got {
 			t.Errorf(
 				"Expected registry to contain entity type %s:{Namespace = %s, Name = %s}",
 				expectedEntityType,
@@ -171,7 +171,7 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 	go func() {
 		startWg.Done()
 		startWg.Wait() // Block until the other goroutine has begun execution
-		reg.Walk(func(entityType EntityType, meta v1.ObjectMeta) {
+		reg.Walk(func(entityType EntityType, meta v1.Object) {
 			threadAObjsSeen++
 		})
 		doneWg.Done()
@@ -181,7 +181,7 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 	go func() {
 		startWg.Done()
 		startWg.Wait() // Block until the other goroutine has begun execution
-		reg.Walk(func(entityType EntityType, meta v1.ObjectMeta) {
+		reg.Walk(func(entityType EntityType, meta v1.Object) {
 			threadBObjsSeen++
 		})
 		doneWg.Done()
