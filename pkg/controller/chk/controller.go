@@ -112,7 +112,11 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	w.reconcileCR(ctx, nil, new)
+	if err := w.reconcileCR(ctx, nil, new); err != nil {
+		// Fail-safe requeue: barriers re-checked on the next pass.
+		log.V(1).M(new).F().Warning("reconcile failed, requeue: %v", err)
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
 
 	return ctrl.Result{}, nil
 }

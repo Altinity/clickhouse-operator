@@ -131,6 +131,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		if errors.Is(err, common.ErrCRUDAbort) {
 			metrics.CRReconcilesAborted(ctx, new)
 		}
+		return err
 	} else {
 		// Reconcile successful
 		// Post-process added items
@@ -140,6 +141,30 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		}
 
 		w.clean(ctx, new)
+
+		// Completed means convergence: the committed Raft membership must
+		// equal the desired set on every member (v3 invariant 6). By this
+		// point no host is staged, so publishedMemberIDs == desired ids.
+		// A stopped CR has all pods scaled down — nothing to observe; skip
+		// the gate (mirrors waitForIPAddresses's stopped-CR short-circuit).
+		if !new.IsStopped() {
+			if crIsSecureOnlyKeeper(new) {
+				// Secure-only Keeper: the gate reads /keeper/config over the closed
+				// plaintext port and can never pass. Degrade to pre-branch behavior
+				// (mark Completed without convergence verification) rather than loop
+				// Aborted forever. Loudly recorded via a Warning event + status action.
+				w.warnRaftGatesSkippedSecureOnly(new, "membership convergence gate")
+			} else if err := w.waitRaftMembershipConverged(ctx, new, publishedMemberIDs(new), raftVerifyTimeout); err != nil {
+				w.a.WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
+					WithError(new).
+					M(new).F().
+					Error("raft membership not converged for CR %s: %v", util.NamespaceNameString(new), err)
+				w.markReconcileCompletedUnsuccessfully(ctx, new, common.ErrCRUDAbort)
+				metrics.CRReconcilesAborted(ctx, new)
+				return err
+			}
+		}
+
 		w.addToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
@@ -261,6 +286,10 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *apiCh
 
 	w.a.V(2).M(cr).S().P()
 	defer w.a.V(2).M(cr).E().P()
+
+	// On scale-down, move leadership off the departing hosts BEFORE the
+	// shrunk raft XML is published (v3 design, scale-down step 2).
+	w.prepareRaftScaleDown(ctx, cr)
 
 	// CR common ConfigMap without added hosts
 	cr.GetRuntime().LockCommonConfig()
@@ -802,11 +831,15 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Warning("Reconcile Host Main - unable to reconcile PVC. Host: %s Err: %v", host.GetName(), err)
 	}
 
-	// Finalize main reconcile with domain activities
+	// Finalize main reconcile with domain activities.
+	// A failed membership barrier is fatal for the host reconcile: the next
+	// host must not be published until this one is committed (v3 invariant 2).
 	if err := w.reconcileHostMainDomain(ctx, host); err != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
-			Warning("Reconcile Host Main - unable to reconcile domain reconcile. Host: %s Err: %v", host.GetName(), err)
+			Warning("Reconcile Host Main - raft membership barrier failed. Host: %s Err: %v", host.GetName(), err)
+		return err
 	}
 
 	return nil
@@ -841,18 +874,50 @@ func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.
 }
 
 func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host) error {
-	// Should we wait for host to startup
-	wait := false
-
-	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
-		wait = true
+	if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
+		return nil
 	}
 
-	// Wait for host to startup; respect ctx cancellation so the worker
-	// unblocks on controller shutdown instead of running out the timer.
-	if wait {
+	if !hostJoinsEstablishedCluster(host) {
+		// Fresh-cluster bootstrap: all peers start together and elect a leader
+		// via standard NuRaft bootstrap; there is no pre-existing committed
+		// membership to observe. Keep the legacy pacing wait.
 		util.WaitContextDoneOrTimeout(ctx, 7*time.Second)
+		return nil
 	}
+
+	// A stopped CR has all pods scaled to 0 — the barriers can never observe
+	// them, so skip rather than burn the full timeout every reconcile. Mirrors
+	// the Completed gate's stopped short-circuit; on unstop the barriers run
+	// normally.
+	if host.GetCR().IsStopped() {
+		return nil
+	}
+
+	// Secure-only Keeper: both the committed-membership barrier (/keeper/config
+	// over ZK) and the follower-sync barrier (mntr 4LW) target the closed
+	// plaintext port, and the operator has no TLS client material for the secure
+	// port. Skip both rather than fail every reconcile — degrades to pre-branch
+	// (join proceeds unverified). Loudly recorded via a Warning event + status action.
+	if crIsSecureOnlyKeeper(host.GetCR()) {
+		w.warnRaftGatesSkippedSecureOnly(host.GetCR(), "join barriers")
+		return nil
+	}
+
+	// The host has just been published into the shared raft XML and its pod
+	// has started: wait until the leader commits it into the Raft
+	// configuration and it catches up with the log. Fail-safe: on timeout the
+	// reconcile aborts (requeue), no destructive action is taken.
+	expected := publishedMemberIDs(host.GetCR())
+	if err := w.waitRaftMembershipConverged(ctx, host.GetCR(), expected, raftBarrierTimeout); err != nil {
+		w.a.V(1).M(host).F().Warning("host %s was not committed into raft membership: %v", host.GetName(), err)
+		return err
+	}
+	if err := w.waitRaftFollowersSynced(ctx, host.GetCR(), len(expected), raftBarrierTimeout); err != nil {
+		w.a.V(1).M(host).F().Warning("raft followers not synced after adding host %s: %v", host.GetName(), err)
+		return err
+	}
+	w.a.V(1).M(host).F().Info("host %s committed into raft membership %v and synced", host.GetName(), expected)
 	return nil
 }
 
