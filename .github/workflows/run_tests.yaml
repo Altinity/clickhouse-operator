@@ -22,6 +22,41 @@ jobs:
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
+
+      # The e2e suite (notably test_010025's 100M-row insert + its replica) fills the
+      # runner's small root partition (~14 GB): with the minikube docker driver the k8s
+      # node runs as a container under the docker data-root (/var/lib/docker on /), so
+      # ClickHouse pod ephemeral storage lands there and exhausts it — the runner then
+      # loses communication mid-run. Move the docker data-root onto the large /mnt
+      # ephemeral SSD (~65 GB) before minikube starts, and trim unused preinstalled
+      # toolchains from / for headroom. MUST run before setup-minikube (no docker is
+      # used before this step, so restarting the daemon here is safe).
+      - name: Free disk and relocate docker data-root to /mnt
+        run: |
+          set -euxo pipefail
+          # If docker fails to restart on the moved data-root, surface disk + daemon logs
+          # so the failure is triageable rather than a bare non-zero exit at this early step.
+          trap 'ec=$?; echo "::error::disk/docker prep failed (exit $ec)"; df -h / /mnt || true; sudo journalctl -u docker --no-pager -n 50 || true' ERR
+          df -h /
+          # Reclaim space on / — none of these toolchains are used by this Go+Python+k8s job.
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          # Relocate docker data-root to /mnt so the minikube node container (and thus the
+          # ClickHouse pod storage inside it) uses the 65 GB SSD, not the 14 GB root.
+          sudo systemctl stop docker docker.socket
+          sudo mkdir -p /mnt/docker
+          # Merge data-root into any existing daemon.json — do NOT clobber runner defaults
+          # (cgroup driver, registry mirrors) or the daemon may fail to restart.
+          if [ -s /etc/docker/daemon.json ]; then
+            sudo jq '. + {"data-root":"/mnt/docker"}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp >/dev/null
+            sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
+          else
+            echo '{"data-root":"/mnt/docker"}' | sudo tee /etc/docker/daemon.json >/dev/null
+          fi
+          sudo systemctl start docker
+          # Fail loudly if the relocation did not take effect.
+          test "$(docker info -f '{{.DockerRootDir}}')" = "/mnt/docker"
+          df -h /mnt /
+
       - name: Cache python
         uses: actions/cache@v4
         id: cache-python
