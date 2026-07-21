@@ -19,6 +19,8 @@ import (
 	"errors"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -55,6 +57,11 @@ type worker struct {
 	normalizer    *normalizer.Normalizer
 	task          *common.Task
 	stsReconciler *statefulset.Reconciler
+
+	// stsGetterFn, when set, overrides the live StatefulSet lookup used by
+	// hostSTSConfirmedAbsent. Tests inject NotFound / transient-error responses
+	// here; production leaves it nil and hits w.c.kube.STS().
+	stsGetterFn func(ctx context.Context, host *api.Host) (*apps.StatefulSet, error)
 
 	start time.Time
 }
@@ -405,7 +412,68 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *apiChk.Clic
 		}
 	})
 
+	w.stageNewHostsForRaftJoin(ctx, cr)
+
 	w.logHosts(cr)
+}
+
+// stageNewHostsForRaftJoin marks newly requested hosts with TagExclude when
+// they join an established cluster, so the shared raft XML never contains
+// more than one not-yet-committed server (split-brain guard: two fresh
+// voters can elect a leader between themselves). Fresh-cluster bootstrap
+// (no established cluster) is left untouched: full static XML at once.
+//
+// "Established cluster" is keyed off the CR ancestor (the last-completed spec
+// already had hosts), NOT off mutable per-host statuses — see
+// api.CRHasEstablishedCluster.
+//
+// A host is staged (excluded from the shared XML) ONLY while its StatefulSet
+// does not yet exist. A Requested host whose STS already exists was already
+// created on a prior pass (committed, or mid-join): it must stay published so
+// the preliminary raft-XML rewrite does not drop it. Excluding it would
+// republish a shorter membership and make Keeper (XML-diff mode) REMOVE a
+// committed voter, then re-add it — churn on every interrupted reconcile. The
+// STS-existence signal is host.Runtime.CurStatefulSet, populated by fillCurSTS
+// during buildCR (which runs before this).
+func (w *worker) stageNewHostsForRaftJoin(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+	if !api.CRHasEstablishedCluster(cr) {
+		return
+	}
+	cr.WalkHosts(func(host *api.Host) error {
+		if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) && w.hostSTSConfirmedAbsent(ctx, host) {
+			w.a.V(1).M(host).Info("Stage new host for one-at-a-time raft join: %s", host.GetName())
+			host.GetReconcileAttributes().SetExclude()
+		}
+		return nil
+	})
+}
+
+// hostSTSConfirmedAbsent reports whether the host's StatefulSet is DEFINITIVELY
+// absent from the API server. host.Runtime.CurStatefulSet is populated by
+// fillCurSTS, which swallows every Get error — so a nil there can mean a genuine
+// NotFound OR a transient apiReader error. Staging a host whose STS actually
+// exists would drop a committed voter from the shared raft XML (the exact
+// churn stageNewHostsForRaftJoin prevents), so we must not treat an ambiguous
+// nil as "absent". When CurStatefulSet is nil we re-probe directly and stage
+// only on an explicit NotFound; any other error keeps the host published
+// (conservative: no churn on a flaky read).
+func (w *worker) hostSTSConfirmedAbsent(ctx context.Context, host *api.Host) bool {
+	if host.Runtime.CurStatefulSet != nil {
+		// STS is known to exist.
+		return false
+	}
+	_, err := w.stsGetter(ctx, host)
+	return apiErrors.IsNotFound(err)
+}
+
+// stsGetter fetches a host's StatefulSet from the API server. It is a small
+// indirection so staging tests can inject NotFound / transient-error responses
+// without a full kube client. When unset it falls back to the live kube client.
+func (w *worker) stsGetter(ctx context.Context, host *api.Host) (*apps.StatefulSet, error) {
+	if w.stsGetterFn != nil {
+		return w.stsGetterFn(ctx, host)
+	}
+	return w.c.kube.STS().Get(ctx, host)
 }
 
 // Log hosts statuses
@@ -442,13 +510,12 @@ func (w *worker) createTemplated(c *apiChk.ClickHouseKeeperInstallation, _opts .
 
 // getRaftGeneratorOptions build base set of RaftOptions
 func (w *worker) getRaftGeneratorOptions() *commonConfig.HostSelector {
-	// Raft specifies to exclude:
-	// 1. all newly added hosts
-	// 2. all explicitly excluded hosts
+	// Exclude from the shared raft XML all hosts staged for one-at-a-time
+	// join (TagExclude, set by stageNewHostsForRaftJoin). They are published
+	// individually by includeHostIntoRaftCluster, each behind a
+	// committed-membership barrier. See docs/chk-rescale-raft-safety-v3.md.
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
-		types.NewReconcileAttributes(),
-		//SetAdd().
-		//SetExclude(),
+		types.NewReconcileAttributes().SetExclude(),
 	)
 }
 

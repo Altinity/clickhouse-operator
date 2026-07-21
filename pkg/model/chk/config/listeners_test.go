@@ -24,11 +24,17 @@ import (
 )
 
 // fakeCR is a minimal ICustomResource stub exercising the WalkHosts-based
-// getPlaintextListenerRemoval. Only WalkHosts is needed; the embedded interface
+// getPlaintextListenerRemoval and the ancestor-based raft-join classification.
+// Only WalkHosts / GetAncestor / HostsCount are needed; the embedded interface
 // satisfies the type at compile time and panics on any unexpected call.
+//
+// ancestorHosts models the last-completed spec: nil means a fresh install (no
+// ancestor / bootstrap), a non-nil slice means an established cluster of that
+// size. See api.CRHasEstablishedCluster.
 type fakeCR struct {
 	chi.ICustomResource
-	hosts []*chi.Host
+	hosts         []*chi.Host
+	ancestorHosts []*chi.Host
 }
 
 func (f *fakeCR) WalkHosts(fn func(host *chi.Host) error) []error {
@@ -37,6 +43,17 @@ func (f *fakeCR) WalkHosts(fn func(host *chi.Host) error) []error {
 		errs = append(errs, fn(h))
 	}
 	return errs
+}
+
+func (f *fakeCR) HostsCount() int {
+	return len(f.hosts)
+}
+
+func (f *fakeCR) GetAncestor() chi.ICustomResource {
+	if f.ancestorHosts == nil {
+		return nil
+	}
+	return &fakeCR{hosts: f.ancestorHosts}
 }
 
 func secureHost(securePort int32) *chi.Host {

@@ -20,6 +20,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -88,6 +89,9 @@ func (c *Generator) getRaftConfig(selector *config.HostSelector) string {
 			util.Iline(raft, i, "    <id>%d</id>", getServerId(host))
 			util.Iline(raft, i, "    <hostname>%s</hostname>", c.namer.Name(interfaces.NameInstanceHostname, host))
 			util.Iline(raft, i, "    <port>%d</port>", host.RaftPort.Value())
+			if isJoiningEstablishedCluster(c.cr, host) {
+				util.Iline(raft, i, "    <start_as_follower>true</start_as_follower>")
+			}
 			if host.IsSecure() {
 				util.Iline(raft, i, "    <secure>1</secure>")
 			}
@@ -187,4 +191,22 @@ func (c *Generator) getPlaintextListenerRemoval() string {
 
 func getServerId(host *chi.Host) int {
 	return host.GetRuntime().GetAddress().GetReplicaIndex()
+}
+
+// isJoiningEstablishedCluster reports whether the host is a newly requested
+// member being added to a cluster that already has established members.
+// Such a host must not initiate elections on first boot (split-brain guard,
+// see docs/chk-rescale-raft-safety-v3.md, Fact 3). On fresh-cluster bootstrap
+// (all hosts new) the flag must NOT be emitted: NuRaft requires at least one
+// server able to start as leader.
+func isJoiningEstablishedCluster(cr chi.ICustomResource, host *chi.Host) bool {
+	if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
+		return false
+	}
+	// "Established" is keyed off the CR ancestor (the cluster already existed on a
+	// prior successful reconcile), NOT off mutable per-host statuses, which flip
+	// during the sequential host loop and would make a fresh multi-node bootstrap
+	// mis-emit start_as_follower on a later host — NuRaft forbids all-followers.
+	// See api.CRHasEstablishedCluster.
+	return chi.CRHasEstablishedCluster(cr)
 }

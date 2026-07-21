@@ -66,6 +66,30 @@ type ICustomResource interface {
 	YAML(opts types.CopyCROptions) string
 }
 
+// CRHasEstablishedCluster reports whether the CR's cluster already existed on a
+// prior successful reconcile — i.e. the last-completed (ancestor) spec already
+// carried hosts.
+//
+// This is the STABLE signal for classifying a Keeper host as joining an
+// established cluster vs bootstrapping a fresh one. It must NOT be derived from
+// the mutable per-host reconcile statuses (Requested/Found/...), which flip
+// during the sequential host loop (host 0 becomes Created mid-loop) and are
+// re-derived every reconcile pass: keying off them makes a fresh 3-node install
+// mis-classify later hosts as "joining" (deadlock) and re-stages
+// already-committed voters on a retry pass (committed-voter churn). The ancestor
+// host count is invariant across the whole reconcile. See
+// docs/chk-rescale-raft-safety-v3.md.
+func CRHasEstablishedCluster(cr ICustomResource) bool {
+	if cr == nil {
+		return false
+	}
+	ancestor := cr.GetAncestor()
+	if ancestor == nil {
+		return false
+	}
+	return ancestor.HostsCount() > 0
+}
+
 type ICRSpec interface {
 	GetNamespaceDomainPattern() *types.String
 	GetDefaults() *Defaults
