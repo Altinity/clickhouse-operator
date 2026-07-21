@@ -14,6 +14,19 @@ metadata:
   labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
   annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
 rules:
+  # coordination.k8s.io resources (leader election)
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
   #
   # Core API group
   #

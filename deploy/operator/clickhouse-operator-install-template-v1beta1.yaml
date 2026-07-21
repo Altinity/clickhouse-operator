@@ -5365,7 +5365,6 @@ metadata:
   namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.27.2
-
 # Template Parameters:
 #
 # NAMESPACE=${OPERATOR_NAMESPACE}
@@ -5451,6 +5450,21 @@ rules:
     verbs:
       - get
       - list
+  #
+  # coordination.k8s.io resources
+  #
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
   #
   # apps.* resources
   #

@@ -5365,7 +5365,6 @@ metadata:
   namespace: kube-system
   labels:
     clickhouse.altinity.com/chop: 0.27.2
-
 # Template Parameters:
 #
 # NAMESPACE=kube-system
@@ -5451,6 +5450,21 @@ rules:
     verbs:
       - get
       - list
+  #
+  # coordination.k8s.io resources
+  #
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
   #
   # apps.* resources
   #
@@ -5618,7 +5632,6 @@ subjects:
   - kind: ServiceAccount
     name: clickhouse-operator
     namespace: kube-system
-
 # Template Parameters:
 #
 # NAMESPACE=kube-system
@@ -5704,6 +5717,21 @@ rules:
     verbs:
       - get
       - list
+  #
+  # coordination.k8s.io resources
+  #
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
   #
   # apps.* resources
   #
