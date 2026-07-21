@@ -96,6 +96,9 @@ func (a *ReconcileAttributes) SetExclude() *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
+	if a.tags == nil {
+		a.tags = NewTags()
+	}
 	a.tags.Set(TagExclude)
 	return a
 }
@@ -121,6 +124,9 @@ func (a *ReconcileAttributes) IsExclude() bool {
 func (a *ReconcileAttributes) SetLowPriority() *ReconcileAttributes {
 	if a == nil {
 		return a
+	}
+	if a.tags == nil {
+		a.tags = NewTags()
 	}
 	a.tags.Set(TagLowPriority)
 	return a
