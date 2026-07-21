@@ -3,6 +3,7 @@ import time
 import yaml
 import threading
 import re
+import subprocess
 
 from e2e.retry_sleep import retry_sleep
 
@@ -7715,6 +7716,50 @@ def test_020003_2(self):
         delete_test_namespace()
 
 
+def keeper_pod_name(chk, replica):
+    return f"chk-{chk}-keeper-0-{replica}-0"
+
+
+def get_keeper_raft_members(chk, replica):
+    """Committed raft member ids as seen by one keeper pod via /keeper/config."""
+    out = kubectl.launch(
+        f"exec {keeper_pod_name(chk, replica)} -- "
+        f"clickhouse-keeper-client -p 2181 -q \"get '/keeper/config'\"",
+        ok_to_fail=True,
+    )
+    return sorted(
+        int(line.split("=")[0].split(".")[1])
+        for line in out.splitlines()
+        if line.startswith("server.")
+    )
+
+
+def get_keeper_mode(chk, replica):
+    out = kubectl.launch(
+        f"exec {keeper_pod_name(chk, replica)} -- bash -c "
+        f"\"exec 3<>/dev/tcp/127.0.0.1/2181; printf srvr >&3; timeout 3 cat <&3\"",
+        ok_to_fail=True,
+    )
+    for line in out.splitlines():
+        if line.startswith("Mode: "):
+            return line[len("Mode: "):].strip()
+    return "unknown"
+
+
+def check_keeper_membership(chk, expected_ids, note=""):
+    """Every expected member must report exactly the expected committed set,
+    and exactly one of them must be leader/standalone."""
+    with Then(f"keeper committed membership is {expected_ids} {note}"):
+        for i in expected_ids:
+            for attempt in retries(timeout=300, delay=10):
+                with attempt:
+                    members = get_keeper_raft_members(chk, i)
+                    assert members == sorted(expected_ids), \
+                        f"pod {i} reports raft members {members}, expected {sorted(expected_ids)}"
+        leaders = [i for i in expected_ids if get_keeper_mode(chk, i) in ("leader", "standalone")]
+        assert len(leaders) == 1, f"expected exactly one leader, got {leaders}"
+
+
 @TestScenario
 @Tags("HEAVY")
 @Name("test_020005. Clickhouse-keeper scale-up/scale-down")
@@ -7739,6 +7784,8 @@ def test_020005(self):
                 "do_not_delete": 1,
             },
         )
+
+    check_keeper_membership(chk, [0], note="after install")
 
     with Given("CHI with 2 replicas"):
         kubectl.create_and_check(
@@ -7765,6 +7812,8 @@ def test_020005(self):
         kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-1-0', '.status.containerStatuses[0].ready', 'true', retries=10)
         kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-2-0', '.status.containerStatuses[0].ready', 'true', retries=10)
 
+    check_keeper_membership(chk, [0, 1, 2], note="after scale-up")
+
     check_replication(chi, {0, 1}, 2)
 
     with Then("Rescale CHK back to 1 replica"):
@@ -7776,7 +7825,44 @@ def test_020005(self):
             },
         )
 
+    check_keeper_membership(chk, [0], note="after scale-down")
+
     check_replication(chi, {0, 1}, 5)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Tags("HEAVY")
+@Name("test_020005_1. Clickhouse-keeper scale-down blocks safely without quorum")
+def test_020005_1(self):
+    """Scale-down must not delete pods while removals cannot be committed."""
+    create_shell_namespace_clickhouse_template()
+
+    chk_manifest_3 = "manifests/chk/test-052-chk-rescale-3.yaml"
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest_3))
+
+    with Given("Install 3-replica CHK"):
+        kubectl.create_and_check(
+            manifest=chk_manifest_3, kind="chk",
+            check={"pod_count": 3, "do_not_delete": 1},
+        )
+    check_keeper_membership(chk, [0, 1, 2], note="after install")
+
+    with When("Two of three keepers are down (no quorum for removal commit)"):
+        with When("keepers 1 and 2 are deleted"):
+            kubectl.launch(f"delete pod {keeper_pod_name(chk, 1)} {keeper_pod_name(chk, 2)} --wait=false")
+        with And("Scale-down is requested while quorum is unavailable"):
+            # Apply directly (not create_and_check) -- the operator is expected to
+            # block on the removal barrier and never reach status Completed here.
+            kubectl.launch(f"apply -f {util.get_full_path('manifests/chk/test-052-chk-rescale-1.yaml')}", ok_to_fail=True)
+
+    with Then("Operator does not delete the STS of members whose removal is not committed"):
+        # The scale-down barrier holds while removals cannot commit; STSs stay.
+        time.sleep(60)
+        sts_count = kubectl.get_count("sts", chk=chk)
+        assert sts_count == 3, f"expected 3 STS while removal is not committed, got {sts_count}"
 
     with Finally("I clean up"):
         delete_test_namespace()
