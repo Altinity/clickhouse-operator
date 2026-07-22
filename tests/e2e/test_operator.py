@@ -2225,6 +2225,35 @@ def test_010016(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+@TestScenario
+@Name("test_010016_1. Test XML injection using unescaped settings")
+def test_010016_1(self):
+    create_shell_namespace_clickhouse_template()
+    with Given("I change operator statefullSet timeout for faster crash"):
+        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
+
+    chi = "test-016-settings"
+    kubectl.create_and_check(
+        manifest="manifests/chi/test-016-settings-07.yaml",
+        check={
+            "apply_templates": {
+                current().context.clickhouse_template,
+            },
+            "pod_count": 1,
+            "do_not_delete": 1,
+        },
+    )
+    with Then("macros layer is defined"):
+        out = clickhouse.query(chi, sql="select substitution from system.macros where macro='layer'")
+        print(out)
+        assert out == "&$</>"
+
+    with And("Injected macro should be missing"):
+        out = clickhouse.query(chi, sql="select count() from system.macros where macro='injection'")
+        assert out == "0"
+
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 @TestScenario
 @Name("test_010017. Test deployment of multiple versions in a cluster")
