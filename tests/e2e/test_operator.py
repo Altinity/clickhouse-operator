@@ -646,7 +646,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
 @Name("test_010009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_010009_1(self, version_from="0.26.3", version_to=None):
+def test_010009_1(self, version_from="0.27.0", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -664,7 +664,7 @@ def test_010009_1(self, version_from="0.26.3", version_to=None):
 @TestScenario
 @Name("test_010009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_010009_2(self, version_from="0.26.3", version_to=None):
+def test_010009_2(self, version_from="0.27.0", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
