@@ -78,6 +78,15 @@ const (
 	// CHK reconcile completing but decides not to trigger a CHI reconcile because the resolved
 	// zookeeper endpoints have not changed.
 	EventReasonKeeperUpdateNoEndpointChange = "KeeperUpdateNoEndpointChange"
+
+	// EventReasonRaftMembershipUnverified fires when the operator SKIPS the Raft
+	// rescale-safety gates (committed-membership barrier, follower-sync barrier,
+	// purge barrier) for a secure-only Keeper. Those gates read /keeper/config and
+	// 4LW over the plaintext client port, which a fully-secure Keeper does not
+	// open; the operator has no TLS client material to dial the secure port today,
+	// so it degrades to pre-gate behavior (unverified rescale) rather than looping
+	// Aborted. See docs/chk-rescale-raft-safety-v3.md (secure-only limitation).
+	EventReasonRaftMembershipUnverified = "RaftMembershipUnverified"
 )
 
 type EventEmitter struct {

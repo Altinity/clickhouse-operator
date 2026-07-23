@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"os"
 
 	"github.com/go-logr/logr"
 
@@ -20,6 +21,7 @@ import (
 	ctrlController "sigs.k8s.io/controller-runtime/pkg/controller"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	deployment "github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	controller "github.com/altinity/clickhouse-operator/pkg/controller/chk"
 )
@@ -67,6 +69,13 @@ func initKeeper(ctx context.Context) error {
 		// pkg/metrics/operator, and the CHK reconcile counters worth exposing are surfaced
 		// through that path, not through controller-runtime's manager-default exposition.
 		Metrics: metricsserver.Options{BindAddress: "0"},
+		// Serialize CHK reconciliation across operator replicas/restarts.
+		// The Lease lives in the operator's own namespace (empty value falls
+		// back to controller-runtime's in-cluster namespace detection).
+		LeaderElection:                true,
+		LeaderElectionID:              "clickhouse-keeper-operator.altinity.com",
+		LeaderElectionNamespace:       os.Getenv(deployment.OPERATOR_POD_NAMESPACE),
+		LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		logger.Error(err, "init keeper - unable to ctrlRuntime.NewManager")

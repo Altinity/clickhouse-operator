@@ -5490,6 +5490,23 @@ rules:
       - list
 
   #
+  # coordination.k8s.io resources
+  #
+
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+
+  #
   # apps.* resources
   #
 
@@ -6726,7 +6743,7 @@ data:
                 stricter list can override this value, but they must keep `ruok` if they
                 also use the default operator probes.
             -->
-            <four_letter_word_white_list>conf,cons,crst,envi,ruok,srst,srvr,stat,wchs,dirs,mntr,isro</four_letter_word_white_list>
+            <four_letter_word_white_list>conf,cons,crst,envi,ruok,srst,srvr,stat,wchs,dirs,mntr,isro,rqld</four_letter_word_white_list>
         </keeper_server>
         <listen_host>::</listen_host>
         <listen_host>0.0.0.0</listen_host>

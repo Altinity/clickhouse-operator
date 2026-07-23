@@ -50,6 +50,22 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	w.a.V(1).M(cr).F().Info("List of existing objects:\n%s", objs)
 	objs.Subtract(need)
 	w.a.V(1).M(cr).F().Info("List of non-reconciled objects:\n%s", objs)
+
+	// Raft safety barrier: a StatefulSet/PVC of a Keeper member may only be
+	// deleted once every published member reports committed Raft membership
+	// equal to the published set (v3 invariant 3). The gate is keyed off what
+	// `objs` actually contains, not off the transient ActionPlan — see
+	// raftSafeToPurge. On timeout, or while the cluster is stopped/
+	// unreachable: skip the purge entirely (fail-safe stuck) — a
+	// removed-but-alive pod is safe; a deleted voting member is not. The
+	// reconcile is then failed by the convergence gate and requeued, and the
+	// purge is retried (and only then completed) once membership actually
+	// converges.
+	if !w.raftSafeToPurge(ctx, cr, objs) {
+		w.a.V(1).M(cr).F().Warning("skip purge: committed raft membership has not converged to the desired set")
+		return
+	}
+
 	if w.purge(ctx, cr, objs, w.task.RegistryFailed()) > 0 {
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
