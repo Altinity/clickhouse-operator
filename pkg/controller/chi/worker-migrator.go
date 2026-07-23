@@ -87,7 +87,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrat
 			Info(
 				"Need to drop replica on host %d to shard %d in cluster %s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-		w.dropZKReplica(ctx, host, NewDropReplicaOptions().SetForceDropUponStorageLoss())
+		w.dropZKReplica(ctx, nil, host, NewDropReplicaOptions().SetForceDropUponStorageLoss())
 	}
 
 	w.a.V(1).
