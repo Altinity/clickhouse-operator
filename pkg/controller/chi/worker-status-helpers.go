@@ -18,6 +18,8 @@ import (
 	"context"
 	"time"
 
+	core "k8s.io/api/core/v1"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -48,6 +50,94 @@ func (w *worker) isPodCrushed(ctx context.Context, host *api.Host) bool {
 func (w *worker) isPodReady(ctx context.Context, host *api.Host) bool {
 	if pod, err := w.c.kube.Pod().Get(ctx, host); err == nil {
 		return !k8s.PodHasNotReadyContainers(pod)
+	}
+	return false
+}
+
+// isPodSustainedNotReady reports whether the host's pod is currently Ready=False AND
+// has been so for at least `threshold`. Returns false for pods whose failure mode is
+// already being handled by kubelet (ImagePullBackOff, CrashLoopBackOff, Pending, etc.)
+// so the operator does not race kubelet on its own recovery path.
+func (w *worker) isPodSustainedNotReady(ctx context.Context, host *api.Host, threshold time.Duration) bool {
+	if threshold <= 0 {
+		// Threshold of 0/negative means "feature disabled"
+		return false
+	}
+	pod, err := w.c.kube.Pod().Get(ctx, host)
+	if err != nil || pod == nil {
+		return false
+	}
+	if podIsInKubeletFailureMode(pod) {
+		return false
+	}
+	return podIsSustainedNotReady(pod, threshold, time.Now())
+}
+
+// podIsSustainedNotReady is the pure inner predicate of isPodSustainedNotReady,
+// extracted so it can be exercised without a kube client. Returns true iff the pod
+// has a PodReady condition that is currently not True and whose LastTransitionTime
+// is at least `threshold` in the past relative to `now`.
+func podIsSustainedNotReady(pod *core.Pod, threshold time.Duration, now time.Time) bool {
+	if pod == nil || threshold <= 0 {
+		return false
+	}
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type != core.PodReady {
+			continue
+		}
+		if cond.Status == core.ConditionTrue {
+			return false
+		}
+		// Status is False or Unknown. Treat both as "not ready"
+		if cond.LastTransitionTime.IsZero() {
+			return false
+		}
+		return now.Sub(cond.LastTransitionTime.Time) >= threshold
+	}
+	// No PodReady condition at all.
+	return false
+}
+
+// kubeletDrivenWaitingReasons is the set of container Waiting.Reason values that
+// indicate kubelet is already actively recovering the pod and a parallel
+// operator-driven StatefulSet rollout would just race kubelet.
+var kubeletDrivenWaitingReasons = map[string]struct{}{
+	"CrashLoopBackOff":           {},
+	"ImagePullBackOff":           {},
+	"ErrImagePull":               {},
+	"InvalidImageName":           {},
+	"CreateContainerError":       {},
+	"RunContainerError":          {},
+	"ContainerCannotRun":         {},
+	"CreateContainerConfigError": {},
+}
+
+// podIsInKubeletFailureMode reports whether the pod is in a state where kubelet
+// (or the kube-scheduler) is already handling the failure: not yet scheduled,
+// in Pending phase, or any container in a kubelet-driven waiting reason.
+// In those states an operator-driven reconcile would race kubelet without value.
+func podIsInKubeletFailureMode(pod *core.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	if pod.Status.Phase == core.PodPending {
+		return true
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.State.Waiting == nil {
+			continue
+		}
+		if _, hit := kubeletDrivenWaitingReasons[cs.State.Waiting.Reason]; hit {
+			return true
+		}
+	}
+	for _, cs := range pod.Status.InitContainerStatuses {
+		if cs.State.Waiting == nil {
+			continue
+		}
+		if _, hit := kubeletDrivenWaitingReasons[cs.State.Waiting.Reason]; hit {
+			return true
+		}
 	}
 	return false
 }
@@ -185,6 +275,18 @@ func (w *worker) getRemoteServersGeneratorOptions() *commonConfig.HostSelector {
 	// Base model specifies to exclude:
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
+	//
+	// Excluding newly-added (ObjectStatusRequested) hosts is DELIBERATE, not incidental: a host
+	// whose StatefulSet does not exist yet is an unreachable cluster member, and remote_servers
+	// lives in the single COMMON ConfigMap mounted by every pod. Advertising a not-yet-created
+	// host would hand every existing pod a cluster definition pointing at a host that cannot be
+	// reached, breaking cluster-wide operations during the reconcile window (existing replicas'
+	// Distributed queries, ON CLUSTER DDL, and the operator's own clusterAllReplicas/remote()
+	// schema-migration and health queries). The new host is added to remote_servers only in the
+	// final phase, once its StatefulSet exists. Do NOT drop this to "seed" the full topology into
+	// the preliminary ConfigMap: because the ConfigMap is shared, that necessarily re-advertises
+	// the not-yet-created host to existing pods. Newly-added hosts recover their cluster-dependent
+	// objects via the post-publish restart in restartNewlyAddedHosts, never by seeding.
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
 		types.NewReconcileAttributes().
 			SetStatus(types.ObjectStatusRequested).

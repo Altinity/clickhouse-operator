@@ -202,12 +202,12 @@ func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string
 		// embedded value NB - printed w/o indent
 		// </tag>
 		n.writeTagOpen(w, indent, attributes, eol)
-		n.writeValue(w, value)
+		n.writeValue(w, value, Raw) // embedded value is a pre-rendered XML fragment
 		n.writeTagClose(w, indent, eol)
 	} else {
 		// <tag>value</tag>
 		n.writeTagOpen(w, indent, attributes, noEol)
-		n.writeValue(w, value)
+		n.writeValue(w, value, Escape) // element text — escape reserved characters
 		n.writeTagClose(w, 0, eol)
 	}
 }
@@ -252,7 +252,36 @@ func (n *xmlNode) writeTag(w io.Writer, indent uint8, attributes string, openTag
 	}
 }
 
-// writeValue prints XML value into io.Writer
-func (n *xmlNode) writeValue(w io.Writer, value string) {
-	util.Fprintf(w, "%s", value)
+// valueEncoding selects how writeValue renders an element's content.
+type valueEncoding int
+
+const (
+	// Escape escapes the XML reserved characters &, < and >. Used for leaf element
+	// text (passwords, scalar setting values) so a value containing them keeps the
+	// document well-formed.
+	Escape valueEncoding = iota
+	// Raw emits the value verbatim. Used for embedded (SetEmbed) settings that are
+	// already pre-rendered XML fragments — e.g. the CHK keeper_server/raft_configuration
+	// or the secure-port overlays — where escaping would turn markup into literal text
+	// and break the generated config.
+	Raw
+)
+
+// writeValue prints XML value into io.Writer.
+//
+// With Escape, reserved characters &, < and > are escaped. Tab, \n and \r are
+// intentionally left untouched to preserve existing multi-line values
+// (encoding/xml.EscapeText would mangle them). With Raw, the value is emitted
+// verbatim (see valueEncoding).
+func (n *xmlNode) writeValue(w io.Writer, value string, encoding valueEncoding) {
+	if encoding == Raw {
+		util.Fprintf(w, "%s", value)
+		return
+	}
+	escaped := strings.NewReplacer(
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
+	).Replace(value)
+	util.Fprintf(w, "%s", escaped)
 }

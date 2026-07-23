@@ -146,8 +146,8 @@ clickhouse:
     # Possible values for 'scheme' are:
     #   1. http - force http to be used to connect to ClickHouse instances
     #   2. https - force https to be used to connect to ClickHouse instances
-    #   3. auto - either http or https is selected based on open ports
-    scheme: "auto"
+    #   3. Auto - either http or https is selected based on open ports
+    scheme: "Auto"
     # ClickHouse credentials (username, password and port) to be used by the operator to connect to ClickHouse instances.
     # These credentials are used for:
     #   1. Metrics requests
@@ -156,7 +156,16 @@ clickhouse:
     # located in 'clickhouse.configuration.file.path.user' folder
     username: "${CH_USERNAME_PLAIN}"
     password: "${CH_PASSWORD_PLAIN}"
+    # Inline PEM CA bundle the operator uses to verify ClickHouse server TLS.
     rootCA: ""
+    # Alternate source for rootCA — a Secret in the operator's namespace.
+    # Mutually exclusive with the inline rootCA above (inline wins). Empty
+    # `name` = not used (no-op). When `key` is empty, the operator tries
+    # "ca.crt" then "tls.crt". Resolved once at config load (an operator
+    # restart picks up a rotated Secret).
+    rootCASecretRef:
+      name: ""
+      key: ""
 
     # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
     # Can be used instead of explicitly specified username and password available in sections:
@@ -250,7 +259,7 @@ clickhouse:
     # Multiple tables can be matched using regexp. Matched tables are merged using merge() table function.
     # Default is "^(metrics|custom_metrics)$" which fetches from both system.metrics and system.custom_metrics.
     tablesRegexp: "^(metrics|custom_metrics)$"
-    # List of regexps to match ClickHouse metrics to exclude from export.
+    # List of regexps to match ClickHouse metrics to exclude from collection/export.
     # Regexps match internal metric names before Prometheus normalization and prefixing.
     # Default is the per-CPU OS metrics filter shown below; set to [] to disable.
     excludeRegexp:
@@ -320,7 +329,7 @@ security:
     tls:
       # Strict refuses an insecure kubeconfig at startup
       verify: ""
-      # Reserved — not yet enforced on K8s API transport
+      # Floors the K8s API client transport TLS version; coerced to 1.3 under FIPS/Enforced
       minVersion: ""
   ipc:
     # Plain (default) | Secure (loopback + X-CHOP-Token)
@@ -404,6 +413,8 @@ reconcile:
   runtime:
     # Max number of concurrent CHI reconciles in progress
     reconcileCHIsThreadsNumber: 10
+    # Max number of concurrent CHK reconciles in progress
+    reconcileCHKsThreadsNumber: 1
 
     # The operator reconciles shards concurrently in each CHI with the following limitations:
     #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
@@ -525,12 +536,13 @@ reconcile:
   ##
   ################################################
   recovery:
-    # Recovery scopes keyed by CHI state being recovered from.
+    # Recovery scopes keyed by the CHI .status.status they apply to.
     # Each scope contains on<Event>: <action> mappings that apply while the CHI
-    # is in that state. Multi-scope design anticipates future states beyond Aborted
+    # is in that status. Multi-scope design anticipates future states beyond Aborted
     # (e.g. Failed, Broken).
-    from:
-      # Recovery from Status=Aborted
+    onStatus:
+      # Recovery for a CHI whose .status.status is Aborted (reconcile did not complete)
+      # when one of its host pods transitions to Ready — auto-resumes the reconcile.
       aborted:
         # Action when a pod belonging to an Aborted CHI transitions to Ready:
         #   retry (default) — re-enqueue the CHI for reconcile
@@ -539,13 +551,28 @@ reconcile:
         # Future events (not yet implemented):
         #   onKeeperReady: retry       — retry when a referenced CHK becomes ready
         #   onOperatorRestart: retry   — sweep Aborted CHIs on operator startup
+      # Recovery for a CHI whose .status.status is Completed (fully reconciled) when one
+      # of its host pods regresses to Ready=False and stays NotReady (sustained) without
+      # crashing — auto-heals stuck hosts.
+      completed:
+        # Action when a Completed CHI's pod flips Ready=True -> Ready=False and
+        # stays NotReady for at least onPodNotReadyThreshold:
+        #   none (default) — do nothing
+        #   retry          — re-enqueue the CHI so the stuck host is force-restarted
+        # OFF by default: force-recreating a Completed CHI's pod is destructive — it can
+        # interrupt a replica's in-progress recovery and means hard downtime for a
+        # single-replica shard. Opt in with `retry` only where that trade-off is acceptable.
+        onPodNotReady: none
+        # Minimum duration a pod must stay Ready=False before recovery fires, once enabled
+        # (Go duration string; default 5m). Raise it for slow-recovering replicas.
+        onPodNotReadyThreshold: 5m
       # Future scopes (not yet implemented):
       # failed:
       #   onPodReady: retry
       # broken:
       #   onPodReady: retry
 
-    # Future global policy knobs (not yet implemented) — flat peers of `from`,
+    # Future global policy knobs (not yet implemented) — flat peers of `onStatus`,
     # apply across all recovery scopes:
     #
     # Global kill-switch for auto-recovery:

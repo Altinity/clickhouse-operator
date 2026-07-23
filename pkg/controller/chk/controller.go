@@ -50,11 +50,21 @@ type Controller struct {
 	//pvcDeleter *volume.PVCDeleter
 }
 
-func (c *Controller) new() {
-	c.namer = managers.NewNameManager(managers.NameManagerTypeKeeper)
-	c.kube = kube.NewAdapter(c.Client, c.APIReader, c.namer)
-	//labeler:                 NewLabeler(kube),
-	//pvcDeleter :=              volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeKeeper))
+// NewController creates a CHK Controller with its request-independent collaborators
+// (name manager, kube adapter) initialized once, at construction. controller-runtime
+// reuses a single Controller across all MaxConcurrentReconciles goroutines, so these
+// fields must NOT be (re)assigned per-Reconcile — doing so is a data race once
+// reconcileCHKsThreadsNumber > 1. The CHI controller initializes the same way.
+func NewController(c client.Client, apiReader client.Reader, scheme *apiMachinery.Scheme, extClient apiExtensions.Interface) *Controller {
+	namer := managers.NewNameManager(managers.NameManagerTypeKeeper)
+	return &Controller{
+		Client:    c,
+		APIReader: apiReader,
+		Scheme:    scheme,
+		ExtClient: extClient,
+		namer:     namer,
+		kube:      kube.NewAdapter(c, apiReader, namer),
+	}
 }
 
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -85,7 +95,6 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	c.new()
 	w := c.newWorker()
 
 	if w.ensureFinalizer(ctx, new) {

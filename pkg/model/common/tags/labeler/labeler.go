@@ -56,6 +56,8 @@ func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]str
 		return l.labelServiceShard(params...)
 	case interfaces.LabelServiceHost:
 		return l.labelServiceHost(params...)
+	case interfaces.LabelServiceHostClient:
+		return l.labelServiceHostClient(params...)
 
 	case interfaces.LabelExistingPV:
 		return l.labelExistingPV(params...)

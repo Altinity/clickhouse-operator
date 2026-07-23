@@ -33,8 +33,6 @@ const (
 	dsnUsernamePasswordPairPattern             = "%s:%s@"
 	dsnUsernamePasswordPairUsernameOnlyPattern = "%s@"
 
-	httpsScheme = "https"
-
 	// tlsSettingsLegacy is the registry key used when no per-endpoint TLS knobs
 	// are configured (the legacy path). Identical knobs across endpoints share
 	// this key. Endpoints with explicit Verify/MinVersion/ServerName/rootCA get
@@ -212,7 +210,7 @@ func (c *EndpointCredentials) makeDSN(hideCredentials bool) string {
 		c.hostname,
 		strconv.Itoa(c.port),
 	)
-	if c.scheme == httpsScheme {
+	if c.scheme == api.ChSchemeHTTPS {
 		baseUrl += "?tls_config=" + c.tlsConfigKey
 	}
 	return baseUrl
@@ -228,7 +226,7 @@ func (c *EndpointCredentials) makeDSNLogQueries(hideCredentials bool) string {
 		strconv.Itoa(c.port),
 	)
 	baseUrl += "?log_queries=1"
-	if c.scheme == httpsScheme {
+	if c.scheme == api.ChSchemeHTTPS {
 		baseUrl += "&tls_config=" + c.tlsConfigKey
 	}
 	return baseUrl

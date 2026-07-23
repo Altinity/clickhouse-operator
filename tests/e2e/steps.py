@@ -5,6 +5,7 @@ import e2e.util as util
 import uuid
 import os
 import re
+import shlex
 import yaml
 import time
 import inspect
@@ -92,6 +93,28 @@ def set_settings(self):
 
     self.context.kubectl_cmd = define("kubectl_cmd", os.getenv("KUBECTL_CMD") if "KUBECTL_CMD" in os.environ else self.context.kubectl_cmd)
 
+    # Dual-cluster e2e: extract the --context / --kubeconfig flags from kubectl_cmd so
+    # direct subprocess kubectl calls (e.g. the port-forward helpers in steps_fips.py)
+    # hit the SAME cluster as kubectl.launch(). Empty list for single-cluster runs.
+    # Only the --flag=value form is recognized (the dual wrapper emits exactly that);
+    # space-separated "--context foo" would drop the value and is not used.
+    self.context.kubectl_context_args = [
+        arg for arg in shlex.split(self.context.kubectl_cmd)
+        if arg.startswith(("--context=", "--kubeconfig="))
+    ]
+    # minikube profile for direct `minikube` invocations (e.g. decoy image load).
+    self.context.minikube_profile = define(
+        "minikube_profile", os.getenv("MINIKUBE_PROFILE") if "MINIKUBE_PROFILE" in os.environ else "minikube"
+    )
+    # Direct-subprocess kube calls invoke the `kubectl` binary natively, so they can
+    # only carry --context/--kubeconfig when the suite runs --native. A dual-cluster
+    # run (context flags present) via the docker-compose runner path cannot route them.
+    if self.context.kubectl_context_args and not current().context.native:
+        raise ValueError(
+            "KUBECTL_CMD carries --context/--kubeconfig but the suite is not --native; "
+            "dual-cluster runs require --native so port-forward/minikube calls reach the right cluster"
+        )
+
     self.context.test_namespace = define("test_namespace", os.getenv("TEST_NAMESPACE") if "TEST_NAMESPACE" in os.environ else "test")
     self.context.operator_version = define("operator_version", (
         os.getenv("OPERATOR_VERSION")
@@ -124,13 +147,6 @@ def set_settings(self):
     self.context.image_pull_policy = define("image_pull_policy", os.getenv("IMAGE_PULL_POLICY") if "IMAGE_PULL_POLICY" in os.environ else "Always")
 
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-stable.yaml"
-    # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-19.17.yaml"
-    # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-20.3.yaml"
-    # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-20.8.yaml"
-    # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-21.3.yaml"
-    # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-21.8.yaml"
-    # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-22.3.yaml"
-    # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-22.8.yaml"
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-23.3.yaml"
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-23.8.yaml"
     self.context.clickhouse_template = define("clickhouse_template",  os.getenv("CLICKHOUSE_TEMPLATE") if "CLICKHOUSE_TEMPLATE" in os.environ else "manifests/chit/tpl-clickhouse-stable.yaml")

@@ -177,7 +177,7 @@ func legacyVerifiedTLSConfig() *tls.Config {
 // users opting into TLS hardening should not silently get InsecureSkipVerify=true.
 func (c *Connection) setupTLSAdvanced() {
 	// Nothing to do for HTTP DSNs.
-	if c.params.scheme != httpsScheme {
+	if c.params.scheme != api.ChSchemeHTTPS {
 		return
 	}
 

@@ -21,9 +21,17 @@ spec:
       labels:
         {{- include "altinity-clickhouse-operator.labels" . | nindent 8 }}
         app.kubernetes.io/component: crd-install-hook
+      {{- with .Values.crdHook.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: {{ include "altinity-clickhouse-operator.fullname" . }}-crd-install
       restartPolicy: OnFailure
+      {{- with .Values.crdHook.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.crdHook.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

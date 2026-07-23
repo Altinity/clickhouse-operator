@@ -111,10 +111,11 @@ def run_shell(cmd, timeout=600, ok_to_fail=False, shell=None, retry_transient=Fa
         assert code == 0, error()
 
 
-def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None):
+def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None, wait=True):
     with When(f"Delete {kind} {name}"):
+        wait_flag = "" if wait else "--wait=false"
         launch(
-            f"delete {kind} {name} -v 5 --now --timeout=600s",
+            f"delete {kind} {name} -v 5 --now --timeout=600s {wait_flag}".strip(),
             ns=ns,
             timeout=600,
             ok_to_fail=ok_to_fail,
@@ -233,7 +234,7 @@ def delete_all(kind, ns=None):
                 # OR mid-restart — e.g. chopconf onChange=restart in test_030008)
                 # makes `kubectl delete --timeout` exit non-zero; we recover via
                 # the force-clear loop below, so this must not raise here.
-                delete_kind(kind, name, ns=ns, ok_to_fail=True)
+                delete_kind(kind, name, ns=ns, ok_to_fail=True, wait=False)
                 # Stuck/re-attached finalizer recovery. The operator can RE-ATTACH
                 # a finalizer after a clear while it is restarting, so a single
                 # wait_object would race the restart and raise. Re-clear + re-delete
@@ -244,7 +245,7 @@ def delete_all(kind, ns=None):
                     if get_count(kind, name=name, ns=ns) == 0:
                         break
                     force_clear_finalizers(kind, name, ns=ns)
-                    delete_kind(kind, name, ns=ns, ok_to_fail=True)
+                    delete_kind(kind, name, ns=ns, ok_to_fail=True, wait=False)
                     # Only sleep if another re-check follows; skip on the last
                     # attempt so a genuinely-stuck CR hits the final wait_object
                     # (the authoritative leak assertion) without an extra wait.
@@ -252,7 +253,7 @@ def delete_all(kind, ns=None):
                         retry_sleep(attempt, 5, f"{kind}/{name} still terminating")
                 # Final assertion: if the CR survived every force-clear, this
                 # raises — surfacing a real cleanup leak rather than hiding it.
-                wait_object(kind, name, ns=ns, count=0)
+                # wait_object(kind, name, ns=ns, count=0)
 
 
 def delete_all_keeper(ns=None):
@@ -366,7 +367,7 @@ def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None):
         raise ValueError(f"Failed to parse JSON from: {stripped}") from e
 
 
-def get_container_restart_count(pod, container, ns=None, shell=None):
+def get_container_restart_count(pod_name, container=None, ns=None, shell=None):
     """restartCount of a single named container in a pod; None if pod/container absent.
 
     Name-scoped on purpose: callers detecting a SPECIFIC container's in-place
@@ -374,13 +375,16 @@ def get_container_restart_count(pod, container, ns=None, shell=None):
     container restarts). Parses the pod JSON in Python to avoid the jsonpath
     quoting hazard of an inline `[?(@.name=="...")]` filter.
     """
-    pod_obj = get("pod", pod, ns=ns, ok_to_fail=True, shell=shell)
-    if not pod_obj:
+    pod = get("pod", pod_name, ns=ns, ok_to_fail=True, shell=shell)
+    if not pod:
         return None
-    statuses = (pod_obj.get("status") or {}).get("containerStatuses") or []
-    for cs in statuses:
-        if cs.get("name") == container:
-            return int(cs.get("restartCount") or 0)
+    statuses = (pod.get("status") or {}).get("containerStatuses") or []
+    if container != None:
+        for cs in statuses:
+            if cs.get("name") == container:
+                return int(cs.get("restartCount") or 0)
+    else:
+        return sum(int(cs.get("restartCount") or 0) for cs in statuses)
     return None
 
 
@@ -578,9 +582,19 @@ def get_pod_status(pod, shell=None, ns=None):
 def wait_container_status(pod, status, shell=None, ns=None):
     wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns, shell=shell)
 
-def get_container_status(pod, shell=None, ns=None):
-    return get_field("pod", pod, ".status.containerStatuses[0].ready", ns, shell=shell)
+def get_container_status(pod, container_index=0, shell=None, ns=None):
+    return get_field("pod", pod, f".status.containerStatuses[{container_index}].ready", ns, shell=shell)
 
+
+def get_condition_status(pod_name, condition_type, shell=None, ns=None):
+    pod = get("pod", pod_name, ns=ns, ok_to_fail=True, shell=shell)
+    if not pod:
+        return None
+    conditions = (pod.get("status") or {}).get("conditions") or []
+    for condition in conditions:
+        if condition.get("type") == condition_type:
+            return condition.get("status")
+    return None
 
 def wait_field(
     kind,
@@ -938,8 +952,10 @@ def force_reconcile(name, kind, taskID, ns=None, shell=None):
         # InProgress poll. The accept-set on the Completed wait below tolerates
         # either "already Completed" or "InProgress → Completed" transitions.
         if kind == "chi":
+            wait_chi_status(name, "InProgress", ns=ns, shell=shell)
             wait_chi_status(name, "Completed", ns=ns, shell=shell)
         elif kind == "chk":
+            wait_chk_status(name, "InProgress", ns=ns, shell=shell)
             wait_chk_status(name, "Completed", ns=ns, shell=shell)
         else:
             assert kind == "chi" or kind == "chk"

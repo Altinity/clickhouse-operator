@@ -15,6 +15,8 @@
 package v1
 
 import (
+	"strings"
+
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -40,6 +42,19 @@ const (
 // NewPVCProvisionerFromString creates new PVCProvisioner from string
 func NewPVCProvisionerFromString(s string) PVCProvisioner {
 	return PVCProvisioner(s)
+}
+
+// Normalize folds any letter-casing of a recognized value to its canonical
+// PVCProvisioner const, so the CRD can accept both humped and all-lowercase forms
+// (e.g. "operator" -> "Operator"). Unrecognized values are returned unchanged for
+// the caller's IsValid()/reset to handle.
+func (v PVCProvisioner) Normalize() PVCProvisioner {
+	for _, known := range []PVCProvisioner{PVCProvisionerStatefulSet, PVCProvisionerOperator} {
+		if strings.EqualFold(string(v), string(known)) {
+			return known
+		}
+	}
+	return v
 }
 
 // IsValid checks whether PVCProvisioner is valid
@@ -82,6 +97,19 @@ const (
 // NewPVCReclaimPolicyFromString creates new PVCReclaimPolicy from string
 func NewPVCReclaimPolicyFromString(s string) PVCReclaimPolicy {
 	return PVCReclaimPolicy(s)
+}
+
+// Normalize folds any letter-casing of a recognized value to its canonical
+// PVCReclaimPolicy const, so the CRD can accept both humped and all-lowercase forms
+// (e.g. "delete" -> "Delete"). Unrecognized values are returned unchanged for the
+// caller's IsValid()/reset to handle.
+func (v PVCReclaimPolicy) Normalize() PVCReclaimPolicy {
+	for _, known := range []PVCReclaimPolicy{PVCReclaimPolicyRetain, PVCReclaimPolicyDelete} {
+		if strings.EqualFold(string(v), string(known)) {
+			return known
+		}
+	}
+	return v
 }
 
 // IsValid checks whether PVCReclaimPolicy is valid

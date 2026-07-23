@@ -167,6 +167,16 @@ spec:
                         rootCA:
                           type: string
                           description: "Root certificate authority that clients use when verifying server certificates. Used for https connection to ClickHouse"
+                        rootCASecretRef:
+                          type: object
+                          description: "Reference to a k8s Secret (in the operator namespace) holding the PEM root certificate authority used when verifying ClickHouse server certificates over https. Alternate source for rootCA; mutually exclusive with the inline rootCA above (inline wins)."
+                          properties:
+                            name:
+                              type: string
+                              description: "Name of the k8s Secret holding the PEM CA bundle. Empty name = not used"
+                            key:
+                              type: string
+                              description: "Key within the Secret whose value is the PEM CA bundle. When empty, the operator tries 'ca.crt' then 'tls.crt'"
                         secret:
                           type: object
                           properties:
@@ -265,7 +275,7 @@ spec:
                           items:
                             type: string
                           description: |
-                            List of regexps to match ClickHouse metrics to exclude from export.
+                            List of regexps to match ClickHouse metrics to exclude from collection/export.
                             Regexps match internal metric names before Prometheus normalization and prefixing.
                 security:
                   type: object
@@ -273,7 +283,7 @@ spec:
                     Per-component security toggles for outbound connections the operator establishes:
                     ClickHouse-client TLS (clickhouse.tls.verify, clickhouse.tls.minVersion, clickhouse.tls.serverName, clickhouse.tls.rootCA, clickhouse.tls.rootCASecretRef),
                     ZooKeeper/Keeper-client TLS (zookeeper.tls.verify, zookeeper.tls.minVersion),
-                    Kubernetes-client startup gate (kubernetes.tls.verify=Strict refuses an insecure kubeconfig; kubernetes.tls.minVersion is declared for shape uniformity but not yet enforced on the K8s API transport),
+                    Kubernetes-client TLS (kubernetes.tls.verify=Strict refuses an insecure kubeconfig at startup; kubernetes.tls.minVersion floors the K8s API client transport, coerced to 1.3 under FIPS/Enforced),
                     operator↔metrics-exporter IPC channel hardening (ipc.mode, ipc.bindHost, ipc.tokenPath).
                     Operator-wide master switch (security.policy): Permissive (default) preserves 0.27.0
                     behavior; Enforced coerces all per-component knobs above to their Strict positions
@@ -307,9 +317,12 @@ spec:
                               - ReadOnStart. Accept CHIT updates on the operators start only.
                               - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
                           enum:
+                            # both humped and all-lowercase accepted
                             - ""
                             - "ReadOnStart"
+                            - "readonstart"
                             - "ApplyOnNextReconcile"
+                            - "applyonnextreconcile"
                         path:
                           type: string
                           description: "Path to folder where ClickHouseInstallationTemplate .yaml manifests are located."
@@ -326,6 +339,11 @@ spec:
                           minimum: 1
                           maximum: 65535
                           description: "How many goroutines will be used to reconcile CHIs in parallel, 10 by default"
+                        reconcileCHKsThreadsNumber:
+                          type: integer
+                          minimum: 1
+                          maximum: 65535
+                          description: "How many goroutines will be used to reconcile CHKs in parallel, 1 by default"
                         reconcileShardsThreadsNumber:
                           type: integer
                           minimum: 1
@@ -546,15 +564,15 @@ spec:
                                 - "reconcile"
                     recovery:
                       type: object
-                      description: "Auto-recovery from reconcile failures, scoped by CHI state"
+                      description: "Auto-recovery from reconcile failures, scoped by CHI status"
                       properties:
-                        from:
+                        onStatus:
                           type: object
-                          description: "Recovery scopes keyed by CHI state being recovered from"
+                          description: "Recovery scopes keyed by the CHI .status.status they apply to"
                           properties:
                             aborted:
                               type: object
-                              description: "Recovery from Status=Aborted"
+                              description: "Recovery while Status=Aborted"
                               properties:
                                 onPodReady:
                                   type: string
@@ -568,6 +586,28 @@ spec:
                                     - "none"
                                     - "Retry"
                                     - "retry"
+                            completed:
+                              type: object
+                              description: "Recovery while Status=Completed when a child pod regresses to Ready=False and stays NotReady"
+                              properties:
+                                onPodNotReady:
+                                  type: string
+                                  description: |
+                                    Reaction when a pod belonging to a Completed CHI flips Ready=True -> Ready=False
+                                    and stays NotReady for at least onPodNotReadyThreshold. OFF by default — opt-in only,
+                                    because force-recreating the pod is destructive (can interrupt replica recovery;
+                                    hard downtime for a single-replica shard).
+                                      none (default) — do nothing
+                                      retry — re-enqueue the CHI for reconcile (force-restart the stuck host)
+                                  enum:
+                                    - ""
+                                    - "None"
+                                    - "none"
+                                    - "Retry"
+                                    - "retry"
+                                onPodNotReadyThreshold:
+                                  type: string
+                                  description: "Minimum duration a pod must stay Ready=False before recovery fires (Go duration string, e.g. '5m'; default 5m)"
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"

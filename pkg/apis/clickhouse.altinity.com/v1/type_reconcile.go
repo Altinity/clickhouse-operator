@@ -235,21 +235,23 @@ func (r *ChiReconcile) GetConfigMapPropagationTimeoutDuration() time.Duration {
 	return time.Duration(r.GetConfigMapPropagationTimeout()) * time.Second
 }
 
-// Possible reconcile policy values
+// Possible reconcile policy values (canonical humped form; CRD also accepts all-lowercase)
 const (
-	ReconcilingPolicyUnspecified = "unspecified"
-	ReconcilingPolicyWait        = "wait"
-	ReconcilingPolicyNoWait      = "nowait"
+	ReconcilingPolicyUnspecified = "Unspecified"
+	ReconcilingPolicyWait        = "Wait"
+	ReconcilingPolicyNoWait      = "NoWait"
 )
 
-// IsReconcilingPolicyWait checks whether reconcile policy is "wait"
+// IsReconcilingPolicyWait checks whether reconcile policy is "Wait".
+// EqualFold so both humped and all-lowercase inputs match regardless of normalization order.
 func (r *ChiReconcile) IsReconcilingPolicyWait() bool {
-	return strings.ToLower(r.GetPolicy()) == ReconcilingPolicyWait
+	return strings.EqualFold(r.GetPolicy(), ReconcilingPolicyWait)
 }
 
-// IsReconcilingPolicyNoWait checks whether reconcile policy is "no wait"
+// IsReconcilingPolicyNoWait checks whether reconcile policy is "NoWait".
+// EqualFold so both humped and all-lowercase inputs match regardless of normalization order.
 func (r *ChiReconcile) IsReconcilingPolicyNoWait() bool {
-	return strings.ToLower(r.GetPolicy()) == ReconcilingPolicyNoWait
+	return strings.EqualFold(r.GetPolicy(), ReconcilingPolicyNoWait)
 }
 
 // GetCleanup gets cleanup

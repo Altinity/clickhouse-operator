@@ -167,6 +167,12 @@ func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *api.Hos
 	return s.QueryHostInt(ctx, host, s.sqlActiveQueriesNum())
 }
 
+// HostClusterDoesNotExistErrorCount returns how many CLUSTER_DOESNT_EXIST errors the host has
+// recorded (issue #2013 signal - see sqlClusterDoesNotExistErrorCount).
+func (s *ClusterSchemer) HostClusterDoesNotExistErrorCount(ctx context.Context, host *api.Host) (int, error) {
+	return s.QueryHostInt(ctx, host, s.sqlClusterDoesNotExistErrorCount())
+}
+
 // HostClickHouseVersion returns ClickHouse version on the host
 func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *api.Host) (string, error) {
 	return s.QueryHostString(ctx, host, s.sqlVersion())

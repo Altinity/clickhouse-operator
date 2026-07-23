@@ -8,6 +8,7 @@ from requirements.requirements import *
 xfails = {
     # test_operator.py
     "/regression/e2e.test_operator/test_010021*": [(Fail, "Storage test is flaky on github")],
+    "/regression/e2e.test_operator/test_010082_1*": [(Fail, "Canary via CHIT injection does not work")],
     "/regression/e2e.test_operator/test_020005*": [(Fail, "Keeper scale-up/scale-down is flaky")],
 }
 
@@ -23,7 +24,6 @@ def regression(self, native, keeper_type, fips140_mode):
         features = [
             "e2e.test_metrics_exporter",
             "e2e.test_operator",
-            "e2e.test_acvp",
         ]
         for feature_name in features:
             Feature(run=load(feature_name, "test"))

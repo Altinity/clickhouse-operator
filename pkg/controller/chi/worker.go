@@ -27,6 +27,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
@@ -191,6 +192,17 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 
 	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host):
 		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
+		return true
+
+	case chop.Config().ShouldRecoverCompletedOnPodNotReady() &&
+		w.isPodSustainedNotReady(ctx, host, chop.Config().CompletedOnPodNotReadyThreshold()):
+		// Closes the gap where Completed CHIs with a sustained-NotReady host
+		// were left stuck indefinitely.
+		threshold := chop.Config().CompletedOnPodNotReadyThreshold()
+		w.a.V(1).M(host).F().
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonHostStuckNotReady).
+			Info("Host pod has been Ready=False past threshold %s — force restart. Host: %s",
+				threshold, host.GetName())
 		return true
 
 	default:

@@ -115,6 +115,14 @@ chPassword: clickhouse_operator_password
 chPort: 8123
 ```
 
+When the operator connects over HTTPS, it verifies the ClickHouse server certificate
+with the CA from `clickhouse.access.rootCA` (inline PEM) or `clickhouse.access.rootCASecretRef`
+(a Secret in the operator's own namespace; key defaults to `ca.crt` then `tls.crt`, inline
+`rootCA` wins). Verification is enforced when TLS hardening is opted in —
+`security.clickhouse.tls.verify: Strict`, or a non-empty `minVersion`/`serverName`; otherwise
+the CA is loaded but verification stays relaxed for backward compatibility.
+See the [operator config example](chi-examples/70-chop-config.yaml).
+
 ## ClickHouse Installation settings
 
 Operator deploys ClickHouse clusters with different defaults, that can be configured in a flexible way. 

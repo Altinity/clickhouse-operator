@@ -1,0 +1,14 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-035-3-opt-out"
+spec:
+  reconcile:
+    recovery:
+      onStatus:
+        # Explicit opt-out: even with an aggressive 30s threshold, onPodNotReady=none
+        # must leave a sustained-NotReady pod alone (no force-recreate). Isolates the
+        # on/off knob from the threshold — proves the default-off contract.
+        completed:
+          onPodNotReady: none
+          onPodNotReadyThreshold: 30s

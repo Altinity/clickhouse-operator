@@ -64,7 +64,14 @@ def restart_operator(ns=None, timeout=600, shell=None):
     pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     old_pod_name = pod["metadata"]["name"]
     old_pod_ip = pod["status"]["podIP"]
-    kubectl.launch(f"delete pod {old_pod_name}", ns=ns, timeout=timeout, shell=shell)
+    # --ignore-not-found: when called via apply_operator_config(), the just-applied
+    # chopconf makes the operator self-restart (watch.configuration.onChange=restart),
+    # replacing this pod before we delete it -> `delete pod <old>` would hit NotFound.
+    # That is the desired end state (the restart already happened), so a missing pod is
+    # success. Using --ignore-not-found rather than ok_to_fail tolerates ONLY that race
+    # while still surfacing a genuine delete failure (RBAC, wrong namespace) as an error.
+    # The rollout-status wait below remains the real readiness gate.
+    kubectl.launch(f"delete pod {old_pod_name} --ignore-not-found", ns=ns, timeout=timeout, shell=shell)
     kubectl.wait_object("pod", name="", ns=ns, label=operator_label, shell=shell)
     pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     new_pod_name = pod["metadata"]["name"]
@@ -286,6 +293,26 @@ def get_metrics(operator_pod=None, operator_namespace=None, container="metrics-e
         ns=operator_namespace,
     )
 
+def _apply_operator_godebug(shell=None):
+    mode = getattr(current().context, "fips140_mode", None)
+    if not mode:
+        return
+
+    ns = current().context.operator_namespace
+    expected = f"fips140={mode}"
+
+    kubectl.launch(
+        "set env deployment/clickhouse-operator "
+        f"--overwrite GODEBUG={expected}",
+        ns=ns,
+        shell=shell,
+    )
+    kubectl.launch(
+        "rollout status deployment/clickhouse-operator",
+        ns=ns,
+        timeout=600,
+        shell=shell,
+    )
 
 def install_operator_if_not_exist(
     reinstall=False,
@@ -323,6 +350,9 @@ def install_operator_if_not_exist(
                 shell=shell
             )
         set_operator_version(current().context.operator_version, shell=shell)
+
+    if not hasattr(current().context, "skip_fips"):
+        _apply_operator_godebug(shell=shell)
 
 
 def install_operator_version(version, shell=None):

@@ -58,7 +58,9 @@ func (c *Controller) OnStatefulSetCreateFailed(ctx context.Context, host *api.Ho
 		return common.ErrCRUDIgnore
 	}
 
-	return common.ErrCRUDUnexpectedFlow
+	// This is unexpected flow
+	// Keep it commented out for not to have linter complain
+	// return common.ErrCRUDUnexpectedFlow
 }
 
 // OnStatefulSetUpdateFailed handles situation when StatefulSet update failed in k8s level
@@ -102,7 +104,9 @@ func (c *Controller) OnStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 		return common.ErrCRUDIgnore
 	}
 
-	return common.ErrCRUDUnexpectedFlow
+	// This is unexpected flow
+	// Keep it commented out for not to have linter complain
+	// return common.ErrCRUDUnexpectedFlow
 }
 
 // shouldContinueOnCreateFailed return nil in case 'continue' or error in case 'do not continue'

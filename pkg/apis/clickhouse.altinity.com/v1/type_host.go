@@ -748,7 +748,7 @@ func (host *Host) ShouldIncludeIntoCluster() bool {
 	switch {
 	case host.IsStopped():
 		return false
-	case host.GetCluster().HostsCount() < 2:
+	case host.GetCluster().IsSingleNode():
 		return false
 	default:
 		return true

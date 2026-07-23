@@ -17,7 +17,7 @@ package v1
 // HostTemplatesIndex describes index of host templates
 type HostTemplatesIndex struct {
 	// templates maps 'name of the template' -> 'template itself'
-	templates map[string]*HostTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	templates map[string]*HostTemplate `testdiff:"ignore"`
 }
 
 // NewHostTemplatesIndex creates new HostTemplatesIndex object
@@ -71,7 +71,7 @@ func (i *HostTemplatesIndex) Walk(f func(template *HostTemplate)) {
 // PodTemplatesIndex describes index of pod templates
 type PodTemplatesIndex struct {
 	// templates maps 'name of the template' -> 'template itself'
-	templates map[string]*PodTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	templates map[string]*PodTemplate `testdiff:"ignore"`
 }
 
 // NewPodTemplatesIndex creates new PodTemplatesIndex object
@@ -125,7 +125,7 @@ func (i *PodTemplatesIndex) Walk(f func(template *PodTemplate)) {
 // VolumeClaimTemplatesIndex describes index of volume claim templates
 type VolumeClaimTemplatesIndex struct {
 	// templates maps 'name of the template' -> 'template itself'
-	templates map[string]*VolumeClaimTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	templates map[string]*VolumeClaimTemplate `testdiff:"ignore"`
 }
 
 // NewVolumeClaimTemplatesIndex creates new VolumeClaimTemplatesIndex object
@@ -179,7 +179,7 @@ func (i *VolumeClaimTemplatesIndex) Walk(f func(template *VolumeClaimTemplate)) 
 // ServiceTemplatesIndex describes index of service templates
 type ServiceTemplatesIndex struct {
 	// templates maps 'name of the template' -> 'template itself'
-	templates map[string]*ServiceTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	templates map[string]*ServiceTemplate `testdiff:"ignore"`
 }
 
 // NewServiceTemplatesIndex creates new ServiceTemplatesIndex object

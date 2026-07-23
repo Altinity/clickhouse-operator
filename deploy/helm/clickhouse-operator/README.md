@@ -1,6 +1,6 @@
 # altinity-clickhouse-operator
 
-![Version: 0.27.1](https://img.shields.io/badge/Version-0.27.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.27.1](https://img.shields.io/badge/AppVersion-0.27.1-informational?style=flat-square)
+![Version: 0.27.2](https://img.shields.io/badge/Version-0.27.2-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.27.2](https://img.shields.io/badge/AppVersion-0.27.2-informational?style=flat-square)
 
 Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
 
@@ -83,6 +83,8 @@ crdHook:
 | crdHook.image.tag | string | `"latest"` | image tag for CRD installation job |
 | crdHook.imagePullSecrets | list | `[]` | image pull secrets for CRD installation job possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |
 | crdHook.nodeSelector | object | `{}` | node selector for CRD installation job |
+| crdHook.podAnnotations | object | `{}` | additional annotations for CRD installation job pod template useful to opt out of service mesh injection, e.g. `sidecar.istio.io/inject: "false"` |
+| crdHook.podSecurityContext | object | `{}` | pod-level security context for CRD installation job required by some admission policies (e.g. Kyverno `restrict-seccomp-strict`) check `kubectl explain pod.spec.securityContext` for details |
 | crdHook.resources | object | `{}` | resource limits and requests for CRD installation job |
 | crdHook.tolerations | list | `[]` | tolerations for CRD installation job |
 | dashboards.additionalLabels | object | `{"grafana_dashboard":""}` | labels to add to a secret with dashboards |
@@ -138,4 +140,5 @@ crdHook:
 | serviceMonitor.operatorMetrics.scrapeTimeout | string | `""` |  |
 | tolerations | list | `[]` | tolerations for scheduler pod assignment, check `kubectl explain pod.spec.tolerations` for details |
 | topologySpreadConstraints | list | `[]` |  |
+| watchNamespaces | list | `[]` | namespaces where the operator watches for ClickHouseInstallation resources. Sets config.yaml watch.namespaces.include (the exclude list is not exposed here). If empty, the operator watches only its own namespace (or all namespaces when running in kube-system). Use [".*"] to watch all namespaces. Entries are regexps and are Helm-templated, so avoid a literal "{{" in a namespace/regexp. Example: watchNamespaces: ["clickhouse", "my-other-namespace"] |
 

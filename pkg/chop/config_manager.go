@@ -120,6 +120,7 @@ func (cm *ConfigManager) Init() error {
 
 	cm.fetchSecretCredentials()
 	cm.fetchSecurityRootCA()
+	cm.fetchAccessRootCA()
 
 	// From now on we have one unified CHOP config
 	log.V(1).Info("Unified CHOP config - with secret data fetched (but not post-processed yet):")
@@ -488,6 +489,23 @@ func (cm *ConfigManager) fetchSecurityRootCA() {
 	fetchSecurityRootCAResolve(cm.config.Security.GetClickHouse().GetTLS(), ns, cm.getSecretData)
 }
 
+// fetchAccessRootCA resolves clickhouse.access.rootCASecretRef into the inline
+// clickhouse.access.rootCA via the shared resolver (see resolveRootCAFromSecret).
+// Unlike the security path it does not clear the ref afterwards: Access.RootCASecretRef
+// is read only here and never flows into per-CHI merges, so there is nothing to clear.
+func (cm *ConfigManager) fetchAccessRootCA() {
+	ns, _ := cm.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
+	access := &cm.config.ClickHouse.Access
+	resolveRootCAFromSecret(
+		&access.RootCA,
+		access.RootCASecretRef.Name,
+		access.RootCASecretRef.Key,
+		ns,
+		"chopconf clickhouse.access",
+		cm.getSecretData,
+	)
+}
+
 // getSecretData adapts the operator's kubeClient to the secretDataGetter seam.
 func (cm *ConfigManager) getSecretData(namespace, name string) (map[string][]byte, error) {
 	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
@@ -497,64 +515,65 @@ func (cm *ConfigManager) getSecretData(namespace, name string) (map[string][]byt
 	return secret.Data, nil
 }
 
-// fetchSecurityRootCAResolve carries the pure decision logic of fetchSecurityRootCA.
-// Mutates tls in place: inlines RootCA on success, clears RootCASecretRef on any
-// terminal outcome (success or failure).
-//
-// Nil-safe on every input: nil tls, nil RootCASecretRef, or nil getSecret all
-// return early. Empty `ref.Name` is the documented "not used" sentinel — the
-// ref is cleared silently with no warning.
-func fetchSecurityRootCAResolve(tls *api.ClusterSecurityClickHouseTLS, operatorNs string, getSecret secretDataGetter) {
-	if (tls == nil) || (tls.RootCASecretRef == nil) {
+// resolveRootCAFromSecret is the shared decision logic for inlining a CA bundle
+// from a Kubernetes Secret into an inline RootCA PEM string at config-load time.
+// Used by BOTH chopconf security.clickhouse.tls (fetchSecurityRootCA) and
+// clickhouse.access (fetchAccessRootCA). It sets *inline on success and is
+// nil-safe / fail-open: empty secretName is the "not used" sentinel; an inline
+// value already set wins; any fetch/key failure leaves *inline untouched and logs
+// at Warning so operators see it at default verbosity (fix the Secret, restart).
+// `what` labels the config path in log messages. Callers own clearing their own
+// ref form (e.g. the *core.SecretKeySelector on the security TLS struct).
+func resolveRootCAFromSecret(inline *string, secretName, secretKey, operatorNs, what string, getSecret secretDataGetter) {
+	if (inline == nil) || (secretName == "") {
+		// Empty secretName is the documented "not used" sentinel — silent no-op.
+		return
+	}
+	if *inline != "" {
+		// Inline rootCA wins; operators see the warning and pick one.
+		log.Warning("%s: both rootCA and rootCASecretRef=%q set — using inline rootCA, ignoring ref", what, secretName)
 		return
 	}
 	if getSecret == nil {
-		// Defensive: a test seam or future refactor passing nil would otherwise
-		// panic at the call site below. Treat as fetch-error: clear the ref so
-		// downstream merges don't propagate a stub, log so it's diagnosable.
-		log.Warning("chopconf security.clickhouse.tls.rootCASecretRef=%q: secret getter is nil — clearing ref", tls.RootCASecretRef.Name)
-		tls.RootCASecretRef = nil
-		return
-	}
-	ref := tls.RootCASecretRef
-	if ref.Name == "" {
-		// Empty Name is the "not used" sentinel — let users keep the ref block
-		// in their chopconf with empty values without forcing them to comment
-		// it out. Clear the ref so downstream merges don't propagate the stub.
-		tls.RootCASecretRef = nil
-		return
-	}
-	if tls.RootCA != "" {
-		// Inline RootCA wins; clear the ref so downstream merges don't propagate
-		// a conflict per CHI. Operators see the warning and pick one.
-		log.Warning("chopconf security.clickhouse.tls: both rootCA and rootCASecretRef=%q set — using inline rootCA, ignoring ref", ref.Name)
-		tls.RootCASecretRef = nil
+		// Defensive: a nil getter would panic below. Treat as a fetch failure.
+		log.Warning("%s rootCASecretRef=%q: secret getter is nil — ignoring ref", what, secretName)
 		return
 	}
 	if operatorNs == "" {
-		log.Warning("chopconf security.clickhouse.tls.rootCASecretRef=%q: operator namespace unknown; clearing ref (chopconf-level CA disabled)", ref.Name)
-		tls.RootCASecretRef = nil
+		log.Warning("%s rootCASecretRef=%q: operator namespace unknown; secret-sourced CA disabled", what, secretName)
 		return
 	}
-	keys := []string{ref.Key}
-	if ref.Key == "" {
+	keys := []string{secretKey}
+	if secretKey == "" {
 		keys = []string{"ca.crt", "tls.crt"}
 	}
-	data, err := getSecret(operatorNs, ref.Name)
+	data, err := getSecret(operatorNs, secretName)
 	if err != nil {
-		log.Warning("chopconf security.clickhouse.tls.rootCASecretRef: unable to fetch %s/%s: %v — clearing ref (fix the Secret and restart the operator)", operatorNs, ref.Name, err)
-		tls.RootCASecretRef = nil
+		log.Warning("%s rootCASecretRef: unable to fetch %s/%s: %v — ignoring ref (fix the Secret and restart the operator)", what, operatorNs, secretName, err)
 		return
 	}
 	for _, k := range keys {
 		if v, ok := data[k]; ok {
-			tls.RootCA = string(v)
-			tls.RootCASecretRef = nil
-			log.V(1).Info("chopconf security.clickhouse.tls: inlined RootCA from %s/%s key=%s", operatorNs, ref.Name, k)
+			*inline = string(v)
+			log.V(1).Info("%s: inlined RootCA from %s/%s key=%s", what, operatorNs, secretName, k)
 			return
 		}
 	}
-	log.Warning("chopconf security.clickhouse.tls.rootCASecretRef: secret %s/%s exists but none of keys %v found — clearing ref (fix the Secret and restart the operator)", operatorNs, ref.Name, keys)
+	log.Warning("%s rootCASecretRef: secret %s/%s exists but none of keys %v found — ignoring ref (fix the Secret and restart the operator)", what, operatorNs, secretName, keys)
+}
+
+// fetchSecurityRootCAResolve resolves the chopconf security.clickhouse.tls
+// rootCASecretRef via the shared resolveRootCAFromSecret, then ALWAYS clears
+// RootCASecretRef: this ref is operator-scoped and terminal once processed here
+// (success or failure), so it must not propagate into the per-CHI MergeFrom
+// inheritance where the normalizer would re-resolve it against every CHI's
+// namespace. Nil-safe: nil tls or nil RootCASecretRef return early.
+func fetchSecurityRootCAResolve(tls *api.ClusterSecurityClickHouseTLS, operatorNs string, getSecret secretDataGetter) {
+	if (tls == nil) || (tls.RootCASecretRef == nil) {
+		return
+	}
+	ref := tls.RootCASecretRef
+	resolveRootCAFromSecret(&tls.RootCA, ref.Name, ref.Key, operatorNs, "chopconf security.clickhouse.tls", getSecret)
 	tls.RootCASecretRef = nil
 }
 

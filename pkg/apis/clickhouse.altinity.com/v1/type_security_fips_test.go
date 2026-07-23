@@ -51,6 +51,36 @@ func TestSecurity_GetFIPS_IsEnforced_NilSafe(t *testing.T) {
 	require.True(t, (&OperatorConfigSecurity{FIPS: &OperatorConfigSecurityFIPS{Enforced: types.NewStringBool(true)}}).GetFIPS().IsEnforced())
 }
 
+// TestResolveK8sTLSMinVersion verifies hardened posture forces TLS 1.3 and that
+// explicit security.kubernetes.tls.minVersion is honored when not hardened.
+func TestResolveK8sTLSMinVersion(t *testing.T) {
+	require.Equal(t, TLSMinVersion(""), (*OperatorConfig)(nil).ResolveK8sTLSMinVersion())
+	require.Equal(t, TLSMinVersion(""), (&OperatorConfig{}).ResolveK8sTLSMinVersion())
+
+	explicit12 := &OperatorConfig{}
+	explicit12.Security.Kubernetes = &ClusterSecurityKubernetes{
+		TLS: &ClusterSecurityKubernetesTLS{MinVersion: types.NewString(string(TLSMinVersion12))},
+	}
+	require.Equal(t, TLSMinVersion12, explicit12.ResolveK8sTLSMinVersion())
+
+	explicit13 := &OperatorConfig{}
+	explicit13.Security.Kubernetes = &ClusterSecurityKubernetes{
+		TLS: &ClusterSecurityKubernetesTLS{MinVersion: types.NewString(string(TLSMinVersion13))},
+	}
+	require.Equal(t, TLSMinVersion13, explicit13.ResolveK8sTLSMinVersion())
+
+	enforcedOver12 := &OperatorConfig{}
+	enforcedOver12.Security.Policy = types.NewString(string(SecurityPolicyEnforced))
+	enforcedOver12.Security.Kubernetes = &ClusterSecurityKubernetes{
+		TLS: &ClusterSecurityKubernetesTLS{MinVersion: types.NewString(string(TLSMinVersion12))},
+	}
+	require.Equal(t, TLSMinVersion13, enforcedOver12.ResolveK8sTLSMinVersion())
+
+	fipsForced := &OperatorConfig{}
+	fipsForced.Security.FIPS = &OperatorConfigSecurityFIPS{Enforced: types.NewStringBool(true)}
+	require.Equal(t, TLSMinVersion13, fipsForced.ResolveK8sTLSMinVersion())
+}
+
 // TestSecurity_RequiresHardening_NilSafe verifies the union accessor used to
 // gate per-CR security checks (plain-text ZK rejection, FIPS-bypass rejection,
 // ZK digest-auth rejection). Fires when EITHER security.policy=Enforced OR

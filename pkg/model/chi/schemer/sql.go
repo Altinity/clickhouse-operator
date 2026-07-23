@@ -256,6 +256,15 @@ func (s *ClusterSchemer) sqlActiveQueriesNum() string {
 	return `SELECT count() FROM system.processes`
 }
 
+// sqlClusterDoesNotExistErrorCount counts CLUSTER_DOESNT_EXIST occurrences on a host.
+// Non-zero means a cluster-dependent object (Distributed / DICTIONARY / refreshable MV) hit a
+// terminal async startup-load failure because the host booted before its remote_servers was
+// complete - i.e. the issue #2013 condition. A host with no cluster-dependent objects (or one that
+// loaded them cleanly) reports 0.
+func (s *ClusterSchemer) sqlClusterDoesNotExistErrorCount() string {
+	return `SELECT sum(value) FROM system.errors WHERE name = 'CLUSTER_DOESNT_EXIST'`
+}
+
 func (s *ClusterSchemer) sqlVersion() string {
 	return `SELECT version()`
 }

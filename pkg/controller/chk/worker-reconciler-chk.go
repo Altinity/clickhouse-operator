@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -493,23 +494,37 @@ func (w *worker) hostScaleDown(ctx context.Context, host *api.Host, opts *statef
 	return nil
 }
 
-// reconcileHostService reconciles host's Service
+// reconcileHostService reconciles host's Service(s). A host may expose more than one Service
+// (the peer/Raft Service and the client-facing Service — see creator.createServiceHost), so all
+// of them are reconciled and registered; failing to register every reconciled Service would let
+// the cleanup pass purge it as an unknown object.
 func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error {
-	service := w.task.Creator().CreateService(interfaces.ServiceHost, host).First()
-	if service == nil {
+	services := w.task.Creator().CreateService(interfaces.ServiceHost, host)
+	if len(services) == 0 {
 		// This is not a problem, service may be omitted
 		return nil
 	}
-	prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceHost, host.GetAncestor()).First()
-	err := w.reconcileService(ctx, host.GetCR(), service, prevService)
-	if err == nil {
-		w.a.V(1).M(host).F().Info("DONE Reconcile service of the host: %s", host.GetName())
-		w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
-	} else {
-		w.a.V(1).M(host).F().Warning("FAILED Reconcile service of the host: %s", host.GetName())
-		w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
+	prevServices := w.task.CreatorPrev().CreateService(interfaces.ServiceHost, host.GetAncestor())
+	for i, service := range services {
+		if service == nil {
+			continue
+		}
+		// Pair with the previous-generation Service at the same index (creators emit a stable order).
+		var prevService *core.Service
+		if i < len(prevServices) {
+			prevService = prevServices[i]
+		}
+		err := w.reconcileService(ctx, host.GetCR(), service, prevService)
+		if err == nil {
+			w.a.V(1).M(host).F().Info("DONE Reconcile service %s of the host: %s", service.GetName(), host.GetName())
+			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
+		} else {
+			w.a.V(1).M(host).F().Warning("FAILED Reconcile service %s of the host: %s", service.GetName(), host.GetName())
+			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
+			return err
+		}
 	}
-	return err
+	return nil
 }
 
 // reconcileCluster reconciles cluster, excluding nested shards

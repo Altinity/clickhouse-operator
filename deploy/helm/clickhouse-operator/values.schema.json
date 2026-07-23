@@ -480,6 +480,9 @@
                                                 "reconcileCHIsThreadsNumber": {
                                                     "type": "integer"
                                                 },
+                                                "reconcileCHKsThreadsNumber": {
+                                                    "type": "integer"
+                                                },
                                                 "reconcileShardsMaxConcurrencyPercent": {
                                                     "type": "integer"
                                                 },
@@ -518,7 +521,7 @@
                                         "recovery": {
                                             "type": "object",
                                             "properties": {
-                                                "from": {
+                                                "onStatus": {
                                                     "type": "object",
                                                     "properties": {
                                                         "aborted": {
@@ -527,6 +530,18 @@
                                                                 "onPodReady": {
                                                                     "type": "string",
                                                                     "enum": ["", "none", "None", "retry", "Retry"]
+                                                                }
+                                                            }
+                                                        },
+                                                        "completed": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "onPodNotReady": {
+                                                                    "type": "string",
+                                                                    "enum": ["", "none", "None", "retry", "Retry"]
+                                                                },
+                                                                "onPodNotReadyThreshold": {
+                                                                    "type": "string"
                                                                 }
                                                             }
                                                         }
@@ -708,6 +723,12 @@
                     "type": "object"
                 },
                 "annotations": {
+                    "type": "object"
+                },
+                "podAnnotations": {
+                    "type": "object"
+                },
+                "podSecurityContext": {
                     "type": "object"
                 },
                 "containerSecurityContext": {

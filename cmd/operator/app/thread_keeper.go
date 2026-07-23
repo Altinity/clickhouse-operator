@@ -17,7 +17,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	//	ctrl "sigs.k8s.io/controller-runtime/pkg/controller"
+	ctrlController "sigs.k8s.io/controller-runtime/pkg/controller"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
@@ -75,7 +75,10 @@ func initKeeper(ctx context.Context) error {
 
 	// Build the apiextensions client for CRD deletion checks during CHK cleanup.
 	// Uses the same kubeConfigFile/masterURL package vars as the CHI thread.
-	_, extClient, _, _ := chop.GetClientset(kubeConfigFile, masterURL)
+	_, extClient, _, _ := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
+
+	maxConcurrentReconciles := chop.Config().Reconcile.Runtime.ReconcileCHKsThreadsNumber
+	logger.Info("init keeper - CHK controller concurrency", "maxConcurrentReconciles", maxConcurrentReconciles)
 
 	err = ctrlRuntime.
 		NewControllerManagedBy(manager).
@@ -84,13 +87,16 @@ func initKeeper(ctx context.Context) error {
 			builder.WithPredicates(keeperPredicate()),
 		).
 		Owns(&apps.StatefulSet{}).
+		WithOptions(ctrlController.Options{
+			MaxConcurrentReconciles: maxConcurrentReconciles,
+		}).
 		Complete(
-			&controller.Controller{
-				Client:    manager.GetClient(),
-				APIReader: manager.GetAPIReader(),
-				Scheme:    manager.GetScheme(),
-				ExtClient: extClient,
-			},
+			controller.NewController(
+				manager.GetClient(),
+				manager.GetAPIReader(),
+				manager.GetScheme(),
+				extClient,
+			),
 		)
 	if err != nil {
 		logger.Error(err, "init keeper - unable to ctrlRuntime.NewControllerManagedBy")

@@ -106,8 +106,14 @@ func serveMetrics(addr, path string) {
 	handler := promhttp.HandlerFor(prom.DefaultGatherer, promhttp.HandlerOpts{
 		ErrorHandling: promhttp.ContinueOnError,
 	})
-	http.Handle(path, handler)
-	err := http.ListenAndServe(addr, nil)
+	// Serve a private mux, NOT http.DefaultServeMux. controller-runtime (pulled in by
+	// the CHK controller) transitively imports net/http/pprof, whose init() registers
+	// /debug/pprof/* on DefaultServeMux. Binding DefaultServeMux here — ListenAndServe(
+	// addr, nil) — would expose those pprof endpoints (CPU profile, heap, goroutine) on
+	// this public metrics port. A dedicated mux serves only the metrics handler.
+	mux := http.NewServeMux()
+	mux.Handle(path, handler)
+	err := http.ListenAndServe(addr, mux)
 	if err != nil {
 		fmt.Printf("error serving http: %v", err)
 	}
