@@ -5720,7 +5720,7 @@ def test_010056(self):
             assert out != "0"
 
         with And("Replica still should be unready after reconcile timeout"):
-            ready = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-1-0", ".metadata.labels.clickhouse\.altinity\.com\/ready")
+            ready = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-1-0", r".metadata.labels.clickhouse\.altinity\.com\/ready")
             print(f"ready label={ready}")
             assert ready != "yes", error("Replica should be unready")
 
@@ -5746,7 +5746,7 @@ def test_010056(self):
 
         with Then("Replica should become ready"):
             kubectl.wait_field("pod", f"chi-{chi}-{cluster}-0-1-0",
-                                       ".metadata.labels.clickhouse\.altinity\.com\/ready", value="yes")
+                                       r".metadata.labels.clickhouse\.altinity\.com\/ready", value="yes")
 
         with And("Replication delay should be zero"):
             out = clickhouse.query(chi, "select max(absolute_delay) from system.replicas", host=f"chi-{chi}-{cluster}-0-1-0")
@@ -7094,6 +7094,164 @@ def test_010072(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
+
+@TestScenario
+@Name("test_010079. Test replicated host sync gate")
+def test_010079(self):
+    create_shell_namespace_clickhouse_template()
+
+    with Given("I enable replicated host sync gate"):
+        util.apply_operator_config("manifests/chopconf/test-079-sync-gate.yaml")
+
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    manifest = "manifests/chi/test-079-sync-gate-1.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
+    source_host = f"chi-{chi}-{cluster}-0-0-0"
+    delayed_replica_host = f"chi-{chi}-{cluster}-0-1-0"
+    next_replica_host = f"chi-{chi}-{cluster}-0-2-0"
+    delayed_replica_fqdn = f"chi-{chi}-{cluster}-0-1.{current().context.test_namespace}.svc.cluster.local"
+
+    def get_replica_caught_up_hosts():
+        chi_status = kubectl.get("chi", chi).get("status") or {}
+        return chi_status.get("hostsWithReplicaCaughtUp") or []
+
+    def wait_table_exists_on_delayed_replica():
+        table_exists = "0"
+        for attempt_index in range(1, 11):
+            table_exists = clickhouse.query_with_error(
+                chi,
+                "select count() from system.tables where name='test_079'",
+                host=delayed_replica_host,
+            )
+            if table_exists == "1":
+                break
+            retry_sleep(attempt_index, 10, "Table is not ready on delayed replica")
+        assert table_exists == "1", error("Table was not created on a new replica")
+
+    def wait_replica_caught_up_marker():
+        caught_up_hosts = []
+        for attempt_index in range(1, 25):
+            caught_up_hosts = get_replica_caught_up_hosts()
+            if delayed_replica_fqdn in caught_up_hosts:
+                break
+            retry_sleep(attempt_index, 5, "Replica caught-up marker is not ready")
+        assert delayed_replica_fqdn in caught_up_hosts, error("Replica caught-up marker was not written")
+
+    def wait_delayed_replica_row_count(expected_count):
+        row_count = ""
+        for attempt_index in range(1, 13):
+            row_count = clickhouse.query(chi, "select count() from test_079", host=delayed_replica_host)
+            if row_count == expected_count:
+                break
+            retry_sleep(attempt_index, 5, "Table data is not yet replicated")
+        assert row_count == expected_count, error("Table data has not been replicated")
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Create a replicated table"):
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_079 (a Int64) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY a PARTITION BY a",
+        )
+        clickhouse.query(chi, "INSERT INTO test_079 SELECT 1")
+
+    with And("STOP REPLICATED SENDS"):
+        clickhouse.query(chi, "SYSTEM STOP REPLICATED SENDS", host=source_host)
+
+    with When("Scale to three replicas while the new replica is delayed"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-079-sync-gate-2.yaml",
+            check={
+                "do_not_delete": 1,
+                "pod_count": 2,
+                "chi_status": "InProgress",
+            },
+        )
+
+        with Then("Table should be created on the delayed replica"):
+            wait_table_exists_on_delayed_replica()
+
+        with And("Table should have no data replicated"):
+            query_result = clickhouse.query(chi, "select count() from test_079", host=delayed_replica_host)
+            assert query_result == "0", error("Table data has been replicated")
+
+        with And("Replication delay should be non-zero"):
+            replica_delay = clickhouse.query(
+                chi,
+                "select max(absolute_delay) from system.replicas",
+                host=delayed_replica_host,
+            )
+            print(f"max(absolute_delay)={replica_delay}")
+            assert replica_delay != "0"
+
+        with And("Wait for the sync gate to observe the delayed replica"):
+            time.sleep(30)
+
+        with And("Delayed replica should not have a caught-up marker"):
+            caught_up_hosts = get_replica_caught_up_hosts()
+            print(yaml.safe_dump(caught_up_hosts))
+            assert delayed_replica_fqdn not in caught_up_hosts
+
+        with And("Next replica should not be created while the gate waits"):
+            pod_count = kubectl.get_count("pod", chi=chi)
+            assert pod_count == 2, error(f"Expected 2 pods while gate waits, got {pod_count}")
+            next_replica_pod = kubectl.get("pod", next_replica_host, ok_to_fail=True)
+            assert next_replica_pod is None, error("Next replica should not be created before sync completes")
+
+        with And("Delayed replica should still be unready"):
+            ready_label = kubectl.get_field(
+                "pod",
+                delayed_replica_host,
+                r".metadata.labels.clickhouse\.altinity\.com\/ready",
+            )
+            print(f"ready label={ready_label}")
+            assert ready_label != "yes", error("Delayed replica should be unready")
+
+    with When("START REPLICATED SENDS"):
+        clickhouse.query(chi, "SYSTEM START REPLICATED SENDS", host=source_host)
+
+        with And("Live inserts continue after sync starts"):
+            clickhouse.query(chi, "INSERT INTO test_079 SELECT number + 2 FROM numbers(5)", host=source_host)
+
+        with Then("Delayed replica should receive a caught-up marker"):
+            wait_replica_caught_up_marker()
+
+        with And("Delayed replica should become ready"):
+            kubectl.wait_field(
+                "pod",
+                delayed_replica_host,
+                r".metadata.labels.clickhouse\.altinity\.com\/ready",
+                value="yes",
+            )
+
+        with And("Next replica should be created after sync completes"):
+            kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=3)
+            kubectl.wait_field(
+                "pod",
+                next_replica_host,
+                r".metadata.labels.clickhouse\.altinity\.com\/ready",
+                value="yes",
+            )
+
+        with And("Live inserts should be visible on the synced replica"):
+            wait_delayed_replica_row_count("6")
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
 
 @TestScenario
 @Tags("HEAVY")

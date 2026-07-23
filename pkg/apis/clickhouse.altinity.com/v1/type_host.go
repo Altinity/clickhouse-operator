@@ -66,6 +66,7 @@ type HostRuntime struct {
 	reconcileAttributes *types.ReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
 	replicas            *types.Int32               `json:"-" yaml:"-"`
 	hasData             bool                       `json:"-" yaml:"-"`
+	forceReplicaCatchUp bool                       `json:"-" yaml:"-"`
 
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
@@ -734,6 +735,20 @@ func (host *Host) SetHasData(hasData bool) {
 		return
 	}
 	host.Runtime.hasData = hasData
+}
+
+func (host *Host) IsForceReplicaCatchUp() bool {
+	if host == nil {
+		return false
+	}
+	return host.Runtime.forceReplicaCatchUp
+}
+
+func (host *Host) SetForceReplicaCatchUp(force bool) {
+	if host == nil {
+		return
+	}
+	host.Runtime.forceReplicaCatchUp = force
 }
 
 func (host *Host) IsZero() bool {

@@ -222,6 +222,85 @@ spec:
 
 See [Keeper Reference](keeper_reference.md) for details on how CHI references CHK resources.
 
+### Replicated Host Sync Gate
+
+The operator can optionally block a rolling host reconcile until a recreated replicated
+ClickHouse host catches up to a bounded replication baseline. This is an operator
+rolling gate, not a readiness probe. It is disabled by default.
+
+This is especially useful for local or direct-attached storage deployments, including
+NVMe-backed Local PVs, where a recreated pod may start with an empty or replaced disk
+and must rebuild replicated data from peer replicas before the operator rolls the next
+host.
+
+The existing caught-up marker path remains unchanged when this gate is disabled. That
+path only polls the local host's `MAX(absolute_delay)` from `system.replicas` before
+writing `status.hostsWithReplicaCaughtUp`, which is weak for recreated-host recovery
+because the metric is limited to replicated objects already loaded and visible on that
+local server. During recreated-host recovery, asynchronous database/table loading may
+not have exposed all replicated objects on the local host yet, and a local delay metric
+cannot discover replicated objects that exist on peers or issue a ClickHouse sync
+barrier for their known parts. The sync gate adds those checks before the operator
+advances to the next host.
+
+```yaml
+spec:
+  reconcile:
+    host:
+      wait:
+        replicas:
+          sync:
+            enabled: "false"
+            mode: "lightweight"
+            timeout: 0
+            onTimeout: "abort"
+            health:
+              pollInterval: 10
+              successThreshold: 6
+```
+
+| Setting | Default | Description |
+|---|---|---|
+| `enabled` | `"false"` | Enables the replicated-host sync gate. Existing replica-delay behavior is unchanged when disabled. |
+| `mode` | `"lightweight"` | Uses `SYSTEM SYNC REPLICA ... LIGHTWEIGHT`. No fallback to legacy `SYSTEM SYNC REPLICA` is performed. |
+| `timeout` | `0` | Whole-gate timeout in seconds. `0` means unbounded. |
+| `onTimeout` | `"abort"` | `abort` stops reconcile on the gate deadline. `proceed` advances without writing the caught-up marker, so a later reconcile can try again. |
+| `health.pollInterval` | `10` | Seconds between post-sync health checks. |
+| `health.successThreshold` | `6` | Consecutive healthy checks required after sync before the caught-up marker is written. |
+
+When enabled, the gate waits for asynchronous database loading when ClickHouse exposes
+`system.asynchronous_loader`, discovers replicated objects from peer replicas, syncs
+`Replicated` databases with `SYSTEM SYNC DATABASE REPLICA`, syncs replicated tables
+with `SYSTEM SYNC REPLICA ... LIGHTWEIGHT`, and then requires a stable health window.
+Health is based on `system.replicas`: `is_readonly = 0`, `is_session_expired = 0`, and
+`absolute_delay <= reconcile.host.wait.replicas.delay`.
+
+The `LIGHTWEIGHT` baseline is the time when the sync command runs. It waits for the
+relevant part-acquisition work known at that point; it does not require
+`system.replication_queue` to become empty and does not block forever on unrelated
+merges, mutations, or new ingest that arrives after the sync command. ClickHouse
+versions below `23.4` do not support `LIGHTWEIGHT`; enabling this gate on those
+versions fails explicitly instead of silently falling back.
+
+Hard failures always abort regardless of `onTimeout`: query or connection failure,
+parent reconcile context cancellation, failed/canceled async load jobs, readonly
+replicas, and expired Keeper sessions. The caught-up marker is written only after real
+success or when peer discovery confirms that there are no replicated objects to sync.
+
+Manual local-PV/data-loss validation:
+
+1. Create a CHI with a replicated shard and `sync.enabled: "true"`.
+2. Wait for the current hosts to become caught up and confirm
+   `status.hostsWithReplicaCaughtUp` contains the host FQDNs.
+3. Simulate storage loss for one host, for example by removing the local PV/PVC data
+   in a test environment.
+4. Reconcile the CHI and confirm the operator removes the stale caught-up marker for
+   the recreated host.
+5. Confirm the recreated host runs the sync gate and the next host in the shard does
+   not advance while the recreated host is still behind.
+6. Allow replication to catch up and confirm the recreated host receives the
+   caught-up marker again, then the next host proceeds.
+
 ## Security
 
 The `security:` block at the chopconf top level (sibling of `clickhouse:`) holds operator-wide hardening defaults across three orthogonal axes: transport hardening (`security.policy`), FIPS cryptographic-module enforcement (`security.fips.enforced`), and workload supply-chain gating (`security.images.policy`). Per-component sub-blocks under it cover ClickHouse-client TLS, ZooKeeper-client TLS, Kubernetes-client TLS, and the operator↔metrics-exporter IPC channel.
