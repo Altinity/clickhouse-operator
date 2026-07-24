@@ -52,9 +52,6 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	switch {
 	case w.isAfterFinalizerInstalled(old, new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-1")
-	case w.isGenerationTheSame(old, new):
-		log.V(2).M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
-		return nil
 	}
 
 	w.a.M(new).S().P()
@@ -83,6 +80,9 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		return nil
 	}
 
+	generationTheSame := w.isGenerationTheSame(old, new)
+	hasUnhealthyHosts := w.hasUnhealthyHosts(ctx, new)
+
 	switch {
 	case new.Spec.Suspend.Value():
 		// if CR is suspended, should skip reconciliation
@@ -107,12 +107,19 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 			metrics.CRReconcilesCompleted(ctx, new)
 		}
 		return nil
+	case generationTheSame && !hasUnhealthyHosts:
+		// Spec unchanged and every host healthy — nothing to do (#1704: do not skip when unhealthy).
+		w.a.M(new).F().Info("isGenerationTheSame() and all hosts are healthy - nothing to do, exit")
+		metrics.CRReconcilesCompleted(ctx, new)
+		return nil
 	case new.HasReconcileWork():
 		w.a.M(new).F().Info("CR has reconcile work - continue reconcile")
 	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
 	case w.crHasHostNeedingStuckRecovery(ctx, new):
 		w.a.M(new).F().Info("CR has a sustained-NotReady host - continue reconcile for stuck-host recovery")
+	case hasUnhealthyHosts:
+		w.a.M(new).F().Warning("Unhealthy hosts detected - continue reconcile for recovery")
 	default:
 		w.a.M(new).F().Info("No reconcile work - abort reconcile")
 		metrics.CRReconcilesCompleted(ctx, new)
@@ -549,7 +556,9 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	// If a pod-template rollout is already coming via the StatefulSet reconcile below, skip
 	// the pre-rollout software restart — see hostRequiresStatefulSetRollout for why.
 	if w.shouldForceRestartHost(ctx, host) {
-		if hostRequiresStatefulSetRollout(host) {
+		if w.isHostHealthyForReconcile(ctx, host) && !w.isShardSafeToDisruptHost(ctx, host) {
+			w.a.V(1).M(host).F().Warning("Skip force restart: no healthy peer in shard. Host: %s", host.GetName())
+		} else if hostRequiresStatefulSetRollout(host) {
 			w.a.V(1).M(host).F().Info("Pod template changed - skipping software restart; StatefulSet rollout will restart the pod. Host: %s", host.GetName())
 		} else {
 			w.a.V(1).M(host).F().Info("Reconcile host STS force restart: %s", host.GetName())
@@ -900,9 +909,40 @@ func (w *worker) reconcileShardWithHosts(ctx context.Context, shard api.IShard) 
 	if err := w.reconcileShard(ctx, shard); err != nil {
 		return err
 	}
-	return shard.WalkHostsAbortOnError(func(host *api.Host) error {
-		return w.reconcileHost(ctx, host)
+
+	// Recovery first, then rollout — avoid disrupting the last healthy peer while
+	// another replica in the shard is still down (#1704).
+	var recovery, rollout []*api.Host
+	shard.WalkHosts(func(host *api.Host) error {
+		if w.isHostHealthyForReconcile(ctx, host) {
+			rollout = append(rollout, host)
+		} else {
+			recovery = append(recovery, host)
+		}
+		return nil
 	})
+
+	for _, host := range recovery {
+		if err := w.reconcileHost(ctx, host); err != nil {
+			return err
+		}
+	}
+
+	deferred := 0
+	for _, host := range rollout {
+		if w.hostMayRequireDisruption(ctx, host) && !w.isShardSafeToDisruptHost(ctx, host) {
+			w.a.V(1).M(host).F().Warning("Deferring host reconcile: no healthy peer in shard. Host: %s", host.GetName())
+			deferred++
+			continue
+		}
+		if err := w.reconcileHost(ctx, host); err != nil {
+			return err
+		}
+	}
+	if deferred > 0 {
+		return common.ErrCRUDAbort
+	}
+	return nil
 }
 
 // reconcileShard reconciles specified shard, excluding nested replicas

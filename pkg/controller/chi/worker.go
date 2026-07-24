@@ -353,18 +353,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 		return nil
 	}
 
-	if w.isCHIProcessedOnTheSameIP(new) {
-		// First minute after restart do not reconcile already reconciled generations
-		w.a.V(1).M(new).F().Info("Will not reconcile known generation after restart. Generation %d", new.Generation)
-		return nil
-	}
-
-	if util.IsContextDone(ctx) {
-		log.V(1).Info("Reconcile is aborted.")
-		return nil
-	}
-
-	// CHI is being reconciled
+	// Health-gated generation skip lives in reconcileCR after buildCR (#1704).
 	return w.reconcileCR(ctx, old, new)
 }
 

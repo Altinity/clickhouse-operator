@@ -7455,6 +7455,120 @@ def test_010082_1(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
+@TestScenario
+@Tags("HEAVY")
+@Name("test_010083. Interrupted roll must keep a healthy shard replica (issue #1704)")
+def test_010083(self):
+    """Reproduce issue #1704: operator restart mid-roll must not take down the last
+    healthy replica in a shard while its peer is still recovering.
+
+    Uses a broken image so the first replica stays permanently unhealthy
+    (ImagePullBackOff), giving a deterministic mid-roll window.
+
+    Scenario:
+      1. Start a 1-shard / 2-replica CHI on the clickhouse-version template image
+      2. Roll to a broken image (operator updates replica 0 first)
+      3. Wait until replica 0 is ImagePullBackOff and replica 1 is still Ready
+      4. Restart the operator and force the reconcile
+      5. Replica 1 must stay Ready and must not be recreated (startTime unchanged)
+      6. Roll the good new image and wait for both replicas to recover
+    """
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-083-shard-safety"
+    cluster = "default"
+    down_pod = f"chi-{chi}-{cluster}-0-0-0"
+    healthy_pod = f"chi-{chi}-{cluster}-0-1-0"
+    good_version = current().context.clickhouse_version
+    broken_version = "clickhouse/clickhouse-server:26.3-broken"
+    new_version = "clickhouse/clickhouse-server:26.3"
+
+    with Given("A 1-shard / 2-replica CHI"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-shard-safety-1.yaml",
+            check={
+                "pod_count": 2,
+                "pod_image": good_version,
+                "do_not_delete": 1,
+            },
+        )
+        healthy_start_time = kubectl.get_field("pod", healthy_pod, ".status.startTime")
+        down_start_time    = kubectl.get_field("pod", down_pod, ".status.startTime")
+
+    with When("Rolling update to a broken image is started"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-shard-safety-2.yaml",
+            check={
+                "chi_status": "InProgress",
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("First replica is stuck on the broken image while the second stays Ready"):
+        kubectl.wait_field(
+            "pod",
+            down_pod,
+            ".status.containerStatuses[0].state.waiting.reason",
+            ["ErrImagePull", "ImagePullBackOff"],
+        )
+        down_image = kubectl.get_pod_image(chi, pod_name=down_pod)
+        assert broken_version in down_image, error(
+            f"down replica {down_pod} must be on broken image {broken_version}, got {down_image}"
+        )
+        assert kubectl.get_condition_status(healthy_pod, "Ready") == "True", error(
+            f"healthy replica {healthy_pod} must stay Ready while {down_pod} is pulling the broken image"
+        )
+        cur_start = kubectl.get_field("pod", healthy_pod, ".status.startTime")
+        assert cur_start == healthy_start_time, error(
+            f"healthy replica {healthy_pod} must not be restarted during the broken-image roll, "
+            f"but startTime changed from {healthy_start_time} to {cur_start}"
+        )
+
+    with And("Operator is restarted while the first replica is still down"):
+        util.restart_operator()
+
+    with And("Reconcile is forced one more time while the first replica is still down"):
+        kubectl.force_chi_reconcile(chi, "force", "Aborted")
+
+    with Then("Second replica was never restarted while the broken first replica is down"):
+        # Broken image never becomes Ready — probe long enough to catch a bad
+        # re-roll of the healthy peer after operator restart.
+        assert kubectl.get_condition_status(down_pod, "Ready") != "True", error(
+            f"broken-image replica {down_pod} unexpectedly became Ready"
+        )
+        assert kubectl.get_condition_status(healthy_pod, "Ready") == "True", error(
+            f"healthy replica {healthy_pod} must stay Ready while {down_pod} is down "
+            f"(issue #1704 simultaneous shard outage)"
+        )
+        cur_start = kubectl.get_field("pod", healthy_pod, ".status.startTime")
+        assert cur_start == healthy_start_time, error(
+            f"healthy replica {healthy_pod} must never be restarted while peer is down, "
+            f"but startTime changed from {healthy_start_time} to {cur_start}"
+        )
+
+    with When("New image is applied"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-shard-safety-3.yaml",
+            check={
+                "pod_count": 2,
+                "pod_image": new_version,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Both replicas recover on the good image"):
+        for pod in (down_pod, healthy_pod):
+            kubectl.wait_container_status(pod, "true")
+            image = kubectl.get_pod_image(chi, pod_name=pod)
+            assert image == new_version, error(
+                f"{pod} must run {new_version} after restore, but image={image}"
+            )
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
 #
 # Keeper tests section
 #
