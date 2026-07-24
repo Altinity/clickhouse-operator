@@ -61,6 +61,10 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	metrics.CRReconcilesStarted(ctx, new)
 	startTime := time.Now()
 
+	// Capture before buildCR: normalize/fillStatus overwrites status.chop-ip with
+	// the current operator pod IP, which would hide an IP change.
+	prevCHOpIP := new.Status.GetCHOpIP()
+
 	new = w.buildCR(ctx, new)
 
 	// If buildCR's normalize already aborted the CR (e.g. FIPS strict rejected
@@ -82,6 +86,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 
 	generationTheSame := w.isGenerationTheSame(old, new)
 	hasUnhealthyHosts := w.hasUnhealthyHosts(ctx, new)
+	operatorIPTheSame := w.isOperatorIPTheSame(prevCHOpIP)
 
 	switch {
 	case new.Spec.Suspend.Value():
@@ -107,11 +112,15 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 			metrics.CRReconcilesCompleted(ctx, new)
 		}
 		return nil
-	case generationTheSame && !hasUnhealthyHosts:
-		// Spec unchanged and every host healthy — nothing to do (#1704: do not skip when unhealthy).
-		w.a.M(new).F().Info("isGenerationTheSame() and all hosts are healthy - nothing to do, exit")
+	case generationTheSame && !hasUnhealthyHosts && operatorIPTheSame:
+		// Spec unchanged, hosts healthy, operator IP the same — nothing to do.
+		// Do not skip when unhealthy (#1704) or when operator IP changed (need to
+		// refresh clickhouse-operator user networks).
+		w.a.M(new).F().Info("isGenerationTheSame(), all hosts healthy, operator IP the same - nothing to do, exit")
 		metrics.CRReconcilesCompleted(ctx, new)
 		return nil
+	case generationTheSame && !hasUnhealthyHosts && !operatorIPTheSame:
+		w.a.M(new).F().Info("Operator IP changed - continue reconcile to refresh clickhouse-operator user networks")
 	case new.HasReconcileWork():
 		w.a.M(new).F().Info("CR has reconcile work - continue reconcile")
 	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):

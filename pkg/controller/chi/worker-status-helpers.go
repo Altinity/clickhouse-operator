@@ -23,6 +23,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
@@ -190,6 +191,16 @@ func (w *worker) hasUnhealthyHosts(ctx context.Context, cr *api.ClickHouseInstal
 		return nil
 	})
 	return found
+}
+
+// isOperatorIPTheSame reports whether the operator pod IP still matches the
+// CHOpIP persisted on the CR from the previous reconcile. A changed IP must
+// force reconcile so clickhouse-operator user networks/host_regexp are refreshed.
+// Compare against prevCHOpIP captured before buildCR — normalize/fillStatus
+// overwrites status.chop-ip with the current operator IP.
+func (w *worker) isOperatorIPTheSame(prevCHOpIP string) bool {
+	ip, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_IP)
+	return ip == prevCHOpIP
 }
 
 // isShardSafeToDisruptHost is true when host may be excluded/restarted/rolled

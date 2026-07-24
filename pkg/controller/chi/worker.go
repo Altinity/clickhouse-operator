@@ -353,7 +353,6 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 		return nil
 	}
 
-	// Health-gated generation skip lives in reconcileCR after buildCR (#1704).
 	return w.reconcileCR(ctx, old, new)
 }
 
