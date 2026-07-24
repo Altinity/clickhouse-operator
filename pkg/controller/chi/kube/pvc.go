@@ -44,7 +44,9 @@ func (c *PVC) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*cor
 
 func (c *PVC) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
 	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, controller.NewGetOptions())
+	return getWithRetry(ctx, func() (*core.PersistentVolumeClaim, error) {
+		return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, controller.NewGetOptions())
+	})
 }
 
 func (c *PVC) Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {

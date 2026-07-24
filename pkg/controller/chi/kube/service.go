@@ -65,7 +65,9 @@ func (c *Service) Get(ctx context.Context, params ...any) (*core.Service, error)
 		}
 	}
 	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().Services(namespace).Get(ctx, name, controller.NewGetOptions())
+	return getWithRetry(ctx, func() (*core.Service, error) {
+		return c.kubeClient.CoreV1().Services(namespace).Get(ctx, name, controller.NewGetOptions())
+	})
 }
 
 func (c *Service) Create(ctx context.Context, svc *core.Service) (*core.Service, error) {

@@ -66,7 +66,9 @@ func (c *Pod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
 		panic(any("incorrect number or params"))
 	}
 	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, controller.NewGetOptions())
+	return getWithRetry(ctx, func() (*core.Pod, error) {
+		return c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, controller.NewGetOptions())
+	})
 }
 
 func (c *Pod) GetRestartCounters(ctx context.Context, params ...any) (map[string]int, error) {

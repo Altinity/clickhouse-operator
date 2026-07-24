@@ -45,7 +45,9 @@ func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.Confi
 
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
 	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, controller.NewGetOptions())
+	return getWithRetry(ctx, func() (*core.ConfigMap, error) {
+		return c.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, controller.NewGetOptions())
+	})
 }
 
 func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
