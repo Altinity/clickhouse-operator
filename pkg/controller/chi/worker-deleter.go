@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -450,21 +451,125 @@ func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 	return nil
 }
 
-// dropZKReplica drops replica's info from Zookeeper
-func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *dropReplicaOptions) error {
+const (
+	// maxDropReplicaRetries defines maximum attempts for SYSTEM DROP REPLICA on active replica errors (Code 305)
+	maxDropReplicaRetries = 6
+
+	// defaultRetryDelay specifies base backoff delay between retry attempts
+	defaultRetryDelay = 5 * time.Second
+
+	// defaultReplicaWaitTimeout is used when ZooKeeper session timeout is unconfigured
+	defaultReplicaWaitTimeout = 120 * time.Second
+
+	// defaultReplicaPollInterval is the frequency to check replica activity in ClickHouse
+	defaultReplicaPollInterval = 5 * time.Second
+
+	// replicaWaitGracePeriod gives ZooKeeper extra time after session expiration before giving up
+	replicaWaitGracePeriod = 30 * time.Second
+)
+
+// isReplicaActiveError targets ClickHouse Code 305 ("replica active"), caused by lingering ZooKeeper sessions.
+func isReplicaActiveError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "Code: 305") ||
+		strings.Contains(s, "because it's active") ||
+		strings.Contains(s, "Replica is active")
+}
+
+// getCoordinatorHost finds an operational host to execute SYSTEM DROP REPLICA queries against.
+func (w *worker) getCoordinatorHost(hostToDrop *api.Host) *api.Host {
+	if hostToDrop == nil || !hostToDrop.HasCR() {
+		return nil
+	}
+	if shard := hostToDrop.GetShard(); shard != nil {
+		if h := shard.FirstHost(); h != nil {
+			return h
+		}
+	}
+	// Fallback: any alive host in the cluster if the target host's shard is unavailable
+	if cluster := hostToDrop.GetCluster(); cluster != nil {
+		var candidate *api.Host
+		cluster.WalkHosts(func(h *api.Host) error {
+			if candidate == nil {
+				candidate = h
+			}
+			return nil
+		})
+		return candidate
+	}
+	return nil
+}
+
+// waitHostReplicaInactive polls until ZooKeeper session expires and ClickHouse reports host inactive.
+func (w *worker) waitHostReplicaInactive(ctx context.Context, hostToRunOn, hostToDrop *api.Host, pollInterval, waitTimeout time.Duration) error {
+	if util.IsContextDone(ctx) {
+		return ctx.Err()
+	}
+
 	if hostToDrop == nil {
-		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
 
-	// Sometimes host to drop is already unavailable, so let's run SQL statement of the first replica in the shard
-	var hostToRunOn *api.Host
-	if shard := hostToDrop.GetShard(); shard != nil {
-		hostToRunOn = shard.FirstHost()
+	timeout := defaultReplicaWaitTimeout
+	if hostToDrop.HasCR() && hostToDrop.GetCluster() != nil {
+		if zk := hostToDrop.GetZookeeper(); zk != nil && zk.SessionTimeoutMs > 0 {
+			timeout = time.Duration(zk.SessionTimeoutMs)*time.Millisecond + replicaWaitGracePeriod
+		}
+	}
+	if waitTimeout > 0 {
+		timeout = waitTimeout
 	}
 
+	if pollInterval <= 0 {
+		pollInterval = defaultReplicaPollInterval
+	}
+
+	w.a.V(2).M(hostToRunOn).F().Info("Wait for host %s to become inactive", hostToDrop.GetName())
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	schemer := w.ensureClusterSchemer(hostToRunOn)
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		if util.IsContextDone(timeoutCtx) {
+			return timeoutCtx.Err()
+		}
+
+		if !schemer.IsHostActiveReplica(timeoutCtx, hostToRunOn, hostToDrop) {
+			w.a.V(2).M(hostToRunOn).F().Info("Host %s is inactive", hostToDrop.GetName())
+			return nil
+		}
+
+		select {
+		case <-timeoutCtx.Done():
+			return timeoutCtx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+// dropZKReplica drops replica's info from Zookeeper
+func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *dropReplicaOptions) error {
+	if hostToDrop == nil {
+		w.a.V(1).F().Error("FAILED to drop replica. Need host to drop.")
+		return nil
+	}
+
+	if !hostToDrop.HasCR() {
+		w.a.V(1).F().Error("FAILED to drop replica. Host has no CR, hostToDrop: %s", hostToDrop.GetName())
+		return nil
+	}
+
+	// Sometimes host to drop is already unavailable, so let's run SQL statement of the first replica in the shard or cluster candidate
+	hostToRunOn := w.getCoordinatorHost(hostToDrop)
 	if hostToRunOn == nil {
-		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn: %s, hostToDrop: %s", hostToRunOn.GetName(), hostToDrop.GetName())
+		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn is nil, hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
 
@@ -473,7 +578,11 @@ func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *
 		return nil
 	}
 
-	err := w.ensureClusterSchemer(hostToRunOn).HostDropReplica(ctx, hostToRunOn, hostToDrop)
+	if err := w.waitHostReplicaInactive(ctx, hostToRunOn, hostToDrop, 0, 0); err != nil {
+		w.a.V(2).M(hostToRunOn).F().Warning("Replica %s still active after wait: %v", hostToDrop.GetName(), err)
+	}
+
+	err := w.retryDropReplica(ctx, hostToRunOn, hostToDrop, 0)
 
 	if err == nil {
 		w.a.V(1).
@@ -486,6 +595,38 @@ func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *
 			WithError(hostToRunOn.GetCR()).
 			M(hostToRunOn).F().
 			Error("FAILED to drop replica on host: %s with error: %v", hostToDrop.GetName(), err)
+	}
+
+	return err
+}
+
+func (w *worker) retryDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host, baseDelay time.Duration) error {
+	schemer := w.ensureClusterSchemer(hostToRunOn)
+	var err error
+
+	if baseDelay <= 0 {
+		baseDelay = defaultRetryDelay
+	}
+
+	for try := 1; try <= maxDropReplicaRetries; try++ {
+		if util.IsContextDone(ctx) {
+			err = ctx.Err()
+			break
+		}
+
+		err = schemer.HostDropReplica(ctx, hostToRunOn, hostToDrop)
+		if err == nil {
+			break
+		}
+
+		// Retry if replica is still active
+		if isReplicaActiveError(err) && try < maxDropReplicaRetries {
+			delay := time.Duration(try) * baseDelay
+			w.a.V(1).M(hostToRunOn).F().Warning("Retrying SYSTEM DROP REPLICA for host %s (attempt %d/%d), backoff %v: %v", hostToDrop.GetName(), try, maxDropReplicaRetries, delay, err)
+			util.WaitContextDoneOrTimeout(ctx, delay)
+		} else {
+			break
+		}
 	}
 
 	return err

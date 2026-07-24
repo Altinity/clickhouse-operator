@@ -154,9 +154,12 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 	return true
 }
 
-func (w *worker) ensureClusterSchemer(host *api.Host) *schemer.ClusterSchemer {
+func (w *worker) ensureClusterSchemer(host *api.Host) schemer.ISchemer {
 	if w == nil {
 		return nil
+	}
+	if w.schemer != nil {
+		return w.schemer
 	}
 	// Make base cluster connection params from CHOP-config defaults, then
 	// overlay the per-cluster security.clickhouse.tls fields populated by the

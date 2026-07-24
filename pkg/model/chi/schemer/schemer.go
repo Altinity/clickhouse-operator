@@ -27,6 +27,23 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// ISchemer defines cluster schema manager interface
+type ISchemer interface {
+	HostSyncTables(ctx context.Context, host *api.Host) error
+	IsHostActiveReplica(ctx context.Context, hostToRunOn, hostToCheck *api.Host) bool
+	HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host) error
+	HostCreateTables(ctx context.Context, host *api.Host) error
+	HostDropTables(ctx context.Context, host *api.Host) error
+	IsHostInCluster(ctx context.Context, host *api.Host) bool
+	HostActiveQueriesNum(ctx context.Context, host *api.Host) (int, error)
+	HostClickHouseVersion(ctx context.Context, host *api.Host) (string, error)
+	HostMaxReplicaDelay(ctx context.Context, host *api.Host) (int, error)
+	HostShutdown(ctx context.Context, host *api.Host) error
+	ExecHost(ctx context.Context, host *api.Host, SQLs []string, _opts ...*clickhouse.QueryOptions) error
+	ExecCluster(ctx context.Context, cluster *api.Cluster, SQLs []string, _opts ...*clickhouse.QueryOptions) error
+	HostClusterDoesNotExistErrorCount(ctx context.Context, host *api.Host) (int, error)
+}
+
 // ClusterSchemer specifies cluster schema manager
 type ClusterSchemer struct {
 	*Cluster
