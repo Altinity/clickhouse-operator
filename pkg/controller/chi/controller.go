@@ -153,6 +153,11 @@ func (c *Controller) createQueue() queue.PriorityQueue {
 	//),
 }
 
+// deletedObject decodes an informer delete payload into *T, transparently
+// unwrapping a client-go DeletedFinalStateUnknown tombstone (delivered when a
+// watch delete is missed and a relist finds the cached object gone). T is the
+// value type so the result stays pointer-nil-comparable: a tombstone can carry
+// a typed-nil *T that satisfies the assertion, so the nil check is required.
 func deletedObject[T any](obj interface{}) (*T, error) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
@@ -489,7 +494,6 @@ func (c *Controller) addEventHandlersStatefulSet(
 				return
 			}
 			log.V(3).M(statefulSet).Info("statefulSetInformer.AddFunc")
-			//controller.handleObject(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			statefulSet := old.(*apps.StatefulSet)
@@ -919,52 +923,6 @@ func (c *Controller) uninstallFinalizer(ctx context.Context, chi *api.ClickHouse
 	cur.SetFinalizers(util.RemoveFromArray(FinalizerName, cur.GetFinalizers()))
 
 	return c.patchCHIFinalizers(ctx, cur)
-}
-
-// handleObject enqueues CHI which is owner of `obj` into reconcile loop
-func (c *Controller) handleObject(obj interface{}) {
-	// TODO review
-	object, ok := obj.(meta.Object)
-	if !ok {
-		ts, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilRuntime.HandleError(fmt.Errorf(messageUnableToDecode))
-			return
-		}
-		object, ok = ts.Obj.(meta.Object)
-		if !ok {
-			utilRuntime.HandleError(fmt.Errorf(messageUnableToDecode))
-			return
-		}
-	}
-
-	// object is an instance of meta.Object
-
-	// Checking that we control current StatefulSet Object
-	ownerRef := meta.GetControllerOf(object)
-	if ownerRef == nil {
-		// No owner
-		return
-	}
-
-	// Ensure owner is of a proper kind
-	if ownerRef.Kind != api.ClickHouseInstallationCRDResourceKind {
-		return
-	}
-
-	log.V(1).Info("Processing object: %s", object.GetName())
-
-	// Get owner - it is expected to be CHI
-	// TODO chi, err := c.chi.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
-
-	// TODO
-	//if err != nil {
-	//	log.V(1).Infof("ignoring orphaned object '%s' of ClickHouseInstallation '%s'", object.GetSelfLink(), ownerRef.Name)
-	//	return
-	//}
-
-	// Add CHI object into reconcile loop
-	// TODO c.enqueueObject(chi.Namespace, chi.Name, chi)
 }
 
 func ShouldEnqueue(cr *api.ClickHouseInstallation) bool {

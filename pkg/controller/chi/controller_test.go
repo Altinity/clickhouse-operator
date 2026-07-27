@@ -13,7 +13,7 @@ func init() {
 	chop.New(nil, nil, "")
 }
 
-func TestDeletedObject(t *testing.T) {
+func Test_deletedObject(t *testing.T) {
 	chi := &api.ClickHouseInstallation{}
 	var nilCHI *api.ClickHouseInstallation
 	tests := []struct {
