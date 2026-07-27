@@ -17,6 +17,7 @@ package kube
 import (
 	"context"
 
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,12 +66,14 @@ func (c *Pod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
 	default:
 		panic(any("incorrect number or params"))
 	}
-	pod := &core.Pod{}
-	err := c.kubeClient.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, pod)
-	return pod, err
+	return commonKube.GetWithRetry(ctx, func() (*core.Pod, error) {
+		pod := &core.Pod{}
+		err := c.kubeClient.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		}, pod)
+		return pod, err
+	})
 }
 
 // GetAll gets all pods for provided entity

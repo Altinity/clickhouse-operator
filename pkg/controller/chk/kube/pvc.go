@@ -17,6 +17,7 @@ package kube
 import (
 	"context"
 
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -44,16 +45,17 @@ func (c *PVC) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*cor
 }
 
 func (c *PVC) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
-	pvc := &core.PersistentVolumeClaim{}
-	err := c.kubeClient.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, pvc)
-	if err == nil {
+	return commonKube.GetWithRetry(ctx, func() (*core.PersistentVolumeClaim, error) {
+		pvc := &core.PersistentVolumeClaim{}
+		err := c.kubeClient.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		}, pvc)
+		if err != nil {
+			return nil, err
+		}
 		return pvc, nil
-	} else {
-		return nil, err
-	}
+	})
 }
 
 func (c *PVC) Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
