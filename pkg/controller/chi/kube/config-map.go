@@ -25,6 +25,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 )
 
@@ -44,9 +45,8 @@ func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.Confi
 }
 
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
-	ctx = k8sCtx(ctx)
-	return getWithRetry(ctx, func() (*core.ConfigMap, error) {
-		return c.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, controller.NewGetOptions())
+	return commonKube.GetWithRetry(ctx, func() (*core.ConfigMap, error) {
+		return c.kubeClient.CoreV1().ConfigMaps(namespace).Get(k8sCtx(ctx), name, controller.NewGetOptions())
 	})
 }
 

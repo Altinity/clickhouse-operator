@@ -26,6 +26,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
@@ -69,9 +70,8 @@ func (c *STS) Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 	default:
 		panic(any("unexpected number of args"))
 	}
-	ctx = k8sCtx(ctx)
-	return getWithRetry(ctx, func() (*apps.StatefulSet, error) {
-		return c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, controller.NewGetOptions())
+	return commonKube.GetWithRetry(ctx, func() (*apps.StatefulSet, error) {
+		return c.kubeClient.AppsV1().StatefulSets(namespace).Get(k8sCtx(ctx), name, controller.NewGetOptions())
 	})
 }
 

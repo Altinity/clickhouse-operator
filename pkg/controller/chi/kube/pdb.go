@@ -25,6 +25,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 )
 
@@ -44,9 +45,8 @@ func (c *PDB) Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*pol
 }
 
 func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error) {
-	ctx = k8sCtx(ctx)
-	return getWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
-		return c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).Get(ctx, name, controller.NewGetOptions())
+	return commonKube.GetWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
+		return c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).Get(k8sCtx(ctx), name, controller.NewGetOptions())
 	})
 }
 
