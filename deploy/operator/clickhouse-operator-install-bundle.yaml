@@ -3762,6 +3762,12 @@ spec:
                       type: object
                       description: "List of namespaces where clickhouse-operator watches for events."
                       x-kubernetes-preserve-unknown-fields: true
+                    labelSelector:
+                      type: string
+                      description: "Label selector (standard Kubernetes label selector syntax) restricting which CHI/CHK resources this operator instance manages. Empty selector manages everything. Env var override: WATCH_LABEL_SELECTOR."
+                    requireLabelSelector:
+                      type: boolean
+                      description: "When true, an empty labelSelector aborts operator startup. Env var override: WATCH_LABEL_SELECTOR_REQUIRED."
                     configuration:
                       type: object
                       description: "Behavior when ClickHouseOperatorConfiguration resources change"
@@ -5979,6 +5985,21 @@ data:
         include: []
         exclude: []
     
+      # Restricts which CHI/CHK resources this operator manages (label selector syntax,
+      # e.g. "example.com/clickhouse-shard=logs" or "!example.com/clickhouse-shard"). Empty manages everything.
+      # Env var override: WATCH_LABEL_SELECTOR. Invalid selector aborts startup.
+      # Note: an empty env var does NOT clear a file-configured selector (same semantics
+      # as WATCH_NAMESPACES) — de-sharding requires a file config change.
+      # Every label key referenced by the selector is automatically appended to
+      # `label.exclude` below: ownership labels never propagate to child objects, so
+      # re-assigning a CR to another operator never restarts its pods.
+      labelSelector: ""
+    
+      # When true, an empty labelSelector aborts startup. Set on sharded operator deployments
+      # so a lost/typo'd selector fails loudly instead of silently watching everything.
+      # Env var override: WATCH_LABEL_SELECTOR_REQUIRED.
+      requireLabelSelector: false
+
       # Behavior when ClickHouseOperatorConfiguration changes: none | restart
       configuration:
         onChange: restart

@@ -282,11 +282,22 @@ func (w *worker) finalizeCR(
 	updateStatusOpts types.UpdateStatusOptions,
 	f func(*api.ClickHouseInstallation),
 ) error {
-	chi, err := w.buildCRFromObj(ctx, obj)
+	raw, err := w.c.GetCR(obj)
 	if err != nil {
 		log.V(1).Error("Unable to finalize CR: %s err: %v", util.NamespacedName(obj), err)
 		return err
 	}
+
+	// Re-check ownership on the RAW live CR before the status/configmap writes — the shard
+	// label may have flipped since this work was enqueued. Must be checked pre-normalization:
+	// templates (CHIT) merge their ObjectMeta into the CR and could inject/override the shard
+	// label, making this guard disagree with the enqueue-time guards that see raw labels.
+	if !ownsCR(raw) {
+		log.V(1).Info("CR no longer matches this operator's watch scope, skip finalize: %s", util.NamespacedName(obj))
+		return nil
+	}
+
+	chi := w.buildCR(ctx, raw)
 
 	if f != nil {
 		f(chi)
@@ -319,6 +330,22 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	w.a.V(1).M(new).S().P()
 	defer w.a.V(1).M(new).E().P()
 
+	if new != nil {
+		n, err := w.c.kube.CR().Get(ctx, new.GetNamespace(), new.GetName())
+		if err != nil {
+			return err
+		}
+		new = n.(*api.ClickHouseInstallation)
+	}
+
+	// Shard label may have flipped while this command sat in the queue; a stale reconcile
+	// would purge the gaining operator's objects. Checked before any write, including the
+	// finalizer install below.
+	if !ownsCR(new) {
+		w.a.V(1).M(new).F().Info("CHI no longer matches this operator's watch scope (shard label flipped?), skip reconcile: %s/%s", new.Namespace, new.Name)
+		return nil
+	}
+
 	if w.ensureFinalizer(context.Background(), new) {
 		w.a.M(new).F().Info("finalizer installed, let's restart reconcile cycle. CHI: %s/%s", new.Namespace, new.Name)
 		w.a.M(new).F().Info("---------------------------------------------------------------------")
@@ -330,14 +357,6 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted")
 		return nil
-	}
-
-	if new != nil {
-		n, err := w.c.kube.CR().Get(ctx, new.GetNamespace(), new.GetName())
-		if err != nil {
-			return err
-		}
-		new = n.(*api.ClickHouseInstallation)
 	}
 
 	metrics.CRRegister(ctx, new)

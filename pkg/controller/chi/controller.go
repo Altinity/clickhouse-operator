@@ -48,12 +48,15 @@ import (
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
+	chopListers "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	ctrlLabeler "github.com/altinity/clickhouse-operator/pkg/controller/chi/labeler"
+	chiMetrics "github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
+	operatorMetrics "github.com/altinity/clickhouse-operator/pkg/metrics/operator"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
@@ -73,6 +76,12 @@ type Controller struct {
 	extClient     apiExtensions.Interface
 	chopClient    chopClientSet.Interface
 	dynamicClient dynamic.Interface
+
+	// chiLister resolves the owning CHI of child objects from the informer cache
+	chiLister chopListers.ClickHouseInstallationLister
+	// chiListerSynced reports whether the CHI informer cache has completed its initial sync;
+	// before that, a cache miss means "not synced yet", not "CHI does not exist"
+	chiListerSynced cache.InformerSynced
 
 	// queues used to organize events queue processed by the operator
 	queues []queue.PriorityQueue
@@ -118,15 +127,17 @@ func NewController(
 
 	// Create Controller instance
 	controller := &Controller{
-		kubeClient:    kubeClient,
-		extClient:     extClient,
-		chopClient:    chopClient,
-		dynamicClient: dynamicClient,
-		recorder:      recorder,
-		namer:         namer,
-		kube:          kube,
-		ctrlLabeler:   ctrlLabeler.New(kube),
-		pvcDeleter:    volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
+		kubeClient:      kubeClient,
+		extClient:       extClient,
+		chopClient:      chopClient,
+		dynamicClient:   dynamicClient,
+		chiLister:       chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Lister(),
+		chiListerSynced: chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().HasSynced,
+		recorder:        recorder,
+		namer:           namer,
+		kube:            kube,
+		ctrlLabeler:     ctrlLabeler.New(kube),
+		pvcDeleter:      volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
 	}
 	controller.initQueues()
 	controller.addEventHandlers(chopConfigInformerFactory, chopInformerFactory, kubeInformerFactory)
@@ -196,13 +207,21 @@ func (c *Controller) addEventHandlersCHI(
 			oldChi := old.(*api.ClickHouseInstallation)
 			newChi := new.(*api.ClickHouseInstallation)
 			if !ShouldEnqueue(newChi) {
+				if isFlipAway(oldChi, newChi) {
+					// Drop local watch/exporter state and per-CR metrics only; cluster resources
+					// belong to the gaining operator and a flip must never be treated as a delete.
+					log.V(1).M(newChi).Info("CHI flipped out of this operator's shard, dropping local watch state")
+					c.deleteWatch(oldChi)
+					chiMetrics.CRUnregister(context.Background(), oldChi)
+				}
 				return
 			}
 			log.V(3).M(newChi).Info("chiInformer.UpdateFunc")
 			c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: deleteHandler("chiInformer.DeleteFunc", func(chi *api.ClickHouseInstallation) {
-			if !chop.Config().IsNamespaceWatched(chi.Namespace) {
+			// Same guard as Add/Update: another shard's CHI is not ours to tear down
+			if !ShouldEnqueue(chi) {
 				return
 			}
 			log.V(3).M(chi).Info("chiInformer.DeleteFunc")
@@ -561,7 +580,40 @@ func (c *Controller) addEventHandlers(
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(meta meta.Object) bool {
-	return chop.Config().IsNamespaceWatched(meta.GetNamespace()) && chiLabeler.New(nil).IsCHOPGeneratedObject(meta)
+	return chop.Config().IsNamespaceWatched(meta.GetNamespace()) &&
+		chiLabeler.New(nil).IsCHOPGeneratedObject(meta) &&
+		c.isOwningCRWatched(meta)
+}
+
+// isOwningCRWatched checks watch.labelSelector against a child object's owning CHI (child
+// objects stay unlabeled — labeling them would restart pods on every shard flip).
+// Unresolvable owner => not tracked.
+func (c *Controller) isOwningCRWatched(obj meta.Object) bool {
+	if !chop.Config().HasWatchLabelSelector() {
+		return true
+	}
+	chiName, err := chiLabeler.New(nil).GetCRNameFromObjectMeta(obj)
+	if err != nil {
+		log.V(2).Info("skip child object %s/%s: unable to resolve owning CHI name: %v", obj.GetNamespace(), obj.GetName(), err)
+		return false
+	}
+	if c.chiLister == nil {
+		log.V(2).Info("skip child object %s/%s: no CHI lister available to check watch.labelSelector", obj.GetNamespace(), obj.GetName())
+		return false
+	}
+	// Until the CHI cache completes its initial sync, a miss means "not synced yet", not
+	// "does not exist". Dropping edge-triggered events here (e.g. EndpointSlice IP assignment)
+	// would lose them permanently — resync re-fires with old==new and produces no diff. Track
+	// the object instead; every downstream write path re-checks ownership at dequeue time.
+	if (c.chiListerSynced != nil) && !c.chiListerSynced() {
+		return true
+	}
+	chi, err := c.chiLister.ClickHouseInstallations(obj.GetNamespace()).Get(chiName)
+	if (err != nil) || (chi == nil) {
+		log.V(2).Info("skip child object %s/%s: owning CHI '%s' not found in cache: %v", obj.GetNamespace(), obj.GetName(), chiName, err)
+		return false
+	}
+	return chop.Config().IsLabelSelectorWatched(chi.GetLabels())
 }
 
 // Run syncs caches, starts workers
@@ -925,10 +977,26 @@ func (c *Controller) uninstallFinalizer(ctx context.Context, chi *api.ClickHouse
 	return c.patchCHIFinalizers(ctx, cur)
 }
 
+// ownsCR re-checks watch scope against fresh CR state (labels may flip after enqueue).
+func ownsCR(cr meta.Object) bool {
+	return chop.Config().IsCRWatched(cr.GetNamespace(), cr.GetLabels())
+}
+
+// isFlipAway reports whether an update moves a CR out of this operator's shard.
+func isFlipAway(old, new *api.ClickHouseInstallation) bool {
+	return !ShouldEnqueue(new) && ShouldEnqueue(old)
+}
+
 func ShouldEnqueue(cr *api.ClickHouseInstallation) bool {
 	ns := cr.GetNamespace()
 	if !chop.Config().IsNamespaceWatched(ns) {
 		log.V(2).M(cr).Info("skip enqueue, namespace '%s' is not watched or is in deny list", ns)
+		return false
+	}
+
+	if !chop.Config().IsLabelSelectorWatched(cr.GetLabels()) {
+		log.V(2).M(cr).Info("skip enqueue, CHI labels do not match watch.labelSelector '%s'", chop.Config().Watch.LabelSelector)
+		operatorMetrics.CRSkippedByLabelSelector("chi", cr.GetNamespace(), cr.GetName())
 		return false
 	}
 

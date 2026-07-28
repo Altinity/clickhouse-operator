@@ -25,6 +25,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
@@ -46,6 +47,15 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 		WithAction(cr).
 		M(cr).F().
 		Info("remove items scheduled for deletion")
+
+	// Re-check ownership on live labels before the destructive purge; skipping is recoverable,
+	// deleting another shard's objects is not. No-op unless a selector is configured.
+	if chop.Config().HasWatchLabelSelector() {
+		if live, err := w.c.kube.CR().Get(ctx, cr.GetNamespace(), cr.GetName()); (err != nil) || !ownsCR(live) {
+			w.a.V(1).M(cr).F().Warning("skip purge: CR ownership not confirmed (flipped to another shard or lookup failed): %s/%s err: %v", cr.GetNamespace(), cr.GetName(), err)
+			return
+		}
+	}
 
 	// Remove deleted items
 	w.a.V(1).M(cr).F().Info("List of objects which have failed to reconcile:\n%s", w.task.RegistryFailed())

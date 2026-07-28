@@ -361,6 +361,8 @@ func (cm *ConfigManager) listSupportedEnvVarNames() []string {
 		deployment.WATCH_NAMESPACE,
 		deployment.WATCH_NAMESPACES,
 		deployment.WATCH_NAMESPACES_EXCLUDE,
+		deployment.WATCH_LABEL_SELECTOR,
+		deployment.WATCH_LABEL_SELECTOR_REQUIRED,
 	}
 }
 

@@ -8306,6 +8306,12 @@ spec:
                       type: object
                       description: "List of namespaces where clickhouse-operator watches for events."
                       x-kubernetes-preserve-unknown-fields: true
+                    labelSelector:
+                      type: string
+                      description: "Label selector (standard Kubernetes label selector syntax) restricting which CHI/CHK resources this operator instance manages. Empty selector manages everything. Env var override: WATCH_LABEL_SELECTOR."
+                    requireLabelSelector:
+                      type: boolean
+                      description: "When true, an empty labelSelector aborts operator startup. Env var override: WATCH_LABEL_SELECTOR_REQUIRED."
                     configuration:
                       type: object
                       description: "Behavior when ClickHouseOperatorConfiguration resources change"

@@ -20,9 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -38,6 +35,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
 
 // reconcileCR runs reconcile cycle for a Custom Resource
@@ -206,15 +204,6 @@ func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *
 	w.a.V(1).M(cr).Info(actionPlan.Log("buildCR"))
 
 	return cr
-}
-
-func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*api.ClickHouseInstallation, error) {
-	_cr, err := w.c.GetCR(obj)
-	if err != nil {
-		w.a.M(obj).F().Error("UNABLE-1 to find obj by labels: %v err: %v", obj.GetLabels(), err)
-		return nil, err
-	}
-	return w.buildCR(ctx, _cr), nil
 }
 
 func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*api.ClickHouseInstallation) {

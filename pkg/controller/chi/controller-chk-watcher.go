@@ -158,11 +158,9 @@ func (c *Controller) enqueueDependentCHIs(chkNamespace, chkName string) {
 	for i := range chiList.Items {
 		chi := &chiList.Items[i]
 
-		// Filter out CHIs in namespaces the operator doesn't actually watch.
-		// The List above may surface namespaces beyond the watch scope when
-		// the watch is regexp-driven; the normal informer path applies
-		// IsNamespaceWatched at ShouldEnqueue time, and we must mirror that.
-		if !chop.Config().IsNamespaceWatched(chi.Namespace) {
+		// Mirror ShouldEnqueue: namespace AND label selector. The triggering CHK is
+		// deliberately not filtered — our CHI may reference another shard's CHK.
+		if !chop.Config().IsCRWatched(chi.Namespace, chi.GetLabels()) {
 			continue
 		}
 

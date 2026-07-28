@@ -271,5 +271,43 @@ The per-component TLS knobs `clickhouse.tls` and `zookeeper.tls` use 3-level inh
 
 See [security_hardening.md](security_hardening.md) for per-knob semantics, the `security.policy: Enforced` master switch, the orthogonal-axes posture table, and the externally-managed-token (Secret-backed) GitOps pattern. FIPS-specific controls (`security.fips.enforced` cryptographic-module gate, `security.images.policy: FIPSRequired` workload supply-chain gate, FIPS coercion details, ACVP responder, FIPS build and release evidence) are documented in [security_hardening_fips.md](security_hardening_fips.md).
 
+## Sharding CHI/CHK resources across operator instances
+
+By default a single operator instance manages every `ClickHouseInstallation` (CHI) and `ClickHouseKeeperInstallation` (CHK) in its watched namespaces. In large fleets this makes one operator a scaling and blast-radius bottleneck: a slow reconcile of one CR delays all others, and an operator bug or bad rollout affects the whole fleet at once.
+
+`watch.labelSelector` lets several operator instances run side by side, each managing a disjoint, label-defined subset ("shard") of CRs across the same namespaces:
+
+```yaml
+watch:
+  # Standard Kubernetes label selector syntax.
+  # This operator instance only manages CRs whose labels match.
+  labelSelector: "example.com/clickhouse-shard=shard-a"
+
+  # Abort startup when labelSelector is empty. Recommended on sharded
+  # deployments so a lost or typo'd selector fails loudly instead of the
+  # operator silently taking over the whole fleet.
+  requireLabelSelector: true
+```
+
+A typical two-shard layout plus a legacy catch-all:
+
+| Operator instance | `watch.labelSelector` | Manages |
+|---|---|---|
+| `clickhouse-operator-shard-a` | `example.com/clickhouse-shard=shard-a` | CRs labeled `shard-a` |
+| `clickhouse-operator-shard-b` | `example.com/clickhouse-shard=shard-b` | CRs labeled `shard-b` |
+| `clickhouse-operator` (legacy) | `!example.com/clickhouse-shard` | unlabeled CRs |
+
+Behavior details:
+
+* **Standard selector syntax.** Anything `k8s.io/apimachinery`'s `labels.Parse` accepts: equality (`k=v`), set-based (`k in (a,b)`), presence (`k`), absence (`!k`), and conjunctions (`k=v,other!=x`). An invalid selector aborts startup.
+* **Environment overrides.** `WATCH_LABEL_SELECTOR` overrides the file value; `WATCH_LABEL_SELECTOR_REQUIRED` overrides `requireLabelSelector`. An *empty* `WATCH_LABEL_SELECTOR` env var does **not** clear a file-configured selector (same semantics as `WATCH_NAMESPACES`), so removing a selector requires a config file change — an accidentally-unset env var cannot silently widen an operator's scope.
+* **Applies to CHI and CHK resources and to the metrics-exporter**: each exporter only scrapes the CHIs its operator instance manages, so metrics ownership follows reconcile ownership. `ClickHouseInstallationTemplate`s are not filtered — templates remain visible to every operator instance.
+* **No pod restarts on re-assignment.** Every label key referenced by the selector is automatically appended to `label.exclude`, so shard-assignment labels never propagate from the CR to child objects (StatefulSets, Pods, Services, ConfigMaps). Flipping a CR's shard label hands it to another operator without touching running ClickHouse pods.
+* **Flip-away handling.** When a CR's labels stop matching, the losing operator treats it as an unwatch (stops metrics scraping, drops it from in-memory state) without running the deletion protocol — the CR and its child objects are left intact for the operator that now matches.
+* **Live-state confirmation before writes.** Reconciles triggered by cached/stale events re-check ownership against the live CR state before any write (finalizer install, child-object reconcile, deletion), so two operators do not fight over a CR during a label flip.
+* **Observability.** CRs skipped due to a selector mismatch are counted in the `clickhouse_operator_cr_skipped_by_label_selector` metric and logged at debug verbosity.
+
+Selectors on different operator instances should be mutually exclusive — a CR matching two operators would be reconciled by both. A disjoint scheme like the table above (one value per shard plus an absence-based catch-all) guarantees every possible label state matches exactly one operator.
+
 [clickhouse-operator-install-bundle.yaml]: ../deploy/operator/clickhouse-operator-install-bundle.yaml
 [70-chop-config.yaml]: ./chi-examples/70-chop-config.yaml

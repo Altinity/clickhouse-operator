@@ -21,7 +21,6 @@ import (
 	"time"
 
 	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
@@ -183,15 +182,6 @@ func (w *worker) buildCR(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstal
 	w.a.V(1).M(cr).Info(actionPlan.Log("buildCR"))
 
 	return cr
-}
-
-func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
-	_cr, err := w.c.GetCR(obj)
-	if err != nil {
-		w.a.M(obj).F().Error("UNABLE-1 to find obj by labels: %v err: %v", obj.GetLabels(), err)
-		return nil, err
-	}
-	return w.buildCR(ctx, _cr), nil
 }
 
 func (w *worker) buildTemplates(chi *apiChk.ClickHouseKeeperInstallation) (templates []*apiChk.ClickHouseKeeperInstallation) {

@@ -31,6 +31,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	operatorMetrics "github.com/altinity/clickhouse-operator/pkg/metrics/operator"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -93,6 +94,20 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 		// Return and requeue
 		return ctrl.Result{}, err
+	}
+
+	// Label guard here, not just in the predicate: reconcile requests from owned
+	// StatefulSet changes bypass predicates.
+	if !chop.Config().IsLabelSelectorWatched(new.GetLabels()) {
+		log.V(2).M(new).Info("skip reconcile, CHK labels do not match watch.labelSelector '%s'", chop.Config().Watch.LabelSelector)
+		return ctrl.Result{}, nil
+	}
+
+	// The cached read above can lag a shard-label flip; confirm ownership on live state
+	// before any write (finalizer install, child-object reconcile, deletion protocol).
+	if chop.Config().HasWatchLabelSelector() && !c.ownsLiveCR(ctx, req.Namespace, req.Name) {
+		log.V(1).M(new).Info("skip reconcile, live CHK ownership not confirmed (shard label flipped?): %s/%s", req.Namespace, req.Name)
+		return ctrl.Result{}, nil
 	}
 
 	w := c.newWorker()
@@ -191,10 +206,28 @@ func (c *Controller) poll(ctx context.Context, cr api.ICustomResource, f func(c 
 	}
 }
 
+// ownsLiveCR re-checks watch scope against live (non-cached) CR state — the entry guard in
+// Reconcile reads the informer cache, which can miss a shard label flip mid-reconcile.
+// Lookup failure counts as not-owned: skipping is recoverable, purging another shard's objects is not.
+func (c *Controller) ownsLiveCR(ctx context.Context, namespace, name string) bool {
+	live := &apiChk.ClickHouseKeeperInstallation{}
+	if err := c.APIReader.Get(ctx, kubeTypes.NamespacedName{Namespace: namespace, Name: name}, live); err != nil {
+		log.V(1).Warning("unable to confirm live CHK ownership %s/%s: %v", namespace, name, err)
+		return false
+	}
+	return chop.Config().IsCRWatched(live.GetNamespace(), live.GetLabels())
+}
+
 func ShouldEnqueue(cr *apiChk.ClickHouseKeeperInstallation) bool {
 	ns := cr.GetNamespace()
 	if !chop.Config().IsNamespaceWatched(ns) {
 		log.V(2).M(cr).Info("skip enqueue, namespace '%s' is not watched or is in deny list", ns)
+		return false
+	}
+
+	if !chop.Config().IsLabelSelectorWatched(cr.GetLabels()) {
+		log.V(2).M(cr).Info("skip enqueue, CHK labels do not match watch.labelSelector '%s'", chop.Config().Watch.LabelSelector)
+		operatorMetrics.CRSkippedByLabelSelector("chk", cr.GetNamespace(), cr.GetName())
 		return false
 	}
 
