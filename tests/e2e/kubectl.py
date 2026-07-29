@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import time
 import threading
 
@@ -67,7 +68,9 @@ def launch(command, ok_to_fail=False, ns=None, timeout=600, shell=None):
 
     # retry_transient: kubectl-only resilience (launch builds a kubectl command),
     # so a momentary apiserver blip is retried rather than hard-failing the test.
-    # Direct run_shell() callers (docker, `go version -m`) keep fail-fast.
+    # Direct run_shell() callers keep fail-fast: host tooling in steps_fips.py
+    # (`go version -m`, `--fips-info`, readelf) and the piped-manifest paths in
+    # apply()/delete(), which bypass launch() -- apply() wraps its own retries().
     return run_shell(cmd, timeout, ok_to_fail, shell=shell, retry_transient=True)
 
 
@@ -109,6 +112,35 @@ def run_shell(cmd, timeout=600, ok_to_fail=False, shell=None, retry_transient=Fa
         print(f"command failed, exit code:\n{code}")
         print(f"command failed, output :\n{output}")
         assert code == 0, error()
+
+
+def run_host_cmd(cmd, timeout=60, ok_to_fail=False):
+    """Run a command on the test host, with a timeout that is actually enforced."""
+    # Not run_shell(): that hands the command to a testflows Shell whose expect()
+    # budget is refreshed by every newline and is never given an absolute deadline, so a
+    # command that keeps emitting output never times out, and one that hangs outright is
+    # not killed -- it just pollutes the session. subprocess kills the child, so a
+    # caller's retry loop sees a failure instead of hanging the whole suite. That is
+    # also why the default is small: 60s total wall clock, where run_shell's 600s is a
+    # per-line budget. Use for host tooling; the docker calls in steps_fips.py are the
+    # first. kubectl calls belong in launch(), which adds kube-apiserver retry handling.
+    try:
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        if not ok_to_fail:
+            raise
+        note(f"timed out after {timeout}s, tolerated: {cmd}")
+        # Hand back whatever the child wrote before the kill. TimeoutExpired carries it
+        # as bytes even under text=True.
+        return "".join(
+            stream.decode(errors="replace") if isinstance(stream, bytes) else stream
+            for stream in (exc.stdout, exc.stderr) if stream
+        )
+    output = f"{result.stdout}{result.stderr}"
+    assert ok_to_fail or result.returncode == 0, error(
+        f"host command failed with exit code {result.returncode}: {cmd}\n{output}"
+    )
+    return output
 
 
 def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None, wait=True):
