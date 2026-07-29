@@ -8263,6 +8263,8 @@ def test_030001(self):
     release_version = self.context.release_version
     godebug_default = "fips140=on"
 
+    create_shell()
+
     with Given("operator and metrics-exporter binaries are extracted from shipped images"):
         fips_extract_shipped_binaries()
 
@@ -9215,6 +9217,8 @@ def test_030017(self):
     openssl s_server as the API TLS peer.
     """
 
+    create_shell()
+
     with Given("operator and metrics-exporter binaries are extracted from shipped images"):
         fips_extract_shipped_binaries()
 
@@ -9298,6 +9302,9 @@ def test_030017(self):
 def test_030011(self):
     """Verify that corrupting the embedded FIPS HMAC causes binaries to panic at startup.
     """
+
+    create_shell()
+
     with Given("operator and metrics-exporter binaries are extracted"):
         fips_extract_shipped_binaries()
 
@@ -9334,6 +9341,8 @@ def test_030015(self):
         "TLSv1.3-SHA2-256",
         "cSHAKE128",
     )
+
+    create_shell()
 
     with Given("operator and metrics-exporter binaries are extracted"):
         fips_extract_shipped_binaries()
