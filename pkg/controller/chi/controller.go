@@ -153,6 +153,18 @@ func (c *Controller) createQueue() queue.PriorityQueue {
 	//),
 }
 
+// unwrapDeletedObject extracts the concrete object from a
+// cache.DeletedFinalStateUnknown tombstone, or returns obj unchanged.
+// Every DeleteFunc must call this before asserting the concrete type, because
+// client-go wraps deleted objects in a tombstone when the watch reconnects
+// after a disconnect and the object was deleted while the connection was down.
+func unwrapDeletedObject(obj interface{}) interface{} {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		return tombstone.Obj
+	}
+	return obj
+}
+
 func (c *Controller) addEventHandlersCHI(
 	chopInformerFactory chopInformers.SharedInformerFactory,
 ) {
@@ -175,7 +187,10 @@ func (c *Controller) addEventHandlersCHI(
 			c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
-			chi := obj.(*api.ClickHouseInstallation)
+			chi, ok := unwrapDeletedObject(obj).(*api.ClickHouseInstallation)
+			if !ok {
+				return
+			}
 			if !chop.Config().IsNamespaceWatched(chi.Namespace) {
 				return
 			}
@@ -208,7 +223,10 @@ func (c *Controller) addEventHandlersCHIT(
 			c.enqueueObject(cmd_queue.NewReconcileCHIT(cmd_queue.ReconcileUpdate, oldChit, newChit))
 		},
 		DeleteFunc: func(obj interface{}) {
-			chit := obj.(*api.ClickHouseInstallationTemplate)
+			chit, ok := unwrapDeletedObject(obj).(*api.ClickHouseInstallationTemplate)
+			if !ok {
+				return
+			}
 			if !chop.Config().IsNamespaceWatched(chit.Namespace) {
 				return
 			}
@@ -234,7 +252,10 @@ func (c *Controller) addEventHandlersChopConfig(
 			c.enqueueObject(cmd_queue.NewReconcileChopConfig(cmd_queue.ReconcileUpdate, oldChopConfig, newChopConfig))
 		},
 		DeleteFunc: func(obj interface{}) {
-			chopConfig := obj.(*api.ClickHouseOperatorConfiguration)
+			chopConfig, ok := unwrapDeletedObject(obj).(*api.ClickHouseOperatorConfiguration)
+			if !ok {
+				return
+			}
 			log.V(3).M(chopConfig).Info("chopInformer.DeleteFunc")
 			c.enqueueObject(cmd_queue.NewReconcileChopConfig(cmd_queue.ReconcileDelete, chopConfig, nil))
 		},
@@ -260,7 +281,10 @@ func (c *Controller) addEventHandlersService(
 			log.V(3).M(oldService).Info("serviceInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
-			service := obj.(*core.Service)
+			service, ok := unwrapDeletedObject(obj).(*core.Service)
+			if !ok {
+				return
+			}
 			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
@@ -395,7 +419,10 @@ func (c *Controller) addEventHandlersEndpoints(
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			endpoints := obj.(*core.Endpoints)
+			endpoints, ok := unwrapDeletedObject(obj).(*core.Endpoints)
+			if !ok {
+				return
+			}
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
@@ -427,7 +454,10 @@ func (c *Controller) addEventHandlersEndpointSlice(
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			endpointSlice := obj.(*discovery.EndpointSlice)
+			endpointSlice, ok := unwrapDeletedObject(obj).(*discovery.EndpointSlice)
+			if !ok {
+				return
+			}
 			if !c.isTrackedObject(&endpointSlice.ObjectMeta) {
 				return
 			}
@@ -455,7 +485,10 @@ func (c *Controller) addEventHandlersConfigMap(
 			log.V(3).M(configMap).Info("configMapInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
-			configMap := obj.(*core.ConfigMap)
+			configMap, ok := unwrapDeletedObject(obj).(*core.ConfigMap)
+			if !ok {
+				return
+			}
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
@@ -484,7 +517,10 @@ func (c *Controller) addEventHandlersStatefulSet(
 			log.V(3).M(statefulSet).Info("statefulSetInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
-			statefulSet := obj.(*apps.StatefulSet)
+			statefulSet, ok := unwrapDeletedObject(obj).(*apps.StatefulSet)
+			if !ok {
+				return
+			}
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
@@ -516,7 +552,10 @@ func (c *Controller) addEventHandlersPod(
 			c.enqueueObject(cmd_queue.NewReconcilePod(cmd_queue.ReconcileUpdate, oldPod, newPod))
 		},
 		DeleteFunc: func(obj interface{}) {
-			pod := obj.(*core.Pod)
+			pod, ok := unwrapDeletedObject(obj).(*core.Pod)
+			if !ok {
+				return
+			}
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
