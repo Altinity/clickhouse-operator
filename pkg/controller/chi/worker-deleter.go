@@ -360,6 +360,12 @@ func (w *worker) canDropReplica(ctx context.Context, hostToRunOn, hostToDrop *ap
 
 	case opt.ForceDropUponStorageLoss():
 		w.a.V(1).F().Info("Force drop replica upon storage loss. hostToDrop: %s", hostToDrop.GetName())
+		// Check whether drop replicas on lost volume is allowed to the operator
+		if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.OnLostVolume.IsFalse() {
+			w.a.V(1).F().Info("Drop replicas on lost volume are prohibited. hostToDrop: %s", hostToDrop.GetName())
+			return false
+		}
+
 		// Active replica may have restriction to be deleted
 		if w.ensureClusterSchemer(hostToRunOn).IsHostActiveReplica(ctx, hostToRunOn, hostToDrop) {
 			w.a.V(1).F().Info("Replica is an active one. Need ti check whether it can be dropped. hostToDrop: %s", hostToDrop.GetName())

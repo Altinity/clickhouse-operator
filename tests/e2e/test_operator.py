@@ -4380,6 +4380,127 @@ def test_010036(self):
 
 
 @TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
+@Name("test_010036_1. onLostVolume=no prohibits DROP REPLICA on volume loss")
+@Tags("NO_PARALLEL")
+def test_010036_1(self):
+    """reconcile.host.drop.replicas.onLostVolume=no must refuse SYSTEM DROP REPLICA
+    when the operator detects storage loss (ForceDrop path).
+
+    Scenario (mirrors the PVC-loss + DROP step of test_010036):
+    1. CHI uses CHIT test-036-1-on-lost-volume-no; 1 shard × 2 replicas, Operator PVC
+    2. Replicated table + data; seed HasData
+    3. Delete replica-0 PVC (storage loss) and force reconcile
+    4. Assert ForceDrop was attempted but onLostVolume=no refused DROP
+    """
+    try:
+        create_shell_namespace_clickhouse_template()
+
+        manifest = "manifests/chi/test-036-1-on-lost-volume-no.yaml"
+        chi = yaml_manifest.get_name(util.get_full_path(manifest))
+        cluster = "simple"
+        sts0 = f"chi-{chi}-{cluster}-0-0"
+        pvc0 = f"default-{sts0}-0"
+        pod0 = f"{sts0}-0"
+
+        util.require_keeper(keeper_type=self.context.keeper_type)
+
+        with Given("CHI with two replicas and onLostVolume=no via CHIT"):
+            kubectl.create_and_check(
+                manifest=manifest,
+                check={
+                    "apply_templates": {
+                        current().context.clickhouse_template,
+                        "manifests/chit/test-036-1-on-lost-volume-no.yaml",
+                    },
+                    "pod_count": 2,
+                    "do_not_delete": 1,
+                },
+            )
+            wait_for_cluster(chi, cluster, 1, 2)
+
+        with And("I create a replicated table with some data"):
+            clickhouse.query(chi, "CREATE DATABASE IF NOT EXISTS test_036 ON CLUSTER '{cluster}'")
+            create_table = """
+                CREATE TABLE IF NOT EXISTS test_036.test_local_036 ON CLUSTER '{cluster}' (a UInt32)
+                Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+                PARTITION BY tuple()
+                ORDER BY a
+                """.replace("\r", "").replace("\n", "")
+            clickhouse.query(chi, create_table)
+            clickhouse.query(chi, "INSERT INTO test_036.test_local_036 SELECT * FROM numbers(10000)")
+
+        with And("Seed hostsWithTablesCreated so HasData=true"):
+            kubectl.force_chi_reconcile(chi, "seed-hosts-with-tables-created")
+            hosts_with_tables = kubectl.get("chi", chi)["status"].get("hostsWithTablesCreated") or []
+            note(f"hostsWithTablesCreated: {hosts_with_tables}")
+            assert len(hosts_with_tables) == 2, error(
+                f"expected both replicas in hostsWithTablesCreated, got {hosts_with_tables}"
+            )
+
+        query_log_start = clickhouse.query(chi, "SELECT now()")
+        loss_started = time.time()
+
+        with When("Delete PVC on replica 0 (storage loss)"):
+            # Same pattern as test_010036 delete_pvc: that path is known to enter
+            # ForceDrop / SYSTEM DROP REPLICA when onLostVolume=yes.
+            kubectl.launch(
+                f"""patch pvc {pvc0} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
+            )
+            kubectl.launch(f"delete pvc {pvc0} --force &")
+            kubectl.launch(f"delete pod {pod0}")
+            for i in range(10):
+                if kubectl.get_count("pvc", pvc0) == 0:
+                    break
+                retry_sleep(1, 5, "PVC is not deleted")
+            assert kubectl.get_count("pvc", pvc0) == 0, error("PVC is not deleted")
+
+        with And("Force reconcile to trigger the storage-loss ForceDrop path"):
+            kubectl.force_chi_reconcile(chi, "reconcile-after-PVC-deleted")
+            kubectl.wait_chi_status(chi, "Completed")
+            kubectl.wait_object("pod", pod0)
+
+        with Then("Operator must not have run SYSTEM DROP REPLICA"):
+            clickhouse.query(chi, "SYSTEM FLUSH LOGS", pod=pod0)
+            clickhouse.query(chi, "SYSTEM FLUSH LOGS", pod=f"chi-{chi}-{cluster}-0-1-0")
+            util.check_query_log(chi, [], ["SYSTEM DROP REPLICA"], since=query_log_start)
+
+        with Then("onLostVolume=no must prohibit force drop"):
+            since_s = max(int(time.time() - loss_started) + 5, 10)
+            operator_pod = kubectl.get_operator_pod(ns=current().context.test_namespace)
+            op_logs = kubectl.launch(
+                f"logs {operator_pod} -c clickhouse-operator --since={since_s}s",
+                ns=current().context.test_namespace,
+            )
+            # Helpful on failure: show whether ForceDrop was attempted at all.
+            for line in op_logs.splitlines():
+                if any(
+                    m in line
+                    for m in (
+                        "force data recovery",
+                        "Force drop replica",
+                        "lost volume",
+                        "DROP REPLICA",
+                        "Data loss detected",
+                    )
+                ):
+                    note(line)
+
+            assert "Will do force data recovery" in op_logs or "Force drop replica upon storage loss" in op_logs, error(
+                "storage-loss ForceDrop path was not entered; cannot verify onLostVolume"
+            )
+            assert "Accepted force drop replica upon storage loss" not in op_logs, error(
+                "force DROP was accepted despite onLostVolume=no"
+            )
+            assert "Drop replicas on lost volume are prohibited" in op_logs, error(
+                "expected onLostVolume=no prohibition in operator logs "
+            )
+    finally:
+        with Finally("I clean up"):
+            delete_test_namespace()
+
+
+@TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_StorageManagementSwitch("1.0"))
 @Name("test_010037. StorageManagement switch")
 def test_010037(self):
