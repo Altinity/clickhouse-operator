@@ -163,6 +163,74 @@ func (w *worker) isPodOK(ctx context.Context, host *api.Host) bool {
 	return false
 }
 
+// isHostHealthyForReconcile is true when host is safe to count as a live peer for
+// shard-safety checks. Stopped/troubleshoot hosts are intentionally unavailable
+// and do not block disruption of a peer.
+func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) bool {
+	if host == nil {
+		return false
+	}
+	if host.IsStopped() || host.IsTroubleshoot() {
+		return true
+	}
+	return w.c != nil && w.c.kube != nil &&
+		w.isPodRunning(ctx, host) &&
+		w.isPodReady(ctx, host) &&
+		!w.isPodCrushed(ctx, host)
+}
+
+func (w *worker) hasUnhealthyHosts(ctx context.Context, cr *api.ClickHouseInstallation) bool {
+	if cr == nil {
+		return false
+	}
+	found := false
+	cr.WalkHosts(func(host *api.Host) error {
+		if !w.isHostHealthyForReconcile(ctx, host) {
+			found = true
+		}
+		return nil
+	})
+	return found
+}
+
+// isOperatorIPTheSame reports whether the operator pod IP still matches the
+// CHOpIP persisted on the CR from the previous reconcile. A changed IP must
+// force reconcile so clickhouse-operator user networks/host_regexp are refreshed.
+// Compare against prevCHOpIP captured before buildCR — normalize/fillStatus
+// overwrites status.chop-ip with the current operator IP.
+func (w *worker) isOperatorIPTheSame(prevCHOpIP string) bool {
+	ip, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_IP)
+	return ip == prevCHOpIP
+}
+
+// isShardSafeToDisruptHost is true when host may be excluded/restarted/rolled
+// without taking down the last healthy replica in its shard.
+func (w *worker) isShardSafeToDisruptHost(ctx context.Context, host *api.Host) bool {
+	if host == nil || host.GetShard() == nil || host.GetShard().HostsCount() <= 1 {
+		return true
+	}
+	safe := false
+	host.GetShard().WalkHosts(func(peer *api.Host) error {
+		if peer != nil && peer.GetName() != host.GetName() && w.isHostHealthyForReconcile(ctx, peer) {
+			safe = true
+		}
+		return nil
+	})
+	return safe
+}
+
+// hostMayRequireDisruption is true when reconcile is expected to restart or roll the host.
+func (w *worker) hostMayRequireDisruption(ctx context.Context, host *api.Host) bool {
+	if host == nil || host.IsStopped() || host.IsTroubleshoot() {
+		return false
+	}
+	if w.shouldForceRestartHost(ctx, host) {
+		return true
+	}
+	status := host.GetReconcileAttributes().GetStatus()
+	return !status.Is(types.ObjectStatusRequested) && !status.Is(types.ObjectStatusSame)
+}
+
 func (w *worker) isPodRestarted(ctx context.Context, host *api.Host, initialRestartCounters map[string]int) bool {
 	curRestartCounters, _ := w.c.kube.Pod().(interfaces.IKubePodEx).GetRestartCounters(ctx, host)
 	return !util.MapsAreTheSame(initialRestartCounters, curRestartCounters)
@@ -178,66 +246,6 @@ func (w *worker) doesHostHaveNoReplicationDelay(ctx context.Context, host *api.H
 	delay, _ := w.ensureClusterSchemer(host).HostMaxReplicaDelay(ctx, host)
 	log.V(1).Info("replication lag %d host: %s", delay, host.GetName())
 	return delay <= chop.Config().Reconcile.Host.Wait.Replicas.Delay.IntValue()
-}
-
-// isCHIProcessedOnTheSameIP checks whether it is just a restart of the operator on the same IP
-func (w *worker) isCHIProcessedOnTheSameIP(chi *api.ClickHouseInstallation) bool {
-	ip, _ := chop.GetRuntimeParam(deployment.OPERATOR_POD_IP)
-	operatorIpIsTheSame := ip == chi.Status.GetCHOpIP()
-	log.V(1).Info("Operator IPs to process CHI: %s. Previous: %s Cur: %s", chi.Name, chi.Status.GetCHOpIP(), ip)
-
-	if !operatorIpIsTheSame {
-		// Operator has restarted on the different IP address.
-		// We may need to reconcile config files
-		log.V(1).Info("Operator IPs are different. Operator was restarted on another IP since previous reconcile of the CHI: %s", chi.Name)
-		return false
-	}
-
-	log.V(1).Info("Operator IPs are the same as on previous reconcile of the CHI: %s", chi.Name)
-	return w.isCleanRestart(chi)
-}
-
-// isCleanRestart checks whether it is just a restart of the operator and CHI has no changes since last processed
-func (w *worker) isCleanRestart(chi *api.ClickHouseInstallation) bool {
-	// Clean restart may be only in case operator has just recently started
-	if !w.isJustStarted() {
-		log.V(1).Info("Operator is not just started. May not be clean restart")
-		return false
-	}
-
-	log.V(1).Info("Operator just started. May be clean restart")
-
-	// Migration support
-	// Do we have have previously completed CHI?
-	// In case no - this means that CHI has either not completed or we are migrating from
-	// such a version of the operator, where there is no completed CHI at all
-	noCompletedCHI := !chi.HasAncestor()
-	// Having status completed and not having completed CHI suggests we are migrating operator version
-	statusIsCompleted := chi.Status.GetStatus() == api.StatusCompleted
-	if noCompletedCHI && statusIsCompleted {
-		// In case of a restart - assume that normalized is already completed
-		chi.SetAncestor(chi.GetTarget())
-	}
-
-	// Check whether anything has changed in CHI spec
-	// In case the generation is the same as already completed - it is clean restart
-	generationIsOk := false
-	// However, completed CHI still can be missing, for example, in newly requested CHI
-	if chi.HasAncestor() {
-		generationIsOk = chi.Generation == chi.GetAncestor().GetGeneration()
-		log.V(1).Info(
-			"CHI %s has ancestor. Generations. Prev: %d Cur: %d Generation is the same: %t",
-			chi.Name,
-			chi.GetAncestor().GetGeneration(),
-			chi.Generation,
-			generationIsOk,
-		)
-	} else {
-		log.V(1).Info("CHI %s has NO ancestor, meaning reconcile cycle was never completed.", chi.Name)
-	}
-
-	log.V(1).Info("Is CHI %s clean on operator restart: %t", chi.Name, generationIsOk)
-	return generationIsOk
 }
 
 // areUsableOldAndNew checks whether there are old and new usable

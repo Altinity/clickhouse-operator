@@ -1,0 +1,21 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-083-shard-safety
+spec:
+  templates:
+    podTemplates:
+      - name: clickhouse-stable-new
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:26.3
+  defaults:
+    templates:
+      podTemplate: clickhouse-stable-new
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 2
