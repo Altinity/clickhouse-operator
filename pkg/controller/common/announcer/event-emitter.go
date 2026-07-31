@@ -78,6 +78,11 @@ const (
 	// CHK reconcile completing but decides not to trigger a CHI reconcile because the resolved
 	// zookeeper endpoints have not changed.
 	EventReasonKeeperUpdateNoEndpointChange = "KeeperUpdateNoEndpointChange"
+
+	// EventReasonHookSkippedUnreachableHost fires when a cluster-scoped reconcile hook does not
+	// run on one of its target hosts because that host's pod cannot serve SQL - during a
+	// scale-up it may not exist yet. The hook still succeeds on the hosts it could reach.
+	EventReasonHookSkippedUnreachableHost = "HookSkippedUnreachableHost"
 )
 
 type EventEmitter struct {
