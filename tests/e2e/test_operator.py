@@ -6092,6 +6092,30 @@ def test_010062(self):
     with Then("allhosts_hook_marker and 'all hosts' appear in operator logs"):
         check_operator_logs(["allhosts_hook_marker", "Running SQL cluster hook on all hosts"])
 
+    # The cluster pre-hook runs before hosts are reconciled, so on the scale-up above shard 1
+    # has no pod yet and is legitimately skipped as unreachable. Reconcile again now that both
+    # pods are up, so the hook actually has every host to fan out to.
+    with When("Force reconcile with both hosts up so the AllHosts hook can reach every host"):
+        kubectl.force_chi_reconcile(chi, "allhosts")
+
+    with And("the AllHosts hook executed on every host, not only the first"):
+        # Assert the row, not the table: the log line above is emitted before the hook fans
+        # out, and schema propagation copies the table itself to a new host regardless of
+        # whether the hook ran there. Only host-local data proves execution. That combination
+        # is how issue #2052 stayed hidden -- the exec layer consumed the queries slice on the
+        # first host, leaving every host after it with an empty payload and no error.
+        for shard in (0, 1):
+            host = f"chi-{chi}-default-{shard}-0"
+            rows = clickhouse.query_with_error(
+                chi,
+                "SELECT count() FROM default.hook_allhosts_trace WHERE h = hostName()",
+                host=host,
+            ).strip()
+            assert rows.isdigit() and int(rows) >= 1, error(
+                f"target=AllHosts hook did not execute on {host}: "
+                f"count of host-local marker rows returned {rows!r}"
+            )
+
     # Step 3: Pre-hook failure aborts reconcile.
     with When("Apply CHI with a pre-hook that fails"):
         kubectl.apply(
