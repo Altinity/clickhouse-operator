@@ -7746,7 +7746,6 @@ def test_010083_1(self):
     protected_sts = f"chi-{chi}-{cluster}-0-1"
     sibling_pods = [f"chi-{chi}-{cluster}-1-0-0", f"chi-{chi}-{cluster}-1-1-0"]
     good_version = "clickhouse/clickhouse-server:24.3"
-    broken_version = "clickhouse/clickhouse-server:26.3-broken"
     new_version = "clickhouse/clickhouse-server:26.3"
 
     with Given("A 2-shard / 2-replica CHI, all hosts on the same good image"):
