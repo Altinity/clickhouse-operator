@@ -7714,6 +7714,135 @@ def test_010083(self):
         delete_test_namespace()
 
 
+
+
+@TestScenario
+@Tags("HEAVY")
+@Name("test_010083_1. Deferred host must not starve sibling shards (issue #1704)")
+def test_010083_1(self):
+    """Companion to test_010083, which covers a single shard.
+
+    The shard-safety gate defers a host whose shard has no other healthy replica. That
+    deferral must not become "abort the whole reconcile": the other shards are healthy and
+    still need their update. This scenario pins that, plus two things a naive fix breaks.
+
+    Layout: 2 shards x 2 replicas. Shard 0 replica 0 is parked on a broken image, so shard
+    0 replica 1 is its shard's last healthy replica and must be left alone. Shard 1 is
+    fully healthy and must roll.
+
+    Asserted after the roll:
+      - shard 1 converges to the new image            <- the fix; fails if a deferral aborts the pass
+      - shard 0 replica 1 is untouched                <- the protection from test_010083 still holds
+      - CHI is Aborted                                <- the deferral is still reported, not swallowed
+      - status-normalizedCompleted does NOT advance    <- else the pending roll is lost forever
+      - the deferred host's StatefulSet still exists   <- else clean() purges the replica we protect
+    """
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-083-multishard"
+    cluster = "default"
+    broken_pod = f"chi-{chi}-{cluster}-0-0-0"
+    protected_pod = f"chi-{chi}-{cluster}-0-1-0"
+    protected_sts = f"chi-{chi}-{cluster}-0-1"
+    sibling_pods = [f"chi-{chi}-{cluster}-1-0-0", f"chi-{chi}-{cluster}-1-1-0"]
+    good_version = "clickhouse/clickhouse-server:24.3"
+    broken_version = "clickhouse/clickhouse-server:26.3-broken"
+    new_version = "clickhouse/clickhouse-server:26.3"
+
+    with Given("A 2-shard / 2-replica CHI, all hosts on the same good image"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-multishard-1.yaml",
+            check={
+                "pod_count": 4,
+                "do_not_delete": 1,
+            },
+        )
+
+    with When("Shard 0 replica 0 is parked on a broken image"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-multishard-2.yaml",
+            check={
+                "chi_status": "InProgress",
+                "do_not_delete": 1,
+            },
+        )
+        kubectl.wait_field(
+            "pod",
+            broken_pod,
+            ".status.containerStatuses[0].state.waiting.reason",
+            ["ErrImagePull", "ImagePullBackOff"],
+        )
+
+    with And("Its peer is the shard's last healthy replica"):
+        assert kubectl.get_condition_status(protected_pod, "Ready") == "True", error(
+            f"{protected_pod} must be Ready - it is the only healthy replica of shard 0"
+        )
+        protected_start_time = kubectl.get_field("pod", protected_pod, ".status.startTime")
+        # Captured before the roll: a deferring pass must not run finalizeReconcileAndMarkCompleted,
+        # because that advances the ancestor past a host that was never rolled and the pending
+        # restart is then diffed away for good. Compared as a whole document rather than by
+        # generation - the snapshot is a normalized spec and need not carry metadata.generation.
+        completed_before = kubectl.get_chi_normalizedCompleted(chi)
+
+    with When("A new image is rolled to every host except the broken one"):
+        kubectl.apply(
+            util.get_full_path("manifests/chi/test-083-multishard-3.yaml"),
+            ns=current().context.test_namespace,
+        )
+
+    with Then("Sibling shard 1 converges - a deferral in shard 0 must not stop it"):
+        for pod in sibling_pods:
+            kubectl.wait_field("pod", pod, ".spec.containers[0].image", new_version)
+            kubectl.wait_container_status(pod, "true")
+
+    with And("Shard 0 replica 1 is left serving on its old image"):
+        image = kubectl.get_pod_image(chi, pod_name=protected_pod)
+        assert image == good_version, error(
+            f"{protected_pod} is the last healthy replica of its shard and must not be rolled, "
+            f"but image={image}"
+        )
+        cur_start = kubectl.get_field("pod", protected_pod, ".status.startTime")
+        assert cur_start == protected_start_time, error(
+            f"{protected_pod} must not be restarted while its peer is down, "
+            f"but startTime changed from {protected_start_time} to {cur_start}"
+        )
+
+    with And("The deferral is reported, not swallowed"):
+        kubectl.wait_chi_status(chi, "Aborted")
+
+    with And("The completed-spec snapshot did not advance past the deferred host"):
+        completed_after = kubectl.get_chi_normalizedCompleted(chi)
+        assert completed_after == completed_before, error(
+            f"status-normalizedCompleted advanced while {protected_pod} was deferred. The pending "
+            f"roll for it is then diffed away against the new ancestor and lost for good"
+        )
+
+    with And("The deferred host's StatefulSet was not purged"):
+        assert kubectl.get_count("sts", name=protected_sts) == 1, error(
+            f"StatefulSet {protected_sts} disappeared - clean() must not purge a host that was "
+            f"deferred rather than reconciled"
+        )
+
+    with When("The broken replica is given the new image too"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-multishard-4.yaml",
+            check={
+                "pod_count": 4,
+                "pod_image": new_version,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Every host converges once the shard has a healthy peer again"):
+        for pod in [broken_pod, protected_pod] + sibling_pods:
+            kubectl.wait_container_status(pod, "true")
+            image = kubectl.get_pod_image(chi, pod_name=pod)
+            assert image == new_version, error(f"{pod} must run {new_version}, got {image}")
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
 #
 # Keeper tests section
 #

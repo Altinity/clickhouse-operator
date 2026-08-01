@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"errors"
 	"math"
 	"sync"
 
@@ -125,6 +126,9 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 
 	// Launch workers
 	var err error
+	// Tracked apart from err: a deferral is a routine outcome, and last-writer-wins would let
+	// one silently overwrite a real shard failure.
+	var deferred bool
 	var errLock sync.Mutex
 	for i := 0; i < workersNum; i++ {
 		wg.Add(1)
@@ -134,7 +138,11 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 				w.a.V(1).Info("Starting shard index: %d on worker", rq.index)
 				if e := w.reconcileShardWithHosts(ctx, rq.shard); e != nil {
 					errLock.Lock()
-					err = e
+					if errors.Is(e, common.ErrCRUDDeferred) {
+						deferred = true
+					} else {
+						err = e
+					}
 					errLock.Unlock()
 				}
 			}
@@ -144,7 +152,13 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 	w.a.V(1).Info("Starting to wait shards from index: %d on workers.", startShardIndex)
 	wg.Wait()
 	w.a.V(1).Info("Finished to wait shards from index: %d on workers.", startShardIndex)
-	return err
+	if err != nil {
+		return err
+	}
+	if deferred {
+		return common.ErrCRUDDeferred
+	}
+	return nil
 }
 
 func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {

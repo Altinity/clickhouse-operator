@@ -79,6 +79,11 @@ const (
 	// zookeeper endpoints have not changed.
 	EventReasonKeeperUpdateNoEndpointChange = "KeeperUpdateNoEndpointChange"
 
+	// EventReasonHostReconcileDeferredShardSafety fires when a host's restart or StatefulSet
+	// roll is postponed because its shard has no other healthy replica to serve meanwhile.
+	// The shard keeps serving; the reconcile retries once a peer is back.
+	EventReasonHostReconcileDeferredShardSafety = "HostReconcileDeferredShardSafety"
+
 	// EventReasonHookSkippedUnreachableHost fires when a cluster-scoped reconcile hook does not
 	// run on one of its target hosts because that host's pod cannot serve SQL - during a
 	// scale-up it may not exist yet. The hook still succeeds on the hosts it could reach.

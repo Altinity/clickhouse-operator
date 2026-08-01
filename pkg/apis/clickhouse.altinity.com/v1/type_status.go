@@ -64,6 +64,11 @@ const (
 	// ClickHouse clients. Caught at admission to surface the misconfiguration
 	// instead of producing a silently-broken cluster.
 	StatusReasonNoKeeperListener = "NoKeeperListener"
+	// StatusReasonShardHasNoHealthyPeer: a host's reconcile would have restarted or rolled it
+	// while its shard had no other healthy replica to serve, so the disruption was deferred and
+	// the shard left serving. Recoverable without a spec edit - the peer coming back triggers
+	// a retry - so it is deliberately absent from normalizeTimeAbortReasons.
+	StatusReasonShardHasNoHealthyPeer = "ShardHasNoHealthyPeer"
 )
 
 // Status defines status section of the custom resource.

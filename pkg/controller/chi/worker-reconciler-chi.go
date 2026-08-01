@@ -561,13 +561,25 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
 	opts = w.prepareStsReconcileOptsWaitSection(host, opts)
 
+	// #1704: this is the first point where the host's status reflects the desired StatefulSet,
+	// so it is the first point where "would this pass take the pod down?" can be answered
+	// honestly. Defer only that - everything before here (ConfigMap, Service, PVCs) has already
+	// been reconciled, so a converged host in a degraded shard still gets its config refreshed.
+	if w.hostDisruptionWouldDegradeShard(ctx, host) {
+		host.GetCR().IEnsureStatus().ReconcileAbortWithReason(
+			api.StatusReasonShardHasNoHealthyPeer,
+			fmt.Sprintf("host %s: shard has no other healthy replica to serve during a roll", host.GetName()))
+		w.a.V(1).M(host).F().
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonHostReconcileDeferredShardSafety).
+			Warning("Deferring host StatefulSet reconcile: shard has no other healthy replica. Host: %s", host.GetName())
+		return common.ErrCRUDDeferred
+	}
+
 	// Start with force-restart host.
 	// If a pod-template rollout is already coming via the StatefulSet reconcile below, skip
 	// the pre-rollout software restart — see hostRequiresStatefulSetRollout for why.
 	if w.shouldForceRestartHost(ctx, host) {
-		if w.isHostHealthyForReconcile(ctx, host) && !w.isShardSafeToDisruptHost(ctx, host) {
-			w.a.V(1).M(host).F().Warning("Skip force restart: no healthy peer in shard. Host: %s", host.GetName())
-		} else if hostRequiresStatefulSetRollout(host) {
+		if hostRequiresStatefulSetRollout(host) {
 			w.a.V(1).M(host).F().Info("Pod template changed - skipping software restart; StatefulSet rollout will restart the pod. Host: %s", host.GetName())
 		} else {
 			w.a.V(1).M(host).F().Info("Reconcile host STS force restart: %s", host.GetName())
@@ -884,6 +896,9 @@ func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *ap
 
 	// Which shard to start concurrent processing with
 	var startShard int
+	// A shard that deferred a host must not stop the shards after it: those are healthy and
+	// still need their config. Remember it and surface it once, at the end of the pass.
+	deferred := false
 	if opts.FullFanOut {
 		// For full fan-out scenarios we'll start shards processing from the very beginning
 		startShard = 0
@@ -894,8 +909,11 @@ func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *ap
 		// and for large clusters it is a small price to pay before performing concurrent fan-out.
 		w.a.V(1).Info("starting first shard separately")
 		if err := w.reconcileShardWithHosts(ctx, shards[0]); err != nil {
-			w.a.V(1).Warning("first shard failed, skipping rest of shards due to an error: %v", err)
-			return err
+			if !errors.Is(err, common.ErrCRUDDeferred) {
+				w.a.V(1).Warning("first shard failed, skipping rest of shards due to an error: %v", err)
+				return err
+			}
+			deferred = true
 		}
 
 		// Since shard with 0 index is already done, we'll proceed concurrently starting with the 1-st
@@ -907,10 +925,16 @@ func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *ap
 	workersNum := w.getReconcileShardsWorkersNum(cluster, opts)
 	w.a.V(1).Info("Starting rest of shards on workers. Workers num: %d", workersNum)
 	if err := w.runConcurrently(ctx, workersNum, startShard, shards[startShard:]); err != nil {
-		w.a.V(1).Info("Finished with ERROR rest of shards on workers: %d, err: %v", workersNum, err)
-		return err
+		if !errors.Is(err, common.ErrCRUDDeferred) {
+			w.a.V(1).Info("Finished with ERROR rest of shards on workers: %d, err: %v", workersNum, err)
+			return err
+		}
+		deferred = true
 	}
 	w.a.V(1).Info("Finished successfully rest of shards on workers: %d", workersNum)
+	if deferred {
+		return common.ErrCRUDDeferred
+	}
 	return nil
 }
 
@@ -919,8 +943,11 @@ func (w *worker) reconcileShardWithHosts(ctx context.Context, shard api.IShard) 
 		return err
 	}
 
-	// Recovery first, then rollout — avoid disrupting the last healthy peer while
-	// another replica in the shard is still down (#1704).
+	// Recovery first, then rollout: bring a replica that is already down back up before
+	// touching its healthy peer, so an interrupted roll cannot take the whole shard down
+	// (#1704). The disruption itself is gated in reconcileHostStatefulSet, which is the first
+	// point where the desired StatefulSet - and therefore whether the pod actually rolls - is
+	// known.
 	var recovery, rollout []*api.Host
 	shard.WalkHosts(func(host *api.Host) error {
 		if w.isHostHealthyForReconcile(ctx, host) {
@@ -931,25 +958,18 @@ func (w *worker) reconcileShardWithHosts(ctx context.Context, shard api.IShard) 
 		return nil
 	})
 
-	for _, host := range recovery {
+	deferred := false
+	for _, host := range append(recovery, rollout...) {
 		if err := w.reconcileHost(ctx, host); err != nil {
-			return err
+			if !errors.Is(err, common.ErrCRUDDeferred) {
+				return err
+			}
+			// A deferred host is not a failure - keep reconciling the rest of the shard.
+			deferred = true
 		}
 	}
-
-	deferred := 0
-	for _, host := range rollout {
-		if w.hostMayRequireDisruption(ctx, host) && !w.isShardSafeToDisruptHost(ctx, host) {
-			w.a.V(1).M(host).F().Warning("Deferring host reconcile: no healthy peer in shard. Host: %s", host.GetName())
-			deferred++
-			continue
-		}
-		if err := w.reconcileHost(ctx, host); err != nil {
-			return err
-		}
-	}
-	if deferred > 0 {
-		return common.ErrCRUDAbort
+	if deferred {
+		return common.ErrCRUDDeferred
 	}
 	return nil
 }

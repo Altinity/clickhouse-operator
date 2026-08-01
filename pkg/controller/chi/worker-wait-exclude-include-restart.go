@@ -387,9 +387,15 @@ func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 			return false
 		}
+		// Do not drain a host we are about to defer. reconcileHostStatefulSet skips the
+		// restart when the shard has no other healthy replica, and it returns before
+		// reconcileHostIncludeIntoAllActivities - so a host drained here would lose its
+		// ready label, drop out of the CHI/cluster/shard Service endpoints, and have
+		// nothing left in the pass to put it back. On a shard whose only other replica is
+		// down that empties the entrypoint Service while the pod is up and serving.
 		if !w.isShardSafeToDisruptHost(ctx, host) {
 			w.a.V(1).M(host).F().Warning(
-				"Host restart exclude deferred: no healthy peer. Host/shard/cluster: %d/%d/%s",
+				"Host restart needs no exclude: shard has no other healthy replica, restart will be deferred. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 			return false
 		}

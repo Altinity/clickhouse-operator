@@ -26,4 +26,10 @@ var (
 	ErrCRUDIgnore         ErrorCRUD = errors.New("crud error - should ignore")
 	ErrCRUDRecreate       ErrorCRUD = errors.New("crud error - should recreate")
 	ErrCRUDUnexpectedFlow ErrorCRUD = errors.New("crud error - unexpected flow")
+	// ErrCRUDDeferred says the operation was intentionally postponed, not that it failed.
+	// Kept distinct from ErrCRUDAbort so a deferred host does not starve its sibling shards:
+	// callers carry on and surface it once at the end of the pass. It must still reach the
+	// top as an error - a pass that swallowed it would advance the CR ancestor past a host
+	// that was never rolled (losing the pending restart) and let clean() purge that host.
+	ErrCRUDDeferred ErrorCRUD = errors.New("crud error - should defer")
 )
