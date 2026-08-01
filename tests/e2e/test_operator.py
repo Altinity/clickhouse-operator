@@ -7600,6 +7600,248 @@ def test_010082_1(self):
     with Finally("I clean up"):
         delete_test_namespace()
 
+
+@TestScenario
+@Tags("HEAVY")
+@Name("test_010083. Interrupted roll must keep a healthy shard replica (issue #1704)")
+def test_010083(self):
+    """Reproduce issue #1704: operator restart mid-roll must not take down the last
+    healthy replica in a shard while its peer is still recovering.
+
+    Uses a broken image so the first replica stays permanently unhealthy
+    (ImagePullBackOff), giving a deterministic mid-roll window.
+
+    Scenario:
+      1. Start a 1-shard / 2-replica CHI on the clickhouse-version template image
+      2. Roll to a broken image (operator updates replica 0 first)
+      3. Wait until replica 0 is ImagePullBackOff and replica 1 is still Ready
+      4. Restart the operator and force the reconcile
+      5. Replica 1 must stay Ready and must not be recreated (startTime unchanged)
+      6. Roll the good new image and wait for both replicas to recover
+    """
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-083-shard-safety"
+    cluster = "default"
+    down_pod = f"chi-{chi}-{cluster}-0-0-0"
+    healthy_pod = f"chi-{chi}-{cluster}-0-1-0"
+    good_version = current().context.clickhouse_version
+    broken_version = "clickhouse/clickhouse-server:26.3-broken"
+    new_version = "clickhouse/clickhouse-server:26.3"
+
+    with Given("A 1-shard / 2-replica CHI"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-shard-safety-1.yaml",
+            check={
+                "pod_count": 2,
+                "pod_image": good_version,
+                "do_not_delete": 1,
+            },
+        )
+        healthy_start_time = kubectl.get_field("pod", healthy_pod, ".status.startTime")
+        down_start_time    = kubectl.get_field("pod", down_pod, ".status.startTime")
+
+    with When("Rolling update to a broken image is started"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-shard-safety-2.yaml",
+            check={
+                "chi_status": "InProgress",
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("First replica is stuck on the broken image while the second stays Ready"):
+        kubectl.wait_field(
+            "pod",
+            down_pod,
+            ".status.containerStatuses[0].state.waiting.reason",
+            ["ErrImagePull", "ImagePullBackOff"],
+        )
+        down_image = kubectl.get_pod_image(chi, pod_name=down_pod)
+        assert broken_version in down_image, error(
+            f"down replica {down_pod} must be on broken image {broken_version}, got {down_image}"
+        )
+        assert kubectl.get_condition_status(healthy_pod, "Ready") == "True", error(
+            f"healthy replica {healthy_pod} must stay Ready while {down_pod} is pulling the broken image"
+        )
+        cur_start = kubectl.get_field("pod", healthy_pod, ".status.startTime")
+        assert cur_start == healthy_start_time, error(
+            f"healthy replica {healthy_pod} must not be restarted during the broken-image roll, "
+            f"but startTime changed from {healthy_start_time} to {cur_start}"
+        )
+
+    with And("Operator is restarted while the first replica is still down"):
+        util.restart_operator()
+
+    with And("Reconcile is forced one more time while the first replica is still down"):
+        kubectl.force_chi_reconcile(chi, "force", "Aborted")
+
+    with Then("Second replica was never restarted while the broken first replica is down"):
+        # Broken image never becomes Ready — probe long enough to catch a bad
+        # re-roll of the healthy peer after operator restart.
+        assert kubectl.get_condition_status(down_pod, "Ready") != "True", error(
+            f"broken-image replica {down_pod} unexpectedly became Ready"
+        )
+        assert kubectl.get_condition_status(healthy_pod, "Ready") == "True", error(
+            f"healthy replica {healthy_pod} must stay Ready while {down_pod} is down "
+            f"(issue #1704 simultaneous shard outage)"
+        )
+        cur_start = kubectl.get_field("pod", healthy_pod, ".status.startTime")
+        assert cur_start == healthy_start_time, error(
+            f"healthy replica {healthy_pod} must never be restarted while peer is down, "
+            f"but startTime changed from {healthy_start_time} to {cur_start}"
+        )
+
+    with When("New image is applied"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-shard-safety-3.yaml",
+            check={
+                "pod_count": 2,
+                "pod_image": new_version,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Both replicas recover on the good image"):
+        for pod in (down_pod, healthy_pod):
+            kubectl.wait_container_status(pod, "true")
+            image = kubectl.get_pod_image(chi, pod_name=pod)
+            assert image == new_version, error(
+                f"{pod} must run {new_version} after restore, but image={image}"
+            )
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+
+
+@TestScenario
+@Tags("HEAVY")
+@Name("test_010083_1. Deferred host must not starve sibling shards (issue #1704)")
+def test_010083_1(self):
+    """Companion to test_010083, which covers a single shard.
+
+    The shard-safety gate defers a host whose shard has no other healthy replica. That
+    deferral must not become "abort the whole reconcile": the other shards are healthy and
+    still need their update. This scenario pins that, plus two things a naive fix breaks.
+
+    Layout: 2 shards x 2 replicas. Shard 0 replica 0 is parked on a broken image, so shard
+    0 replica 1 is its shard's last healthy replica and must be left alone. Shard 1 is
+    fully healthy and must roll.
+
+    Asserted after the roll:
+      - shard 1 converges to the new image            <- the fix; fails if a deferral aborts the pass
+      - shard 0 replica 1 is untouched                <- the protection from test_010083 still holds
+      - CHI is Aborted                                <- the deferral is still reported, not swallowed
+      - status-normalizedCompleted does NOT advance    <- else the pending roll is lost forever
+      - the deferred host's StatefulSet still exists   <- else clean() purges the replica we protect
+    """
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-083-multishard"
+    cluster = "default"
+    broken_pod = f"chi-{chi}-{cluster}-0-0-0"
+    protected_pod = f"chi-{chi}-{cluster}-0-1-0"
+    protected_sts = f"chi-{chi}-{cluster}-0-1"
+    sibling_pods = [f"chi-{chi}-{cluster}-1-0-0", f"chi-{chi}-{cluster}-1-1-0"]
+    good_version = "clickhouse/clickhouse-server:24.3"
+    new_version = "clickhouse/clickhouse-server:26.3"
+
+    with Given("A 2-shard / 2-replica CHI, all hosts on the same good image"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-multishard-1.yaml",
+            check={
+                "pod_count": 4,
+                "do_not_delete": 1,
+            },
+        )
+
+    with When("Shard 0 replica 0 is parked on a broken image"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-multishard-2.yaml",
+            check={
+                "chi_status": "InProgress",
+                "do_not_delete": 1,
+            },
+        )
+        kubectl.wait_field(
+            "pod",
+            broken_pod,
+            ".status.containerStatuses[0].state.waiting.reason",
+            ["ErrImagePull", "ImagePullBackOff"],
+        )
+
+    with And("Its peer is the shard's last healthy replica"):
+        assert kubectl.get_condition_status(protected_pod, "Ready") == "True", error(
+            f"{protected_pod} must be Ready - it is the only healthy replica of shard 0"
+        )
+        protected_start_time = kubectl.get_field("pod", protected_pod, ".status.startTime")
+        # Captured before the roll: a deferring pass must not run finalizeReconcileAndMarkCompleted,
+        # because that advances the ancestor past a host that was never rolled and the pending
+        # restart is then diffed away for good. Compared as a whole document rather than by
+        # generation - the snapshot is a normalized spec and need not carry metadata.generation.
+        completed_before = kubectl.get_chi_normalizedCompleted(chi)
+
+    with When("A new image is rolled to every host except the broken one"):
+        kubectl.apply(
+            util.get_full_path("manifests/chi/test-083-multishard-3.yaml"),
+            ns=current().context.test_namespace,
+        )
+
+    with Then("Sibling shard 1 converges - a deferral in shard 0 must not stop it"):
+        for pod in sibling_pods:
+            kubectl.wait_field("pod", pod, ".spec.containers[0].image", new_version)
+            kubectl.wait_container_status(pod, "true")
+
+    with And("Shard 0 replica 1 is left serving on its old image"):
+        image = kubectl.get_pod_image(chi, pod_name=protected_pod)
+        assert image == good_version, error(
+            f"{protected_pod} is the last healthy replica of its shard and must not be rolled, "
+            f"but image={image}"
+        )
+        cur_start = kubectl.get_field("pod", protected_pod, ".status.startTime")
+        assert cur_start == protected_start_time, error(
+            f"{protected_pod} must not be restarted while its peer is down, "
+            f"but startTime changed from {protected_start_time} to {cur_start}"
+        )
+
+    with And("The deferral is reported, not swallowed"):
+        kubectl.wait_chi_status(chi, "Aborted")
+
+    with And("The completed-spec snapshot did not advance past the deferred host"):
+        completed_after = kubectl.get_chi_normalizedCompleted(chi)
+        assert completed_after == completed_before, error(
+            f"status-normalizedCompleted advanced while {protected_pod} was deferred. The pending "
+            f"roll for it is then diffed away against the new ancestor and lost for good"
+        )
+
+    with And("The deferred host's StatefulSet was not purged"):
+        assert kubectl.get_count("sts", name=protected_sts) == 1, error(
+            f"StatefulSet {protected_sts} disappeared - clean() must not purge a host that was "
+            f"deferred rather than reconciled"
+        )
+
+    with When("The broken replica is given the new image too"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-083-multishard-4.yaml",
+            check={
+                "pod_count": 4,
+                "pod_image": new_version,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Every host converges once the shard has a healthy peer again"):
+        for pod in [broken_pod, protected_pod] + sibling_pods:
+            kubectl.wait_container_status(pod, "true")
+            image = kubectl.get_pod_image(chi, pod_name=pod)
+            assert image == new_version, error(f"{pod} must run {new_version}, got {image}")
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
 #
 # Keeper tests section
 #

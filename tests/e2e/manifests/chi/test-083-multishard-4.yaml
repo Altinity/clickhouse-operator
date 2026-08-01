@@ -1,0 +1,40 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-083-multishard
+spec:
+  templates:
+    podTemplates:
+      - name: ch-good
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:24.3
+      - name: ch-broken
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:26.3-broken
+      - name: ch-new
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:26.3
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          # Replicas are listed explicitly, and every step below changes exactly one
+          # podTemplate reference. That keeps each roll intentional - an inherited
+          # default would re-roll replicas the step is not about.
+          shards:
+            - replicas:
+                - templates:
+                    podTemplate: ch-new
+                - templates:
+                    podTemplate: ch-new
+            - replicas:
+                - templates:
+                    podTemplate: ch-new
+                - templates:
+                    podTemplate: ch-new
