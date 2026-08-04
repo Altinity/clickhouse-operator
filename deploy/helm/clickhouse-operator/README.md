@@ -133,7 +133,14 @@ crdHook:
 | serviceMonitor.clickhouseMetrics.metricRelabelings | list | `[]` |  |
 | serviceMonitor.clickhouseMetrics.relabelings | list | `[]` |  |
 | serviceMonitor.clickhouseMetrics.scrapeTimeout | string | `""` |  |
-| serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) In serviceMonitor will be created two endpoints ch-metrics on port 8888 and op-metrics # 9999. Ypu can specify interval, scrapeTimeout, relabelings, metricRelabelings for each endpoint below |
+| serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) In serviceMonitor will be created two endpoints ch-metrics on port 8888 and op-metrics # 9999 and separate ServiceMonitor for keeper-metrics. You can specify interval, scrapeTimeout, relabelings, metricRelabelings for each endpoint below |
+| serviceMonitor.keeperMetrics.enabled | bool | `true` | create separate ServiceMonitor for scrape native ClickHouse Keeper prometheus endpoint from every keeper service managed by operator (matched by `clickhouse-keeper.altinity.com/app: chop` label). Keeper shall expose prometheus endpoint via `prometheus/*` settings in CHK manifest and named port in serviceTemplate |
+| serviceMonitor.keeperMetrics.interval | string | `"30s"` |  |
+| serviceMonitor.keeperMetrics.metricRelabelings | list | `[]` |  |
+| serviceMonitor.keeperMetrics.namespaceSelector | object | `{"any":true}` | namespaces where prometheus-operator will discover keeper services, `any: true` means all namespaces |
+| serviceMonitor.keeperMetrics.port | string | `"metrics"` | name of the port in keeper Service which expose native keeper prometheus endpoint |
+| serviceMonitor.keeperMetrics.relabelings | list | `[]` |  |
+| serviceMonitor.keeperMetrics.scrapeTimeout | string | `""` |  |
 | serviceMonitor.operatorMetrics.interval | string | `"30s"` |  |
 | serviceMonitor.operatorMetrics.metricRelabelings | list | `[]` |  |
 | serviceMonitor.operatorMetrics.relabelings | list | `[]` |  |

@@ -47,4 +47,40 @@ spec:
   selector:
     matchLabels:
       {{- include "altinity-clickhouse-operator.selectorLabels" . | nindent 6 }}
+{{- if .Values.serviceMonitor.keeperMetrics.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ printf "%s-keeper-metrics" (include "altinity-clickhouse-operator.fullname" .) }}
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
+  labels:
+    {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+    {{- if .Values.serviceMonitor.additionalLabels }}
+    {{- toYaml .Values.serviceMonitor.additionalLabels | nindent 4 }}
+    {{- end }}
+  annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
+spec:
+  endpoints:
+    - port: {{ .Values.serviceMonitor.keeperMetrics.port }} # native keeper prometheus endpoint, requires prometheus/* settings in CHK and `metrics` port in serviceTemplate
+      {{- with .Values.serviceMonitor.keeperMetrics.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.keeperMetrics.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.keeperMetrics.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.keeperMetrics.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  namespaceSelector:
+    {{- toYaml .Values.serviceMonitor.keeperMetrics.namespaceSelector | nindent 4 }}
+  selector:
+    matchLabels:
+      clickhouse-keeper.altinity.com/app: chop
+{{- end }}
 {{- end }}
