@@ -20,6 +20,7 @@ import (
 	"time"
 
 	core "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -539,12 +540,25 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 
 	var err error
 	if host.Runtime.CurStatefulSet, err = w.c.kube.STS().Get(ctx, host); err != nil {
-		w.a.WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonDeleteCompleted).
-			WithAction(host.GetCR()).
+		if apiErrors.IsNotFound(err) {
+			// StatefulSet is gone for sure - the host is already deleted.
+			w.a.WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonDeleteCompleted).
+				WithAction(host.GetCR()).
+				M(host).F().
+				Info("Delete host: %s/%s - completed StatefulSet not found - already deleted",
+					host.Runtime.Address.ClusterName, host.GetName())
+			return nil
+		}
+		// Unable to tell whether the StatefulSet exists.
+		// Do not report deletion as completed - the cleanup below is skipped, and the host's
+		// PVCs carry no owner reference (see model/common/creator/pvc.go), so nothing else
+		// would reclaim them. Report the failure and let the caller decide.
+		w.a.WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonDeleteFailed).
+			WithError(host.GetCR()).
 			M(host).F().
-			Info("Delete host: %s/%s - completed StatefulSet not found - already deleted? err: %v",
+			Error("Delete host: %s/%s - unable to get StatefulSet, host deletion not performed. err: %v",
 				host.Runtime.Address.ClusterName, host.GetName(), err)
-		return nil
+		return err
 	}
 
 	// Pre-delete host hooks: run BEFORE we touch the host's k8s objects so the pod is
