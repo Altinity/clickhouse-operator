@@ -79,6 +79,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y conntrack clickhouse-client
 
+      # test_010084 render-tests the Helm chart. The runner image happens to preinstall helm,
+      # but declaring it keeps the suite from silently skipping that scenario if that changes.
+      - uses: azure/setup-helm@v4
+        with:
+          version: latest
+
       - uses: medyagh/setup-minikube@master
         with:
           driver: docker
