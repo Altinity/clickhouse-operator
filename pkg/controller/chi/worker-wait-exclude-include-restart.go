@@ -380,6 +380,27 @@ func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
 
+	// Image upgrades defer SQL restart to the StatefulSet rollout (see shouldForceRestartHost /
+	// isImageChangeRequested), but the host still goes down and must be drained first
+	case w.isImageChangeRequested(host):
+		if !w.isHostHealthyForReconcile(ctx, host) {
+			w.a.V(1).M(host).F().Info(
+				"Host image change but host is unhealthy - skip exclude. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
+		if !w.isShardSafeToDisruptHost(ctx, host) {
+			w.a.V(1).M(host).F().Warning(
+				"Host image change needs no exclude: shard has no other healthy replica, rollout will be deferred. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
+		w.a.V(1).
+			M(host).F().
+			Info("Host image change via STS rollout, need to exclude. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return true
+
 	case w.shouldForceRestartHost(ctx, host):
 		if !w.isHostHealthyForReconcile(ctx, host) {
 			w.a.V(1).M(host).F().Info(
