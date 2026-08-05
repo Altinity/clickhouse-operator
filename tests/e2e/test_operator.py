@@ -7842,6 +7842,30 @@ def test_010083_1(self):
         delete_test_namespace()
 
 
+@TestScenario
+@Name("test_010084. Helm chart renders its ServiceMonitors correctly")
+def test_010084(self):
+    """Render-test the operator Helm chart.
+
+    A `helm install` with default values leaves `serviceMonitor.enabled` off, so every
+    ServiceMonitor template ships unrendered - the chart CI never evaluates them, and neither
+    does the rest of this suite, which installs from deploy/operator manifests rather than the
+    chart. This scenario runs the chart's own rendering assertions so a broken template is
+    caught by a normal suite run.
+
+    Host-only: no namespace, no cluster, no prometheus-operator CRDs. Roughly 2 seconds.
+    """
+    with Given("helm is available on the test host"):
+        if kubectl.run_host_cmd("command -v helm", ok_to_fail=True).strip() == "":
+            skip("helm is not installed on the test host - the check_helm workflow covers this in CI")
+
+    with Then("the chart rendering assertions pass"):
+        # --skip-docs: the README drift check regenerates README.md in place, and a test run
+        # must not write to the working tree. That check belongs to the check_helm workflow.
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "dev", "test_helm_chart.sh")
+        note(kubectl.run_host_cmd(f"bash {script} --skip-docs", timeout=180))
+
+
 #
 # Keeper tests section
 #
