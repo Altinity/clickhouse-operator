@@ -16,6 +16,27 @@ on:
         type: string
         required: false
 jobs:
+  # Go unit tests were previously run by nothing at all, which is how pkg/model's registry
+  # concurrency test sat broken for two years without anyone noticing. Runs beside the e2e
+  # job, so it costs no extra wall clock. -race is the point: those tests exist to catch
+  # locking regressions and only the detector can see them.
+  go_unit_tests:
+    name: Go unit tests (race)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          # go.mod is the single source of the build Go version.
+          go-version-file: go.mod
+
+      # -vet=off is the project convention: plain `go test` fails to build a few packages
+      # on pre-existing vet noise unrelated to the tests.
+      - name: go test -race
+        run: go test -vet=off -race -count=1 ./pkg/...
+
   run_tests:
     name: Run Tests
     runs-on: ubuntu-latest
