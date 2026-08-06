@@ -16,6 +16,8 @@ package schemer
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -33,6 +35,14 @@ type ClusterSchemer struct {
 	interfaces.INameManager
 	version *swversion.SoftWareVersion
 }
+
+type replicatedTable struct {
+	DatabaseName string
+	TableName    string
+}
+
+// ErrGateDeadline marks the shared sync-gate deadline being reached.
+var ErrGateDeadline = errors.New("sync gate deadline exceeded")
 
 // NewClusterSchemer creates new Schemer object
 func NewClusterSchemer(clusterConnectionParams *clickhouse.ClusterConnectionParams, version *swversion.SoftWareVersion) *ClusterSchemer {
@@ -180,7 +190,103 @@ func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *api.Ho
 
 // HostMaxReplicaDelay returns max replica delay on the host
 func (s *ClusterSchemer) HostMaxReplicaDelay(ctx context.Context, host *api.Host) (int, error) {
-	return s.QueryHostInt(ctx, host, s.sqlMaxReplicaDelay())
+	replicaDelay, err := s.QueryHostInt(ctx, host, s.sqlMaxReplicaDelay())
+	if contextError := ctx.Err(); contextError != nil {
+		return 0, contextError
+	}
+	return replicaDelay, err
+}
+
+func (s *ClusterSchemer) HostMaxIsReadonly(ctx context.Context, host *api.Host) (int, error) {
+	readonly, err := s.QueryHostInt(ctx, host, s.sqlReplicaHealth("is_readonly"))
+	if contextError := ctx.Err(); contextError != nil {
+		return 0, contextError
+	}
+	return readonly, err
+}
+
+func (s *ClusterSchemer) HostMaxIsSessionExpired(ctx context.Context, host *api.Host) (int, error) {
+	sessionExpired, err := s.QueryHostInt(ctx, host, s.sqlReplicaHealth("is_session_expired"))
+	if contextError := ctx.Err(); contextError != nil {
+		return 0, contextError
+	}
+	return sessionExpired, err
+}
+
+func (s *ClusterSchemer) PeerReplicatedObjectCount(ctx context.Context, host *api.Host, deadline time.Time) (int, error) {
+	databaseNames, replicatedTables, err := s.peerReplicatedObjects(ctx, host, deadline)
+	if err != nil {
+		return 0, err
+	}
+	return len(databaseNames) + len(replicatedTables), nil
+}
+
+func (s *ClusterSchemer) HostAsyncLoadBarrier(ctx context.Context, host *api.Host, deadline time.Time) error {
+	for {
+		asyncLoaderExists, err := s.queryHostIntWithDeadline(ctx, host, deadline, s.sqlAsyncLoaderTableExists())
+		if err != nil {
+			return err
+		}
+		if asyncLoaderExists == 0 {
+			return nil
+		}
+
+		pendingLoadJobs, failedLoadJobs, err := s.queryHostIntPairWithDeadline(ctx, host, deadline, s.sqlAsyncLoaderState())
+		if err != nil {
+			return err
+		}
+		if failedLoadJobs > 0 {
+			failedLoadJob, detailErr := s.queryHostStringWithDeadline(ctx, host, deadline, s.sqlAsyncLoaderFailedDetails())
+			if detailErr != nil {
+				return detailErr
+			}
+			return fmt.Errorf("async loader failed or canceled job: %s", failedLoadJob)
+		}
+		if pendingLoadJobs == 0 {
+			return nil
+		}
+		if err := waitForNextGatePoll(ctx, deadline); err != nil {
+			return err
+		}
+	}
+}
+
+func (s *ClusterSchemer) HostSyncReplicatedObjects(ctx context.Context, host *api.Host, deadline time.Time) error {
+	if (s == nil) || (s.version == nil) || !s.version.Matches(">= 23.4") {
+		return fmt.Errorf("SYSTEM SYNC REPLICA ... LIGHTWEIGHT requires ClickHouse >= 23.4, got %s", s.version)
+	}
+
+	if err := s.HostAsyncLoadBarrier(ctx, host, deadline); err != nil {
+		return err
+	}
+
+	databaseNames, _, err := s.peerReplicatedObjects(ctx, host, deadline)
+	if err != nil {
+		return err
+	}
+	for _, databaseName := range databaseNames {
+		if err := s.execHostWithDeadline(ctx, host, deadline, s.sqlSyncDatabaseReplica(databaseName)); err != nil {
+			return err
+		}
+	}
+
+	if err := s.HostAsyncLoadBarrier(ctx, host, deadline); err != nil {
+		return err
+	}
+
+	_, replicatedTables, err := s.peerReplicatedObjects(ctx, host, deadline)
+	if err != nil {
+		return err
+	}
+	for _, replicatedTable := range replicatedTables {
+		if err := s.execHostWithDeadline(ctx, host, deadline, s.sqlWaitLoadingParts(replicatedTable.DatabaseName, replicatedTable.TableName)); err != nil {
+			return err
+		}
+		if err := s.execHostWithDeadline(ctx, host, deadline, s.sqlSyncReplicaLightweight(replicatedTable.DatabaseName, replicatedTable.TableName)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // HostShutdown shutdown a host
@@ -203,4 +309,211 @@ func debugCreateSQLs(names, sqls []string, err error) ([]string, []string) {
 		log.V(2).Info("sql: %s", v)
 	}
 	return names, sqls
+}
+
+func (s *ClusterSchemer) peerReplicatedObjects(ctx context.Context, host *api.Host, deadline time.Time) ([]string, []replicatedTable, error) {
+	if _, err := gateRemaining(ctx, deadline); err != nil {
+		return nil, nil, err
+	}
+
+	peers := s.Names(interfaces.NameFQDNs, host, api.Cluster{}, true)
+	if len(peers) == 0 {
+		return nil, nil, nil
+	}
+
+	queryCtx, cancel, err := gateQueryContext(ctx, deadline)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer cancel()
+
+	queryResult, err := s.Cluster.SetHosts(peers).QueryAny(queryCtx, s.sqlReplicatedObjects(host.Runtime.Address.ClusterName))
+	if mappedErr := gateQueryError(ctx, queryCtx, err); mappedErr != nil {
+		return nil, nil, mappedErr
+	}
+	if queryResult == nil {
+		return nil, nil, fmt.Errorf("empty replicated object discovery result from peers %v", peers)
+	}
+	defer queryResult.Close()
+
+	databaseNames := make([]string, 0)
+	replicatedTables := make([]replicatedTable, 0)
+	for queryResult.Rows.Next() {
+		var objectType string
+		var databaseName string
+		var tableName string
+		if err := queryResult.Rows.Scan(&objectType, &databaseName, &tableName); err != nil {
+			if mappedErr := gateQueryError(ctx, queryCtx, err); mappedErr != nil {
+				return nil, nil, mappedErr
+			}
+			return nil, nil, err
+		}
+		switch objectType {
+		case "database":
+			databaseNames = append(databaseNames, databaseName)
+		case "table":
+			replicatedTables = append(replicatedTables, replicatedTable{
+				DatabaseName: databaseName,
+				TableName:    tableName,
+			})
+		default:
+			return nil, nil, fmt.Errorf("unknown replicated object type %q", objectType)
+		}
+	}
+	if err := queryResult.Rows.Err(); err != nil {
+		if mappedErr := gateQueryError(ctx, queryCtx, err); mappedErr != nil {
+			return nil, nil, mappedErr
+		}
+		return nil, nil, err
+	}
+	if mappedErr := gateQueryError(ctx, queryCtx, nil); mappedErr != nil {
+		return nil, nil, mappedErr
+	}
+	return databaseNames, replicatedTables, nil
+}
+
+func (s *ClusterSchemer) execHostWithDeadline(ctx context.Context, host *api.Host, deadline time.Time, querySQL string) error {
+	remaining, err := gateRemaining(ctx, deadline)
+	if err != nil {
+		return err
+	}
+
+	opts := clickhouse.NewQueryOptions()
+	opts.SetRetry(false)
+	opts.SetQueryTimeout(remaining)
+
+	err = s.ExecHost(ctx, host, []string{sqlWithReceiveTimeout(querySQL, remaining)}, opts)
+	if contextError := ctx.Err(); contextError != nil {
+		return contextError
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return ErrGateDeadline
+	}
+	return err
+}
+
+func (s *ClusterSchemer) queryHostIntWithDeadline(ctx context.Context, host *api.Host, deadline time.Time, querySQL string) (int, error) {
+	queryCtx, cancel, err := gateQueryContext(ctx, deadline)
+	if err != nil {
+		return 0, err
+	}
+	defer cancel()
+
+	queryValue, err := s.QueryHostInt(queryCtx, host, querySQL)
+	if mappedErr := gateQueryError(ctx, queryCtx, err); mappedErr != nil {
+		return 0, mappedErr
+	}
+	return queryValue, nil
+}
+
+func (s *ClusterSchemer) queryHostStringWithDeadline(ctx context.Context, host *api.Host, deadline time.Time, querySQL string) (string, error) {
+	queryCtx, cancel, err := gateQueryContext(ctx, deadline)
+	if err != nil {
+		return "", err
+	}
+	defer cancel()
+
+	queryValue, err := s.QueryHostString(queryCtx, host, querySQL)
+	if mappedErr := gateQueryError(ctx, queryCtx, err); mappedErr != nil {
+		return "", mappedErr
+	}
+	return queryValue, nil
+}
+
+func (s *ClusterSchemer) queryHostIntPairWithDeadline(ctx context.Context, host *api.Host, deadline time.Time, querySQL string) (int, int, error) {
+	queryCtx, cancel, err := gateQueryContext(ctx, deadline)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer cancel()
+
+	queryResult, err := s.QueryHost(queryCtx, host, querySQL)
+	if mappedErr := gateQueryError(ctx, queryCtx, err); mappedErr != nil {
+		return 0, 0, mappedErr
+	}
+	if queryResult == nil {
+		return 0, 0, fmt.Errorf("empty query result")
+	}
+	defer queryResult.Close()
+
+	if !queryResult.Rows.Next() {
+		if err := queryResult.Rows.Err(); err != nil {
+			if mappedErr := gateQueryError(ctx, queryCtx, err); mappedErr != nil {
+				return 0, 0, mappedErr
+			}
+			return 0, 0, err
+		}
+		return 0, 0, fmt.Errorf("found no rows")
+	}
+
+	var firstValue int
+	var secondValue int
+	if err := queryResult.Rows.Scan(&firstValue, &secondValue); err != nil {
+		if mappedErr := gateQueryError(ctx, queryCtx, err); mappedErr != nil {
+			return 0, 0, mappedErr
+		}
+		return 0, 0, err
+	}
+	if err := queryResult.Rows.Err(); err != nil {
+		if mappedErr := gateQueryError(ctx, queryCtx, err); mappedErr != nil {
+			return 0, 0, mappedErr
+		}
+		return 0, 0, err
+	}
+	if mappedErr := gateQueryError(ctx, queryCtx, nil); mappedErr != nil {
+		return 0, 0, mappedErr
+	}
+	return firstValue, secondValue, nil
+}
+
+func gateQueryContext(ctx context.Context, deadline time.Time) (context.Context, context.CancelFunc, error) {
+	remaining, err := gateRemaining(ctx, deadline)
+	if err != nil {
+		return nil, nil, err
+	}
+	queryCtx, cancel := context.WithTimeout(ctx, remaining)
+	return queryCtx, cancel, nil
+}
+
+func gateRemaining(ctx context.Context, deadline time.Time) (time.Duration, error) {
+	if contextError := ctx.Err(); contextError != nil {
+		return 0, contextError
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return 0, ErrGateDeadline
+	}
+	return remaining, nil
+}
+
+func gateQueryError(parentCtx, queryCtx context.Context, err error) error {
+	if contextError := parentCtx.Err(); contextError != nil {
+		return contextError
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(queryCtx.Err(), context.DeadlineExceeded) {
+		return ErrGateDeadline
+	}
+	if contextError := queryCtx.Err(); contextError != nil {
+		return contextError
+	}
+	return err
+}
+
+func waitForNextGatePoll(ctx context.Context, deadline time.Time) error {
+	remaining, err := gateRemaining(ctx, deadline)
+	if err != nil {
+		return err
+	}
+	sleepDuration := time.Second
+	if remaining < sleepDuration {
+		sleepDuration = remaining
+	}
+	timer := time.NewTimer(sleepDuration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }

@@ -23,6 +23,8 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
 // sts is a small builder for an apps/v1 StatefulSet with a single-container pod template
@@ -45,6 +47,50 @@ func hostWith(cur, desired *apps.StatefulSet) *api.Host {
 	h.Runtime.CurStatefulSet = cur
 	h.Runtime.DesiredStatefulSet = desired
 	return h
+}
+
+func withReplicaSyncGate(t *testing.T, enabled bool) {
+	t.Helper()
+	cfg := chop.Config()
+	prev := cfg.Reconcile.Host.Wait.Replicas.Sync
+	t.Cleanup(func() {
+		cfg.Reconcile.Host.Wait.Replicas.Sync = prev
+	})
+	cfg.Reconcile.Host.Wait.Replicas.Sync = (&api.ReconcileHostWaitReplicasSync{
+		Enabled: types.NewStringBool(enabled),
+	}).Normalize()
+}
+
+func hostWithReplicaCaughtUpMarker(fqdn string) *api.Host {
+	cr := &api.ClickHouseInstallation{}
+	host := &api.Host{}
+	host.SetCR(cr)
+	host.GetCR().IEnsureStatus().PushHostReplicaCaughtUp(fqdn)
+	return host
+}
+
+func TestForceReplicaCatchUpAfterStorageLossNoopWhenSyncDisabled(t *testing.T) {
+	const fqdn = "chi-x-default-0-0"
+	withReplicaSyncGate(t, false)
+	host := hostWithReplicaCaughtUpMarker(fqdn)
+	w := &worker{}
+
+	w.forceReplicaCatchUpAfterStorageLoss(host, fqdn)
+
+	require.False(t, host.IsForceReplicaCatchUp())
+	require.True(t, host.HasListedReplicaCaughtUp(fqdn))
+}
+
+func TestForceReplicaCatchUpAfterStorageLossClearsMarkerWhenSyncEnabled(t *testing.T) {
+	const fqdn = "chi-x-default-0-0"
+	withReplicaSyncGate(t, true)
+	host := hostWithReplicaCaughtUpMarker(fqdn)
+	w := &worker{}
+
+	w.forceReplicaCatchUpAfterStorageLoss(host, fqdn)
+
+	require.True(t, host.IsForceReplicaCatchUp())
+	require.False(t, host.HasListedReplicaCaughtUp(fqdn))
 }
 
 // TestHostRequiresStatefulSetRollout exercises the pure decision function that gates

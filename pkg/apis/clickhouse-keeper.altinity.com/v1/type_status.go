@@ -184,6 +184,20 @@ func (s *Status) PushHostReplicaCaughtUp(host string) {
 	})
 }
 
+// RemoveHostReplicaCaughtUp removes host from the list of hosts with replica caught-up
+func (s *Status) RemoveHostReplicaCaughtUp(host string) {
+	host = util.NormalizeFQDN(host)
+	doWithWriteLock(s, func(s *Status) {
+		hosts := s.HostsWithReplicaCaughtUp[:0]
+		for _, caughtUpHost := range s.HostsWithReplicaCaughtUp {
+			if caughtUpHost != host {
+				hosts = append(hosts, caughtUpHost)
+			}
+		}
+		s.HostsWithReplicaCaughtUp = hosts
+	})
+}
+
 // PushHostTablesCreated pushes host to the list of hosts with created tables
 func (s *Status) PushHostTablesCreated(host string) {
 	host = util.NormalizeFQDN(host)

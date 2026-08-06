@@ -219,7 +219,7 @@ func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *
 	actionPlan := api.MakeActionPlan(cr.GetAncestorT(), cr)
 	cr.EnsureRuntime().ActionPlan = actionPlan
 	cr.EnsureStatus().SetActionPlan(actionPlan)
-	w.a.V(1).M(cr).Info(actionPlan.Log("buildCR"))
+	w.a.V(1).M(cr).Info("%s", actionPlan.Log("buildCR"))
 
 	return cr
 }
@@ -1123,6 +1123,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			w.a.V(1).M(host).F().Warning("Data loss detected for host: %s. Aborting reconcile as configured (onDataLoss: abort)", host.GetName())
 			return common.ErrCRUDAbort
 		}
+		w.forceReplicaCatchUpAfterStorageLoss(host, w.c.namer.Name(interfaces.NameFQDN, host))
 		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataLossDetectedOptions(host)
 		w.a.V(1).
 			M(host).F().
@@ -1133,6 +1134,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			return common.ErrCRUDAbort
 		}
 		// stsReconcileOpts, migrateTableOpts = w.hostPVCsDataVolumeMissedDetectedOptions(host)
+		w.forceReplicaCatchUpAfterStorageLoss(host, w.c.namer.Name(interfaces.NameFQDN, host))
 		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataLossDetectedOptions(host)
 		w.a.V(1).
 			M(host).F().
@@ -1193,6 +1195,14 @@ func (w *worker) prepareStsReconcileOptsWaitSection(host *api.Host, opts *statef
 			Warning("Setting option SetWaitUntilReady")
 	}
 	return opts
+}
+
+func (w *worker) forceReplicaCatchUpAfterStorageLoss(host *api.Host, fqdn string) {
+	if !chop.Config().Reconcile.Host.Wait.Replicas.Sync.IsEnabled() {
+		return
+	}
+	host.SetForceReplicaCatchUp(true)
+	host.GetCR().IEnsureStatus().RemoveHostReplicaCaughtUp(fqdn)
 }
 
 func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {

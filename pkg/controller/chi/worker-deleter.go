@@ -534,8 +534,8 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 		return nil
 	}
 
-	w.a.V(2).M(host).S().Info(host.Runtime.Address.HostName)
-	defer w.a.V(2).M(host).E().Info(host.Runtime.Address.HostName)
+	w.a.V(2).M(host).S().Info("%s", host.Runtime.Address.HostName)
+	defer w.a.V(2).M(host).E().Info("%s", host.Runtime.Address.HostName)
 
 	w.a.V(1).
 		WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonDeleteStarted).
