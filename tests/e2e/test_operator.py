@@ -8151,6 +8151,23 @@ def test_020003_2(self):
             kubectl.wait_field('pod', 'chk-test-020003-chk-keeper-0-1-0', '.status.containerStatuses[0].ready', 'true', retries=10)
             kubectl.wait_field('pod', 'chk-test-020003-chk-keeper-0-2-0', '.status.containerStatuses[0].ready', 'true', retries=10)
 
+        with And("CHK remains completed after the steady-state reconcile window"):
+            kubectl.wait_chk_status("test-020003-chk", "Completed")
+            task_ids_started = kubectl.get_field("chk", "test-020003-chk", ".status.taskIDsStarted")
+            task_ids_completed = kubectl.get_field("chk", "test-020003-chk", ".status.taskIDsCompleted")
+            assert task_ids_completed, error("CHK must record at least one completed reconcile task")
+
+            # Issue #2035 reproduced as a reconcile roughly every 10 seconds:
+            # status returned to InProgress and taskIDsStarted kept growing.
+            time.sleep(12)
+            assert kubectl.get_field("chk", "test-020003-chk", ".status.status") == "Completed", error()
+            assert kubectl.get_field("chk", "test-020003-chk", ".status.taskIDsStarted") == task_ids_started, error(
+                "steady-state CHK unexpectedly started another reconcile task"
+            )
+            assert kubectl.get_field("chk", "test-020003-chk", ".status.taskIDsCompleted") == task_ids_completed, error(
+                "steady-state CHK unexpectedly changed its completed task history"
+            )
+
     with Finally("I clean up"):
         delete_test_namespace()
 
