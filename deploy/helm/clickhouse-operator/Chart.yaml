@@ -21,6 +21,11 @@ version: 0.27.3
 appVersion: 0.27.3
 home: https://github.com/Altinity/clickhouse-operator
 icon: https://logosandtypes.com/wp-content/uploads/2020/12/altinity.svg
+sources:
+  - https://github.com/Altinity/clickhouse-operator
 maintainers:
   - name: altinity
     email: support@altinity.com
+annotations:
+  artifacthub.io/license: Apache-2.0
+
