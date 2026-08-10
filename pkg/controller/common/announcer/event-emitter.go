@@ -85,6 +85,11 @@ const (
 	// The shard keeps serving; the reconcile retries once a peer is back.
 	EventReasonHostReconcileDeferredShardSafety = "HostReconcileDeferredShardSafety"
 
+	// EventReasonReplicationCatchUpRescheduled fires when a host did not catch up within one
+	// reconcile pass. The host is left out of the Service - it is knowingly behind - and the CR is
+	// re-enqueued so a later pass resumes the wait instead of holding a reconcile worker.
+	EventReasonReplicationCatchUpRescheduled = "ReplicationCatchUpRescheduled"
+
 	// EventReasonHookSkippedUnreachableHost fires when a cluster-scoped reconcile hook does not
 	// run on one of its target hosts because that host's pod cannot serve SQL - during a
 	// scale-up it may not exist yet. The hook still succeeds on the hosts it could reach.

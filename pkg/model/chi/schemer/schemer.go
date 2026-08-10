@@ -252,8 +252,12 @@ func (s *ClusterSchemer) HostAsyncLoadBarrier(ctx context.Context, host *api.Hos
 }
 
 func (s *ClusterSchemer) HostSyncReplicatedObjects(ctx context.Context, host *api.Host, deadline time.Time) error {
-	if (s == nil) || (s.version == nil) || !s.version.Matches(">= 23.4") {
-		return fmt.Errorf("SYSTEM SYNC REPLICA ... LIGHTWEIGHT requires ClickHouse >= 23.4, got %s", s.version)
+	// LIGHTWEIGHT is available since 23.4 only. When the version is unknown (digest-pinned
+	// or non-numeric image tag) or older, fall back to plain SYSTEM SYNC REPLICA rather than
+	// failing the reconcile - the gate must never be harder to pass than the plain wait it replaces.
+	lightweight := s.version.Matches(">= 23.4")
+	if !lightweight {
+		log.V(1).M(host).F().Info("SYSTEM SYNC REPLICA LIGHTWEIGHT is unavailable for version %s - falling back to full SYNC REPLICA", s.version)
 	}
 
 	if err := s.HostAsyncLoadBarrier(ctx, host, deadline); err != nil {
@@ -282,7 +286,7 @@ func (s *ClusterSchemer) HostSyncReplicatedObjects(ctx context.Context, host *ap
 		if err := s.execHostWithDeadline(ctx, host, deadline, s.sqlWaitLoadingParts(replicatedTable.DatabaseName, replicatedTable.TableName)); err != nil {
 			return err
 		}
-		if err := s.execHostWithDeadline(ctx, host, deadline, s.sqlSyncReplicaLightweight(replicatedTable.DatabaseName, replicatedTable.TableName)); err != nil {
+		if err := s.execHostWithDeadline(ctx, host, deadline, s.sqlSyncReplica(replicatedTable.DatabaseName, replicatedTable.TableName, lightweight)); err != nil {
 			return err
 		}
 	}
@@ -316,7 +320,9 @@ func (s *ClusterSchemer) peerReplicatedObjects(ctx context.Context, host *api.Ho
 		return nil, nil, err
 	}
 
-	peers := s.Names(interfaces.NameFQDNs, host, api.Cluster{}, true)
+	// Replication is a per-shard property - discover replicated objects from the shard peers only.
+	// A cluster-wide scan would drag tables that live on other shards into this host's catch-up.
+	peers := s.Names(interfaces.NameFQDNs, host, api.ChiShard{}, true)
 	if len(peers) == 0 {
 		return nil, nil, nil
 	}
@@ -327,7 +333,7 @@ func (s *ClusterSchemer) peerReplicatedObjects(ctx context.Context, host *api.Ho
 	}
 	defer cancel()
 
-	queryResult, err := s.Cluster.SetHosts(peers).QueryAny(queryCtx, s.sqlReplicatedObjects(host.Runtime.Address.ClusterName))
+	queryResult, err := s.Cluster.SetHosts(peers).QueryAny(queryCtx, s.sqlReplicatedObjects())
 	if mappedErr := gateQueryError(ctx, queryCtx, err); mappedErr != nil {
 		return nil, nil, mappedErr
 	}
@@ -382,7 +388,7 @@ func (s *ClusterSchemer) execHostWithDeadline(ctx context.Context, host *api.Hos
 	opts.SetRetry(false)
 	opts.SetQueryTimeout(remaining)
 
-	err = s.ExecHost(ctx, host, []string{sqlWithReceiveTimeout(querySQL, remaining)}, opts)
+	err = s.ExecHost(ctx, host, []string{querySQL}, opts)
 	if contextError := ctx.Err(); contextError != nil {
 		return contextError
 	}

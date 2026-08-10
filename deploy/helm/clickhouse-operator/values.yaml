@@ -806,10 +806,10 @@ configs:
               delay: 10
               # Optional replicated-host catch-up gate before advancing to the next host.
               # Disabled by default to preserve existing reconcile behavior.
-              sync:
+              catchUp:
                 enabled: "false"
-                mode: "lightweight"
-                timeout: 0
+                # Per-host wall-clock budget for the catch-up gate, in seconds.
+                timeout: 900
                 onTimeout: "abort"
                 health:
                   pollInterval: 10

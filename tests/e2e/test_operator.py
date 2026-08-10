@@ -7242,12 +7242,20 @@ def test_010072(self):
 
 
 @TestScenario
-@Name("test_010079. Test replicated host sync gate")
+@Name("test_010079. Test replicated host catch-up gate")
 def test_010079(self):
     create_shell_namespace_clickhouse_template()
 
-    with Given("I enable replicated host sync gate"):
+    with Given("I enable replicated host catch-up gate"):
         util.apply_operator_config("manifests/chopconf/test-079-sync-gate.yaml")
+
+    with And("The chopconf CR retains the catchUp block (CRD schema must not prune it)"):
+        # A ClickHouseOperatorConfiguration CRD without the catchUp sub-schema silently drops
+        # `catchUp:` on apply, and the gate would then be OFF while the test claims it is ON.
+        applied = kubectl.get("chopconf", "sync-gate", ns=current().context.operator_namespace)
+        applied_catch_up = applied["spec"]["reconcile"]["host"]["wait"]["replicas"].get("catchUp")
+        assert applied_catch_up is not None, error("chopconf CRD pruned the catchUp block")
+        assert applied_catch_up["enabled"] == "true", error(f"catch-up gate is not enabled: {applied_catch_up}")
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -7342,7 +7350,7 @@ def test_010079(self):
             print(f"max(absolute_delay)={replica_delay}")
             assert replica_delay != "0"
 
-        with And("Wait for the sync gate to observe the delayed replica"):
+        with And("Wait for the catch-up gate to observe the delayed replica"):
             time.sleep(30)
 
         with And("Delayed replica should not have a caught-up marker"):
@@ -7368,7 +7376,9 @@ def test_010079(self):
     with When("START REPLICATED SENDS"):
         clickhouse.query(chi, "SYSTEM START REPLICATED SENDS", host=source_host)
 
-        with And("Live inserts continue after sync starts"):
+        # Not And(): clickhouse.query() above opens no TestFlows step, so an And() here would be
+        # the block's first child and would have no sibling to inherit its subtype from.
+        with When("Live inserts continue after sync starts"):
             clickhouse.query(chi, "INSERT INTO test_079 SELECT number + 2 FROM numbers(5)", host=source_host)
 
         with Then("Delayed replica should receive a caught-up marker"):
@@ -7395,6 +7405,75 @@ def test_010079(self):
             wait_delayed_replica_row_count("6")
 
     with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Tags("HEAVY")
+@Name("test_010079_2. Sync gate OFF control: rolling reconcile advances past a delayed replica")
+def test_010079_2(self):
+    """No-waits baseline for test_010079. Same fixture (replicated table, REPLICATED SENDS
+    stopped, scale 1 -> 3), with the catch-up gate disabled AND wait.replicas.all/new off, so no
+    catch-up wait of any kind applies. The reconcile MUST advance to the third replica while
+    the second one is still behind.
+
+    Note this disables all three knobs together, so it establishes that the fixture itself
+    does not stall - it does not isolate the gate from the pre-existing replication-delay
+    wait. Isolating those would need a third scenario with the gate off but wait.replicas.new
+    left on."""
+    create_shell_namespace_clickhouse_template()
+
+    with Given("I disable the replicated host catch-up gate"):
+        util.apply_operator_config("manifests/chopconf/test-079-sync-gate-off.yaml")
+
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    manifest = "manifests/chi/test-079-sync-gate-1.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    cluster = "default"
+    source_host = f"chi-{chi}-{cluster}-0-0-0"
+    delayed_replica_host = f"chi-{chi}-{cluster}-0-1-0"
+    delayed_replica_fqdn = f"chi-{chi}-{cluster}-0-1.{current().context.test_namespace}.svc.cluster.local"
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "apply_templates": {current().context.clickhouse_template},
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Create a replicated table and stop replicated sends"):
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_079 (a Int64) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') ORDER BY a PARTITION BY a",
+        )
+        clickhouse.query(chi, "INSERT INTO test_079 SELECT 1")
+        clickhouse.query(chi, "SYSTEM STOP REPLICATED SENDS", host=source_host)
+
+    with When("Scale to three replicas while the new replica is delayed"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-079-sync-gate-2.yaml",
+            check={"do_not_delete": 1, "pod_count": 3},
+        )
+
+    with Then("All three pods exist even though the second replica is behind"):
+        assert kubectl.get_count("pod", chi=chi) == 3, error("gate-OFF reconcile must not stop at 2 pods")
+        replica_delay = clickhouse.query(
+            chi, "select max(absolute_delay) from system.replicas", host=delayed_replica_host
+        )
+        print(f"max(absolute_delay)={replica_delay}")
+
+    with And("No caught-up marker is written for the delayed replica"):
+        chi_status = kubectl.get("chi", chi).get("status") or {}
+        assert delayed_replica_fqdn not in (chi_status.get("hostsWithReplicaCaughtUp") or []), error(
+            "caught-up marker must not be written when the gate is disabled"
+        )
+
+    with Finally("I clean up"):
+        clickhouse.query_with_error(chi, "SYSTEM START REPLICATED SENDS", host=source_host)
         delete_test_namespace()
 
 

@@ -7,10 +7,13 @@ spec:
     host:
       wait:
         replicas:
-          sync:
+          catchUp:
             enabled: "true"
-            mode: "lightweight"
-            timeout: 120
+            # Matches the shipped default. The scenario holds the gate open across its own setup -
+            # table poll, a 30s settle, then three negative probes - which is minutes, so a 120s
+            # budget would expire mid-test and abort the reconcile before the test resumes
+            # replicated sends, leaving the gate's release half unreachable.
+            timeout: 900
             onTimeout: "abort"
             health:
               pollInterval: 5

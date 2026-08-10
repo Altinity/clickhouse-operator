@@ -37,7 +37,7 @@ func TestHostMaxReplicaDelayReturnsCanceledContext(t *testing.T) {
 
 func TestSQLSyncReplicaLightweight(t *testing.T) {
 	schemer := &ClusterSchemer{}
-	sql := schemer.sqlSyncReplicaLightweight(`my"db`, "tbl")
+	sql := schemer.sqlSyncReplica(`my"db`, "tbl", true)
 	if !strings.HasSuffix(sql, "LIGHTWEIGHT") {
 		t.Fatalf("table sync must end with LIGHTWEIGHT: %s", sql)
 	}
@@ -65,10 +65,28 @@ func TestSQLWaitLoadingPartsShape(t *testing.T) {
 	}
 }
 
-func TestSQLWithReceiveTimeoutCeilsRemainingSeconds(t *testing.T) {
-	sql := sqlWithReceiveTimeout("SYSTEM SYNC REPLICA \"db\".\"tbl\" LIGHTWEIGHT", 1500*time.Millisecond)
-	if !strings.HasSuffix(sql, "SETTINGS receive_timeout=2") {
-		t.Fatalf("receive_timeout must ceil seconds: %s", sql)
+// SYSTEM statements have no SETTINGS production - appending one is a parse-time SYNTAX_ERROR (Code 62).
+func TestSQLSyncStatementsCarryNoSettingsClause(t *testing.T) {
+	schemer := &ClusterSchemer{}
+	for _, sql := range []string{
+		schemer.sqlSyncReplica("db", "tbl", true),
+		schemer.sqlSyncReplica("db", "tbl", false),
+		schemer.sqlSyncDatabaseReplica("db"),
+		schemer.sqlWaitLoadingParts("db", "tbl"),
+	} {
+		if strings.Contains(sql, "SETTINGS") {
+			t.Fatalf("SYSTEM statement must carry no SETTINGS clause: %s", sql)
+		}
+	}
+}
+
+func TestSQLSyncReplicaLightweightToggle(t *testing.T) {
+	schemer := &ClusterSchemer{}
+	if !strings.HasSuffix(schemer.sqlSyncReplica("db", "tbl", true), "LIGHTWEIGHT") {
+		t.Fatalf("lightweight variant must end with LIGHTWEIGHT")
+	}
+	if strings.Contains(schemer.sqlSyncReplica("db", "tbl", false), "LIGHTWEIGHT") {
+		t.Fatalf("fallback variant must not use LIGHTWEIGHT")
 	}
 }
 
@@ -83,14 +101,17 @@ func TestSQLAsyncLoaderStateShape(t *testing.T) {
 	}
 }
 
-func TestHostSyncReplicatedObjectsRejectsUnsupportedLightweightVersion(t *testing.T) {
-	schemer := &ClusterSchemer{version: swversion.NewSoftWareVersion("23.3.22")}
-	err := schemer.HostSyncReplicatedObjects(context.Background(), &api.Host{}, time.Now().Add(time.Minute))
-	if err == nil {
-		t.Fatalf("expected unsupported LIGHTWEIGHT error")
-	}
-	if !strings.Contains(err.Error(), "requires ClickHouse >= 23.4") {
-		t.Fatalf("wrong version error: %v", err)
+// An unknown or pre-23.4 version must NOT fail the gate - it falls back to full SYNC REPLICA.
+func TestHostSyncReplicatedObjectsFailsOpenOnOldVersion(t *testing.T) {
+	for _, version := range []string{"23.3.22", "0.0.1"} {
+		schemer := &ClusterSchemer{version: swversion.NewSoftWareVersion(version)}
+		err := schemer.HostSyncReplicatedObjects(context.Background(), &api.Host{}, time.Now().Add(-time.Second))
+		// The version decision is taken before the async-load barrier, so an expired deadline
+		// proves the gate got past it: a hard-fail would surface the version error here instead
+		// of ErrGateDeadline.
+		if !errors.Is(err, ErrGateDeadline) {
+			t.Fatalf("version %s must not hard-fail the gate, want ErrGateDeadline, got %v", version, err)
+		}
 	}
 }
 

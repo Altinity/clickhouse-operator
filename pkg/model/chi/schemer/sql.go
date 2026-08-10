@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/MakeNowJust/heredoc"
 
@@ -97,8 +96,15 @@ func (s *ClusterSchemer) sqlReplicaHealth(column string) string {
 	return fmt.Sprintf("SELECT coalesce(max(%s),0) FROM system.replicas", column)
 }
 
-func (s *ClusterSchemer) sqlSyncReplicaLightweight(databaseName, tableName string) string {
-	return fmt.Sprintf(`SYSTEM SYNC REPLICA "%s"."%s" LIGHTWEIGHT`, quoteIdent(databaseName), quoteIdent(tableName))
+// sqlSyncReplica waits for the local replica to fetch the replication log of the specified table.
+// LIGHTWEIGHT (23.4+) waits for metadata/entry fetch only, full sync waits for parts as well.
+// SYSTEM statements accept no SETTINGS clause - the wait is bounded by the query context deadline.
+func (s *ClusterSchemer) sqlSyncReplica(databaseName, tableName string, lightweight bool) string {
+	sql := fmt.Sprintf(`SYSTEM SYNC REPLICA "%s"."%s"`, quoteIdent(databaseName), quoteIdent(tableName))
+	if lightweight {
+		sql += " LIGHTWEIGHT"
+	}
+	return sql
 }
 
 func (s *ClusterSchemer) sqlSyncDatabaseReplica(databaseName string) string {
@@ -140,18 +146,15 @@ func (s *ClusterSchemer) sqlAsyncLoaderFailedDetails() string {
 		`)
 }
 
-func (s *ClusterSchemer) sqlReplicatedObjects(cluster string) string {
+func (s *ClusterSchemer) sqlReplicatedObjects() string {
+	// Runs on a shard peer, against its LOCAL system tables. Replication is per-shard, so the set of
+	// objects this host has to catch up on is exactly the set its shard peer already serves.
 	return heredoc.Docf(`
 		SELECT
 			'database' AS object_type,
 			name AS database,
 			'' AS table_name
-		FROM
-		(
-			SELECT *
-			FROM clusterAllReplicas('%s', system.databases)
-			SETTINGS skip_unavailable_shards = 1
-		) databases
+		FROM system.databases
 		WHERE
 			name NOT IN (%s) AND
 			engine = 'Replicated'
@@ -160,40 +163,14 @@ func (s *ClusterSchemer) sqlReplicatedObjects(cluster string) string {
 			'table' AS object_type,
 			database,
 			name AS table_name
-		FROM
-		(
-			SELECT *
-			FROM clusterAllReplicas('%s', system.tables)
-			SETTINGS skip_unavailable_shards = 1
-		) tables
+		FROM system.tables
 		WHERE
 			database NOT IN (%s) AND
 			engine LIKE 'Replicated%%'
 		`,
-		cluster,
 		ignoredDBs,
-		cluster,
 		ignoredDBs,
 	)
-}
-
-func sqlWithReceiveTimeout(sql string, remaining time.Duration) string {
-	seconds := receiveTimeoutSeconds(remaining)
-	return fmt.Sprintf("%s SETTINGS receive_timeout=%d", sql, seconds)
-}
-
-func receiveTimeoutSeconds(remaining time.Duration) int64 {
-	if remaining <= 0 {
-		return 1
-	}
-	seconds := int64(remaining / time.Second)
-	if remaining%time.Second != 0 {
-		seconds++
-	}
-	if seconds < 1 {
-		return 1
-	}
-	return seconds
 }
 
 func quoteIdent(identifier string) string {

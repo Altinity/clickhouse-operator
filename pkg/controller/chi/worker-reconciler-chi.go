@@ -1197,10 +1197,10 @@ func (w *worker) prepareStsReconcileOptsWaitSection(host *api.Host, opts *statef
 	return opts
 }
 
+// forceReplicaCatchUpAfterStorageLoss invalidates the persisted caught-up marker of a host that lost
+// its storage. Unconditional by design: the stale marker is a correctness bug on its own (the host is
+// empty yet listed as caught-up), and clearing it must not depend on the sync gate being enabled.
 func (w *worker) forceReplicaCatchUpAfterStorageLoss(host *api.Host, fqdn string) {
-	if !chop.Config().Reconcile.Host.Wait.Replicas.Sync.IsEnabled() {
-		return
-	}
 	host.SetForceReplicaCatchUp(true)
 	host.GetCR().IEnsureStatus().RemoveHostReplicaCaughtUp(fqdn)
 }

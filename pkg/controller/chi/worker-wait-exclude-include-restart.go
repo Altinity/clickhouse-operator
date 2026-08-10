@@ -18,12 +18,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	common "github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
@@ -31,6 +33,24 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+)
+
+const (
+	// replicationCatchUpPassTimeout bounds how long one reconcile pass waits for a host to catch
+	// up. It is not a budget for the whole catch-up - the replica fetches from its peers whether
+	// or not the operator is watching - so expiry costs nothing but the wait, and the CR is
+	// re-enqueued to resume it.
+	replicationCatchUpPassTimeout = 15 * time.Minute
+	// replicationCatchUpRetryDelay spaces out those retries so a replica that never converges
+	// re-checks periodically instead of spinning.
+	replicationCatchUpRetryDelay = 1 * time.Minute
+)
+
+var (
+	// errReplicationCatchUpNotFinished is returned when the per-pass wait expired with the host
+	// still behind. It is distinct from a hard failure: the caller keeps the host out of the
+	// Service and schedules another pass rather than aborting the reconcile.
+	errReplicationCatchUpNotFinished = errors.New("host has not caught up within this reconcile pass")
 )
 
 // waitForIPAddresses waits for all pods to get IP address assigned
@@ -149,7 +169,7 @@ func (w *worker) shouldWaitReplicationHost(host *api.Host) bool {
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
 
-	case chop.Config().Reconcile.Host.Wait.Replicas.Sync.IsEnabled() && host.IsForceReplicaCatchUp():
+	case host.IsForceReplicaCatchUp():
 		w.a.V(1).
 			M(host).F().
 			Info("Force replica catch-up after data loss. Host/shard/cluster: %d/%d/%s",
@@ -211,7 +231,7 @@ func healthWindowStep(counter int, ok bool, threshold int) (int, bool) {
 }
 
 func onSoftTimeout(onTimeout string) (advance bool, pushMarker bool, err error) {
-	if onTimeout == "proceed" {
+	if strings.EqualFold(onTimeout, api.CatchUpOnTimeoutProceed) {
 		return true, false, nil
 	}
 	return false, false, common.ErrCRUDAbort
@@ -224,10 +244,17 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 		Info("Include host into cluster. Host/shard/cluster: %d/%d/%s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	// w.includeHostIntoClickHouseCluster(ctx, host)
-	w.ascendHostInClickHouseCluster(ctx, host)
-	syncGateEnabled := chop.Config().Reconcile.Host.Wait.Replicas.Sync.IsEnabled()
+	catchUpGateEnabled := chop.Config().Reconcile.Host.Wait.Replicas.CatchUp.IsEnabled()
+	// Catch up FIRST, ascend afterwards. A host that was excluded is still carrying the low
+	// priority descendHostInClickHouseCluster gave it, so distributed queries keep preferring its
+	// up-to-date peers for the duration of the wait. (A host that was never excluded - a brand new
+	// one, or one the shard-safety guard declined to drain - is at normal priority throughout;
+	// ordering only matters for the excluded case.) The ascend is unconditional so a host whose
+	// catch-up failed still returns to normal priority in this pass: a conditional ascend would
+	// leave it deprioritized until some later pass regenerates the common ConfigMap, and once the
+	// CR reaches Completed the reconcile early-exit means that may be a long way off.
 	err := w.catchReplicationLag(ctx, host)
+	w.ascendHostInClickHouseCluster(ctx, host)
 	if err == nil {
 		w.a.V(1).
 			M(host).F().
@@ -239,7 +266,7 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 			M(host).F().
 			Warning("Will NOT include host into cluster due to replication lag. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-		if syncGateEnabled {
+		if catchUpGateEnabled {
 			return err
 		}
 	}
@@ -361,16 +388,16 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error 
 	w.addHostToMonitoring(host)
 
 	var err error
-	if chop.Config().Reconcile.Host.Wait.Replicas.Sync.IsEnabled() {
+	if chop.Config().Reconcile.Host.Wait.Replicas.CatchUp.IsEnabled() {
 		var caughtUp bool
-		caughtUp, err = w.runReplicaSyncGate(ctx, host)
+		caughtUp, err = w.runReplicaCatchUpGate(ctx, host)
 		if err == nil {
 			w.a.V(1).
 				M(host).F().
-				WithEvent(host.GetCR(), a.EventActionReconcile, replicaSyncGateEventReason(caughtUp)).
+				WithEvent(host.GetCR(), a.EventActionReconcile, replicaCatchUpGateEventReason(caughtUp)).
 				Info("Wait for host to catch replication lag - %s "+
 					"Host/shard/cluster: %d/%d/%s",
-					replicaSyncGateResultLabel(caughtUp),
+					replicaCatchUpGateResultLabel(caughtUp),
 					host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName,
 				)
 		} else {
@@ -398,6 +425,11 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error 
 			)
 
 		host.GetCR().IEnsureStatus().PushHostReplicaCaughtUp(w.c.namer.Name(interfaces.NameFQDN, host))
+	} else if errors.Is(err, errReplicationCatchUpNotFinished) {
+		// Ran out of pass time, not a failure. Leave the host out of the Service - it is knowingly
+		// behind - and schedule another pass to resume the wait, so this releases the reconcile
+		// worker instead of holding it until the replica converges.
+		w.scheduleReplicationCatchUpRetry(host)
 	} else {
 		w.a.V(1).
 			M(host).F().
@@ -413,14 +445,14 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error 
 	return err
 }
 
-func (w *worker) runReplicaSyncGate(ctx context.Context, host *api.Host) (bool, error) {
-	syncConfig := chop.Config().Reconcile.Host.Wait.Replicas.Sync
+func (w *worker) runReplicaCatchUpGate(ctx context.Context, host *api.Host) (bool, error) {
+	catchUpConfig := chop.Config().Reconcile.Host.Wait.Replicas.CatchUp
 	clusterSchemer := w.ensureClusterSchemer(host)
 	hostFQDN := w.c.namer.Name(interfaces.NameFQDN, host)
-	deadline := syncGateDeadline(syncConfig.GetTimeout())
+	deadline := catchUpGateDeadline(catchUpConfig.GetTimeout())
 
 	failSoft := func(reason string) (bool, error) {
-		advance, _, err := onSoftTimeout(syncConfig.GetOnTimeout())
+		advance, _, err := onSoftTimeout(catchUpConfig.GetOnTimeout())
 		if advance {
 			w.a.M(host).F().Warning("sync gate %s; proceeding without caught-up marker (onTimeout=proceed)", reason)
 		}
@@ -456,7 +488,7 @@ func (w *worker) runReplicaSyncGate(ctx context.Context, host *api.Host) (bool, 
 
 	healthCounter := 0
 	for {
-		ok, hardFail, healthErr := w.syncHealthOK(ctx, host, deadline)
+		ok, hardFail, healthErr := w.catchUpHealthOK(ctx, host, deadline)
 		if healthErr != nil {
 			return classifyErr(healthErr)
 		}
@@ -464,9 +496,9 @@ func (w *worker) runReplicaSyncGate(ctx context.Context, host *api.Host) (bool, 
 		remaining := time.Until(deadline)
 		var done bool
 		var hardDeadline bool
-		healthCounter, done, hardDeadline = syncGateHealthStep(healthCounter, ok, hardFail, syncConfig.GetSuccessThreshold(), remaining)
+		healthCounter, done, hardDeadline = catchUpGateHealthStep(healthCounter, ok, hardFail, catchUpConfig.GetSuccessThreshold(), remaining)
 		if hardDeadline {
-			return false, syncGateHardFailError(host)
+			return false, catchUpGateHardFailError(host)
 		}
 		if done {
 			host.GetCR().IEnsureStatus().PushHostReplicaCaughtUp(hostFQDN)
@@ -476,7 +508,7 @@ func (w *worker) runReplicaSyncGate(ctx context.Context, host *api.Host) (bool, 
 		if remaining <= 0 {
 			return failSoft("health window not satisfied")
 		}
-		sleepDuration := time.Duration(syncConfig.GetPollInterval()) * time.Second
+		sleepDuration := time.Duration(catchUpConfig.GetPollInterval()) * time.Second
 		if sleepDuration > remaining {
 			sleepDuration = remaining
 		}
@@ -485,13 +517,13 @@ func (w *worker) runReplicaSyncGate(ctx context.Context, host *api.Host) (bool, 
 			return false, ctx.Err()
 		case <-time.After(sleepDuration):
 			if hardFail && !time.Now().Before(deadline) {
-				return false, syncGateHardFailError(host)
+				return false, catchUpGateHardFailError(host)
 			}
 		}
 	}
 }
 
-func syncGateHealthStep(counter int, ok bool, hardFail bool, threshold int, remaining time.Duration) (int, bool, bool) {
+func catchUpGateHealthStep(counter int, ok bool, hardFail bool, threshold int, remaining time.Duration) (int, bool, bool) {
 	if hardFail {
 		return 0, false, remaining <= 0
 	}
@@ -499,29 +531,54 @@ func syncGateHealthStep(counter int, ok bool, hardFail bool, threshold int, rema
 	return nextCounter, done, false
 }
 
-func syncGateHardFailError(host *api.Host) error {
+func catchUpGateHardFailError(host *api.Host) error {
 	return fmt.Errorf("host %s readonly or session-expired; refusing to advance", host.GetName())
 }
 
-func replicaSyncGateEventReason(caughtUp bool) string {
+func replicaCatchUpGateEventReason(caughtUp bool) string {
 	if caughtUp {
 		return a.EventReasonReconcileCompleted
 	}
 	return a.EventReasonReconcileProceed
 }
 
-func replicaSyncGateResultLabel(caughtUp bool) string {
+func replicaCatchUpGateResultLabel(caughtUp bool) string {
 	if caughtUp {
 		return "COMPLETED"
 	}
 	return "PROCEEDED without caught-up marker"
 }
 
-func syncGateDeadline(timeoutSeconds int) time.Time {
-	if timeoutSeconds <= 0 {
-		return time.Now().Add(time.Hour * 24 * 365 * 100)
-	}
+// catchUpGateDeadline turns the configured budget into an absolute deadline. The caller passes
+// GetTimeout(), which substitutes the default for a nil or non-positive value, so the budget is
+// always positive - the gate has no unbounded mode.
+func catchUpGateDeadline(timeoutSeconds int) time.Time {
 	return time.Now().Add(time.Duration(timeoutSeconds) * time.Second)
+}
+
+// scheduleReplicationCatchUpRetry re-enqueues the CR so a later pass resumes a catch-up that did
+// not finish within replicationCatchUpPassTimeout. Mirrors the stuck-host recovery scheduler:
+// the queue coalesces by handle, so repeated scheduling cannot pile up work.
+func (w *worker) scheduleReplicationCatchUpRetry(host *api.Host) {
+	// NewReconcileCHI takes the concrete CHI; GetCR() is the shared interface, and CHK has no
+	// catch-up wait, so a failed assertion simply means there is nothing to re-enqueue.
+	cr, ok := host.GetCR().(*api.ClickHouseInstallation)
+	if !ok || (cr == nil) {
+		return
+	}
+
+	w.a.V(1).
+		M(host).F().
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonReplicationCatchUpRescheduled).
+		Warning("Host has not caught up within %s - left out of the service, re-enqueue in %s. Host/shard/cluster: %d/%d/%s",
+			replicationCatchUpPassTimeout, replicationCatchUpRetryDelay,
+			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName,
+		)
+
+	scheduled := cr
+	time.AfterFunc(replicationCatchUpRetryDelay, func() {
+		w.c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileAdd, nil, scheduled))
+	})
 }
 
 // shouldExcludeHost determines whether host to be excluded from cluster before reconcile
@@ -721,9 +778,31 @@ func (w *worker) waitHostHasNoActiveQueries(ctx context.Context, host *api.Host)
 	return domain.PollHost(ctx, host, w.doesHostHaveNoRunningQueries)
 }
 
-// waitHostHasNoReplicationDelay
+// waitHostHasNoReplicationDelay waits until the host reports a replication lag within the
+// configured limit, for at most replicationCatchUpPassTimeout.
+//
+// The bound is per reconcile pass, not a budget for the whole catch-up: the replica fetches from
+// its peers regardless of whether the operator is watching, so giving up here loses no progress.
+// On expiry the caller leaves the host out of the Service - it is knowingly behind - and
+// re-enqueues the CR, so a slow replica converges over several passes while a replica that can
+// never converge stays visible instead of holding a reconcile worker for good.
 func (w *worker) waitHostHasNoReplicationDelay(ctx context.Context, host *api.Host) error {
-	return domain.PollHost(ctx, host, w.doesHostHaveNoReplicationDelay, &poller.Options{Timeout: time.Hour * 24 * 365 * 100})
+	err := domain.PollHost(ctx, host, w.doesHostHaveNoReplicationDelay, &poller.Options{Timeout: replicationCatchUpPassTimeout})
+	if err != nil {
+		return err
+	}
+	// The poller reports a cancelled context as success, and QueryHostInt answers a cancelled
+	// context with a delay of 0, so without this check an interrupted reconcile would look like
+	// a host that caught up - and the caller would persist that verdict.
+	if util.IsContextDone(ctx) {
+		return common.ErrCRUDAbort
+	}
+	// Poll() also returns nil when it simply ran out of time, so re-check the predicate: without
+	// this an expired wait is indistinguishable from a host that caught up.
+	if !w.doesHostHaveNoReplicationDelay(ctx, host) {
+		return errReplicationCatchUpNotFinished
+	}
+	return nil
 }
 
 // waitHostRestart

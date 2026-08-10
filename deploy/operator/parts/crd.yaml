@@ -8725,6 +8725,48 @@ spec:
                                 delay:
                                   type: integer
                                   description: "replication max absolute delay to consider replica is not delayed"
+                                catchUp:
+                                  type: object
+                                  description: "Replicated-host catch-up gate to run before advancing to the next host of the shard"
+                                  properties:
+                                    enabled:
+                                      # StringBool is polymorphic — accepts native YAML
+                                      # bool (true/false), integer (0/1), or string from
+                                      # the recognized vocabulary. Normalized by
+                                      # pkg/apis/common/types StringBool.UnmarshalJSON.
+                                      # Structural-schema rules don't natively support
+                                      # bool|int|string union, so we use the documented
+                                      # escape hatch x-kubernetes-preserve-unknown-fields.
+                                      x-kubernetes-preserve-unknown-fields: true
+                                      description: "Whether to run the replicated-host catch-up gate"
+                                    timeout:
+                                      type: integer
+                                      description: "Per-host wall-clock budget for the catch-up gate, in seconds. Omit to use the default"
+                                      minimum: 1
+                                    onTimeout:
+                                      type: string
+                                      description: |
+                                        What to do when the gate does not complete within timeout.
+                                          abort (default) — stop the reconcile
+                                          proceed — advance to the next host without writing the caught-up marker
+                                      enum:
+                                        - ""
+                                        - "Abort"
+                                        - "abort"
+                                        - "Proceed"
+                                        - "proceed"
+                                    health:
+                                      type: object
+                                      description: "Stable-health window required after the host synced its replicated objects"
+                                      properties:
+                                        pollInterval:
+                                          type: integer
+                                          description: "How often to re-check host health, in seconds. Omit to use the default"
+                                          minimum: 1
+                                        successThreshold:
+                                          type: integer
+                                          description: "How many consecutive healthy checks conclude the gate. Omit to use the default"
+                                          minimum: 1
                             probes:
                               type: object
                               description: "What probes the operator should wait during host launch procedure"

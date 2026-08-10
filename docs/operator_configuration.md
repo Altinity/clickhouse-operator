@@ -222,7 +222,7 @@ spec:
 
 See [Keeper Reference](keeper_reference.md) for details on how CHI references CHK resources.
 
-### Replicated Host Sync Gate
+### Replicated Host Catch-Up Gate
 
 The operator can optionally block a rolling host reconcile until a recreated replicated
 ClickHouse host catches up to a bounded replication baseline. This is an operator
@@ -233,14 +233,29 @@ NVMe-backed Local PVs, where a recreated pod may start with an empty or replaced
 and must rebuild replicated data from peer replicas before the operator rolls the next
 host.
 
-The existing caught-up marker path remains unchanged when this gate is disabled. That
-path only polls the local host's `MAX(absolute_delay)` from `system.replicas` before
+Three changes to the surrounding catch-up behaviour are **not** gated on `catchUp.enabled`, so they
+apply even with this gate off:
+
+1. A host that lost its storage volume is forced to catch up before it is returned to service:
+   its `status.hostsWithReplicaCaughtUp` entry is invalidated and the wait runs. This overrides
+   `reconcile.host.wait.replicas.all` and `.new` — a host whose disk is gone waits even when both
+   are `no`, because a marker describing a disk that no longer exists is not evidence of anything.
+   Note the wait itself is not time-capped, so a replica that cannot converge will stall that
+   CHI's reconcile; it is visible as `InProgress` with periodic replication-lag log lines, and
+   editing the CHI cancels the stalled pass.
+2. A reconcile cancelled while a host is still catching up no longer records the marker — a
+   cancelled wait is not evidence that the replica caught up.
+3. The catch-up wait now runs before the host is restored to normal priority in `remote_servers`,
+   rather than after, so a host that was excluded stays deprioritized for the duration of the wait
+   instead of receiving distributed queries while still behind.
+
+The marker path only polls the local host's `MAX(absolute_delay)` from `system.replicas` before
 writing `status.hostsWithReplicaCaughtUp`, which is weak for recreated-host recovery
 because the metric is limited to replicated objects already loaded and visible on that
 local server. During recreated-host recovery, asynchronous database/table loading may
 not have exposed all replicated objects on the local host yet, and a local delay metric
 cannot discover replicated objects that exist on peers or issue a ClickHouse sync
-barrier for their known parts. The sync gate adds those checks before the operator
+barrier for their known parts. The catch-up gate adds those checks before the operator
 advances to the next host.
 
 ```yaml
@@ -249,10 +264,9 @@ spec:
     host:
       wait:
         replicas:
-          sync:
+          catchUp:
             enabled: "false"
-            mode: "lightweight"
-            timeout: 0
+            timeout: 900
             onTimeout: "abort"
             health:
               pollInterval: 10
@@ -261,26 +275,23 @@ spec:
 
 | Setting | Default | Description |
 |---|---|---|
-| `enabled` | `"false"` | Enables the replicated-host sync gate. Existing replica-delay behavior is unchanged when disabled. |
-| `mode` | `"lightweight"` | Uses `SYSTEM SYNC REPLICA ... LIGHTWEIGHT`. No fallback to legacy `SYSTEM SYNC REPLICA` is performed. |
-| `timeout` | `0` | Whole-gate timeout in seconds. `0` means unbounded. |
-| `onTimeout` | `"abort"` | `abort` stops reconcile on the gate deadline. `proceed` advances without writing the caught-up marker, so a later reconcile can try again. |
-| `health.pollInterval` | `10` | Seconds between post-sync health checks. |
-| `health.successThreshold` | `6` | Consecutive healthy checks required after sync before the caught-up marker is written. |
+| `enabled` | `"false"` | Enables the replicated-host catch-up gate. Existing replica-delay behavior is unchanged when disabled. |
+| `timeout` | `900` | Per-host gate budget in seconds; omit it to take the default. The CRD requires `>= 1`, and the config-file path falls back to the default for anything `<= 0`, so the gate is never unbounded - otherwise `onTimeout` could never fire. |
+| `onTimeout` | `"abort"` | `abort` stops reconcile on the gate deadline. `proceed` advances without writing the caught-up marker, so a later reconcile can try again. Accepted in either case, like the other enum-valued options. |
+| `health.pollInterval` | `10` | Seconds between post-sync health checks; omit it to take the default. CRD requires `>= 1`. |
+| `health.successThreshold` | `6` | Consecutive healthy checks required after sync before the caught-up marker is written; omit it to take the default. CRD requires `>= 1`. |
 
 When enabled, the gate waits for asynchronous database loading when ClickHouse exposes
-`system.asynchronous_loader`, discovers replicated objects from peer replicas, syncs
+`system.asynchronous_loader`, discovers replicated objects from the peer replicas of the same shard, syncs
 `Replicated` databases with `SYSTEM SYNC DATABASE REPLICA`, syncs replicated tables
-with `SYSTEM SYNC REPLICA ... LIGHTWEIGHT`, and then requires a stable health window.
+with `SYSTEM SYNC REPLICA ... LIGHTWEIGHT` (full `SYSTEM SYNC REPLICA` when the ClickHouse version is older than 23.4 or cannot be determined), and then requires a stable health window.
 Health is based on `system.replicas`: `is_readonly = 0`, `is_session_expired = 0`, and
 `absolute_delay <= reconcile.host.wait.replicas.delay`.
 
 The `LIGHTWEIGHT` baseline is the time when the sync command runs. It waits for the
 relevant part-acquisition work known at that point; it does not require
 `system.replication_queue` to become empty and does not block forever on unrelated
-merges, mutations, or new ingest that arrives after the sync command. ClickHouse
-versions below `23.4` do not support `LIGHTWEIGHT`; enabling this gate on those
-versions fails explicitly instead of silently falling back.
+merges, mutations, or new ingest that arrives after the sync command.
 
 Hard failures always abort regardless of `onTimeout`: query or connection failure,
 parent reconcile context cancellation, failed/canceled async load jobs, readonly
@@ -289,14 +300,14 @@ success or when peer discovery confirms that there are no replicated objects to 
 
 Manual local-PV/data-loss validation:
 
-1. Create a CHI with a replicated shard and `sync.enabled: "true"`.
+1. Create a CHI with a replicated shard and `catchUp.enabled: "true"`.
 2. Wait for the current hosts to become caught up and confirm
    `status.hostsWithReplicaCaughtUp` contains the host FQDNs.
 3. Simulate storage loss for one host, for example by removing the local PV/PVC data
    in a test environment.
 4. Reconcile the CHI and confirm the operator removes the stale caught-up marker for
    the recreated host.
-5. Confirm the recreated host runs the sync gate and the next host in the shard does
+5. Confirm the recreated host runs the catch-up gate and the next host in the shard does
    not advance while the recreated host is still behind.
 6. Allow replication to catch up and confirm the recreated host receives the
    caught-up marker again, then the next host proceeds.

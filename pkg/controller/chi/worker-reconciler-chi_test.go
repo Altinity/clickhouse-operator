@@ -49,14 +49,14 @@ func hostWith(cur, desired *apps.StatefulSet) *api.Host {
 	return h
 }
 
-func withReplicaSyncGate(t *testing.T, enabled bool) {
+func withReplicaCatchUpGate(t *testing.T, enabled bool) {
 	t.Helper()
 	cfg := chop.Config()
-	prev := cfg.Reconcile.Host.Wait.Replicas.Sync
+	prev := cfg.Reconcile.Host.Wait.Replicas.CatchUp
 	t.Cleanup(func() {
-		cfg.Reconcile.Host.Wait.Replicas.Sync = prev
+		cfg.Reconcile.Host.Wait.Replicas.CatchUp = prev
 	})
-	cfg.Reconcile.Host.Wait.Replicas.Sync = (&api.ReconcileHostWaitReplicasSync{
+	cfg.Reconcile.Host.Wait.Replicas.CatchUp = (&api.ReconcileHostWaitReplicasCatchUp{
 		Enabled: types.NewStringBool(enabled),
 	}).Normalize()
 }
@@ -69,21 +69,22 @@ func hostWithReplicaCaughtUpMarker(fqdn string) *api.Host {
 	return host
 }
 
-func TestForceReplicaCatchUpAfterStorageLossNoopWhenSyncDisabled(t *testing.T) {
+// The stale caught-up marker is invalid regardless of the gate - clearing it is unconditional.
+func TestForceReplicaCatchUpAfterStorageLossClearsMarkerWhenCatchUpGateDisabled(t *testing.T) {
 	const fqdn = "chi-x-default-0-0"
-	withReplicaSyncGate(t, false)
+	withReplicaCatchUpGate(t, false)
 	host := hostWithReplicaCaughtUpMarker(fqdn)
 	w := &worker{}
 
 	w.forceReplicaCatchUpAfterStorageLoss(host, fqdn)
 
-	require.False(t, host.IsForceReplicaCatchUp())
-	require.True(t, host.HasListedReplicaCaughtUp(fqdn))
+	require.True(t, host.IsForceReplicaCatchUp())
+	require.False(t, host.HasListedReplicaCaughtUp(fqdn))
 }
 
-func TestForceReplicaCatchUpAfterStorageLossClearsMarkerWhenSyncEnabled(t *testing.T) {
+func TestForceReplicaCatchUpAfterStorageLossClearsMarkerWhenCatchUpGateEnabled(t *testing.T) {
 	const fqdn = "chi-x-default-0-0"
-	withReplicaSyncGate(t, true)
+	withReplicaCatchUpGate(t, true)
 	host := hostWithReplicaCaughtUpMarker(fqdn)
 	w := &worker{}
 

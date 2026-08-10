@@ -34,36 +34,43 @@ func TestHealthWindowResetsOnFailure(t *testing.T) {
 }
 
 func TestOnSoftTimeoutNeverPushesMarker(t *testing.T) {
-	advance, pushMarker, err := onSoftTimeout("proceed")
-	if !advance || pushMarker || err != nil {
-		t.Fatalf("proceed => advance without marker; got advance=%v push=%v err=%v", advance, pushMarker, err)
+	// Both spellings of each value, because this is where the case-insensitive comparison
+	// actually happens - the config layer only validates, it does not canonicalize, so a
+	// case-sensitive check here would silently abort a reconcile configured with "Proceed".
+	for _, proceed := range []string{"proceed", "Proceed"} {
+		advance, pushMarker, err := onSoftTimeout(proceed)
+		if !advance || pushMarker || err != nil {
+			t.Fatalf("%s => advance without marker; got advance=%v push=%v err=%v", proceed, advance, pushMarker, err)
+		}
 	}
 
-	advance, pushMarker, err = onSoftTimeout("abort")
-	if advance || pushMarker || !errors.Is(err, common.ErrCRUDAbort) {
-		t.Fatalf("abort => abort without marker; got advance=%v push=%v err=%v", advance, pushMarker, err)
+	for _, abort := range []string{"abort", "Abort", ""} {
+		advance, pushMarker, err := onSoftTimeout(abort)
+		if advance || pushMarker || !errors.Is(err, common.ErrCRUDAbort) {
+			t.Fatalf("%q => abort without marker; got advance=%v push=%v err=%v", abort, advance, pushMarker, err)
+		}
 	}
 }
 
-func TestSyncGateHealthStepTreatsHardFailAsNotReadyBeforeDeadline(t *testing.T) {
-	counter, done, hardDeadline := syncGateHealthStep(3, true, true, 6, time.Second)
+func TestCatchUpGateHealthStepTreatsHardFailAsNotReadyBeforeDeadline(t *testing.T) {
+	counter, done, hardDeadline := catchUpGateHealthStep(3, true, true, 6, time.Second)
 	if counter != 0 || done || hardDeadline {
 		t.Fatalf("hard health before deadline must reset and keep waiting; counter=%d done=%v hardDeadline=%v", counter, done, hardDeadline)
 	}
 }
 
-func TestSyncGateHealthStepReturnsHardFailAtDeadline(t *testing.T) {
-	counter, done, hardDeadline := syncGateHealthStep(3, true, true, 6, 0)
+func TestCatchUpGateHealthStepReturnsHardFailAtDeadline(t *testing.T) {
+	counter, done, hardDeadline := catchUpGateHealthStep(3, true, true, 6, 0)
 	if counter != 0 || done || !hardDeadline {
 		t.Fatalf("hard health at deadline must hard fail; counter=%d done=%v hardDeadline=%v", counter, done, hardDeadline)
 	}
 }
 
-func TestReplicaSyncGateEventReasonDistinguishesProceedWithoutMarker(t *testing.T) {
-	if got := replicaSyncGateEventReason(true); got != a.EventReasonReconcileCompleted {
+func TestReplicaCatchUpGateEventReasonDistinguishesProceedWithoutMarker(t *testing.T) {
+	if got := replicaCatchUpGateEventReason(true); got != a.EventReasonReconcileCompleted {
 		t.Fatalf("caught-up sync gate must report completed event; got %s", got)
 	}
-	if got := replicaSyncGateEventReason(false); got == a.EventReasonReconcileCompleted {
+	if got := replicaCatchUpGateEventReason(false); got == a.EventReasonReconcileCompleted {
 		t.Fatalf("proceed without marker must not report completed event")
 	}
 }

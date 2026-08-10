@@ -66,6 +66,13 @@ const (
 	// RecoveryActionRetry means re-enqueue CHI for reconcile (default).
 	RecoveryActionRetry = "Retry"
 
+	// CatchUpOnTimeoutAbort means stop the reconcile when the replicated host sync gate
+	// reaches its deadline (default).
+	CatchUpOnTimeoutAbort = "Abort"
+	// CatchUpOnTimeoutProceed means advance to the next host on the gate deadline without
+	// writing the caught-up marker, so a later reconcile retries the catch-up.
+	CatchUpOnTimeoutProceed = "Proceed"
+
 	// defaultCompletedOnPodNotReadyThreshold is the minimum time a pod must remain in
 	// Ready=False before the operator considers the host stuck and re-enqueues a reconcile
 	defaultCompletedOnPodNotReadyThreshold = 5 * time.Minute
@@ -227,11 +234,12 @@ const (
 )
 
 const (
-	defaultReconcileHostWaitReplicasSyncMode                   = "lightweight"
-	defaultReconcileHostWaitReplicasSyncOnTimeout              = "abort"
-	defaultReconcileHostWaitReplicasSyncTimeoutSeconds         = 0
-	defaultReconcileHostWaitReplicasSyncHealthPollSeconds      = 10
-	defaultReconcileHostWaitReplicasSyncHealthSuccessThreshold = 6
+	defaultReconcileHostWaitReplicasCatchUpOnTimeout = CatchUpOnTimeoutAbort
+	// defaultReconcileHostWaitReplicasCatchUpTimeoutSeconds bounds one host catch-up. 0 would mean
+	// "never give up" - the gate would poll until the reconcile context dies, with no hard failure.
+	defaultReconcileHostWaitReplicasCatchUpTimeoutSeconds         = 900
+	defaultReconcileHostWaitReplicasCatchUpHealthPollSeconds      = 10
+	defaultReconcileHostWaitReplicasCatchUpHealthSuccessThreshold = 6
 )
 
 // OperatorConfig specifies operator configuration
@@ -729,7 +737,7 @@ func (wait ReconcileHostWait) Normalize() ReconcileHostWait {
 		// Default update timeout in seconds
 		wait.Replicas.Delay = types.NewInt32(defaultMaxReplicationDelay)
 	}
-	wait.Replicas.Sync = wait.Replicas.Sync.Normalize()
+	wait.Replicas.CatchUp = wait.Replicas.CatchUp.Normalize()
 
 	if wait.Probes == nil {
 		wait.Probes = &ReconcileHostWaitProbes{}
@@ -768,130 +776,116 @@ func (drop ReconcileHostDrop) MergeFrom(from ReconcileHostDrop) ReconcileHostDro
 }
 
 type ReconcileHostWaitReplicas struct {
-	All   *types.StringBool              `json:"all,omitempty"   yaml:"all,omitempty"`
-	New   *types.StringBool              `json:"new,omitempty"   yaml:"new,omitempty"`
-	Delay *types.Int32                   `json:"delay,omitempty" yaml:"delay,omitempty"`
-	Sync  *ReconcileHostWaitReplicasSync `json:"sync,omitempty"  yaml:"sync,omitempty"`
+	All     *types.StringBool                 `json:"all,omitempty"   yaml:"all,omitempty"`
+	New     *types.StringBool                 `json:"new,omitempty"   yaml:"new,omitempty"`
+	Delay   *types.Int32                      `json:"delay,omitempty" yaml:"delay,omitempty"`
+	CatchUp *ReconcileHostWaitReplicasCatchUp `json:"catchUp,omitempty"  yaml:"catchUp,omitempty"`
 }
 
-// ReconcileHostWaitReplicasSync configures a replicated-host catch-up gate before advancing shard rolling reconcile.
-type ReconcileHostWaitReplicasSync struct {
-	Enabled   *types.StringBool                    `json:"enabled,omitempty"   yaml:"enabled,omitempty"`
-	Mode      *types.String                        `json:"mode,omitempty"      yaml:"mode,omitempty"`
-	Timeout   *types.Int32                         `json:"timeout,omitempty"   yaml:"timeout,omitempty"`
-	OnTimeout *types.String                        `json:"onTimeout,omitempty" yaml:"onTimeout,omitempty"`
-	Health    *ReconcileHostWaitReplicasSyncHealth `json:"health,omitempty"    yaml:"health,omitempty"`
+// ReconcileHostWaitReplicasCatchUp configures a replicated-host catch-up gate before advancing shard rolling reconcile.
+type ReconcileHostWaitReplicasCatchUp struct {
+	Enabled   *types.StringBool                       `json:"enabled,omitempty"   yaml:"enabled,omitempty"`
+	Timeout   *types.Int32                            `json:"timeout,omitempty"   yaml:"timeout,omitempty"`
+	OnTimeout *types.String                           `json:"onTimeout,omitempty" yaml:"onTimeout,omitempty"`
+	Health    *ReconcileHostWaitReplicasCatchUpHealth `json:"health,omitempty"    yaml:"health,omitempty"`
 }
 
-// ReconcileHostWaitReplicasSyncHealth configures the stable-health window after replicated-host sync.
-type ReconcileHostWaitReplicasSyncHealth struct {
+// ReconcileHostWaitReplicasCatchUpHealth configures the stable-health window after replicated-host sync.
+type ReconcileHostWaitReplicasCatchUpHealth struct {
 	PollInterval     *types.Int32 `json:"pollInterval,omitempty"     yaml:"pollInterval,omitempty"`
 	SuccessThreshold *types.Int32 `json:"successThreshold,omitempty" yaml:"successThreshold,omitempty"`
 }
 
-func isValidReconcileHostWaitReplicasSyncMode(value string) bool {
-	return value == defaultReconcileHostWaitReplicasSyncMode
+// isValidReconcileHostWaitReplicasCatchUpOnTimeout accepts either canonical spelling in any case -
+// the CRD lists both, matching how every other enum-valued option in this config is handled.
+func isValidReconcileHostWaitReplicasCatchUpOnTimeout(value string) bool {
+	return strings.EqualFold(value, CatchUpOnTimeoutAbort) || strings.EqualFold(value, CatchUpOnTimeoutProceed)
 }
 
-func isValidReconcileHostWaitReplicasSyncOnTimeout(value string) bool {
-	return value == "abort" || value == "proceed"
+func (catchUpConfig *ReconcileHostWaitReplicasCatchUp) Normalize() *ReconcileHostWaitReplicasCatchUp {
+	if catchUpConfig == nil {
+		catchUpConfig = &ReconcileHostWaitReplicasCatchUp{}
+	}
+	catchUpConfig.Enabled = catchUpConfig.Enabled.Normalize(false)
+	if (catchUpConfig.Timeout == nil) || (catchUpConfig.Timeout.Value() <= 0) {
+		catchUpConfig.Timeout = types.NewInt32(defaultReconcileHostWaitReplicasCatchUpTimeoutSeconds)
+	}
+	if !isValidReconcileHostWaitReplicasCatchUpOnTimeout(catchUpConfig.OnTimeout.Value()) {
+		catchUpConfig.OnTimeout = types.NewString(defaultReconcileHostWaitReplicasCatchUpOnTimeout)
+	}
+	catchUpConfig.Health = catchUpConfig.Health.Normalize()
+	return catchUpConfig
 }
 
-func (syncConfig *ReconcileHostWaitReplicasSync) Normalize() *ReconcileHostWaitReplicasSync {
-	if syncConfig == nil {
-		syncConfig = &ReconcileHostWaitReplicasSync{}
-	}
-	syncConfig.Enabled = syncConfig.Enabled.Normalize(false)
-	if !isValidReconcileHostWaitReplicasSyncMode(syncConfig.Mode.Value()) {
-		syncConfig.Mode = types.NewString(defaultReconcileHostWaitReplicasSyncMode)
-	}
-	if syncConfig.Timeout == nil || syncConfig.Timeout.Value() < 0 {
-		syncConfig.Timeout = types.NewInt32(defaultReconcileHostWaitReplicasSyncTimeoutSeconds)
-	}
-	if !isValidReconcileHostWaitReplicasSyncOnTimeout(syncConfig.OnTimeout.Value()) {
-		syncConfig.OnTimeout = types.NewString(defaultReconcileHostWaitReplicasSyncOnTimeout)
-	}
-	syncConfig.Health = syncConfig.Health.Normalize()
-	return syncConfig
-}
-
-func (health *ReconcileHostWaitReplicasSyncHealth) Normalize() *ReconcileHostWaitReplicasSyncHealth {
+func (health *ReconcileHostWaitReplicasCatchUpHealth) Normalize() *ReconcileHostWaitReplicasCatchUpHealth {
 	if health == nil {
-		health = &ReconcileHostWaitReplicasSyncHealth{}
+		health = &ReconcileHostWaitReplicasCatchUpHealth{}
 	}
-	if health.PollInterval == nil || health.PollInterval.Value() <= 0 {
-		health.PollInterval = types.NewInt32(defaultReconcileHostWaitReplicasSyncHealthPollSeconds)
+	if (health.PollInterval == nil) || (health.PollInterval.Value() <= 0) {
+		health.PollInterval = types.NewInt32(defaultReconcileHostWaitReplicasCatchUpHealthPollSeconds)
 	}
-	if health.SuccessThreshold == nil || health.SuccessThreshold.Value() <= 0 {
-		health.SuccessThreshold = types.NewInt32(defaultReconcileHostWaitReplicasSyncHealthSuccessThreshold)
+	if (health.SuccessThreshold == nil) || (health.SuccessThreshold.Value() <= 0) {
+		health.SuccessThreshold = types.NewInt32(defaultReconcileHostWaitReplicasCatchUpHealthSuccessThreshold)
 	}
 	return health
 }
 
-func (syncConfig *ReconcileHostWaitReplicasSync) MergeFrom(from *ReconcileHostWaitReplicasSync) *ReconcileHostWaitReplicasSync {
+func (catchUpConfig *ReconcileHostWaitReplicasCatchUp) MergeFrom(from *ReconcileHostWaitReplicasCatchUp) *ReconcileHostWaitReplicasCatchUp {
 	if from == nil {
-		return syncConfig
+		return catchUpConfig
 	}
-	if syncConfig == nil {
-		syncConfig = &ReconcileHostWaitReplicasSync{}
+	if catchUpConfig == nil {
+		catchUpConfig = &ReconcileHostWaitReplicasCatchUp{}
 	}
-	syncConfig.Enabled = syncConfig.Enabled.MergeFrom(from.Enabled)
-	syncConfig.Mode = syncConfig.Mode.MergeFrom(from.Mode)
-	syncConfig.Timeout = syncConfig.Timeout.MergeFrom(from.Timeout)
-	syncConfig.OnTimeout = syncConfig.OnTimeout.MergeFrom(from.OnTimeout)
-	syncConfig.Health = syncConfig.Health.MergeFrom(from.Health)
-	return syncConfig
+	catchUpConfig.Enabled = catchUpConfig.Enabled.MergeFrom(from.Enabled)
+	catchUpConfig.Timeout = catchUpConfig.Timeout.MergeFrom(from.Timeout)
+	catchUpConfig.OnTimeout = catchUpConfig.OnTimeout.MergeFrom(from.OnTimeout)
+	catchUpConfig.Health = catchUpConfig.Health.MergeFrom(from.Health)
+	return catchUpConfig
 }
 
-func (health *ReconcileHostWaitReplicasSyncHealth) MergeFrom(from *ReconcileHostWaitReplicasSyncHealth) *ReconcileHostWaitReplicasSyncHealth {
+func (health *ReconcileHostWaitReplicasCatchUpHealth) MergeFrom(from *ReconcileHostWaitReplicasCatchUpHealth) *ReconcileHostWaitReplicasCatchUpHealth {
 	if from == nil {
 		return health
 	}
 	if health == nil {
-		health = &ReconcileHostWaitReplicasSyncHealth{}
+		health = &ReconcileHostWaitReplicasCatchUpHealth{}
 	}
 	health.PollInterval = health.PollInterval.MergeFrom(from.PollInterval)
 	health.SuccessThreshold = health.SuccessThreshold.MergeFrom(from.SuccessThreshold)
 	return health
 }
 
-func (syncConfig *ReconcileHostWaitReplicasSync) IsEnabled() bool {
-	return syncConfig != nil && syncConfig.Enabled.Value()
+func (catchUpConfig *ReconcileHostWaitReplicasCatchUp) IsEnabled() bool {
+	return (catchUpConfig != nil) && catchUpConfig.Enabled.Value()
 }
 
-func (syncConfig *ReconcileHostWaitReplicasSync) GetMode() string {
-	if syncConfig == nil || !isValidReconcileHostWaitReplicasSyncMode(syncConfig.Mode.Value()) {
-		return defaultReconcileHostWaitReplicasSyncMode
+func (catchUpConfig *ReconcileHostWaitReplicasCatchUp) GetTimeout() int {
+	if (catchUpConfig == nil) || (catchUpConfig.Timeout == nil) || (catchUpConfig.Timeout.Value() <= 0) {
+		return defaultReconcileHostWaitReplicasCatchUpTimeoutSeconds
 	}
-	return syncConfig.Mode.Value()
+	return catchUpConfig.Timeout.IntValue()
 }
 
-func (syncConfig *ReconcileHostWaitReplicasSync) GetTimeout() int {
-	if syncConfig == nil || syncConfig.Timeout == nil || syncConfig.Timeout.Value() < 0 {
-		return defaultReconcileHostWaitReplicasSyncTimeoutSeconds
+func (catchUpConfig *ReconcileHostWaitReplicasCatchUp) GetOnTimeout() string {
+	if (catchUpConfig == nil) || !isValidReconcileHostWaitReplicasCatchUpOnTimeout(catchUpConfig.OnTimeout.Value()) {
+		return defaultReconcileHostWaitReplicasCatchUpOnTimeout
 	}
-	return syncConfig.Timeout.IntValue()
+	return catchUpConfig.OnTimeout.Value()
 }
 
-func (syncConfig *ReconcileHostWaitReplicasSync) GetOnTimeout() string {
-	if syncConfig == nil || !isValidReconcileHostWaitReplicasSyncOnTimeout(syncConfig.OnTimeout.Value()) {
-		return defaultReconcileHostWaitReplicasSyncOnTimeout
+func (catchUpConfig *ReconcileHostWaitReplicasCatchUp) GetPollInterval() int {
+	if (catchUpConfig == nil) || (catchUpConfig.Health == nil) || (catchUpConfig.Health.PollInterval == nil) || (catchUpConfig.Health.PollInterval.Value() <= 0) {
+		return defaultReconcileHostWaitReplicasCatchUpHealthPollSeconds
 	}
-	return syncConfig.OnTimeout.Value()
+	return catchUpConfig.Health.PollInterval.IntValue()
 }
 
-func (syncConfig *ReconcileHostWaitReplicasSync) GetPollInterval() int {
-	if syncConfig == nil || syncConfig.Health == nil || syncConfig.Health.PollInterval == nil || syncConfig.Health.PollInterval.Value() <= 0 {
-		return defaultReconcileHostWaitReplicasSyncHealthPollSeconds
+func (catchUpConfig *ReconcileHostWaitReplicasCatchUp) GetSuccessThreshold() int {
+	if (catchUpConfig == nil) || (catchUpConfig.Health == nil) || (catchUpConfig.Health.SuccessThreshold == nil) || (catchUpConfig.Health.SuccessThreshold.Value() <= 0) {
+		return defaultReconcileHostWaitReplicasCatchUpHealthSuccessThreshold
 	}
-	return syncConfig.Health.PollInterval.IntValue()
-}
-
-func (syncConfig *ReconcileHostWaitReplicasSync) GetSuccessThreshold() int {
-	if syncConfig == nil || syncConfig.Health == nil || syncConfig.Health.SuccessThreshold == nil || syncConfig.Health.SuccessThreshold.Value() <= 0 {
-		return defaultReconcileHostWaitReplicasSyncHealthSuccessThreshold
-	}
-	return syncConfig.Health.SuccessThreshold.IntValue()
+	return catchUpConfig.Health.SuccessThreshold.IntValue()
 }
 
 func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas) *ReconcileHostWaitReplicas {
@@ -912,7 +906,7 @@ func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas) *
 	r.All = r.All.MergeFrom(from.All)
 	r.New = r.New.MergeFrom(from.New)
 	r.Delay = r.Delay.MergeFrom(from.Delay)
-	r.Sync = r.Sync.MergeFrom(from.Sync)
+	r.CatchUp = r.CatchUp.MergeFrom(from.CatchUp)
 
 	return r
 }
