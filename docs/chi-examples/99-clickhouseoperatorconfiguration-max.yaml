@@ -1,0 +1,858 @@
+# Comprehensive ClickHouseOperatorConfiguration (CHOPCONF) example covering every
+# option the chopconf CRD exposes. Counterpart of CHI's 99-clickhouseinstallation-max.yaml.
+#
+# Designed as documentation, not for direct deployment. Values shown are the
+# operator's own defaults, so applying this file wholesale is close to a no-op -
+# but see the merge rules below before copying any of it into a real CR.
+#
+# For a short, deployable starting point use 70-chop-config.yaml instead.
+#
+# ---------------------------------------------------------------------------
+# Two forms of the same settings
+# ---------------------------------------------------------------------------
+# The operator reads its configuration from two places:
+#
+#   1. Its own ConfigMap - the file shipped as `config/config.yaml`, mounted at
+#      /etc/clickhouse-operator/config.yaml. Flat-rooted: sections start at the
+#      top level, with no apiVersion/kind/spec wrapper.
+#   2. A ClickHouseOperatorConfiguration custom resource - this file's shape.
+#      Everything under `spec:` here matches the ConfigMap's top level.
+#
+# The CR is merged ON TOP of the ConfigMap, so a CR only needs to carry the
+# settings it actually changes.
+#
+# ---------------------------------------------------------------------------
+# Merge rules - read these before copying anything
+# ---------------------------------------------------------------------------
+#   1. A non-empty value PINS that setting for the lifetime of the CR. It wins
+#      over the operator's built-in default, including future defaults changed
+#      by a later release. Delete a key rather than restating the value you
+#      believe is already the default.
+#   2. List-valued settings APPEND to the operator's list, they do not replace
+#      it. Restating a default list doubles it - e.g. repeating the default
+#      `networksIP` yields four entries, not two. The single exception is
+#      `clickhouse.metrics.excludeRegexp`, which replaces.
+#   3. The operator reads this CR at startup. `watch.configuration.onChange`
+#      below governs what happens when it changes afterwards.
+#
+# A handful of settings exist in the ConfigMap only and cannot be expressed in
+# this CR at all; they are called out in place.
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "chop-config-max"
+spec:
+  ################################################
+  ##
+  ## Watch section
+  ##
+  ################################################
+  watch:
+    # Namespaces where clickhouse-operator watches for events.
+    # Concurrently running operators should watch on different namespaces.
+    # `include` and `exclude` accept literal namespace names or regexp patterns.
+    # Empty `include` watches the operator's own namespace (or all namespaces when
+    # the operator runs in `kube-system`); use [".*"] to force watch-all elsewhere.
+    # Empty `exclude` matches none. `exclude` is applied after `include`.
+    namespaces:
+      include: []
+      exclude: []
+
+    # Behavior when ClickHouseOperatorConfiguration changes: none | restart
+    configuration:
+      onChange: restart
+
+  ################################################
+  ##
+  ## ClickHouse section
+  ##
+  ################################################
+  clickhouse:
+    configuration:
+      ################################################
+      ##
+      ## Configuration files section
+      ##
+      ################################################
+      file:
+        # Each 'path' can be either absolute or relative.
+        # In case path is absolute - it is used as is
+        # In case path is relative - it is relative to the folder where the operator's
+        # configuration file is located.
+        path:
+          # Path to the folder where ClickHouse configuration files common for all instances within a CHI are located.
+          common: chi/config.d
+          # Path to the folder where ClickHouse configuration files unique for each instance (host) within a CHI are located.
+          host: chi/conf.d
+          # Path to the folder where ClickHouse configuration files with users' settings are located.
+          # Files are common for all instances within a CHI.
+          user: chi/users.d
+      ################################################
+      ##
+      ## Configuration users section
+      ##
+      ################################################
+      user:
+        # Default settings for user accounts, created by the operator.
+        # IMPORTANT. These are not access credentials or settings for the 'default' user account,
+        # it is a template for filling out missing fields for all user accounts to be created by the operator,
+        # with the following EXCEPTIONS:
+        # 1. 'default' user account DOES NOT use provided password, but uses all the rest of the fields.
+        #    Password for 'default' user account has to be provided explicitly, if to be used.
+        # 2. CHOP user account DOES NOT use:
+        #    - profile setting. It uses predefined profile called 'clickhouse_operator'
+        #    - quota setting. It uses empty quota name.
+        #    - networks IP setting. Operator specifies 'networks/ip' user setting to match operators' pod IP only.
+        #    - password setting. Password for CHOP account is used from 'clickhouse.access.*' section
+        default:
+          # Default values for ClickHouse user account(s) created by the operator
+          #   1. user/profile - string
+          #   2. user/quota - string
+          #   3. user/networks/ip - multiple strings
+          #   4. user/password - string
+          # These values can be overwritten on per-user basis.
+          profile: "default"
+          quota: "default"
+          # APPENDS to the operator's list. Listing the two defaults here would
+          # produce four entries - specify only additional networks.
+          networksIP:
+            - "::1"
+            - "127.0.0.1"
+          password: "default"
+      ################################################
+      ##
+      ## Configuration network section
+      ##
+      ################################################
+      network:
+        # Default host_regexp to limit network connectivity from outside
+        hostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+
+    ################################################
+    ##
+    ## Configuration restart policy section
+    ## Describes what configuration changes require a ClickHouse restart
+    ##
+    ################################################
+    configurationRestartPolicy:
+      rules:
+        # IMPORTANT!
+        # Special version of "*" - default version - has to satisfy all ClickHouse versions.
+        # Default version will also be used in case ClickHouse version is unknown.
+        # ClickHouse version may be unknown due to host being down - for example, because of incorrect "settings" section.
+        # ClickHouse is not willing to start in case incorrect/unknown settings are provided in config file.
+        - version: "*"
+          rules:
+            # see https://kb.altinity.com/altinity-kb-setup-and-maintenance/altinity-kb-server-config-files/#server-config-configxml-sections-which-dont-require-restart
+            # to be replaced with "select * from system.server_settings where changeable_without_restart = 'No'"
+
+            - settings/*: "yes"
+
+            # single values
+            - settings/access_control_path: "no"
+            - settings/dictionaries_config: "no"
+            - settings/max_server_memory_*: "no"
+            - settings/max_*_to_drop: "no"
+            - settings/max_concurrent_queries: "no"
+            - settings/models_config: "no"
+            - settings/user_defined_executable_functions_config: "no"
+
+            # structured XML
+            - settings/logger/*: "no"
+            - settings/macros/*: "no"
+            - settings/remote_servers/*: "no"
+            - settings/user_directories/*: "no"
+
+            # these settings should not lead to pod restarts
+            - settings/display_secrets_in_show_and_select: "no"
+
+            - zookeeper/*: "no"
+
+            - files/*.xml: "yes"
+            - files/config.d/*.xml: "yes"
+            - files/config.d/*dict*.xml: "no"
+            - files/config.d/*no_restart*: "no"
+
+            # exceptions in default profile
+            - profiles/default/background_*_pool_size: "yes"
+            - profiles/default/max_*_for_server: "yes"
+        - version: "21.*"
+          rules:
+            - settings/logger: "yes"
+
+    ################################################
+    ##
+    ## Access to ClickHouse instances
+    ##
+    ################################################
+    access:
+      # Possible values for 'scheme' are:
+      #   1. http - force http to be used to connect to ClickHouse instances
+      #   2. https - force https to be used to connect to ClickHouse instances
+      #   3. Auto - either http or https is selected based on open ports
+      # Coerced http -> https when security.policy is Enforced.
+      scheme: "Auto"
+      # ClickHouse credentials (username, password and port) to be used by the operator
+      # to connect to ClickHouse instances. These credentials are used for:
+      #   1. Metrics requests
+      #   2. Schema maintenance
+      # User with these credentials can be specified in additional ClickHouse .xml config files,
+      # located in 'clickhouse.configuration.file.path.user' folder.
+      # Prefer the `secret` reference below over inline credentials.
+      username: ""
+      password: ""
+      # Location of the k8s Secret with username and password to be used by the operator
+      # to connect to ClickHouse instances. Can be used instead of the explicit
+      # username/password above. Secret should have two keys: `username` and `password`.
+      secret:
+        # Empty `namespace` means the k8s Secret is looked up in the same namespace
+        # where the operator's pod is running.
+        namespace: ""
+        # Empty `name` means no k8s Secret would be looked for
+        name: "clickhouse-operator"
+      # Port where to connect to ClickHouse instances to
+      port: 8123
+
+      # `rootCA`: inline PEM CA bundle the operator uses to verify the ClickHouse
+      # server certificate when connecting over https (scheme: https, or Auto when
+      # only TLS ports are open). Verification is enforced when TLS hardening is
+      # opted in - security.clickhouse.tls.verify: Strict, or a non-empty
+      # minVersion/serverName; otherwise the CA is loaded but verification stays
+      # relaxed for backward compatibility.
+      rootCA: ""
+      # `rootCASecretRef`: alternate source - read the PEM CA from a Kubernetes
+      # Secret in the operator's own namespace instead of inlining it above. The
+      # operator resolves it into `rootCA` once at config load (rotate the Secret +
+      # restart the operator to pick up a new CA). Mutually exclusive with the
+      # inline `rootCA` above (inline wins). Empty `name` = not used. When `key` is
+      # empty, the operator tries "ca.crt" then "tls.crt".
+      rootCASecretRef:
+        name: ""
+        key: ""
+
+      # Timeouts used to limit connection and queries from the operator to ClickHouse
+      # instances. Specified in seconds.
+      timeouts:
+        # Timeout to set up a connection from the operator to ClickHouse instances.
+        connect: 5
+        # Timeout to perform an SQL query from the operator to ClickHouse instances.
+        query: 4
+
+    ################################################
+    ##
+    ## Addons specify additional configuration sections applied per ClickHouse version
+    ##
+    ################################################
+    addons:
+      rules:
+        - version: "*"
+          spec:
+            configuration:
+              users:
+              profiles:
+              quotas:
+              settings:
+              files:
+        - version: ">= 23.3"
+          spec:
+            configuration:
+              ###
+              ### users.d is global while description depends on CH version which may vary on per-host basis
+              ### In case of global-ness this may be better to implement via auto-templates
+              ###
+              ### As a solution, this may be applied on the whole cluster based on any of its hosts
+              ###
+              ### What to do when host is just created? CH version is not known prior to CH started and user config is required before CH started.
+              ### We do not have any info about the cluster on initial creation
+              ###
+              users:
+                "{clickhouseOperatorUser}/access_management": 1
+                "{clickhouseOperatorUser}/named_collection_control": 1
+                "{clickhouseOperatorUser}/show_named_collections": 1
+                "{clickhouseOperatorUser}/show_named_collections_secrets": 1
+              profiles:
+              quotas:
+              settings:
+              files:
+        - version: ">= 23.5"
+          spec:
+            configuration:
+              users:
+              profiles:
+                clickhouse_operator/format_display_secrets_in_show_and_select: 1
+              quotas:
+              settings:
+                ##
+                ## this may be added on per-host basis into host's conf.d folder
+                ##
+                display_secrets_in_show_and_select: 1
+              files:
+
+    ################################################
+    ##
+    ## Metrics collection from ClickHouse instances
+    ##
+    ################################################
+    metrics:
+      # Timeouts used to limit connection and queries from the metrics exporter to
+      # ClickHouse instances. Specified in seconds.
+      timeouts:
+        # Timeout used to limit metrics collection request.
+        # Upon reaching this timeout metrics collection is aborted and no more metrics
+        # are collected in this cycle. All collected metrics are returned.
+        collect: 9
+      # Regexp to match tables in system database to fetch metrics from.
+      # Multiple tables can be matched using regexp. Matched tables are merged using merge() table function.
+      # Default is "^(metrics|custom_metrics)$" which fetches from both system.metrics and system.custom_metrics.
+      tablesRegexp: "^(metrics|custom_metrics)$"
+      # List of regexps to match ClickHouse metrics to exclude from collection/export.
+      # Regexps match internal metric names before Prometheus normalization and prefixing.
+      # Default is the per-CPU OS metrics filter shown below; set to [] to disable.
+      # Unlike other lists in this file, this one REPLACES rather than appends.
+      excludeRegexp:
+        - "^metric\\.(OS.*CPU[0-9]+|CPUFrequencyMHz_[0-9]+)$"
+
+  ################################################
+  ##
+  ## Keeper section
+  ##
+  ## NOTE: this section is not declared in the chopconf CRD schema. It survives
+  ## in a CR (the schema preserves unknown top-level sections) but gets no
+  ## validation. The ConfigMap form is the supported way to set it.
+  ##
+  ################################################
+  keeper:
+    configuration:
+      file:
+        path:
+          # Path to the folder where Keeper configuration files common for all instances within a CHK are located.
+          common: chk/keeper_config.d
+          # Path to the folder where Keeper configuration files unique for each instance (host) within a CHK are located.
+          host: chk/conf.d
+          # Path to the folder where Keeper configuration files with users' settings are located.
+          user: chk/users.d
+
+  ################################################
+  ##
+  ## Security section (operator-wide defaults; a CHI can override per-cluster
+  ## via `spec.configuration.clusters[].security`)
+  ##
+  ## Shape is target-scoped: security.<target>.<protocol>.<knob>.
+  ## ClickHouse-client TLS lives under `clickhouse.tls.*`, ZooKeeper /
+  ## Keeper-client TLS under `zookeeper.tls.*`, Kubernetes-client toggles
+  ## under `kubernetes.*`. IPC and FIPS are operator-internal - no CHI override.
+  ##
+  ## Three orthogonal hardening axes live in this block:
+  ##   1. security.policy           - TLS-hardening master switch.
+  ##   2. security.fips.enforced    - FIPS cryptographic-module gate (Fatals
+  ##                                  at startup if the binary lacks GOFIPS140).
+  ##   3. security.images.policy    - workload supply-chain gate (rejects
+  ##                                  CH/Keeper images that lack "fips" in
+  ##                                  their tag).
+  ## Each axis is opt-in and independent of the other two.
+  ##
+  ## See docs/security_hardening.md for the design and per-knob semantics.
+  ##
+  ## NOTE: the CRD models this whole block as a free-form object, so none of the
+  ## fields below are schema-validated. A typo here is accepted silently.
+  ##
+  ################################################
+  security:
+    clickhouse:
+      # TLS verification for outbound ClickHouse client connections the operator
+      # makes (schemer, health probes, /metrics scraping helpers).
+      #
+      # Each field below is a TRISTATE: explicit value, empty string (""), or
+      # absent. Empty/absent means "inherit" - for back-compat the operator's
+      # baseline default is still PERMISSIVE (`InsecureSkipVerify=true`, Go-default
+      # TLS version), matching pre-0.27.1 behavior. Set explicit values here to
+      # tighten across every CHI managed by this operator. A CHI may override
+      # per-cluster via `spec.configuration.clusters[].security.clickhouse.tls`.
+      tls:
+        # `verify`: does the client verify the server's certificate chain?
+        #   "Strict" - verify server cert against `rootCA` (or system roots if
+        #              empty). Hostname must match `serverName` (or the dial
+        #              host if `serverName` is empty). MITM-resistant.
+        #   "None"   - skip verification entirely. Connection is encrypted but
+        #              an attacker can intercept transparently. Useful only for
+        #              development/self-signed clusters.
+        #   ""       - preserve legacy behavior: equivalent to "None" today, but
+        #              re-evaluated by the future master switch. Will become
+        #              "Strict" once the FIPS profile is enforced.
+        verify: ""
+        # `minVersion`: minimum negotiated TLS version. Empty uses Go stdlib
+        # default (currently TLS 1.2). FIPS Strict coerces to "1.3".
+        #   "1.2" | "1.3" | ""
+        minVersion: ""
+        # `serverName`: SNI name + name that the server cert must match when
+        # `verify=Strict`. Empty derives it from the dial host (typically the
+        # pod's headless-service FQDN). Set this when the cert is issued to a
+        # different name than the dial address (e.g. a wildcard or service-CN).
+        serverName: ""
+        # `rootCA`: PEM-encoded CA bundle used to validate the server cert when
+        # `verify=Strict`. Accepts raw PEM or base64-wrapped PEM. Empty means
+        # use the system CA roots from the operator pod's trust store.
+        rootCA: ""
+        # `rootCASecretRef`: alternate source - read the PEM CA from a Kubernetes
+        # Secret. The operator resolves it at CHI normalize time and inlines the
+        # value into `rootCA`. Mutually exclusive with the inline `rootCA` above
+        # - setting both aborts the CR with reason RootCAConflict.
+        #
+        # `key` defaulting: when omitted, the operator tries "ca.crt" first
+        # (cert-manager / kubernetes.io/tls convention), then "tls.crt" as a
+        # fallback. Override `key:` for hand-rolled Secrets with custom layouts.
+        #
+        # Namespace: SecretKeySelector has no namespace field. The Secret is
+        # expected in the CHI's namespace (for cluster-level refs) or the
+        # operator's namespace (for CHOP-config-level refs).
+        #
+        # Missing Secret/key aborts the CR with reason RootCASecretUnresolved.
+        # There is no silent fallback to system roots, because empty CA +
+        # Verify=Strict would refuse every dial.
+        rootCASecretRef:
+          name: ""
+          key: ""
+    zookeeper:
+      # TLS knobs for the operator's ZooKeeper / Keeper client. Existing ZK TLS
+      # already loads cert/key/CA + ServerName separately; these knobs add
+      # MinVersion + InsecureSkipVerify control on top of that path.
+      tls:
+        # Same tristate semantics as `clickhouse.tls.verify`, but the ZK baseline
+        # is more conservative: when the existing ZK TLS path is active (cert+key+CA
+        # are wired up), "Strict" is the effective default. Set "None" here to
+        # opt out of cert verification for a development ZK ensemble.
+        verify: ""
+        # Same semantics as `clickhouse.tls.minVersion`. Empty = Go default (1.2).
+        minVersion: ""
+    kubernetes:
+      tls:
+        # `verify`: TLS posture applied as a LOAD-TIME GATE against the kubeconfig.
+        # Unlike clickhouse/zookeeper, the operator does NOT build the kubeconfig
+        # tls.Config - client-go reads TLSClientConfig.Insecure from disk. This
+        # knob only refuses or permits startup based on what the kubeconfig says.
+        #   "Strict" - refuse startup if the kubeconfig has Insecure=true.
+        #   "None"   - explicit opt-in: permit an insecure kubeconfig.
+        #   ""       - preserve current behavior (kubeconfig wins).
+        verify: ""
+        # `minVersion`: floor TLS at this protocol version. Declared here for
+        # shape uniformity and FIPS coercion symmetry, but NOT yet enforced on
+        # the operator's K8s API transport.
+        #   "1.2" | "1.3" | ""
+        minVersion: ""
+    # Operator<->metrics-exporter REST channel (`/chi` on port 8888) hardening.
+    # Plain (default) preserves today's behavior: server binds all interfaces,
+    # no auth. Secure rejects non-loopback callers at the /chi handler AND
+    # requires an X-CHOP-Token bearer-token header on every request. The
+    # operator provisions the token at startup (32 bytes from crypto/rand,
+    # hex-encoded) into a shared Pod-local emptyDir volume mounted into
+    # both containers.
+    ipc:
+      # `mode`: IPC channel posture.
+      #   "Plain"  - default. Server binds all interfaces, no auth required.
+      #   "Secure" - bind loopback only, require X-CHOP-Token on every call.
+      mode: "Plain"
+      # `bindHost`: address the IPC server binds to in Secure mode. Empty
+      # defaults to "127.0.0.1". Ignored in Plain mode (server still binds
+      # all interfaces).
+      bindHost: ""
+      # `tokenPath`: filesystem path to the shared Pod-local token file used
+      # by both containers in Secure mode. Empty defaults to
+      # "/etc/clickhouse-operator-ipc/token". An advanced GitOps/Vault use
+      # case - sourcing the token from a Kubernetes Secret - is supported
+      # via a Deployment volume override (no CRD field). See
+      # docs/security_hardening.md -> Externally-managed token (advanced).
+      tokenPath: ""
+    # Axis 1 - Operator-wide TLS-hardening master switch. Permissive (default)
+    # preserves 0.27.0 behavior - no coercion, no rejection. Enforced coerces
+    # all transport knobs above to their Strict positions at startup
+    # (clickhouse.tls.verify=Strict, clickhouse.tls.minVersion=1.3,
+    # zookeeper.tls.verify=Strict, zookeeper.tls.minVersion=1.3,
+    # kubernetes.tls.verify=Strict, kubernetes.tls.minVersion=1.3,
+    # ipc.mode=Secure), re-registers the ClickHouse legacy TLS config to
+    # verifying mode (no InsecureSkipVerify), coerces clickhouse.access.scheme
+    # http->https, rejects ZK `digest:` auth files, and rejects CHIs that
+    # cannot be served in a FIPS-compatible posture (e.g. CHIs referencing
+    # plain-text external ZooKeeper). Transport hardening only - does NOT
+    # assert the binary is FIPS-linked; that is the orthogonal `fips.enforced`
+    # axis below.
+    policy: Permissive
+    # Axis 2 - FIPS cryptographic-module gate. Orthogonal to `policy`. When
+    # `enforced: true`, the operator Fatals at startup unless the binary was
+    # built with GOFIPS140 and crypto/fips140 reports Enabled (i.e. the
+    # process is running with GODEBUG=fips140=on or fips140=only). Also
+    # triggers the same TLS coercions as `policy: Enforced` - a FIPS-asserted
+    # operator necessarily wants verified TLS.
+    #
+    # The default `altinity/clickhouse-operator` and `altinity/metrics-exporter`
+    # images are FIPS 140-3 compatible (not certified): built with
+    # GOFIPS140=v1.0.0 and run with GODEBUG=fips140=on. Setting
+    # `enforced: true` asserts that posture at startup.
+    fips:
+      enforced: false
+    images:
+      # Axis 3 - Workload supply-chain gate, orthogonal to `policy` and
+      # `fips.enforced`. Permissive (default) accepts any image; FIPSRequired
+      # refuses CRs whose CH/Keeper images lack the "fips" tag substring
+      # (admission) AND aborts running CRs whose `SELECT version()` lacks
+      # "fips" (post-Ready confirmation). See docs/security_hardening_fips.md
+      # -> "security.images.policy: FIPSRequired" for the full policy details
+      # and recovery procedure.
+      policy: Permissive
+
+  ################################################
+  ##
+  ## Template(s) management section
+  ##
+  ################################################
+  template:
+    chi:
+      # CHI template updates handling policy
+      # Possible policy values:
+      #   - ReadOnStart. Accept CHIT updates on the operator's start only.
+      #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
+      policy: ApplyOnNextReconcile
+
+      # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
+      # Templates are added to the list of all templates and used when CHI is reconciled.
+      # Templates are applied in sorted alpha-numeric order.
+      path: chi/templates.d
+
+  ################################################
+  ##
+  ## Reconcile section
+  ##
+  ################################################
+  reconcile:
+    # Reconcile runtime settings
+    runtime:
+      # Max number of concurrent CHI reconciles in progress
+      reconcileCHIsThreadsNumber: 10
+      # Max number of concurrent CHK reconciles in progress
+      reconcileCHKsThreadsNumber: 1
+
+      # The operator reconciles shards concurrently in each CHI with the following limitations:
+      #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
+      #      can not be greater than 'reconcileShardsThreadsNumber'.
+      #   2. Percentage of shards being reconciled (and thus having hosts down) in each CHI concurrently
+      #      can not be greater than 'reconcileShardsMaxConcurrencyPercent'.
+      #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
+      # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
+
+      # Max number of concurrent shard reconciles within one cluster in progress
+      reconcileShardsThreadsNumber: 5
+      # Max percentage of concurrent shard reconciles within one cluster in progress
+      reconcileShardsMaxConcurrencyPercent: 50
+
+    # Reconcile StatefulSet scenario
+    statefulSet:
+      # Create StatefulSet scenario
+      create:
+        # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
+        # Possible options:
+        # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+        #    do not try to fix or delete or update it, just abort reconcile cycle.
+        #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
+        # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+        # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+        onFailure: ignore
+
+      # Update StatefulSet scenario
+      update:
+        # How many seconds to wait for created/updated StatefulSet to be 'Ready'
+        timeout: 300
+        # How many seconds to wait between checks/polls for created/updated StatefulSet status
+        pollInterval: 5
+        # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
+        # Possible options:
+        # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+        #    do not try to fix or delete or update it, just abort reconcile cycle.
+        #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
+        # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
+        #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
+        #    Follow 'abort' path afterwards.
+        # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+        onFailure: abort
+
+      # Recreate StatefulSet scenario
+      recreate:
+        # What to do in case the operator is in need to recreate a StatefulSet?
+        # Possible options:
+        # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+        #    do not try to fix or delete or update it, just abort reconcile cycle.
+        #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
+        # 2. recreate - proceed and recreate StatefulSet.
+
+        # Triggered when PVC data loss or missing volumes are detected.
+        # `abort` is the setting that stops the operator from recreating a host
+        # whose volume was lost - the safe choice where data loss must be
+        # investigated by an admin rather than healed automatically.
+        onDataLoss: recreate
+        # Triggered when StatefulSet update fails or StatefulSet is not ready
+        onUpdateFailure: recreate
+
+    # Reconcile Host scenario
+    host:
+      # The operator during reconcile procedure should wait for a ClickHouse host to achieve the following conditions:
+      wait:
+        # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+        #   - to be excluded from a ClickHouse cluster
+        #   - to complete all running queries
+        #   - to be included into a ClickHouse cluster
+        # respectfully before moving forward with host reconcile
+        exclude: "true"
+        queries: "true"
+        include: "false"
+        # The operator during reconcile procedure should wait for replicas to catch-up
+        # replication delay a.k.a replication lag for the following replicas
+        replicas:
+          # All replicas (new and known earlier) are explicitly requested to wait for replication to catch-up
+          all: "no"
+          # New replicas only are requested to wait for replication to catch-up
+          new: "yes"
+          # Replication catch-up is considered to be completed as soon as replication delay
+          # a.k.a replication lag - calculated as "MAX(absolute_delay) FROM system.replicas"
+          # is within this specified delay (in seconds)
+          delay: 10
+          # Opt-in gate that holds the rolling reconcile until a recreated replica has
+          # actually rebuilt from its peers, instead of trusting the local
+          # "MAX(absolute_delay)" probe above. Aimed at local/direct-attached storage
+          # recovery, where a pod can report a healthy delay before asynchronous
+          # loading has exposed every replicated object.
+          catchUp:
+            # Whether the gate is active. Default is off - the legacy delay probe above is used.
+            enabled: "no"
+            # Per-host wall-clock budget for the whole gate, in seconds. Must be >= 1.
+            # Omit to use the default.
+            timeout: 900
+            # What to do when the gate does not complete within `timeout`:
+            #   - abort   stop the reconcile (default)
+            #   - proceed advance to the next host without writing the caught-up marker,
+            #             so a later reconcile retries the catch-up
+            # Accepted in either case, like the other enum-valued options.
+            onTimeout: "abort"
+            # Stable-health window required after the host has synced its replicated objects.
+            # Health is read from system.replicas: is_readonly = 0, is_session_expired = 0 and
+            # absolute_delay within `delay` above.
+            health:
+              # Seconds between health checks. Must be >= 1. Omit to use the default.
+              pollInterval: 10
+              # Consecutive healthy checks required before the caught-up marker is written.
+              # Must be >= 1. Omit to use the default.
+              successThreshold: 6
+        probes:
+          # Whether the operator during host launch procedure should wait for startup probe to succeed.
+          # In case probe is unspecified wait is assumed to be completed successfully.
+          # Default option value is to do not wait.
+          startup: "no"
+          # Whether the operator during host launch procedure should wait for readiness probe to succeed.
+          # In case probe is unspecified wait is assumed to be completed successfully.
+          # Default option value is to wait.
+          readiness: "yes"
+
+      # The operator during reconcile procedure should drop the following entities:
+      drop:
+        replicas:
+          # Whether the operator during reconcile procedure should drop replicas when replica is deleted
+          onDelete: "yes"
+          # Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+          onLostVolume: "yes"
+          # Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
+          active: "no"
+
+      # Operator-wide default reconcile hooks, inherited by every CHI this operator
+      # manages. A CHI can declare its own under `spec.reconcile.host.hooks`; see
+      # docs/chi-examples/23-reconcile-hooks-*.yaml for the per-CHI form.
+      #
+      # KNOWN LIMITATION: the chopconf CRD does not declare the `events` and
+      # `failurePolicy` fields that the CHI CRD declares, so the API server strips
+      # them from a ClickHouseOperatorConfiguration CR. A hook with no `events` never
+      # matches and never fires, and a stripped `failurePolicy` falls back to `Fail`.
+      # Until the schema is fixed, set operator-wide hooks through the operator's
+      # ConfigMap (config.yaml), which is not schema-filtered. The block below is
+      # therefore shown commented out.
+      #
+      # hooks:
+      #   pre:
+      #     - events:
+      #         - HostReconcileStarted
+      #       target: host
+      #       failurePolicy: Fail
+      #       sql:
+      #         queries:
+      #           - "SYSTEM STOP DISTRIBUTED SENDS"
+      #   post:
+      #     - events:
+      #         - HostReconcileCompleted
+      #       target: host
+      #       failurePolicy: Ignore
+      #       shell:
+      #         container: clickhouse
+      #         command:
+      #           - "/bin/sh"
+      #           - "-c"
+      #           - "echo reconciled"
+
+    ################################################
+    ##
+    ## Coordination with external systems during reconcile
+    ##
+    ################################################
+    coordination:
+      keeper:
+        # How long the operator waits for a referenced ClickHouseKeeper to become ready
+        # before aborting CHI reconcile. In seconds.
+        readyTimeout: 120
+        # Reaction when a referenced CHK resource changes:
+        #   none (default) - do nothing
+        #   reconcile      - trigger CHI reconcile
+        onKeeperResourceUpdate: none
+
+    ################################################
+    ##
+    ## Auto-recovery from aborted/completed reconcile
+    ##
+    ################################################
+    recovery:
+      # Recovery scopes keyed by the CHI .status.status they apply to.
+      # Each scope contains on<Event>: <action> mappings that apply while the CHI
+      # is in that status.
+      onStatus:
+        # Recovery for a CHI whose .status.status is Aborted (reconcile did not
+        # complete) when one of its host pods transitions to Ready.
+        aborted:
+          # Action when a pod belonging to an Aborted CHI transitions to Ready:
+          #   retry (default) - re-enqueue the CHI for reconcile
+          #   none            - do nothing, CHI stays Aborted; an operator user must
+          #                     edit the CR spec to retrigger normalize
+          onPodReady: retry
+        # Recovery for a CHI whose .status.status is Completed (fully reconciled)
+        # when one of its host pods regresses to Ready=False and stays NotReady.
+        completed:
+          # Action when a Completed CHI's pod flips Ready=True -> Ready=False and
+          # stays NotReady for at least onPodNotReadyThreshold:
+          #   none (default) - do nothing
+          #   retry          - re-enqueue the CHI so the stuck host is force-restarted
+          # OFF by default: force-recreating a Completed CHI's pod is destructive - it
+          # can interrupt a replica's in-progress recovery and means hard downtime for
+          # a single-replica shard. Opt in with `retry` only where that is acceptable.
+          onPodNotReady: none
+          # Minimum duration a pod must stay Ready=False before recovery fires, once
+          # enabled (Go duration string; default 5m). Raise it for slow-recovering replicas.
+          onPodNotReadyThreshold: 5m
+
+  ################################################
+  ##
+  ## Annotations management section
+  ##
+  ################################################
+  annotation:
+    # Applied when:
+    #  1. Propagating annotations from the CHI's `metadata.annotations` to child objects' `metadata.annotations`,
+    #  2. Propagating annotations from the CHI Template's `metadata.annotations` to CHI's `metadata.annotations`,
+    # Include annotations from the following list:
+    # Applied only when not empty. Empty list means "include all, no selection"
+    include: []
+    # Exclude annotations from the following list:
+    exclude: []
+
+  ################################################
+  ##
+  ## Labels management section
+  ##
+  ################################################
+  label:
+    # Applied when:
+    #  1. Propagating labels from the CHI's `metadata.labels` to child objects' `metadata.labels`,
+    #  2. Propagating labels from the CHI Template's `metadata.labels` to CHI's `metadata.labels`,
+    # Include labels from the following list:
+    # Applied only when not empty. Empty list means "include all, no selection"
+    include: []
+    # Exclude labels from the following list:
+    # Applied only when not empty. Empty list means "nothing to exclude, no selection"
+    exclude: []
+    # Whether to append *Scope* labels to StatefulSet and Pod.
+    # Full list of available *scope* labels check in 'labeler.go'
+    #  LabelShardScopeIndex
+    #  LabelReplicaScopeIndex
+    #  LabelCHIScopeIndex
+    #  LabelCHIScopeCycleSize
+    #  LabelCHIScopeCycleIndex
+    #  LabelCHIScopeCycleOffset
+    #  LabelClusterScopeIndex
+    #  LabelClusterScopeCycleSize
+    #  LabelClusterScopeCycleIndex
+    #  LabelClusterScopeCycleOffset
+    appendScope: "no"
+
+  ################################################
+  ##
+  ## Metrics management section
+  ##
+  ## Note: this section governs labels the operator ATTACHES to the metrics it
+  ## exports. Settings for reading metrics OUT of ClickHouse live under
+  ## `clickhouse.metrics` above - the two are deliberately distinct.
+  ##
+  ################################################
+  metrics:
+    labels:
+      # Labels to omit from exported operator metrics. Empty list exports all of them.
+      # Use it to drop high-cardinality labels that inflate the metrics store.
+      exclude: []
+
+  ################################################
+  ##
+  ## Status management section
+  ##
+  ## Which optional fields the operator maintains in a CR's `.status`. Each one
+  ## costs an additional status write per reconcile step, so the more verbose
+  ## history fields are off by default.
+  ##
+  ################################################
+  status:
+    fields:
+      # Last action performed on the CR
+      action: "false"
+      # Rolling history of recent actions
+      actions: "false"
+      # Last error encountered
+      error: "true"
+      # Rolling history of recent errors
+      errors: "true"
+
+  ################################################
+  ##
+  ## StatefulSet management section
+  ##
+  ################################################
+  statefulSet:
+    # How many old ControllerRevisions to retain for each StatefulSet the operator
+    # creates. 0 keeps none.
+    revisionHistoryLimit: 0
+
+  ################################################
+  ##
+  ## Pod management section
+  ##
+  ################################################
+  pod:
+    # Grace period for Pod termination.
+    # How many seconds to wait between sending
+    # SIGTERM and SIGKILL during Pod termination process.
+    # Increase this number in case of slow shutdown.
+    terminationGracePeriod: 30
+
+  ################################################
+  ##
+  ## Log parameters section
+  ##
+  ## These mirror the glog flags the operator binary accepts.
+  ##
+  ################################################
+  logger:
+    logtostderr: "true"
+    alsologtostderr: "false"
+    v: "1"
+    stderrthreshold: ""
+    vmodule: ""
+    log_backtrace_at: ""
