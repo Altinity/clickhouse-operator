@@ -67,6 +67,66 @@ func Test_deletedObject(t *testing.T) {
 	}
 }
 
+// deleteHandler is what the informers actually register, so the contract that
+// matters is "an undecodable payload must not reach the callback" - a bare
+// assertion there panics the whole operator process, which is issue #2050.
+func Test_deleteHandler(t *testing.T) {
+	chi := &api.ClickHouseInstallation{}
+	var nilCHI *api.ClickHouseInstallation
+	tests := []struct {
+		name       string
+		obj        interface{}
+		wantCalled bool
+	}{
+		{
+			name:       "direct object reaches the callback",
+			obj:        chi,
+			wantCalled: true,
+		},
+		{
+			name:       "tombstone is unwrapped and reaches the callback",
+			obj:        cache.DeletedFinalStateUnknown{Obj: chi},
+			wantCalled: true,
+		},
+		{
+			name: "unexpected direct object is dropped",
+			obj:  struct{}{},
+		},
+		{
+			name: "unexpected tombstone object is dropped",
+			obj:  cache.DeletedFinalStateUnknown{Obj: struct{}{}},
+		},
+		{
+			name: "nil tombstone object is dropped",
+			obj:  cache.DeletedFinalStateUnknown{},
+		},
+		{
+			name: "typed nil tombstone object is dropped",
+			obj:  cache.DeletedFinalStateUnknown{Obj: nilCHI},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			var got *api.ClickHouseInstallation
+			handler := deleteHandler("test.DeleteFunc", func(deleted *api.ClickHouseInstallation) {
+				called = true
+				got = deleted
+			})
+
+			handler(tt.obj)
+
+			if called != tt.wantCalled {
+				t.Fatalf("callback called = %v, want %v", called, tt.wantCalled)
+			}
+			if tt.wantCalled && (got != chi) {
+				t.Errorf("callback received %p, want %p", got, chi)
+			}
+		})
+	}
+}
+
 func Test_shouldEnqueue(t *testing.T) {
 	// NB: ShouldEnqueue intentionally does NOT pre-filter on Spec.Suspend.
 	// The reconciler itself handles suspend (including marking CHI as Aborted when
