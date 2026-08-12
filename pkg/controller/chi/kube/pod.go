@@ -23,6 +23,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
@@ -65,8 +66,9 @@ func (c *Pod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
 	default:
 		panic(any("incorrect number or params"))
 	}
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, controller.NewGetOptions())
+	return commonKube.GetWithRetry(ctx, func() (*core.Pod, error) {
+		return c.kubeClient.CoreV1().Pods(namespace).Get(k8sCtx(ctx), name, controller.NewGetOptions())
+	})
 }
 
 func (c *Pod) GetRestartCounters(ctx context.Context, params ...any) (map[string]int, error) {

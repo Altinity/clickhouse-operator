@@ -1,3 +1,12 @@
+## Release 0.27.3
+### Security
+* **Bumped dependencies to address CVEs in the operator and metrics-exporter images.** An image scan flagged four CVEs; all are addressed by patch/minor bumps with no API or behavior changes:
+  * **CVE-2026-39822** (HIGH) and **CVE-2026-42505** (MEDIUM) — Go standard library. Fixed by building on Go **1.26.5** (the `go` directive in `go.mod` — the single source the Dockerfiles and CI derive `GO_VERSION` from — is bumped `1.26.4` → `1.26.5`).
+  * **CVE-2026-46600** — `golang.org/x/net` bumped `v0.55.0` → `v0.56.0`.
+  * **CVE-2026-56852** — `golang.org/x/text` bumped `v0.37.0` → `v0.39.0`.
+
+  Reachability note: `govulncheck` confirms the stdlib `crypto/tls` and `x/text` issues are reachable from operator/exporter code; the `x/net` and stdlib `os` issues are present-in-image but not reachable. All four are bumped for image hygiene regardless. The FIPS module (`GOFIPS140=v1.0.0`) is pinned independently of the Go toolchain and is unaffected.
+
 ## Release 0.27.2
 ### New Features
 * **Keeper split client/peer Services** ([#1982](https://github.com/Altinity/clickhouse-operator/issues/1982)). Each `ClickHouseKeeper` host now exposes two headless Services instead of one:

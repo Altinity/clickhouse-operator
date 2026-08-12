@@ -1,6 +1,6 @@
 # altinity-clickhouse-operator
 
-![Version: 0.27.2](https://img.shields.io/badge/Version-0.27.2-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.27.2](https://img.shields.io/badge/AppVersion-0.27.2-informational?style=flat-square)
+![Version: 0.27.3](https://img.shields.io/badge/Version-0.27.3-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.27.3](https://img.shields.io/badge/AppVersion-0.27.3-informational?style=flat-square)
 
 Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
 
@@ -25,6 +25,10 @@ To disable automatic CRD updates, set `crdHook.enabled: false` in values.yaml. W
 | Name | Email | Url |
 | ---- | ------ | --- |
 | altinity | <support@altinity.com> |  |
+
+## Source Code
+
+* <https://github.com/Altinity/clickhouse-operator>
 
 ## CRD Management
 
@@ -133,7 +137,15 @@ crdHook:
 | serviceMonitor.clickhouseMetrics.metricRelabelings | list | `[]` |  |
 | serviceMonitor.clickhouseMetrics.relabelings | list | `[]` |  |
 | serviceMonitor.clickhouseMetrics.scrapeTimeout | string | `""` |  |
-| serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) In serviceMonitor will be created two endpoints ch-metrics on port 8888 and op-metrics # 9999. Ypu can specify interval, scrapeTimeout, relabelings, metricRelabelings for each endpoint below |
+| serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) In serviceMonitor will be created two endpoints ch-metrics on port 8888 and op-metrics # 9999, plus a separate keeper-metrics ServiceMonitor when `serviceMonitor.keeperMetrics.enabled` is also set. You can specify interval, scrapeTimeout, relabelings, metricRelabelings for each endpoint below |
+| serviceMonitor.keeperMetrics.enabled | bool | `false` | create a separate ServiceMonitor scraping the native ClickHouse Keeper prometheus endpoint on the Keeper Services the operator manages. Unlike ClickHouse server metrics, Keeper metrics do not go through the operator's metrics-exporter - Keeper serves Prometheus itself. Off by default because it needs the CHK to opt in first: operator-generated Keeper Services publish only the `zk`/`zk-secure`/`raft` ports, so the CHK must both enable the endpoint via `prometheus/*` settings and name the port in `spec.templates.serviceTemplates` (a serviceTemplate REPLACES the default port list, so re-declare `zk` and `raft` there). Without that the ServiceMonitor matches no targets and reports nothing. |
+| serviceMonitor.keeperMetrics.interval | string | `"30s"` | Prometheus scrape interval for the keeper-metrics endpoint |
+| serviceMonitor.keeperMetrics.metricRelabelings | list | `[]` | Prometheus [MetricRelabelConfigs] to apply to samples before ingestion |
+| serviceMonitor.keeperMetrics.namespaceSelector | object | `{"any":true}` | namespaces where prometheus-operator will discover keeper services, `any: true` means all namespaces. Entries under `matchNames` must be literal namespace names, not the regexps `watchNamespaces` accepts. Cluster-wide discovery also requires the Prometheus service account to hold cluster-scoped RBAC on services/endpoints, and Prometheus to select this ServiceMonitor (see `serviceMonitor.additionalLabels`) |
+| serviceMonitor.keeperMetrics.port | string | `"prometheus"` | name of the Keeper Service port exposing the native prometheus endpoint. Must match the port name in the CHK serviceTemplate. `prometheus` follows this repo's own Keeper examples (port 7000); charts that name it `metrics` need this overridden |
+| serviceMonitor.keeperMetrics.relabelings | list | `[]` | Prometheus [RelabelConfigs] to apply to samples before scraping |
+| serviceMonitor.keeperMetrics.scrapeTimeout | string | `""` | Prometheus ServiceMonitor scrapeTimeout. If empty, Prometheus uses the global scrape timeout unless it is less than the target's scrape interval value in which the latter is used. |
+| serviceMonitor.keeperMetrics.selector | object | check the `values.yaml` file | matchLabels selecting the Keeper Services to scrape. The default matches every Keeper Service the operator manages. Note the operator creates several Services per CHK (CR-scope plus per-host peer and client), all carrying this label, so if more than one of them names the metrics port the same pod is scraped more than once - narrow with `clickhouse-keeper.altinity.com/Service: chk` (CR-scope) or `: host` (per-host) to pick a single tier |
 | serviceMonitor.operatorMetrics.interval | string | `"30s"` |  |
 | serviceMonitor.operatorMetrics.metricRelabelings | list | `[]` |  |
 | serviceMonitor.operatorMetrics.relabelings | list | `[]` |  |

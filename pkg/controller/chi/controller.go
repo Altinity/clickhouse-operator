@@ -153,6 +153,33 @@ func (c *Controller) createQueue() queue.PriorityQueue {
 	//),
 }
 
+// deletedObject decodes an informer delete payload into *T, transparently
+// unwrapping a client-go DeletedFinalStateUnknown tombstone (delivered when a
+// watch delete is missed and a relist finds the cached object gone). T is the
+// value type so the result stays pointer-nil-comparable: a tombstone can carry
+// a typed-nil *T that satisfies the assertion, so the nil check is required.
+func deletedObject[T any](obj interface{}) (*T, error) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	deleted, ok := obj.(*T)
+	if !ok || deleted == nil {
+		return nil, fmt.Errorf("unexpected object type %T", obj)
+	}
+	return deleted, nil
+}
+
+func deleteHandler[T any](name string, handle func(*T)) func(interface{}) {
+	return func(obj interface{}) {
+		deleted, err := deletedObject[T](obj)
+		if err != nil {
+			utilRuntime.HandleError(fmt.Errorf("%s: %w", name, err))
+			return
+		}
+		handle(deleted)
+	}
+}
+
 func (c *Controller) addEventHandlersCHI(
 	chopInformerFactory chopInformers.SharedInformerFactory,
 ) {
@@ -174,14 +201,13 @@ func (c *Controller) addEventHandlersCHI(
 			log.V(3).M(newChi).Info("chiInformer.UpdateFunc")
 			c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileUpdate, oldChi, newChi))
 		},
-		DeleteFunc: func(obj interface{}) {
-			chi := obj.(*api.ClickHouseInstallation)
+		DeleteFunc: deleteHandler("chiInformer.DeleteFunc", func(chi *api.ClickHouseInstallation) {
 			if !chop.Config().IsNamespaceWatched(chi.Namespace) {
 				return
 			}
 			log.V(3).M(chi).Info("chiInformer.DeleteFunc")
 			c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileDelete, chi, nil))
-		},
+		}),
 	})
 }
 
@@ -207,14 +233,13 @@ func (c *Controller) addEventHandlersCHIT(
 			log.V(3).M(newChit).Info("chitInformer.UpdateFunc")
 			c.enqueueObject(cmd_queue.NewReconcileCHIT(cmd_queue.ReconcileUpdate, oldChit, newChit))
 		},
-		DeleteFunc: func(obj interface{}) {
-			chit := obj.(*api.ClickHouseInstallationTemplate)
+		DeleteFunc: deleteHandler("chitInformer.DeleteFunc", func(chit *api.ClickHouseInstallationTemplate) {
 			if !chop.Config().IsNamespaceWatched(chit.Namespace) {
 				return
 			}
 			log.V(3).M(chit).Info("chitInformer.DeleteFunc")
 			c.enqueueObject(cmd_queue.NewReconcileCHIT(cmd_queue.ReconcileDelete, chit, nil))
-		},
+		}),
 	})
 }
 
@@ -233,11 +258,10 @@ func (c *Controller) addEventHandlersChopConfig(
 			log.V(3).M(newChopConfig).Info("chopInformer.UpdateFunc")
 			c.enqueueObject(cmd_queue.NewReconcileChopConfig(cmd_queue.ReconcileUpdate, oldChopConfig, newChopConfig))
 		},
-		DeleteFunc: func(obj interface{}) {
-			chopConfig := obj.(*api.ClickHouseOperatorConfiguration)
+		DeleteFunc: deleteHandler("chopInformer.DeleteFunc", func(chopConfig *api.ClickHouseOperatorConfiguration) {
 			log.V(3).M(chopConfig).Info("chopInformer.DeleteFunc")
 			c.enqueueObject(cmd_queue.NewReconcileChopConfig(cmd_queue.ReconcileDelete, chopConfig, nil))
-		},
+		}),
 	})
 }
 
@@ -259,13 +283,12 @@ func (c *Controller) addEventHandlersService(
 			}
 			log.V(3).M(oldService).Info("serviceInformer.UpdateFunc")
 		},
-		DeleteFunc: func(obj interface{}) {
-			service := obj.(*core.Service)
+		DeleteFunc: deleteHandler("serviceInformer.DeleteFunc", func(service *core.Service) {
 			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
 			log.V(3).M(service).Info("serviceInformer.DeleteFunc")
-		},
+		}),
 	})
 }
 
@@ -394,13 +417,12 @@ func (c *Controller) addEventHandlersEndpoints(
 				c.enqueueObject(cmd_queue.NewReconcileEndpoints(cmd_queue.ReconcileUpdate, oldEndpoints, newEndpoints))
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
-			endpoints := obj.(*core.Endpoints)
+		DeleteFunc: deleteHandler("endpointsInformer.DeleteFunc", func(endpoints *core.Endpoints) {
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
 			log.V(3).M(endpoints).Info("endpointsInformer.DeleteFunc")
-		},
+		}),
 	})
 }
 
@@ -426,13 +448,12 @@ func (c *Controller) addEventHandlersEndpointSlice(
 				c.enqueueObject(cmd_queue.NewReconcileEndpointSlice(cmd_queue.ReconcileUpdate, oldEndpointSlice, newEndpointSlice))
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
-			endpointSlice := obj.(*discovery.EndpointSlice)
+		DeleteFunc: deleteHandler("endpointSliceInformer.DeleteFunc", func(endpointSlice *discovery.EndpointSlice) {
 			if !c.isTrackedObject(&endpointSlice.ObjectMeta) {
 				return
 			}
 			log.V(3).M(endpointSlice).Info("endpointSliceInformer.DeleteFunc")
-		},
+		}),
 	})
 }
 
@@ -454,13 +475,12 @@ func (c *Controller) addEventHandlersConfigMap(
 			}
 			log.V(3).M(configMap).Info("configMapInformer.UpdateFunc")
 		},
-		DeleteFunc: func(obj interface{}) {
-			configMap := obj.(*core.ConfigMap)
+		DeleteFunc: deleteHandler("configMapInformer.DeleteFunc", func(configMap *core.ConfigMap) {
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
 			log.V(3).M(configMap).Info("configMapInformer.DeleteFunc")
-		},
+		}),
 	})
 }
 
@@ -474,7 +494,6 @@ func (c *Controller) addEventHandlersStatefulSet(
 				return
 			}
 			log.V(3).M(statefulSet).Info("statefulSetInformer.AddFunc")
-			//controller.handleObject(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			statefulSet := old.(*apps.StatefulSet)
@@ -483,14 +502,12 @@ func (c *Controller) addEventHandlersStatefulSet(
 			}
 			log.V(3).M(statefulSet).Info("statefulSetInformer.UpdateFunc")
 		},
-		DeleteFunc: func(obj interface{}) {
-			statefulSet := obj.(*apps.StatefulSet)
+		DeleteFunc: deleteHandler("statefulSetInformer.DeleteFunc", func(statefulSet *apps.StatefulSet) {
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
 			log.V(3).M(statefulSet).Info("statefulSetInformer.DeleteFunc")
-			//controller.handleObject(obj)
-		},
+		}),
 	})
 }
 
@@ -515,14 +532,13 @@ func (c *Controller) addEventHandlersPod(
 			log.V(3).M(newPod).Info("podInformer.UpdateFunc")
 			c.enqueueObject(cmd_queue.NewReconcilePod(cmd_queue.ReconcileUpdate, oldPod, newPod))
 		},
-		DeleteFunc: func(obj interface{}) {
-			pod := obj.(*core.Pod)
+		DeleteFunc: deleteHandler("podInformer.DeleteFunc", func(pod *core.Pod) {
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.DeleteFunc")
 			c.enqueueObject(cmd_queue.NewReconcilePod(cmd_queue.ReconcileDelete, pod, nil))
-		},
+		}),
 	})
 }
 
@@ -907,52 +923,6 @@ func (c *Controller) uninstallFinalizer(ctx context.Context, chi *api.ClickHouse
 	cur.SetFinalizers(util.RemoveFromArray(FinalizerName, cur.GetFinalizers()))
 
 	return c.patchCHIFinalizers(ctx, cur)
-}
-
-// handleObject enqueues CHI which is owner of `obj` into reconcile loop
-func (c *Controller) handleObject(obj interface{}) {
-	// TODO review
-	object, ok := obj.(meta.Object)
-	if !ok {
-		ts, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilRuntime.HandleError(fmt.Errorf(messageUnableToDecode))
-			return
-		}
-		object, ok = ts.Obj.(meta.Object)
-		if !ok {
-			utilRuntime.HandleError(fmt.Errorf(messageUnableToDecode))
-			return
-		}
-	}
-
-	// object is an instance of meta.Object
-
-	// Checking that we control current StatefulSet Object
-	ownerRef := meta.GetControllerOf(object)
-	if ownerRef == nil {
-		// No owner
-		return
-	}
-
-	// Ensure owner is of a proper kind
-	if ownerRef.Kind != api.ClickHouseInstallationCRDResourceKind {
-		return
-	}
-
-	log.V(1).Info("Processing object: %s", object.GetName())
-
-	// Get owner - it is expected to be CHI
-	// TODO chi, err := c.chi.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
-
-	// TODO
-	//if err != nil {
-	//	log.V(1).Infof("ignoring orphaned object '%s' of ClickHouseInstallation '%s'", object.GetSelfLink(), ownerRef.Name)
-	//	return
-	//}
-
-	// Add CHI object into reconcile loop
-	// TODO c.enqueueObject(chi.Namespace, chi.Name, chi)
 }
 
 func ShouldEnqueue(cr *api.ClickHouseInstallation) bool {

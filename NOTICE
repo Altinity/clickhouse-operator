@@ -1,0 +1,11 @@
+Altinity Kubernetes Operator for ClickHouse
+Copyright 2019-2026 Altinity Inc and/or its affiliates.
+
+This product includes software developed at Altinity Inc
+(https://altinity.com/).
+
+Licensed under the Apache License, Version 2.0.
+See LICENSE for the full license text.
+
+Third-party Go dependency attributions for the operator and
+metrics-exporter binaries are listed in THIRD_PARTY_NOTICES.md.

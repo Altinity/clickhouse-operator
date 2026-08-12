@@ -1,5 +1,3 @@
-//go:build race
-
 package model
 
 import (
@@ -70,18 +68,18 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 	go func() {
 		startWg.Done()
 		startWg.Wait() // Block until the other goroutine has begun execution
-		reg.RegisterConfigMap(testCmA)
-		reg.RegisterPVC(testPvcA)
+		reg.RegisterConfigMap(&testCmA)
+		reg.RegisterPVC(&testPvcA)
 		doneWg.Done()
 	}()
 
 	go func() {
 		startWg.Done()
 		startWg.Wait() // Block until the other goroutine has begun execution
-		reg.RegisterConfigMap(testCmA)
-		reg.RegisterConfigMap(testCmAOtherNamespace)
-		reg.RegisterConfigMap(testCmB)
-		reg.RegisterPVC(testPvcB)
+		reg.RegisterConfigMap(&testCmA)
+		reg.RegisterConfigMap(&testCmAOtherNamespace)
+		reg.RegisterConfigMap(&testCmB)
+		reg.RegisterPVC(&testPvcB)
 		doneWg.Done()
 	}()
 
@@ -101,7 +99,7 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 		&testPvcA:              PVC,
 		&testPvcB:              PVC,
 	} {
-		if got := reg.hasEntity(expectedEntityType, *expectedMetaObj); !got {
+		if got := reg.hasEntity(expectedEntityType, expectedMetaObj); !got {
 			t.Errorf(
 				"Expected registry to contain entity type %s:{Namespace = %s, Name = %s}",
 				expectedEntityType,
@@ -117,20 +115,20 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 
 	go func() {
 		startWg.Done()
-		startWg.Wait()                                     // Block until the other goroutine has begun execution
-		reg.RegisterPVC(testPvcD)                          // Add a net-new PVC (both goroutines)
-		reg.deleteEntity(ConfigMap, testCmAOtherNamespace) // Delete testCmAOtherNamespace (only this goroutine)
-		reg.deleteEntity(ConfigMap, testCmB)               // Delete testCmB (both goroutines)
+		startWg.Wait()                                      // Block until the other goroutine has begun execution
+		reg.RegisterPVC(&testPvcD)                          // Add a net-new PVC (both goroutines)
+		reg.deleteEntity(ConfigMap, &testCmAOtherNamespace) // Delete testCmAOtherNamespace (only this goroutine)
+		reg.deleteEntity(ConfigMap, &testCmB)               // Delete testCmB (both goroutines)
 		doneWg.Done()
 	}()
 
 	go func() {
 		startWg.Done()
-		startWg.Wait()                       // Block until the other goroutine has begun execution
-		reg.RegisterPVC(testPvcC)            // Add a net-new PVC (only this goroutine)
-		reg.RegisterPVC(testPvcD)            // Add a net-new PVC (both goroutines)
-		reg.deleteEntity(ConfigMap, testCmB) // Delete testCmB (both goroutines)
-		reg.deleteEntity(PVC, testPvcB)      // Delete testPvcB (only this goroutine)
+		startWg.Wait()                        // Block until the other goroutine has begun execution
+		reg.RegisterPVC(&testPvcC)            // Add a net-new PVC (only this goroutine)
+		reg.RegisterPVC(&testPvcD)            // Add a net-new PVC (both goroutines)
+		reg.deleteEntity(ConfigMap, &testCmB) // Delete testCmB (both goroutines)
+		reg.deleteEntity(PVC, &testPvcB)      // Delete testPvcB (only this goroutine)
 		doneWg.Done()
 	}()
 
@@ -152,7 +150,7 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 		&testPvcC: PVC,       // We added testPvcC (one of the goroutines)
 		&testPvcD: PVC,       // We added testPvcD (both goroutines tried)
 	} {
-		if got := reg.hasEntity(expectedEntityType, *expectedMetaObj); !got {
+		if got := reg.hasEntity(expectedEntityType, expectedMetaObj); !got {
 			t.Errorf(
 				"Expected registry to contain entity type %s:{Namespace = %s, Name = %s}",
 				expectedEntityType,
@@ -171,7 +169,7 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 	go func() {
 		startWg.Done()
 		startWg.Wait() // Block until the other goroutine has begun execution
-		reg.Walk(func(entityType EntityType, meta v1.ObjectMeta) {
+		reg.Walk(func(entityType EntityType, meta v1.Object) {
 			threadAObjsSeen++
 		})
 		doneWg.Done()
@@ -181,7 +179,7 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 	go func() {
 		startWg.Done()
 		startWg.Wait() // Block until the other goroutine has begun execution
-		reg.Walk(func(entityType EntityType, meta v1.ObjectMeta) {
+		reg.Walk(func(entityType EntityType, meta v1.Object) {
 			threadBObjsSeen++
 		})
 		doneWg.Done()
@@ -197,5 +195,74 @@ func Test_Registry_BasicOperations_ConcurrencyTest(t *testing.T) {
 			threadAObjsSeen,
 			threadBObjsSeen,
 		)
+	}
+}
+
+// Test_Registry_ConcurrentReadersAndWriters runs readers concurrently with writers.
+// The test above only ever pairs writers with writers, and its Walk phase runs after all
+// mutation has finished, so a missing *read* lock is invisible to it: stripping the
+// RLock/RUnlock pairs out of objectMetaSet leaves it green. This one reports a data race
+// for that same edit, which is the more likely regression of the two.
+func Test_Registry_ConcurrentReadersAndWriters(t *testing.T) {
+	const iterations = 200
+
+	reg := NewRegistry()
+	// Pre-register so the readers exercise populated entity types, not only the
+	// create-on-miss path, and so there is a stable entry to assert on at the end.
+	reg.RegisterConfigMap(&testCmA)
+	reg.RegisterPVC(&testPvcA)
+
+	churn := func() {
+		for i := 0; i < iterations; i++ {
+			reg.RegisterConfigMap(&testCmB)
+			reg.RegisterPVC(&testPvcB)
+			reg.deleteEntity(ConfigMap, &testCmB)
+			reg.deleteEntity(PVC, &testPvcB)
+		}
+	}
+
+	// Point lookups on exactly the keys the writers add and remove.
+	pointRead := func() {
+		for i := 0; i < iterations; i++ {
+			reg.hasEntity(ConfigMap, &testCmB)
+			reg.hasEntity(PVC, &testPvcB)
+		}
+	}
+
+	// Whole-map iteration during mutation, dereferencing what it yields - a bare count
+	// would never touch the shared objects the registry hands out.
+	iterate := func() {
+		for i := 0; i < iterations; i++ {
+			reg.Walk(func(entityType EntityType, meta v1.Object) {
+				_ = meta.GetName()
+				_ = meta.GetNamespace()
+				_ = len(meta.GetLabels())
+			})
+			_ = reg.Len(ConfigMap)
+		}
+	}
+
+	workers := []func(){churn, churn, pointRead, pointRead, iterate, iterate}
+
+	startWg := sync.WaitGroup{}
+	doneWg := sync.WaitGroup{}
+	startWg.Add(len(workers))
+	doneWg.Add(len(workers))
+	for _, worker := range workers {
+		go func(run func()) {
+			startWg.Done()
+			startWg.Wait() // Block until every goroutine has begun execution
+			run()
+			doneWg.Done()
+		}(worker)
+	}
+	doneWg.Wait()
+
+	// The pre-registered entries are never deleted, so they must survive the churn.
+	if !reg.hasEntity(ConfigMap, &testCmA) {
+		t.Errorf("expected %s to survive concurrent churn", testCmA.Name)
+	}
+	if !reg.hasEntity(PVC, &testPvcA) {
+		t.Errorf("expected %s to survive concurrent churn", testPvcA.Name)
 	}
 }

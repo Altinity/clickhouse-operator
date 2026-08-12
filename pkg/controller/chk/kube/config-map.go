@@ -17,6 +17,7 @@ package kube
 import (
 	"context"
 
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,16 +41,17 @@ func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.Confi
 }
 
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
-	cm := &core.ConfigMap{}
-	err := c.kubeClient.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, cm)
-	if err == nil {
+	return commonKube.GetWithRetry(ctx, func() (*core.ConfigMap, error) {
+		cm := &core.ConfigMap{}
+		err := c.kubeClient.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		}, cm)
+		if err != nil {
+			return nil, err
+		}
 		return cm, nil
-	} else {
-		return nil, err
-	}
+	})
 }
 
 func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {

@@ -30,6 +30,7 @@ import (
 	commonTypes "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
@@ -53,8 +54,9 @@ func NewCR(chopClient chopClientSet.Interface, kubeClient kube.Interface) *CR {
 }
 
 func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResource, error) {
-	ctx = k8sCtx(ctx)
-
+	// Pass the real reconcile ctx through: getCR/getCM wrap their Gets in
+	// GetWithRetry, whose back-off honors ctx cancellation. The actual API calls
+	// still detach to k8sCtx internally (see getCR / ConfigMap.Get).
 	chi, err := c.getCR(ctx, namespace, name)
 	if err != nil {
 		return nil, err
@@ -69,12 +71,14 @@ func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResour
 }
 
 func (c *CR) getCR(ctx context.Context, namespace, name string) (*api.ClickHouseInstallation, error) {
-	ctx = k8sCtx(ctx)
-	return c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
+	return commonKube.GetWithRetry(ctx, func() (*api.ClickHouseInstallation, error) {
+		return c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(k8sCtx(ctx), name, controller.NewGetOptions())
+	})
 }
 
 func (c *CR) getCM(ctx context.Context, chi api.ICustomResource) (*core.ConfigMap, error) {
-	ctx = k8sCtx(ctx)
+	// Real ctx flows to ConfigMap.Get, which wraps its Get in GetWithRetry (ctx-aware
+	// back-off) and detaches to k8sCtx for the actual API call.
 	return NewConfigMap(c.kubeClient).Get(ctx, c.buildCMNamespace(chi), c.buildCMName(chi))
 }
 

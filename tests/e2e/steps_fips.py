@@ -335,13 +335,17 @@ def fips_extract_shipped_binaries(self):
                 ),
             ):
                 container_name = shlex.quote(label)
-                kubectl.run_shell(f"docker create --name {container_name} {shlex.quote(image)}")
+                # create is inside the try so a create that fails or times out still
+                # gets a rm: the daemon may hold the container even when we gave up on
+                # it, and the next attempt uses a fresh suffix that would never reclaim
+                # it. -f because rm of a merely-created container still needs it gone.
                 try:
-                    kubectl.run_shell(
+                    kubectl.run_host_cmd(f"docker create --name {container_name} {shlex.quote(image)}")
+                    kubectl.run_host_cmd(
                         f"docker cp {container_name}:{shlex.quote(image_path)} {shlex.quote(dest)}"
                     )
                 finally:
-                    kubectl.run_shell(f"docker rm {container_name}", ok_to_fail=True)
+                    kubectl.run_host_cmd(f"docker rm -f {container_name}", ok_to_fail=True)
                 os.chmod(dest, 0o755)
             break
         except Exception as exc:

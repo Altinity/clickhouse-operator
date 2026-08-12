@@ -28,6 +28,11 @@ import (
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
+var (
+	// errClusterHasNoHostsForHook is returned when a cluster-scoped hook has no host to run on.
+	errClusterHasNoHostsForHook = errors.New("no hosts for hook execution")
+)
+
 // runClusterPreHooks executes cluster-level pre-reconcile hooks.
 // Returns error on failure — caller should abort the cluster reconcile.
 //
@@ -415,7 +420,8 @@ func findHostInCompletedFromLabels(
 
 // isHostReachableForHook reports whether SQL can plausibly be executed against this host's
 // pod. Used by the pre-delete hook path to avoid blocking deletion of a host whose pod is
-// already crashed / gone.
+// already crashed / gone, and by the cluster-level fan-out targets to avoid failing a
+// reconcile over a host that has not been created yet.
 func (w *worker) isHostReachableForHook(ctx context.Context, host *api.Host) bool {
 	if host == nil {
 		return false
@@ -458,42 +464,66 @@ func (w *worker) runClusterSQLHookAction(ctx context.Context, action *api.HookAc
 	switch action.GetTarget() {
 	case api.HookTargetAllHosts:
 		w.a.V(1).M(cluster).F().Info("Running SQL cluster hook on all hosts: %v", sql.Queries)
-		firstHost := cluster.FirstHost()
-		if firstHost == nil {
-			return fmt.Errorf("cluster %s has no hosts for hook execution", cluster.GetName())
+		var hosts []*api.Host
+		cluster.WalkHosts(func(host *api.Host) error {
+			hosts = append(hosts, host)
+			return nil
+		})
+		if len(hosts) == 0 {
+			return fmt.Errorf("cluster %s: %w", cluster.GetName(), errClusterHasNoHostsForHook)
 		}
-		return w.ensureClusterSchemer(firstHost).ExecCluster(ctx, cluster, sql.Queries)
+		return w.execHookOnHosts(ctx, sql.Queries, hosts)
 
 	case api.HookTargetAllShards:
 		w.a.V(1).M(cluster).F().Info("Running SQL cluster hook on all shards (first replica each): %v", sql.Queries)
-		// Collect ALL shard failures (not just the first) so the caller's failurePolicy
-		// decision is informed by every shard that errored. Without this, two shards
-		// failing would surface as one error and the second silently disappears —
-		// masking the true blast radius of the failure.
-		var shardErrs []error
+		var hosts []*api.Host
 		cluster.WalkShards(func(_ int, shard api.IShard) error {
-			chiShard, ok := shard.(*api.ChiShard)
-			if !ok {
-				return nil
-			}
-			h := chiShard.FirstHost()
-			if h == nil {
-				return nil
-			}
-			if err := w.ensureClusterSchemer(h).ExecHost(ctx, h, sql.Queries); err != nil {
-				w.a.V(1).M(h).F().Warning("Cluster hook on shard host %s failed: %v", h.GetName(), err)
-				shardErrs = append(shardErrs, fmt.Errorf("shard host %s: %w", h.GetName(), err))
+			if chiShard, ok := shard.(*api.ChiShard); ok {
+				if host := chiShard.FirstHost(); host != nil {
+					hosts = append(hosts, host)
+				}
 			}
 			return nil
 		})
-		return errors.Join(shardErrs...)
+		return w.execHookOnHosts(ctx, sql.Queries, hosts)
 
 	default: // HookTargetFirstHost or empty
 		firstHost := cluster.FirstHost()
 		if firstHost == nil {
-			return fmt.Errorf("cluster %s has no hosts for hook execution", cluster.GetName())
+			return fmt.Errorf("cluster %s: %w", cluster.GetName(), errClusterHasNoHostsForHook)
 		}
 		w.a.V(1).M(cluster).F().Info("Running SQL cluster hook on first host %s: %v", firstHost.GetName(), sql.Queries)
 		return w.ensureClusterSchemer(firstHost).ExecHost(ctx, firstHost, sql.Queries)
 	}
+}
+
+// execHookOnHosts runs queries on each host, reporting every host's failure rather than
+// only the first, so the caller's failurePolicy decision sees the full blast radius.
+//
+// A host whose pod cannot serve SQL is skipped, not failed: the host list comes from the
+// spec, so during a scale-up it names hosts whose pod does not exist yet, and a pre-hook
+// with the default failurePolicy Fail would otherwise abort the reconcile. Skipping them
+// all is a different matter - the hook then ran nowhere, which is reported as an error.
+func (w *worker) execHookOnHosts(ctx context.Context, queries []string, hosts []*api.Host) error {
+	var errs []error
+	skipped := 0
+	for _, host := range hosts {
+		if !w.isHostReachableForHook(ctx, host) {
+			// Event, not just a log line: a hook that quietly ran on fewer hosts than asked is
+			// the same class of silent no-op this whole path exists to prevent.
+			w.a.V(1).M(host).F().
+				WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonHookSkippedUnreachableHost).
+				Warning("Skipping cluster hook on unreachable host: %s", host.GetName())
+			skipped++
+			continue
+		}
+		if err := w.ensureClusterSchemer(host).ExecHost(ctx, host, queries); err != nil {
+			w.a.V(1).M(host).F().Warning("Cluster hook on host %s failed: %v", host.GetName(), err)
+			errs = append(errs, fmt.Errorf("host %s: %w", host.GetName(), err))
+		}
+	}
+	if (len(hosts) > 0) && (skipped == len(hosts)) {
+		errs = append(errs, fmt.Errorf("hook did not run: all %d host(s) unreachable", len(hosts)))
+	}
+	return errors.Join(errs...)
 }

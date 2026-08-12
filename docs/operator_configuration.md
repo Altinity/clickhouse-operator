@@ -16,7 +16,9 @@ User configuration typically contains ClickHouse configuration sections with use
 Operator settings are initialized in-order from 3 sources:
 * `/etc/clickhouse-operator/config.yaml`
 * etc-clickhouse-operator-files configmap (also a part of default [clickhouse-operator-install-bundle.yaml][clickhouse-operator-install-bundle.yaml]
-* `ClickHouseOperatorConfiguration` resource. See [example][70-chop-config.yaml] for details.
+* `ClickHouseOperatorConfiguration` resource. See [example][70-chop-config.yaml] for a short
+  starting point, or [the full list of options][99-chopconf-max.yaml] for every setting the
+  resource accepts.
 
 Next sources merge with the previous ones. Currently the operator does not self-reconcile its own configuration: changes to `etc-clickhouse-operator-files` or `ClickHouseOperatorConfiguration` are read only at startup and require an operator restart to apply.
 
@@ -121,7 +123,9 @@ with the CA from `clickhouse.access.rootCA` (inline PEM) or `clickhouse.access.r
 `rootCA` wins). Verification is enforced when TLS hardening is opted in —
 `security.clickhouse.tls.verify: Strict`, or a non-empty `minVersion`/`serverName`; otherwise
 the CA is loaded but verification stays relaxed for backward compatibility.
-See the [operator config example](chi-examples/70-chop-config.yaml).
+See the [operator config example](chi-examples/70-chop-config.yaml) for a short starting point,
+or [99-clickhouseoperatorconfiguration-max.yaml](chi-examples/99-clickhouseoperatorconfiguration-max.yaml)
+for an annotated list of every available option.
 
 ## ClickHouse Installation settings
 
@@ -273,3 +277,4 @@ See [security_hardening.md](security_hardening.md) for per-knob semantics, the `
 
 [clickhouse-operator-install-bundle.yaml]: ../deploy/operator/clickhouse-operator-install-bundle.yaml
 [70-chop-config.yaml]: ./chi-examples/70-chop-config.yaml
+[99-chopconf-max.yaml]: ./chi-examples/99-clickhouseoperatorconfiguration-max.yaml

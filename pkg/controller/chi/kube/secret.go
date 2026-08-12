@@ -26,6 +26,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
@@ -64,8 +65,9 @@ func (c *Secret) Get(ctx context.Context, params ...any) (*core.Secret, error) {
 			namespace = typedObj.Runtime.Address.Namespace
 		}
 	}
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, controller.NewGetOptions())
+	return commonKube.GetWithRetry(ctx, func() (*core.Secret, error) {
+		return c.kubeClient.CoreV1().Secrets(namespace).Get(k8sCtx(ctx), name, controller.NewGetOptions())
+	})
 }
 
 func (c *Secret) Create(ctx context.Context, svc *core.Secret) (*core.Secret, error) {

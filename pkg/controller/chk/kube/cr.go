@@ -17,9 +17,11 @@ package kube
 import (
 	"context"
 	"fmt"
-	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"time"
 
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -42,16 +44,17 @@ func NewCR(kubeClient client.Client) *CR {
 }
 
 func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResource, error) {
-	cm := &apiChk.ClickHouseKeeperInstallation{}
-	err := c.kubeClient.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, cm)
-	if err == nil {
+	return commonKube.GetWithRetry(ctx, func() (api.ICustomResource, error) {
+		cm := &apiChk.ClickHouseKeeperInstallation{}
+		err := c.kubeClient.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		}, cm)
+		if err != nil {
+			return nil, err
+		}
 		return cm, nil
-	} else {
-		return nil, err
-	}
+	})
 }
 
 // StatusUpdate updates CR object's Status

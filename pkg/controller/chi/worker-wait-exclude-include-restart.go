@@ -380,7 +380,46 @@ func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
 
+	// Image upgrades defer SQL restart to the StatefulSet rollout (see shouldForceRestartHost /
+	// isImageChangeRequested), but the host still goes down and must be drained first
+	case w.isImageChangeRequested(host):
+		if !w.isHostHealthyForReconcile(ctx, host) {
+			w.a.V(1).M(host).F().Info(
+				"Host image change but host is unhealthy - skip exclude. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
+		if !w.isShardSafeToDisruptHost(ctx, host) {
+			w.a.V(1).M(host).F().Warning(
+				"Host image change needs no exclude: shard has no other healthy replica, rollout will be deferred. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
+		w.a.V(1).
+			M(host).F().
+			Info("Host image change via STS rollout, need to exclude. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return true
+
 	case w.shouldForceRestartHost(ctx, host):
+		if !w.isHostHealthyForReconcile(ctx, host) {
+			w.a.V(1).M(host).F().Info(
+				"Host requires restart but is unhealthy - skip exclude. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
+		// Do not drain a host we are about to defer. reconcileHostStatefulSet skips the
+		// restart when the shard has no other healthy replica, and it returns before
+		// reconcileHostIncludeIntoAllActivities - so a host drained here would lose its
+		// ready label, drop out of the CHI/cluster/shard Service endpoints, and have
+		// nothing left in the pass to put it back. On a shard whose only other replica is
+		// down that empties the entrypoint Service while the pod is up and serving.
+		if !w.isShardSafeToDisruptHost(ctx, host) {
+			w.a.V(1).M(host).F().Warning(
+				"Host restart needs no exclude: shard has no other healthy replica, restart will be deferred. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
 		w.a.V(1).
 			M(host).F().
 			Info("Host should be restarted, need to exclude. Host/shard/cluster: %d/%d/%s",

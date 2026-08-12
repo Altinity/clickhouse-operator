@@ -29,6 +29,18 @@ def get_shell(self, timeout=600):
 
 
 @TestStep(Given)
+def create_shell(self):
+    """Create shell only, without a namespace."""
+    # For host-only scenarios, which need a shell but no cluster. Without their own
+    # they fall back to the module-level shell created once in test(), which every
+    # scenario in the parallel pool shares. A testflows Shell drives a single pty and
+    # does not lock it, so two scenarios sending commands at the same time consume
+    # each other's prompts and both park in expect() with no way out.
+    shell = get_shell()
+    self.context.shell = shell
+
+
+@TestStep(Given)
 def create_test_namespace(self, force=False):
     """Create unique test namespace for test."""
 
