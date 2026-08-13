@@ -59,7 +59,7 @@ type worker struct {
 
 	//queue workqueue.RateLimitingInterface
 	queue   queue.PriorityQueue
-	schemer *schemer.ClusterSchemer
+	schemer schemer.ISchemer
 
 	normalizer    *normalizer.Normalizer
 	task          *common.Task
