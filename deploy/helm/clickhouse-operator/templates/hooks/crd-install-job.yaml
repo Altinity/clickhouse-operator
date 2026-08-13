@@ -56,13 +56,13 @@ spec:
         - /bin/sh
         - -c
         - |
-        set -e
-        echo "Installing/Updating ClickHouse Operator CRDs..."
-        for crd_file in /crds/*/*.yaml; do
-        echo "Applying $(basename $crd_file)..."
-        kubectl apply --server-side=true --force-conflicts -f "$crd_file"
-        done
-        echo "CRD installation completed successfully"
+          set -e
+          echo "Installing/Updating ClickHouse Operator CRDs..."
+          for crd_file in /crds/*/*.yaml; do
+            echo "Applying $(basename $crd_file)..."
+            kubectl apply --server-side=true --force-conflicts -f "$crd_file"
+          done
+          echo "CRD installation completed successfully"
         volumeMounts:
         - name: crds-1
           mountPath: /crds/1
