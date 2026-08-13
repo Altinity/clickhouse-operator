@@ -116,7 +116,9 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		return nil
 	}
 
-	w.markReconcileStart(ctx, new)
+	if err := w.markReconcileStart(ctx, new); err != nil {
+		return err
+	}
 	w.prepareMonitoring(new)
 	w.setHostStatusesPreliminary(ctx, new)
 
@@ -142,7 +144,9 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		w.clean(ctx, new)
 		w.addToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
-		w.finalizeReconcileAndMarkCompleted(ctx, new)
+		if err := w.finalizeReconcileAndMarkCompleted(ctx, new); err != nil {
+			return err
+		}
 
 		metrics.CRReconcilesCompleted(ctx, new)
 		metrics.CRReconcilesTimings(ctx, new, time.Since(startTime).Seconds())
@@ -281,17 +285,23 @@ func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr 
 	// Use a context-aware wait so a controller shutdown does not stall the
 	// worker for up to two minutes mid-reconcile. The wait windows below are
 	// best-effort pacing only; the function returns early on ctx cancellation.
-	var d time.Duration
-	switch {
-	case cr.HostsCount() < cr.GetAncestor().HostsCount():
-		d = 120 * time.Second
-	case cr.HostsCount() > cr.GetAncestor().HostsCount():
-		d = 30 * time.Second
-	default:
-		d = 10 * time.Second
+	d := keeperMembershipSettleDelay(cr.HostsCount(), cr.GetAncestor().HostsCount())
+	if d == 0 {
+		return nil
 	}
 	util.WaitContextDoneOrTimeout(ctx, d)
 	return nil
+}
+
+func keeperMembershipSettleDelay(currentHosts, ancestorHosts int) time.Duration {
+	switch {
+	case currentHosts < ancestorHosts:
+		return 120 * time.Second
+	case currentHosts > ancestorHosts:
+		return 30 * time.Second
+	default:
+		return 0
+	}
 }
 
 // reconcileCRServicePreliminary runs first stage of CR reconcile process
