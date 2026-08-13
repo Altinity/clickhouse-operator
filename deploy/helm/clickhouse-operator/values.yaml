@@ -15,7 +15,7 @@ crdHook:
     # crdHook.image.repository -- image repository for CRD installation job
     repository: registry.k8s.io/kubectl
     # crdHook.image.tag -- image tag for CRD installation job
-    tag: "v1.36.2"
+    tag: "latest"
     # crdHook.image.pullPolicy -- image pull policy for CRD installation job
     pullPolicy: IfNotPresent
   # crdHook.imagePullSecrets -- image pull secrets for CRD installation job
