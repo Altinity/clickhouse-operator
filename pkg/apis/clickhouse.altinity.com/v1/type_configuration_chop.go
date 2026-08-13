@@ -31,6 +31,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeLabels "k8s.io/apimachinery/pkg/labels"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
@@ -256,8 +257,21 @@ type OperatorConfigWatch struct {
 	// Namespaces where operator watches for events
 	Namespaces OperatorConfigWatchNamespaces `json:"namespaces" yaml:"namespaces"`
 
+	// LabelSelector restricts which CHI/CHK custom resources this operator instance manages
+	// (standard label selector syntax, e.g. "example.com/clickhouse-shard=logs" or "!example.com/clickhouse-shard").
+	// Filtering is applied CLIENT-SIDE only, never as a server-side watch selector.
+	// Empty (default) manages all CRs in the watched namespaces.
+	LabelSelector string `json:"labelSelector,omitempty" yaml:"labelSelector,omitempty"`
+
+	// RequireLabelSelector makes an empty LabelSelector a fatal startup error, so a sharded
+	// operator that loses its selector crashes instead of silently watching everything.
+	RequireLabelSelector bool `json:"requireLabelSelector,omitempty" yaml:"requireLabelSelector,omitempty"`
+
 	// Configuration specifies behavior related to ClickHouseOperatorConfiguration watches
 	Configuration OperatorConfigWatchConfiguration `json:"configuration,omitempty" yaml:"configuration,omitempty"`
+
+	// parsed form of LabelSelector; nil means match everything
+	labelSelector kubeLabels.Selector
 }
 
 // OperatorConfigWatchConfiguration specifies behavior when operator-wide configuration changes.
@@ -1038,6 +1052,12 @@ func (c *OperatorConfig) MergeFrom(from *OperatorConfig) error {
 	}
 
 	excludeRegexp := from.ClickHouse.Metrics.ExcludeRegexp
+
+	// Selector fields define this instance's identity and must not come from CR-based configs,
+	// which every operator in the namespace merges. File config and env are the only channels.
+	labelSelector := c.Watch.LabelSelector
+	requireLabelSelector := c.Watch.RequireLabelSelector
+
 	if err := mergo.Merge(c, *from, mergo.WithAppendSlice, mergo.WithOverride); err != nil {
 		return fmt.Errorf("FAIL merge config Error: %q", err)
 	}
@@ -1047,6 +1067,15 @@ func (c *OperatorConfig) MergeFrom(from *OperatorConfig) error {
 	if excludeRegexp != nil {
 		c.ClickHouse.Metrics.ExcludeRegexp = slices.Clone(excludeRegexp)
 	}
+
+	if from.Watch.LabelSelector != "" {
+		log.Warningf("ignoring watch.labelSelector %q from CR-based config: selector may only be set via file config or env", from.Watch.LabelSelector)
+	}
+	if from.Watch.RequireLabelSelector {
+		log.Warningf("ignoring watch.requireLabelSelector from CR-based config: it may only be set via file config or env")
+	}
+	c.Watch.LabelSelector = labelSelector
+	c.Watch.RequireLabelSelector = requireLabelSelector
 
 	return nil
 }
@@ -1216,6 +1245,80 @@ func (c *OperatorConfig) Postprocess() {
 	c.readCHITemplates()
 	c.applyEnvVarParams()
 	c.applyDefaultWatchNamespace()
+	c.applyWatchLabelSelector()
+}
+
+// applyWatchLabelSelector parses and validates watch.labelSelector. Failures abort startup:
+// falling back to match-all would cause dual management, match-none would orphan CRs.
+func (c *OperatorConfig) applyWatchLabelSelector() {
+	if err := c.ValidateWatchLabelSelector(); err != nil {
+		log.Fatalf("%v", err)
+	}
+	c.excludeWatchLabelSelectorKeysFromPropagation()
+}
+
+// excludeWatchLabelSelectorKeysFromPropagation appends every label key referenced by
+// watch.labelSelector to label.exclude. Ownership labels must never propagate from the CR
+// to child objects: if the shard label reached the StatefulSet pod template, re-assigning
+// a CR to another operator (a label change) would roll-restart its ClickHouse pods.
+// Must run after applyEnvVarParams, which may overwrite Label.Exclude from the deprecated
+// ExcludeFromPropagationLabels field.
+func (c *OperatorConfig) excludeWatchLabelSelectorKeysFromPropagation() {
+	if c.Watch.labelSelector == nil {
+		return
+	}
+	requirements, _ := c.Watch.labelSelector.Requirements()
+	for _, requirement := range requirements {
+		key := requirement.Key()
+		if !util.StringSliceContains(c.Label.Exclude, key) {
+			c.Label.Exclude = append(c.Label.Exclude, key)
+		}
+	}
+}
+
+// ValidateWatchLabelSelector parses watch.labelSelector and enforces watch.requireLabelSelector.
+func (c *OperatorConfig) ValidateWatchLabelSelector() error {
+	if err := c.ParseWatchLabelSelector(); err != nil {
+		return fmt.Errorf("invalid watch.labelSelector %q: %v", c.Watch.LabelSelector, err)
+	}
+	if c.Watch.RequireLabelSelector && !c.HasWatchLabelSelector() {
+		return fmt.Errorf("watch.requireLabelSelector is set but watch.labelSelector is empty")
+	}
+	return nil
+}
+
+// ParseWatchLabelSelector parses and caches watch.labelSelector. Empty means match everything.
+func (c *OperatorConfig) ParseWatchLabelSelector() error {
+	if strings.TrimSpace(c.Watch.LabelSelector) == "" {
+		c.Watch.labelSelector = nil
+		return nil
+	}
+	selector, err := kubeLabels.Parse(c.Watch.LabelSelector)
+	if err != nil {
+		return err
+	}
+	c.Watch.labelSelector = selector
+	return nil
+}
+
+// HasWatchLabelSelector returns whether a watch label selector is configured
+func (c *OperatorConfig) HasWatchLabelSelector() bool {
+	return c.Watch.labelSelector != nil
+}
+
+// IsLabelSelectorWatched returns whether the given CR labels match watch.labelSelector.
+// Always true when no selector is configured.
+func (c *OperatorConfig) IsLabelSelectorWatched(lbls map[string]string) bool {
+	if c.Watch.labelSelector == nil {
+		return true
+	}
+	return c.Watch.labelSelector.Matches(kubeLabels.Set(lbls))
+}
+
+// IsCRWatched returns whether a CR in the given namespace with the given labels falls within
+// this operator's watch scope (namespace filter AND label selector).
+func (c *OperatorConfig) IsCRWatched(namespace string, lbls map[string]string) bool {
+	return c.IsNamespaceWatched(namespace) && c.IsLabelSelectorWatched(lbls)
 }
 
 func (c *OperatorConfig) normalizeSectionClickHouseConfigurationFile() {
@@ -1604,6 +1707,20 @@ func (c *OperatorConfig) applyEnvVarParams() {
 		// We have WATCH_NAMESPACES_EXCLUDE explicitly specified
 		if namespaces := c.splitNamespaces(nss); len(namespaces) > 0 {
 			c.Watch.Namespaces.Exclude = types.NewStrings(namespaces)
+		}
+	}
+
+	if selector := os.Getenv(deployment.WATCH_LABEL_SELECTOR); len(selector) > 0 {
+		// We have WATCH_LABEL_SELECTOR explicitly specified
+		c.Watch.LabelSelector = selector
+	}
+
+	if str := os.Getenv(deployment.WATCH_LABEL_SELECTOR_REQUIRED); len(str) > 0 {
+		// We have WATCH_LABEL_SELECTOR_REQUIRED explicitly specified
+		if required, err := strconv.ParseBool(str); err == nil {
+			c.Watch.RequireLabelSelector = required
+		} else {
+			log.Fatalf("invalid %s value %q: %v", deployment.WATCH_LABEL_SELECTOR_REQUIRED, str, err)
 		}
 	}
 }

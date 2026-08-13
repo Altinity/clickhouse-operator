@@ -25,6 +25,7 @@ import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
@@ -203,11 +204,28 @@ func (w *worker) finalizeCR(
 	updateStatusOpts types.UpdateStatusOptions,
 	f func(*apiChk.ClickHouseKeeperInstallation),
 ) error {
-	chi, err := w.buildCRFromObj(ctx, obj)
+	raw, err := w.c.GetCR(obj)
 	if err != nil {
 		log.V(1).Error("Unable to finalize CR: %s err: %v", util.NamespacedName(obj), err)
 		return err
 	}
+
+	// Re-check ownership on the RAW CR before the status write — checked pre-normalization
+	// because template merging could alter labels (mirrors the CHI-side finalizeCR guard).
+	if !chop.Config().IsCRWatched(raw.GetNamespace(), raw.GetLabels()) {
+		log.V(1).Info("CR no longer matches this operator's watch scope, skip finalize: %s", util.NamespacedName(obj))
+		return nil
+	}
+
+	// The read above goes through the cached client and can lag a shard-label flip;
+	// confirm ownership on live state before the status write (mirrors the Reconcile
+	// entry guard).
+	if chop.Config().HasWatchLabelSelector() && !w.c.ownsLiveCR(ctx, raw.GetNamespace(), raw.GetName()) {
+		log.V(1).Info("live CR ownership not confirmed (shard label flipped?), skip finalize: %s", util.NamespacedName(obj))
+		return nil
+	}
+
+	chi := w.buildCR(ctx, raw)
 
 	if f != nil {
 		f(chi)

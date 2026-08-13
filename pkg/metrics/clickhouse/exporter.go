@@ -181,5 +181,11 @@ func (e *Exporter) shouldWatchCR(chi *api.ClickHouseInstallation) bool {
 		return false
 	}
 
+	// Respect watch.labelSelector so shard exporters don't double-scrape other shards' CHIs
+	if !chop.Config().IsLabelSelectorWatched(chi.GetLabels()) {
+		log.V(1).Infof("CHI %s/%s labels do not match watch.labelSelector, unable to watch it", chi.Namespace, chi.Name)
+		return false
+	}
+
 	return true
 }

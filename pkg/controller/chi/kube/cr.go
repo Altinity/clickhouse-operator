@@ -28,6 +28,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	commonTypes "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
@@ -182,6 +183,14 @@ func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, o
 		}
 		log.V(1).M(cr).F().Error("NULL returned")
 		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", namespace, name)
+	}
+
+	// Sharding: validate ownership on the same object snapshot whose resourceVersion
+	// fences the update below. If the shard label flips after this read, the flip bumps
+	// the resourceVersion, the update conflicts, and the retry re-runs this check.
+	if chop.Config().HasWatchLabelSelector() && !chop.Config().IsCRWatched(cur.GetNamespace(), cur.GetLabels()) {
+		log.V(1).M(cr).F().Info("CR no longer matches watch label selector, skip status update: %s/%s", namespace, name)
+		return nil
 	}
 
 	// Update status of a real (current) object.

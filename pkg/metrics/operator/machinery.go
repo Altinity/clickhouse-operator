@@ -15,11 +15,13 @@
 package operator
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	otelApi "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/metric"
@@ -86,6 +88,8 @@ func StartMetricsExporter(endpoint, path string) {
 
 	meter = meterProvider.Meter("clickhouse-operator-meter", otelApi.WithInstrumentationVersion(version.Version))
 
+	recordOperatorInfo()
+
 	// Start the prometheus HTTP server and pass the exporter Collector to it
 	serveMetrics(endpoint, path)
 }
@@ -94,6 +98,25 @@ var meter otelApi.Meter
 
 func Meter() otelApi.Meter {
 	return meter
+}
+
+// recordOperatorInfo publishes an info-style metric (constant 1) carrying this operator
+// instance's shard identity. Joinable against clickhouse_operator_cr_skipped_by_label_selector
+// to identify CRs whose shard label matches no running operator.
+func recordOperatorInfo() {
+	info, err := meter.Int64Gauge(
+		"clickhouse_operator_info",
+		otelApi.WithDescription("operator instance configuration info; value is always 1"),
+	)
+	if err != nil {
+		log.V(1).Warning("failed to create clickhouse_operator_info metric: %v", err)
+		return
+	}
+	info.Record(context.Background(), 1, otelApi.WithAttributes(
+		attribute.String("watch_label_selector", chop.Config().Watch.LabelSelector),
+		attribute.Bool("require_label_selector", chop.Config().Watch.RequireLabelSelector),
+		attribute.String("version", version.Version),
+	))
 }
 
 func serveMetrics(addr, path string) {
