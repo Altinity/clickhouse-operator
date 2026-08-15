@@ -3,6 +3,7 @@ import time
 import yaml
 import threading
 import re
+import subprocess
 
 from e2e.retry_sleep import retry_sleep
 
@@ -8220,6 +8221,210 @@ def test_020005(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
+
+
+# --- test_020005_2 split-brain injection helpers -----------------------------
+#
+# The minikube docker driver runs the cluster's single node as a container named
+# "minikube" (the same on a GitHub Actions runner: setup-minikube with
+# driver: docker). Pod-to-pod traffic crosses that node's CNI bridge and is
+# subject to bridge-netfilter, so a node-level iptables DROP on one pod's IP in
+# FORWARD partitions it from every other pod while leaving `kubectl exec` (routed
+# through the API server/kubelet to the container runtime, not over the pod
+# network) and in-pod /dev/tcp/127.0.0.1 probes unaffected. This needs NO pod
+# privileges / NET_ADMIN and no in-image iptables -- it drives iptables in the
+# node container from the host. NetworkPolicy is not used because the default
+# minikube CNI does not enforce it.
+_SPLIT_BRAIN_PARTITION_CHAIN = "CHK-TEST-PARTITION"
+
+
+def keeper_pod_name(chk, replica):
+    return f"chk-{chk}-keeper-0-{replica}-0"
+
+
+def get_keeper_mode(chk, replica):
+    """Raft role reported by one keeper pod's `srvr` 4LW, over in-pod localhost
+    (unaffected by the pod-network partition)."""
+    out = kubectl.launch(
+        f"exec {keeper_pod_name(chk, replica)} -- bash -c "
+        f"\"exec 3<>/dev/tcp/127.0.0.1/2181; printf srvr >&3; timeout 3 cat <&3\"",
+        ok_to_fail=True,
+    )
+    for line in out.splitlines():
+        if line.startswith("Mode: "):
+            return line[len("Mode: "):].strip()
+    return "unknown"
+
+
+def _node_exec(*args):
+    """Run a command inside the minikube node container."""
+    return subprocess.run(
+        ["docker", "exec", "minikube"] + list(args),
+        capture_output=True, text=True, check=False,
+    )
+
+
+def _node_iptables(*args):
+    return _node_exec("iptables", *args)
+
+
+def partition_pod_traffic(pod_ip):
+    """Drop all FORWARD traffic to/from pod_ip at the node level, both directions.
+
+    Idempotent -- safe to call repeatedly to re-assert the partition. After
+    installing the DROP rules we flush conntrack for pod_ip: the FORWARD DROP only
+    stops NEW flows, so any already-ESTABLISHED connection (which conntrack would
+    otherwise keep fast-pathing) must be torn down for the partition to be real.
+    """
+    _node_iptables("-N", _SPLIT_BRAIN_PARTITION_CHAIN)  # may already exist; ignore failure
+    _node_iptables("-F", _SPLIT_BRAIN_PARTITION_CHAIN)
+    _node_iptables("-A", _SPLIT_BRAIN_PARTITION_CHAIN, "-s", pod_ip, "-j", "DROP")
+    _node_iptables("-A", _SPLIT_BRAIN_PARTITION_CHAIN, "-d", pod_ip, "-j", "DROP")
+    if _node_iptables("-C", "FORWARD", "-j", _SPLIT_BRAIN_PARTITION_CHAIN).returncode != 0:
+        _node_iptables("-I", "FORWARD", "1", "-j", _SPLIT_BRAIN_PARTITION_CHAIN)
+    _node_exec("conntrack", "-D", "-s", pod_ip)  # kill established flows, ignore failure
+    _node_exec("conntrack", "-D", "-d", pod_ip)
+
+
+def heal_partition():
+    """Remove the partition chain from FORWARD and delete it. Safe to call even if
+    partition_pod_traffic was never called (all steps tolerate failure)."""
+    _node_iptables("-D", "FORWARD", "-j", _SPLIT_BRAIN_PARTITION_CHAIN)
+    _node_iptables("-F", _SPLIT_BRAIN_PARTITION_CHAIN)
+    _node_iptables("-X", _SPLIT_BRAIN_PARTITION_CHAIN)
+
+
+def tcp_reachable(pod, ip, port, ns, timeout=3):
+    """True if `pod` can open a TCP connection to ip:port (via kubectl exec, which
+    bypasses the pod network -- used to independently verify a partition from the
+    OTHER side, not just assert the DROP was requested)."""
+    kubectl_cmd = current().context.kubectl_cmd.split()
+    try:
+        result = subprocess.run(
+            kubectl_cmd + [
+                "--namespace", ns, "exec", pod, "--", "bash", "-c",
+                f"exec 3<>/dev/tcp/{ip}/{port} && echo OPEN || echo CLOSED",
+            ],
+            capture_output=True, text=True, timeout=timeout + 5, check=False,
+        )
+        return result.returncode == 0 and "OPEN" in result.stdout
+    except subprocess.TimeoutExpired:
+        return False
+
+
+@TestScenario
+@Tags("HEAVY")
+@Name("test_020005_2. Clickhouse-keeper scale-up must not split-brain")
+def test_020005_2(self):
+    """Deterministically catch the Raft split-brain window during CHK scale-up.
+
+    Partition the sole existing member (pod0) from all pod-to-pod traffic BEFORE
+    requesting scale 1->3. A fire-and-forget operator publishes the full 3-server
+    raft_configuration and starts BOTH fresh pods at once; pod1+pod2 then form
+    their own 2-of-3 majority and elect a leader WITHOUT pod0 -- a split-brain. A
+    safe operator adds members one at a time behind a committed-membership
+    barrier: with pod0 unreachable that barrier never clears, so pod2 is never
+    even created and the lone pod1 (a 1-of-2 minority) can never elect. Hence the
+    invariant:
+
+        while pod0 is partitioned, NO leader may emerge among the fresh nodes {1,2}.
+
+    RED on the pre-fix operator (a fresh-node leader appears), GREEN on the fixed
+    one (none does). Uses only node-level iptables via `docker exec minikube` --
+    no pod privileges / NET_ADMIN -- so it runs on the GitHub Actions minikube
+    (driver: docker) as well as locally.
+    """
+    create_shell_namespace_clickhouse_template()
+    ns = current().context.test_namespace
+
+    chk_manifest_1 = "manifests/chk/test-052-chk-rescale-1.yaml"
+    chk_manifest_3 = "manifests/chk/test-052-chk-rescale-3.yaml"
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest_1))
+
+    try:
+        with Given("Install 1-replica CHK"):
+            kubectl.create_and_check(
+                manifest=chk_manifest_1, kind="chk",
+                check={"pod_count": 1, "do_not_delete": 1},
+            )
+
+        pod0 = keeper_pod_name(chk, 0)
+        pod0_ip = kubectl.get_field("pod", pod0, ".status.podIP", ns=ns)
+
+        with When(f"pod0 ({pod0_ip}) is partitioned from all other pod traffic"):
+            partition_pod_traffic(pod0_ip)
+
+        with And("Scale-up to 3 is requested (raw apply; a safe operator may never complete it)"):
+            kubectl.launch(
+                f"apply -f {util.get_full_path(chk_manifest_3)}",
+                ok_to_fail=True, ns=ns,
+            )
+
+        with And("Bounded wait (up to 3 min) for the fresh pods to appear (absence is tolerated)"):
+            # Only a fully formed {1,2} pair can elect a leader and pose a rogue
+            # quorum, so give both a chance to come up before we look for one.
+            pod1 = keeper_pod_name(chk, 1)
+            pod2 = keeper_pod_name(chk, 2)
+            deadline = time.time() + 180
+            pod1_running = pod2_running = False
+            while time.time() < deadline and not (pod1_running and pod2_running):
+                pod1_running = kubectl.get_field("pod", pod1, ".status.phase", ns=ns) == "Running"
+                pod2_running = kubectl.get_field("pod", pod2, ".status.phase", ns=ns) == "Running"
+                if not (pod1_running and pod2_running):
+                    time.sleep(10)
+            note(f"pod1 running: {pod1_running}, pod2 running: {pod2_running}")
+
+        if pod1_running:
+            with And("Verify the partition is real: pod1 must NOT reach pod0 raft(9444)/client(2181)"):
+                # Independent confirmation from the OTHER side -- a false negative
+                # here (partition not actually blocking) would invalidate the demo.
+                # Re-assert the partition (idempotent, flushes conntrack) between
+                # attempts: a rule can land a beat after a pod's flow was already
+                # established, so one recheck-with-reapply removes that transient.
+                raft_reachable = client_reachable = True
+                deadline = time.time() + 60
+                while time.time() < deadline:
+                    partition_pod_traffic(pod0_ip)
+                    raft_reachable = tcp_reachable(pod1, pod0_ip, 9444, ns)
+                    client_reachable = tcp_reachable(pod1, pod0_ip, 2181, ns)
+                    if not raft_reachable and not client_reachable:
+                        break
+                    time.sleep(5)
+                note(f"pod1 -> pod0:9444 reachable: {raft_reachable} (expected False)")
+                note(f"pod1 -> pod0:2181 reachable: {client_reachable} (expected False)")
+                assert not raft_reachable, \
+                    f"partition not effective: pod1 still reaches pod0 raft port ({pod0_ip}:9444)"
+                assert not client_reachable, \
+                    f"partition not effective: pod1 still reaches pod0 client port ({pod0_ip}:2181)"
+
+        with Then("No leader may emerge among the fresh nodes {1,2} while pod0 is partitioned"):
+            # Fire-and-forget: pod1+pod2 are both up, form a 2-of-3 majority, and
+            # elect a leader without pod0 -> this loop finds it -> RED. Safe
+            # operator: pod2 is never created, lone pod1 cannot elect -> no
+            # fresh-node leader ever appears -> the assert holds -> GREEN.
+            deadline = time.time() + 120
+            rogue_leader = None
+            while time.time() < deadline and rogue_leader is None:
+                for i in (1, 2):
+                    if kubectl.get_field("pod", keeper_pod_name(chk, i), ".status.phase", ns=ns) == "Running" \
+                            and get_keeper_mode(chk, i) in ("leader", "standalone"):
+                        rogue_leader = i
+                        break
+                if rogue_leader is None:
+                    time.sleep(5)
+            note(f"pod0 mode: {get_keeper_mode(chk, 0)}")
+            if pod1_running:
+                note(f"pod1 mode: {get_keeper_mode(chk, 1)}")
+            if pod2_running:
+                note(f"pod2 mode: {get_keeper_mode(chk, 2)}")
+            assert rogue_leader is None, \
+                f"split-brain: pod{rogue_leader} became leader among the fresh nodes while pod0 " \
+                f"was partitioned -- the fresh nodes formed a quorum without the original member"
+    finally:
+        with Finally("Heal the network partition"):
+            heal_partition()
+        with Finally("I clean up"):
+            delete_test_namespace()
 
 
 @TestScenario
