@@ -83,7 +83,7 @@ crdHook:
 | crdHook.containerSecurityContext | object | `{}` | container security context for CRD installation job check `kubectl explain pod.spec.containers.securityContext` for details |
 | crdHook.enabled | bool | `true` | enable automatic CRD installation/update via pre-install/pre-upgrade hooks when disabled, CRDs must be installed manually using kubectl apply |
 | crdHook.image.pullPolicy | string | `"IfNotPresent"` | image pull policy for CRD installation job |
-| crdHook.image.repository | string | `"bitnami/kubectl"` | image repository for CRD installation job |
+| crdHook.image.repository | string | `"registry.k8s.io/kubectl"` | image repository for CRD installation job |
 | crdHook.image.tag | string | `"latest"` | image tag for CRD installation job |
 | crdHook.imagePullSecrets | list | `[]` | image pull secrets for CRD installation job possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |
 | crdHook.nodeSelector | object | `{}` | node selector for CRD installation job |

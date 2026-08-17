@@ -13,7 +13,7 @@ crdHook:
   enabled: true
   image:
     # crdHook.image.repository -- image repository for CRD installation job
-    repository: bitnami/kubectl
+    repository: registry.k8s.io/kubectl
     # crdHook.image.tag -- image tag for CRD installation job
     tag: "latest"
     # crdHook.image.pullPolicy -- image pull policy for CRD installation job
@@ -154,10 +154,10 @@ podLabels: {}
 # podAnnotations -- annotations to add to the clickhouse-operator pod, check `kubectl explain pod.spec.annotations` for details
 # @default -- check the `values.yaml` file
 podAnnotations:
-  prometheus.io/port: '8888'
-  prometheus.io/scrape: 'true'
-  clickhouse-operator-metrics/port: '9999'
-  clickhouse-operator-metrics/scrape: 'true'
+  prometheus.io/port: "8888"
+  prometheus.io/scrape: "true"
+  clickhouse-operator-metrics/port: "9999"
+  clickhouse-operator-metrics/scrape: "true"
 # watchNamespaces -- namespaces where the operator watches for ClickHouseInstallation resources.
 # Sets config.yaml watch.namespaces.include (the exclude list is not exposed here). If empty, the
 # operator watches only its own namespace (or all namespaces when running in kube-system).
