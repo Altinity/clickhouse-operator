@@ -13,6 +13,16 @@
 
   Not covered by this bump: **GO-2026-5158** in `go.opentelemetry.io/otel` (v1.43.0, fixed in v1.44.0). It is imported but not called — `govulncheck`'s symbol scan does not flag it — though SCA/image scanners that match on module versions will continue to report it until the dependency is bumped.
 
+### Behavior Changes
+* **Helm CRD-install hook no longer uses a Docker Hub Bitnami image** ([PR #2065](https://github.com/Altinity/clickhouse-operator/pull/2065)). `crdHook.image.repository` changes `bitnami/kubectl` → `registry.k8s.io/kubectl`, and `crdHook.image.tag` changes from a floating `latest` to a pinned `v1.36.3`. Bitnami restructured their Docker Hub catalog in September 2025: every versioned tag was removed from `docker.io/bitnami` (semver now exists only in the frozen `bitnamilegacy` namespace), leaving a single floating `latest` that cannot be pinned.
+
+  **If you mirror images into a private registry or install air-gapped, add `registry.k8s.io/kubectl:v1.36.3` to your mirror before upgrading.** The hook runs at `pre-install`/`pre-upgrade`, so an unpullable image blocks the Helm release until `--timeout` expires and then fails it. Point `crdHook.image.repository`/`.tag` at your mirror, or set `crdHook.enabled: false` and apply the CRDs manually. Affects Helm installs only.
+
+  Two related changes come with it: the hook now execs `kubectl` directly rather than wrapping it in `/bin/sh`, because `registry.k8s.io/kubectl` is distroless and ships no shell; and it runs as root (uid 0) where the Bitnami image ran as uid 1001 — set `crdHook.containerSecurityContext` if your admission policies require a non-root uid.
+
+### Fixed
+* **Oversized CRD ConfigMap broke GitOps installs of the Helm chart.** The CRD-install hook packed three CRDs into a single ConfigMap that had grown to 297,849 bytes, past the 262,144-byte `metadata.annotations` ceiling that client-side `kubectl apply` needs for its `last-applied-configuration`. `helm install` and `helm upgrade` were unaffected — Helm POSTs hook objects and writes no such annotation — so this surfaced only for **ArgoCD with default client-side apply and for `helm template | kubectl apply`**, which failed with `ConfigMap "…-crds-1" is invalid: metadata.annotations: Too long`. Present in 0.27.2 and 0.27.3. Each CRD now gets its own ConfigMap (largest 120,151 bytes) projected into one directory for the hook, and `dev/test_helm_chart.sh` asserts the one-CRD-per-ConfigMap pairing so a future CRD cannot silently reintroduce the grouping.
+
 ## Release 0.27.3
 ### Security
 * **Bumped dependencies to address CVEs in the operator and metrics-exporter images.** An image scan flagged four CVEs; all are addressed by patch/minor bumps with no API or behavior changes:

@@ -84,7 +84,7 @@ crdHook:
 | crdHook.enabled | bool | `true` | enable automatic CRD installation/update via pre-install/pre-upgrade hooks when disabled, CRDs must be installed manually using kubectl apply |
 | crdHook.image.pullPolicy | string | `"IfNotPresent"` | image pull policy for CRD installation job |
 | crdHook.image.repository | string | `"registry.k8s.io/kubectl"` | image repository for CRD installation job |
-| crdHook.image.tag | string | `"latest"` | image tag for CRD installation job |
+| crdHook.image.tag | string | `"v1.36.3"` | image tag for CRD installation job. registry.k8s.io/kubectl publishes no `latest` tag, so this must name an explicit version |
 | crdHook.imagePullSecrets | list | `[]` | image pull secrets for CRD installation job possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |
 | crdHook.nodeSelector | object | `{}` | node selector for CRD installation job |
 | crdHook.podAnnotations | object | `{}` | additional annotations for CRD installation job pod template useful to opt out of service mesh injection, e.g. `sidecar.istio.io/inject: "false"` |
