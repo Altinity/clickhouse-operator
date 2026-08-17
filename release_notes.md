@@ -1,3 +1,18 @@
+## Release 0.27.4
+### Security
+* **Bumped the Go toolchain to address stdlib CVEs in the operator and metrics-exporter images.** The `go` directive in `go.mod` — the single source the Dockerfiles and CI derive `GO_VERSION` from — is bumped `1.26.5` → `1.26.6`. No API or behavior changes.
+
+  `govulncheck` reports five standard-library vulnerabilities reachable from operator/exporter code on a 1.26.5 build, and none on 1.26.6:
+  * **GO-2026-6090** — `crypto/tls`, unbounded post-handshake KeyUpdate. Reached from the ZooKeeper/Keeper TLS client and the metrics REST server.
+  * **GO-2026-6089** — `net/http`, `ReadHeaderTimeout` not applied during the unencrypted HTTP/2 check.
+  * **GO-2026-6218** — `net/url`, quadratic complexity in `resolvePath`.
+  * **GO-2026-5972** — `encoding/asn1`, unbounded recursion depth. Reached when parsing an operator-supplied root CA.
+  * **GO-2026-5026** — `golang.org/x/net/idna` as bundled into the standard library.
+
+  The FIPS module is unaffected: `GOFIPS140=v1.0.0` selects a frozen snapshot that is byte-identical between the 1.26.5 and 1.26.6 toolchains, so FIPS evidence and ACVP results do not change.
+
+  Not covered by this bump: **GO-2026-5158** in `go.opentelemetry.io/otel` (v1.43.0, fixed in v1.44.0). It is imported but not called — `govulncheck`'s symbol scan does not flag it — though SCA/image scanners that match on module versions will continue to report it until the dependency is bumped.
+
 ## Release 0.27.3
 ### Security
 * **Bumped dependencies to address CVEs in the operator and metrics-exporter images.** An image scan flagged four CVEs; all are addressed by patch/minor bumps with no API or behavior changes:
