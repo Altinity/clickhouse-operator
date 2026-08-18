@@ -282,7 +282,7 @@ func (s *Setting) CastToVector() *Setting {
 
 // FetchDataSourceAddress fetches data source address from the setting.
 //
-// The namespace is always the caller's own - a data source can never name one. Until 0.28.0 a
+// The namespace is always the caller's own - a data source can never name one. Until 0.27.4 a
 // scalar setting could carry a namespace/name/key triple, which let a CR read a Secret out of any
 // namespace using the operator's ServiceAccount; that form was removed together with the
 // k8s_secret_ syntax that was its only user.

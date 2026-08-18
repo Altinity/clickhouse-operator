@@ -70,7 +70,7 @@ const (
 	// a retry - so it is deliberately absent from normalizeTimeAbortReasons.
 	StatusReasonShardHasNoHealthyPeer = "ShardHasNoHealthyPeer"
 	// StatusReasonRemovedSecretRefSyntax: a user settings field uses the `k8s_secret_` or
-	// `k8s_secret_env_` prefix, removed in 0.28.0 because it accepted a namespace/name/key
+	// `k8s_secret_env_` prefix, removed in 0.27.4 because it accepted a namespace/name/key
 	// triple and could therefore read a Secret from any namespace. Aborts rather than
 	// ignoring the field: an ignored field renders verbatim into the users ConfigMap and
 	// leaves the account on the default password from ClickHouse.Config.User.Default.Password.
