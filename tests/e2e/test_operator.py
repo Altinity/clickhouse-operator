@@ -1135,7 +1135,7 @@ def test_010011_4(self):
 @TestScenario
 @Name("test_010011_5. Removed k8s_secret_ syntax is rejected, not silently downgraded")
 def test_010011_5(self):
-    """The k8s_secret_/k8s_secret_env_ user-settings syntax was removed in 0.28.0 - it accepted a
+    """The k8s_secret_/k8s_secret_env_ user-settings syntax was removed in 0.27.4 - it accepted a
     namespace/secret/key triple and could read a secret from any namespace.
 
     A CHI still using it must be REJECTED (status=Aborted, reason RemovedSecretRefSyntax), not

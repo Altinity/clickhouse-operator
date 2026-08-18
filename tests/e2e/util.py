@@ -1,4 +1,5 @@
 import os
+import re
 import time
 
 import e2e.clickhouse as clickhouse
@@ -272,7 +273,13 @@ def make_http_get_request(host, port, path):
     # return f"wget -O- -q http://{host}:{port}{path}"
     cmd = "export LC_ALL=C; unset headers_read; "
     cmd += f"exec 3<>/dev/tcp/{host}/{port} ; "
-    cmd += f'printf "GET {path} HTTP/1.1\\r\\nHost: {host}\\r\\nUser-Agent: bash\\r\\n\\r\\n" >&3 ; '
+    # HTTP/1.0 on purpose: the reader below does no transfer-decoding, and Go's net/http
+    # answers an HTTP/1.1 request for /metrics with Transfer-Encoding: chunked. The chunk
+    # size markers then land mid-body and split whichever metric line straddles a 2048-byte
+    # boundary, which silently defeats the anchored ^...$ patterns in check_metrics_monitoring.
+    # Chunked encoding is 1.1-only, so under 1.0 the server delimits the body by closing the
+    # connection - the read loop also ends on EOF instead of stalling on `read -t 1`.
+    cmd += f'printf "GET {path} HTTP/1.0\\r\\nHost: {host}\\r\\nUser-Agent: bash\\r\\n\\r\\n" >&3 ; '
     cmd += "IFS=; while read -r -t 1 line 0<&3; do "
     cmd += "line=${line//$'\"'\"'\\r'\"'\"'}; "
     cmd += "if [[ ! -v headers_read ]]; then if [[ -z $line ]]; then headers_read=yes; fi; continue; fi; "
@@ -288,10 +295,17 @@ def get_metrics(operator_pod=None, operator_namespace=None, container="metrics-e
         operator_namespace = current().context.operator_namespace
 
     url_cmd = make_http_get_request("127.0.0.1", port, "/metrics")
-    return kubectl.launch(
+    out = kubectl.launch(
         f"exec {operator_pod} -c {container} -- {url_cmd}",
         ns=operator_namespace,
     )
+    # A bare hex-only line is a chunked transfer-encoding size marker leaking into the body
+    # (see make_http_get_request). It splits metric lines, so anchored patterns stop matching
+    # and the caller retries against corrupt input until it times out. Fail loudly instead.
+    # No false positives: every real Prometheus line carries a space-separated value.
+    chunk_markers = [line for line in out.splitlines() if re.fullmatch(r"[0-9a-fA-F]{1,6}", line)]
+    assert not chunk_markers, error(f"chunked encoding leaked into /metrics: {chunk_markers[:5]}")
+    return out
 
 def _apply_operator_godebug(shell=None):
     mode = getattr(current().context, "fips140_mode", None)
