@@ -51,7 +51,7 @@ spec:
 
       # The three users below are the supported way to source a password from a secret.
       # The secret is always looked up in the CHI's own namespace.
-      # NB the `k8s_secret_` / `k8s_secret_env_` prefixes were removed in 0.28.0 - they accepted a
+      # NB the `k8s_secret_` / `k8s_secret_env_` prefixes were removed in 0.27.4 - they accepted a
       # namespace/secret/key triple and could read a secret from any namespace. A CHI still using
       # them is rejected with reason RemovedSecretRefSyntax.
       # User 'user_secret_ref_password_plain' has plain password specified as reference to the secret's field
