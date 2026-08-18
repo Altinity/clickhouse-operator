@@ -1,0 +1,19 @@
+# Recurring backup of the "backup-demo" ClickHouseInstallation.
+# The operator manages a native Kubernetes CronJob; scheduling, suspension, concurrency
+# and job history are handled by the CronJob, while remote retention is delegated to
+# clickhouse-backup (BACKUPS_TO_KEEP_REMOTE in the sidecar).
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackupSchedule"
+metadata:
+  name: backup-demo-nightly
+spec:
+  clickHouseInstallation: backup-demo
+  schedule: "0 2 * * *"
+  suspend: false
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  backupTemplate:
+    backupNamePrefix: nightly
+    schemaOnly: false
+    replicaSelection: FirstPerShard
