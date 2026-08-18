@@ -144,7 +144,7 @@ stringData:
 
 ```
 
-**REMOVED in 0.28.0**: the syntax that read passwords and password hashes from a secret using the
+**REMOVED in 0.27.4**: the syntax that read passwords and password hashes from a secret using the
 special 'k8s\_secret\_' and 'k8s\_secret\_env\_' prefixes has been removed. It accepted a
 `namespace/secret/key` value and resolved the secret with the operator's own ServiceAccount, so a
 ClickHouseInstallation could read a secret out of **any** namespace.
