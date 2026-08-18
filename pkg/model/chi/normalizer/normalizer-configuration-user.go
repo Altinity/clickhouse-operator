@@ -29,7 +29,7 @@ import (
 
 const envVarNamePrefixConfigurationUsers = "CONFIGURATION_USERS"
 
-// removedSecretRefFieldPrefix is the user settings field prefix removed in 0.28.0. It covers
+// removedSecretRefFieldPrefix is the user settings field prefix removed in 0.27.4. It covers
 // `k8s_secret_env_` too, which shares it. The syntax took a namespace/name/key triple and read
 // the Secret with the operator's own ServiceAccount, so it could reach any namespace.
 // Superseded by valueFrom.secretKeyRef, which cannot name a namespace at all.
@@ -84,7 +84,7 @@ func (n *Normalizer) rejectRemovedSecretRefField(user *api.SettingsUser, name st
 	target.EnsureStatus().ReconcileAbortWithReason(
 		api.StatusReasonRemovedSecretRefSyntax,
 		fmt.Sprintf(
-			"user %q: setting %q uses the k8s_secret_/k8s_secret_env_ syntax removed in 0.28.0 - "+
+			"user %q: setting %q uses the k8s_secret_/k8s_secret_env_ syntax removed in 0.27.4 - "+
 				"migrate every such field to valueFrom.secretKeyRef, see docs/security_hardening.md",
 			user.Username(), name,
 		),
