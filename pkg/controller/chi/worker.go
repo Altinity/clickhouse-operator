@@ -288,11 +288,28 @@ func (w *worker) finalizeCR(
 		return err
 	}
 
+	// Capture the verdict of the normalize just performed by buildCRFromObj, BEFORE f runs.
+	// f is not read-only: finalizeReconcileAndMarkCompleted passes one that calls
+	// ReconcileComplete(), which overwrites Status unconditionally - so a check placed after it
+	// could never observe an abort.
+	//
+	// A rejected spec must not have its users config rewritten. This function re-derives the CR
+	// from the API server and re-normalizes it, so it can reach a verdict reconcileCR never saw
+	// (a spec edit landing mid-reconcile, or an endpoint event on any pod readiness flip). Writing
+	// here would publish config built from a spec the operator has refused - e.g. a user whose
+	// credential source was rejected and who therefore fell through to
+	// ClickHouse.Config.User.Default.Password.
+	aborted := chi.EnsureStatus().GetStatus() == api.StatusAborted
+
 	if f != nil {
 		f(chi)
 	}
 
-	_ = w.reconcileConfigMapCommonUsers(ctx, chi)
+	if aborted {
+		w.a.V(1).M(chi).F().Info("CR normalize aborted - skip users config map reconcile, update status only")
+	} else {
+		_ = w.reconcileConfigMapCommonUsers(ctx, chi)
+	}
 	_ = w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
 
 	return nil

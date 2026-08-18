@@ -144,7 +144,19 @@ stringData:
 
 ```
 
-**DEPRECATED**: Since version 0.23.x the syntax to read passwords and password hashes from a secret using special 'k8s\_secret\_' and 'k8s\_secret\_env\_' prefixes is deprecated:
+**REMOVED in 0.28.0**: the syntax that read passwords and password hashes from a secret using the
+special 'k8s\_secret\_' and 'k8s\_secret\_env\_' prefixes has been removed. It accepted a
+`namespace/secret/key` value and resolved the secret with the operator's own ServiceAccount, so a
+ClickHouseInstallation could read a secret out of **any** namespace.
+
+A ClickHouseInstallation that still uses these prefixes is **rejected**: reconcile aborts with
+reason `RemovedSecretRefSyntax` and the offending field is dropped. The CHI is not reconciled until
+the manifest is migrated - this is deliberate, since silently ignoring the field would leave the
+account with the operator's default password.
+
+Migrate to `valueFrom`/`secretKeyRef`, which resolves only within the CHI's own namespace:
+
+BEFORE - removed, no longer accepted:
 
 ```yaml
 spec:
@@ -152,17 +164,30 @@ spec:
     users:
       user1/k8s_secret_password: clickhouse-secret/pwduser1
       user2/k8s_secret_password_sha256_hex: clickhouse-secret/pwduser2
-      user3/k8s_secret_password_double_sha1_hex: clickhouse-secret/pwduser3
 ```
+
+AFTER:
 
 ```yaml
 spec:
   configuration:
     users:
-      user1/k8s_secret_env_password: clickhouse-secret/pwduser1
-      user2/k8s_secret_env_password_sha256_hex: clickhouse-secret/pwduser2
-      user3/k8s_secret_env_password_double_sha1_hex: clickhouse-secret/pwduser3
+      user1/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: pwduser1
+      user2/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: pwduser2
 ```
+
+Note that `valueFrom`/`secretKeyRef` always passes the value through an environment variable
+(rendered as `from_env=...` in the generated XML). The operator does not hash it, so where you
+previously relied on `k8s_secret_password` being hashed into `password_sha256_hex` for you, store
+the already-hashed value in the secret and reference it from `password_sha256_hex` as shown above.
 
 ### Securing the 'default' user
 

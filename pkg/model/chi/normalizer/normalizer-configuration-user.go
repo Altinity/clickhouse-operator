@@ -17,6 +17,7 @@ package normalizer
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"strings"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -28,6 +29,12 @@ import (
 
 const envVarNamePrefixConfigurationUsers = "CONFIGURATION_USERS"
 
+// removedSecretRefFieldPrefix is the user settings field prefix removed in 0.28.0. It covers
+// `k8s_secret_env_` too, which shares it. The syntax took a namespace/name/key triple and read
+// the Secret with the operator's own ServiceAccount, so it could reach any namespace.
+// Superseded by valueFrom.secretKeyRef, which cannot name a namespace at all.
+const removedSecretRefFieldPrefix = "k8s_secret_"
+
 func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
 	n.normalizeConfigurationUserSecretRef(user)
 	n.normalizeConfigurationUserPassword(user)
@@ -36,9 +43,8 @@ func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
 
 func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser) {
 	user.WalkSafe(func(name string, _ *api.Setting) {
-		if strings.HasPrefix(name, "k8s_secret_") {
-			// TODO remove as obsoleted
-			// Skip this user field, it will be processed later
+		if strings.HasPrefix(name, removedSecretRefFieldPrefix) {
+			n.rejectRemovedSecretRefField(user, name)
 		} else {
 			subst.ReplaceSettingsFieldWithEnvRefToSecretField(
 				n.req,
@@ -46,24 +52,47 @@ func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser)
 				name,
 				name,
 				envVarNamePrefixConfigurationUsers,
-				false,
 			)
 		}
 	})
 }
 
+// rejectRemovedSecretRefField drops a user field that still uses the removed k8s_secret_ /
+// k8s_secret_env_ syntax and aborts the reconcile - at most once per normalization pass, however
+// many fields and users carry it.
+//
+// Aborting is the point: the two alternatives both fail open. Leaving the field in place renders
+// it verbatim into the generated users ConfigMap, publishing the Secret's coordinates; and either
+// way the account ends up with no password of its own, so normalizeConfigurationUserPassword
+// hands it ClickHouse.Config.User.Default.Password - the literal string "default" as shipped.
+// A Secret-protected account would silently become reachable with a documented credential.
+func (n *Normalizer) rejectRemovedSecretRefField(user *api.SettingsUser, name string) {
+	// Drop every offending field, so none of them can reach the generated config.
+	user.Delete(name)
+
+	target := n.req.GetTarget()
+	if target == nil {
+		return
+	}
+
+	// Abort once per pass. The walk visits every field of every user, and each abort also pushes a
+	// completed-taskID entry, so repeating it fills status.errors and status.taskIDsCompleted with
+	// near-identical entries and evicts anything useful - both are capped at 10.
+	if n.req.RemovedSecretRefReported() {
+		return
+	}
+	target.EnsureStatus().ReconcileAbortWithReason(
+		api.StatusReasonRemovedSecretRefSyntax,
+		fmt.Sprintf(
+			"user %q: setting %q uses the k8s_secret_/k8s_secret_env_ syntax removed in 0.28.0 - "+
+				"migrate every such field to valueFrom.secretKeyRef, see docs/security_hardening.md",
+			user.Username(), name,
+		),
+	)
+}
+
 // normalizeConfigurationUserPassword deals with user passwords
 func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
-	// Values from the secret have higher priority than explicitly specified settings
-	subst.ReplaceSettingsFieldWithSecretFieldValue(n.req, user, "password", "k8s_secret_password", n.secretGet)
-	subst.ReplaceSettingsFieldWithSecretFieldValue(n.req, user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex", n.secretGet)
-	subst.ReplaceSettingsFieldWithSecretFieldValue(n.req, user, "password_sha256_hex", "k8s_secret_password_sha256_hex", n.secretGet)
-
-	// Values from the secret passed via ENV have even higher priority
-	subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, user, "password", "k8s_secret_env_password", envVarNamePrefixConfigurationUsers, true)
-	subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex", envVarNamePrefixConfigurationUsers, true)
-	subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex", envVarNamePrefixConfigurationUsers, true)
-
 	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
 	if user.Has("password_double_sha1_hex") {
 		user.Delete("password_sha256_hex")

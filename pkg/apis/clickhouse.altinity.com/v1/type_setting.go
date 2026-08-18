@@ -281,14 +281,13 @@ func (s *Setting) CastToVector() *Setting {
 }
 
 // FetchDataSourceAddress fetches data source address from the setting.
-// defaultNamespace specifies default namespace to be used in case there is no namespace specified in data source address.
-func (s *Setting) FetchDataSourceAddress(defaultNamespace string, parseScalarString bool) (types.ObjectAddress, error) {
+//
+// The namespace is always the caller's own - a data source can never name one. Until 0.28.0 a
+// scalar setting could carry a namespace/name/key triple, which let a CR read a Secret out of any
+// namespace using the operator's ServiceAccount; that form was removed together with the
+// k8s_secret_ syntax that was its only user.
+func (s *Setting) FetchDataSourceAddress(defaultNamespace string) (types.ObjectAddress, error) {
 	switch s.Type() {
-	case SettingTypeScalar:
-		if parseScalarString {
-			// Fetch k8s address of the field from the string
-			return s.parseDataSourceAddress(s.String(), defaultNamespace)
-		}
 	case SettingTypeSource:
 		// Fetch k8s address of the field from the source ref
 		// 1. The name of the secret to select from. Namespace is expected to be provided externally
@@ -302,38 +301,6 @@ func (s *Setting) FetchDataSourceAddress(defaultNamespace string, parseScalarStr
 	}
 
 	return types.ObjectAddress{}, fmt.Errorf("%w - unknown setting type", ErrDataSourceAddressHasIncorrectFormat)
-}
-
-// parseDataSourceAddress parses address into namespace, name, key triple
-func (s *Setting) parseDataSourceAddress(dataSourceAddress, defaultNamespace string) (addr types.ObjectAddress, err error) {
-	// Extract data source's namespace and name and then field name within the data source,
-	// by splitting namespace/name/field (aka key) triple. Namespace can be omitted though
-	switch tags := strings.Split(dataSourceAddress, "/"); len(tags) {
-	case 3:
-		// All components are in place. Expect to have namespace/name/key triple
-		addr.Namespace = tags[0]
-		addr.Name = tags[1]
-		addr.Key = tags[2]
-	case 2:
-		// Assume namespace is omitted. Expect to have name/key pair
-		addr.Namespace = defaultNamespace
-		addr.Name = tags[0]
-		addr.Key = tags[1]
-	default:
-		// Skip incorrect entry
-		return types.ObjectAddress{}, fmt.Errorf("%w, dataSourceAddress: %s", ErrDataSourceAddressHasIncorrectFormat, dataSourceAddress)
-	}
-
-	// Sanity check for all address components being in place
-	if addr.AnyEmpty() {
-		return types.ObjectAddress{}, fmt.Errorf(
-			"%w, %s/%s/%s",
-			ErrDataSourceAddressHasIncorrectFormat,
-			addr.Namespace, addr.Name, addr.Key,
-		)
-	}
-
-	return addr, nil
 }
 
 func (s *Setting) SetEmbed() *Setting {

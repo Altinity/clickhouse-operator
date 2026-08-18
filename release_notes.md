@@ -1,5 +1,31 @@
 ## Release 0.27.4
 ### Security
+* **Removed the `k8s_secret_` and `k8s_secret_env_` user-settings syntax.** These prefixes took a value of the form `namespace/secret/key` and were resolved with the operator's own ServiceAccount, which on a cluster-scoped install can read Secrets everywhere — so a `ClickHouseInstallation` in one namespace could read a Secret out of **any** namespace, and `k8s_secret_password*` additionally inlined the plaintext into the generated users ConfigMap. The whole syntax is gone, along with the address parser branch that accepted an explicit namespace.
+
+  **Action required before upgrading.** A CHI that still uses any `k8s_secret_*` / `k8s_secret_env_*` field is now **rejected**: reconcile aborts with reason `RemovedSecretRefSyntax` and the CHI is not reconciled until the manifest is migrated. This is deliberate — ignoring the field instead would leave the account with no password of its own, and the normalizer would then hand it `ClickHouse.Config.User.Default.Password`, which ships as the literal string `"default"`. A Secret-protected account would silently become reachable with a documented credential.
+
+  Migrate to `valueFrom`/`secretKeyRef`, which resolves only within the CHI's own namespace:
+
+  Before (removed):
+
+  ```yaml
+  users:
+    user1/k8s_secret_password: clickhouse-secret/pwduser1
+  ```
+
+  After:
+
+  ```yaml
+  users:
+    user1/password:
+      valueFrom:
+        secretKeyRef:
+          name: clickhouse-secret
+          key: pwduser1
+  ```
+
+  Note `valueFrom`/`secretKeyRef` always passes the value via an environment variable (`from_env=...` in the generated XML) and does not hash it. Where you relied on `k8s_secret_password` being hashed into `password_sha256_hex` for you, store the already-hashed value in the Secret and reference it from `password_sha256_hex`. See [docs/security_hardening.md](docs/security_hardening.md).
+
 * **Bumped the Go toolchain to address stdlib CVEs in the operator and metrics-exporter images.** The `go` directive in `go.mod` — the single source the Dockerfiles and CI derive `GO_VERSION` from — is bumped `1.26.5` → `1.26.6`. No API or behavior changes.
 
   `govulncheck` reports five standard-library vulnerabilities reachable from operator/exporter code on a 1.26.5 build, and none on 1.26.6:
@@ -12,6 +38,7 @@
   The FIPS module is unaffected: `GOFIPS140=v1.0.0` selects a frozen snapshot that is byte-identical between the 1.26.5 and 1.26.6 toolchains, so FIPS evidence and ACVP results do not change.
 
   Not covered by this bump: **GO-2026-5158** in `go.opentelemetry.io/otel` (v1.43.0, fixed in v1.44.0). It is imported but not called — `govulncheck`'s symbol scan does not flag it — though SCA/image scanners that match on module versions will continue to report it until the dependency is bumped.
+
 
 ### Behavior Changes
 * **Helm CRD-install hook no longer uses a Docker Hub Bitnami image** ([PR #2065](https://github.com/Altinity/clickhouse-operator/pull/2065)). `crdHook.image.repository` changes `bitnami/kubectl` → `registry.k8s.io/kubectl`, and `crdHook.image.tag` changes from a floating `latest` to a pinned `v1.36.3`. Bitnami restructured their Docker Hub catalog in September 2025: every versioned tag was removed from `docker.io/bitnami` (semver now exists only in the frozen `bitnamilegacy` namespace), leaving a single floating `latest` that cannot be pinned.

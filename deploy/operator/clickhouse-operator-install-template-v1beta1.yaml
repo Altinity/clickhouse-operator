@@ -1038,13 +1038,9 @@ spec:
 
                     look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                    any key with prefix `k8s_secret_` shall has value with format namespace/secret/key or secret/key
-                    in this case value from secret will write directly into XML tag during render *-usersd ConfigMap
-
-                    any key with prefix `k8s_secret_env` shall has value with format namespace/secret/key or secret/key
-                    in this case value from secret will write into environment variable and write to XML tag via from_env=XXX
-
-                    look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+                    the `k8s_secret_` and `k8s_secret_env_` key prefixes were REMOVED in 0.28.0
+                    they accepted a namespace/secret/key value and could therefore read a secret from any namespace
+                    a CHI still using them is rejected with reason RemovedSecretRefSyntax - use `valueFrom`/`secretKeyRef` above
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 profiles:
@@ -2879,13 +2875,9 @@ spec:
 
                     look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                    any key with prefix `k8s_secret_` shall has value with format namespace/secret/key or secret/key
-                    in this case value from secret will write directly into XML tag during render *-usersd ConfigMap
-
-                    any key with prefix `k8s_secret_env` shall has value with format namespace/secret/key or secret/key
-                    in this case value from secret will write into environment variable and write to XML tag via from_env=XXX
-
-                    look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+                    the `k8s_secret_` and `k8s_secret_env_` key prefixes were REMOVED in 0.28.0
+                    they accepted a namespace/secret/key value and could therefore read a secret from any namespace
+                    a CHI still using them is rejected with reason RemovedSecretRefSyntax - use `valueFrom`/`secretKeyRef` above
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 profiles:
@@ -5648,7 +5640,7 @@ data:
     #   CH_PASSWORD_PLAIN=
     #   CH_CREDENTIALS_SECRET_NAMESPACE=
     #   CH_CREDENTIALS_SECRET_NAME=clickhouse-operator
-    #   VERBOSITY=1
+    #   VERBOSITY=2
 
     ################################################
     ##
@@ -6326,7 +6318,7 @@ data:
     logger:
       logtostderr: "true"
       alsologtostderr: "false"
-      v: "1"
+      v: "2"
       stderrthreshold: ""
       vmodule: ""
       log_backtrace_at: ""

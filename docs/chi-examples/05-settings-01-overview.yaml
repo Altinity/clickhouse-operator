@@ -49,6 +49,11 @@ spec:
       admin/profile: default
       admin/quota: default
 
+      # The three users below are the supported way to source a password from a secret.
+      # The secret is always looked up in the CHI's own namespace.
+      # NB the `k8s_secret_` / `k8s_secret_env_` prefixes were removed in 0.28.0 - they accepted a
+      # namespace/secret/key triple and could read a secret from any namespace. A CHI still using
+      # them is rejected with reason RemovedSecretRefSyntax.
       # User 'user_secret_ref_password_plain' has plain password specified as reference to the secret's field
       # will pass via pod.spec.containers.env and render in XML with from_env attribute
       # no regeneration if secret updated
@@ -80,17 +85,6 @@ spec:
       readonly/profile: readonly
       readonly/quota: default
 
-      # reference to namespace/secret/key in the secret with plain password, will render in XML as is from secret, no updates when secret updated
-      testpwduser1/k8s_secret_password: dev/clickhouse-credentials/password_plain
-      # reference to the same namespace as operator is running in secret/key format with hashed password, will render in XML as is from secret, no updates when secret updated
-      testpwduser2/k8s_secret_password_sha256_hex: clickhouse-credentials/password_sha256_hex
-      testpwduser3/k8s_secret_password_double_sha1_hex: clickhouse-credentials/password_double_sha1_hex
-
-      # reference to namespace/secret/key in the secret with plain password, will render in XML with from_env attribute
-      testenvpwduser1/k8s_secret_env_password: dev/clickhouse-credentials/password_plain
-      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password, will render in XML with from_env attribute
-      testenvpwduser2/k8s_secret_env_password_sha256_hex: clickhouse-credentials/password_sha256_hex
-      testenvpwduser3/k8s_secret_env_password_double_sha1_hex: clickhouse-credentials/password_double_sha1_hex
 
     profiles:
       test_profile/max_memory_usage: 1000000000
