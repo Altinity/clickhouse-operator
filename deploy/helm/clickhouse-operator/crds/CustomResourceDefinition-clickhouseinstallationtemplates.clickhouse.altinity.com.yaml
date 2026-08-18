@@ -1043,7 +1043,7 @@ spec:
 
                         look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                        the `k8s_secret_` and `k8s_secret_env_` key prefixes were REMOVED in 0.28.0
+                        the `k8s_secret_` and `k8s_secret_env_` key prefixes were REMOVED in 0.27.4
                         they accepted a namespace/secret/key value and could therefore read a secret from any namespace
                         a CHI still using them is rejected with reason RemovedSecretRefSyntax - use `valueFrom`/`secretKeyRef` above
                       # nullable: true
