@@ -2,7 +2,7 @@
 
 Restores a ClickHouse Cloud backup with propriatery Shared engines onto an OSS (or self-managed) cluster that uses OSS database and table engines.
 
-Automation: [`restore_s3_backup_to_replicated.py`](restore_s3_backup_to_replicated.py).
+Automation: [`restore_shared_to_replicated.py`](restore_shared_to_replicated.py).
 
 This is **not** `clickhouse-backup` extension. The source is the embedded backup created by `BACKUP … TO S3` DDL statement. The feature request to `clickhouse-backup` is submitted as [#1508](https://github.com/Altinity/clickhouse-backup/issues/1508).
 
@@ -35,7 +35,7 @@ System databases (`system`, `information_schema`, …) are skipped. Optional fil
 ### Example
 
 ```bash
-python3 tools/restore_s3_backup_to_replicated.py \
+python3 tools/restore_shared_to_replicated.py \
   --bucket my-bucket \
   --access-key ... \
   --secret-key ... \
