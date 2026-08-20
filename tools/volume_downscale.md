@@ -124,12 +124,12 @@ sequenceDiagram
   participant Old as Large PV
   participant New as Small PV
 
-  Note over CH,New: prepare — New PVC created, often Pending until scheduled
+  Note over CH,New: prepare - New PVC created, often Pending until scheduled
   CH->>Old: read/write live data
-  Note over CH,New: warm-copy — both mounted; rsync loops
+  Note over CH,New: warm-copy - both volumes mounted, rsync loops
   Old-->>New: online rsync
-  Note over CH,New: swap — pod stopped; claim names swapped
-  Note over CH,New: final-copy — offline rsync then start CH
+  Note over CH,New: swap - pod stopped, claim names swapped
+  Note over CH,New: final-copy - offline rsync then start CH
   Old-->>New: offline rsync
   CH->>New: live data on small volume
   Note over Old: retained until cleanup
