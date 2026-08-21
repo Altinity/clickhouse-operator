@@ -391,17 +391,10 @@ template:
     # Templates are added to the list of all templates and used when CHI is reconciled.
     # Templates are applied in sorted alpha-numeric order.
     path: chi/templates.d
-  chk:
-    # CHK template updates handling policy
-    # Possible policy values:
-    #   - ReadOnStart. Accept CHIT updates on the operators start only.
-    #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
-    policy: ApplyOnNextReconcile
-
-    # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
-    # Templates are added to the list of all templates and used when CHI is reconciled.
-    # Templates are applied in sorted alpha-numeric order.
-    path: chk/templates.d
+  # NB there is deliberately no `chk:` section here. OperatorConfigTemplate declares only a CHI
+  # field, so any template.chk.* key unmarshals into nothing and is pruned by the chopconf CRD -
+  # it read as a supported knob while doing nothing. CHK templating is not implemented; adding
+  # the keys back requires the Go field and a reader first.
 
 ################################################
 ##
@@ -528,7 +521,7 @@ reconcile:
       # Reaction when a referenced CHK resource changes:
       #   none      — do nothing (default, backward-compatible)
       #   reconcile — trigger CHI reconcile
-      # onKeeperResourceUpdate: none
+      onKeeperResourceUpdate: none
 
   ################################################
   ##
