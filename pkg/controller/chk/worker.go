@@ -197,25 +197,40 @@ func (w *worker) ensureFinalizer(ctx context.Context, chk *apiChk.ClickHouseKeep
 	return true
 }
 
+// finalizeCR re-derives the CR from the API server, lets the caller stamp its outcome via f, and
+// persists the result. It reports whether its own normalize refused the spec, so a caller that
+// announces success can stay consistent with the status actually written. CHI mirror:
+// pkg/controller/chi/worker.go.
 func (w *worker) finalizeCR(
 	ctx context.Context,
 	obj meta.Object,
 	updateStatusOpts types.UpdateStatusOptions,
 	f func(*apiChk.ClickHouseKeeperInstallation),
-) error {
+) (aborted bool, err error) {
 	chi, err := w.buildCRFromObj(ctx, obj)
 	if err != nil {
 		log.V(1).Error("Unable to finalize CR: %s err: %v", util.NamespacedName(obj), err)
-		return err
+		return false, err
 	}
 
-	if f != nil {
+	// Capture the verdict of the normalize just performed by buildCRFromObj, BEFORE f runs.
+	// f is not read-only: finalizeReconcileAndMarkCompleted passes one that calls
+	// ReconcileComplete(), which overwrites Status unconditionally - so a check placed after it
+	// could never observe an abort.
+	aborted = chi.EnsureStatus().GetStatus() == api.StatusAborted
+
+	if aborted {
+		// Skip f: it calls ReconcileComplete() and advances the ancestor to the spec just
+		// refused, which would publish Completed for a spec the operator rejected and leave the
+		// next action plan diffing against a spec that was never applied.
+		w.a.V(1).M(chi).F().Info("CR normalize aborted - persist the abort, skip completion bookkeeping")
+	} else if f != nil {
 		f(chi)
 	}
 
 	_ = w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
 
-	return nil
+	return aborted, nil
 }
 
 func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
@@ -252,7 +267,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CR object
-	_ = w.finalizeCR(
+	aborted, _ := w.finalizeCR(
 		ctx,
 		_cr,
 		types.UpdateStatusOptions{
@@ -268,6 +283,17 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 			c.EnsureStatus().ReconcileComplete()
 		},
 	)
+
+	if aborted {
+		// finalizeCR's own re-normalize refused the spec, so it persisted Aborted and skipped the
+		// completion bookkeeping. Announcing success here would contradict the status just written.
+		w.a.V(1).
+			WithEvent(_cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(_cr).
+			M(_cr).F().
+			Warning("reconcile not marked completed - spec refused on finalize, task id: %s", _cr.GetSpecT().GetTaskID())
+		return
+	}
 
 	w.a.V(1).
 		WithEvent(_cr, a.EventActionReconcile, a.EventReasonReconcileCompleted).
