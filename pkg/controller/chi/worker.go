@@ -260,7 +260,7 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 
 // updateEndpoints updates endpoints
 func (w *worker) updateEndpoints(ctx context.Context, m meta.Object) error {
-	_ = w.finalizeCR(
+	_, _ = w.finalizeCR(
 		ctx,
 		m,
 		types.UpdateStatusOptions{
@@ -276,22 +276,25 @@ func (w *worker) updateEndpoints(ctx context.Context, m meta.Object) error {
 	return nil
 }
 
+// finalizeCR re-derives the CR from the API server, lets the caller stamp its outcome via f, and
+// persists the result. It reports whether its own normalize refused the spec, so a caller that
+// announces success can stay consistent with the status actually written.
 func (w *worker) finalizeCR(
 	ctx context.Context,
 	obj meta.Object,
 	updateStatusOpts types.UpdateStatusOptions,
 	f func(*api.ClickHouseInstallation),
-) error {
+) (aborted bool, err error) {
 	chi, err := w.buildCRFromObj(ctx, obj)
 	if err != nil {
 		log.V(1).Error("Unable to finalize CR: %s err: %v", util.NamespacedName(obj), err)
-		return err
+		return false, err
 	}
 
 	// Capture the verdict of the normalize just performed by buildCRFromObj, BEFORE f runs.
 	// f is not read-only: finalizeReconcileAndMarkCompleted passes one that calls
 	// ReconcileComplete(), which overwrites Status unconditionally - so a check placed after it
-	// could never observe an abort.
+	// could never observe an abort. The other caller (updateEndpoints) passes a nil f.
 	//
 	// A rejected spec must not have its users config rewritten. This function re-derives the CR
 	// from the API server and re-normalizes it, so it can reach a verdict reconcileCR never saw
@@ -299,20 +302,27 @@ func (w *worker) finalizeCR(
 	// here would publish config built from a spec the operator has refused - e.g. a user whose
 	// credential source was rejected and who therefore fell through to
 	// ClickHouse.Config.User.Default.Password.
-	aborted := chi.EnsureStatus().GetStatus() == api.StatusAborted
-
-	if f != nil {
-		f(chi)
-	}
+	aborted = chi.EnsureStatus().GetStatus() == api.StatusAborted
 
 	if aborted {
-		w.a.V(1).M(chi).F().Info("CR normalize aborted - skip users config map reconcile, update status only")
+		// Skip f as well as the config map. finalizeReconcileAndMarkCompleted's f calls
+		// ReconcileComplete() and advances the ancestor to the spec just refused - which would
+		// publish status.status: Completed for a spec the operator rejected and leave the next
+		// action plan diffing against a spec that was never applied. Only the abort is persisted.
+		//
+		// This does NOT keep the task id out of status.taskIDsCompleted: ReconcileAbortWithReason
+		// pushes it itself (type_status.go), so a caller polling that list alone cannot tell an
+		// abort from a success either way. status.status is the field that distinguishes them.
+		w.a.V(1).M(chi).F().Info("CR normalize aborted - persist the abort, skip completion bookkeeping and users config map")
 	} else {
+		if f != nil {
+			f(chi)
+		}
 		_ = w.reconcileConfigMapCommonUsers(ctx, chi)
 	}
 	_ = w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
 
-	return nil
+	return aborted, nil
 }
 
 // updateCHI sync CHI which was already created earlier
@@ -407,7 +417,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CR object
-	_ = w.finalizeCR(
+	aborted, _ := w.finalizeCR(
 		ctx,
 		_cr,
 		types.UpdateStatusOptions{
@@ -423,6 +433,18 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 			c.EnsureStatus().ReconcileComplete()
 		},
 	)
+
+	if aborted {
+		// finalizeCR's own re-normalize refused the spec, so it persisted Aborted and skipped the
+		// completion bookkeeping. Announcing success here would contradict the status just written
+		// and hand dashboards a ReconcileCompleted event for a spec the operator rejected.
+		w.a.V(1).
+			WithEvent(_cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(_cr).
+			M(_cr).F().
+			Warning("reconcile not marked completed - spec refused on finalize, task id: %s", _cr.GetSpecT().GetTaskID())
+		return
+	}
 
 	w.a.V(1).
 		WithEvent(_cr, a.EventActionReconcile, a.EventReasonReconcileCompleted).
