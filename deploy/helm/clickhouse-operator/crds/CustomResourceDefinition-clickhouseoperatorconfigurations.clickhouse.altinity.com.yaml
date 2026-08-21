@@ -277,6 +277,18 @@ spec:
                           description: |
                             List of regexps to match ClickHouse metrics to exclude from collection/export.
                             Regexps match internal metric names before Prometheus normalization and prefixing.
+                keeper:
+                  type: object
+                  description: |
+                    Keeper-side counterparts of the `clickhouse` section - config-file paths and the
+                    default Keeper user/network settings the operator generates for
+                    ClickHouseKeeperInstallation resources.
+                    Declared preserve-unknown-fields rather than fully modelled: without this the API
+                    server PRUNES the whole section from a ClickHouseOperatorConfiguration CR and the
+                    operator silently falls back to built-in defaults. The ConfigMap path was never
+                    affected. Modelling the leaves properly would also buy validation - see the
+                    coverage test in pkg/apis/clickhouse.altinity.com/v1.
+                  x-kubernetes-preserve-unknown-fields: true
                 security:
                   type: object
                   description: |
@@ -530,6 +542,65 @@ spec:
                                       - "allhosts"
                                       - "AllShards"
                                       - "allshards"
+                                  events:
+                                    type: array
+                                    minItems: 1
+                                    description: |
+                                      Reconcile lifecycle events that trigger this hook. Required, must be non-empty.
+                                      The hook is skipped on any reconcile whose classifier does not emit at least one
+                                      of the listed events. Supported values:
+                                        Any               - wildcard match: fires on every hook-evaluation point,
+                                                            including the pre-delete sweep on the dying host
+                                        HostCreate        - first reconcile that creates a host (no ancestor); best
+                                                            paired with POST hooks because PRE hooks on first creation
+                                                            are skipped (no live pod yet)
+                                        HostUpdate        - reconcile that has prior state for the host; catch-all
+                                                            for ongoing reconciles
+                                        HostStart         - host transitions from stopped to running
+                                        HostStop          - host is being stopped (current spec marks it stopped)
+                                        HostConfigRestart - in-place software restart for a configuration change
+                                        HostRollout       - pod-template change forces a StatefulSet rollout
+                                        HostShutdown      - aggregate: fires whenever the pod is going down for any
+                                                            reason (Stop, ConfigRestart, Rollout, or Delete)
+                                        HostDelete        - host is being removed from the cluster (downsize); fires
+                                                            on the dying host before tear-down. Always emitted
+                                                            alongside HostShutdown.
+                                    items:
+                                      type: string
+                                      # Both PascalCase and all-lowercase forms are accepted; the
+                                      # runtime comparison is case-insensitive (strings.EqualFold).
+                                      enum:
+                                        - "Any"
+                                        - "any"
+                                        - "HostCreate"
+                                        - "hostcreate"
+                                        - "HostDelete"
+                                        - "hostdelete"
+                                        - "HostUpdate"
+                                        - "hostupdate"
+                                        - "HostStart"
+                                        - "hoststart"
+                                        - "HostStop"
+                                        - "hoststop"
+                                        - "HostConfigRestart"
+                                        - "hostconfigrestart"
+                                        - "HostRollout"
+                                        - "hostrollout"
+                                        - "HostShutdown"
+                                        - "hostshutdown"
+                                  failurePolicy:
+                                    type: string
+                                    description: |
+                                      Controls what happens when this hook returns an error.
+                                      Fail (default): error propagates — pre-hook aborts reconcile / host deletion.
+                                      Ignore: error is logged and the reconcile continues.
+                                    # Both PascalCase and all-lowercase forms are accepted; the
+                                    # runtime normalizes via strings.EqualFold (Fail == fail).
+                                    enum:
+                                      - "Fail"
+                                      - "fail"
+                                      - "Ignore"
+                                      - "ignore"
                             post:
                               type: array
                               description: "actions to execute after host reconcile"
