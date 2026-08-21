@@ -49,8 +49,12 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 
 	common.LogOldAndNew("non-normalized yet (native)", old, new)
 
-	switch {
-	case w.isAfterFinalizerInstalled(old, new):
+	// Capture from the raw informer pair, before buildCR replaces `new` with the normalized CR:
+	// the finalizer transition is only visible here. Installing a finalizer does not bump
+	// metadata.generation, so without this the event that carries an accompanying spec change
+	// looks like a no-op and gets skipped.
+	afterFinalizerInstalled := w.isAfterFinalizerInstalled(old, new)
+	if afterFinalizerInstalled {
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-1")
 	}
 
@@ -72,7 +76,14 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	// markReconcileStart below would overwrite Status=Aborted with InProgress.
 	// Recovery is via spec edit: informer UpdateFunc re-enqueues on next apply.
 	if new.EnsureStatus().GetStatus() == api.StatusAborted {
-		w.a.M(new).F().Info("Normalize marked CR Aborted — skipping reconcile (recovery via spec edit)")
+		// Warning + event, not Info: the only other trace of a normalize abort is status.status,
+		// so without an event `kubectl describe chi` shows nothing at all and a rejected manifest
+		// looks like an operator that simply stopped reconciling.
+		w.a.V(1).
+			WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(new).
+			M(new).F().
+			Warning("Normalize marked CR Aborted — skipping reconcile (recovery via spec edit)")
 		_ = w.c.updateCRObjectStatus(ctx, new, types.UpdateStatusOptions{
 			CopyStatusOptions: types.CopyStatusOptions{
 				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
@@ -112,27 +123,38 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 			metrics.CRReconcilesCompleted(ctx, new)
 		}
 		return nil
-	case generationTheSame && !hasUnhealthyHosts && operatorIPTheSame:
-		// Spec unchanged, hosts healthy, operator IP the same — nothing to do.
-		// Do not skip when unhealthy (#1704) or when operator IP changed (need to
-		// refresh clickhouse-operator user networks).
-		w.a.M(new).F().Info("isGenerationTheSame(), all hosts healthy, operator IP the same - nothing to do, exit")
-		metrics.CRReconcilesCompleted(ctx, new)
-		return nil
-	case generationTheSame && !hasUnhealthyHosts && !operatorIPTheSame:
-		w.a.M(new).F().Info("Operator IP changed - continue reconcile to refresh clickhouse-operator user networks")
-	case new.HasReconcileWork():
+	}
+
+	// The ordering of the remaining checks lives in decideReconcileGate so it can be tested
+	// exhaustively - getting it wrong drops reconciles silently.
+	switch decision := decideReconcileGate(reconcileGateInputs{
+		hasReconcileWork:                new.HasReconcileWork(),
+		afterFinalizerInstalled:         afterFinalizerInstalled,
+		afterFinalizerInstalledAncestor: w.isAfterFinalizerInstalled(new.GetAncestorT(), new),
+		generationTheSame:               generationTheSame,
+		hasUnhealthyHosts:               hasUnhealthyHosts,
+		operatorIPTheSame:               operatorIPTheSame,
+		hasHostNeedingStuckRecovery:     func() bool { return w.crHasHostNeedingStuckRecovery(ctx, new) },
+	}); decision {
+	case gateReconcileWork:
 		w.a.M(new).F().Info("CR has reconcile work - continue reconcile")
-	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
+	case gateFinalizerInstalled:
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
-	case w.crHasHostNeedingStuckRecovery(ctx, new):
+	case gateOperatorIPChanged:
+		w.a.M(new).F().Info("Operator IP changed - continue reconcile to refresh clickhouse-operator user networks")
+	case gateStuckHostRecovery:
 		w.a.M(new).F().Info("CR has a sustained-NotReady host - continue reconcile for stuck-host recovery")
-	case hasUnhealthyHosts:
+	case gateUnhealthyHosts:
 		w.a.M(new).F().Warning("Unhealthy hosts detected - continue reconcile for recovery")
-	default:
-		w.a.M(new).F().Info("No reconcile work - abort reconcile")
+	case gateNothingToDo:
+		w.a.M(new).F().Info("No reconcile work - abort reconcile. Decision: %s", decision)
 		metrics.CRReconcilesCompleted(ctx, new)
 		return nil
+	default:
+		// Fail open. An unrecognised decision means the enum grew and this switch was not
+		// updated; reconciling redundantly is recoverable, silently dropping the event is the
+		// exact failure this gate exists to prevent.
+		w.a.M(new).F().Warning("Unhandled reconcile gate decision, continuing reconcile: %s", decision)
 	}
 
 	w.markReconcileStart(ctx, new)
