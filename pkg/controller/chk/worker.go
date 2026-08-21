@@ -56,6 +56,9 @@ type worker struct {
 	task          *common.Task
 	stsReconciler *statefulset.Reconciler
 
+	// countReadyEnsembleMembersFn overrides live Ready counting (tests only).
+	countReadyEnsembleMembersFn func(ctx context.Context, cr api.ICustomResource) int
+
 	start time.Time
 }
 
@@ -119,7 +122,7 @@ func (w *worker) newTask(new, old *apiChk.ClickHouseKeeperInstallation) {
 		labeler.New(new),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
 		w.c.kube,
-		statefulset.NewDefaultFallback(),
+		newChkStatefulSetFallback(),
 	)
 }
 
@@ -228,26 +231,28 @@ func (w *worker) finalizeCR(
 		f(chi)
 	}
 
-	_ = w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
-
-	return aborted, nil
+	// The status write is reported rather than discarded: a completion the operator failed to
+	// persist must not be announced as one (#2059).
+	return aborted, w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
 }
 
-func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
-		return
+		return ctx.Err()
 	}
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	cr.EnsureStatus().ReconcileStart(cr.EnsureRuntime().ActionPlan)
-	_ = w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
+	if err := w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
 				FieldGroupMain: true,
 			},
 		},
-	})
+	}); err != nil {
+		return err
+	}
 
 	w.a.V(1).
 		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileStarted).
@@ -256,18 +261,19 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKe
 		M(cr).F().
 		Info("reconcile started, task id: %s", cr.GetSpecT().GetTaskID())
 	w.a.V(2).M(cr).F().Info("action plan\n%s\n", cr.EnsureRuntime().ActionPlan.String())
+	return nil
 }
 
-func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstallation) {
+func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", _cr.GetName())
-		return
+		return ctx.Err()
 	}
 
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CR object
-	aborted, _ := w.finalizeCR(
+	aborted, err := w.finalizeCR(
 		ctx,
 		_cr,
 		types.UpdateStatusOptions{
@@ -283,6 +289,9 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 			c.EnsureStatus().ReconcileComplete()
 		},
 	)
+	if err != nil {
+		return err
+	}
 
 	if aborted {
 		// finalizeCR's own re-normalize refused the spec, so it persisted Aborted and skipped the
@@ -292,7 +301,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 			WithAction(_cr).
 			M(_cr).F().
 			Warning("reconcile not marked completed - spec refused on finalize, task id: %s", _cr.GetSpecT().GetTaskID())
-		return
+		return nil
 	}
 
 	w.a.V(1).
@@ -301,6 +310,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 		WithActions(_cr).
 		M(_cr).F().
 		Info("reconcile completed successfully, task id: %s", _cr.GetSpecT().GetTaskID())
+	return nil
 }
 
 func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, err error) {

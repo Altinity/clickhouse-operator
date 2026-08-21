@@ -112,7 +112,9 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	w.reconcileCR(ctx, nil, new)
+	if err := w.reconcileCR(ctx, nil, new); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
