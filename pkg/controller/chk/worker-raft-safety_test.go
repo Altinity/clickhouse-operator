@@ -117,6 +117,16 @@ func TestEnsureQuorumSafeToDisruptHost(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "would drop below Raft quorum")
 	})
+
+	t.Run("allows disrupt of the sole host (n=1)", func(t *testing.T) {
+		solo := hostOnCR(chkWithHosts(1))
+		solo.Runtime.CurStatefulSet = &apps.StatefulSet{}
+		solo.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+		w := &worker{
+			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 1 },
+		}
+		require.NoError(t, w.ensureQuorumSafeToDisruptHost(ctx, solo))
+	})
 }
 
 func TestChkStatefulSetFallbackAborts(t *testing.T) {

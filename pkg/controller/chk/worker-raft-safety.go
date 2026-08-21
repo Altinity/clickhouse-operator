@@ -117,13 +117,18 @@ func hostContributesReady(host *api.Host) bool {
 
 // ensureQuorumSafeToDisruptHost refuses to take down a Ready host when the
 // remaining Ready members would fall below quorum. No-op when the ensemble
-// already lacks live quorum (bootstrap / resume-from-stopped / recovery).
+// already lacks live quorum (bootstrap / resume-from-stopped / recovery), or
+// when there is only one host (restart is unavoidable — no sibling can hold
+// quorum).
 func (w *worker) ensureQuorumSafeToDisruptHost(ctx context.Context, host *api.Host) error {
 	cr := host.GetCR()
 	if cr == nil {
 		return nil
 	}
 	n := cr.HostsCount()
+	if n <= 1 {
+		return nil
+	}
 	q := raftQuorumSize(n)
 	ready := w.countReadyEnsembleMembers(ctx, cr)
 	if ready < q {
