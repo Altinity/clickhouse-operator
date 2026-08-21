@@ -21,6 +21,7 @@ import (
 	log "github.com/golang/glog"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util/runtime"
 )
 
@@ -131,7 +132,15 @@ func (a Announcer) M(m ...interface{}) Announcer {
 			if typed == nil {
 				return a
 			}
+		case *apiChk.ClickHouseKeeperInstallation:
+			if typed == nil {
+				return a
+			}
 		case *api.Cluster:
+			if typed == nil {
+				return a
+			}
+		case *apiChk.Cluster:
 			if typed == nil {
 				return a
 			}
@@ -140,6 +149,10 @@ func (a Announcer) M(m ...interface{}) Announcer {
 				return a
 			}
 		case *api.ChiReplica:
+			if typed == nil {
+				return a
+			}
+		case *apiChk.ChkReplica:
 			if typed == nil {
 				return a
 			}
@@ -160,7 +173,15 @@ func (a Announcer) M(m ...interface{}) Announcer {
 		switch typed := m[0].(type) {
 		case *api.ClickHouseInstallation:
 			b.meta = fmt.Sprintf("CHI:%s/%s", typed.GetNamespace(), typed.GetName())
+		case *apiChk.ClickHouseKeeperInstallation:
+			b.meta = fmt.Sprintf("CHK:%s/%s", typed.GetNamespace(), typed.GetName())
 		case *api.Cluster:
+			b.meta = fmt.Sprintf("Cluster:%s[%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetClusterName(),
+				typed.GetRuntime().GetAddress().GetClusterIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *apiChk.Cluster:
 			b.meta = fmt.Sprintf("Cluster:%s[%d]:%s/%s",
 				typed.GetRuntime().GetAddress().GetClusterName(),
 				typed.GetRuntime().GetAddress().GetClusterIndex(),
@@ -173,6 +194,12 @@ func (a Announcer) M(m ...interface{}) Announcer {
 				typed.GetRuntime().GetAddress().GetNamespace(),
 				typed.GetRuntime().GetAddress().GetCRName())
 		case *api.ChiReplica:
+			b.meta = fmt.Sprintf("Replica:%s[%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetReplicaName(),
+				typed.GetRuntime().GetAddress().GetReplicaIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *apiChk.ChkReplica:
 			b.meta = fmt.Sprintf("Replica:%s[%d]:%s/%s",
 				typed.GetRuntime().GetAddress().GetReplicaName(),
 				typed.GetRuntime().GetAddress().GetReplicaIndex(),
