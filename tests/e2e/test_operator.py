@@ -8846,7 +8846,7 @@ def test_030003(self):
     with Given("test TLS secret is installed for ClickHouse and Keeper hosts"):
         create_tls_secret_for_fips_hosts(chi=chi, chk=chk)
 
-    with And("external ClickHouse client container is started"):
+    with And("external ClickHouse client pod is started"):
         start_external_ch_container()
 
     with When("FIPS ClickHouse Keeper is deployed with TLS settings"):
@@ -8936,7 +8936,7 @@ def test_030004(self):
     with And("test TLS secret covers up to 3 CHI and CHK replicas"):
         create_tls_secret_for_fips_hosts(chi=chi, chk=chk, replicas=3)
 
-    with And("external ClickHouse client container is started"):
+    with And("external ClickHouse client pod is started"):
         start_external_ch_container()
 
     with When("FIPS ClickHouse Keeper is deployed with TLS settings"):
@@ -9083,7 +9083,7 @@ def test_030005(self):
     with And("TLS secret covers up to 3 CHI and CHK replicas"):
         create_tls_secret_for_fips_hosts(chi=chi, chk=chk, replicas=3)
 
-    with And("external ClickHouse client container is started"):
+    with And("external ClickHouse client pod is started"):
         start_external_ch_container()
 
     with When("FIPS ClickHouse Keeper is deployed with 2 replicas"):

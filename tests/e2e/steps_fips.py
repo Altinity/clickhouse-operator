@@ -742,6 +742,7 @@ def create_tls_secret_for_fips_hosts(
     )
 
     self.context.tls = {
+        "secret_name": secret_name,
         "ca_crt": ca_crt,
         "server_crt": server_crt,
         "server_key": server_key,
@@ -752,166 +753,166 @@ def create_tls_secret_for_fips_hosts(
 
 
 # ---------------------------------------------------------------------------
-# External ClickHouse client
+# External ClickHouse client (in-cluster pod, same pattern as test-034 / test-058)
 # ---------------------------------------------------------------------------
 
-@TestStep(Given)
-def start_external_ch_container(self, ns=None, cipher_suites=None):
-    ns = ns or self.context.test_namespace
-    ca_crt = self.context.tls["ca_crt"]
-    container = f"fips-ch-ext-{ns}"[:63]
-    fips_image = "altinity/clickhouse-server:25.3.8.30001.altinityfips"
+_FIPS_CLIENT_MANIFEST = "manifests/chi/fips-client.yaml"
+_FIPS_CLIENT_POD = "fips-client"
+_FIPS_CLIENT_CONFIGMAP = "fips-client-config"
 
-    cipher_suites_xml = ""
-    if cipher_suites:
-        cipher_suites_xml = (
-            f"\n      <cipherSuites>{':'.join(cipher_suites)}</cipherSuites>"
+_FIPS_OPENSSL_MANIFEST = "manifests/chi/fips-openssl.yaml"
+_FIPS_OPENSSL_POD = "fips-openssl"
+_FIPS_OPENSSL_CA_FILE = "/certs/ca.crt"
+
+
+def _chi_service_host_from_pod(pod):
+    """Map CHI/CHK pod name to its headless Service host (strip STS ordinal)."""
+    return re.sub(r"-\d+$", "", pod)
+
+
+def ensure_fips_openssl_pod(ns=None, secret_name=None):
+    """Ensure the in-cluster OpenSSL probe Pod is Running (idempotent).
+
+    CHI/CHK images do not ship an openssl CLI; host openssl is often LibreSSL.
+    Namespace teardown removes the pod — no separate Finally required.
+    """
+    ctx = current().context
+    ns = ns or ctx.test_namespace
+    secret_name = (
+        secret_name
+        or getattr(ctx, "tls", {}).get("secret_name")
+        or "clickhouse-certs"
+    )
+
+    existing = kubectl.get("pod", _FIPS_OPENSSL_POD, ns=ns, ok_to_fail=True)
+    if existing and (existing.get("status") or {}).get("phase") == "Running":
+        return _FIPS_OPENSSL_POD
+
+    manifest_host = util.get_full_path(_FIPS_OPENSSL_MANIFEST)
+    apply_path = util.get_full_path(_FIPS_OPENSSL_MANIFEST, lookup_in_host=False)
+    tmp_path = None
+
+    if secret_name != "clickhouse-certs":
+        doc = yaml.safe_load(open(manifest_host, encoding="utf-8"))
+        for vol in doc["spec"]["volumes"]:
+            if vol.get("name") == "cert" and "secret" in vol:
+                vol["secret"]["secretName"] = secret_name
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            yaml.safe_dump(doc, f, default_flow_style=False, sort_keys=False)
+            tmp_path = f.name
+            apply_path = tmp_path
+
+    try:
+        kubectl.launch(
+            f"delete pod {_FIPS_OPENSSL_POD} --ignore-not-found",
+            ns=ns,
+            ok_to_fail=True,
         )
+        kubectl.apply(apply_path, ns=ns)
+    finally:
+        if tmp_path:
+            os.unlink(tmp_path)
 
-    openssl_xml = f"""
-<clickhouse>
-  <openSSL>
-    <client>
-      <caConfig>/tmp/ca.crt</caConfig>
-      <loadDefaultCAFile>false</loadDefaultCAFile>
-      <verificationMode>strict</verificationMode>{cipher_suites_xml}
-    </client>
-  </openSSL>
-</clickhouse>
-""".strip()
+    kubectl.wait_pod_status(_FIPS_OPENSSL_POD, "Running", ns=ns)
+    note(f"openssl probe pod ready: {_FIPS_OPENSSL_POD}")
+    return _FIPS_OPENSSL_POD
 
-    with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as f:
-        client_config = f.name
-        f.write(openssl_xml)
 
-    subprocess.run(
-        ["docker", "rm", "-f", container],
-        capture_output=True,
-        text=True,
-        check=False,
+@TestStep(Given)
+def start_external_ch_container(self, ns=None, cipher_suites=None, secret_name=None):
+    """Start the in-cluster FIPS clickhouse-client Pod from ``fips-client.yaml``.
+
+    The step name is kept for call-site compatibility; this applies a Pod + ConfigMap
+    (test-034 / test-058 style), not a host Docker container.
+    """
+    ns = ns or self.context.test_namespace
+    secret_name = (
+        secret_name
+        or getattr(self.context, "tls", {}).get("secret_name")
+        or "clickhouse-certs"
     )
+    manifest_host = util.get_full_path(_FIPS_CLIENT_MANIFEST)
+    apply_path = util.get_full_path(_FIPS_CLIENT_MANIFEST, lookup_in_host=False)
+    tmp_path = None
 
-    result = subprocess.run(
-        [
-            "docker", "run", "-d",
-            "--name", container,
-            "--network", "host",
-            "-v", f"{ca_crt}:/tmp/ca.crt:ro",
-            "-v", f"{client_config}:/tmp/client.xml:ro",
-            fips_image,
-            "sleep", "infinity",
-        ],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    if cipher_suites or secret_name != "clickhouse-certs":
+        docs = list(yaml.safe_load_all(open(manifest_host, encoding="utf-8")))
+        for doc in docs:
+            if not doc:
+                continue
+            if doc.get("kind") == "ConfigMap" and cipher_suites:
+                xml = doc["data"]["config.xml"]
+                needle = "<verificationMode>strict</verificationMode>"
+                insert = (
+                    f"{needle}\n"
+                    f"                <cipherSuites>{':'.join(cipher_suites)}</cipherSuites>"
+                )
+                doc["data"]["config.xml"] = xml.replace(needle, insert, 1)
+            if doc.get("kind") == "Pod" and secret_name != "clickhouse-certs":
+                for vol in doc["spec"]["volumes"]:
+                    if vol.get("name") == "cert" and "secret" in vol:
+                        vol["secret"]["secretName"] = secret_name
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            yaml.dump_all(docs, f, default_flow_style=False, sort_keys=False)
+            tmp_path = f.name
+            apply_path = tmp_path
 
-    assert result.returncode == 0, error(
-        f"failed to start external ClickHouse client container\n"
-        f"image: {fips_image}\n"
-        f"exit code: {result.returncode}\n"
-        f"stdout:\n{result.stdout}\n"
-        f"stderr:\n{result.stderr}"
-    )
+    try:
+        kubectl.launch(f"delete pod {_FIPS_CLIENT_POD} --ignore-not-found", ns=ns, ok_to_fail=True)
+        kubectl.launch(
+            f"delete configmap {_FIPS_CLIENT_CONFIGMAP} --ignore-not-found",
+            ns=ns,
+            ok_to_fail=True,
+        )
+        kubectl.apply(apply_path, ns=ns)
+    finally:
+        if tmp_path:
+            os.unlink(tmp_path)
 
-    note(f"external ClickHouse client container started: {container}")
-    self.context.external_chi_container = container
+    kubectl.wait_pod_status(_FIPS_CLIENT_POD, "Running", ns=ns)
+    note(f"external ClickHouse client pod started: {_FIPS_CLIENT_POD}")
+    self.context.external_chi_container = _FIPS_CLIENT_POD
+    self.context.external_chi_client_config = _FIPS_CLIENT_CONFIGMAP
 
     yield
 
-    with Finally("stop external ClickHouse client container"):
+    with Finally("stop external ClickHouse client pod"):
         stop_external_ch_container()
+
 
 @TestStep(Finally)
 def stop_external_ch_container(self):
-    """Remove the scenario-scoped external ClickHouse Docker client container."""
-    container = self.context.external_chi_container
-    subprocess.run(
-        ["docker", "rm", "-f", container],
-        capture_output=True,
-        text=True,
-        check=False,
+    """Remove the FIPS clickhouse-client Pod and ConfigMap from ``fips-client.yaml``."""
+    ns = getattr(self.context, "test_namespace", None)
+    if not ns:
+        return
+    kubectl.launch(f"delete pod {_FIPS_CLIENT_POD} --ignore-not-found", ns=ns, ok_to_fail=True)
+    kubectl.launch(
+        f"delete configmap {_FIPS_CLIENT_CONFIGMAP} --ignore-not-found",
+        ns=ns,
+        ok_to_fail=True,
     )
 
 
 @TestStep(When)
 def fips_ch_external_secure_query(self, pod, sql, ns=None):
-    """Run a ClickHouse query from the scenario Docker client over port-forward TLS.
+    """Run a ClickHouse query from the FIPS client Pod over in-cluster TLS.
 
-    Requires ``start_external_ch_container`` at scenario start.
+    Requires ``start_external_ch_container`` at scenario start. Connects to the
+    CHI/CHK headless Service derived from ``pod`` (same pattern as test-034 / test-058).
     """
     ns = ns or self.context.test_namespace
-    container = self.context.external_chi_container
-    local_port = _free_local_port()
+    client_pod = self.context.external_chi_container
+    host = _chi_service_host_from_pod(pod)
 
-    pf = subprocess.Popen(
-        [
-            "kubectl",
-            *self.context.kubectl_context_args,
-            "-n", ns,
-            "port-forward",
-            f"pod/{pod}",
-            f"{local_port}:9440",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+    # Use run_shell (not launch) so shlex-quoted SQL with spaces survives.
+    out = kubectl.run_shell(
+        f"{current().context.kubectl_cmd} -n {shlex.quote(ns)} "
+        f"exec {shlex.quote(client_pod)} -c clickhouse-client -- "
+        f"clickhouse-client --secure --host {shlex.quote(host)} --port 9440 "
+        f"--query {shlex.quote(sql)}"
     )
-
-    try:
-        deadline = time.time() + 10
-        while time.time() < deadline:
-            if pf.poll() is not None:
-                out, err = pf.communicate()
-                raise RuntimeError(
-                    f"kubectl port-forward exited early\n"
-                    f"stdout:\n{out}\n"
-                    f"stderr:\n{err}"
-                )
-
-            try:
-                socket.create_connection(
-                    ("127.0.0.1", int(local_port)), timeout=0.5
-                ).close()
-                break
-            except OSError:
-                time.sleep(0.2)
-        else:
-            raise RuntimeError(
-                f"kubectl port-forward to {pod}:9440 "
-                f"did not become ready on 127.0.0.1:{local_port}"
-            )
-
-        query_result = subprocess.run(
-            [
-                "docker", "exec", container,
-                "clickhouse-client",
-                "--config-file", "/tmp/client.xml",
-                "--secure",
-                "--host", "127.0.0.1",
-                "--port", local_port,
-                "--query", sql,
-            ],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-
-        assert query_result.returncode == 0, error(
-            f"external Docker clickhouse-client failed\n"
-            f"container: {container}\n"
-            f"exit code: {query_result.returncode}\n"
-            f"stdout:\n{query_result.stdout}\n"
-            f"stderr:\n{query_result.stderr}"
-        )
-
-        return query_result.stdout.strip()
-    finally:
-        pf.terminate()
-        try:
-            pf.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            pf.kill()
+    return out.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -1223,91 +1224,53 @@ def fips_run_openssl_s_client_on_pod_port(
     tls_version="1.3",
     ok_to_fail=False,
     ns=None,
+    container=None,
 ):
-    """Run ``openssl s_client`` against a pod listener through ``kubectl port-forward``."""
+    """Run ``openssl s_client`` from the ``fips-openssl`` probe Pod.
+
+    Target is the CHI/CHK Service DNS name for ``pod`` (not host openssl and not
+    the workload image — those lack a usable OpenSSL 3 ``s_client``).
+    ``container`` is unused (kept for call-site compatibility).
+    """
+    del container  # probes always run in fips-openssl
     ns = ns or self.context.test_namespace
-    ca_crt = self.context.tls["ca_crt"]
-    local_port = _free_local_port()
+    target_host = _chi_service_host_from_pod(pod)
 
-    with Given(f"port-forward from localhost:{local_port} to {pod}:{port}"):
-        pf = subprocess.Popen(
-            [
-                "kubectl",
-                *self.context.kubectl_context_args,
-                "-n", ns,
-                "port-forward",
-                f"pod/{pod}",
-                f"{local_port}:{port}",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+    with Given("openssl probe pod is available"):
+        openssl_pod = ensure_fips_openssl_pod(ns=ns)
+
+    with When(
+        f"openssl s_client from {openssl_pod} to {target_host}:{port}"
+    ):
+        tls_args = " ".join(shlex.quote(a) for a in openssl_tls_version_args(tls_version))
+        cipher_args = " ".join(
+            shlex.quote(a) for a in openssl_cipher_args(tls_version, cipher_suite)
         )
+        # Feed "Q\n" so s_client exits after the handshake.
+        cmd = (
+            f"printf 'Q\\n' | {current().context.kubectl_cmd} -n {shlex.quote(ns)} "
+            f"exec -i {shlex.quote(openssl_pod)} -- "
+            f"openssl s_client "
+            f"-connect {shlex.quote(target_host)}:{int(port)} "
+            f"-servername localhost "
+            f"-CAfile {_FIPS_OPENSSL_CA_FILE} "
+            f"-verify_return_error "
+            f"{tls_args} {cipher_args}"
+        )
+        shell = current().context.shell
+        result = shell(cmd, timeout=60)
+        output = result.output or ""
 
-    try:
-        with When("port-forward is ready on localhost"):
-            deadline = time.time() + 10
-            while time.time() < deadline:
-                if pf.poll() is not None:
-                    out, err = pf.communicate()
-                    assert False, error(
-                        "kubectl port-forward exited early\n"
-                        f"stdout:\n{out}\n"
-                        f"stderr:\n{err}"
-                    )
-
-                try:
-                    socket.create_connection(
-                        ("127.0.0.1", int(local_port)), timeout=0.5
-                    ).close()
-                    break
-                except OSError:
-                    time.sleep(0.2)
-            else:
-                assert False, error(
-                    f"kubectl port-forward to {pod}:{port} "
-                    f"did not become ready on 127.0.0.1:{local_port}"
-                )
-
-        with And("openssl s_client runs against the forwarded port"):
-            command = [
-                "openssl", "s_client",
-                "-connect", f"127.0.0.1:{local_port}",
-                "-servername", "localhost",
-                "-CAfile", ca_crt,
-                "-verify_return_error",
-            ]
-
-            command.extend(openssl_tls_version_args(tls_version))
-            command.extend(openssl_cipher_args(tls_version, cipher_suite))
-
-            result = subprocess.run(
-                command,
-                input="Q\n",
-                text=True,
-                capture_output=True,
-                check=False,
+    if not ok_to_fail:
+        with Then("openssl s_client handshake succeeds"):
+            assert result.exitcode == 0, error(
+                f"{pod}:{port}: openssl s_client failed for "
+                f"tls={tls_version}, cipher={cipher_suite}\n"
+                f"exit code: {result.exitcode}\n"
+                f"output:\n{output}"
             )
 
-            output = f"{result.stdout}\n{result.stderr}"
-
-        if not ok_to_fail:
-            with Then("openssl s_client handshake succeeds"):
-                assert result.returncode == 0, error(
-                    f"{pod}:{port}: openssl s_client failed for "
-                    f"tls={tls_version}, cipher={cipher_suite}\n"
-                    f"exit code: {result.returncode}\n"
-                    f"output:\n{output}"
-                )
-
-        return output
-
-    finally:
-        pf.terminate()
-        try:
-            pf.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            pf.kill()
+    return output
 
 @TestStep(Check)
 def fips_assert_rejected_tls_cases_on_endpoint(
@@ -1344,7 +1307,7 @@ def fips_assert_rejected_tls_cases_on_endpoint(
             )
 
             if case["tls_version"] in ("1.0", "1.1"):
-                # Downgrade cases: host openssl may refuse the legacy protocol
+                # Downgrade cases: in-pod openssl may refuse the legacy protocol
                 # LOCALLY and never contact the server -> a client-side refusal
                 # must NOT count as a pass. Require a SERVER-originated alert;
                 # else skip (an actually-accepting server is already caught above
@@ -1352,7 +1315,7 @@ def fips_assert_rejected_tls_cases_on_endpoint(
                 if not any(m in output_lower for m in TLS_SERVER_REJECT_MARKERS):
                     skip(
                         f"{label} {pod}:{port}: no server-side rejection alert for "
-                        f"{case['name']} - host openssl likely refused locally "
+                        f"{case['name']} - pod openssl likely refused locally "
                         f"(no ClientHello reached the server)\noutput:\n{output}"
                     )
             else:
@@ -2041,7 +2004,7 @@ def check_clickhouse_backup_embeds_gofips(
 
 @TestStep(Then)
 def check_external_clickhouse_reports_fips_version(self, pod):
-    """Verify an external strict-TLS client sees a FIPS ClickHouse server."""
+    """Verify an in-cluster FIPS client Pod sees a FIPS ClickHouse server over TLS."""
     version = fips_ch_external_secure_query(pod=pod, sql="SELECT version()")
     note(f"external SELECT version(): {version}")
     assert "fips" in version.lower(), error(
@@ -2650,20 +2613,22 @@ def check_tls13_cipher_fails(
     pod,
     port,
     cipher,
-    target_host="localhost",
+    target_host=None,
     container=None,
     ns=None,
 ):
-    """Verify a TLS 1.3 cipher cannot be negotiated."""
-
+    """Verify a TLS 1.3 cipher cannot be negotiated (via ``fips-openssl`` pod)."""
+    del container  # probes always run in fips-openssl
     ns = ns or self.context.test_namespace
-
-    container_arg = f"-c {container} " if container else ""
+    target_host = target_host or _chi_service_host_from_pod(pod)
+    openssl_pod = ensure_fips_openssl_pod(ns=ns)
 
     out = kubectl.launch(
-        f"exec {pod} {container_arg}-- "
+        f"exec {openssl_pod} -- "
         "openssl s_client "
         f"-connect {target_host}:{port} "
+        "-servername localhost "
+        f"-CAfile {_FIPS_OPENSSL_CA_FILE} "
         "-tls1_3 "
         f"-ciphersuites {cipher}",
         ns=ns,

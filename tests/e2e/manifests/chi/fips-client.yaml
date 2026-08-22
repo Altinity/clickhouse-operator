@@ -1,0 +1,49 @@
+# In-cluster FIPS clickhouse-client for TLS e2e
+# Mounts CA from the scenario TLS Secret created by
+# create_tls_secret_for_fips_hosts (default name: clickhouse-certs).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "fips-client-config"
+data:
+  config.xml: |
+    <config>
+        <openSSL>
+            <client>
+                <loadDefaultCAFile>false</loadDefaultCAFile>
+                <caConfig>/etc/clickhouse-client/certs/ca.crt</caConfig>
+                <verificationMode>strict</verificationMode>
+            </client>
+        </openSSL>
+        <port>9440</port>
+        <secure>1</secure>
+    </config>
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "fips-client"
+spec:
+  containers:
+    - name: clickhouse-client
+      image: altinity/clickhouse-server:25.3.8.30001.altinityfips
+      imagePullPolicy: IfNotPresent
+      command: [ "/bin/sh", "-c", "sleep 3600" ]
+      volumeMounts:
+        - name: config
+          mountPath: "/etc/clickhouse-client/"
+        - name: cert
+          mountPath: "/etc/clickhouse-client/certs/"
+  volumes:
+    - name: config
+      configMap:
+        name: fips-client-config
+        items:
+          - key: config.xml
+            path: config.xml
+    - name: cert
+      secret:
+        secretName: clickhouse-certs
+        items:
+          - key: ca.crt
+            path: ca.crt
