@@ -17,6 +17,7 @@ package chk
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -179,23 +180,21 @@ func TestWaitForQuorumSafeToDisruptHost(t *testing.T) {
 	})
 
 	t.Run("waits until ready count increases", func(t *testing.T) {
-		ready := 2
+		var ready atomic.Int32
+		ready.Store(2)
 		w := &worker{
 			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int {
-				return ready
+				return int(ready.Load())
 			},
 			quorumDisruptPollOverride: 5 * time.Millisecond,
-			quorumDisruptWaitOverride:  200 * time.Millisecond,
+			quorumDisruptWaitOverride: 200 * time.Millisecond,
 		}
 		waitSnap := snap
-		done := make(chan struct{})
 		go func() {
 			time.Sleep(20 * time.Millisecond)
-			ready = 3
-			close(done)
+			ready.Store(3)
 		}()
 		require.NoError(t, w.waitForQuorumSafeToDisruptHost(ctx, host, nil, &waitSnap))
-		<-done
 	})
 
 	t.Run("defers after wait budget expires", func(t *testing.T) {
