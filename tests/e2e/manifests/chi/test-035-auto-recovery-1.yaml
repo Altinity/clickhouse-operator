@@ -15,7 +15,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: altinity/clickhouse-server:25.8.16.10001.altinitystable
+              image: altinity/clickhouse-server:25.8.28.10001.altinitystable
               # sleep 90s before starting clickhouse — forces reconcile to time out
               # and abort, but pod becomes Ready shortly after. Operator should
               # auto-recover reconcile once pod is Ready.
