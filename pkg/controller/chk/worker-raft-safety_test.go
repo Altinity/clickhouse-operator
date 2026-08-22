@@ -16,7 +16,9 @@ package chk
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	apps "k8s.io/api/apps/v1"
@@ -35,132 +37,119 @@ func TestRaftQuorumSize(t *testing.T) {
 	require.Equal(t, 3, raftQuorumSize(5))
 }
 
-func TestEnsembleHasLiveQuorum(t *testing.T) {
-	cr := chkWithHosts(3)
-	w := &worker{}
-
-	t.Run("no ready members — bootstrap / resume-from-stopped", func(t *testing.T) {
-		w.countReadyEnsembleMembersFn = func(context.Context, api.ICustomResource) int { return 0 }
-		require.False(t, w.ensembleHasLiveQuorum(context.Background(), cr))
-	})
-
-	t.Run("below quorum", func(t *testing.T) {
-		w.countReadyEnsembleMembersFn = func(context.Context, api.ICustomResource) int { return 1 }
-		require.False(t, w.ensembleHasLiveQuorum(context.Background(), cr))
-	})
-
-	t.Run("at quorum", func(t *testing.T) {
-		w.countReadyEnsembleMembersFn = func(context.Context, api.ICustomResource) int { return 2 }
-		require.True(t, w.ensembleHasLiveQuorum(context.Background(), cr))
-	})
-}
-
-func TestShouldWaitHostReady(t *testing.T) {
+func TestSnapshotHostEnsemble(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("single host always waits Ready even with 0 ReadyReplicas", func(t *testing.T) {
+	t.Run("single host is rolling even with 0 ReadyReplicas", func(t *testing.T) {
 		w := &worker{
 			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 0 },
 		}
 		host := hostOnCR(chkWithHosts(1))
-		require.True(t, w.shouldWaitHostReady(ctx, host))
+		snap := w.snapshotHostEnsemble(ctx, host)
+		require.True(t, snap.rolling)
+		require.Equal(t, 1, snap.members)
+		require.Equal(t, 0, snap.readyCount)
 	})
 
-	t.Run("multi-host without live quorum does not wait Ready", func(t *testing.T) {
+	t.Run("multi-host without live quorum is bootstrap", func(t *testing.T) {
 		w := &worker{
 			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 0 },
 		}
 		host := hostOnCR(chkWithHosts(3))
-		require.False(t, w.shouldWaitHostReady(ctx, host))
+		snap := w.snapshotHostEnsemble(ctx, host)
+		require.False(t, snap.rolling)
+		require.Equal(t, 3, snap.members)
+		require.Equal(t, 0, snap.readyCount)
 	})
 
-	t.Run("multi-host with live quorum waits Ready", func(t *testing.T) {
-		w := &worker{
-			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 2 },
-		}
-		host := hostOnCR(chkWithHosts(3))
-		require.True(t, w.shouldWaitHostReady(ctx, host))
-	})
-}
-
-func TestPrepareStsReconcileOptsWaitSection(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("no live quorum skips Ready", func(t *testing.T) {
-		w := &worker{}
-		host := hostOnCR(chkWithHosts(3))
-		opts := w.prepareStsReconcileOptsWaitSection(ctx, host, nil, false)
-		require.True(t, opts.WaitUntilStarted())
-		require.False(t, opts.WaitUntilReady())
-	})
-
-	t.Run("waitReady waits Ready", func(t *testing.T) {
-		w := &worker{}
-		host := hostOnCR(chkWithHosts(3))
-		opts := w.prepareStsReconcileOptsWaitSection(ctx, host, nil, true)
-		require.True(t, opts.WaitUntilReady())
-	})
-
-	t.Run("waitReady can opt out of Ready probe", func(t *testing.T) {
-		w := &worker{}
-		host := hostOnCR(chkWithHosts(3))
-		host.GetCluster().GetReconcile().Host.Wait.Probes.Readiness = types.NewStringBool(false)
-		opts := w.prepareStsReconcileOptsWaitSection(ctx, host, statefulset.NewReconcileStatefulSetOptions(), true)
-		require.False(t, opts.WaitUntilReady())
-	})
-
-	t.Run("single-host post-restart still waits Ready", func(t *testing.T) {
-		// Simulates ReadyReplicas=0 after force-restart: shouldWaitHostReady was
-		// true beforehand; prepareSts must honor that and not fall back to Started-only.
-		w := &worker{
-			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 0 },
-		}
-		host := hostOnCR(chkWithHosts(1))
-		waitReady := w.shouldWaitHostReady(ctx, host)
-		require.True(t, waitReady)
-		opts := w.prepareStsReconcileOptsWaitSection(ctx, host, nil, waitReady)
-		require.True(t, opts.WaitUntilReady())
-	})
-}
-
-func TestEnsureQuorumSafeToDisruptHost(t *testing.T) {
-	ctx := context.Background()
-	cr := chkWithHosts(3)
-	host := hostOnCR(cr)
-	host.Runtime.CurStatefulSet = &apps.StatefulSet{}
-	host.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
-
-	t.Run("allows disrupt when no live quorum", func(t *testing.T) {
-		w := &worker{
-			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 0 },
-		}
-		require.NoError(t, w.ensureQuorumSafeToDisruptHost(ctx, host))
-	})
-
-	t.Run("allows disrupt when siblings keep quorum", func(t *testing.T) {
-		w := &worker{
-			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 3 },
-		}
-		require.NoError(t, w.ensureQuorumSafeToDisruptHost(ctx, host))
-	})
-
-	t.Run("refuses disrupt when remaining would be below quorum", func(t *testing.T) {
-		w := &worker{
-			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 2 },
-		}
-		err := w.ensureQuorumSafeToDisruptHost(ctx, host)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "would drop below Raft quorum")
-	})
-
-	t.Run("allows disrupt of the sole host (n=1)", func(t *testing.T) {
-		solo := hostOnCR(chkWithHosts(1))
-		solo.Runtime.CurStatefulSet = &apps.StatefulSet{}
-		solo.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+	t.Run("multi-host below quorum is bootstrap", func(t *testing.T) {
 		w := &worker{
 			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 1 },
 		}
-		require.NoError(t, w.ensureQuorumSafeToDisruptHost(ctx, solo))
+		host := hostOnCR(chkWithHosts(3))
+		snap := w.snapshotHostEnsemble(ctx, host)
+		require.False(t, snap.rolling)
+	})
+
+	t.Run("multi-host at quorum is rolling", func(t *testing.T) {
+		w := &worker{
+			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 2 },
+		}
+		host := hostOnCR(chkWithHosts(3))
+		snap := w.snapshotHostEnsemble(ctx, host)
+		require.True(t, snap.rolling)
+		require.Equal(t, 2, snap.readyCount)
+	})
+}
+
+func TestEnsembleQuorumSafeAfterDisrupt(t *testing.T) {
+	host := hostOnCR(chkWithHosts(3))
+	host.Runtime.CurStatefulSet = &apps.StatefulSet{}
+	host.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+
+	t.Run("bootstrap mode is always safe", func(t *testing.T) {
+		snap := hostEnsembleSnapshot{rolling: false, members: 3, readyCount: 0}
+		require.True(t, ensembleQuorumSafeAfterDisrupt(snap, host))
+	})
+
+	t.Run("safe when siblings keep quorum", func(t *testing.T) {
+		snap := hostEnsembleSnapshot{rolling: true, members: 3, readyCount: 3}
+		require.True(t, ensembleQuorumSafeAfterDisrupt(snap, host))
+	})
+
+	t.Run("unsafe when remaining would be below quorum", func(t *testing.T) {
+		snap := hostEnsembleSnapshot{rolling: true, members: 3, readyCount: 2}
+		require.False(t, ensembleQuorumSafeAfterDisrupt(snap, host))
+	})
+
+	t.Run("sole host is always safe", func(t *testing.T) {
+		solo := hostOnCR(chkWithHosts(1))
+		solo.Runtime.CurStatefulSet = &apps.StatefulSet{}
+		solo.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+		snap := hostEnsembleSnapshot{rolling: true, members: 1, readyCount: 1}
+		require.True(t, ensembleQuorumSafeAfterDisrupt(snap, solo))
+	})
+}
+
+func TestHostDisruptionWouldBreakQuorum(t *testing.T) {
+	ctx := context.Background()
+	w := &worker{}
+	host := hostOnCR(chkWithHosts(3))
+	host.Runtime.CurStatefulSet = &apps.StatefulSet{}
+	host.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+	host.GetReconcileAttributes().SetStatus(types.ObjectStatusModified)
+	snap := hostEnsembleSnapshot{rolling: true, members: 3, readyCount: 2}
+
+	t.Run("no-op for new host", func(t *testing.T) {
+		newHost := hostOnCR(chkWithHosts(3))
+		newHost.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+		require.False(t, w.hostDisruptionWouldBreakQuorum(ctx, newHost, nil, snap))
+	})
+
+	t.Run("no-op when STS is unchanged", func(t *testing.T) {
+		same := hostOnCR(chkWithHosts(3))
+		same.Runtime.CurStatefulSet = &apps.StatefulSet{}
+		same.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+		same.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
+		require.False(t, w.hostDisruptionWouldBreakQuorum(ctx, same, nil, snap))
+	})
+
+	t.Run("blocks disruptive roll without quorum headroom", func(t *testing.T) {
+		require.True(t, w.hostDisruptionWouldBreakQuorum(ctx, host, nil, snap))
+	})
+
+	t.Run("allows disruptive roll when siblings keep quorum", func(t *testing.T) {
+		bigSnap := hostEnsembleSnapshot{rolling: true, members: 3, readyCount: 3}
+		require.False(t, w.hostDisruptionWouldBreakQuorum(ctx, host, nil, bigSnap))
+	})
+
+	t.Run("force recreate counts as disruptive", func(t *testing.T) {
+		same := hostOnCR(chkWithHosts(3))
+		same.Runtime.CurStatefulSet = &apps.StatefulSet{}
+		same.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+		same.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
+		opts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
+		require.True(t, w.hostDisruptionWouldBreakQuorum(ctx, same, opts, snap))
 	})
 }
 
@@ -168,6 +157,107 @@ func TestChkStatefulSetFallbackAborts(t *testing.T) {
 	f := newChkStatefulSetFallback()
 	require.Equal(t, common.ErrCRUDAbort, f.OnStatefulSetCreateFailed(nil, nil))
 	require.Equal(t, common.ErrCRUDAbort, f.OnStatefulSetUpdateFailed(nil, nil, nil, nil))
+}
+
+func TestErrCRUDDeferredIsDistinctFromAbort(t *testing.T) {
+	require.False(t, errors.Is(common.ErrCRUDDeferred, common.ErrCRUDAbort))
+	require.False(t, errors.Is(common.ErrCRUDAbort, common.ErrCRUDDeferred))
+}
+
+func TestWaitForQuorumSafeToDisruptHost(t *testing.T) {
+	ctx := context.Background()
+	host := hostOnCR(chkWithHosts(3))
+	host.Runtime.CurStatefulSet = &apps.StatefulSet{}
+	host.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+	host.GetReconcileAttributes().SetStatus(types.ObjectStatusModified)
+	snap := hostEnsembleSnapshot{rolling: true, members: 3, readyCount: 2}
+
+	t.Run("returns immediately when already safe", func(t *testing.T) {
+		w := &worker{}
+		safeSnap := hostEnsembleSnapshot{rolling: true, members: 3, readyCount: 3}
+		require.NoError(t, w.waitForQuorumSafeToDisruptHost(ctx, host, nil, &safeSnap))
+	})
+
+	t.Run("waits until ready count increases", func(t *testing.T) {
+		ready := 2
+		w := &worker{
+			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int {
+				return ready
+			},
+			quorumDisruptPollOverride: 5 * time.Millisecond,
+			quorumDisruptWaitOverride:  200 * time.Millisecond,
+		}
+		waitSnap := snap
+		done := make(chan struct{})
+		go func() {
+			time.Sleep(20 * time.Millisecond)
+			ready = 3
+			close(done)
+		}()
+		require.NoError(t, w.waitForQuorumSafeToDisruptHost(ctx, host, nil, &waitSnap))
+		<-done
+	})
+
+	t.Run("defers after wait budget expires", func(t *testing.T) {
+		w := &worker{
+			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 2 },
+			quorumDisruptPollOverride:   5 * time.Millisecond,
+			quorumDisruptWaitOverride:    20 * time.Millisecond,
+		}
+		waitSnap := snap
+		err := w.waitForQuorumSafeToDisruptHost(ctx, host, nil, &waitSnap)
+		require.ErrorIs(t, err, common.ErrCRUDDeferred)
+	})
+}
+
+func TestIsHostHealthyForReconcile(t *testing.T) {
+	ctx := context.Background()
+	w := &worker{}
+
+	t.Run("nil host", func(t *testing.T) {
+		require.False(t, w.isHostHealthyForReconcile(ctx, nil))
+	})
+
+	t.Run("stopped counts as healthy for ordering", func(t *testing.T) {
+		cr := chkWithHosts(1)
+		cr.Spec.Stop = types.NewStringBool(true)
+		host := hostOnCR(cr)
+		require.True(t, w.isHostHealthyForReconcile(ctx, host))
+	})
+
+	t.Run("ready STS counts as healthy", func(t *testing.T) {
+		host := hostOnCR(chkWithHosts(1))
+		host.Runtime.CurStatefulSet = &apps.StatefulSet{}
+		host.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+		require.True(t, w.isHostHealthyForReconcile(ctx, host))
+	})
+
+	t.Run("not ready STS is recovery", func(t *testing.T) {
+		host := hostOnCR(chkWithHosts(1))
+		host.Runtime.CurStatefulSet = &apps.StatefulSet{}
+		require.False(t, w.isHostHealthyForReconcile(ctx, host))
+	})
+}
+
+func TestShardHostsRecoveryFirst(t *testing.T) {
+	cr := chkWithHosts(2)
+	shard := cr.Spec.Configuration.Clusters[0].Layout.Shards[0]
+	h0 := shard.Hosts[0]
+	h1 := shard.Hosts[1]
+	h0.SetCR(cr)
+	h1.SetCR(cr)
+
+	h0.Runtime.CurStatefulSet = &apps.StatefulSet{}
+	h0.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+	h1.Runtime.CurStatefulSet = &apps.StatefulSet{}
+
+	healthy := func(host *api.Host) bool {
+		return host.Runtime.CurStatefulSet != nil && host.Runtime.CurStatefulSet.Status.ReadyReplicas > 0
+	}
+	ordered := shardHostsRecoveryFirst(shard, healthy)
+	require.Len(t, ordered, 2)
+	require.Same(t, h1, ordered[0], "not-ready host should reconcile first")
+	require.Same(t, h0, ordered[1], "ready host should reconcile second")
 }
 
 func chkWithHosts(n int) *apiChk.ClickHouseKeeperInstallation {

@@ -69,6 +69,9 @@ const (
 	// the shard left serving. Recoverable without a spec edit - the peer coming back triggers
 	// a retry - so it is deliberately absent from normalizeTimeAbortReasons.
 	StatusReasonShardHasNoHealthyPeer = "ShardHasNoHealthyPeer"
+	// StatusReasonRaftQuorumUnsafe: a CHK host's reconcile would disrupt a Ready replica while
+	// the ensemble lacks Raft quorum headroom. Disruption is deferred until siblings recover.
+	StatusReasonRaftQuorumUnsafe = "RaftQuorumUnsafe"
 	// StatusReasonRemovedSecretRefSyntax: a user settings field uses the `k8s_secret_` or
 	// `k8s_secret_env_` prefix, removed in 0.27.4 because it accepted a namespace/name/key
 	// triple and could therefore read a Secret from any namespace. Aborts rather than

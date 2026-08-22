@@ -8245,6 +8245,157 @@ def test_020003_2(self):
 
 @TestScenario
 @Tags("HEAVY")
+@Name("test_020003_3. Interrupted Keeper roll must preserve Raft quorum (issue #2069)")
+def test_020003_3(self):
+    """Companion to test_010083 for ClickHouse Keeper.
+
+    Reproduce issue #2069: a broken keeper image roll must stop after the first
+    replica and must not disrupt healthy peers that still hold Raft quorum.
+
+    Uses a broken image so the first replica stays permanently unhealthy
+    (ImagePullBackOff), giving a deterministic mid-roll window.
+
+    Scenario:
+      1. Start a 3-node CHK and a 2-replica CHI on a good keeper image
+      2. Roll keeper to a broken image (operator updates replica 0 first)
+      3. Wait until replica 0 is ImagePullBackOff and replicas 1-2 are still Ready
+      4. Restart the operator and force reconcile
+      5. Replicas 1-2 must stay Ready and must not be recreated (startTime unchanged)
+      6. Roll the good image back and wait for all keeper replicas to recover
+      7. ClickHouse replication must still work
+    """
+    create_shell_namespace_clickhouse_template()
+
+    chk = "test-020003-3-chk"
+    chi = "test-020003-3-chi"
+    cluster = "keeper"
+    down_pod = f"chk-{chk}-{cluster}-0-0-0"
+    healthy_pods = [
+        f"chk-{chk}-{cluster}-0-1-0",
+        f"chk-{chk}-{cluster}-0-2-0",
+    ]
+    good_version = "clickhouse/clickhouse-keeper:25.8"
+    broken_version = "clickhouse/clickhouse-keeper:25.8-broken"
+    new_version = "clickhouse/clickhouse-keeper:26.3"
+
+    with Given("CHK with 3 replicas on a good image"):
+        kubectl.create_and_check(
+            manifest="manifests/chk/test-020003-3-chk-1.yaml",
+            kind="chk",
+            check={
+                "pod_count": 3,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("CHI with 2 replicas connected to the keeper"):
+        kubectl.create_and_check(
+            manifest="manifests/chk/test-020003-3-chi.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    check_replication(chi, {0, 1}, 1)
+
+    healthy_start_times = {
+        pod: kubectl.get_field("pod", pod, ".status.startTime")
+        for pod in healthy_pods
+    }
+
+    with When("Rolling update to a broken keeper image is started"):
+        kubectl.create_and_check(
+            manifest="manifests/chk/test-020003-3-chk-2.yaml",
+            kind="chk",
+            check={
+                "chk_status": "InProgress",
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("First replica is stuck on the broken image while the others stay Ready"):
+        kubectl.wait_field(
+            "pod",
+            down_pod,
+            ".status.containerStatuses[0].state.waiting.reason",
+            ["ErrImagePull", "ImagePullBackOff"],
+        )
+        down_image = kubectl.get_field("pod", down_pod, ".spec.containers[0].image")
+        assert broken_version in down_image, error(
+            f"down replica {down_pod} must be on broken image {broken_version}, got {down_image}"
+        )
+        for pod in healthy_pods:
+            assert kubectl.get_condition_status(pod, "Ready") == "True", error(
+                f"healthy replica {pod} must stay Ready while {down_pod} is pulling the broken image"
+            )
+            cur_start = kubectl.get_field("pod", pod, ".status.startTime")
+            assert cur_start == healthy_start_times[pod], error(
+                f"healthy replica {pod} must not be restarted during the broken-image roll, "
+                f"but startTime changed from {healthy_start_times[pod]} to {cur_start}"
+            )
+
+    with And("ClickHouse still reaches Keeper while the first replica is down"):
+        for attempt in retries(timeout=60, delay=5):
+            out = clickhouse.query_with_error(chi, "select * from system.zookeeper_connection")
+            if "KEEPER_EXCEPTION" not in out and "Exception" not in out:
+                break
+
+    with And("Operator is restarted while the first replica is still down"):
+        util.restart_operator()
+
+    with And("Reconcile is forced while the first replica is still down"):
+        kubectl.force_chk_reconcile(chk, "force", "InProgress")
+
+    with Then("Healthy replicas were never restarted while the broken replica is down"):
+        assert kubectl.get_condition_status(down_pod, "Ready") != "True", error(
+            f"broken-image replica {down_pod} unexpectedly became Ready"
+        )
+        for pod in healthy_pods:
+            assert kubectl.get_condition_status(pod, "Ready") == "True", error(
+                f"healthy replica {pod} must stay Ready while {down_pod} is down "
+                f"(issue #2069 Raft quorum safety)"
+            )
+            cur_start = kubectl.get_field("pod", pod, ".status.startTime")
+            assert cur_start == healthy_start_times[pod], error(
+                f"healthy replica {pod} must never be restarted while peer is down, "
+                f"but startTime changed from {healthy_start_times[pod]} to {cur_start}"
+            )
+
+    with When("New keeper image is applied"):
+        kubectl.create_and_check(
+            manifest="manifests/chk/test-020003-3-chk-3.yaml",
+            kind="chk",
+            check={
+                "pod_count": 3,
+                "chk_status": "Completed",
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("All keeper replicas recover on the new image"):
+        for pod in [down_pod] + healthy_pods:
+            kubectl.wait_field(
+                "pod", pod, ".status.containerStatuses[0].ready", "true", retries=30,
+            )
+            image = kubectl.get_field("pod", pod, ".spec.containers[0].image")
+            assert new_version in image, error(
+                f"{pod} must run {new_version} after restore, but image={image}"
+            )
+
+    with And("ClickHouse replication works after keeper recovery"):
+        for attempt in retries(timeout=180, delay=5):
+            out = clickhouse.query_with_error(chi, "select * from system.zookeeper_connection")
+            if "KEEPER_EXCEPTION" not in out and "Exception" not in out:
+                break
+        check_replication(chi, {0, 1}, 2)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Tags("HEAVY")
 @Name("test_020005. Clickhouse-keeper scale-up/scale-down")
 def test_020005(self):
     """Check that clickhouse-operator support scale-up/scale-down without service interruption"""
@@ -8303,6 +8454,9 @@ def test_020005(self):
                 "do_not_delete": 1,
             },
         )
+
+    with Then("Confirm CHK pod is ready"):
+        kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-0-0', '.status.containerStatuses[0].ready', 'true', retries=10)
 
     check_replication(chi, {0, 1}, 5)
 

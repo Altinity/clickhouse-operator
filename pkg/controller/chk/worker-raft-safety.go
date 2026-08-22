@@ -17,28 +17,42 @@ package chk
 import (
 	"context"
 	"fmt"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Raft / ensemble safety for CHK (#2069).
 //
-// Live Ready count decides the mode — not CR ancestor / host inventory:
+// snapshotHostEnsemble records rolling vs bootstrap once per host, before any
+// disruption. Live Ready count drives rolling — not CR ancestor / host inventory:
 //
-//   - Live quorum (Ready members >= majority): rolling recreate of a healthy
-//     ensemble — wait Ready before the next host, and refuse to disrupt a host
-//     if doing so would drop below quorum.
-//   - No live quorum (fresh install, resume-from-stopped, or already broken):
-//     bootstrap / recovery — wait Started only so siblings can come up together.
+//   - Rolling (n<=1 or live quorum): wait Ready, refuse disrupt below quorum.
+//   - Bootstrap: wait Started only so siblings can come up together.
 //
-// Hooks below stay thin so a fuller Raft-membership barrier (committed
-// /keeper/config + mntr, as in PR #2041) can replace verifyHostEnsembleMembership
-// without reshaping the reconcile loop.
+// verifyHostEnsembleMembership is the extension point for a fuller Raft barrier
+// (committed /keeper/config + mntr, as in PR #2041).
+
+const (
+	defaultQuorumDisruptPollInterval = 5 * time.Second
+	defaultQuorumDisruptWaitTimeout  = 2 * time.Minute
+)
+
+// hostEnsembleSnapshot captures ensemble state before any host disruption.
+// rolling must not be re-derived after force-restart — ReadyReplicas drops to 0.
+type hostEnsembleSnapshot struct {
+	rolling    bool
+	members    int
+	readyCount int
+}
 
 // chkStatefulSetFallback aborts the reconcile on STS create/update wait failure.
 // DefaultFallback returns ErrCRUDIgnore, which lets the host loop recreate the
@@ -96,15 +110,108 @@ func (w *worker) countReadyEnsembleMembers(ctx context.Context, cr api.ICustomRe
 	return ready
 }
 
-// ensembleHasLiveQuorum reports whether enough hosts are Ready to form a Raft
-// majority. Resume-from-stopped and fresh bootstrap both yield false (0 Ready)
-// and therefore take the fast startup path.
-func (w *worker) ensembleHasLiveQuorum(ctx context.Context, cr api.ICustomResource) bool {
-	if cr == nil {
+// snapshotHostEnsemble records rolling vs bootstrap before disrupting a host.
+func (w *worker) snapshotHostEnsemble(ctx context.Context, host *api.Host) hostEnsembleSnapshot {
+	if host == nil || host.GetCR() == nil {
+		return hostEnsembleSnapshot{}
+	}
+	cr := host.GetCR()
+	n := cr.HostsCount()
+	ready := w.countReadyEnsembleMembers(ctx, cr)
+	return hostEnsembleSnapshot{
+		rolling:    n <= 1 || ready >= raftQuorumSize(n),
+		members:    n,
+		readyCount: ready,
+	}
+}
+
+// refreshQuorumSnapshotCounts updates live Ready counts for an in-flight wait.
+// rolling is intentionally frozen — it was captured before any disruption.
+func (w *worker) refreshQuorumSnapshotCounts(ctx context.Context, host *api.Host, snap *hostEnsembleSnapshot) {
+	if host == nil || snap == nil || !snap.rolling {
+		return
+	}
+	if w.c != nil {
+		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+	}
+	if cr := host.GetCR(); cr != nil {
+		snap.readyCount = w.countReadyEnsembleMembers(ctx, cr)
+	}
+}
+
+func (w *worker) quorumDisruptPollInterval() time.Duration {
+	if w.quorumDisruptPollOverride > 0 {
+		return w.quorumDisruptPollOverride
+	}
+	return defaultQuorumDisruptPollInterval
+}
+
+func (w *worker) quorumDisruptWaitTimeout() time.Duration {
+	if w.quorumDisruptWaitOverride > 0 {
+		return w.quorumDisruptWaitOverride
+	}
+	return defaultQuorumDisruptWaitTimeout
+}
+
+// waitForQuorumSafeToDisruptHost polls until disrupting the host would not drop
+// the ensemble below Raft quorum, or until the wait budget expires.
+func (w *worker) waitForQuorumSafeToDisruptHost(
+	ctx context.Context,
+	host *api.Host,
+	opts *statefulset.ReconcileOptions,
+	snap *hostEnsembleSnapshot,
+) error {
+	if snap == nil || !snap.rolling || snap.members <= 1 {
+		return nil
+	}
+	if !w.hostDisruptionWouldBreakQuorum(ctx, host, opts, *snap) {
+		return nil
+	}
+
+	w.a.V(1).M(host).F().Info(
+		"Waiting for Raft quorum headroom before disrupting host %s (ready=%d quorum=%d)",
+		host.GetName(), snap.readyCount, raftQuorumSize(snap.members),
+	)
+
+	deadline := time.Now().Add(w.quorumDisruptWaitTimeout())
+	for time.Now().Before(deadline) {
+		if util.WaitContextDoneOrTimeout(ctx, w.quorumDisruptPollInterval()) {
+			return ctx.Err()
+		}
+		w.refreshQuorumSnapshotCounts(ctx, host, snap)
+		if !w.hostDisruptionWouldBreakQuorum(ctx, host, opts, *snap) {
+			w.a.V(1).M(host).F().Info(
+				"Raft quorum headroom available — proceeding with host %s disruption (ready=%d)",
+				host.GetName(), snap.readyCount,
+			)
+			return nil
+		}
+	}
+
+	w.a.V(1).M(host).F().
+		WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonHostReconcileDeferredShardSafety).
+		Warning(
+			"Deferring host StatefulSet reconcile: disrupting %s would drop below Raft quorum (%s)",
+			host.GetName(), quorumDisruptDeferMessage(host, *snap),
+		)
+	return common.ErrCRUDDeferred
+}
+
+// isHostHealthyForReconcile is true when the host counts as live for recovery-first
+// ordering and quorum headroom. Stopped/troubleshoot hosts are intentionally
+// unavailable and are ordered after recovery hosts (CHI #1704).
+func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) bool {
+	if host == nil {
 		return false
 	}
-	n := cr.HostsCount()
-	return w.countReadyEnsembleMembers(ctx, cr) >= raftQuorumSize(n)
+	if host.IsStopped() || host.IsTroubleshoot() {
+		return true
+	}
+	sts := host.Runtime.CurStatefulSet
+	if sts == nil && w.c != nil {
+		sts, _ = w.c.kube.STS().Get(ctx, host)
+	}
+	return sts != nil && sts.Status.ReadyReplicas > 0
 }
 
 // hostContributesReady reports whether this host currently counts toward live quorum.
@@ -115,105 +222,58 @@ func hostContributesReady(host *api.Host) bool {
 	return host.Runtime.CurStatefulSet.Status.ReadyReplicas > 0
 }
 
-// ensureQuorumSafeToDisruptHost refuses to take down a Ready host when the
-// remaining Ready members would fall below quorum. No-op when the ensemble
-// already lacks live quorum (bootstrap / resume-from-stopped / recovery), or
-// when there is only one host (restart is unavoidable — no sibling can hold
-// quorum).
-func (w *worker) ensureQuorumSafeToDisruptHost(ctx context.Context, host *api.Host) error {
-	cr := host.GetCR()
-	if cr == nil {
-		return nil
+// ensembleQuorumSafeAfterDisrupt reports whether remaining Ready members would still
+// meet quorum if this host were disrupted. Pure — snap counts are frozen before disrupt.
+func ensembleQuorumSafeAfterDisrupt(snap hostEnsembleSnapshot, host *api.Host) bool {
+	if !snap.rolling || snap.members <= 1 {
+		return true
 	}
-	n := cr.HostsCount()
-	if n <= 1 {
-		return nil
-	}
-	q := raftQuorumSize(n)
-	ready := w.countReadyEnsembleMembers(ctx, cr)
-	if ready < q {
-		return nil
-	}
-	remaining := ready
+	remaining := snap.readyCount
 	if hostContributesReady(host) {
 		remaining--
 	}
-	if remaining < q {
-		return fmt.Errorf(
-			"refusing to disrupt host %s: ready=%d remaining=%d quorum=%d (would drop below Raft quorum)",
-			host.GetName(), ready, remaining, q,
-		)
-	}
-	return nil
+	return remaining >= raftQuorumSize(snap.members)
 }
 
-// shouldWaitHostReady decides whether STS reconcile must wait until Ready.
+// hostDisruptionWouldBreakQuorum is true when this pass would disrupt a Ready host and
+// drop the ensemble below Raft quorum (#2069).
 //
-// Decision is taken BEFORE disrupting the host. After a force-restart,
-// ReadyReplicas is 0 so ensembleHasLiveQuorum is false — re-checking then
-// would wrongly fall into "bootstrap / Started-only" and complete while the
-// pod is still 0/1 Running (seen after CHK 3→1 downscale).
-//
-// Rules:
-//   - n <= 1: always wait Ready (no siblings to deadlock on)
-//   - n > 1: wait Ready only when the ensemble already has live quorum
-func (w *worker) shouldWaitHostReady(ctx context.Context, host *api.Host) bool {
-	if host == nil || host.GetCR() == nil {
-		return false
-	}
-	if host.GetCR().HostsCount() <= 1 {
-		return true
-	}
-	return w.ensembleHasLiveQuorum(ctx, host.GetCR())
-}
-
-// prepareStsReconcileOptsWaitSection sets STS launch waits for Keeper.
-//
-// waitReady must be computed via shouldWaitHostReady before any disruption.
-// Live quorum / single-node: wait until Ready before moving on.
-// No live quorum on multi-node: wait Started only — Ready would deadlock
-// until siblings exist (bootstrap / resume-from-stopped / recovery).
-func (w *worker) prepareStsReconcileOptsWaitSection(
+// Must be called after PrepareHostStatefulSetWithStatus — ObjectStatusSame is assigned only there.
+func (w *worker) hostDisruptionWouldBreakQuorum(
 	ctx context.Context,
 	host *api.Host,
 	opts *statefulset.ReconcileOptions,
-	waitReady bool,
-) *statefulset.ReconcileOptions {
-	if opts == nil {
-		opts = statefulset.NewReconcileStatefulSetOptions()
+	snap hostEnsembleSnapshot,
+) bool {
+	if host == nil || host.IsStopped() {
+		return false
 	}
-	probes := host.GetCluster().GetReconcile().Host.Wait.Probes
-	_ = ctx
-
-	if probes.GetStartup().IsTrue() || !waitReady {
-		opts = opts.SetWaitUntilStarted()
-		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilStarted")
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
+		return false
 	}
-
-	switch {
-	case waitReady && !probes.GetReadiness().IsFalse():
-		opts = opts.SetWaitUntilReady()
-		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (Keeper must become Ready)")
-	case !waitReady:
-		w.a.V(1).M(host).F().Info("Skip WaitUntilReady — no live quorum (bootstrap / resume-from-stopped / recovery)")
+	willDisrupt := !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) ||
+		w.shouldForceRestartHost(ctx, host) ||
+		(opts != nil && opts.ForceRecreate())
+	if !willDisrupt {
+		return false
 	}
-
-	return opts
+	return hostContributesReady(host) && !ensembleQuorumSafeAfterDisrupt(snap, host)
 }
 
-// waitHostRaftJoined is the post-host hook for confirming the replica is part of
-// the live ensemble before the reconciler advances.
-//
-// Today a no-op beyond what STS Ready wait already enforced. Replace or extend
-// verifyHostEnsembleMembership with committed Raft membership checks as in
-// Altinity/clickhouse-operator#2041.
-func (w *worker) waitHostRaftJoined(ctx context.Context, host *api.Host) error {
-	return w.verifyHostEnsembleMembership(ctx, host)
+func quorumDisruptDeferMessage(host *api.Host, snap hostEnsembleSnapshot) string {
+	remaining := snap.readyCount
+	if hostContributesReady(host) {
+		remaining--
+	}
+	return fmt.Sprintf(
+		"ready=%d remaining=%d quorum=%d",
+		snap.readyCount, remaining, raftQuorumSize(snap.members),
+	)
 }
 
 // verifyHostEnsembleMembership is the extension point for Raft membership
-// verification. Currently a no-op: STS Ready wait already ran when live quorum
-// mode applied. Implement committed-config / leader sync barriers here when
+// verification after a host joins in rolling mode. Currently a no-op: STS Ready
+// wait already ran. Implement committed-config / leader sync barriers here when
 // adopting the fuller rescale design from PR #2041.
 func (w *worker) verifyHostEnsembleMembership(ctx context.Context, host *api.Host) error {
 	_ = ctx

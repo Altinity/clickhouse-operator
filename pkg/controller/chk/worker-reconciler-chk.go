@@ -123,6 +123,21 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	w.setHostStatusesPreliminary(ctx, new)
 
 	if err := w.reconcile(ctx, new); err != nil {
+		if errors.Is(err, common.ErrCRUDDeferred) {
+			w.a.V(1).M(new).F().Info("Reconcile deferred — waiting for Raft quorum headroom")
+			new.EnsureStatus().PushError(fmt.Sprintf(
+				"[%s] deferred host disruption until Raft quorum headroom is available",
+				apiChk.StatusReasonRaftQuorumUnsafe,
+			))
+			_ = w.c.updateCRObjectStatus(ctx, new, types.UpdateStatusOptions{
+				CopyStatusOptions: types.CopyStatusOptions{
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupMain: true,
+					},
+				},
+			})
+			return err
+		}
 		// Something went wrong
 		w.a.WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithError(new).
@@ -435,30 +450,35 @@ func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) err
 }
 
 // reconcileHostStatefulSet reconciles host's StatefulSet
-func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
+func (w *worker) reconcileHostStatefulSet(
+	ctx context.Context,
+	host *api.Host,
+	opts *statefulset.ReconcileOptions,
+	snap hostEnsembleSnapshot,
+) error {
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
 	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. App version: %s", host.GetName(), host.Runtime.Version.Render())
 
-	// Decide Ready vs Started-only wait before any disruption. Force-restart
-	// drops ReadyReplicas to 0; re-evaluating live quorum afterward would skip
-	// WaitUntilReady and let reconcile complete while the pod is still 0/1.
-	waitReady := w.shouldWaitHostReady(ctx, host)
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+	opts = w.prepareStsReconcileOptsWaitSection(host, opts, snap.rolling)
 
-	// Start with force-restart host
-	forcedRestart := false
-	if w.shouldForceRestartHost(ctx, host) {
-		if err := w.ensureQuorumSafeToDisruptHost(ctx, host); err != nil {
-			w.a.V(1).M(host).F().Error("%v", err)
+	// First point where "would this pass take the host down?" can be answered — same
+	// placement as CHI hostDisruptionWouldDegradeShard (#1704).
+	if w.hostDisruptionWouldBreakQuorum(ctx, host, opts, snap) {
+		if err := w.waitForQuorumSafeToDisruptHost(ctx, host, opts, &snap); err != nil {
 			return err
 		}
+	}
+
+	forcedRestart := false
+	if w.shouldForceRestartHost(ctx, host) {
 		w.a.V(1).M(host).F().Info("Reconcile host STS force restart: %s", host.GetName())
 		_ = w.hostForceRestart(ctx, host, opts)
 		forcedRestart = true
+		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
 	}
-
-	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
 	// After a force restart the STS was scaled down to 0 replicas. PrepareHostStatefulSetWithStatus
 	// compares fingerprints of the desired STS (replicas=1) vs the current STS (replicas=0, set by
 	// hostScaleDown). In the current codebase these fingerprints differ, so ObjectStatusSame is not
@@ -470,16 +490,6 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 		w.a.V(1).M(host).F().Info("Override ObjectStatusSame after force restart to ensure scale-up: %s", host.GetName())
 		host.GetReconcileAttributes().SetStatus(types.ObjectStatusModified)
 	}
-	// Update / recreate / force-recreate can take a Ready host down. Refuse when that
-	// would leave the ensemble below Raft quorum (#2069). No-op when there is no live
-	// quorum (bootstrap, resume-from-stopped).
-	if (opts != nil && opts.ForceRecreate()) || !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) {
-		if err := w.ensureQuorumSafeToDisruptHost(ctx, host); err != nil {
-			w.a.V(1).M(host).F().Error("%v", err)
-			return err
-		}
-	}
-	opts = w.prepareStsReconcileOptsWaitSection(ctx, host, opts, waitReady)
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. Reconcile StatefulSet", host.GetName())
@@ -647,6 +657,7 @@ func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *ap
 
 	// Which shard to start concurrent processing with
 	var startShard int
+	deferred := false
 	if opts.FullFanOut {
 		// For full fan-out scenarios we'll start shards processing from the very beginning
 		startShard = 0
@@ -657,8 +668,11 @@ func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *ap
 		// and for large clusters it is a small price to pay before performing concurrent fan-out.
 		w.a.V(1).Info("starting first shard separately")
 		if err := w.reconcileShardWithHosts(ctx, shards[0]); err != nil {
-			w.a.V(1).Warning("first shard failed, skipping rest of shards due to an error: %v", err)
-			return err
+			if !errors.Is(err, common.ErrCRUDDeferred) {
+				w.a.V(1).Warning("first shard failed, skipping rest of shards due to an error: %v", err)
+				return err
+			}
+			deferred = true
 		}
 
 		// Since shard with 0 index is already done, we'll proceed concurrently starting with the 1-st
@@ -670,10 +684,16 @@ func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *ap
 	workersNum := w.getReconcileShardsWorkersNum(cluster, opts)
 	w.a.V(1).Info("Starting rest of shards on workers. Workers num: %d", workersNum)
 	if err := w.runConcurrently(ctx, workersNum, startShard, shards[startShard:]); err != nil {
-		w.a.V(1).Info("Finished with ERROR rest of shards on workers: %d, err: %v", workersNum, err)
-		return err
+		if !errors.Is(err, common.ErrCRUDDeferred) {
+			w.a.V(1).Info("Finished with ERROR rest of shards on workers: %d, err: %v", workersNum, err)
+			return err
+		}
+		deferred = true
 	}
 	w.a.V(1).Info("Finished successfully rest of shards on workers: %d", workersNum)
+	if deferred {
+		return common.ErrCRUDDeferred
+	}
 	return nil
 }
 
@@ -681,9 +701,44 @@ func (w *worker) reconcileShardWithHosts(ctx context.Context, shard api.IShard) 
 	if err := w.reconcileShard(ctx, shard); err != nil {
 		return err
 	}
-	return shard.WalkHostsAbortOnError(func(host *api.Host) error {
-		return w.reconcileHost(ctx, host)
+
+	// Recovery first, then rollout: bring a replica that is already down back up before
+	// touching its healthy peer, so an interrupted roll cannot take the ensemble below
+	// Raft quorum (#2069, n=2). Disruption is gated in reconcileHostStatefulSet.
+	deferred := false
+	for _, host := range shardHostsRecoveryFirst(shard, func(h *api.Host) bool {
+		return w.isHostHealthyForReconcile(ctx, h)
+	}) {
+		if err := w.reconcileHost(ctx, host); err != nil {
+			if errors.Is(err, common.ErrCRUDDeferred) {
+				deferred = true
+				continue
+			}
+			return err
+		}
+	}
+	if deferred {
+		return common.ErrCRUDDeferred
+	}
+	return nil
+}
+
+// shardHostsRecoveryFirst returns shard hosts with not-ready replicas first, then
+// ready ones — same ordering as CHI reconcileShardWithHosts (#1704).
+func shardHostsRecoveryFirst(shard api.IShard, healthy func(*api.Host) bool) []*api.Host {
+	if shard == nil {
+		return nil
+	}
+	var recovery, rollout []*api.Host
+	shard.WalkHosts(func(host *api.Host) error {
+		if healthy(host) {
+			rollout = append(rollout, host)
+		} else {
+			recovery = append(recovery, host)
+		}
+		return nil
 	})
+	return append(recovery, rollout...)
 }
 
 // reconcileShard reconciles specified shard, excluding nested replicas
@@ -833,8 +888,11 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Warning("Reconcile Host Main - unable to reconcile Service. Host: %s Err: %v", host.GetName(), err)
 	}
 
+	// Snapshot rolling vs bootstrap before any STS disruption on this host.
+	snap := w.snapshotHostEnsemble(ctx, host)
+
 	// Reconcile StatefulSet
-	if err := w.reconcileHostStatefulSet(ctx, host, stsReconcileOpts); err != nil {
+	if err := w.reconcileHostStatefulSet(ctx, host, stsReconcileOpts, snap); err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
@@ -852,7 +910,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	// Finalize main reconcile with domain activities.
 	// Membership / ensemble gates must abort the host loop — continuing would
 	// recreate the next replica while this one never rejoined (#2069).
-	if err := w.reconcileHostMainDomain(ctx, host); err != nil {
+	if err := w.reconcileHostMainDomain(ctx, host, snap); err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
@@ -871,21 +929,49 @@ func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.
 	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 }
 
-func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host) error {
+func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, snap hostEnsembleSnapshot) error {
 	if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		return nil
 	}
 
-	if !w.ensembleHasLiveQuorum(ctx, host.GetCR()) {
+	if !snap.rolling {
 		// Bootstrap / resume-from-stopped / recovery: peers start together;
-		// keep the legacy pacing wait (Ready wait was skipped).
+		// legacy pacing wait (Ready wait was skipped on STS).
 		util.WaitContextDoneOrTimeout(ctx, 7*time.Second)
 		return nil
 	}
 
-	// Live quorum mode: STS Ready wait already ran. Hook for richer Raft
-	// membership confirmation (PR #2041) lives in waitHostRaftJoined.
-	return w.waitHostRaftJoined(ctx, host)
+	// Extension point for richer Raft membership confirmation (PR #2041).
+	return w.verifyHostEnsembleMembership(ctx, host)
+}
+
+// prepareStsReconcileOptsWaitSection sets STS launch waits for Keeper.
+//
+// rolling comes from snapshotHostEnsemble before any disruption.
+func (w *worker) prepareStsReconcileOptsWaitSection(
+	host *api.Host,
+	opts *statefulset.ReconcileOptions,
+	rolling bool,
+) *statefulset.ReconcileOptions {
+	if opts == nil {
+		opts = statefulset.NewReconcileStatefulSetOptions()
+	}
+	probes := host.GetCluster().GetReconcile().Host.Wait.Probes
+
+	if probes.GetStartup().IsTrue() || !rolling {
+		opts = opts.SetWaitUntilStarted()
+		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilStarted")
+	}
+
+	switch {
+	case rolling && !probes.GetReadiness().IsFalse():
+		opts = opts.SetWaitUntilReady()
+		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (Keeper must become Ready)")
+	case !rolling:
+		w.a.V(1).M(host).F().Info("Skip WaitUntilReady — bootstrap / resume-from-stopped / recovery")
+	}
+
+	return opts
 }
 
 // reconcileHostIncludeIntoAllActivities includes specified ClickHouse host into all activities
