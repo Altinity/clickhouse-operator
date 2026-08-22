@@ -58,7 +58,7 @@ func hostWith(cur, desired *apps.StatefulSet) *api.Host {
 // ClickHouse needs to pick up new settings).
 func TestHostRequiresStatefulSetRollout(t *testing.T) {
 	same := sts("altinity/clickhouse-server:25.8")
-	other := sts("altinity/clickhouse-server:25.8.16.10001.altinitystable")
+	other := sts("altinity/clickhouse-server:25.8.28.10001.altinitystable")
 
 	t.Run("nil host", func(t *testing.T) {
 		require.False(t, hostRequiresStatefulSetRollout(nil))

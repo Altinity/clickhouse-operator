@@ -9564,8 +9564,8 @@ def test_030008(self):
         cleanup_admission_only_chi(chi=chi_case_insensitive)
 
     with When("runtime decoy image alias is prepared"):
-        decoy_tag = "altinity/clickhouse-server:25.8.16.10002.altinityfips-decoy"
-        stable_tag = "altinity/clickhouse-server:25.8.16.10002.altinitystable"
+        decoy_tag = "altinity/clickhouse-server:25.8.28.10001.altinityfips-decoy"
+        stable_tag = "altinity/clickhouse-server:25.8.28.10001.altinitystable"
         tag_result = subprocess.run(
             ["docker", "tag", stable_tag, decoy_tag],
             capture_output=True,

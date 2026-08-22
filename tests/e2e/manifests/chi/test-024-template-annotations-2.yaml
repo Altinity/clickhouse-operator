@@ -16,7 +16,7 @@ spec:
       spec:
         containers:
         - name: clickhouse-pod
-          image: altinity/clickhouse-server:25.8.16.10001.altinitystable
+          image: altinity/clickhouse-server:25.8.28.10001.altinitystable
     volumeClaimTemplates:
     - name: default-volumeclaim-template
       reclaimPolicy: Delete
