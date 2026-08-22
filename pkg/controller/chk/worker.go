@@ -59,6 +59,11 @@ type worker struct {
 	// countReadyEnsembleMembersFn overrides live Ready counting (tests only).
 	countReadyEnsembleMembersFn func(ctx context.Context, cr api.ICustomResource) int
 
+	// quorumDisruptPollOverride / quorumDisruptWaitOverride override pacing in
+	// waitForQuorumSafeToDisruptHost (tests only). Zero means use defaults.
+	quorumDisruptPollOverride time.Duration
+	quorumDisruptWaitOverride  time.Duration
+
 	start time.Time
 }
 
