@@ -288,17 +288,31 @@ func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr 
 	// best-effort pacing only; the function returns early on ctx cancellation.
 	// Same-size reconciles do not wait (see #2035 / #2059) — a fixed 10s sleep
 	// previously left healthy ensembles cycling and delayed Completed.
-	d := keeperMembershipSettleDelay(cr.HostsCount(), cr.GetAncestor().HostsCount())
+	d := w.membershipSettleDelay(cr)
 	if d == 0 {
 		return nil
 	}
+	w.a.V(1).M(cr).Info("Waiting %s for Keeper Raft membership to settle", d)
 	util.WaitContextDoneOrTimeout(ctx, d)
 	return nil
 }
 
-// keeperMembershipSettleDelay is a best-effort pause after publishing membership
-// changes so Raft can settle. Same host count → no delay.
-func keeperMembershipSettleDelay(currentHosts, ancestorHosts int) time.Duration {
+// membershipSettleDelay is a best-effort pause after publishing membership
+// changes so Raft can settle:
+//   - same host count → no delay
+//   - upscale → 30s
+//   - downscale → 120s (survivors still need time after raft_configuration shrink;
+//     peer purge later adds another 1m in clean())
+func (w *worker) membershipSettleDelay(cr *apiChk.ClickHouseKeeperInstallation) time.Duration {
+	if cr == nil {
+		return 0
+	}
+	ancestorHosts := 0
+	if ancestor := cr.GetAncestor(); ancestor != nil {
+		ancestorHosts = ancestor.HostsCount()
+	}
+	currentHosts := cr.HostsCount()
+
 	switch {
 	case currentHosts < ancestorHosts:
 		return 120 * time.Second
@@ -427,6 +441,11 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 
 	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. App version: %s", host.GetName(), host.Runtime.Version.Render())
 
+	// Decide Ready vs Started-only wait before any disruption. Force-restart
+	// drops ReadyReplicas to 0; re-evaluating live quorum afterward would skip
+	// WaitUntilReady and let reconcile complete while the pod is still 0/1.
+	waitReady := w.shouldWaitHostReady(ctx, host)
+
 	// Start with force-restart host
 	forcedRestart := false
 	if w.shouldForceRestartHost(ctx, host) {
@@ -460,7 +479,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 			return err
 		}
 	}
-	opts = w.prepareStsReconcileOptsWaitSection(ctx, host, opts)
+	opts = w.prepareStsReconcileOptsWaitSection(ctx, host, opts, waitReady)
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. Reconcile StatefulSet", host.GetName())

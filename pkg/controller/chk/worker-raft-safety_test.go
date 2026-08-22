@@ -55,36 +55,71 @@ func TestEnsembleHasLiveQuorum(t *testing.T) {
 	})
 }
 
-func TestPrepareStsReconcileOptsWaitSection(t *testing.T) {
+func TestShouldWaitHostReady(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("no live quorum skips Ready", func(t *testing.T) {
+	t.Run("single host always waits Ready even with 0 ReadyReplicas", func(t *testing.T) {
+		w := &worker{
+			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 0 },
+		}
+		host := hostOnCR(chkWithHosts(1))
+		require.True(t, w.shouldWaitHostReady(ctx, host))
+	})
+
+	t.Run("multi-host without live quorum does not wait Ready", func(t *testing.T) {
 		w := &worker{
 			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 0 },
 		}
 		host := hostOnCR(chkWithHosts(3))
-		opts := w.prepareStsReconcileOptsWaitSection(ctx, host, nil)
+		require.False(t, w.shouldWaitHostReady(ctx, host))
+	})
+
+	t.Run("multi-host with live quorum waits Ready", func(t *testing.T) {
+		w := &worker{
+			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 2 },
+		}
+		host := hostOnCR(chkWithHosts(3))
+		require.True(t, w.shouldWaitHostReady(ctx, host))
+	})
+}
+
+func TestPrepareStsReconcileOptsWaitSection(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("no live quorum skips Ready", func(t *testing.T) {
+		w := &worker{}
+		host := hostOnCR(chkWithHosts(3))
+		opts := w.prepareStsReconcileOptsWaitSection(ctx, host, nil, false)
 		require.True(t, opts.WaitUntilStarted())
 		require.False(t, opts.WaitUntilReady())
 	})
 
-	t.Run("live quorum waits Ready", func(t *testing.T) {
-		w := &worker{
-			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 3 },
-		}
+	t.Run("waitReady waits Ready", func(t *testing.T) {
+		w := &worker{}
 		host := hostOnCR(chkWithHosts(3))
-		opts := w.prepareStsReconcileOptsWaitSection(ctx, host, nil)
+		opts := w.prepareStsReconcileOptsWaitSection(ctx, host, nil, true)
 		require.True(t, opts.WaitUntilReady())
 	})
 
-	t.Run("live quorum can opt out of Ready", func(t *testing.T) {
-		w := &worker{
-			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 3 },
-		}
+	t.Run("waitReady can opt out of Ready probe", func(t *testing.T) {
+		w := &worker{}
 		host := hostOnCR(chkWithHosts(3))
 		host.GetCluster().GetReconcile().Host.Wait.Probes.Readiness = types.NewStringBool(false)
-		opts := w.prepareStsReconcileOptsWaitSection(ctx, host, statefulset.NewReconcileStatefulSetOptions())
+		opts := w.prepareStsReconcileOptsWaitSection(ctx, host, statefulset.NewReconcileStatefulSetOptions(), true)
 		require.False(t, opts.WaitUntilReady())
+	})
+
+	t.Run("single-host post-restart still waits Ready", func(t *testing.T) {
+		// Simulates ReadyReplicas=0 after force-restart: shouldWaitHostReady was
+		// true beforehand; prepareSts must honor that and not fall back to Started-only.
+		w := &worker{
+			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 0 },
+		}
+		host := hostOnCR(chkWithHosts(1))
+		waitReady := w.shouldWaitHostReady(ctx, host)
+		require.True(t, waitReady)
+		opts := w.prepareStsReconcileOptsWaitSection(ctx, host, nil, waitReady)
+		require.True(t, opts.WaitUntilReady())
 	})
 }
 
