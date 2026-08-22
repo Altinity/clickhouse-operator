@@ -147,28 +147,54 @@ func (w *worker) ensureQuorumSafeToDisruptHost(ctx context.Context, host *api.Ho
 	return nil
 }
 
+// shouldWaitHostReady decides whether STS reconcile must wait until Ready.
+//
+// Decision is taken BEFORE disrupting the host. After a force-restart,
+// ReadyReplicas is 0 so ensembleHasLiveQuorum is false — re-checking then
+// would wrongly fall into "bootstrap / Started-only" and complete while the
+// pod is still 0/1 Running (seen after CHK 3→1 downscale).
+//
+// Rules:
+//   - n <= 1: always wait Ready (no siblings to deadlock on)
+//   - n > 1: wait Ready only when the ensemble already has live quorum
+func (w *worker) shouldWaitHostReady(ctx context.Context, host *api.Host) bool {
+	if host == nil || host.GetCR() == nil {
+		return false
+	}
+	if host.GetCR().HostsCount() <= 1 {
+		return true
+	}
+	return w.ensembleHasLiveQuorum(ctx, host.GetCR())
+}
+
 // prepareStsReconcileOptsWaitSection sets STS launch waits for Keeper.
 //
-// Live quorum present: wait until Ready before moving on.
-// No live quorum: wait Started only — Ready would deadlock until siblings exist
-// (bootstrap, resume-from-stopped, or recovery).
-func (w *worker) prepareStsReconcileOptsWaitSection(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) *statefulset.ReconcileOptions {
+// waitReady must be computed via shouldWaitHostReady before any disruption.
+// Live quorum / single-node: wait until Ready before moving on.
+// No live quorum on multi-node: wait Started only — Ready would deadlock
+// until siblings exist (bootstrap / resume-from-stopped / recovery).
+func (w *worker) prepareStsReconcileOptsWaitSection(
+	ctx context.Context,
+	host *api.Host,
+	opts *statefulset.ReconcileOptions,
+	waitReady bool,
+) *statefulset.ReconcileOptions {
 	if opts == nil {
 		opts = statefulset.NewReconcileStatefulSetOptions()
 	}
 	probes := host.GetCluster().GetReconcile().Host.Wait.Probes
-	liveQuorum := w.ensembleHasLiveQuorum(ctx, host.GetCR())
+	_ = ctx
 
-	if probes.GetStartup().IsTrue() || !liveQuorum {
+	if probes.GetStartup().IsTrue() || !waitReady {
 		opts = opts.SetWaitUntilStarted()
 		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilStarted")
 	}
 
 	switch {
-	case liveQuorum && !probes.GetReadiness().IsFalse():
+	case waitReady && !probes.GetReadiness().IsFalse():
 		opts = opts.SetWaitUntilReady()
-		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (live Raft quorum)")
-	case !liveQuorum:
+		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (Keeper must become Ready)")
+	case !waitReady:
 		w.a.V(1).M(host).F().Info("Skip WaitUntilReady — no live quorum (bootstrap / resume-from-stopped / recovery)")
 	}
 

@@ -62,40 +62,32 @@ func newStatusTestWorker(statusWriter interfaces.IKubeCR) *worker {
 	}
 }
 
-func TestKeeperMembershipSettleDelay(t *testing.T) {
-	tests := []struct {
-		name          string
-		currentHosts  int
-		ancestorHosts int
-		want          time.Duration
-	}{
-		{
-			name:          "same size does not wait",
-			currentHosts:  3,
-			ancestorHosts: 3,
-			want:          0,
-		},
-		{
-			name:          "upscale waits for raft membership",
-			currentHosts:  3,
-			ancestorHosts: 1,
-			want:          30 * time.Second,
-		},
-		{
-			name:          "downscale waits for raft membership",
-			currentHosts:  1,
-			ancestorHosts: 3,
-			want:          120 * time.Second,
-		},
-	}
+func TestMembershipSettleDelay(t *testing.T) {
+	w := &worker{a: a.NewAnnouncer(nil, nil)}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := keeperMembershipSettleDelay(tt.currentHosts, tt.ancestorHosts); got != tt.want {
-				t.Fatalf("keeperMembershipSettleDelay(%d, %d) = %s, want %s", tt.currentHosts, tt.ancestorHosts, got, tt.want)
-			}
-		})
-	}
+	t.Run("same size does not wait", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(3))
+		if got := w.membershipSettleDelay(cr); got != 0 {
+			t.Fatalf("membershipSettleDelay() = %s, want 0", got)
+		}
+	})
+
+	t.Run("upscale waits for raft membership", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		if got := w.membershipSettleDelay(cr); got != 30*time.Second {
+			t.Fatalf("membershipSettleDelay() = %s, want 30s", got)
+		}
+	})
+
+	t.Run("downscale always waits 120s", func(t *testing.T) {
+		cr := chkWithHosts(1)
+		cr.SetAncestor(chkWithHosts(3))
+		if got := w.membershipSettleDelay(cr); got != 120*time.Second {
+			t.Fatalf("membershipSettleDelay() = %s, want 120s", got)
+		}
+	})
 }
 
 func TestPersistReconcileCompleted(t *testing.T) {
