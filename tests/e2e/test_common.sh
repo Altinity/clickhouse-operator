@@ -71,6 +71,7 @@ PRELOAD_IMAGES_ALL=(
     "clickhouse/clickhouse-server:24.8"        # test-017-multi-version (metrics)
     "clickhouse/clickhouse-server:25.3"
     "clickhouse/clickhouse-server:25.8"
+    "clickhouse/clickhouse-server:26.3"
     "clickhouse/clickhouse-server:latest"
     # Altinity builds (default stable template + FIPS)
     "altinity/clickhouse-server:25.8.16.10001.altinitystable"  # default clickhouse_template
@@ -87,8 +88,8 @@ PRELOAD_IMAGES_ALL=(
     "registry.access.redhat.com/ubi8/ubi-minimal:latest"
     "nginx:latest"
     "altinity/clickhouse-backup:stable"
-    "altinity/clickhouse-backup:2.4.15"
-    "altinity/clickhouse-backup:2.7.0-fips"  # FIPS backup sidecar (manifests/chit/test-030003-backup-template.yaml; test_030003/030004 run_backup_fips_checks)
+    "altinity/clickhouse-backup:latest-fips"  # FIPS backup sidecar (manifests/chit/test-030003-backup-template.yaml)
+    "alpine/openssl:3.3.3"
 )
 
 # =============================================================================
