@@ -48,17 +48,19 @@ func minimalCR(namespace, name string) *api.ClickHouseInstallation {
 // fakeSTS is a minimal IKubeSTS test double recording every call and returning
 // injected results so each test scenario can exercise a specific code path.
 type fakeSTS struct {
-	getCalls    int
-	createCalls int
-	updateCalls int
-	deleteCalls int
+	getCalls            int
+	createCalls         int
+	validateCreateCalls int
+	updateCalls         int
+	deleteCalls         int
 
-	getReturn    *apps.StatefulSet
-	getErr       error
-	createErr    error
-	updateErr    error
-	deleteErr    error
-	updateReturn *apps.StatefulSet
+	getReturn         *apps.StatefulSet
+	getErr            error
+	createErr         error
+	validateCreateErr error
+	updateErr         error
+	deleteErr         error
+	updateReturn      *apps.StatefulSet
 
 	lastDeleteNamespace string
 	lastDeleteName      string
@@ -75,6 +77,11 @@ func (f *fakeSTS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.Stat
 		return nil, f.createErr
 	}
 	return sts, nil
+}
+
+func (f *fakeSTS) ValidateCreate(ctx context.Context, sts *apps.StatefulSet) error {
+	f.validateCreateCalls++
+	return f.validateCreateErr
 }
 
 func (f *fakeSTS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
@@ -289,6 +296,7 @@ func TestRecreateStatefulSet_HappyPath(t *testing.T) {
 	err := r.recreateStatefulSet(context.Background(), h, false /*register*/, NewReconcileStatefulSetOptions())
 
 	require.NoError(t, err)
+	assert.Equal(t, 1, fake.validateCreateCalls, "desired StatefulSet must be dry-run validated before delete")
 	assert.Equal(t, 1, fake.deleteCalls, "delete should be invoked once")
 	assert.Equal(t, 1, fake.createCalls, "create should follow a successful delete")
 }
@@ -340,4 +348,26 @@ func TestCreateStatefulSet_AlreadyExistsPropagatesAsRecreate(t *testing.T) {
 	assert.Equal(t, common.ErrCRUDRecreate, err,
 		"createStatefulSet must propagate ErrCRUDRecreate so the caller retries on the next reconcile pass")
 	assert.Equal(t, 1, fake.createCalls, "Create should be attempted exactly once")
+}
+
+// TestRecreateStatefulSet_InvalidDesiredSkipsDelete: when the dry-run rejects the desired
+// StatefulSet, recreate returns the error and does not delete the existing one (#1420).
+func TestRecreateStatefulSet_InvalidDesiredSkipsDelete(t *testing.T) {
+	validateErr := errors.New(`StatefulSet is invalid: spec.template.labels: Invalid value: "/metrics"`)
+	fake := &fakeSTS{
+		getReturn:         stsWithReplicas(int32Ptr(3)),
+		validateCreateErr: validateErr,
+	}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+
+	h := hostWithCR("ns", "test-chi")
+	h.Runtime.DesiredStatefulSet = stsWithReplicas(int32Ptr(1))
+
+	err := r.recreateStatefulSet(context.Background(), h, false /*register*/, NewReconcileStatefulSetOptions())
+
+	require.Error(t, err, "an invalid desired StatefulSet must fail the recreate")
+	assert.Equal(t, validateErr, err, "the dry-run validation error must propagate verbatim")
+	assert.Equal(t, 1, fake.validateCreateCalls, "ValidateCreate must run once, before any delete")
+	assert.Equal(t, 0, fake.deleteCalls, "the running StatefulSet must NOT be deleted when the desired spec is invalid")
+	assert.Equal(t, 0, fake.createCalls, "no create should be attempted when validation fails")
 }

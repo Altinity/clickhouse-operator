@@ -192,6 +192,22 @@ func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, re
 	r.a.V(2).M(host).S().Info(util.NamespaceNameString(host.GetCR()))
 	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(host.GetCR()))
 
+	// Recreate deletes the existing StatefulSet before creating the desired one, so a desired spec
+	// the API server rejects would leave the host with no StatefulSet (#1420). Dry-run the desired
+	// StatefulSet first and, if it is rejected, return without deleting the existing one.
+	if err := r.sts.ValidateCreate(ctx, host.Runtime.DesiredStatefulSet); err != nil {
+		namespace := host.Runtime.Address.Namespace
+		name := r.namer.Name(interfaces.NameStatefulSet, host)
+		r.a.V(1).
+			WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateFailed).
+			WithAction(host.GetCR()).
+			WithError(host.GetCR()).
+			M(host).F().
+			Warning("Recreate aborted: desired StatefulSet is invalid, keeping existing one %s/%s", namespace, name)
+		log.V(1).M(host).F().Error("Recreate aborted: desired StatefulSet dry-run rejected, keeping existing StatefulSet %s/%s err: %v", namespace, name, err)
+		return err
+	}
+
 	if err := r.doDeleteStatefulSet(ctx, host); err != nil {
 		namespace := host.Runtime.Address.Namespace
 		name := r.namer.Name(interfaces.NameStatefulSet, host)
