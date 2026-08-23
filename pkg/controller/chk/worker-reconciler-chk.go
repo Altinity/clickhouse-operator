@@ -312,32 +312,6 @@ func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr 
 	return nil
 }
 
-// membershipSettleDelay is a best-effort pause after publishing membership
-// changes so Raft can settle:
-//   - same host count → no delay
-//   - upscale → 30s
-//   - downscale → 120s (survivors still need time after raft_configuration shrink;
-//     peer purge later adds another 1m in clean())
-func (w *worker) membershipSettleDelay(cr *apiChk.ClickHouseKeeperInstallation) time.Duration {
-	if cr == nil {
-		return 0
-	}
-	ancestorHosts := 0
-	if ancestor := cr.GetAncestor(); ancestor != nil {
-		ancestorHosts = ancestor.HostsCount()
-	}
-	currentHosts := cr.HostsCount()
-
-	switch {
-	case currentHosts < ancestorHosts:
-		return 120 * time.Second
-	case currentHosts > ancestorHosts:
-		return 30 * time.Second
-	default:
-		return 0
-	}
-}
-
 // reconcileCRServicePreliminary runs first stage of CR reconcile process
 func (w *worker) reconcileCRServicePreliminary(ctx context.Context, cr api.ICustomResource) error {
 	if cr.IsStopped() {
@@ -463,13 +437,8 @@ func (w *worker) reconcileHostStatefulSet(
 
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
 	opts = w.prepareStsReconcileOptsWaitSection(host, opts, snap.rolling)
-
-	// First point where "would this pass take the host down?" can be answered — same
-	// placement as CHI hostDisruptionWouldDegradeShard (#1704).
-	if w.hostDisruptionWouldBreakQuorum(ctx, host, opts, snap) {
-		if err := w.waitForQuorumSafeToDisruptHost(ctx, host, opts, &snap); err != nil {
-			return err
-		}
+	if err := w.ensureQuorumSafeToDisruptHost(ctx, host, opts, &snap); err != nil {
+		return err
 	}
 
 	forcedRestart := false
@@ -668,11 +637,10 @@ func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *ap
 		// and for large clusters it is a small price to pay before performing concurrent fan-out.
 		w.a.V(1).Info("starting first shard separately")
 		if err := w.reconcileShardWithHosts(ctx, shards[0]); err != nil {
-			if !errors.Is(err, common.ErrCRUDDeferred) {
-				w.a.V(1).Warning("first shard failed, skipping rest of shards due to an error: %v", err)
-				return err
+			if hard := noteCRUDResult(err, &deferred); hard != nil {
+				w.a.V(1).Warning("first shard failed, skipping rest of shards due to an error: %v", hard)
+				return hard
 			}
-			deferred = true
 		}
 
 		// Since shard with 0 index is already done, we'll proceed concurrently starting with the 1-st
@@ -684,11 +652,10 @@ func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *ap
 	workersNum := w.getReconcileShardsWorkersNum(cluster, opts)
 	w.a.V(1).Info("Starting rest of shards on workers. Workers num: %d", workersNum)
 	if err := w.runConcurrently(ctx, workersNum, startShard, shards[startShard:]); err != nil {
-		if !errors.Is(err, common.ErrCRUDDeferred) {
-			w.a.V(1).Info("Finished with ERROR rest of shards on workers: %d, err: %v", workersNum, err)
-			return err
+		if hard := noteCRUDResult(err, &deferred); hard != nil {
+			w.a.V(1).Info("Finished with ERROR rest of shards on workers: %d, err: %v", workersNum, hard)
+			return hard
 		}
-		deferred = true
 	}
 	w.a.V(1).Info("Finished successfully rest of shards on workers: %d", workersNum)
 	if deferred {
@@ -709,11 +676,7 @@ func (w *worker) reconcileShardWithHosts(ctx context.Context, shard api.IShard) 
 	for _, host := range shardHostsRecoveryFirst(shard, func(h *api.Host) bool {
 		return w.isHostHealthyForReconcile(ctx, h)
 	}) {
-		if err := w.reconcileHost(ctx, host); err != nil {
-			if errors.Is(err, common.ErrCRUDDeferred) {
-				deferred = true
-				continue
-			}
+		if err := noteCRUDResult(w.reconcileHost(ctx, host), &deferred); err != nil {
 			return err
 		}
 	}
@@ -721,24 +684,6 @@ func (w *worker) reconcileShardWithHosts(ctx context.Context, shard api.IShard) 
 		return common.ErrCRUDDeferred
 	}
 	return nil
-}
-
-// shardHostsRecoveryFirst returns shard hosts with not-ready replicas first, then
-// ready ones — same ordering as CHI reconcileShardWithHosts (#1704).
-func shardHostsRecoveryFirst(shard api.IShard, healthy func(*api.Host) bool) []*api.Host {
-	if shard == nil {
-		return nil
-	}
-	var recovery, rollout []*api.Host
-	shard.WalkHosts(func(host *api.Host) error {
-		if healthy(host) {
-			rollout = append(rollout, host)
-		} else {
-			recovery = append(recovery, host)
-		}
-		return nil
-	})
-	return append(recovery, rollout...)
 }
 
 // reconcileShard reconciles specified shard, excluding nested replicas
@@ -943,35 +888,6 @@ func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, sn
 
 	// Extension point for richer Raft membership confirmation (PR #2041).
 	return w.verifyHostEnsembleMembership(ctx, host)
-}
-
-// prepareStsReconcileOptsWaitSection sets STS launch waits for Keeper.
-//
-// rolling comes from snapshotHostEnsemble before any disruption.
-func (w *worker) prepareStsReconcileOptsWaitSection(
-	host *api.Host,
-	opts *statefulset.ReconcileOptions,
-	rolling bool,
-) *statefulset.ReconcileOptions {
-	if opts == nil {
-		opts = statefulset.NewReconcileStatefulSetOptions()
-	}
-	probes := host.GetCluster().GetReconcile().Host.Wait.Probes
-
-	if probes.GetStartup().IsTrue() || !rolling {
-		opts = opts.SetWaitUntilStarted()
-		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilStarted")
-	}
-
-	switch {
-	case rolling && !probes.GetReadiness().IsFalse():
-		opts = opts.SetWaitUntilReady()
-		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (Keeper must become Ready)")
-	case !rolling:
-		w.a.V(1).M(host).F().Info("Skip WaitUntilReady — bootstrap / resume-from-stopped / recovery")
-	}
-
-	return opts
 }
 
 // reconcileHostIncludeIntoAllActivities includes specified ClickHouse host into all activities

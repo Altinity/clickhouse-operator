@@ -16,6 +16,7 @@ package chk
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -30,10 +31,15 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// raftQuorumDeferredRequeueAfter is the fixed retry interval when reconcile
+// returns ErrCRUDDeferred (Raft quorum headroom not available yet).
+const raftQuorumDeferredRequeueAfter = 5 * time.Second
 
 // Controller reconciles a ClickHouseKeeper object
 type Controller struct {
@@ -113,6 +119,15 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	if err := w.reconcileCR(ctx, nil, new); err != nil {
+		if errors.Is(err, common.ErrCRUDDeferred) {
+			// Soft defer: quorum headroom not available yet. Status already
+			// records [RaftQuorumUnsafe]; retry on a fixed interval instead of
+			// error backoff.
+			log.V(1).M(new).F().Info(
+				"Raft quorum defer — requeue in %s", raftQuorumDeferredRequeueAfter,
+			)
+			return ctrl.Result{RequeueAfter: raftQuorumDeferredRequeueAfter}, nil
+		}
 		return ctrl.Result{}, err
 	}
 

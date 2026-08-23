@@ -21,6 +21,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
@@ -30,14 +31,19 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// Raft / ensemble safety for CHK (#2069).
+// Raft / ensemble safety policy for CHK (#2069).
 //
-// snapshotHostEnsemble records rolling vs bootstrap once per host, before any
-// disruption. Live Ready count drives rolling — not CR ancestor / host inventory:
+// Owns rolling-vs-bootstrap classification, STS wait probes, quorum disrupt gate,
+// recovery-first host ordering, and membership settle delays. The reconciler
+// calls into these helpers; it should not restate the policy inline.
 //
-//   - Rolling (n<=1 or live quorum): wait Ready, refuse disrupt below quorum.
-//   - Bootstrap: wait Started only so siblings can come up together.
+// Before disrupting a host STS:
 //
+//  1. snapshotHostEnsemble — freeze rolling vs bootstrap (live Ready, not ancestor)
+//  2. prepareStsReconcileOptsWaitSection — Ready wait iff rolling
+//  3. ensureQuorumSafeToDisruptHost — wait/defer if disrupt would break Raft majority
+//
+// hostDisruptionWouldBreakQuorum is the tested predicate used inside the façade.
 // verifyHostEnsembleMembership is the extension point for a fuller Raft barrier
 // (committed /keeper/config + mntr, as in PR #2041).
 
@@ -153,9 +159,11 @@ func (w *worker) quorumDisruptWaitTimeout() time.Duration {
 	return defaultQuorumDisruptWaitTimeout
 }
 
-// waitForQuorumSafeToDisruptHost polls until disrupting the host would not drop
-// the ensemble below Raft quorum, or until the wait budget expires.
-func (w *worker) waitForQuorumSafeToDisruptHost(
+// ensureQuorumSafeToDisruptHost is the reconciler façade for the Raft disrupt gate.
+// Call after PrepareHostStatefulSetWithStatus so ObjectStatusSame is assigned.
+// Returns nil when safe (or not a rolling multi-member disrupt); ErrCRUDDeferred
+// after waiting up to the budget without quorum headroom.
+func (w *worker) ensureQuorumSafeToDisruptHost(
 	ctx context.Context,
 	host *api.Host,
 	opts *statefulset.ReconcileOptions,
@@ -279,4 +287,76 @@ func (w *worker) verifyHostEnsembleMembership(ctx context.Context, host *api.Hos
 	_ = ctx
 	_ = host
 	return nil
+}
+
+// prepareStsReconcileOptsWaitSection sets STS launch waits for Keeper.
+// rolling comes from snapshotHostEnsemble before any disruption.
+func (w *worker) prepareStsReconcileOptsWaitSection(
+	host *api.Host,
+	opts *statefulset.ReconcileOptions,
+	rolling bool,
+) *statefulset.ReconcileOptions {
+	if opts == nil {
+		opts = statefulset.NewReconcileStatefulSetOptions()
+	}
+	probes := host.GetCluster().GetReconcile().Host.Wait.Probes
+
+	if probes.GetStartup().IsTrue() || !rolling {
+		opts = opts.SetWaitUntilStarted()
+		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilStarted")
+	}
+
+	switch {
+	case rolling && !probes.GetReadiness().IsFalse():
+		opts = opts.SetWaitUntilReady()
+		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (Keeper must become Ready)")
+	case !rolling:
+		w.a.V(1).M(host).F().Info("Skip WaitUntilReady — bootstrap / resume-from-stopped / recovery")
+	}
+
+	return opts
+}
+
+// membershipSettleDelay is a best-effort pause after publishing membership
+// changes so Raft can settle:
+//   - same host count → no delay
+//   - upscale → 30s
+//   - downscale → 120s (survivors still need time after raft_configuration shrink;
+//     peer purge later adds another 1m in clean())
+func (w *worker) membershipSettleDelay(cr *apiChk.ClickHouseKeeperInstallation) time.Duration {
+	if cr == nil {
+		return 0
+	}
+	ancestorHosts := 0
+	if ancestor := cr.GetAncestor(); ancestor != nil {
+		ancestorHosts = ancestor.HostsCount()
+	}
+	currentHosts := cr.HostsCount()
+
+	switch {
+	case currentHosts < ancestorHosts:
+		return 120 * time.Second
+	case currentHosts > ancestorHosts:
+		return 30 * time.Second
+	default:
+		return 0
+	}
+}
+
+// shardHostsRecoveryFirst returns shard hosts with not-ready replicas first, then
+// ready ones — same ordering as CHI reconcileShardWithHosts (#1704).
+func shardHostsRecoveryFirst(shard api.IShard, healthy func(*api.Host) bool) []*api.Host {
+	if shard == nil {
+		return nil
+	}
+	var recovery, rollout []*api.Host
+	shard.WalkHosts(func(host *api.Host) error {
+		if healthy(host) {
+			rollout = append(rollout, host)
+		} else {
+			recovery = append(recovery, host)
+		}
+		return nil
+	})
+	return append(recovery, rollout...)
 }
