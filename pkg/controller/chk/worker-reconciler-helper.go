@@ -53,6 +53,21 @@ func (w *worker) reconcileShardsAndHostsFetchOpts(ctx context.Context) *common.R
 	}
 }
 
+// noteCRUDResult records ErrCRUDDeferred on deferred and returns hard errors only.
+// Soft deferred results return nil so the caller can continue other hosts/shards.
+func noteCRUDResult(err error, deferred *bool) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, common.ErrCRUDDeferred) {
+		if deferred != nil {
+			*deferred = true
+		}
+		return nil
+	}
+	return err
+}
+
 func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShardIndex int, shards []*apiChk.ChkShard) error {
 	if len(shards) == 0 {
 		return nil
@@ -91,10 +106,8 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 				w.a.V(1).Info("Starting shard index: %d on worker", rq.index)
 				if e := w.reconcileShardWithHosts(ctx, rq.shard); e != nil {
 					errLock.Lock()
-					if errors.Is(e, common.ErrCRUDDeferred) {
-						deferred = true
-					} else {
-						err = e
+					if hard := noteCRUDResult(e, &deferred); hard != nil {
+						err = hard
 					}
 					errLock.Unlock()
 				}

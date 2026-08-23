@@ -165,7 +165,7 @@ func TestErrCRUDDeferredIsDistinctFromAbort(t *testing.T) {
 	require.False(t, errors.Is(common.ErrCRUDAbort, common.ErrCRUDDeferred))
 }
 
-func TestWaitForQuorumSafeToDisruptHost(t *testing.T) {
+func TestEnsureQuorumSafeToDisruptHost(t *testing.T) {
 	ctx := context.Background()
 	host := hostOnCR(chkWithHosts(3))
 	host.Runtime.CurStatefulSet = &apps.StatefulSet{}
@@ -176,7 +176,7 @@ func TestWaitForQuorumSafeToDisruptHost(t *testing.T) {
 	t.Run("returns immediately when already safe", func(t *testing.T) {
 		w := &worker{}
 		safeSnap := hostEnsembleSnapshot{rolling: true, members: 3, readyCount: 3}
-		require.NoError(t, w.waitForQuorumSafeToDisruptHost(ctx, host, nil, &safeSnap))
+		require.NoError(t, w.ensureQuorumSafeToDisruptHost(ctx, host, nil, &safeSnap))
 	})
 
 	t.Run("waits until ready count increases", func(t *testing.T) {
@@ -194,7 +194,7 @@ func TestWaitForQuorumSafeToDisruptHost(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 			ready.Store(3)
 		}()
-		require.NoError(t, w.waitForQuorumSafeToDisruptHost(ctx, host, nil, &waitSnap))
+		require.NoError(t, w.ensureQuorumSafeToDisruptHost(ctx, host, nil, &waitSnap))
 	})
 
 	t.Run("defers after wait budget expires", func(t *testing.T) {
@@ -204,7 +204,7 @@ func TestWaitForQuorumSafeToDisruptHost(t *testing.T) {
 			quorumDisruptWaitOverride:    20 * time.Millisecond,
 		}
 		waitSnap := snap
-		err := w.waitForQuorumSafeToDisruptHost(ctx, host, nil, &waitSnap)
+		err := w.ensureQuorumSafeToDisruptHost(ctx, host, nil, &waitSnap)
 		require.ErrorIs(t, err, common.ErrCRUDDeferred)
 	})
 }
@@ -257,6 +257,76 @@ func TestShardHostsRecoveryFirst(t *testing.T) {
 	require.Len(t, ordered, 2)
 	require.Same(t, h1, ordered[0], "not-ready host should reconcile first")
 	require.Same(t, h0, ordered[1], "ready host should reconcile second")
+}
+
+func TestMembershipSettleDelay(t *testing.T) {
+	w := &worker{}
+
+	t.Run("same size does not wait", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(3))
+		if got := w.membershipSettleDelay(cr); got != 0 {
+			t.Fatalf("membershipSettleDelay() = %s, want 0", got)
+		}
+	})
+
+	t.Run("upscale waits for raft membership", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		if got := w.membershipSettleDelay(cr); got != 30*time.Second {
+			t.Fatalf("membershipSettleDelay() = %s, want 30s", got)
+		}
+	})
+
+	t.Run("downscale always waits 120s", func(t *testing.T) {
+		cr := chkWithHosts(1)
+		cr.SetAncestor(chkWithHosts(3))
+		if got := w.membershipSettleDelay(cr); got != 120*time.Second {
+			t.Fatalf("membershipSettleDelay() = %s, want 120s", got)
+		}
+	})
+}
+
+func TestPrepareStsReconcileOptsWaitSection(t *testing.T) {
+	w := &worker{}
+
+	t.Run("bootstrap skips Ready", func(t *testing.T) {
+		host := hostOnCR(chkWithHosts(3))
+		opts := w.prepareStsReconcileOptsWaitSection(host, nil, false)
+		if !opts.WaitUntilStarted() || opts.WaitUntilReady() {
+			t.Fatal("bootstrap should wait Started only")
+		}
+	})
+
+	t.Run("rolling waits Ready", func(t *testing.T) {
+		host := hostOnCR(chkWithHosts(3))
+		opts := w.prepareStsReconcileOptsWaitSection(host, nil, true)
+		if !opts.WaitUntilReady() {
+			t.Fatal("rolling should wait Ready")
+		}
+	})
+
+	t.Run("rolling can opt out of Ready probe", func(t *testing.T) {
+		host := hostOnCR(chkWithHosts(3))
+		host.GetCluster().GetReconcile().Host.Wait.Probes.Readiness = types.NewStringBool(false)
+		opts := w.prepareStsReconcileOptsWaitSection(host, statefulset.NewReconcileStatefulSetOptions(), true)
+		if opts.WaitUntilReady() {
+			t.Fatal("readiness=false should skip Ready wait")
+		}
+	})
+
+	t.Run("single-host post-restart still waits Ready", func(t *testing.T) {
+		w.countReadyEnsembleMembersFn = func(context.Context, api.ICustomResource) int { return 0 }
+		host := hostOnCR(chkWithHosts(1))
+		snap := w.snapshotHostEnsemble(context.Background(), host)
+		if !snap.rolling {
+			t.Fatal("single host should be rolling")
+		}
+		opts := w.prepareStsReconcileOptsWaitSection(host, nil, snap.rolling)
+		if !opts.WaitUntilReady() {
+			t.Fatal("rolling snapshot must drive Ready wait after force-restart")
+		}
+	})
 }
 
 func chkWithHosts(n int) *apiChk.ClickHouseKeeperInstallation {

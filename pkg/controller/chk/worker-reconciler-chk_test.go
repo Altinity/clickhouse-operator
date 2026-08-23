@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -26,7 +25,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
@@ -61,34 +59,6 @@ func newStatusTestWorker(statusWriter interfaces.IKubeCR) *worker {
 		c: controller,
 		a: a.NewAnnouncer(nil, statusWriter),
 	}
-}
-
-func TestMembershipSettleDelay(t *testing.T) {
-	w := &worker{a: a.NewAnnouncer(nil, nil)}
-
-	t.Run("same size does not wait", func(t *testing.T) {
-		cr := chkWithHosts(3)
-		cr.SetAncestor(chkWithHosts(3))
-		if got := w.membershipSettleDelay(cr); got != 0 {
-			t.Fatalf("membershipSettleDelay() = %s, want 0", got)
-		}
-	})
-
-	t.Run("upscale waits for raft membership", func(t *testing.T) {
-		cr := chkWithHosts(3)
-		cr.SetAncestor(chkWithHosts(1))
-		if got := w.membershipSettleDelay(cr); got != 30*time.Second {
-			t.Fatalf("membershipSettleDelay() = %s, want 30s", got)
-		}
-	})
-
-	t.Run("downscale always waits 120s", func(t *testing.T) {
-		cr := chkWithHosts(1)
-		cr.SetAncestor(chkWithHosts(3))
-		if got := w.membershipSettleDelay(cr); got != 120*time.Second {
-			t.Fatalf("membershipSettleDelay() = %s, want 120s", got)
-		}
-	})
 }
 
 func TestPersistReconcileCompleted(t *testing.T) {
@@ -154,46 +124,4 @@ func TestMarkReconcileStartReturnsStatusUpdateError(t *testing.T) {
 	if got := cr.EnsureStatus().GetStatus(); got != api.StatusInProgress {
 		t.Fatalf("status = %q, want %q before persistence attempt", got, api.StatusInProgress)
 	}
-}
-
-func TestPrepareStsReconcileOptsWaitSection(t *testing.T) {
-	w := &worker{a: a.NewAnnouncer(nil, nil)}
-
-	t.Run("bootstrap skips Ready", func(t *testing.T) {
-		host := hostOnCR(chkWithHosts(3))
-		opts := w.prepareStsReconcileOptsWaitSection(host, nil, false)
-		if !opts.WaitUntilStarted() || opts.WaitUntilReady() {
-			t.Fatal("bootstrap should wait Started only")
-		}
-	})
-
-	t.Run("rolling waits Ready", func(t *testing.T) {
-		host := hostOnCR(chkWithHosts(3))
-		opts := w.prepareStsReconcileOptsWaitSection(host, nil, true)
-		if !opts.WaitUntilReady() {
-			t.Fatal("rolling should wait Ready")
-		}
-	})
-
-	t.Run("rolling can opt out of Ready probe", func(t *testing.T) {
-		host := hostOnCR(chkWithHosts(3))
-		host.GetCluster().GetReconcile().Host.Wait.Probes.Readiness = types.NewStringBool(false)
-		opts := w.prepareStsReconcileOptsWaitSection(host, statefulset.NewReconcileStatefulSetOptions(), true)
-		if opts.WaitUntilReady() {
-			t.Fatal("readiness=false should skip Ready wait")
-		}
-	})
-
-	t.Run("single-host post-restart still waits Ready", func(t *testing.T) {
-		w.countReadyEnsembleMembersFn = func(context.Context, api.ICustomResource) int { return 0 }
-		host := hostOnCR(chkWithHosts(1))
-		snap := w.snapshotHostEnsemble(context.Background(), host)
-		if !snap.rolling {
-			t.Fatal("single host should be rolling")
-		}
-		opts := w.prepareStsReconcileOptsWaitSection(host, nil, snap.rolling)
-		if !opts.WaitUntilReady() {
-			t.Fatal("rolling snapshot must drive Ready wait after force-restart")
-		}
-	})
 }
