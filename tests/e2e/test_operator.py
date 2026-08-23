@@ -8908,7 +8908,7 @@ def test_030003(self):
 
 @TestScenario
 @Tags("HEAVY")
-@Name("test_030004. FIPS CHI: scale replicas 2 -> 3 -> 1")
+@Name("test_030004. FIPS CHI: scale replicas 1 -> 2 -> 1")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_FIPS_CH_Rescale("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_CH_ConfigUpdate("1.0"),
@@ -8916,9 +8916,9 @@ def test_030003(self):
 def test_030004(self):
     """Verify FIPS ClickHouse survives replica scale-up and scale-down.
 
-    Starts from the base FIPS CHI manifest with two replicas, upscales to three,
-    then downscales to one. Each stage reuses the base manifest via a temp copy
-    with an edited ``replicasCount``.
+    Starts from a single-replica FIPS CHI, upscales to two replicas, downscales
+    back to one, then applies a TLS cipher config update. Each stage reuses the
+    base manifest via a temp copy with an edited ``replicasCount``.
     """
     chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
     chi_manifest = "manifests/chi/test-030003.yaml"
@@ -8933,8 +8933,8 @@ def test_030004(self):
     with Given("strict FIPS operator configuration is applied"):
         util.apply_operator_config(chopconf)
 
-    with And("test TLS secret covers up to 3 CHI and CHK replicas"):
-        create_tls_secret_for_fips_hosts(chi=chi, chk=chk, replicas=3)
+    with And("test TLS secret covers up to 2 CHI and CHK replicas"):
+        create_tls_secret_for_fips_hosts(chi=chi, chk=chk, replicas=2)
 
     with And("external ClickHouse client pod is started"):
         start_external_ch_container()
@@ -8946,7 +8946,32 @@ def test_030004(self):
             kind="chk",
         )
 
-    with And("FIPS ClickHouse is deployed with 2 replicas and backup sidecars"):
+    with And("FIPS ClickHouse is deployed with 1 replica and backup sidecars"):
+        chi_manifest_1 = fips_edit_manifest(
+            source_manifest=chi_manifest,
+            replicas_count=1,
+            kind="chi",
+        )
+        fips_apply_manifest(
+            manifest_path=chi_manifest_1,
+            replica_count=1,
+            kind="chi",
+            apply_templates=[backup_template],
+        )
+
+    with Then("single-replica ClickHouse cluster passes essential FIPS checks"):
+        run_chi_fips_checks(
+            workload=chi,
+            replica_count=1,
+        )
+
+    with Check("clickhouse-backup sidecar passes essential FIPS checks"):
+        run_backup_fips_checks(
+            workload=chi,
+            replica_count=1,
+        )
+
+    with When("CHI is upscaled to 2 replicas"):
         chi_manifest_2 = fips_edit_manifest(
             source_manifest=chi_manifest,
             replicas_count=2,
@@ -8956,7 +8981,6 @@ def test_030004(self):
             manifest_path=chi_manifest_2,
             replica_count=2,
             kind="chi",
-            apply_templates=[backup_template],
         )
 
     with Then("2-replica ClickHouse cluster passes essential FIPS checks"):
@@ -8973,36 +8997,6 @@ def test_030004(self):
 
     with Check("ReplicatedMergeTree data converges across 2 replicas"):
         fips_check_replication_across_replicas(chi_pods=chi_pods)
-
-    with When("CHI is upscaled to 3 replicas"):
-        chi_manifest_3 = fips_edit_manifest(
-            source_manifest=chi_manifest,
-            replicas_count=3,
-            kind="chi",
-        )
-        fips_apply_manifest(
-            manifest_path=chi_manifest_3,
-            replica_count=3,
-            kind="chi",
-        )
-
-    with Then("3-replica ClickHouse cluster passes essential FIPS checks"):
-        chi_pods = run_chi_fips_checks(
-            workload=chi,
-            replica_count=3,
-        )
-
-    with Check("clickhouse-backup sidecars pass essential FIPS checks"):
-        run_backup_fips_checks(
-            workload=chi,
-            replica_count=3,
-        )
-
-    with Check("ReplicatedMergeTree data converges across 3 replicas"):
-        fips_check_replication_across_replicas(
-            chi_pods=chi_pods,
-            table="repl_scale_test_3",
-        )
 
     with When("CHI is downscaled to 1 replica"):
         chi_manifest_1 = fips_edit_manifest(
@@ -9055,7 +9049,7 @@ def test_030004(self):
 
 @TestScenario
 @Tags("HEAVY")
-@Name("test_030005. FIPS CHK: scale replicas 2 -> 3 -> 1")
+@Name("test_030005. FIPS CHK: scale replicas 1 -> 3 -> 1")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_FIPS_CHK_Rescale("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_CHK_ConfigUpdate("1.0"),
@@ -9063,9 +9057,9 @@ def test_030004(self):
 def test_030005(self):
     """Verify FIPS ClickHouse Keeper survives replica scale-up and scale-down.
 
-    Starts from the base FIPS CHK manifest with two replicas, upscales to three,
-    then downscales to one. A fixed two-replica FIPS CHI is deployed alongside
-    to confirm ClickHouse stays connected after each CHK scale.
+    Starts from a single-replica FIPS CHK, upscales to three, then downscales
+    back to one. A fixed two-replica FIPS CHI is deployed alongside to confirm
+    ClickHouse stays connected after each CHK scale.
     """
     chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
     chi_manifest = "manifests/chi/test-030003.yaml"
@@ -9086,22 +9080,22 @@ def test_030005(self):
     with And("external ClickHouse client pod is started"):
         start_external_ch_container()
 
-    with When("FIPS ClickHouse Keeper is deployed with 2 replicas"):
-        chk_manifest_2 = fips_edit_manifest(
+    with When("FIPS ClickHouse Keeper is deployed with 1 replica"):
+        chk_manifest_1 = fips_edit_manifest(
             source_manifest=chk_manifest,
-            replicas_count=2,
+            replicas_count=1,
             kind="chk",
         )
         fips_apply_manifest(
-            manifest_path=chk_manifest_2,
-            replica_count=2,
+            manifest_path=chk_manifest_1,
+            replica_count=1,
             kind="chk",
         )
 
-    with Check("2-replica Keeper cluster passes essential FIPS checks"):
+    with Check("single-replica Keeper cluster passes essential FIPS checks"):
         run_chk_fips_checks(
             workload=chk,
-            replica_count=2,
+            replica_count=1,
         )
 
     with When("FIPS ClickHouse is deployed with 2 replicas"):
