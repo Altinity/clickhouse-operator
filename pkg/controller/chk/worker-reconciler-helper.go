@@ -16,6 +16,7 @@ package chk
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
@@ -52,6 +53,21 @@ func (w *worker) reconcileShardsAndHostsFetchOpts(ctx context.Context) *common.R
 	}
 }
 
+// noteCRUDResult records ErrCRUDDeferred on deferred and returns hard errors only.
+// Soft deferred results return nil so the caller can continue other hosts/shards.
+func noteCRUDResult(err error, deferred *bool) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, common.ErrCRUDDeferred) {
+		if deferred != nil {
+			*deferred = true
+		}
+		return nil
+	}
+	return err
+}
+
 func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShardIndex int, shards []*apiChk.ChkShard) error {
 	if len(shards) == 0 {
 		return nil
@@ -80,6 +96,7 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 
 	// Launch workers
 	var err error
+	var deferred bool
 	var errLock sync.Mutex
 	for i := 0; i < workersNum; i++ {
 		wg.Add(1)
@@ -89,7 +106,9 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 				w.a.V(1).Info("Starting shard index: %d on worker", rq.index)
 				if e := w.reconcileShardWithHosts(ctx, rq.shard); e != nil {
 					errLock.Lock()
-					err = e
+					if hard := noteCRUDResult(e, &deferred); hard != nil {
+						err = hard
+					}
 					errLock.Unlock()
 				}
 			}
@@ -99,7 +118,13 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 	w.a.V(1).Info("Starting to wait shards from index: %d on workers.", startShardIndex)
 	wg.Wait()
 	w.a.V(1).Info("Finished to wait shards from index: %d on workers.", startShardIndex)
-	return err
+	if err != nil {
+		return err
+	}
+	if deferred {
+		return common.ErrCRUDDeferred
+	}
+	return nil
 }
 
 func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) *statefulset.ReconcileOptions {
