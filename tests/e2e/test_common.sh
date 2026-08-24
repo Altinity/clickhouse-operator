@@ -46,7 +46,6 @@ NO_CLEANUP="${NO_CLEANUP:-""}"
 # NOTE: Keep this list in sync with images referenced from:
 #   - tests/e2e/manifests/**/*.yaml                   (test-specific manifests)
 #   - tests/e2e/manifests/chit/tpl-clickhouse-stable.yaml   (default CLICKHOUSE_TEMPLATE)
-#   - tests/e2e/manifests/chit/tpl-clickhouse-23.3.yaml     (clickhouse_template_old)
 #   - tests/e2e/manifests/chk/*.yaml                  (keeper tests, incl. FIPS)
 # Intentionally EXCLUDED from preload (verified — do not re-add):
 #   - Meant-to-fail / decoy images (preloading them would defeat the test that rejects them):
@@ -65,21 +64,19 @@ NO_CLEANUP="${NO_CLEANUP:-""}"
 # parallel and skips images already present — and removes that whole class of flake.
 PRELOAD_IMAGES_ALL=(
     # ClickHouse server versions used in manifests and templates
-    "clickhouse/clickhouse-server:23.3"        # clickhouse_template_old + older-version compat tests
-    "clickhouse/clickhouse-server:23.8"
     "clickhouse/clickhouse-server:24.3"        # also base for 24.3-broken rollback tests; test-017-multi-version (metrics)
     "clickhouse/clickhouse-server:24.8"        # test-017-multi-version (metrics)
     "clickhouse/clickhouse-server:25.3"
     "clickhouse/clickhouse-server:25.8"
+    "clickhouse/clickhouse-server:26.3"
     "clickhouse/clickhouse-server:latest"
     # Altinity builds (default stable template + FIPS)
-    "altinity/clickhouse-server:25.8.16.10001.altinitystable"  # default clickhouse_template
-    "altinity/clickhouse-server:25.8.16.10002.altinitystable"  # test_010035 auto-recovery upgrade target (manifests/chi/test-035-auto-recovery-2.yaml)
+    "altinity/clickhouse-server:25.8.28.10001.altinitystable"  # default clickhouse_template
     "altinity/clickhouse-server:25.3.8.30001.altinityfips"     # FIPS CHI (e.g. manifests/chk/test-020008-chi-fips.yaml)
     # ClickHouse Keeper versions
     "clickhouse/clickhouse-keeper:25.3"
     "clickhouse/clickhouse-keeper:25.8"
-    "clickhouse/clickhouse-keeper:latest-alpine"  # test_clickhouse_keeper_rescale (deploy/clickhouse-keeper/clickhouse-keeper-manually/...-for-test-only.yaml)
+    "clickhouse/clickhouse-keeper:26.3"
     "altinity/clickhouse-keeper:25.3.8.30001.altinityfips"
     # Zookeeper
     "docker.io/zookeeper:3.8.4"
@@ -87,8 +84,8 @@ PRELOAD_IMAGES_ALL=(
     "registry.access.redhat.com/ubi8/ubi-minimal:latest"
     "nginx:latest"
     "altinity/clickhouse-backup:stable"
-    "altinity/clickhouse-backup:2.4.15"
-    "altinity/clickhouse-backup:2.7.0-fips"  # FIPS backup sidecar (manifests/chit/test-030003-backup-template.yaml; test_030003/030004 run_backup_fips_checks)
+    "altinity/clickhouse-backup:latest-fips"  # FIPS backup sidecar (manifests/chit/test-030003-backup-template.yaml)
+    "alpine/openssl:3.3.3"
 )
 
 # =============================================================================

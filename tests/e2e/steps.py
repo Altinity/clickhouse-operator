@@ -10,11 +10,64 @@ import yaml
 import time
 import inspect
 import pathlib
+import sys
 from testflows.core import current
 from testflows.asserts import error
 
 import e2e.kubectl as kubectl
 import e2e.settings as settings
+
+
+def _test_run_failed(test=None):
+    """True when the current scenario (or a sibling step) already failed."""
+    if sys.exc_info()[0] is not None:
+        return True
+
+    node = test if test is not None else current()
+    while node is not None:
+        result = getattr(node, "result", None)
+        if isinstance(result, (Fail, Error)):
+            return True
+        parent = getattr(node, "parent", None)
+        if parent is not None:
+            for subtest in getattr(parent, "subtests", {}).values():
+                subtest_result = getattr(subtest, "result", None)
+                if isinstance(subtest_result, (Fail, Error)):
+                    return True
+        node = parent
+    return False
+
+
+def _dump_failed_test_namespace(test, ns, shell):
+    """Best-effort cluster snapshot before namespace teardown."""
+    operator_ns = getattr(test.context, "operator_namespace", None) or ns
+    print(f"\n=== DEBUG DUMP (test failed) namespace={ns} ===")
+
+    for kind in ("pods", "chi", "chk"):
+        try:
+            print(f"\n--- {kind.upper()} ---")
+            items = kubectl.launch(f"get {kind}", ns=ns, ok_to_fail=True, shell=shell)
+            print(items or f"(no {kind})")
+        except Exception as exc:
+            print(f"failed to list {kind}: {exc}")
+
+    try:
+        print("\n--- Operator log (last 10 lines) ---")
+        operator_pod = kubectl.get_operator_pod(ns=operator_ns, shell=shell)
+        if not operator_pod:
+            print(f"(operator pod not found in namespace {operator_ns})")
+        else:
+            logs = kubectl.launch(
+                f"logs {operator_pod} -c clickhouse-operator --tail=10",
+                ns=operator_ns,
+                ok_to_fail=True,
+                shell=shell,
+            )
+            print(logs or "(empty operator log)")
+    except Exception as exc:
+        print(f"failed to fetch operator logs: {exc}")
+
+    print("=== END DEBUG DUMP ===\n")
 
 
 @TestStep(Given)
@@ -71,6 +124,8 @@ def delete_test_namespace(self):
         return
     shell = get_shell()
     self.context.shell = shell
+    if _test_run_failed(self):
+        _dump_failed_test_namespace(self, ns, shell)
     util.delete_namespace(namespace=ns, delete_chi=True)
     shell.close()
 
@@ -162,10 +217,8 @@ def set_settings(self):
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-23.3.yaml"
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-23.8.yaml"
     self.context.clickhouse_template = define("clickhouse_template",  os.getenv("CLICKHOUSE_TEMPLATE") if "CLICKHOUSE_TEMPLATE" in os.environ else "manifests/chit/tpl-clickhouse-stable.yaml")
-    self.context.clickhouse_template_old = define("clickhouse_template_old", "manifests/chit/tpl-clickhouse-23.3.yaml")
 
     self.context.clickhouse_version = define("clickhouse_version", get_ch_version(test_file=self.context.clickhouse_template))
-    self.context.clickhouse_version_old = define("clickhouse_version_old", get_ch_version(test_file=self.context.clickhouse_template_old))
 
     self.context.prometheus_namespace = define("prometheus_namespace", "prometheus")
     self.context.prometheus_operator_version = define("prometheus_operator_version", "0.68")
