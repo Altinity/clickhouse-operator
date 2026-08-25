@@ -716,29 +716,65 @@ def test_010010_1(self):
     create_shell_namespace_clickhouse_template()
     chi = "test-010-zk-init"
 
-    kubectl.create_and_check(
-        manifest="manifests/chi/test-010-zk-init.yaml",
-        check={
-            "apply_templates": {
-                current().context.clickhouse_template,
+    with When("Start ClickHouse with wrong ZooKeeper host"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-010-zk-init-wrong-host.yaml",
+            check={
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                    },
+                "do_not_delete": 1,
+                "chi_status": "InProgress"
+                },
+            )
+
+        with Then("Operator should start complaining about connection"):
+            wait_operator_logs(["zk path to be verified"])
+            wait_operator_logs(["no such host"])
+
+        with And("CHI should stay in progress with no pods created (waiting for ZooKeeper)"):
+            assert kubectl.get_chi_status(chi) == "InProgress"
+            assert kubectl.get_count("pod", chi = chi) == 0
+
+    with When("Fix ZooKeeper host but do not start it yet"):
+        lastTaskID = kubectl.get_field("chi", chi, ".status.taskID")
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-010-zk-init.yaml",
+            check={
+                "do_not_delete": 1,
+                "chi_status": "InProgress"
             },
-            "do_not_delete": 1,
-            "chi_status": "InProgress"
-        },
-    )
+        )
+        started = int(time.time()) - 5
+        with Then("Create zookeeper service so it would start resolving"):
+            kubectl.apply(util.get_full_path("manifests/chi/test-010-zk-service.yaml"))
 
-    with Then("CHI should stay in progress with no pods created (waiting for ZooKeeper)"):
-        time.sleep(15)
-        assert kubectl.get_chi_status(chi) == "InProgress"
-        assert kubectl.get_count("pod", chi = chi) == 0
+        with Then("And TaskID should be different to confirm reconcile has restarted"):
+            for i in range(0,10):
+                taskID = kubectl.get_field("chi", chi, ".status.taskID")
+                if taskID != lastTaskID:
+                    break
+                retry_sleep(1, 5, "taskID not updated yet")
+            assert taskID != lastTaskID, error("taskID was not updated")
 
-    util.require_keeper(keeper_type=self.context.keeper_type)
+        with And("Operator should start complaining about connection refused"):
+            wait_operator_logs(["zk path to be verified"], time.time() - started)
+            wait_operator_logs(["connect: connection refused"], time.time() - started)
 
-    kubectl.wait_chi_status(chi, "Completed")
+        with And("CHI should stay in progress with no pods created (waiting for ZooKeeper)"):
+            assert kubectl.get_chi_status(chi) == "InProgress"
+            assert kubectl.get_count("pod", chi = chi) == 0
 
-    with And("ClickHouse should not complain regarding zookeeper path"):
-        out = clickhouse.query_with_error(chi, "select path from system.zookeeper where path = '/' limit 1")
-        assert "/" == out
+    with When("Start ZooKeeper normally"):
+        kubectl.delete_kind("service", "zookeeper")
+        util.require_keeper(keeper_type=self.context.keeper_type)
+
+        with Then("ClickHouse should start healthy"):
+            kubectl.wait_chi_status(chi, "Completed")
+
+        with And("ClickHouse should not complain regarding zookeeper path"):
+            out = clickhouse.query_with_error(chi, "select path from system.zookeeper where path = '/' limit 1")
+            assert "/" == out
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -6229,19 +6265,32 @@ def test_010061(self):
         delete_test_namespace()
 
 
-def check_operator_logs(markers, since = ""):
+def check_operator_logs(markers, since_s = "", is_assert = True):
     """Check clickhouse-operator pod logs for specific markers.
     since is accpeted as XXs format to filter out recent rows only"""
     operator_pod = kubectl.get_operator_pod(ns=current().context.test_namespace)
-    if since != "":
-        since = f"--since={since}"
+    if since_s != "":
+        since_s = f"--since={since_s}s"
     out = kubectl.launch(
-        f"logs {operator_pod} -c clickhouse-operator {since}",
+        f"logs {operator_pod} -c clickhouse-operator {since_s}",
         ns=current().context.test_namespace,
     )
+    found_markers = []
     for marker in markers:
         with Then(f"operator logs should contain '{marker}'"):
-            assert marker in out, error(f"Marker '{marker}' not found in operator logs")
+            if is_assert:
+                assert marker in out, error(f"Marker '{marker}' not found in operator logs")
+            else:
+                if marker in out and marker not in found_markers:
+                    found_markers.append(marker)
+    return len(found_markers) == len(markers)
+
+def wait_operator_logs(markers, since_s = "", retries = 10):
+    for i in range(0, retries):
+        if check_operator_logs(markers, since_s = since_s, is_assert = False):
+            return
+        retry_sleep(i, 5, "not yet")
+    assert False, error(f"{markers} were not found in operator logs")
 
 
 @TestScenario

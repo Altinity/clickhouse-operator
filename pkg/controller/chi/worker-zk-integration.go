@@ -15,13 +15,15 @@
 package chi
 
 import (
+	"context"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
 )
 
-func (w *worker) reconcileClusterZookeeperRootPath(cluster *api.Cluster) error {
+func (w *worker) reconcileClusterZookeeperRootPath(ctx context.Context, cluster *api.Cluster) error {
 	// Cluster ZK path reconciliation is optional
 	if !shouldReconcileClusterZookeeperPath(cluster) {
 		// Nothing to reconcile
@@ -48,7 +50,9 @@ func (w *worker) reconcileClusterZookeeperRootPath(cluster *api.Cluster) error {
 		M(cluster.GetCR()).F().
 		Info("Confirm ZK is configured for cluster %s/%s/%s", cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName())
 
-	ensureZkPath(cluster)
+	if err := ensureZkPath(ctx, cluster); err != nil {
+		return err
+	}
 
 	w.a.V(1).
 		WithEvent(cluster.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
@@ -77,7 +81,7 @@ func clusterZookeeperRequiresTLSDial(cluster *api.Cluster) bool {
 	return false
 }
 
-func ensureZkPath(cluster *api.Cluster) {
+func ensureZkPath(ctx context.Context, cluster *api.Cluster) error {
 	// Plumb cluster-level security.zookeeper.tls.{minVersion,verify} into the
 	// ZK dial. Defaults preserve current behavior (Go default TLS version,
 	// strict verify since RootCAs+ServerName are always set). CHOP-config
@@ -100,8 +104,9 @@ func ensureZkPath(cluster *api.Cluster) {
 	}
 	conn := zookeeper.NewConnection(cluster.Zookeeper.Nodes, params)
 	path := zookeeper.NewPathManager(conn)
-	path.Ensure(cluster.Zookeeper.Root)
-	path.Close()
+	err := path.Ensure(ctx, cluster.Zookeeper.Root)
+	_ = path.Close()
+	return err
 }
 
 func shouldReconcileClusterZookeeperPath(cluster *api.Cluster) bool {
@@ -111,6 +116,23 @@ func shouldReconcileClusterZookeeperPath(cluster *api.Cluster) bool {
 	}
 	if cluster.Zookeeper.IsEmpty() {
 		// Nothing to reconcile
+		return false
+	}
+
+	// Same generation as the last completed ancestor with no pending action-plan
+	// work means this pass is recovery-only (#1704 unhealthy / stuck hosts, or
+	// similar). The ZK root was already ensured when the generation last changed;
+	// re-dialing a down ensemble only floods dial timeouts. Spec changes bump
+	// generation (or leave action-plan work) and still ensure.
+	cr := cluster.GetCR()
+	if cr == nil {
+		return true
+	}
+	ancestor := cr.GetAncestorT()
+	ap := cr.EnsureRuntime().ActionPlan
+	if ancestor != nil &&
+		ancestor.GetGeneration() == cr.GetGeneration() &&
+		(ap == nil || !ap.HasActionsToDo()) {
 		return false
 	}
 
