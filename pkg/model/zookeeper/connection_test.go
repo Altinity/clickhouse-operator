@@ -3,11 +3,13 @@ package zookeeper
 import (
 	"context"
 	"testing"
+	"time"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/go-zookeeper/zk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConnection_Get(t *testing.T) {
@@ -704,7 +706,7 @@ func TestConnection_Close(t *testing.T) {
 func newTestConnection(nodes api.ZookeeperNodes, client ZKClient, _params ...*ConnectionParams) *Connection {
 	conn := NewConnection(nodes, _params...)
 	conn.connection = client
-	conn.retryDelayFn = func(i int) {} // Disable retry delay for tests
+	conn.retryDelayFn = func(ctx context.Context, i int) error { return nil } // Disable retry delay for tests
 	return conn
 }
 
@@ -731,6 +733,88 @@ func TestShouldRejectAuthScheme(t *testing.T) {
 			assert.Equal(t, tt.want, shouldRejectAuthScheme(tt.rejectDigest, tt.scheme))
 		})
 	}
+}
+
+func TestConnection_retryRespectsContextCancel(t *testing.T) {
+	mockClient := new(MockZKClient)
+	mockClient.On("Get", "/cancel").Return([]byte(nil), (*zk.Stat)(nil), zk.ErrConnectionClosed).Once()
+
+	conn := newTestConnection(api.ZookeeperNodes{}, mockClient, &ConnectionParams{MaxRetriesNum: 30})
+	ctx, cancel := context.WithCancel(context.Background())
+	conn.retryDelayFn = func(ctx context.Context, i int) error {
+		cancel()
+		return ctx.Err()
+	}
+
+	_, _, err := conn.Get(ctx, "/cancel")
+	assert.ErrorIs(t, err, context.Canceled)
+	mockClient.AssertExpectations(t)
+}
+
+func TestResolveServersRespectsContextCancel(t *testing.T) {
+	orig := lookupHostFn
+	defer func() { lookupHostFn = orig }()
+
+	started := make(chan struct{})
+	lookupHostFn = func(ctx context.Context, host string) ([]string, error) {
+		close(started)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := resolveServers(ctx, []string{"zookeeper:2181"})
+		errCh <- err
+	}()
+
+	<-started
+	cancel()
+
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Contains(t, err.Error(), "zk dns lookup")
+	case <-time.After(2 * time.Second):
+		t.Fatal("resolveServers did not return after cancel")
+	}
+}
+
+func TestResolveServersRespectsDeadline(t *testing.T) {
+	orig := lookupHostFn
+	defer func() { lookupHostFn = orig }()
+
+	lookupHostFn = func(ctx context.Context, host string) ([]string, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := resolveServers(ctx, []string{"zookeeper:2181"})
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, elapsed, 2*time.Second, "DNS must not hang past the dial deadline")
+}
+
+func TestResolveServersSuccess(t *testing.T) {
+	orig := lookupHostFn
+	defer func() { lookupHostFn = orig }()
+
+	lookupHostFn = func(ctx context.Context, host string) ([]string, error) {
+		assert.Equal(t, "zookeeper", host)
+		return []string{"10.0.0.1", "10.0.0.2"}, nil
+	}
+
+	got, err := resolveServers(context.Background(), []string{"zookeeper:2181"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"10.0.0.1:2181", "10.0.0.2:2181"}, got)
 }
 
 // MockZKClient is a mock implementation of the ZKClient interface for testing

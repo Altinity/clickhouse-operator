@@ -33,18 +33,17 @@ func NewPathManager(connection *Connection) *PathManager {
 	}
 }
 
-func (p *PathManager) Ensure(path string) {
+func (p *PathManager) Ensure(ctx context.Context, path string) error {
 	// Sanity check
 	path = strings.TrimSpace(path)
 	if len(path) == 0 {
-		return
+		return nil
 	}
 	if path == "/" {
-		return
+		return nil
 	}
 
 	// Params if the zk node to be created on each folder
-	ctx := context.TODO()
 	value := []byte{}
 	flags := int32(0)
 	acl := []zk.ACL{
@@ -60,10 +59,17 @@ func (p *PathManager) Ensure(path string) {
 	pathParts := strings.Split(strings.Trim(path, "/"), "/")
 	subPath := ""
 	for _, folder := range pathParts {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		subPath += "/" + folder
 		if ok, err := p.Connection.Exists(ctx, subPath); !ok {
 			if err != nil {
-				log.Warning("received error while checking zk path: %s err: %v", subPath, err)
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				// Per-attempt failures are already logged in Connection.retry.
+				log.Warning("zk path ensure Exists failed for %s after retries", subPath)
 			}
 		} else {
 			log.Info("zk path already exists: %s", subPath)
@@ -76,7 +82,12 @@ func (p *PathManager) Ensure(path string) {
 		if err == nil {
 			log.Info("zk path created: %s", created)
 		} else {
-			log.Warning("zk path FAILED to create: %s err: %v", subPath, err)
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			// Per-attempt failures are already logged in Connection.retry.
+			log.Warning("zk path ensure Create failed for %s after retries", subPath)
 		}
 	}
+	return nil
 }
