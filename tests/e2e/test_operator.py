@@ -730,7 +730,7 @@ def test_010010_1(self):
 
         with Then("Operator should start complaining about connection"):
             wait_operator_logs(["zk path to be verified"])
-            wait_operator_logs(["no such host"])
+            wait_operator_logs(['failed: zk dns lookup'])
 
         with And("CHI should stay in progress with no pods created (waiting for ZooKeeper)"):
             assert kubectl.get_chi_status(chi) == "InProgress"
