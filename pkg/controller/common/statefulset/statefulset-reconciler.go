@@ -194,8 +194,11 @@ func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, re
 
 	// Recreate deletes the existing StatefulSet before creating the desired one, so a desired spec
 	// the API server rejects would leave the host with no StatefulSet (#1420). Dry-run the desired
-	// StatefulSet first and, if it is rejected, return without deleting the existing one.
-	if err := r.sts.ValidateCreate(ctx, host.Runtime.DesiredStatefulSet); err != nil {
+	// StatefulSet first and, if it is rejected on validation, return without deleting the existing
+	// one. The current StatefulSet is still present at this point, so a dry-run create reports
+	// AlreadyExists once the spec is valid; that is the normal recreate precondition, not a
+	// validation failure, so let the recreate proceed in that case.
+	if err := r.sts.ValidateCreate(ctx, host.Runtime.DesiredStatefulSet); err != nil && !apiErrors.IsAlreadyExists(err) {
 		namespace := host.Runtime.Address.Namespace
 		name := r.namer.Name(interfaces.NameStatefulSet, host)
 		r.a.V(1).

@@ -371,3 +371,24 @@ func TestRecreateStatefulSet_InvalidDesiredSkipsDelete(t *testing.T) {
 	assert.Equal(t, 0, fake.deleteCalls, "the running StatefulSet must NOT be deleted when the desired spec is invalid")
 	assert.Equal(t, 0, fake.createCalls, "no create should be attempted when validation fails")
 }
+
+// TestRecreateStatefulSet_AlreadyExistsFromDryRunProceeds: the existing StatefulSet is still
+// present when recreate runs, so a dry-run create of a valid desired spec reports AlreadyExists.
+// That is the normal recreate precondition, not a validation failure, so the recreate must
+// proceed (delete then create) rather than abort.
+func TestRecreateStatefulSet_AlreadyExistsFromDryRunProceeds(t *testing.T) {
+	fake := &fakeSTS{
+		getReturn:         stsWithReplicas(int32Ptr(0)),
+		validateCreateErr: apiErrors.NewAlreadyExists(stsResource, "chi-test-cluster-0-0"),
+	}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	h := hostWithCR("ns", "test-chi")
+	h.Runtime.DesiredStatefulSet = stsWithReplicas(int32Ptr(1))
+
+	err := r.recreateStatefulSet(context.Background(), h, false /*register*/, NewReconcileStatefulSetOptions())
+
+	require.NoError(t, err, "AlreadyExists from the dry-run must not abort a valid recreate")
+	assert.Equal(t, 1, fake.validateCreateCalls, "ValidateCreate must run once")
+	assert.Equal(t, 1, fake.deleteCalls, "the existing StatefulSet must be deleted so the recreate proceeds")
+	assert.Equal(t, 1, fake.createCalls, "the desired StatefulSet must be created")
+}
