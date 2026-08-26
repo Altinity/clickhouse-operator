@@ -19,10 +19,17 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"strings"
+	"sync"
+	"time"
+
 	goch "github.com/mailru/go-clickhouse/v2"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -33,6 +40,17 @@ import (
 
 // const clickHouseDriverName = "clickhouse"
 const clickHouseDriverName = "chhttp"
+
+// Keep a finite lifetime as defense in depth for connections that never
+// surface an error. Connection-class failures reset the pools immediately.
+const defaultDBConnectionMaxLifetime = 10 * time.Minute
+
+type dbOpener func(driverName, dataSourceName string) (*sql.DB, error)
+
+type poolInitialization struct {
+	done chan struct{}
+	err  error
+}
 
 // init registers the legacy `tlsSettingsLegacy` DSN key with an insecure
 // TLS config for pre-0.27.1 back-compat. Under FIPS-enforced startup the
@@ -52,6 +70,9 @@ type Connection struct {
 	params      *EndpointConnectionParams
 	dbPrimary   *sql.DB
 	dbSecondary *sql.DB
+	poolMutex   sync.RWMutex
+	poolInit    *poolInitialization
+	openDB      dbOpener
 	l           log.Announcer
 }
 
@@ -60,6 +81,7 @@ func NewConnection(params *EndpointConnectionParams) *Connection {
 	// Do not establish connection immediately, do it in l lazy manner
 	return &Connection{
 		params: params,
+		openDB: sql.Open,
 		l:      log.New(),
 	}
 
@@ -82,23 +104,28 @@ func (c *Connection) SetLog(l log.Announcer) *Connection {
 	return c
 }
 
-// connect performs connect
-func (c *Connection) connect(ctx context.Context) {
+// openPools creates and verifies a new pair of ClickHouse pools without
+// publishing them to the connection. Callers can therefore perform the slow
+// network work without holding poolMutex.
+func (c *Connection) openPools(ctx context.Context) (*sql.DB, *sql.DB, error) {
 	// ClickHouse connection may have custom TLS options specified
 	c.setupTLSAdvanced()
 
 	c.l.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
-	dbPrimaryConn, err := sql.Open(clickHouseDriverName, c.params.GetDSN())
+	dbPrimaryConn, err := c.openDB(clickHouseDriverName, c.params.GetDSN())
 	if err != nil {
 		c.l.V(1).F().Error("FAILED Open(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
-		return
+		return nil, nil, err
 	}
+	configureDBConnectionPool(dbPrimaryConn, defaultDBConnectionMaxLifetime)
 
-	dbSecondaryConn, err := sql.Open(clickHouseDriverName, c.params.GetDSNLogQueries())
+	dbSecondaryConn, err := c.openDB(clickHouseDriverName, c.params.GetDSNLogQueries())
 	if err != nil {
 		c.l.V(1).F().Error("FAILED Open2(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
-		return
+		closePools(dbPrimaryConn, nil)
+		return nil, nil, err
 	}
+	configureDBConnectionPool(dbSecondaryConn, defaultDBConnectionMaxLifetime)
 
 	// Ping should have timeout
 	pingCtxPrimary, cancel1 := context.WithTimeout(c.ensureCtx(ctx), c.params.GetConnectTimeout())
@@ -106,9 +133,8 @@ func (c *Connection) connect(ctx context.Context) {
 
 	if err := dbPrimaryConn.PingContext(pingCtxPrimary); err != nil {
 		c.l.V(1).F().Error("FAILED Ping(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
-		_ = dbPrimaryConn.Close()
-		_ = dbSecondaryConn.Close()
-		return
+		closePools(dbPrimaryConn, dbSecondaryConn)
+		return nil, nil, err
 	}
 
 	pingCtxSecondary, cancel2 := context.WithTimeout(c.ensureCtx(ctx), c.params.GetConnectTimeout())
@@ -116,13 +142,24 @@ func (c *Connection) connect(ctx context.Context) {
 
 	if err := dbSecondaryConn.PingContext(pingCtxSecondary); err != nil {
 		c.l.V(1).F().Error("FAILED Ping2(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
-		_ = dbPrimaryConn.Close()
-		_ = dbSecondaryConn.Close()
-		return
+		closePools(dbPrimaryConn, dbSecondaryConn)
+		return nil, nil, err
 	}
 
-	c.dbPrimary = dbPrimaryConn
-	c.dbSecondary = dbSecondaryConn
+	return dbPrimaryConn, dbSecondaryConn, nil
+}
+
+func configureDBConnectionPool(db *sql.DB, maxLifetime time.Duration) {
+	db.SetConnMaxLifetime(maxLifetime)
+}
+
+func closePools(primary, secondary *sql.DB) {
+	if primary != nil {
+		_ = primary.Close()
+	}
+	if secondary != nil && secondary != primary {
+		_ = secondary.Close()
+	}
 }
 
 func setupTLSBasic() {
@@ -283,16 +320,158 @@ func parseRootCAs(certString string, l log.Announcer) (*x509.CertPool, error) {
 	return pool, nil
 }
 
-// ensureConnected ensures connection is set
-func (c *Connection) ensureConnected(ctx context.Context) bool {
+// currentDB returns a stable snapshot of the requested pool. Callers never
+// retain the lock while performing SQL or network I/O.
+func (c *Connection) currentDB(logQueries bool) *sql.DB {
+	c.poolMutex.RLock()
+	defer c.poolMutex.RUnlock()
+
+	if logQueries {
+		return c.dbSecondary
+	}
+	return c.dbPrimary
+}
+
+// startPoolInitialization returns the in-flight initialization or starts one.
+// Publishing and generation changes are protected by poolMutex, while opening
+// and pinging the database connections happen asynchronously without the lock.
+func (c *Connection) startPoolInitialization() *poolInitialization {
+	c.poolMutex.Lock()
 	if c.dbPrimary != nil {
-		c.l.V(2).F().Info("Already connected: %s", c.params.GetDSNWithHiddenCredentials())
+		c.poolMutex.Unlock()
+		return nil
+	}
+	if c.poolInit != nil {
+		init := c.poolInit
+		c.poolMutex.Unlock()
+		return init
+	}
+
+	init := &poolInitialization{done: make(chan struct{})}
+	c.poolInit = init
+	c.poolMutex.Unlock()
+
+	go func() {
+		primary, secondary, err := c.openPools(context.Background())
+
+		c.poolMutex.Lock()
+		if err == nil && c.dbPrimary == nil {
+			c.dbPrimary, c.dbSecondary = primary, secondary
+			primary, secondary = nil, nil
+		}
+		init.err = err
+		if c.poolInit == init {
+			c.poolInit = nil
+		}
+		close(init.done)
+		c.poolMutex.Unlock()
+
+		// A concurrent generation may already have won publication. Do not leak
+		// the verified-but-unused pair in that case.
+		closePools(primary, secondary)
+	}()
+
+	return init
+}
+
+// db returns the requested pool, initializing both pools once when necessary.
+// Initialization is shared per host, but each waiter can stop waiting as soon
+// as its own context is canceled. The initializer uses bounded Ping contexts
+// in openPools and may finish publishing a healthy pool for other callers.
+func (c *Connection) db(ctx context.Context, logQueries bool) (*sql.DB, error) {
+	if db := c.currentDB(logQueries); db != nil {
+		return db, nil
+	}
+
+	init := c.startPoolInitialization()
+
+	if init != nil {
+		waitCtx := c.ensureCtx(ctx)
+		select {
+		case <-waitCtx.Done():
+			return nil, waitCtx.Err()
+		case <-init.done:
+			if init.err != nil {
+				return nil, init.err
+			}
+		}
+	}
+
+	db := c.currentDB(logQueries)
+	if db == nil {
+		return nil, errors.New("ClickHouse connection pool is unavailable")
+	}
+	return db, nil
+}
+
+// resetPoolsIfCurrent atomically detaches both pools only when failedDB still
+// belongs to the active generation. A delayed failure from an older operation
+// must not tear down pools that another retry has already created.
+func (c *Connection) resetPoolsIfCurrent(failedDB *sql.DB) bool {
+	c.poolMutex.Lock()
+	if failedDB == nil || (failedDB != c.dbPrimary && failedDB != c.dbSecondary) {
+		c.poolMutex.Unlock()
+		return false
+	}
+
+	primary, secondary := c.dbPrimary, c.dbSecondary
+	c.dbPrimary, c.dbSecondary = nil, nil
+	c.poolMutex.Unlock()
+
+	c.l.V(1).F().Info("Resetting ClickHouse connection pools after connection-class failure: %s", c.params.GetDSNWithHiddenCredentials())
+	closePools(primary, secondary)
+	return true
+}
+
+// isConnectionFailure distinguishes failures for which retaining pooled HTTP
+// transports is unsafe from normal ClickHouse query errors. The original error
+// is always returned; invalidation only affects the next operator retry.
+func isConnectionFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var clickHouseErr *goch.Error
+	if errors.As(err, &clickHouseErr) {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) ||
+		errors.Is(err, driver.ErrBadConn) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
 		return true
 	}
 
-	c.connect(ctx)
+	message := strings.ToLower(err.Error())
+	for _, marker := range []string{
+		"transport failed",
+		"failed to read response",
+		"upstream connect error",
+		"no healthy upstream",
+		"upstream request timeout",
+		"connection reset",
+		"connection refused",
+		"broken pipe",
+		"unexpected eof",
+	} {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+	return false
+}
 
-	return c.dbPrimary != nil
+// shouldResetPools excludes cancellation imposed by the caller. An internal
+// query timeout or a transport failure still invalidates the active generation.
+func shouldResetPools(err error, callerCtx context.Context) bool {
+	callerCanceled := callerCtx != nil && callerCtx.Err() != nil
+	contextFailure := errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+	if callerCanceled && contextFailure {
+		return false
+	}
+	return isConnectionFailure(err)
 }
 
 // QueryContext runs given sql query on behalf of specified context
@@ -301,10 +480,11 @@ func (c *Connection) QueryContext(ctx context.Context, sql string) (*QueryResult
 		return nil, nil
 	}
 
-	if !c.ensureConnected(ctx) {
+	db, err := c.db(ctx, false)
+	if err != nil {
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
 		c.l.V(1).F().Error(s)
-		return nil, errors.New(s)
+		return nil, fmt.Errorf("%s: %w", s, err)
 	}
 
 	if util.IsContextDone(ctx) {
@@ -314,9 +494,12 @@ func (c *Connection) QueryContext(ctx context.Context, sql string) (*QueryResult
 	// Query should have timeout
 	queryCtx, cancel := context.WithTimeout(c.ensureCtx(ctx), c.params.GetQueryTimeout())
 
-	rows, err := c.dbPrimary.QueryContext(queryCtx, sql)
+	rows, err := db.QueryContext(queryCtx, sql)
 	if err != nil {
 		cancel()
+		if shouldResetPools(err, ctx) {
+			c.resetPoolsIfCurrent(db)
+		}
 		s := fmt.Sprintf("FAILED Query(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
 		c.l.V(1).F().Error(s)
 		return nil, err
@@ -356,22 +539,21 @@ func (c *Connection) Exec(_ctx context.Context, sql string, opts *QueryOptions) 
 	ctx, cancel := c.ctx(_ctx, opts)
 	defer cancel()
 
-	if !c.ensureConnected(ctx) {
+	db, err := c.db(ctx, opts.GetLogQueries())
+	if err != nil {
 		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
 		c.l.V(1).F().Error(s)
-		return errors.New(s)
+		return fmt.Errorf("%s: %w", s, err)
 	}
 
-	db := c.dbPrimary
-	if opts.GetLogQueries() {
-		db = c.dbSecondary
-	}
-
-	_, err := db.ExecContext(ctx, sql)
+	_, err = db.ExecContext(ctx, sql)
 
 	if err != nil {
 		cancel()
+		if shouldResetPools(err, _ctx) {
+			c.resetPoolsIfCurrent(db)
+		}
 		c.l.V(1).F().Error("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
 		return err
 	}
