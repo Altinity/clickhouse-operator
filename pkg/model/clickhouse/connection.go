@@ -45,6 +45,11 @@ const clickHouseDriverName = "chhttp"
 // surface an error. Connection-class failures reset the pools immediately.
 const defaultDBConnectionMaxLifetime = 10 * time.Minute
 
+// defaultDBConnectionIdleTimeDivisor derives the idle cap from the lifetime cap, so the two cannot
+// drift apart. 5 gives a 2m idle cap against the 10m lifetime - short enough that a socket rarely
+// survives the gap between reconciles, long enough that a busy reconcile does not re-handshake.
+const defaultDBConnectionIdleTimeDivisor = 5
+
 type dbOpener func(driverName, dataSourceName string) (*sql.DB, error)
 
 type poolInitialization struct {
@@ -151,6 +156,14 @@ func (c *Connection) openPools(ctx context.Context) (*sql.DB, *sql.DB, error) {
 
 func configureDBConnectionPool(db *sql.DB, maxLifetime time.Duration) {
 	db.SetConnMaxLifetime(maxLifetime)
+	// ConnMaxLifetime alone does not bound this failure. The stale thing here is an IDLE keep-alive
+	// socket: each driver conn owns an http.Transport whose IdleConnTimeout defaults to 1h
+	// (vendor/github.com/mailru/go-clickhouse/v2/config.go), and between reconciles the operator's
+	// connections sit idle for exactly that kind of interval. Capping idle time means a socket that
+	// nobody has used recently is retired before it can be handed to the next reconcile pointing at
+	// a Pod IP that no longer exists - which is the case the reactive reset cannot catch, because
+	// with no traffic there is no error to classify.
+	db.SetConnMaxIdleTime(maxLifetime / defaultDBConnectionIdleTimeDivisor)
 }
 
 func closePools(primary, secondary *sql.DB) {

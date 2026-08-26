@@ -758,6 +758,10 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	err := w.reconcileHostPVCs(ctx, host)
 	onDataLoss := host.GetCluster().GetReconcile().StatefulSet.Recreate.OnDataLoss
 	switch {
+	case storage.ErrIsVolumeAdded(err):
+		// A volume was ADDED to a host that already has data - nothing was lost, so onDataLoss
+		// deliberately does not gate this. CHI mirror: worker-reconciler-chi.go.
+		stsReconcileOpts = w.hostPVCsDataVolumeAddedDetectedOptions(host)
 	case storage.ErrIsDataLoss(err):
 		if onDataLoss == api.OnStatefulSetRecreateOnDataLossActionAbort {
 			w.a.V(1).M(host).F().Warning("Data loss detected for host: %s. Aborting reconcile as configured (onDataLoss: abort)", host.GetName())

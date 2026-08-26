@@ -102,6 +102,18 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 	return err
 }
 
+// hostPVCsDataVolumeAddedDetectedOptions is the response to a volume being ADDED to a host that
+// already has data. CHI mirror: pkg/controller/chi/worker-reconciler-helper.go. Keeper has no table
+// migration or replica-drop concept, so this differs from the data-loss path only in what it logs -
+// but keeping the branch explicit keeps CHI and CHK reading the same way.
+func (w *worker) hostPVCsDataVolumeAddedDetectedOptions(host *api.Host) *statefulset.ReconcileOptions {
+	w.a.V(1).
+		M(host).F().
+		Info("Volume added to host: %s. Will recreate StatefulSet without data recovery", host.GetName())
+
+	return statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
+}
+
 func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) *statefulset.ReconcileOptions {
 	w.a.V(1).
 		M(host).F().

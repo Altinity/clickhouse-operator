@@ -1140,6 +1140,13 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	err := w.reconcileHostPVCs(ctx, host)
 	onDataLoss := host.GetCluster().GetReconcile().StatefulSet.Recreate.OnDataLoss
 	switch {
+	case storage.ErrIsVolumeAdded(err):
+		// A volume was ADDED to a host that already has data - the PVC is missing because it never
+		// existed here, not because anything was lost. The StatefulSet still has to be re-created to
+		// pick up the new mount, but forcing a ZK replica drop and a full DDL replay would be
+		// destructive busywork, and it is what dragged this path into the 45-79 minute retry loop.
+		// onDataLoss deliberately does NOT gate this: there is no data loss to abort on.
+		stsReconcileOpts, migrateTableOpts = w.hostPVCsDataVolumeAddedDetectedOptions(host)
 	case storage.ErrIsDataLoss(err):
 		if onDataLoss == api.OnStatefulSetRecreateOnDataLossActionAbort {
 			w.a.V(1).M(host).F().Warning("Data loss detected for host: %s. Aborting reconcile as configured (onDataLoss: abort)", host.GetName())
@@ -1193,7 +1200,12 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		// reconcile() routes them through markReconcileCompletedUnsuccessfully,
 		// which persists StatusAborted via updateCRObjectStatus. Other errors
 		// stay logged but non-fatal — preserves pre-existing tolerance.
-		if errors.Is(err, common.ErrCRUDAbort) {
+		//
+		// Deferred propagates too, and must: a failed table migration returns it, and swallowing it
+		// here would put the host back into remote_servers with a Completed CHI - the original bug.
+		// Unlike Abort it does not unwind the shard walk; runConcurrently carries on with the
+		// siblings and surfaces the deferral once the pass is done.
+		if errors.Is(err, common.ErrCRUDAbort) || errors.Is(err, common.ErrCRUDDeferred) {
 			return err
 		}
 	}

@@ -39,6 +39,11 @@ var (
 	ErrPVCWithLostPVDeleted ErrorDataPersistence = errors.New("pvc with lost pv deleted")
 	ErrPVCIsLost            ErrorDataPersistence = errors.New("pvc is lost")
 	ErrPVCIsMissed          ErrorDataPersistence = errors.New("pvc is missed")
+	// ErrPVCIsNew: the operator had to create the PVC because none existed, AND the
+	// volumeClaimTemplate behind it is absent from the last reconciled spec - i.e. a volume was
+	// ADDED to a host that already has data. Deliberately NOT part of ErrIsDataLoss: nothing was
+	// lost, so forcing a ZK replica drop and a full DDL replay would be destructive busywork.
+	ErrPVCIsNew ErrorDataPersistence = errors.New("pvc is new")
 )
 
 func ErrIsDataLoss(err error) bool {
@@ -57,6 +62,41 @@ func ErrIsVolumeMissed(err error) bool {
 		return true
 	}
 	return false
+}
+
+// ErrIsVolumeAdded reports whether the error means a volume was newly added rather than lost.
+func ErrIsVolumeAdded(err error) bool {
+	switch err {
+	case ErrPVCIsNew:
+		return true
+	}
+	return false
+}
+
+// errSeverity ranks the data-persistence verdicts so that aggregating across a host's volumes keeps
+// the one that demands the strongest response. Data loss outranks everything: a volume that was
+// merely added must never mask a volume that was lost.
+func errSeverity(err ErrorDataPersistence) int {
+	switch {
+	case err == nil:
+		return 0
+	case ErrIsVolumeAdded(err):
+		return 1
+	case ErrIsVolumeMissed(err):
+		return 2
+	case ErrIsDataLoss(err):
+		return 3
+	}
+	// Unknown verdict - rank above the benign ones so a future sentinel is not silently swallowed.
+	return 2
+}
+
+// moreSevere returns whichever verdict demands the stronger response.
+func moreSevere(a, b ErrorDataPersistence) ErrorDataPersistence {
+	if errSeverity(b) > errSeverity(a) {
+		return b
+	}
+	return a
 }
 
 type Reconciler struct {
@@ -90,9 +130,10 @@ func (w *Reconciler) ReconcilePVCs(ctx context.Context, host *api.Host, which ap
 			return
 		}
 		if e := w.reconcilePVCFromVolumeMount(ctx, host, volumeMount); e != nil {
-			if res == nil {
-				res = e
-			}
+			// Keep the most severe verdict, not the first one. A host can have a newly added volume
+			// AND a lost one in the same reconcile; returning whichever was walked first would let
+			// ErrPVCIsNew mask the loss and skip recovery entirely.
+			res = moreSevere(res, e)
 		}
 	})
 
@@ -141,9 +182,16 @@ func (w *Reconciler) reconcilePVCFromVolumeMount(
 	// Check scenario 1 - no PVC available
 	// Such a PVC should be re-created
 	if w.isLostPVC(pvc, chopCreated, host) {
-		// Looks like data loss detected
-		log.V(1).M(host).Warning("PVC is either newly added to the host or was lost earlier (%s/%s/%s/%s)", pvcNamespace, host.GetName(), volumeMount.Name, pvcName)
-		reconcileError = ErrPVCIsLost
+		// The operator had to model this PVC because k8s has none. That is data loss only for a
+		// volume the previously reconciled spec already carried; a volumeClaimTemplate added in
+		// this very reconcile never had a PVC on this host, so nothing was lost.
+		if w.isNewVolume(host, volumeMount) {
+			log.V(1).M(host).Info("PVC is newly added to the host, not lost (%s/%s/%s/%s)", pvcNamespace, host.GetName(), volumeMount.Name, pvcName)
+			reconcileError = ErrPVCIsNew
+		} else {
+			log.V(1).M(host).Warning("PVC was lost (%s/%s/%s/%s)", pvcNamespace, host.GetName(), volumeMount.Name, pvcName)
+			reconcileError = ErrPVCIsLost
+		}
 	}
 
 	// Check scenario 2 - PVC exists, but no PV available
@@ -161,6 +209,17 @@ func (w *Reconciler) reconcilePVCFromVolumeMount(
 	}
 
 	if pvc == nil {
+		// A newly added volumeClaimTemplate legitimately has no PVC yet under the DEFAULT
+		// PVCProvisionerStatefulSet: the operator is not in charge of creating it, the StatefulSet
+		// controller is, and it has not run yet. Overwriting the verdict here would send the
+		// add-a-volume case straight back down the data-loss path (ErrPVCIsMissed is routed to
+		// hostPVCsDataLossDetectedOptions), which is the whole thing this change exists to stop -
+		// and it would do so for every user who has NOT opted into provisioner: Operator, i.e.
+		// almost all of them. Only 13 of the 205 e2e CHI manifests set it, which is why the
+		// coverage for this path passed while the default path stayed broken.
+		if ErrIsVolumeAdded(reconcileError) {
+			return reconcileError
+		}
 		log.M(host).F().Error("Unable to reconcile nil PVC: %s/%s", pvcNamespace, pvcName)
 		reconcileError = ErrPVCIsMissed
 		return reconcileError
@@ -263,6 +322,29 @@ func (w *Reconciler) isLostPVC(pvc *core.PersistentVolumeClaim, chopCreated bool
 
 	// PVC is in place
 	return false
+}
+
+// isNewVolume reports whether volumeMount refers to a volumeClaimTemplate that the last reconciled
+// spec did not have - i.e. the volume was just added, so its missing PVC is expected rather than lost.
+//
+// FAIL-SAFE: when the ancestor cannot be consulted this returns false, which classifies the volume as
+// LOST. The ancestor is not guaranteed to be there - the operator tolerates a failed status-ConfigMap
+// read (pkg/controller/chi/kube/cr.go) and the first reconcile after an upgrade may have none - and
+// getting this backwards is the destructive direction: claiming "new" for a volume that really was
+// lost skips the recovery entirely and leaves a replica silently short of its data. A spurious
+// recovery is recoverable; a skipped one is not.
+func (w *Reconciler) isNewVolume(host *api.Host, volumeMount *core.VolumeMount) bool {
+	// GetAncestor() chains through GetCR(), which is a nil interface on a host that has not been
+	// wired to its CR - guard rather than panic, and take the safe answer while doing it.
+	if !host.HasCR() {
+		return false
+	}
+	ancestor := host.GetAncestor()
+	if ancestor == nil {
+		return false
+	}
+	_, existedBefore := volume.GetVolumeClaimTemplate(ancestor, volumeMount)
+	return !existedBefore
 }
 
 func (w *Reconciler) isLostPV(pvc *core.PersistentVolumeClaim) bool {

@@ -16,9 +16,11 @@ package chi
 
 import (
 	"context"
+	"fmt"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
@@ -105,6 +107,19 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrat
 			M(host).F().
 			Error("ERROR add tables failed on shard/host:%d/%d cluster:%s err:%v",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName, err)
+		// Return, and do NOT fall through to the success announcement or PushHostTablesCreated.
+		//
+		// Pushing here was the worse half of the bug: hostsWithTablesCreated feeds HasData(), and
+		// shouldMigrateTables() skips migration outright for a host that HasData - so a host recorded
+		// as tables-created after a FAILED migration is never retried. It also fed the false
+		// "Tables added successfully" event and let includeHost() put a schema-less replica back into
+		// remote_servers with the CHI reporting Completed.
+		//
+		// See migrateTablesFailure for why the returned error carries a CRUD sentinel, and why it is
+		// Deferred rather than Abort. Status is deliberately NOT written here: the post-restart
+		// re-migration caller is best-effort and swallows this error, so writing status would poison
+		// the CR as a side effect of a path that is allowed to fail.
+		return migrateTablesFailure(host, err)
 	}
 
 	w.a.V(1).
@@ -117,6 +132,21 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrat
 	host.GetCR().IEnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
 
 	return nil
+}
+
+// migrateTablesFailure wraps a table-creation failure in the sentinel reconcileHostMain propagates.
+// Extracted so the wrap is reachable from a test: everything else about the failure path needs a
+// live schemer, but losing the sentinel is the silent regression - a bare error is logged as a
+// Warning and the reconcile carries on to includeHost() with a Completed CHI.
+//
+// Deferred rather than Abort on purpose. Both end the CR non-Completed (reconcile() coerces any
+// error to ErrCRUDAbort before markReconcileCompletedUnsuccessfully), but Abort unwinds the shard
+// walk on the first bad host, so one un-creatable object - a Dictionary with a missing source, an
+// MV over a dropped table - would halt every remaining shard mid-upgrade. Deferred is the signal
+// the shard/cluster walks already understand: runConcurrently keeps going, records the deferral,
+// and surfaces it once at the end of the pass, so the siblings still reconcile.
+func migrateTablesFailure(host *api.Host, err error) error {
+	return fmt.Errorf("%w: add tables failed on host %s: %v", common.ErrCRUDDeferred, host.GetName(), err)
 }
 
 func (w *worker) setHasData(host *api.Host) {
