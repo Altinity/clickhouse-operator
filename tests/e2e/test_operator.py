@@ -7954,6 +7954,144 @@ def test_010084(self):
         note(kubectl.run_host_cmd(f"bash {script} --skip-docs", timeout=180))
 
 
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
+@Name("test_010085. Adding a volume under the default provisioner is not data loss")
+@Tags("NO_PARALLEL")
+def test_010085(self):
+    """Adding a volumeClaimTemplate to a host that already has data must not be treated as
+    storage loss.
+
+    test_010036 covers the same add-a-disk step, but its CHI pins
+    storageManagement.provisioner: Operator. Under that provisioner the operator builds the PVC
+    model itself, so the added volume is classified off that model. Under the DEFAULT
+    PVCProvisionerStatefulSet the StatefulSet controller owns the PVC and the operator sees no
+    PVC at all - a separate branch, and the one nearly every user is on: 13 of the 205 CHI
+    manifests in this suite pin provisioner: Operator.
+
+    On that branch the added volume used to be reported as ErrPVCIsMissed, which routes to
+    hostPVCsDataLossDetectedOptions - "Data loss detected", ZK replica dropped, full DDL replay.
+    Asserted here instead: the volume-added response, no SYSTEM DROP REPLICA, and data intact.
+    """
+    try:
+        create_shell_namespace_clickhouse_template()
+
+        manifest = "manifests/chi/test-085-volume-add-default-provisioner-1.yaml"
+        chi = yaml_manifest.get_name(util.get_full_path(manifest))
+        cluster = "simple"
+        util.require_keeper(keeper_type=self.context.keeper_type)
+
+        with Given("CHI with two replicas and a single volume is created"):
+            kubectl.create_and_check(
+                manifest=manifest,
+                check={
+                    "apply_templates": {current().context.clickhouse_template},
+                    "pod_count": 2,
+                    "do_not_delete": 1,
+                },
+            )
+
+        wait_for_cluster(chi, cluster, 1, 2)
+
+        with And("I create a replicated table with data and a Memory-engine view"):
+            clickhouse.query(chi, "CREATE DATABASE IF NOT EXISTS test_085 ON CLUSTER '{cluster}'")
+            create_table = """
+                CREATE TABLE IF NOT EXISTS test_085.test_local_085 ON CLUSTER '{cluster}' (a UInt32)
+                Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+                PARTITION BY tuple()
+                ORDER BY a
+                """.replace("\r", "").replace("\n", "")
+            clickhouse.query(chi, create_table)
+            clickhouse.query(chi, "INSERT INTO test_085.test_local_085 SELECT * FROM numbers(10000)")
+
+            # Memory-engine objects live in RAM and are not replicated through ZooKeeper. Adding a
+            # volume re-creates the pod, so only a forced re-migration brings them back - that is
+            # the half of the volume-added response that has to survive alongside "no replica drop".
+            clickhouse.query(chi, "CREATE DATABASE IF NOT EXISTS test_085_mem ON CLUSTER '{cluster}' Engine = Memory")
+            clickhouse.query(
+                chi,
+                "CREATE VIEW IF NOT EXISTS test_085_mem.test_view ON CLUSTER '{cluster}' AS SELECT * FROM system.tables",
+            )
+
+        with And("Both hosts are recorded as having tables created"):
+            # HasData() gates the entire classification - isLostPVC() returns false outright for a
+            # host without it - so without this seed the scenario would pass vacuously on any build.
+            kubectl.force_chi_reconcile(chi, "seed-hosts-with-tables-created")
+            hosts_with_tables = kubectl.get("chi", chi)["status"].get("hostsWithTablesCreated") or []
+            note(f"hostsWithTablesCreated: {hosts_with_tables}")
+            assert len(hosts_with_tables) == 2, error(
+                f"expected both replicas in hostsWithTablesCreated, got {hosts_with_tables}"
+            )
+
+        query_log_start = clickhouse.query(chi, "SELECT now()")
+        volume_add_started = time.time()
+
+        with When("A second volumeClaimTemplate is added to the running CHI"):
+            kubectl.create_and_check(
+                manifest="manifests/chi/test-085-volume-add-default-provisioner-2.yaml",
+                check={
+                    "apply_templates": {current().context.clickhouse_template},
+                    "pod_count": 2,
+                    "do_not_delete": 1,
+                },
+            )
+            wait_for_cluster(chi, cluster, 1, 2, force_wait=True)
+
+        with Then("Both disks are mounted"):
+            out = clickhouse.query(chi, "SELECT count() FROM system.disks")
+            assert out == "2", error(f"expected 2 disks, got {out}")
+
+        with Then("The operator classifies the added volume as added, not lost"):
+            since_s = max(int(time.time() - volume_add_started) + 5, 10)
+            operator_pod = kubectl.get_operator_pod(ns=current().context.test_namespace)
+            op_logs = kubectl.launch(
+                f"logs {operator_pod} -c clickhouse-operator --since={since_s}s",
+                ns=current().context.test_namespace,
+            )
+            # Helpful on failure: show which classification the operator actually reached.
+            for line in op_logs.splitlines():
+                if any(
+                    m in line
+                    for m in (
+                        "Volume added to host",
+                        "Data loss detected",
+                        "force data recovery",
+                        "DROP REPLICA",
+                    )
+                ):
+                    note(line)
+
+            # The positive assertion comes first, and it is what keeps the negative one honest: if
+            # the PVC classification never ran at all, neither message appears and "no data loss"
+            # would hold for the wrong reason.
+            assert "Volume added to host" in op_logs, error(
+                "volume-added path was not entered - the added volumeClaimTemplate was not classified"
+            )
+            assert "Data loss detected" not in op_logs, error(
+                "adding a volume was reported as data loss"
+            )
+
+        with And("No replica was dropped"):
+            for replica in (0, 1):
+                clickhouse.query(chi, "SYSTEM FLUSH LOGS", pod=f"chi-{chi}-{cluster}-0-{replica}-0")
+            util.check_query_log(chi, [], ["SYSTEM DROP REPLICA"], since=query_log_start)
+
+        with And("Data and the Memory-engine view survived on both replicas"):
+            for replica in (0, 1):
+                pod = f"chi-{chi}-{cluster}-0-{replica}-0"
+                out = clickhouse.query(chi, "SELECT count() FROM test_085.test_local_085", pod=pod)
+                assert out == "10000", error(f"replica {replica}: expected 10000 rows, got {out}")
+                out = clickhouse.query(
+                    chi,
+                    "SELECT count() FROM system.tables WHERE database = 'test_085_mem' AND name = 'test_view'",
+                    pod=pod,
+                )
+                assert out == "1", error(f"replica {replica}: Memory-engine view did not survive")
+    finally:
+        with Finally("I clean up"):
+            delete_test_namespace()
+
+
 #
 # Keeper tests section
 #

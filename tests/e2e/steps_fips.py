@@ -2011,6 +2011,29 @@ def check_external_clickhouse_reports_fips_version(self, pod):
         f"expected FIPS in ClickHouse version(), got {version!r}"
     )
 
+# The operator stamps the enclosing Go function name into every announcer line, so a marker like
+# "connect():FAILED" silently stops matching the moment that function is renamed - the assertion
+# then fails while the operator is behaving perfectly. That is exactly what happened when
+# Connection.connect() became Connection.openPools(): the rejection was still logged, 82 times,
+# and the test polled for 57 minutes for a string the binary could no longer emit.
+#
+# Match the OPERATION instead of the call stack. These cover the dial-time failures
+# (Open/Open2/Ping/Ping2) without the trailing "(" so the numbered variants match too. Kept
+# deliberately narrow: the caller still ANDs this against the specific rejection text, so widening
+# it to any "tls:" line - which would turn the assertion vacuous - is not on the table.
+_CH_CONNECT_FAILURE_MARKERS = (
+    "FAILED Ping",
+    "FAILED Open",
+    "FAILED connect(",
+)
+
+
+def _is_ch_connect_failure_line(line):
+    """Return True when the line is an operator connection-establishment failure, whatever the
+    enclosing Go function happens to be called."""
+    return any(marker in line for marker in _CH_CONNECT_FAILURE_MARKERS)
+
+
 def _fips_tls_rejection_present_in_logs(logs, min_version, rejection):
     """Return True when logs contain coerced TLS setup and a connect rejection."""
     expected_setup_parts = (
@@ -2022,7 +2045,7 @@ def _fips_tls_rejection_present_in_logs(logs, min_version, rejection):
         for line in logs.splitlines()
     )
     rejection_found = any(
-        "connect():FAILED" in line and rejection in line
+        _is_ch_connect_failure_line(line) and rejection in line
         for line in logs.splitlines()
     )
     return setup_found and rejection_found
@@ -2033,7 +2056,7 @@ def _fips_tls_rejection_log_excerpt(logs):
         line for line in logs.splitlines()
         if (
             "setupTLSAdvanced()" in line
-            or "connect():FAILED" in line
+            or _is_ch_connect_failure_line(line)
             or "tls:" in line
             or "minVersion" in line
         )
@@ -3811,9 +3834,12 @@ def _fips_assert(condition, message):
 
 _HOSTRUN_CH_TLS_FAILURE_MARKERS = (
     "setupTLSAdvanced",
-    "connect():FAILED",
+    # NB function-name-stamped markers rot on rename - see _CH_CONNECT_FAILURE_MARKERS. This is an
+    # any-match list that already carries the operation-shaped "FAILED Ping(", so it kept working
+    # when connect() became openPools(); the stale entry is dropped rather than updated.
     "QueryContext():FAILED",
     "FAILED Ping(",
+    "FAILED Open",
     "FAILED connect(",
     "remote error: tls",
     "handshake failure",
