@@ -37,7 +37,11 @@
 
   The FIPS module is unaffected: `GOFIPS140=v1.0.0` selects a frozen snapshot that is byte-identical between the 1.26.5 and 1.26.6 toolchains, so FIPS evidence and ACVP results do not change.
 
-  Not covered by this bump: **GO-2026-5158** in `go.opentelemetry.io/otel` (v1.43.0, fixed in v1.44.0). It is imported but not called — `govulncheck`'s symbol scan does not flag it — though SCA/image scanners that match on module versions will continue to report it until the dependency is bumped.
+* **Bumped `go.opentelemetry.io/otel` to clear GO-2026-5158 in the operator and metrics-exporter images.** `go.opentelemetry.io/otel` and `go.opentelemetry.io/otel/metric` move `v1.43.0` → `v1.44.0`, along with the indirect `go.opentelemetry.io/otel/trace`. No API or behavior changes.
+
+  **GO-2026-5158** — `baggage.Parse` did not cap the length of a raw baggage header. The affected symbols (`baggage.New`, `baggage.Parse`, `propagation.Baggage.Extract`) are never called from operator or exporter code, so `govulncheck`'s symbol scan never flagged it; the bump clears the module-version match that SCA and container-image scanners report.
+
+  `go.opentelemetry.io/otel/sdk` and `go.opentelemetry.io/otel/sdk/metric` are deliberately left at `v1.43.0`. They are not affected by the advisory, and `sdk/metric` v1.44.0 changes the default cardinality limit from unlimited to 2000 — on a large fleet that would silently collapse per-host series into a single `otel.metric.overflow` entry.
 
 
 ### Behavior Changes
