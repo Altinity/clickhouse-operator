@@ -39,6 +39,20 @@ import (
 // Assert that zk.Conn implements ZKClient
 var _ ZKClient = (*zk.Conn)(nil)
 
+// Assert that zkLogger implements zk.Logger
+var _ zk.Logger = zkLogger{}
+
+// zkLogger adapts the announcer to the logger interface the zk library expects.
+// The library dials in an unbounded loop of its own, printing one line per failed
+// attempt straight to stderr unless given a logger.
+type zkLogger struct {
+	nodes api.ZookeeperNodes
+}
+
+func (l zkLogger) Printf(format string, args ...interface{}) {
+	log.V(1).Info("zk conn %v: "+format, append([]interface{}{l.nodes}, args...)...)
+}
+
 type Connection struct {
 	nodes api.ZookeeperNodes
 	ConnectionParams
@@ -190,7 +204,7 @@ func (c *Connection) retry(ctx context.Context, fn func(connection ZKClient) err
 
 		connection, err := c.ensureConnection(ctx)
 		if err != nil {
-			log.Warning("zk connect attempt %d/%d failed: %v", i+1, c.MaxRetriesNum, err)
+			log.V(1).Info("zk connect attempt %d/%d failed: %v", i+1, c.MaxRetriesNum, err)
 			errs = append(errs, fmt.Errorf("retry %d: connection error: %w", i+1, err))
 			continue // Retry
 		}
@@ -208,13 +222,13 @@ func (c *Connection) retry(ctx context.Context, fn func(connection ZKClient) err
 				c.connection = nil
 			}
 			c.mu.Unlock()
-			log.Warning("zk operation attempt %d/%d failed: connection closed: %v", i+1, c.MaxRetriesNum, err)
+			log.V(1).Info("zk operation attempt %d/%d failed: connection closed: %v", i+1, c.MaxRetriesNum, err)
 			errs = append(errs, fmt.Errorf("retry %d: connection closed: %w", i+1, err))
 			continue // Retry
 		}
 
 		// Collect the errors
-		log.Warning("zk operation attempt %d/%d failed: %v", i+1, c.MaxRetriesNum, err)
+		log.V(1).Info("zk operation attempt %d/%d failed: %v", i+1, c.MaxRetriesNum, err)
 		errs = append(errs, fmt.Errorf("retry %d: %w", i+1, err))
 	}
 
@@ -289,22 +303,20 @@ func shouldRejectAuthScheme(rejectDigest bool, scheme string) bool {
 
 func (c *Connection) connectionEventsProcessor(connection ZKClient, events <-chan zk.Event) {
 	for event := range events {
-		shouldCloseConnection := false
 		switch event.State {
 		case
 			zk.StateExpired,
-			zk.StateConnecting:
-			shouldCloseConnection = true
-			fallthrough
-		case zk.StateDisconnected:
+			zk.StateConnecting,
+			zk.StateDisconnected:
 			c.mu.Lock()
 			if c.connection == connection {
 				c.connection = nil
 			}
 			c.mu.Unlock()
-			if shouldCloseConnection {
-				connection.Close()
-			}
+			// Disconnected included: this goroutine returns right after, and nothing else
+			// holds the handle, so an unclosed zk.Conn would keep re-dialing its cached
+			// (by then dead) endpoints roughly once a second for the life of the process.
+			connection.Close()
 			log.Info("zk conn: session for addr %v ended: %v", c.nodes, event)
 			return
 		}
@@ -390,7 +402,7 @@ func (c *Connection) connect(ctx context.Context) (ZKClient, <-chan zk.Event, er
 	// Pass resolved IP:port strings; zk's default DNSHostProvider.Init only does a
 	// cheap literal lookup on those, so the ctx-aware resolve above remains the
 	// bound that matters for missing/stuck DNS.
-	return zk.Connect(resolvedServers, c.TimeoutKeepAlive, optionsDialer)
+	return zk.Connect(resolvedServers, c.TimeoutKeepAlive, optionsDialer, zk.WithLogger(zkLogger{nodes: c.nodes}))
 }
 
 // lookupHostFn is overridable in tests.
