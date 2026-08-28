@@ -489,9 +489,9 @@ reconcile:
       # replication delay a.k.a replication lag for the following replicas
       replicas:
         # All replicas (new and known earlier) are explicitly requested to wait for replication to catch-up
-        all: no
+        all: false
         # New replicas only are requested to wait for replication to catch-up
-        new: yes
+        new: true
         # Replication catch-up is considered to be completed as soon as replication delay
         # a.k.a replication lag - calculated as "MAX(absolute_delay) FROM system.replicas"
         # is within this specified delay (in seconds)
@@ -500,20 +500,20 @@ reconcile:
         # Whether the operator during host launch procedure should wait for startup probe to succeed.
         # In case probe is unspecified wait is assumed to be completed successfully.
         # Default option value is to do not wait.
-        startup: no
+        startup: false
         # Whether the operator during host launch procedure should wait for readiness probe to succeed.
         # In case probe is unspecified wait is assumed to be completed successfully.
         # Default option value is to wait.
-        readiness: yes
+        readiness: true
     # The operator during reconcile procedure should drop the following entities:
     drop:
       replicas:
         # Whether the operator during reconcile procedure should drop replicas when replica is deleted
-        onDelete: yes
+        onDelete: true
         # Whether the operator during reconcile procedure should drop replicas when replica volume is lost
-        onLostVolume: yes
+        onLostVolume: true
         # Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
-        active: no
+        active: false
 
   ################################################
   ##
