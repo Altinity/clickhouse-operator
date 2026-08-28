@@ -16,6 +16,8 @@ package zookeeper
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/go-zookeeper/zk"
@@ -55,6 +57,7 @@ func (p *PathManager) Ensure(ctx context.Context, path string) error {
 	}
 
 	// Create path step-by-step
+	var errs []error
 	log.Info("zk path to be verified: %s", path)
 	pathParts := strings.Split(strings.Trim(path, "/"), "/")
 	subPath := ""
@@ -63,15 +66,15 @@ func (p *PathManager) Ensure(ctx context.Context, path string) error {
 			return err
 		}
 		subPath += "/" + folder
-		if ok, err := p.Connection.Exists(ctx, subPath); !ok {
-			if err != nil {
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
-				// Per-attempt failures are already logged in Connection.retry.
-				log.Warning("zk path ensure Exists failed for %s after retries", subPath)
-			}
-		} else {
+
+		exists, existsErr := p.Connection.Exists(ctx, subPath)
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		// existsErr has to gate this: the client reports exists=true alongside most
+		// errors, so trusting exists alone would skip a component that is not there.
+		// Falling through costs nothing - Create treats ErrNodeExists as success.
+		if exists && (existsErr == nil) {
 			log.Info("zk path already exists: %s", subPath)
 			continue // for
 		}
@@ -79,15 +82,28 @@ func (p *PathManager) Ensure(ctx context.Context, path string) error {
 		log.Info("zk path does not exist, need to create: %s", subPath)
 
 		created, err := p.Connection.Create(ctx, subPath, value, flags, acl)
-		if err == nil {
+		switch {
+		case err == nil:
 			log.Info("zk path created: %s", created)
-		} else {
-			if ctx.Err() != nil {
-				return ctx.Err()
+		case errors.Is(err, zk.ErrNodeExists):
+			// Created concurrently - by a peer operator or by ClickHouse itself. The
+			// component is present, which is all this function promises.
+			log.Info("zk path created concurrently: %s", subPath)
+		default:
+			if err := ctx.Err(); err != nil {
+				return err
 			}
 			// Per-attempt failures are already logged in Connection.retry.
-			log.Warning("zk path ensure Create failed for %s after retries", subPath)
+			log.Warning("zk path ensure failed for %s after retries", subPath)
+			// Keyed on the Create failure alone; existsErr rides along as context. An
+			// Exists that failed before a successful Create leaves the component present
+			// and must not be reported.
+			errs = append(errs, fmt.Errorf("zk: ensure %q: %w", subPath, errors.Join(existsErr, err)))
 		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("zk path ensure %q failed: %w", path, errors.Join(errs...))
 	}
 	return nil
 }
