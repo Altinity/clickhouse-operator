@@ -710,6 +710,36 @@ func newTestConnection(nodes api.ZookeeperNodes, client ZKClient, _params ...*Co
 	return conn
 }
 
+// TestConnectionEventsProcessorClosesConnection pins the fix for the "operator keeps
+// probing ZK" report. On a terminal session state the processor nils c.connection and
+// returns, so after that point nothing holds a reference to the zk.Conn - Connection.Close()
+// sees a nil pointer and does nothing. If the processor does not close it here, the
+// library's internal loop keeps re-dialing the cached endpoint addresses about once a
+// second for the life of the process, which no amount of gating on the reconcile side
+// can stop.
+//
+// StateDisconnected is the case that regressed: it used to fall through without closing,
+// unlike Expired/Connecting - and it is the state the library reports first.
+func TestConnectionEventsProcessorClosesConnection(t *testing.T) {
+	for _, state := range []zk.State{zk.StateDisconnected, zk.StateExpired, zk.StateConnecting} {
+		t.Run(state.String(), func(t *testing.T) {
+			mockClient := new(MockZKClient)
+			mockClient.On("Close").Once()
+
+			conn := newTestConnection(api.ZookeeperNodes{}, mockClient)
+
+			events := make(chan zk.Event, 1)
+			events <- zk.Event{State: state}
+			close(events)
+
+			conn.connectionEventsProcessor(mockClient, events)
+
+			mockClient.AssertExpectations(t)
+			assert.Nil(t, conn.connection, "connection handle must be released")
+		})
+	}
+}
+
 // TestShouldRejectAuthScheme pins the FIPS-mode predicate for ZK digest-auth
 // rejection. The check fires only when RejectDigestAuth=true AND the auth-file
 // scheme is "digest" (case-insensitive, since ZK scheme parsing is lowercased
