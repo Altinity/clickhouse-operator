@@ -21,6 +21,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func (w *worker) reconcileClusterZookeeperRootPath(ctx context.Context, cluster *api.Cluster) error {
@@ -51,7 +52,23 @@ func (w *worker) reconcileClusterZookeeperRootPath(ctx context.Context, cluster 
 		Info("Confirm ZK is configured for cluster %s/%s/%s", cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName())
 
 	if err := ensureZkPath(ctx, cluster); err != nil {
-		return err
+		if util.IsContextDone(ctx) {
+			// Superseded or shutting down. Not a failure, and the caller aborts on its
+			// own context check, so do not announce either outcome.
+			return nil
+		}
+		// Precreating the root path is a convenience, not a prerequisite: ClickHouse
+		// creates it itself on first DDL, which is exactly what the TLS-only branch
+		// above already relies on. Failing the reconcile here would stop the walk at
+		// this cluster - no StatefulSets for it, later clusters in the same CR skipped -
+		// over a step the cluster can recover from on its own.
+		w.a.
+			WithEvent(cluster.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(cluster.GetCR()).
+			M(cluster.GetCR()).F().
+			Warning("Unable to ensure ZK root for cluster %s/%s/%s, ClickHouse will create it on first DDL. err: %v",
+				cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName(), err)
+		return nil
 	}
 
 	w.a.V(1).
