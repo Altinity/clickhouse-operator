@@ -529,6 +529,8 @@ func (w *worker) deleteTables(ctx context.Context, host *api.Host) error {
 
 // deleteHost deletes all kubernetes resources related to a host
 // chi is the new CHI in which there will be no more this host
+// Returns an error when the host's StatefulSet could not be read: the resources below it
+// cannot be cleaned up safely without knowing whether the host still exists.
 func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Delete host is aborted. Host: %s ", host.GetName())
@@ -544,10 +546,13 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 		M(host).F().
 		Info("Delete host: %s/%s - started", host.Runtime.Address.ClusterName, host.GetName())
 
-	var err error
-	if host.Runtime.CurStatefulSet, err = w.c.kube.STS().Get(ctx, host); err != nil {
+	sts, err := w.c.kube.STS().Get(ctx, host)
+	if err != nil {
+		// Never carry a StatefulSet we did not actually read. client-go's typed Get returns a
+		// non-nil zero-valued object alongside the error, and the previous value may be stale.
+		host.Runtime.CurStatefulSet = nil
+
 		if apiErrors.IsNotFound(err) {
-			// StatefulSet is gone for sure - the host is already deleted.
 			w.a.WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonDeleteCompleted).
 				WithAction(host.GetCR()).
 				M(host).F().
@@ -555,17 +560,23 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 					host.Runtime.Address.ClusterName, host.GetName())
 			return nil
 		}
-		// Unable to tell whether the StatefulSet exists.
+		// Unable to tell whether the StatefulSet exists. Not retried here: the Get already runs
+		// under GetWithRetry, and IsTransientAPIError excludes Forbidden, so an error arriving
+		// here is either terminal or an outage that already outlived the whole back-off budget.
+		//
 		// Do not report deletion as completed - the cleanup below is skipped, and the host's
 		// PVCs carry no owner reference (see model/common/creator/pvc.go), so nothing else
-		// would reclaim them. Report the failure and let the caller decide.
+		// would reclaim them.
+		//
+		// No WithError: it would write CR status through an uncancellable retry loop, and the
+		// CR is about to be finalized anyway. The event and the log line are what survive.
 		w.a.WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonDeleteFailed).
-			WithError(host.GetCR()).
 			M(host).F().
 			Error("Delete host: %s/%s - unable to get StatefulSet, host deletion not performed. err: %v",
 				host.Runtime.Address.ClusterName, host.GetName(), err)
 		return err
 	}
+	host.Runtime.CurStatefulSet = sts
 
 	// Pre-delete host hooks: run BEFORE we touch the host's k8s objects so the pod is
 	// still up and SQL hooks can drain / de-register it. A pre-delete hook with
@@ -651,6 +662,9 @@ func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallatio
 		wg.Add(1)
 		go func(h *api.Host) {
 			defer wg.Done()
+			// TODO: propagate this error. deleteCHI uninstalls the finalizer regardless,
+			// so a failed host delete still lets the CR go away and orphans its PVCs.
+			// Needs an error sink shared across these goroutines (#2056).
 			_ = w.deleteHost(ctx, chi, h)
 		}(host)
 		return nil
