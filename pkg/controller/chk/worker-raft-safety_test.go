@@ -201,7 +201,7 @@ func TestEnsureQuorumSafeToDisruptHost(t *testing.T) {
 		w := &worker{
 			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 2 },
 			quorumDisruptPollOverride:   5 * time.Millisecond,
-			quorumDisruptWaitOverride:    20 * time.Millisecond,
+			quorumDisruptWaitOverride:   20 * time.Millisecond,
 		}
 		waitSnap := snap
 		err := w.ensureQuorumSafeToDisruptHost(ctx, host, nil, &waitSnap)

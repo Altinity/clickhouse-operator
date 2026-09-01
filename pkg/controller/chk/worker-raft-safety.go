@@ -82,6 +82,16 @@ func (f *chkStatefulSetFallback) OnStatefulSetUpdateFailed(
 	return common.ErrCRUDAbort
 }
 
+// raftFaultTolerantMinMembers is the smallest ensemble that can lose a member and still hold a
+// majority: quorum(1)=1 and quorum(2)=2, so below 3 there is no headroom to protect. Gating those
+// sizes defers every roll forever instead of preserving availability the user still has.
+const raftFaultTolerantMinMembers = 3
+
+// ensembleHasQuorumHeadroom reports whether the gate can ever pass for this ensemble size.
+func ensembleHasQuorumHeadroom(members int) bool {
+	return members >= raftFaultTolerantMinMembers
+}
+
 // raftQuorumSize is Raft majority for an ensemble of n members (n/2 + 1).
 func raftQuorumSize(members int) int {
 	if members <= 0 {
@@ -103,12 +113,22 @@ func (w *worker) countReadyEnsembleMembers(ctx context.Context, cr api.ICustomRe
 		return 0
 	}
 	ready := 0
+	var firstErr error
 	_ = cr.WalkHosts(func(host *api.Host) error {
-		sts := host.Runtime.CurStatefulSet
-		if sts == nil && w.c != nil {
-			sts, _ = w.c.kube.STS().Get(ctx, host)
+		if w.c == nil {
+			return nil
 		}
-		if sts != nil && sts.Status.ReadyReplicas > 0 {
+		// Always re-read. fillCurSTS froze every peer's CurStatefulSet at reconcile start, so a
+		// cached read can never observe the peer recovery this wait exists to wait for.
+		sts, err := w.c.kube.STS().Get(ctx, host)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			return nil
+		}
+		host.Runtime.CurStatefulSet = sts
+		if sts.Status.ReadyReplicas > 0 {
 			ready++
 		}
 		return nil
@@ -122,7 +142,13 @@ func (w *worker) snapshotHostEnsemble(ctx context.Context, host *api.Host) hostE
 		return hostEnsembleSnapshot{}
 	}
 	cr := host.GetCR()
+	// Membership is whichever set is larger. Live Raft still runs the ancestor's members until
+	// clean() purges them, so a 3->1 downscale must keep gating at quorum(3) rather than fall
+	// through the small-ensemble bypass on the target count alone.
 	n := cr.HostsCount()
+	if ancestor := cr.GetAncestor().HostsCount(); ancestor > n {
+		n = ancestor
+	}
 	ready := w.countReadyEnsembleMembers(ctx, cr)
 	return hostEnsembleSnapshot{
 		rolling:    n <= 1 || ready >= raftQuorumSize(n),
@@ -137,9 +163,8 @@ func (w *worker) refreshQuorumSnapshotCounts(ctx context.Context, host *api.Host
 	if host == nil || snap == nil || !snap.rolling {
 		return
 	}
-	if w.c != nil {
-		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
-	}
+	// countReadyEnsembleMembers re-reads every host, this one included, so readyCount tracks live
+	// peer recovery while rolling stays frozen at its pre-disrupt value.
 	if cr := host.GetCR(); cr != nil {
 		snap.readyCount = w.countReadyEnsembleMembers(ctx, cr)
 	}
@@ -169,7 +194,7 @@ func (w *worker) ensureQuorumSafeToDisruptHost(
 	opts *statefulset.ReconcileOptions,
 	snap *hostEnsembleSnapshot,
 ) error {
-	if snap == nil || !snap.rolling || snap.members <= 1 {
+	if snap == nil || !snap.rolling || !ensembleHasQuorumHeadroom(snap.members) {
 		return nil
 	}
 	if !w.hostDisruptionWouldBreakQuorum(ctx, host, opts, *snap) {
@@ -233,7 +258,7 @@ func hostContributesReady(host *api.Host) bool {
 // ensembleQuorumSafeAfterDisrupt reports whether remaining Ready members would still
 // meet quorum if this host were disrupted. Pure — snap counts are frozen before disrupt.
 func ensembleQuorumSafeAfterDisrupt(snap hostEnsembleSnapshot, host *api.Host) bool {
-	if !snap.rolling || snap.members <= 1 {
+	if !snap.rolling || !ensembleHasQuorumHeadroom(snap.members) {
 		return true
 	}
 	remaining := snap.readyCount

@@ -62,7 +62,7 @@ type worker struct {
 	// quorumDisruptPollOverride / quorumDisruptWaitOverride override pacing in
 	// ensureQuorumSafeToDisruptHost (tests only). Zero means use defaults.
 	quorumDisruptPollOverride time.Duration
-	quorumDisruptWaitOverride  time.Duration
+	quorumDisruptWaitOverride time.Duration
 
 	start time.Time
 }
@@ -205,40 +205,48 @@ func (w *worker) ensureFinalizer(ctx context.Context, chk *apiChk.ClickHouseKeep
 	return true
 }
 
-// finalizeCR re-derives the CR from the API server, lets the caller stamp its outcome via f, and
-// persists the result. It reports whether its own normalize refused the spec, so a caller that
-// announces success can stay consistent with the status actually written. CHI mirror:
-// pkg/controller/chi/worker.go.
+// finalizeCR re-derives the CR from the API server and persists the outcome. It reports whether
+// its own normalize refused the spec, so a caller that announces success can stay consistent with
+// the status actually written. CHI mirror: pkg/controller/chi/worker.go.
 func (w *worker) finalizeCR(
 	ctx context.Context,
 	obj meta.Object,
 	updateStatusOpts types.UpdateStatusOptions,
-	f func(*apiChk.ClickHouseKeeperInstallation),
 ) (aborted bool, err error) {
-	chi, err := w.buildCRFromObj(ctx, obj)
+	cr, err := w.buildCRFromObj(ctx, obj)
 	if err != nil {
 		log.V(1).Error("Unable to finalize CR: %s err: %v", util.NamespacedName(obj), err)
 		return false, err
 	}
 
-	// Capture the verdict of the normalize just performed by buildCRFromObj, BEFORE f runs.
-	// f is not read-only: finalizeReconcileAndMarkCompleted passes one that calls
-	// ReconcileComplete(), which overwrites Status unconditionally - so a check placed after it
-	// could never observe an abort.
-	aborted = chi.EnsureStatus().GetStatus() == api.StatusAborted
-
-	if aborted {
-		// Skip f: it calls ReconcileComplete() and advances the ancestor to the spec just
-		// refused, which would publish Completed for a spec the operator rejected and leave the
-		// next action plan diffing against a spec that was never applied.
-		w.a.V(1).M(chi).F().Info("CR normalize aborted - persist the abort, skip completion bookkeeping")
-	} else if f != nil {
-		f(chi)
+	// The verdict of the normalize just performed by buildCRFromObj. Checked before the
+	// completion bookkeeping runs: ReconcileComplete() overwrites Status unconditionally, so a
+	// check placed after it could never observe an abort.
+	if cr.EnsureStatus().GetStatus() == api.StatusAborted {
+		// Skip the completion bookkeeping: it advances the ancestor to the spec just refused,
+		// which would publish Completed for a spec the operator rejected and leave the next
+		// action plan diffing against a spec that was never applied.
+		w.a.V(1).M(cr).F().Info("CR normalize aborted - persist the abort, skip completion bookkeeping")
+		return true, w.c.updateCRObjectStatus(ctx, cr, updateStatusOpts)
 	}
 
-	// The status write is reported rather than discarded: a completion the operator failed to
-	// persist must not be announced as one (#2059).
-	return aborted, w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
+	return false, w.persistReconcileCompleted(ctx, cr)
+}
+
+// persistReconcileCompleted stamps the completion bookkeeping onto cr and writes it. The status
+// write is reported rather than discarded: a completion the operator failed to persist must not
+// be announced as one (#2059).
+func (w *worker) persistReconcileCompleted(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
+	cr.SetAncestor(cr.GetTarget())
+	cr.SetTarget(nil)
+	cr.EnsureStatus().ReconcileComplete()
+	return w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
+		CopyStatusOptions: types.CopyStatusOptions{
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupWholeStatus: true,
+			},
+		},
+	})
 }
 
 func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
@@ -287,11 +295,6 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 					FieldGroupWholeStatus: true,
 				},
 			},
-		},
-		func(c *apiChk.ClickHouseKeeperInstallation) {
-			c.SetAncestor(c.GetTarget())
-			c.SetTarget(nil)
-			c.EnsureStatus().ReconcileComplete()
 		},
 	)
 	if err != nil {
