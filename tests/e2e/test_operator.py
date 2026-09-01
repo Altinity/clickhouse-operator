@@ -8534,20 +8534,31 @@ def test_020003_3(self):
     with And("Reconcile is forced while the first replica is still down"):
         kubectl.force_chk_reconcile(chk, "force", "InProgress")
 
-    with Then("Healthy replicas were never restarted while the broken replica is down"):
-        assert kubectl.get_condition_status(down_pod, "Ready") != "True", error(
-            f"broken-image replica {down_pod} unexpectedly became Ready"
-        )
-        for pod in healthy_pods:
-            assert kubectl.get_condition_status(pod, "Ready") == "True", error(
-                f"healthy replica {pod} must stay Ready while {down_pod} is down "
-                f"(issue #2069 Raft quorum safety)"
+    with Then("Healthy replicas are never restarted while the broken replica is down"):
+        # A single sample proves nothing here. The CHK is already parked at InProgress by the
+        # quorum defer loop, so both waits inside force_chk_reconcile() are satisfied the moment
+        # the taskID patch lands - possibly before the operator has even re-read the CR. Soak
+        # instead: the deferred host is requeued every 5s, so 60s spans >= 12 reconcile cycles,
+        # each one a chance for a regressed gate to disrupt a peer that still holds quorum.
+        # A plain loop, not retries(): the invariant must hold at EVERY sample, not eventually.
+        soak_samples = 13
+        for sample in range(soak_samples):
+            assert kubectl.get_condition_status(down_pod, "Ready") != "True", error(
+                f"broken-image replica {down_pod} unexpectedly became Ready (sample {sample})"
             )
-            cur_start = kubectl.get_field("pod", pod, ".status.startTime")
-            assert cur_start == healthy_start_times[pod], error(
-                f"healthy replica {pod} must never be restarted while peer is down, "
-                f"but startTime changed from {healthy_start_times[pod]} to {cur_start}"
-            )
+            for pod in healthy_pods:
+                assert kubectl.get_condition_status(pod, "Ready") == "True", error(
+                    f"healthy replica {pod} must stay Ready while {down_pod} is down, "
+                    f"not Ready at sample {sample} (issue #2069 Raft quorum safety)"
+                )
+                cur_start = kubectl.get_field("pod", pod, ".status.startTime")
+                assert cur_start == healthy_start_times[pod], error(
+                    f"healthy replica {pod} must never be restarted while peer is down, "
+                    f"but startTime changed from {healthy_start_times[pod]} to {cur_start} "
+                    f"at sample {sample}"
+                )
+            if sample < soak_samples - 1:
+                time.sleep(5)
 
     with When("New keeper image is applied"):
         kubectl.create_and_check(

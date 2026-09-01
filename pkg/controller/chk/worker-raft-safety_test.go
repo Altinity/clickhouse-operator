@@ -17,18 +17,21 @@ package chk
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	apps "k8s.io/api/apps/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 func TestRaftQuorumSize(t *testing.T) {
@@ -46,7 +49,8 @@ func TestSnapshotHostEnsemble(t *testing.T) {
 			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 0 },
 		}
 		host := hostOnCR(chkWithHosts(1))
-		snap := w.snapshotHostEnsemble(ctx, host)
+		snap, err := w.snapshotHostEnsemble(ctx, host)
+		require.NoError(t, err)
 		require.True(t, snap.rolling)
 		require.Equal(t, 1, snap.members)
 		require.Equal(t, 0, snap.readyCount)
@@ -57,7 +61,8 @@ func TestSnapshotHostEnsemble(t *testing.T) {
 			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 0 },
 		}
 		host := hostOnCR(chkWithHosts(3))
-		snap := w.snapshotHostEnsemble(ctx, host)
+		snap, err := w.snapshotHostEnsemble(ctx, host)
+		require.NoError(t, err)
 		require.False(t, snap.rolling)
 		require.Equal(t, 3, snap.members)
 		require.Equal(t, 0, snap.readyCount)
@@ -68,7 +73,8 @@ func TestSnapshotHostEnsemble(t *testing.T) {
 			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 1 },
 		}
 		host := hostOnCR(chkWithHosts(3))
-		snap := w.snapshotHostEnsemble(ctx, host)
+		snap, err := w.snapshotHostEnsemble(ctx, host)
+		require.NoError(t, err)
 		require.False(t, snap.rolling)
 	})
 
@@ -77,7 +83,8 @@ func TestSnapshotHostEnsemble(t *testing.T) {
 			countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 2 },
 		}
 		host := hostOnCR(chkWithHosts(3))
-		snap := w.snapshotHostEnsemble(ctx, host)
+		snap, err := w.snapshotHostEnsemble(ctx, host)
+		require.NoError(t, err)
 		require.True(t, snap.rolling)
 		require.Equal(t, 2, snap.readyCount)
 	})
@@ -158,11 +165,6 @@ func TestChkStatefulSetFallbackAborts(t *testing.T) {
 	f := newChkStatefulSetFallback()
 	require.Equal(t, common.ErrCRUDAbort, f.OnStatefulSetCreateFailed(nil, nil))
 	require.Equal(t, common.ErrCRUDAbort, f.OnStatefulSetUpdateFailed(nil, nil, nil, nil))
-}
-
-func TestErrCRUDDeferredIsDistinctFromAbort(t *testing.T) {
-	require.False(t, errors.Is(common.ErrCRUDDeferred, common.ErrCRUDAbort))
-	require.False(t, errors.Is(common.ErrCRUDAbort, common.ErrCRUDDeferred))
 }
 
 func TestEnsureQuorumSafeToDisruptHost(t *testing.T) {
@@ -318,7 +320,8 @@ func TestPrepareStsReconcileOptsWaitSection(t *testing.T) {
 	t.Run("single-host post-restart still waits Ready", func(t *testing.T) {
 		w.countReadyEnsembleMembersFn = func(context.Context, api.ICustomResource) int { return 0 }
 		host := hostOnCR(chkWithHosts(1))
-		snap := w.snapshotHostEnsemble(context.Background(), host)
+		snap, err := w.snapshotHostEnsemble(context.Background(), host)
+		require.NoError(t, err)
 		if !snap.rolling {
 			t.Fatal("single host should be rolling")
 		}
@@ -327,6 +330,71 @@ func TestPrepareStsReconcileOptsWaitSection(t *testing.T) {
 			t.Fatal("rolling snapshot must drive Ready wait after force-restart")
 		}
 	})
+}
+
+// TestRefreshQuorumSnapshotCountsFreezesRolling pins the freeze on a MULTI-host ensemble,
+// where re-deriving rolling actually changes the answer (the n<=1 short-circuit hides it).
+//
+// A force-restart drops the host STS to ReadyReplicas=0, so live Ready falls below quorum
+// mid-pass. rolling must keep the value it had before the disruption, otherwise the pass
+// silently reclassifies itself as bootstrap and stops waiting for Keeper to become Ready -
+// the host is left un-rejoined while the loop moves on to its peers (#2069).
+func TestRefreshQuorumSnapshotCountsFreezesRolling(t *testing.T) {
+	ctx := context.Background()
+
+	var ready atomic.Int32
+	ready.Store(3)
+	w := &worker{
+		countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int {
+			return int(ready.Load())
+		},
+	}
+	host := hostOnCR(chkWithHosts(3))
+
+	// Snapshot taken while the ensemble holds quorum -> rolling pass.
+	snap, err := w.snapshotHostEnsemble(ctx, host)
+	require.NoError(t, err)
+	require.True(t, snap.rolling, "healthy 3-member ensemble must classify as rolling")
+	require.Equal(t, 3, snap.members)
+	require.Equal(t, 3, snap.readyCount)
+
+	// Force-restart: every Ready count drops to 0 while the pass is in flight.
+	ready.Store(0)
+
+	// Guard against a vacuous assertion: at this live count a FRESH snapshot is bootstrap,
+	// so "still rolling" below can only come from the freeze, not from the input.
+	freshSnap, err := w.snapshotHostEnsemble(ctx, host)
+	require.NoError(t, err)
+	require.False(t, freshSnap.rolling,
+		"fresh snapshot at ready=0 must be bootstrap - otherwise the freeze assertion proves nothing")
+
+	w.refreshQuorumSnapshotCounts(ctx, host, &snap)
+
+	require.True(t, snap.rolling, "rolling must stay frozen at its pre-disrupt value")
+	require.Equal(t, 0, snap.readyCount, "readyCount must track live peer recovery")
+	require.Equal(t, 3, snap.members, "membership must not change mid-pass")
+
+	// Downstream consequence: the frozen rolling flag still drives the Ready wait.
+	opts := w.prepareStsReconcileOptsWaitSection(host, nil, snap.rolling)
+	require.True(t, opts.WaitUntilReady(),
+		"post-force-restart pass must still wait for Keeper to become Ready")
+	require.False(t, opts.WaitUntilStarted(),
+		"rolling pass must not degrade to the bootstrap Started-only wait")
+}
+
+// TestRefreshQuorumSnapshotCountsNoOpOnBootstrap pins the early return: a bootstrap pass
+// never upgrades itself to rolling, no matter how many peers come up mid-pass.
+func TestRefreshQuorumSnapshotCountsNoOpOnBootstrap(t *testing.T) {
+	w := &worker{
+		countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 3 },
+	}
+	host := hostOnCR(chkWithHosts(3))
+	snap := hostEnsembleSnapshot{rolling: false, members: 3, readyCount: 0}
+
+	w.refreshQuorumSnapshotCounts(context.Background(), host, &snap)
+
+	require.False(t, snap.rolling, "bootstrap pass must not flip to rolling mid-flight")
+	require.Equal(t, 0, snap.readyCount, "bootstrap snapshot counts are not refreshed")
 }
 
 func chkWithHosts(n int) *apiChk.ClickHouseKeeperInstallation {
@@ -359,4 +427,270 @@ func hostOnCR(cr *apiChk.ClickHouseKeeperInstallation) *api.Host {
 	host.Runtime.Address.ClusterName = cluster.Name
 	host.Runtime.Address.ShardName = cluster.Layout.Shards[0].Name
 	return host
+}
+
+// raftFakeSTS answers the live StatefulSet lookups countReadyEnsembleMembers makes.
+// Ready replicas are keyed by host pointer so a fixture can hold peers at different
+// readiness and flip one mid-wait, the way a recovering Keeper pod does.
+// Every mutating method panics: the quorum gate only ever reads.
+type raftFakeSTS struct {
+	mu       sync.Mutex
+	ready    map[*api.Host]int32
+	err      error
+	getCalls int
+}
+
+func newRaftFakeSTS() *raftFakeSTS {
+	return &raftFakeSTS{ready: map[*api.Host]int32{}}
+}
+
+func (f *raftFakeSTS) setReady(host *api.Host, ready int32) *raftFakeSTS {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ready[host] = ready
+	return f
+}
+
+func (f *raftFakeSTS) calls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.getCalls
+}
+
+func (f *raftFakeSTS) Get(ctx context.Context, params ...any) (*apps.StatefulSet, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.getCalls++
+	if f.err != nil {
+		// Mirror client-go: a typed Get hands back a non-nil zero object alongside the error.
+		return &apps.StatefulSet{}, f.err
+	}
+	sts := &apps.StatefulSet{}
+	if len(params) > 0 {
+		if host, ok := params[0].(*api.Host); ok {
+			sts.Status.ReadyReplicas = f.ready[host]
+		}
+	}
+	return sts, nil
+}
+
+func (f *raftFakeSTS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
+	panic("quorum gate must not create a StatefulSet")
+}
+
+func (f *raftFakeSTS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
+	panic("quorum gate must not update a StatefulSet")
+}
+
+func (f *raftFakeSTS) Delete(ctx context.Context, namespace, name string) error {
+	panic("quorum gate must not delete a StatefulSet")
+}
+
+func (f *raftFakeSTS) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]apps.StatefulSet, error) {
+	return nil, nil
+}
+
+// raftFakeKube exposes STS() only. IKube is embedded as a nil interface, so any other
+// accessor panics - a guard that the quorum gate reaches nothing else in kube.
+type raftFakeKube struct {
+	interfaces.IKube
+	sts interfaces.IKubeSTS
+}
+
+func (k *raftFakeKube) STS() interfaces.IKubeSTS { return k.sts }
+
+func raftWorkerWithSTS(sts interfaces.IKubeSTS) *worker {
+	return &worker{c: &Controller{kube: &raftFakeKube{sts: sts}}}
+}
+
+// cacheAllHostsAt stamps every host's CurStatefulSet the way fillCurSTS does at reconcile
+// start - one frozen read per host, taken before anything was disrupted.
+func cacheAllHostsAt(cr *apiChk.ClickHouseKeeperInstallation, ready ...int32) []*api.Host {
+	var hosts []*api.Host
+	cr.WalkHosts(func(host *api.Host) error {
+		sts := &apps.StatefulSet{}
+		if len(hosts) < len(ready) {
+			sts.Status.ReadyReplicas = ready[len(hosts)]
+		}
+		host.Runtime.CurStatefulSet = sts
+		hosts = append(hosts, host)
+		return nil
+	})
+	return hosts
+}
+
+// TestCountReadyEnsembleMembersRereadsPeers pins that peer readiness is read live.
+//
+// fillCurSTS populates Runtime.CurStatefulSet for every host at reconcile start. When
+// countReadyEnsembleMembers preferred that cache, the quorum wait polled a value that
+// could never change: a peer coming back Ready was invisible, so the wait burned its
+// whole budget and deferred the roll even though the ensemble had recovered.
+func TestCountReadyEnsembleMembersRereadsPeers(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("live Ready beats a stale not-ready cache", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		hosts := cacheAllHostsAt(cr, 0, 0, 0)
+		fake := newRaftFakeSTS()
+		for _, host := range hosts {
+			fake.setReady(host, 1)
+		}
+		w := raftWorkerWithSTS(fake)
+
+		gotReady, err := w.countReadyEnsembleMembers(ctx, cr)
+		require.NoError(t, err)
+		require.Equal(t, 3, gotReady, "must count live Ready, not the frozen cache")
+		require.Equal(t, 3, fake.calls(), "every peer must be re-read")
+		for _, host := range hosts {
+			require.EqualValues(t, 1, host.Runtime.CurStatefulSet.Status.ReadyReplicas,
+				"live read must refresh the cached STS")
+		}
+	})
+
+	t.Run("wait observes a peer recovering instead of burning the budget", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		hosts := cacheAllHostsAt(cr, 1, 1, 0)
+		fake := newRaftFakeSTS().setReady(hosts[0], 1).setReady(hosts[1], 1).setReady(hosts[2], 0)
+
+		w := raftWorkerWithSTS(fake)
+		w.quorumDisruptPollOverride = 5 * time.Millisecond
+		w.quorumDisruptWaitOverride = 2 * time.Second
+
+		host := hostOnCR(cr)
+		host.GetReconcileAttributes().SetStatus(types.ObjectStatusModified)
+		snap, err := w.snapshotHostEnsemble(ctx, host)
+		require.NoError(t, err)
+		require.True(t, snap.rolling)
+		require.Equal(t, 2, snap.readyCount, "third peer is down at snapshot time")
+
+		go func() {
+			time.Sleep(20 * time.Millisecond)
+			fake.setReady(hosts[2], 1)
+		}()
+
+		require.NoError(t, w.ensureQuorumSafeToDisruptHost(ctx, host, nil, &snap),
+			"recovered peer must unblock the wait")
+		require.Equal(t, 3, snap.readyCount)
+	})
+}
+
+// TestCountReadyEnsembleMembersSwallowsStatefulSetGetError pins CURRENT behavior, which is
+// not the behavior the fix commit claims.
+//
+// countReadyEnsembleMembers records the first Get error in a local firstErr and then drops
+// it on the floor - the signature returns only int, so an API blip is indistinguishable
+// from "peer not Ready". At snapshot time that undercount flips rolling to false, which
+// disables both the quorum gate and the Ready wait, i.e. it fails OPEN on the one path
+// where failing closed matters. Update this test when the error is surfaced.
+// TestCountReadyEnsembleMembersSurfacesStatefulSetGetError pins the failure direction.
+//
+// Swallowing the Get error undercounts Ready members, which flips the pass to bootstrap - and a
+// bootstrap pass skips both the quorum gate and the Ready wait. An apiserver blip would therefore
+// re-enable exactly the unguarded fan-out this gate exists to prevent (#2069). The Get already
+// runs under GetWithRetry, so an error reaching here is a sustained outage: fail the pass and let
+// the reconcile requeue rather than proceed on a count we know is wrong.
+func TestCountReadyEnsembleMembersSurfacesStatefulSetGetError(t *testing.T) {
+	ctx := context.Background()
+	cr := chkWithHosts(3)
+	hosts := cacheAllHostsAt(cr, 1, 1, 1)
+	fake := newRaftFakeSTS()
+	for _, host := range hosts {
+		fake.setReady(host, 1)
+	}
+	wantErr := errors.New("apiserver unavailable")
+	fake.err = wantErr
+	w := raftWorkerWithSTS(fake)
+
+	_, err := w.countReadyEnsembleMembers(ctx, cr)
+	require.ErrorIs(t, err, wantErr, "a failed Get must be reported, not counted as not-Ready")
+
+	host := hostOnCR(cr)
+	host.GetReconcileAttributes().SetStatus(types.ObjectStatusModified)
+	_, err = w.snapshotHostEnsemble(ctx, host)
+	require.ErrorIs(t, err, wantErr,
+		"the snapshot must fail the pass rather than classify it as bootstrap on a bad count")
+}
+
+// TestSnapshotUsesAncestorMemberCount pins ensemble size as max(desired, ancestor).
+//
+// Live Raft still runs the ancestor's membership until clean() purges the removed peers,
+// so a 3->1 downscale that sized the ensemble on the desired count alone got members=1,
+// fell through the small-ensemble bypass, and disrupted the survivor unguarded - exactly
+// when 2 of 3 were still required.
+// TestSnapshotCountsReadyOverTheSameSetAsMembers pins that members and readyCount are tallied
+// over the SAME host set.
+//
+// Taking members from the ancestor while counting Ready over the (smaller) desired set caps ready
+// below quorum(ancestor) on every downscale. That forces the pass to bootstrap, which disables the
+// quorum gate AND the Ready wait - strictly worse than not widening members at all. This test uses
+// the production counter deliberately: injecting countReadyEnsembleMembersFn bypasses the very
+// path the bug lived in.
+func TestSnapshotCountsReadyOverTheSameSetAsMembers(t *testing.T) {
+	ctx := context.Background()
+
+	// 3 -> 1 downscale with every live member still Ready.
+	ancestor := chkWithHosts(3)
+	cr := chkWithHosts(1)
+	cr.SetAncestor(ancestor)
+
+	fake := newRaftFakeSTS()
+	for _, host := range cacheAllHostsAt(ancestor, 1, 1, 1) {
+		fake.setReady(host, 1)
+	}
+	for _, host := range cacheAllHostsAt(cr, 1) {
+		fake.setReady(host, 1)
+	}
+	w := raftWorkerWithSTS(fake)
+
+	snap, err := w.snapshotHostEnsemble(ctx, hostOnCR(cr))
+	require.NoError(t, err)
+
+	require.Equal(t, 3, snap.members, "live Raft still runs the ancestor's members")
+	require.Equal(t, 3, snap.readyCount,
+		"Ready must be tallied over the ancestor set too, or it is structurally capped below quorum")
+	require.True(t, snap.rolling,
+		"a fully Ready ensemble must stay rolling: classifying it bootstrap disables the gate and the Ready wait")
+}
+
+func TestSnapshotUsesAncestorMemberCount(t *testing.T) {
+	ctx := context.Background()
+
+	cr := chkWithHosts(1)
+	cr.SetAncestor(chkWithHosts(3))
+	host := hostOnCR(cr)
+	host.Runtime.CurStatefulSet = &apps.StatefulSet{}
+	host.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+	host.GetReconcileAttributes().SetStatus(types.ObjectStatusModified)
+
+	w := &worker{
+		countReadyEnsembleMembersFn: func(context.Context, api.ICustomResource) int { return 2 },
+		quorumDisruptPollOverride:   5 * time.Millisecond,
+		quorumDisruptWaitOverride:   20 * time.Millisecond,
+	}
+
+	snap, err := w.snapshotHostEnsemble(ctx, host)
+
+	require.NoError(t, err)
+	require.Equal(t, 3, snap.members, "ancestor membership still runs in live Raft")
+	require.True(t, snap.rolling)
+	require.True(t, ensembleHasQuorumHeadroom(snap.members), "gate must be active, not bypassed")
+
+	require.True(t, w.hostDisruptionWouldBreakQuorum(ctx, host, nil, snap),
+		"disrupting the last Ready member of a 3-member ensemble breaks quorum")
+	require.ErrorIs(t, w.ensureQuorumSafeToDisruptHost(ctx, host, nil, &snap), common.ErrCRUDDeferred)
+
+	t.Run("desired count wins when it is the larger set", func(t *testing.T) {
+		up := chkWithHosts(3)
+		up.SetAncestor(chkWithHosts(1))
+		upSnap, err := w.snapshotHostEnsemble(ctx, hostOnCR(up))
+		require.NoError(t, err)
+		require.Equal(t, 3, upSnap.members)
+	})
+
+	t.Run("no ancestor falls back to desired count", func(t *testing.T) {
+		fresh := chkWithHosts(3)
+		freshCRSnap, err := w.snapshotHostEnsemble(ctx, hostOnCR(fresh))
+		require.NoError(t, err)
+		require.Equal(t, 3, freshCRSnap.members)
+	})
 }

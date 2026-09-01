@@ -105,12 +105,12 @@ func raftQuorumSize(members int) int {
 //
 // countReadyEnsembleMembersFn, when set on the worker, overrides live lookup
 // (tests inject fixed Ready counts).
-func (w *worker) countReadyEnsembleMembers(ctx context.Context, cr api.ICustomResource) int {
+func (w *worker) countReadyEnsembleMembers(ctx context.Context, cr api.ICustomResource) (int, error) {
 	if w.countReadyEnsembleMembersFn != nil {
-		return w.countReadyEnsembleMembersFn(ctx, cr)
+		return w.countReadyEnsembleMembersFn(ctx, cr), nil
 	}
 	if cr == nil {
-		return 0
+		return 0, nil
 	}
 	ready := 0
 	var firstErr error
@@ -133,41 +133,62 @@ func (w *worker) countReadyEnsembleMembers(ctx context.Context, cr api.ICustomRe
 		}
 		return nil
 	})
-	return ready
+	return ready, firstErr
 }
 
 // snapshotHostEnsemble records rolling vs bootstrap before disrupting a host.
-func (w *worker) snapshotHostEnsemble(ctx context.Context, host *api.Host) hostEnsembleSnapshot {
+func (w *worker) snapshotHostEnsemble(ctx context.Context, host *api.Host) (hostEnsembleSnapshot, error) {
 	if host == nil || host.GetCR() == nil {
-		return hostEnsembleSnapshot{}
+		return hostEnsembleSnapshot{}, nil
 	}
 	cr := host.GetCR()
-	// Membership is whichever set is larger. Live Raft still runs the ancestor's members until
-	// clean() purges them, so a 3->1 downscale must keep gating at quorum(3) rather than fall
-	// through the small-ensemble bypass on the target count alone.
-	n := cr.HostsCount()
-	if ancestor := cr.GetAncestor().HostsCount(); ancestor > n {
-		n = ancestor
+	// Count members and Ready over the SAME set. Live Raft still runs the ancestor's members
+	// until clean() purges them, so a downscale must gate at the ancestor's quorum - but the
+	// Ready tally has to span that same set, or a 3->1 downscale would compare 1 Ready against
+	// quorum(3) and force the pass to bootstrap, disabling the gate and the Ready wait alike.
+	ensemble := cr
+	if cr.GetAncestor().HostsCount() > cr.HostsCount() {
+		ensemble = cr.GetAncestor()
 	}
-	ready := w.countReadyEnsembleMembers(ctx, cr)
+	n := ensemble.HostsCount()
+	ready, err := w.countReadyEnsembleMembers(ctx, ensemble)
+	if err != nil {
+		// Fail the pass rather than degrade: an undercount flips rolling to false, which turns
+		// off both this gate and the Ready wait - the unsafe direction, and exactly the fan-out
+		// #2069 exists to prevent. The Get already runs under GetWithRetry, so reaching here
+		// means a sustained outage worth a normal error requeue.
+		return hostEnsembleSnapshot{}, err
+	}
 	return hostEnsembleSnapshot{
 		rolling:    n <= 1 || ready >= raftQuorumSize(n),
 		members:    n,
 		readyCount: ready,
-	}
+	}, nil
 }
 
 // refreshQuorumSnapshotCounts updates live Ready counts for an in-flight wait.
 // rolling is intentionally frozen — it was captured before any disruption.
-func (w *worker) refreshQuorumSnapshotCounts(ctx context.Context, host *api.Host, snap *hostEnsembleSnapshot) {
+func (w *worker) refreshQuorumSnapshotCounts(ctx context.Context, host *api.Host, snap *hostEnsembleSnapshot) error {
 	if host == nil || snap == nil || !snap.rolling {
-		return
+		return nil
 	}
-	// countReadyEnsembleMembers re-reads every host, this one included, so readyCount tracks live
-	// peer recovery while rolling stays frozen at its pre-disrupt value.
-	if cr := host.GetCR(); cr != nil {
-		snap.readyCount = w.countReadyEnsembleMembers(ctx, cr)
+	cr := host.GetCR()
+	if cr == nil {
+		return nil
 	}
+	// Count over the same set snapshotHostEnsemble used, so readyCount stays comparable with
+	// the frozen members. countReadyEnsembleMembers re-reads every host, this one included, so
+	// readyCount tracks live peer recovery while rolling stays frozen at its pre-disrupt value.
+	ensemble := cr
+	if cr.GetAncestor().HostsCount() > cr.HostsCount() {
+		ensemble = cr.GetAncestor()
+	}
+	ready, err := w.countReadyEnsembleMembers(ctx, ensemble)
+	if err != nil {
+		return err
+	}
+	snap.readyCount = ready
+	return nil
 }
 
 func (w *worker) quorumDisruptPollInterval() time.Duration {
@@ -211,7 +232,9 @@ func (w *worker) ensureQuorumSafeToDisruptHost(
 		if util.WaitContextDoneOrTimeout(ctx, w.quorumDisruptPollInterval()) {
 			return ctx.Err()
 		}
-		w.refreshQuorumSnapshotCounts(ctx, host, snap)
+		if err := w.refreshQuorumSnapshotCounts(ctx, host, snap); err != nil {
+			return err
+		}
 		if !w.hostDisruptionWouldBreakQuorum(ctx, host, opts, *snap) {
 			w.a.V(1).M(host).F().Info(
 				"Raft quorum headroom available — proceeding with host %s disruption (ready=%d)",

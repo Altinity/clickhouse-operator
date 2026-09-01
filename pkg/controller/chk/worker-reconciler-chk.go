@@ -838,7 +838,14 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	}
 
 	// Snapshot rolling vs bootstrap before any STS disruption on this host.
-	snap := w.snapshotHostEnsemble(ctx, host)
+	snap, err := w.snapshotHostEnsemble(ctx, host)
+	if err != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to read ensemble readiness. Host: %s Err: %v", host.GetName(), err)
+		return err
+	}
 
 	// Reconcile StatefulSet
 	if err := w.reconcileHostStatefulSet(ctx, host, stsReconcileOpts, snap); err != nil {

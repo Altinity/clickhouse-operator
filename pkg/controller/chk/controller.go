@@ -118,20 +118,30 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	if err := w.reconcileCR(ctx, nil, new); err != nil {
-		if errors.Is(err, common.ErrCRUDDeferred) {
-			// Soft defer: quorum headroom not available yet. Status already
-			// records [RaftQuorumUnsafe]; retry on a fixed interval instead of
-			// error backoff.
-			log.V(1).M(new).F().Info(
-				"Raft quorum defer — requeue in %s", raftQuorumDeferredRequeueAfter,
-			)
-			return ctrl.Result{RequeueAfter: raftQuorumDeferredRequeueAfter}, nil
-		}
+	return c.reconcileResult(new, w.reconcileCR(ctx, nil, new))
+}
+
+// reconcileResult maps the outcome of reconcileCR onto a controller-runtime result.
+//
+// ErrCRUDDeferred is an intentional postponement, not a failure, so it must not be
+// returned as an error: controller-runtime would apply exponential backoff to a wait
+// that is expected to clear within seconds. Match with errors.Is - the reconciler
+// wraps the sentinel with host context on its way up.
+func (c *Controller) reconcileResult(cr *apiChk.ClickHouseKeeperInstallation, err error) (ctrl.Result, error) {
+	switch {
+	case err == nil:
+		return ctrl.Result{}, nil
+	case errors.Is(err, common.ErrCRUDDeferred):
+		// Soft defer: quorum headroom not available yet. Status already
+		// records [RaftQuorumUnsafe]; retry on a fixed interval instead of
+		// error backoff.
+		log.V(1).M(cr).F().Info(
+			"Raft quorum defer — requeue in %s", raftQuorumDeferredRequeueAfter,
+		)
+		return ctrl.Result{RequeueAfter: raftQuorumDeferredRequeueAfter}, nil
+	default:
 		return ctrl.Result{}, err
 	}
-
-	return ctrl.Result{}, nil
 }
 
 // installFinalizer adds the operator finalizer to the CHK CR.
