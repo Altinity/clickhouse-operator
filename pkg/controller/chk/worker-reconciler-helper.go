@@ -37,7 +37,16 @@ func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *sw
 	return swversion.MinVersion().SetDescription("min - unable to acquire neither from the tag nor from the app")
 }
 
-// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
+// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile.
+//
+// The constant 1 is load-bearing for Raft safety, not a stub. Hosts within a shard are always
+// serial, so this only bites a multi-shard CHK - but countReadyEnsembleMembers walks the whole CR
+// and writes every peer's Runtime.CurStatefulSet, which hostContributesReady and
+// isHostHealthyForReconcile read. Two shards in flight is therefore a data race on that field and
+// on the unsynchronized quorumWaitSpent, plus a TOCTOU on the gate itself: both workers read the
+// same Ready tally, both conclude a disrupt is safe, and two members go down at once - the fan-out
+// this gate exists to prevent. Raising this needs a cluster-wide disrupt budget first.
+// Asserted by TestReconcileShardsWorkersNumIsOne.
 func (w *worker) getReconcileShardsWorkersNum(cluster *apiChk.Cluster, opts *common.ReconcileShardsAndHostsOptions) int {
 	return 1
 }
