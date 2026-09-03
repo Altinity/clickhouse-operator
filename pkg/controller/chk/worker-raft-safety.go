@@ -32,7 +32,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// Raft / ensemble safety policy for CHK (#2069).
+// Raft / ensemble safety policy for CHK.
 //
 // Owns rolling-vs-bootstrap classification, STS wait probes, quorum disrupt gate,
 // recovery-first host ordering, and membership settle delays. The reconciler
@@ -47,7 +47,7 @@ import (
 //
 // hostDisruptionWouldBreakQuorum is the tested predicate used inside the façade.
 // verifyHostEnsembleMembership is the extension point for a fuller Raft barrier
-// (committed /keeper/config + mntr, as in PR #2041).
+// (committed /keeper/config + mntr).
 
 const (
 	defaultQuorumDisruptPollInterval = 5 * time.Second
@@ -64,7 +64,7 @@ type hostEnsembleSnapshot struct {
 
 // chkStatefulSetFallback aborts the reconcile on STS create/update wait failure.
 // DefaultFallback returns ErrCRUDIgnore, which lets the host loop recreate the
-// next replica while the previous one never rejoined — the #2069 failure mode.
+// next replica while the previous one never rejoined — the fan-out this package prevents.
 type chkStatefulSetFallback struct{}
 
 func newChkStatefulSetFallback() *chkStatefulSetFallback {
@@ -171,7 +171,7 @@ func (w *worker) snapshotHostEnsemble(ctx context.Context, host *api.Host) (host
 	if err != nil {
 		// Fail the pass rather than degrade: an undercount flips rolling to false, which turns
 		// off both this gate and the Ready wait - the unsafe direction, and exactly the fan-out
-		// #2069 exists to prevent. The Get already runs under GetWithRetry, so reaching here
+		// this gate exists to prevent. The Get already runs under GetWithRetry, so reaching here
 		// means a sustained outage worth a normal error requeue.
 		return hostEnsembleSnapshot{}, err
 	}
@@ -331,7 +331,7 @@ func (w *worker) deferQuorumDisrupt(host *api.Host, snap hostEnsembleSnapshot) e
 
 // isHostHealthyForReconcile is true when the host counts as live for recovery-first
 // ordering and quorum headroom. Stopped/troubleshoot hosts are intentionally
-// unavailable and are ordered after recovery hosts (CHI #1704).
+// unavailable and are ordered after recovery hosts, as the CHI shard reconciler does.
 func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) bool {
 	if host == nil {
 		return false
@@ -363,7 +363,7 @@ func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) 
 // Sizing growth on the desired set inflates the denominator against a membership that does not
 // exist yet, and the damage is in the unsafe direction: a 3->5 with one member already down
 // counts 2 Ready against quorum(5)=3, so rolling goes false, and a bootstrap pass switches off
-// both this gate and the Ready wait - the unguarded fan-out #2069 exists to prevent. Shrink is
+// both this gate and the Ready wait - the unguarded fan-out this gate exists to prevent. Shrink is
 // the same story from the other side: departing peers keep voting until clean() purges them.
 //
 // An ancestor too small to tolerate a loss is not a quorum worth protecting, so fall back to the
@@ -403,7 +403,7 @@ func ensembleQuorumSafeAfterDisrupt(snap hostEnsembleSnapshot, host *api.Host) b
 }
 
 // hostDisruptionWouldBreakQuorum is true when this pass would disrupt a Ready host and
-// drop the ensemble below Raft quorum (#2069).
+// drop the ensemble below Raft quorum.
 //
 // Must be called after PrepareHostStatefulSetWithStatus — ObjectStatusSame is assigned only there.
 func (w *worker) hostDisruptionWouldBreakQuorum(
@@ -441,7 +441,7 @@ func quorumDisruptDeferMessage(host *api.Host, snap hostEnsembleSnapshot) string
 // verifyHostEnsembleMembership is the extension point for Raft membership
 // verification after a host joins in rolling mode. Currently a no-op: STS Ready
 // wait already ran. Implement committed-config / leader sync barriers here when
-// adopting the fuller rescale design from PR #2041.
+// adopting a fuller rescale design.
 func (w *worker) verifyHostEnsembleMembership(ctx context.Context, host *api.Host) error {
 	_ = ctx
 	_ = host
@@ -468,7 +468,7 @@ func (w *worker) prepareStsReconcileOptsWaitSection(
 	// from a live ensemble (3->5 and larger; a 2->3 is instead held by the gate, which sizes on
 	// the desired 3 and refuses to disrupt either live member). The quorum gate keeps reading
 	// rolling unchanged; only this consumer needs the per-host narrowing, which is what the
-	// pre-#2069 code expressed as GetReadiness().IsTrue() && host.HasAncestor().
+	// code before this gate expressed as GetReadiness().IsTrue() && host.HasAncestor().
 	//
 	// HasAncestor() alone is not enough. It resolves through .status.normalizedCompleted, which
 	// only a fully successful pass stamps, so an ensemble whose first reconcile never finished -
@@ -481,7 +481,7 @@ func (w *worker) prepareStsReconcileOptsWaitSection(
 	// snapshotHostEnsemble.
 	joinedEnsemble := host.HasAncestor() || hostContributesReady(host)
 
-	// A host outside the live ensemble still has to wait to START. The pre-#2069 code spelled
+	// A host outside the live ensemble still has to wait to START. The code before this gate spelled
 	// this `probes.GetStartup().IsTrue() || !host.HasAncestor()`; narrowing it to !rolling alone
 	// would leave a scale-up host with startup:"false" waiting for nothing whatsoever, and the
 	// host loop would move on before this Keeper had even begun booting.
@@ -529,7 +529,7 @@ func (w *worker) membershipSettleDelay(cr *apiChk.ClickHouseKeeperInstallation) 
 }
 
 // shardHostsRecoveryFirst returns shard hosts with not-ready replicas first, then ready ones —
-// same ordering as CHI reconcileShardWithHosts (#1704). The partition is STABLE: within each
+// same ordering as CHI reconcileShardWithHosts. The partition is STABLE: within each
 // group hosts keep their declaration order, which is what lets tests assert an exact sequence.
 func shardHostsRecoveryFirst(shard api.IShard, healthy func(*api.Host) bool) []*api.Host {
 	if shard == nil {
