@@ -301,8 +301,8 @@ func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr 
 	// Use a context-aware wait so a controller shutdown does not stall the
 	// worker for up to two minutes mid-reconcile. The wait windows below are
 	// best-effort pacing only; the function returns early on ctx cancellation.
-	// Same-size reconciles do not wait (see #2035 / #2059) — a fixed 10s sleep
-	// previously left healthy ensembles cycling and delayed Completed.
+	// Same-size reconciles do not wait at all — a fixed 10s sleep previously left
+	// healthy ensembles cycling and delayed Completed.
 	d := w.membershipSettleDelay(cr)
 	if d == 0 {
 		return nil
@@ -671,7 +671,8 @@ func (w *worker) reconcileShardWithHosts(ctx context.Context, shard api.IShard) 
 
 	// Recovery first, then rollout: bring a replica that is already down back up before
 	// touching its healthy peer, so an interrupted roll cannot take the ensemble below
-	// Raft quorum (#2069, n=2). Disruption is gated in reconcileHostStatefulSet.
+	// Raft quorum. Disruption itself is gated in reconcileHostStatefulSet, which
+	// only engages at 3+ members - this ordering is what protects the smaller ensembles.
 	deferred := false
 	for _, host := range shardHostsRecoveryFirst(shard, func(h *api.Host) bool {
 		return w.isHostHealthyForReconcile(ctx, h)
@@ -710,6 +711,11 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. Host: %s ", host.GetName())
 		return nil
+	}
+	// Below the ctx check on purpose: a cancelled reconcile must short-circuit identically
+	// whether or not the seam is armed, or the host loop becomes un-modellable under shutdown.
+	if w.reconcileHostFn != nil {
+		return w.reconcileHostFn(ctx, host)
 	}
 
 	w.a.V(2).M(host).S().P()
@@ -837,22 +843,10 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Warning("Reconcile Host Main - unable to reconcile Service. Host: %s Err: %v", host.GetName(), err)
 	}
 
-	// Snapshot rolling vs bootstrap before any STS disruption on this host.
-	snap, err := w.snapshotHostEnsemble(ctx, host)
+	// Snapshot the ensemble and reconcile the StatefulSet against that same snapshot.
+	snap, err := w.reconcileHostStatefulSetWithEnsembleSnapshot(ctx, host, stsReconcileOpts)
 	if err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
-		w.a.V(1).
-			M(host).F().
-			Warning("Reconcile Host Main - unable to read ensemble readiness. Host: %s Err: %v", host.GetName(), err)
-		return err
-	}
-
-	// Reconcile StatefulSet
-	if err := w.reconcileHostStatefulSet(ctx, host, stsReconcileOpts, snap); err != nil {
-		metrics.HostReconcilesErrors(ctx, host.GetCR())
-		w.a.V(1).
-			M(host).F().
-			Warning("Reconcile Host Main - unable to reconcile StatefulSet. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
@@ -865,7 +859,7 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 
 	// Finalize main reconcile with domain activities.
 	// Membership / ensemble gates must abort the host loop — continuing would
-	// recreate the next replica while this one never rejoined (#2069).
+	// recreate the next replica while this one never rejoined.
 	if err := w.reconcileHostMainDomain(ctx, host, snap); err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
@@ -875,6 +869,39 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	}
 
 	return nil
+}
+
+// reconcileHostStatefulSetWithEnsembleSnapshot freezes ensemble state and reconciles the host
+// StatefulSet against that very snapshot.
+//
+// The two steps are one unit on purpose. Both quorum protections - the Raft disrupt gate and the
+// STS Ready wait - hang off snap.rolling, and an empty snapshot reads as bootstrap, which turns
+// both OFF silently. Wired inline this pairing had no unit under test: every gate test supplies a
+// snapshot of its own, so passing a literal, taking the snapshot after the disruption, or
+// demoting its error to a warning all left the suite green while the operator rolled an ensemble
+// below Raft majority.
+func (w *worker) reconcileHostStatefulSetWithEnsembleSnapshot(
+	ctx context.Context,
+	host *api.Host,
+	opts *statefulset.ReconcileOptions,
+) (hostEnsembleSnapshot, error) {
+	// Snapshot rolling vs bootstrap before any STS disruption on this host.
+	snap, err := w.snapshotHostEnsemble(ctx, host)
+	if err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to read ensemble readiness. Host: %s Err: %v", host.GetName(), err)
+		return hostEnsembleSnapshot{}, err
+	}
+
+	if err := w.reconcileHostStatefulSet(ctx, host, opts, snap); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to reconcile StatefulSet. Host: %s Err: %v", host.GetName(), err)
+		return snap, err
+	}
+
+	return snap, nil
 }
 
 func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {
@@ -897,7 +924,7 @@ func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, sn
 		return nil
 	}
 
-	// Extension point for richer Raft membership confirmation (PR #2041).
+	// Extension point for richer Raft membership confirmation.
 	return w.verifyHostEnsembleMembership(ctx, host)
 }
 
