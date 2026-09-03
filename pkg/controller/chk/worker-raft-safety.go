@@ -20,6 +20,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -40,7 +41,8 @@ import (
 // Before disrupting a host STS:
 //
 //  1. snapshotHostEnsemble — freeze rolling vs bootstrap (live Ready, not ancestor)
-//  2. prepareStsReconcileOptsWaitSection — Ready wait iff rolling
+//  2. prepareStsReconcileOptsWaitSection — Ready wait when rolling AND the host has joined,
+//     unless readiness is explicitly disabled
 //  3. ensureQuorumSafeToDisruptHost — wait/defer if disrupt would break Raft majority
 //
 // hostDisruptionWouldBreakQuorum is the tested predicate used inside the façade.
@@ -122,7 +124,15 @@ func (w *worker) countReadyEnsembleMembers(ctx context.Context, cr api.ICustomRe
 		// cached read can never observe the peer recovery this wait exists to wait for.
 		sts, err := w.c.kube.STS().Get(ctx, host)
 		if err != nil {
-			if firstErr == nil {
+			// NotFound is an answer, not a failure: the host simply has no StatefulSet yet.
+			// Every host of a fresh CHK is in that state, and so is every host added by a
+			// scale-up, so treating it as an error would fail the reconcile that is supposed
+			// to create them. It counts as not-Ready, which is exactly what it is.
+			if apiErrors.IsNotFound(err) {
+				// Gone means gone: leaving the cached object in place would keep reporting a
+				// deleted peer as Ready to hostContributesReady and isHostHealthyForReconcile.
+				host.Runtime.CurStatefulSet = nil
+			} else if firstErr == nil {
 				firstErr = err
 			}
 			return nil
@@ -146,12 +156,18 @@ func (w *worker) snapshotHostEnsemble(ctx context.Context, host *api.Host) (host
 	// until clean() purges them, so a downscale must gate at the ancestor's quorum - but the
 	// Ready tally has to span that same set, or a 3->1 downscale would compare 1 Ready against
 	// quorum(3) and force the pass to bootstrap, disabling the gate and the Ready wait alike.
-	ensemble := cr
-	if cr.GetAncestor().HostsCount() > cr.HostsCount() {
-		ensemble = cr.GetAncestor()
-	}
+	ensemble := quorumSizingEnsemble(cr)
 	n := ensemble.HostsCount()
 	ready, err := w.countReadyEnsembleMembers(ctx, ensemble)
+	if err == nil {
+		// Refresh the reconciled host too. When the ensemble is the ancestor its hosts are
+		// separately normalized objects, so the walk above never touches the host that
+		// hostContributesReady() reads - and this snapshot feeds the FIRST gate evaluation,
+		// which for most passes is the only one. Left stale, a host that recovered since
+		// fillCurSTS reads as not-contributing and the gate skips a disrupt that does break
+		// quorum.
+		err = w.refreshHostStatefulSet(ctx, host)
+	}
 	if err != nil {
 		// Fail the pass rather than degrade: an undercount flips rolling to false, which turns
 		// off both this gate and the Ready wait - the unsafe direction, and exactly the fan-out
@@ -179,15 +195,36 @@ func (w *worker) refreshQuorumSnapshotCounts(ctx context.Context, host *api.Host
 	// Count over the same set snapshotHostEnsemble used, so readyCount stays comparable with
 	// the frozen members. countReadyEnsembleMembers re-reads every host, this one included, so
 	// readyCount tracks live peer recovery while rolling stays frozen at its pre-disrupt value.
-	ensemble := cr
-	if cr.GetAncestor().HostsCount() > cr.HostsCount() {
-		ensemble = cr.GetAncestor()
-	}
-	ready, err := w.countReadyEnsembleMembers(ctx, ensemble)
+	ready, err := w.countReadyEnsembleMembers(ctx, quorumSizingEnsemble(cr))
 	if err != nil {
 		return err
 	}
+	// Refresh the reconciled host explicitly. When the ensemble is the ancestor its hosts are
+	// separately normalized objects - different *api.Host pointers - so the tally above never
+	// touches the host hostContributesReady() reads. Left stale, the decrement can disagree
+	// with the count it is subtracting from and the gate fails open.
+	if err := w.refreshHostStatefulSet(ctx, host); err != nil {
+		return err
+	}
 	snap.readyCount = ready
+	return nil
+}
+
+// refreshHostStatefulSet re-reads one host's StatefulSet. A missing StatefulSet is not an
+// error - see countReadyEnsembleMembers.
+func (w *worker) refreshHostStatefulSet(ctx context.Context, host *api.Host) error {
+	if w.c == nil || host == nil {
+		return nil
+	}
+	sts, err := w.c.kube.STS().Get(ctx, host)
+	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			host.Runtime.CurStatefulSet = nil
+			return nil
+		}
+		return err
+	}
+	host.Runtime.CurStatefulSet = sts
 	return nil
 }
 
@@ -222,14 +259,46 @@ func (w *worker) ensureQuorumSafeToDisruptHost(
 		return nil
 	}
 
+	// The budget spans the pass, not the host. The first gated host still gets the whole
+	// allowance, so a transient blip is absorbed exactly as before; later hosts share what is
+	// left, and once it is gone they defer immediately. This bounds the WAIT only - the refusal
+	// below is unconditional, so a disrupt that would break quorum is still never allowed.
+	remaining := w.quorumDisruptWaitTimeout() - w.quorumWaitSpent
+	if remaining <= 0 {
+		w.a.V(1).M(host).F().Info(
+			"Raft quorum wait budget for this pass is spent - deferring host %s without waiting",
+			host.GetName(),
+		)
+		return w.deferQuorumDisrupt(host, *snap)
+	}
+
 	w.a.V(1).M(host).F().Info(
-		"Waiting for Raft quorum headroom before disrupting host %s (ready=%d quorum=%d)",
-		host.GetName(), snap.readyCount, raftQuorumSize(snap.members),
+		"Waiting for Raft quorum headroom before disrupting host %s (ready=%d quorum=%d budget=%s)",
+		host.GetName(), snap.readyCount, raftQuorumSize(snap.members), remaining,
 	)
 
-	deadline := time.Now().Add(w.quorumDisruptWaitTimeout())
+	waitStart := time.Now()
+	// Charge the pass however this returns - proceeded, deferred, errored or cancelled. A
+	// successful wait is charged too, on purpose: refunding it would let a flapping peer burn
+	// unbounded worker time, which is the whole thing being rationed. Only THIS wait is
+	// budgeted - membershipSettleDelay and the StatefulSet launch waits are separate.
+	defer func() { w.quorumWaitSpent += time.Since(waitStart) }()
+
+	deadline := waitStart.Add(remaining)
 	for time.Now().Before(deadline) {
-		if util.WaitContextDoneOrTimeout(ctx, w.quorumDisruptPollInterval()) {
+		// Never sleep past the deadline. Polling a fixed interval regardless of what is left
+		// overshoots the budget by up to one interval - 5s by default. That is once per pass, not
+		// per host, since the overshooting host exhausts the budget and the rest take the
+		// early-defer branch above; bounded, but it is the budget's own ceiling, so honour it.
+		if util.WaitContextDoneOrTimeout(ctx, min(w.quorumDisruptPollInterval(), time.Until(deadline))) {
+			return ctx.Err()
+		}
+		// Re-check cancellation explicitly. Once the clamp can hand WaitContextDoneOrTimeout a
+		// non-positive duration, both of its select cases are ready at once and Go picks between
+		// them at random, so a cancelled context is reported as cancelled only about half the
+		// time. Without this the loop would go on to poll the apiserver under a dead context and
+		// surface that Get's failure instead of ctx.Err().
+		if util.IsContextDone(ctx) {
 			return ctx.Err()
 		}
 		if err := w.refreshQuorumSnapshotCounts(ctx, host, snap); err != nil {
@@ -244,11 +313,18 @@ func (w *worker) ensureQuorumSafeToDisruptHost(
 		}
 	}
 
+	return w.deferQuorumDisrupt(host, *snap)
+}
+
+// deferQuorumDisrupt announces the refusal and returns the soft-defer sentinel. Split out so the
+// budget-exhausted path and the waited-and-still-unsafe path report identically: from the user's
+// side both mean "this host was not touched because the ensemble could not afford it".
+func (w *worker) deferQuorumDisrupt(host *api.Host, snap hostEnsembleSnapshot) error {
 	w.a.V(1).M(host).F().
 		WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonHostReconcileDeferredShardSafety).
 		Warning(
 			"Deferring host StatefulSet reconcile: disrupting %s would drop below Raft quorum (%s)",
-			host.GetName(), quorumDisruptDeferMessage(host, *snap),
+			host.GetName(), quorumDisruptDeferMessage(host, snap),
 		)
 	return common.ErrCRUDDeferred
 }
@@ -268,6 +344,41 @@ func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) 
 		sts, _ = w.c.kube.STS().Get(ctx, host)
 	}
 	return sts != nil && sts.Status.ReadyReplicas > 0
+}
+
+// quorumSizingEnsemble returns the host set to size Raft quorum on - the denominator behind
+// members, raftQuorumSize and the disrupt gate.
+//
+// Usually that is the ensemble live Raft is actually running, i.e. the last reconciled (ancestor)
+// set. It is NOT always: when the ancestor is too small to tolerate a loss there is no quorum to
+// protect, and this falls back to the desired set (see the last paragraph). So read the result as
+// "what to size quorum on", never as "what is currently running".
+//
+// Membership is static. The generator emits keeper_server/raft_configuration as a plain config
+// section, and enable_reconfiguration is shipped explicitly disabled
+// (config/chk/keeper_config.d/01-keeper-03-enable-reconfig.xml), so a running Keeper holds the
+// membership it started with. Publishing the ConfigMap for a scale-up therefore does NOT admit the new
+// servers to the running Raft - they join only as the existing pods roll onto the new config.
+//
+// Sizing growth on the desired set inflates the denominator against a membership that does not
+// exist yet, and the damage is in the unsafe direction: a 3->5 with one member already down
+// counts 2 Ready against quorum(5)=3, so rolling goes false, and a bootstrap pass switches off
+// both this gate and the Ready wait - the unguarded fan-out #2069 exists to prevent. Shrink is
+// the same story from the other side: departing peers keep voting until clean() purges them.
+//
+// An ancestor too small to tolerate a loss is not a quorum worth protecting, so fall back to the
+// desired set there. That also keeps growth classified as bootstrap: a 1->3 sized at 1 would read
+// rolling (members<=1 is rolling unconditionally), putting a Ready wait on the one EXISTING host
+// while the ensemble it must reach quorum with is still being created. The new hosts are already
+// safe either way - joinedEnsemble below denies them the Ready wait.
+func quorumSizingEnsemble(cr api.ICustomResource) api.ICustomResource {
+	if cr == nil {
+		return nil
+	}
+	if ensembleHasQuorumHeadroom(cr.GetAncestor().HostsCount()) {
+		return cr.GetAncestor()
+	}
+	return cr
 }
 
 // hostContributesReady reports whether this host currently counts toward live quorum.
@@ -349,15 +460,42 @@ func (w *worker) prepareStsReconcileOptsWaitSection(
 	}
 	probes := host.GetCluster().GetReconcile().Host.Wait.Probes
 
-	if probes.GetStartup().IsTrue() || !rolling {
+	// rolling describes the ENSEMBLE; the Ready wait is a per-HOST decision, and a host that is
+	// not yet a member of the live ensemble must never carry it. Keeper membership is static, so
+	// a brand-new peer cannot reach /ready until the existing members roll onto the config that
+	// admits it - and recovery-first ordering reconciles the new hosts before any of them do.
+	// Waiting there can only expire into chkStatefulSetFallback's ErrCRUDAbort, wedging an upscale
+	// from a live ensemble (3->5 and larger; a 2->3 is instead held by the gate, which sizes on
+	// the desired 3 and refuses to disrupt either live member). The quorum gate keeps reading
+	// rolling unchanged; only this consumer needs the per-host narrowing, which is what the
+	// pre-#2069 code expressed as GetReadiness().IsTrue() && host.HasAncestor().
+	//
+	// HasAncestor() alone is not enough. It resolves through .status.normalizedCompleted, which
+	// only a fully successful pass stamps, so an ensemble whose first reconcile never finished -
+	// a deferral, an error, an operator killed mid-pass - is live but ancestor-less, and dropping
+	// the Ready wait there would unserialize a genuine rolling update. On a 2-member CHK it,
+	// recovery-first ordering and chkStatefulSetFallback are the whole of the protection, since
+	// the quorum gate has no headroom to engage below raftFaultTolerantMinMembers. A host already
+	// reporting Ready is a member whatever the status says, while a host this pass is adding has
+	// no StatefulSet at all and so fails both terms. CurStatefulSet was refreshed moments ago by
+	// snapshotHostEnsemble.
+	joinedEnsemble := host.HasAncestor() || hostContributesReady(host)
+
+	// A host outside the live ensemble still has to wait to START. The pre-#2069 code spelled
+	// this `probes.GetStartup().IsTrue() || !host.HasAncestor()`; narrowing it to !rolling alone
+	// would leave a scale-up host with startup:"false" waiting for nothing whatsoever, and the
+	// host loop would move on before this Keeper had even begun booting.
+	if probes.GetStartup().IsTrue() || !rolling || !joinedEnsemble {
 		opts = opts.SetWaitUntilStarted()
 		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilStarted")
 	}
 
 	switch {
-	case rolling && !probes.GetReadiness().IsFalse():
+	case rolling && joinedEnsemble && !probes.GetReadiness().IsFalse():
 		opts = opts.SetWaitUntilReady()
 		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (Keeper must become Ready)")
+	case rolling && !joinedEnsemble:
+		w.a.V(1).M(host).F().Info("Skip WaitUntilReady — host has not joined the live ensemble yet")
 	case !rolling:
 		w.a.V(1).M(host).F().Info("Skip WaitUntilReady — bootstrap / resume-from-stopped / recovery")
 	}
@@ -375,10 +513,9 @@ func (w *worker) membershipSettleDelay(cr *apiChk.ClickHouseKeeperInstallation) 
 	if cr == nil {
 		return 0
 	}
-	ancestorHosts := 0
-	if ancestor := cr.GetAncestor(); ancestor != nil {
-		ancestorHosts = ancestor.HostsCount()
-	}
+	// GetAncestor() returns a typed nil and HostsCount() walks via WalkHosts(), which
+	// guards a nil receiver - no explicit nil check needed.
+	ancestorHosts := cr.GetAncestor().HostsCount()
 	currentHosts := cr.HostsCount()
 
 	switch {
@@ -391,8 +528,9 @@ func (w *worker) membershipSettleDelay(cr *apiChk.ClickHouseKeeperInstallation) 
 	}
 }
 
-// shardHostsRecoveryFirst returns shard hosts with not-ready replicas first, then
-// ready ones — same ordering as CHI reconcileShardWithHosts (#1704).
+// shardHostsRecoveryFirst returns shard hosts with not-ready replicas first, then ready ones —
+// same ordering as CHI reconcileShardWithHosts (#1704). The partition is STABLE: within each
+// group hosts keep their declaration order, which is what lets tests assert an exact sequence.
 func shardHostsRecoveryFirst(shard api.IShard, healthy func(*api.Host) bool) []*api.Host {
 	if shard == nil {
 		return nil
