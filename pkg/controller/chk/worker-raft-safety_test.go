@@ -420,7 +420,7 @@ func TestPrepareStsReconcileOptsWaitSection(t *testing.T) {
 // A force-restart drops the host STS to ReadyReplicas=0, so live Ready falls below quorum
 // mid-pass. rolling must keep the value it had before the disruption, otherwise the pass
 // silently reclassifies itself as bootstrap and stops waiting for Keeper to become Ready -
-// the host is left un-rejoined while the loop moves on to its peers (#2069).
+// the host is left un-rejoined while the loop moves on to its peers.
 func TestRefreshQuorumSnapshotCountsFreezesRolling(t *testing.T) {
 	ctx := context.Background()
 
@@ -692,7 +692,7 @@ func TestUpscaleFromSingleMemberClassifiesAsBootstrap(t *testing.T) {
 // a 3->5 with one member already down tallies 2 Ready against quorum(5)=3, so rolling goes false
 // and the pass is classified bootstrap - which disables this gate AND the Ready wait, leaving the
 // two survivors of a 3-member ensemble free to be restarted back to back. That is precisely the
-// unguarded fan-out of #2069. Sized on the live ensemble it is 2 Ready of 3, quorum 2, and
+// unguarded fan-out this gate prevents. Sized on the live ensemble it is 2 Ready of 3, quorum 2, and
 // disrupting either survivor is refused.
 func TestDegradedUpscaleKeepsGateArmed(t *testing.T) {
 	ctx := context.Background()
@@ -865,7 +865,7 @@ func TestSnapshotHostEnsembleTreatsMissingStatefulSetAsNotReady(t *testing.T) {
 //
 // Every other test here drives ensureQuorumSafeToDisruptHost directly, so deleting its call
 // from reconcileHostStatefulSet leaves the whole suite green while the operator happily rolls
-// an ensemble below Raft majority - the exact #2069 fan-out. This test goes through
+// an ensemble below Raft majority - the exact fan-out this gate prevents. This test goes through
 // reconcileHostStatefulSet and asserts two things: the deferral reaches the caller, and the
 // StatefulSet was never touched on the way out.
 func TestReconcileHostStatefulSetConsultsQuorumGate(t *testing.T) {
@@ -911,7 +911,7 @@ func TestReconcileHostStatefulSetConsultsQuorumGate(t *testing.T) {
 //
 // chkStatefulSetFallback returning ErrCRUDAbort is worthless unless newTask actually installs
 // it: with the default fallback a StatefulSet wait failure returns ErrCRUDIgnore and the walk
-// carries on to the next replica, which is the #2069 fan-out. Asserting the constants alone
+// carries on to the next replica, which is the fan-out this gate prevents. Asserting the constants alone
 // leaves that revert green, so assert what the reconciler was built with.
 func TestNewTaskWiresChkStatefulSetFallback(t *testing.T) {
 	w := &worker{
@@ -1004,7 +1004,7 @@ func TestCountReadyEnsembleMembersRereadsPeers(t *testing.T) {
 //
 // Swallowing the Get error undercounts Ready members, which flips the pass to bootstrap - and a
 // bootstrap pass skips both the quorum gate and the Ready wait. An apiserver blip would therefore
-// re-enable exactly the unguarded fan-out this gate exists to prevent (#2069). The Get already
+// re-enable exactly the unguarded fan-out this gate exists to prevent. The Get already
 // runs under GetWithRetry, so an error reaching here is a sustained outage: fail the pass and let
 // the reconcile requeue rather than proceed on a count we know is wrong.
 func TestCountReadyEnsembleMembersSurfacesStatefulSetGetError(t *testing.T) {
@@ -1300,13 +1300,13 @@ func TestMembershipSettleDelayIsActuallyWaited(t *testing.T) {
 		start := time.Now()
 		require.NoError(t, w.reconcileCRAuxObjectsPreliminaryDomain(context.Background(), cr))
 		require.Less(t, time.Since(start), time.Second,
-			"a same-size reconcile must not pause at all (#2035/#2059)")
+			"a same-size reconcile must not pause at all")
 	})
 }
 
 // TestReconcileShardWithHostsLoop pins the two host-loop invariants that no test reached before:
-// recovery-first ordering (#1704) and abort-on-error. A loop that keeps going after a hard error
-// is the #2069 fan-out itself - it would recreate the next replica while the previous one never
+// recovery-first ordering and abort-on-error. A loop that keeps going after a hard error
+// is the fan-out this gate prevents - it would recreate the next replica while the previous one never
 // rejoined.
 func TestReconcileShardWithHostsLoop(t *testing.T) {
 	ctx := context.Background()
@@ -1347,7 +1347,7 @@ func TestReconcileShardWithHostsLoop(t *testing.T) {
 		}
 		require.ErrorIs(t, w.reconcileShardWithHosts(ctx, shard), boom)
 		require.Len(t, visited, 1,
-			"a hard error must stop the loop - carrying on is the #2069 fan-out")
+			"a hard error must stop the loop - carrying on is the fan-out this gate prevents")
 	})
 
 	t.Run("a deferral visits every host and surfaces at the end", func(t *testing.T) {
@@ -1508,7 +1508,7 @@ func TestPassBudgetBoundsTheWholeShardLoop(t *testing.T) {
 // TestReconcileHostStatefulSetWithEnsembleSnapshot pins the WIRING between the snapshot and the
 // StatefulSet reconcile, which no other test can see.
 //
-// Both #2069 protections hang off snap.rolling: ensureQuorumSafeToDisruptHost returns nil on its
+// Both quorum protections hang off snap.rolling: ensureQuorumSafeToDisruptHost returns nil on its
 // first line for a non-rolling snapshot, and prepareStsReconcileOptsWaitSection drops
 // SetWaitUntilReady. An empty hostEnsembleSnapshot is non-rolling, so handing one to
 // reconcileHostStatefulSet - by passing a literal, by snapshotting AFTER the disruption, or by
