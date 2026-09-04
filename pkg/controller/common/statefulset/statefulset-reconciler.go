@@ -44,7 +44,7 @@ type Reconciler struct {
 	cr  interfaces.IKubeCR
 	sts interfaces.IKubeSTS
 
-	fallback fallback
+	fallback Fallback
 }
 
 func NewReconciler(
@@ -55,7 +55,7 @@ func NewReconciler(
 	labeler interfaces.ILabeler,
 	storage *storage.Reconciler,
 	kube interfaces.IKube,
-	fallback fallback,
+	fallback Fallback,
 ) *Reconciler {
 	return &Reconciler{
 		a:    a,
@@ -77,6 +77,11 @@ func NewReconciler(
 func (r *Reconciler) PrepareHostStatefulSetWithStatus(ctx context.Context, host *api.Host, shutdown bool) {
 	r.prepareDesiredStatefulSet(host, shutdown)
 	host.GetReconcileAttributes().SetStatus(r.getStatefulSetStatus(host))
+}
+
+// Fallback reports the create/update failure policy this Reconciler was built with.
+func (r *Reconciler) Fallback() Fallback {
+	return r.fallback
 }
 
 // prepareDesiredStatefulSet prepares desired StatefulSet
