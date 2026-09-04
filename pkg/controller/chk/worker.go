@@ -64,6 +64,18 @@ type worker struct {
 	quorumDisruptPollOverride time.Duration
 	quorumDisruptWaitOverride time.Duration
 
+	// reconcileHostFn overrides per-host reconcile (tests only), so the shard host loop -
+	// recovery-first ordering and abort-on-error - can be exercised without a live StatefulSet
+	// reconciler and the whole kube surface behind it.
+	reconcileHostFn func(ctx context.Context, host *api.Host) error
+
+	// quorumWaitSpent is the wait the Raft disrupt gate has already burned in THIS pass. The
+	// budget is per pass, not per host: a permanently unhealthy peer would otherwise cost the
+	// full timeout on every remaining host, and with ReconcileCHKsThreadsNumber defaulting to 1
+	// that single worker stops reconciling every other CHK for the duration. Reset by newTask.
+	// Unsynchronized on purpose - see getReconcileShardsWorkersNum on why hosts are serial.
+	quorumWaitSpent time.Duration
+
 	start time.Time
 }
 
@@ -118,6 +130,10 @@ func (w *worker) buildCreator(cr *apiChk.ClickHouseKeeperInstallation) *commonCr
 }
 
 func (w *worker) newTask(new, old *apiChk.ClickHouseKeeperInstallation) {
+	// A new pass gets a fresh Raft-gate wait budget. Reset here rather than relying on the
+	// worker being per-request, so a pooled or reused worker cannot inherit a spent budget and
+	// silently stop waiting for peers that are merely slow.
+	w.quorumWaitSpent = 0
 	w.task = common.NewTask(w.buildCreator(new), w.buildCreator(old))
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
@@ -235,7 +251,7 @@ func (w *worker) finalizeCR(
 
 // persistReconcileCompleted stamps the completion bookkeeping onto cr and writes it. The status
 // write is reported rather than discarded: a completion the operator failed to persist must not
-// be announced as one (#2059).
+// be announced as one.
 func (w *worker) persistReconcileCompleted(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
 	cr.SetAncestor(cr.GetTarget())
 	cr.SetTarget(nil)
