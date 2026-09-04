@@ -105,6 +105,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrat
 			M(host).F().
 			Error("ERROR add tables failed on shard/host:%d/%d cluster:%s err:%v",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName, err)
+		return err
 	}
 
 	w.a.V(1).
