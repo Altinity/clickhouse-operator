@@ -3091,7 +3091,7 @@ def assert_local_fake_k8s_rejected_tls_cases(
     """Run all FIPS_LISTENER_REJECTED_TLS_CASES against the local fake API."""
 
     for case in FIPS_LISTENER_REJECTED_TLS_CASES:
-        # Operator K8s client min TLS is 1.3 (PR #2020). Skip 1.2 *cipher* cases,
+        # Operator K8s client min TLS is 1.3. Skip 1.2 *cipher* cases,
         # but keep the single 1.2 *protocol* case as a live negative probe.
         if case["tls_version"] == "1.2" and case["cipher_suite"] is not None:
             continue

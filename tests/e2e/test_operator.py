@@ -757,9 +757,18 @@ def test_010010_1(self):
                 retry_sleep(1, 5, "taskID not updated yet")
             assert taskID != lastTaskID, error("taskID was not updated")
 
-        with And("Operator should start complaining about connection refused"):
+        with And("Operator should start complaining that it cannot connect"):
             wait_operator_logs(["zk path to be verified"], time.time() - started)
-            wait_operator_logs(["connect: connection refused"], time.time() - started)
+            # Match the zk client's own failure message, not the errno it carries. The service
+            # created above selects no pods, and whether kube-proxy REJECTs such a ClusterIP
+            # (ECONNREFUSED) or blackholes it (i/o timeout) is a programming-latency race - a run
+            # that blackholes logs 38 timeouts and never the refusal. The dial failure is logged
+            # once per attempt either way, and never on the "connected to" success path.
+            # The "zk conn <nodes>:" prefix is ours (zkLogger), and it is what carries the
+            # hostname - the library half of the line reports the RESOLVED IP, so anchoring on
+            # "...connect to zookeeper:2181" would match nothing. Same fix as 2e55a7328, which
+            # replaced "no such host" for the DNS marker one phase earlier.
+            wait_operator_logs(["zk conn zookeeper:2181: failed to connect"], time.time() - started)
 
         with And("CHI should stay in progress with no pods created (waiting for ZooKeeper)"):
             assert kubectl.get_chi_status(chi) == "InProgress"
@@ -6360,7 +6369,7 @@ def test_010062(self):
         # Assert the row, not the table: the log line above is emitted before the hook fans
         # out, and schema propagation copies the table itself to a new host regardless of
         # whether the hook ran there. Only host-local data proves execution. That combination
-        # is how issue #2052 stayed hidden -- the exec layer consumed the queries slice on the
+        # is how that bug stayed hidden -- the exec layer consumed the queries slice on the
         # first host, leaving every host after it with an empty payload and no error.
         for shard in (0, 1):
             host = f"chi-{chi}-default-{shard}-0"
@@ -6582,7 +6591,7 @@ def test_010063(self):
             out = clickhouse.query(chi, "SELECT path FROM system.zookeeper WHERE path = '/' limit 1", pod=pod_name)
             assert out == '/', error(f"ZooKeeper should be accessible from {pod_name}")
 
-    with And("CHI resolves the keeper CLIENT tier, not the not-ready peer tier (issue #1982)"):
+    with And("CHI resolves the keeper CLIENT tier, not the not-ready peer tier"):
         # The CHK exposes a ready-only client Service (…-client, publishNotReadyAddresses=false)
         # alongside the peer/Raft Service. The keeper-ref resolver MUST hand ClickHouse the client
         # tier so queries never hit a not-yet-Ready Keeper. Proven here by the resolved
@@ -7506,9 +7515,9 @@ def test_010080(self):
 
 @TestScenario
 @Tags("HEAVY")
-@Name("test_010081. Scale-up restart gate and scaled-up replica Distributed table (issue #2013)")
+@Name("test_010081. Scale-up restart gate and scaled-up replica Distributed table")
 def test_010081(self):
-    """Issue #2013: a replica added to an existing cluster used to boot before the full remote_servers
+    """A replica added to an existing cluster used to boot before the full remote_servers
     was published, so a cluster-dependent object (Distributed / DICTIONARY / refreshable MV) failed its
     async startup load with CLUSTER_DOESNT_EXIST and never recovered. The operator now detects that
     terminal failure on the newly-added host and restarts it once (against the complete remote_servers)
@@ -7740,9 +7749,9 @@ def test_010082_1(self):
 
 @TestScenario
 @Tags("HEAVY")
-@Name("test_010083. Interrupted roll must keep a healthy shard replica (issue #1704)")
+@Name("test_010083. Interrupted roll must keep a healthy shard replica")
 def test_010083(self):
-    """Reproduce issue #1704: operator restart mid-roll must not take down the last
+    """Operator restart mid-roll must not take down the last
     healthy replica in a shard while its peer is still recovering.
 
     Uses a broken image so the first replica stays permanently unhealthy
@@ -7821,7 +7830,7 @@ def test_010083(self):
         )
         assert kubectl.get_condition_status(healthy_pod, "Ready") == "True", error(
             f"healthy replica {healthy_pod} must stay Ready while {down_pod} is down "
-            f"(issue #1704 simultaneous shard outage)"
+            f"(simultaneous shard outage)"
         )
         cur_start = kubectl.get_field("pod", healthy_pod, ".status.startTime")
         assert cur_start == healthy_start_time, error(
@@ -7855,7 +7864,7 @@ def test_010083(self):
 
 @TestScenario
 @Tags("HEAVY")
-@Name("test_010083_1. Deferred host must not starve sibling shards (issue #1704)")
+@Name("test_010083_1. Deferred host must not starve sibling shards")
 def test_010083_1(self):
     """Companion to test_010083, which covers a single shard.
 
@@ -8432,11 +8441,11 @@ def test_020003_2(self):
 
 @TestScenario
 @Tags("HEAVY")
-@Name("test_020003_3. Interrupted Keeper roll must preserve Raft quorum (issue #2069)")
+@Name("test_020003_3. Interrupted Keeper roll must preserve Raft quorum")
 def test_020003_3(self):
     """Companion to test_010083 for ClickHouse Keeper.
 
-    Reproduce issue #2069: a broken keeper image roll must stop after the first
+    A broken keeper image roll must stop after the first
     replica and must not disrupt healthy peers that still hold Raft quorum.
 
     Uses a broken image so the first replica stays permanently unhealthy
@@ -8549,7 +8558,7 @@ def test_020003_3(self):
             for pod in healthy_pods:
                 assert kubectl.get_condition_status(pod, "Ready") == "True", error(
                     f"healthy replica {pod} must stay Ready while {down_pod} is down, "
-                    f"not Ready at sample {sample} (issue #2069 Raft quorum safety)"
+                    f"not Ready at sample {sample} (Raft quorum safety)"
                 )
                 cur_start = kubectl.get_field("pod", pod, ".status.startTime")
                 assert cur_start == healthy_start_times[pod], error(
@@ -9009,7 +9018,7 @@ def test_020016(self):
 @Name("test_020017. CHK emits two per-host Services (peer + client) with split readiness")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
 def test_020017(self):
-    """issue #1982. A CHK with no replicaServiceTemplate must emit TWO
+    """A CHK with no replicaServiceTemplate must emit TWO
     per-host headless Services:
       - peer/Raft Service `chk-{chk}-{cluster}-{host}`: publishNotReadyAddresses=true
         (Raft peers must reach each other before pods are Ready to bootstrap quorum),
