@@ -47,6 +47,10 @@ type ActionPlan struct {
 	attributesEqual bool
 
 	skipTaskID bool
+
+	// str is the plan rendered once at construction time - re-rendering is
+	// expensive and not deterministic (map iteration order)
+	str string
 }
 
 func NewActionPlan() *ActionPlan {
@@ -105,6 +109,9 @@ func MakeActionPlan(old, new ICustomResource) IActionPlan {
 	}
 
 	ap.excludePaths()
+
+	// Render the plan exactly once, after the diffs are finalized
+	ap.str = ap.render()
 
 	return ap
 }
@@ -233,8 +240,13 @@ func (ap *ActionPlan) Log(tag string) string {
 	)
 }
 
-// String stringifies ActionPlan
+// String returns the ActionPlan rendering produced at construction time.
 func (ap *ActionPlan) String() string {
+	return ap.str
+}
+
+// render stringifies the ActionPlan. Called exactly once from MakeActionPlan.
+func (ap *ActionPlan) render() string {
 	if !ap.HasActionsToDo() {
 		return ""
 	}
