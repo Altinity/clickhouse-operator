@@ -16,6 +16,7 @@ package v1
 
 import (
 	"fmt"
+	"sync"
 
 	"gopkg.in/d4l3k/messagediff.v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,9 +49,21 @@ type ActionPlan struct {
 
 	skipTaskID bool
 
-	// str is the plan rendered once at construction time - re-rendering is
-	// expensive and not deterministic (map iteration order)
-	str string
+	// str caches the rendering. render() reflection-dumps every diffed object and the
+	// status path calls String() once per update attempt, so re-rendering dominated
+	// operator CPU on a large scale-up. Rendered on first use, not at construction:
+	// most plans are built only to test HasActionsToDo() and are discarded unread.
+	//
+	// mu guards that first render, because String() is genuinely called from several
+	// goroutines at once: a shard fan-out gives every shard worker a status update, and
+	// each one pointer-copies this same plan into the status it builds. Today the race is
+	// masked - the reconciler renders the plan for a log line before the fan-out starts -
+	// but that is an accident of statement order, not a guarantee, and it would vanish the
+	// moment that log line became level-gated. A pointer keeps DeepCopyInto's *out = *ap
+	// free of the copylocks vet error.
+	str      string
+	rendered bool
+	mu       *sync.Mutex
 }
 
 func NewActionPlan() *ActionPlan {
@@ -62,6 +75,7 @@ func MakeActionPlan(old, new ICustomResource) IActionPlan {
 	ap := &ActionPlan{
 		old: old,
 		new: new,
+		mu:  &sync.Mutex{},
 	}
 
 	if (old != nil) && (new != nil) {
@@ -109,9 +123,6 @@ func MakeActionPlan(old, new ICustomResource) IActionPlan {
 	}
 
 	ap.excludePaths()
-
-	// Render the plan exactly once, after the diffs are finalized
-	ap.str = ap.render()
 
 	return ap
 }
@@ -240,14 +251,30 @@ func (ap *ActionPlan) Log(tag string) string {
 	)
 }
 
-// String returns the ActionPlan rendering produced at construction time.
+// String stringifies ActionPlan, rendering at most once per plan.
 func (ap *ActionPlan) String() string {
+	if ap.mu == nil {
+		// Not built by MakeActionPlan, so there is no shared plan to protect and no diffs
+		// to cache. Render straight through rather than write unguarded fields.
+		return ap.render()
+	}
+	ap.mu.Lock()
+	defer ap.mu.Unlock()
+	if !ap.rendered {
+		ap.str = ap.render()
+		ap.rendered = true
+	}
 	return ap.str
 }
 
-// render stringifies the ActionPlan. Called exactly once from MakeActionPlan.
+// render stringifies the ActionPlan. Call it through String(), which memoizes.
 func (ap *ActionPlan) render() string {
 	if !ap.HasActionsToDo() {
+		return ""
+	}
+	if ap.specDiff == nil {
+		// A plan that was never diffed reports actions-to-do (every *Equal flag is false)
+		// but has nothing to render, so say so rather than dereference a nil diff.
 		return ""
 	}
 
@@ -268,7 +295,10 @@ func (ap *ActionPlan) render() string {
 		str += util.MessageDiffItemString("modified spec items", "none", "", ap.specDiff.Modified)
 	}
 
-	if len(ap.specDiffReverse.Modified) > 0 {
+	// Only the both-non-nil construction branch assigns specDiffReverse, so a plan
+	// built from a nil old has none. render() used to be reached rarely enough to
+	// hide that; it must not panic now that String() is on the status path.
+	if (ap.specDiffReverse != nil) && (len(ap.specDiffReverse.Modified) > 0) {
 		// Something modified
 		str += util.MessageDiffItemString("prev spec items", "none", "", ap.specDiffReverse.Modified)
 	}
@@ -438,11 +468,20 @@ func (ap *ActionPlan) WalkModified(
 	}
 }
 
-// DeepCopyInto is deliberately shallow: ActionPlan is treated as immutable after
-// MakeActionPlan returns (only Walk* readers from here on), and its messagediff.Diff
-// pointers are not safe to deep-copy. Sharing pointers between the source and the
-// copy is acceptable because nobody mutates either side.
+// DeepCopyInto is deliberately shallow: the diffs are fixed once MakeActionPlan returns,
+// and its messagediff.Diff pointers are not safe to deep-copy. Sharing pointers between
+// source and copy is acceptable because nobody mutates the diffs.
+//
+// The plan is not strictly immutable, though: String() memoizes on first call, so it
+// mutates str/rendered under mu - and this copies those two fields, so it has to take the
+// same lock. Without it a copy can land with rendered=true beside a torn str header and
+// then serve that text forever. The copy shares mu with the source, which is harmless:
+// each guards its own first render.
 func (ap *ActionPlan) DeepCopyInto(out *ActionPlan) {
+	if ap.mu != nil {
+		ap.mu.Lock()
+		defer ap.mu.Unlock()
+	}
 	*out = *ap
 }
 
