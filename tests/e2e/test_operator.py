@@ -8015,7 +8015,7 @@ def test_010084(self):
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
 @Name("test_010085. Adding a volume under the default provisioner is not data loss")
-@Tags("NO_PARALLEL")
+@Tags("HEAVY")
 def test_010085(self):
     """Adding a volumeClaimTemplate to a host that already has data must not be treated as
     storage loss.
@@ -8119,13 +8119,22 @@ def test_010085(self):
                 ):
                     note(line)
 
+            # Scope to THIS CHI. Each scenario installs its own operator into its own namespace
+            # (see create_shell_namespace_clickhouse_template), so cross-test contamination is
+            # already impossible and this is hardening rather than a fix. It still earns its place:
+            # the not-in assertion is the kind that passes when it matches nothing, and pinning it
+            # to our own hosts keeps it meaningful if the harness ever moves to a shared operator.
+            # The announcer stamps host lines as Host:<name>[s/r]:<namespace>/<CR>.
+            scope = f"{current().context.test_namespace}/{chi}"
+            ours = [line for line in op_logs.splitlines() if scope in line]
+
             # The positive assertion comes first, and it is what keeps the negative one honest: if
-            # the PVC classification never ran at all, neither message appears and "no data loss"
-            # would hold for the wrong reason.
-            assert "Volume added to host" in op_logs, error(
+            # the PVC classification never ran at all - or the scope matched nothing - neither
+            # message appears and "no data loss" would hold for the wrong reason.
+            assert any("Volume added to host" in line for line in ours), error(
                 "volume-added path was not entered - the added volumeClaimTemplate was not classified"
             )
-            assert "Data loss detected" not in op_logs, error(
+            assert not any("Data loss detected" in line for line in ours), error(
                 "adding a volume was reported as data loss"
             )
 
