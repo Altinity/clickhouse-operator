@@ -23,9 +23,16 @@ import (
 )
 
 // isZookeeperChangeRequiresReboot checks two ZooKeeper configs and decides,
-// whether config modifications require a reboot to be applied
+// whether config modifications require a reboot to be applied.
+// ZooKeeper endpoint/config changes are applied from generated config without a ClickHouse restart
+// unless operator configurationRestartPolicy explicitly requires reboot for zookeeper/*.
 func isZookeeperChangeRequiresReboot(host *api.Host, a, b *api.ZookeeperConfig) bool {
-	return !a.Equals(b)
+	if a.Equals(b) {
+		return false
+	}
+	return isListedChangeRequiresReboot(host, []string{
+		configurationRestartPolicyRulesSectionZookeeper + "/*",
+	})
 }
 
 // isSettingsChangeRequiresReboot checks whether changes between two settings requires ClickHouse reboot
@@ -168,7 +175,7 @@ func isListedChangeRequiresReboot(host *api.Host, paths []string) bool {
 //	        - settings/models_config: "no"
 //	        - settings/user_defined_executable_functions_config: "no"
 //
-//	        - zookeeper/*: "yes"
+//	        - zookeeper/*: "no"
 //
 //	        - files/*.xml: "yes"
 //	        - files/config.d/*.xml: "yes"
