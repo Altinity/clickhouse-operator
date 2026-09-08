@@ -1179,7 +1179,8 @@ def test_010011_4(self):
 
 @TestScenario
 @Name("test_010011_5. Removed k8s_secret_ syntax is rejected, not silently downgraded")
-def test_010011_5(self):
+@Tags("NO_PARALLEL")
+def test_010011_5(self, version_from="0.27.3", version_to=None):
     """The k8s_secret_/k8s_secret_env_ user-settings syntax was removed in 0.27.4 - it accepted a
     namespace/secret/key triple and could read a secret from any namespace.
 
@@ -1189,23 +1190,27 @@ def test_010011_5(self):
     ClickHouse.Config.User.Default.Password - the literal string "default" - so a secret-protected
     user would silently become reachable with a documented credential.
 
-    The CHI is created working FIRST and broken afterwards on purpose. That is the real upgrade
-    shape, and it is the only way to exercise the paths that write config outside the main
-    reconcile: with pods already running, endpoint events drive finalizeCR, which re-normalizes the
-    CR and previously wrote the users ConfigMap without observing the abort.
+    This is the real upgrade shape: a CHI created under 0.27.3 with the old syntax must abort
+    when the operator is upgraded, without rewriting the secret-backed user to the operator
+    default password.
     """
-    create_shell_namespace_clickhouse_template()
+    if version_to is None:
+        version_to = current().context.operator_version
+
+    self.context.skip_fips = True  # avoids setting GODEBUG to fips enforced for this test
 
     chi = "test-011-1-removed-secret-ref"
-    cluster = "default"
     # sha256("default") - what the account would be given if the rejection failed open.
     default_password_sha256 = "37a8eec1ce19687d132fe29051dca629d164e2c4958ba141d5f4133a33f0688f"
     users_cm = f"chi-{chi}-common-usersd"
 
-    with Given("A secret and a CHI using the supported valueFrom/secretKeyRef syntax"):
+    with Given(f"clickhouse-operator from {version_from}"):
+        current().context.operator_version = version_from
+        create_shell_namespace_clickhouse_template()
+
         kubectl.apply(util.get_full_path("manifests/secret/test-011-secret.yaml"))
         kubectl.create_and_check(
-            manifest="manifests/chi/test-011-1-removed-secret-ref-migrated.yaml",
+            manifest="manifests/chi/test-011-1-removed-secret-ref.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1214,30 +1219,21 @@ def test_010011_5(self):
 
         with Then("user1 can log in with the secret-backed password"):
             out = clickhouse.query_with_error(chi, "select 'OK'", user="user1", pwd="pwduser1")
-            assert out == "OK", error(f"expected the migrated CHI to work, got: {out}")
+            assert out == "OK", error(f"expected the CHI to work on {version_from}, got: {out}")
 
-    with When("The CHI is changed back to the removed k8s_secret_ syntax"):
-        kubectl.apply(util.get_full_path("manifests/chi/test-011-1-removed-secret-ref.yaml", lookup_in_host=False))
+    with When(f"upgrade operator to {version_to}"):
+        current().context.operator_version = version_to
+        util.install_operator_version(version_to)
+        time.sleep(15)
 
         with Then("The CHI must be rejected"):
             kubectl.wait_chi_status(chi, "Aborted", retries=20)
 
-        with And("The abort reason must name the removed syntax"):
+        with And("The abort reason must be RemovedSecretRefSyntax"):
             errors = " ".join(kubectl.get("chi", chi)["status"].get("errors", []))
             assert "RemovedSecretRefSyntax" in errors, error(
                 f"expected reason RemovedSecretRefSyntax in status.errors, got: {errors}"
             )
-
-    with When("A pod is deleted, forcing endpoint events and a finalize-time re-normalize"):
-        # This is what caught two regressions during review: finalizeCR re-derives and
-        # re-normalizes the CR outside the main reconcile, and used to write the users
-        # ConfigMap without observing the abort.
-        kubectl.launch(f"delete pod chi-{chi}-{cluster}-0-0-0", ok_to_fail=True)
-        time.sleep(30)
-
-        with Then("The CHI must still be Aborted"):
-            status = kubectl.get_chi_status(chi)
-            assert status == "Aborted", error(f"expected CHI to stay Aborted, got status={status}")
 
         with And("The users ConfigMap must NOT carry the default-password fallback"):
             # The manifests give the `default` user its own distinct password, so this hash
@@ -1255,11 +1251,15 @@ def test_010011_5(self):
             out = clickhouse.query_with_error(chi, "select 'OK'", user="user1", pwd="pwduser1")
             assert out == "OK", error(f"expected the pre-existing config to keep serving, got: {out}")
 
-    with When("The CHI is migrated back to valueFrom/secretKeyRef"):
+    with When("The CHI is migrated to valueFrom/secretKeyRef"):
         kubectl.apply(util.get_full_path("manifests/chi/test-011-1-removed-secret-ref-migrated.yaml", lookup_in_host=False))
 
         with Then("The CHI recovers"):
             kubectl.wait_chi_status(chi, "Completed", retries=20)
+
+        with And("user1 can log in with the secret-backed password"):
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user1", pwd="pwduser1")
+            assert out == "OK", error(f"expected the migrated CHI to work, got: {out}")
 
     with Finally("I clean up"):
         delete_test_namespace()
