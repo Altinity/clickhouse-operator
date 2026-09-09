@@ -22,12 +22,31 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
-// isZookeeperChangeRequiresReboot checks two ZooKeeper configs and decides,
-// whether config modifications require a reboot to be applied.
-// ZooKeeper endpoint/config changes are applied from generated config without a ClickHouse restart
-// unless operator configurationRestartPolicy explicitly requires reboot for zookeeper/*.
+// isZookeeperChangeRequiresReboot checks two ZooKeeper configs and decides whether the
+// modifications require a reboot to be applied.
+//
+// An edit between two configured ensembles is applied from the generated config without a
+// restart, subject to configurationRestartPolicy for zookeeper/*. Turning ZooKeeper on or off
+// always restarts, whatever the policy says; a change between two configs that both amount to
+// "no ZooKeeper" never does.
 func isZookeeperChangeRequiresReboot(host *api.Host, a, b *api.ZookeeperConfig) bool {
 	if a.Equals(b) {
+		return false
+	}
+	// Enabling or disabling ZooKeeper adds or removes the whole generated section, and with it
+	// <distributed_ddl>. ClickHouse builds its DDLWorker only at startup, so the policy gets no
+	// say here: without a restart, enabling leaves ON CLUSTER DDL dead on every pre-existing
+	// host, and disabling leaves a DDLWorker running against a section that is gone.
+	if a.IsEmpty() != b.IsEmpty() {
+		return true
+	}
+	// Both sides amount to "no ZooKeeper" yet compare unequal - a nil config against a minted
+	// zero-value one, or two node-less configs differing only in root/identity/timeouts, all of
+	// which InheritZookeeperFrom can produce. getHostZookeeper returns before rendering any of
+	// those fields, so both revisions generate the same zero bytes and a restart would be a
+	// no-op. Guard order makes b.IsEmpty() redundant here, but stating both reads as the
+	// invariant it is.
+	if a.IsEmpty() && b.IsEmpty() {
 		return false
 	}
 	return isListedChangeRequiresReboot(host, []string{
