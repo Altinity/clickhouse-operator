@@ -6645,7 +6645,6 @@ def test_010064(self):
     chopconf_manifest = "manifests/chopconf/test-063-keeper-watch.yaml"
     chk = "test-063-chk"
     chi = "test-063-keeper-ref"
-    cluster = "default"
 
     with Given("Operator configuration enables keeper watch"):
         util.apply_operator_config(chopconf_manifest)
@@ -6669,7 +6668,14 @@ def test_010064(self):
             },
         )
 
-    start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+    # Container start, not pod start: a ClickHouse restart here is a SQL SYSTEM SHUTDOWN
+    # and an in-place container restart, which leaves pod .status.startTime untouched -
+    # so asserting on the pod field cannot tell a restart from no restart at all.
+    start_time = kubectl.get_clickhouse_start(chi)
+    # get_field is ok_to_fail and yields "" when the field cannot be read, and "" == "" would
+    # satisfy the not-restarted asserts below without ever having read a timestamp. A missing
+    # pod raises IndexError inside the helper instead, which fails loudly on its own.
+    assert start_time != "", error("could not read the ClickHouse container start time")
     connected_time = ""
     with And("CHI is connected to Keeper"):
         connected_time = clickhouse.query(chi, "SELECT connected_time from system.zookeeper_connection")
@@ -6682,7 +6688,7 @@ def test_010064(self):
             kubectl.wait_chi_status(chi, "Completed")
 
         with Then("CHI has not been restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+            new_start_time = kubectl.get_clickhouse_start(chi)
             assert new_start_time == start_time, error("CHI has been restarted")
 
         with Then("CHI does not reconnect to Keeper"):
@@ -6718,7 +6724,7 @@ def test_010064(self):
             # Zookeeper config changes do not require pod restart (configurationRestartPolicy
             # marks zookeeper/* as "no"). ClickHouse picks up the new server list via config
             # reload.
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+            new_start_time = kubectl.get_clickhouse_start(chi)
             assert new_start_time == start_time, error("CHI has been restarted")
 
         with Then("CHI is still connected to Keeper after config change"):
