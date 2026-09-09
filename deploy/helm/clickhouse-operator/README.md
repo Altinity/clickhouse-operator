@@ -26,6 +26,10 @@ To disable automatic CRD updates, set `crdHook.enabled: false` in values.yaml. W
 | ---- | ------ | --- |
 | altinity | <support@altinity.com> |  |
 
+## Source Code
+
+* <https://github.com/Altinity/clickhouse-operator>
+
 ## CRD Management
 
 This chart includes automatic CRD installation and update functionality using Helm hooks. CRDs are automatically applied during `helm install` and `helm upgrade` operations.
