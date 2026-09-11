@@ -148,3 +148,12 @@ Arguments (list): root context, configs.files, watchNamespaces list
 {{- end -}}
 {{- include "altinity-clickhouse-operator.configmap-data" (list $root $files) -}}
 {{- end -}}
+
+{{/*
+Compute a ConfigMap checksum from its data only, for the checksum/* pod annotations.
+Hashing the whole manifest includes the helm.sh/chart label, which changes on every chart version
+bump and would restart the operator when no configuration changed.
+*/}}
+{{- define "altinity-clickhouse-operator.configMapContentHash" -}}
+{{ pick (include (print .ctx.Template.BasePath .name) .ctx | fromYaml) "data" "binaryData" | toYaml | sha256sum }}
+{{- end -}}
