@@ -178,13 +178,13 @@ go version -m /tmp/clickhouse-operator | grep -E 'GOFIPS140|vcs\.|build\s+-tags'
 Expected (relevant lines only):
 
 ```
-build   GOFIPS140=v1.0.0
+build   GOFIPS140=v1.0.0-c2097c7c
 build   -trimpath=true
 build   -buildvcs=true
 build   vcs.revision=<commit sha>
 ```
 
-The `GOFIPS140=v1.0.0` line is the canonical proof that the binary was
+The `GOFIPS140` line is the canonical proof that the binary was
 linked against the Go FIPS 140-3 cryptographic module. Its absence in a
 shipped image is a release failure.
 
