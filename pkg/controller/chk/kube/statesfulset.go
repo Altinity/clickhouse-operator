@@ -107,6 +107,11 @@ func (c *STS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.Stateful
 	return sts, err
 }
 
+// ValidateCreate runs a server-side dry-run create: validation runs, nothing is persisted.
+func (c *STS) ValidateCreate(ctx context.Context, sts *apps.StatefulSet) error {
+	return c.kubeClient.Create(ctx, sts.DeepCopy(), client.DryRunAll)
+}
+
 func (c *STS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	log.V(3).M(sts).Info("Going to update STS: %s", util.NamespaceNameString(sts))
 	err := c.kubeClient.Update(ctx, sts)
