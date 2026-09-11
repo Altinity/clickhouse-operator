@@ -9134,7 +9134,10 @@ def test_030001(self):
     """
 
     gofips_version = "v1.0.0"
-    gofips140_needle = f"GOFIPS140={gofips_version}"
+    # Build metadata records the content-addressed snapshot rather than the bare
+    # module version, so assert the full string: a change here means the frozen
+    # FIPS module moved, which is precisely what a toolchain bump must not do.
+    gofips140_needle = "GOFIPS140=v1.0.0-c2097c7c"
     release_version = self.context.release_version
     godebug_default = "fips140=on"
 
