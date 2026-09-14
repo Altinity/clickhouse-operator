@@ -41,21 +41,15 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false
-
       - name: Install bundle tools
-        env:
-          GOBIN: /tmp/certification-tools
         run: |
           set -euo pipefail
-          mkdir -p "${GOBIN}"
-          go install "github.com/mikefarah/yq/v4@${YQ_VERSION}"
-          go install "github.com/operator-framework/operator-sdk/cmd/operator-sdk@${OPERATOR_SDK_VERSION}"
-          echo "${GOBIN}" >> "${GITHUB_PATH}"
+          sudo curl -fsSLo /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          sudo chmod 0755 /usr/local/bin/yq
+          curl -fsSLo /tmp/operator-sdk \
+            "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_linux_amd64"
+          sudo install -m 0755 /tmp/operator-sdk /usr/local/bin/operator-sdk
 
       - name: Generate certified bundle
         run: ./deploy/certified-operator/build-bundle.sh
