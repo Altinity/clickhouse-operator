@@ -170,3 +170,45 @@ func TestDeleteHostStatefulSetGetErrorClassification(t *testing.T) {
 		})
 	}
 }
+
+// A deferred pass skips clean() and dropZKReplicas, so the hosts the action plan removed are
+// still on disk. announceCleanupPostponed is the only signal a user gets, and it is only worth
+// emitting when there is actually something left behind - events here are created directly
+// against the API with nothing to aggregate them, so an ungated call mints a new Event object
+// on every deferred pass forever.
+//
+// WalkRemoved dispatches on the diff entry's TYPE: a dropped shard arrives as one IShard entry,
+// never as its hosts, which is why the walk expands clusters and shards back into hosts.
+func TestRemovedHostFQDNs(t *testing.T) {
+	nameFQDN := func(host *api.Host) string { return "fqdn-" + host.GetName() }
+
+	crWith := func(hostNames ...string) *api.ClickHouseInstallation {
+		cr := &api.ClickHouseInstallation{}
+		shard := &api.ChiShard{}
+		for _, n := range hostNames {
+			shard.Hosts = append(shard.Hosts, &api.Host{Name: n})
+		}
+		cr.Spec.Configuration = &api.Configuration{
+			Clusters: []*api.Cluster{{Layout: &api.ChiClusterLayout{Shards: []*api.ChiShard{shard}}}},
+		}
+		return cr
+	}
+
+	t.Run("nothing removed means nothing to announce", func(t *testing.T) {
+		cr := crWith("h0")
+		cr.EnsureRuntime().ActionPlan = api.MakeActionPlan(crWith("h0"), cr)
+		require.Empty(t, removedHostFQDNs(cr, nameFQDN),
+			"an unchanged plan must stay silent - otherwise every deferred pass mints an Event")
+	})
+
+	t.Run("a nil CR is handled", func(t *testing.T) {
+		require.Empty(t, removedHostFQDNs(nil, nameFQDN))
+	})
+
+	t.Run("a removed host is named", func(t *testing.T) {
+		cr := crWith("h0")
+		cr.EnsureRuntime().ActionPlan = api.MakeActionPlan(crWith("h0", "h1"), cr)
+		require.Contains(t, removedHostFQDNs(cr, nameFQDN), "fqdn-h1",
+			"the FQDN of a host the plan drops must reach the event")
+	})
+}

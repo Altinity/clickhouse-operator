@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
@@ -792,4 +794,51 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 
 	// CR delete completed
 	return true
+}
+
+// removedHostFQDNs enumerates the FQDNs of the hosts this pass planned to remove.
+//
+// WalkRemoved dispatches on the diff entry's type, so a removed cluster or shard arrives as ONE
+// entry rather than as its constituent hosts - both are expanded back into hosts here, the same
+// way runHostPreDeleteHooksOnRemovedHosts does. nameFQDN is injected so the walk is reachable
+// from a test without a live name manager.
+func removedHostFQDNs(cr *api.ClickHouseInstallation, nameFQDN func(*api.Host) string) (fqdns []string) {
+	if cr == nil {
+		return nil
+	}
+	collect := func(host *api.Host) error {
+		if host != nil {
+			fqdns = append(fqdns, nameFQDN(host))
+		}
+		return nil
+	}
+	cr.EnsureRuntime().ActionPlan.WalkRemoved(
+		func(cluster api.ICluster) { cluster.WalkHosts(collect) },
+		func(shard api.IShard) { shard.WalkHosts(collect) },
+		func(host *api.Host) { _ = collect(host) },
+	)
+	return fqdns
+}
+
+// announceCleanupPostponed surfaces the one consequence of a deferred pass that is otherwise
+// invisible: clean() did not purge the removed hosts and dropZKReplicas did not drop their ZK
+// paths, so they keep consuming storage and keep showing up in system.replicas.
+//
+// Gated on there actually being removed hosts. Events here are created directly against the API
+// (chi/kube/event.go) with no client-go correlator to aggregate them, so an ungated call would
+// mint a fresh Event object on every deferred pass, forever. Deliberately no WithError: the
+// host-level branch already records WHY the pass deferred, and .status.errors holds only 10
+// entries - filling it with per-pass cleanup notices would evict the useful one.
+func (w *worker) announceCleanupPostponed(cr *api.ClickHouseInstallation) {
+	fqdns := removedHostFQDNs(cr, func(host *api.Host) string {
+		return w.c.namer.Name(interfaces.NameFQDN, host)
+	})
+	if len(fqdns) == 0 {
+		return
+	}
+	w.a.V(1).
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonCleanupPostponed).
+		M(cr).F().
+		Warning("Reconcile deferred - removed hosts are NOT cleaned up and remain on disk: %s",
+			util.StringHead(strings.Join(fqdns, ","), 1024))
 }

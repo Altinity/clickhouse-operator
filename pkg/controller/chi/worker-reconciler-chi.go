@@ -68,6 +68,10 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	// Capture before buildCR: normalize/fillStatus overwrites status.chop-ip with
 	// the current operator pod IP, which would hide an IP change.
 	prevCHOpIP := new.Status.GetCHOpIP()
+	// Same class of loss, and total: normalization never carries status.status forward at all, so
+	// a scope resolved after buildCR is always empty. Capture it as a local - writing it back onto
+	// the normalized CR would make a previous pass's Aborted latch at the check below and freeze
+	// the CR permanently.
 
 	new = w.buildCR(ctx, new)
 
@@ -157,16 +161,26 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		w.a.M(new).F().Warning("Unhandled reconcile gate decision, continuing reconcile: %s", decision)
 	}
 
+	// Carry the scope resolved from the pre-buildCR status into the walk: past this point the
+	// in-memory status is InProgress and the original is gone.
+
 	w.markReconcileStart(ctx, new)
 	w.prepareMonitoring(new)
 	w.setHostStatusesPreliminary(ctx, new)
 
 	if err := w.reconcile(ctx, new); err != nil {
-		// Something went wrong
-		w.a.WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
-			WithError(new).
-			M(new).F().
-			Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
+		if errors.Is(err, common.ErrCRUDDeferred) {
+			// A deferral is a postponement, not a failure. The host-level branch already recorded
+			// WHY; this records WHAT the skipped success block left behind, which is otherwise
+			// invisible: the removed hosts keep their StatefulSets, PVCs and ZooKeeper replicas.
+			w.announceCleanupPostponed(new)
+		} else {
+			// Something went wrong
+			w.a.WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
+				WithError(new).
+				M(new).F().
+				Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
+		}
 		err = common.ErrCRUDAbort
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 		if errors.Is(err, common.ErrCRUDAbort) {
@@ -310,12 +324,33 @@ func (w *worker) reconcile(ctx context.Context, cr *api.ClickHouseInstallation) 
 		w.a.V(1).M(cr).Info("Unable to use full fan-out mode. Counters: %s. CR: %s", counters, util.NamespaceNameString(cr))
 	}
 
-	return cr.WalkTillError(
+	// A deferral must not cost the CR its final phase. WalkTillError stops before fCRFinal on ANY
+	// error, and reconcileCRAuxObjectsFinal owns the final common-ConfigMap write,
+	// includeAllHostsIntoCluster and restartNewlyAddedHosts - the last of which is the recovery for
+	// a newly added host that boots before its remote_servers has synced and so cannot create its
+	// Distributed tables. Letting a deferred host suppress it turns that self-healing scale-up into
+	// a permanently broken replica. Hard errors still stop the walk; a deferral is carried past it
+	// and surfaced once the pass has finished its cleanup.
+	var deferred error
+	err := cr.WalkTillError(
 		ctx,
 		w.reconcileCRAuxObjectsPreliminary,
-		w.reconcileCluster,
-		w.reconcileCRAuxObjectsFinal,
+		func(ctx context.Context, cluster *api.Cluster) error {
+			e := w.reconcileCluster(ctx, cluster)
+			if errors.Is(e, common.ErrCRUDDeferred) {
+				deferred = e
+				return nil
+			}
+			return e
+		},
+		func(ctx context.Context, cr *api.ClickHouseInstallation) error {
+			return w.reconcileCRAuxObjectsFinal(ctx, cr, deferred != nil)
+		},
 	)
+	if err != nil {
+		return err
+	}
+	return deferred
 }
 
 // reconcileCRAuxObjectsPreliminary reconciles CR preliminary in order to ensure that ConfigMaps are in place
@@ -382,8 +417,19 @@ func (w *worker) reconcileCRServiceFinal(ctx context.Context, cr api.ICustomReso
 	return nil
 }
 
+// finalRemoteServersOptions picks the remote_servers render for the CR-final phase: unfiltered
+// normally, and the preliminary phase's exclusions when the pass deferred. Extracted so the
+// polarity is reachable from a test - inverting it silently advertises an unreachable host to
+// every pod, which is exactly the failure the exclusions exist to prevent.
+func finalRemoteServersOptions(deferred bool, filtered *config.FilesGeneratorOptions) []*config.FilesGeneratorOptions {
+	if deferred {
+		return []*config.FilesGeneratorOptions{filtered}
+	}
+	return nil
+}
+
 // reconcileCRAuxObjectsFinal reconciles CR global objects
-func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHouseInstallation) (err error) {
+func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHouseInstallation, deferred bool) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. CR aux final: %s ", cr.GetName())
 		return nil
@@ -392,9 +438,17 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 	w.a.V(2).M(cr).S().P()
 	defer w.a.V(2).M(cr).E().P()
 
-	// CR ConfigMaps with update
+	// Normally the final phase renders remote_servers with no exclusions - that is where a
+	// newly-added host is finally advertised, once its StatefulSet exists.
+	//
+	// A DEFERRED pass has not earned that. At least one host did not complete, and the
+	// shard-safety deferral returns before ReconcileStatefulSet, so the host may have no
+	// StatefulSet at all. remote_servers lives in the single common ConfigMap mounted by every
+	// pod, so advertising it would hand every EXISTING pod a cluster definition pointing at an
+	// unreachable member - see getRemoteServersGeneratorOptions. Keep the preliminary phase's
+	// exclusions; the include-all render happens on the next pass that completes.
 	cr.GetRuntime().LockCommonConfig()
-	err = w.reconcileConfigMapCommon(ctx, cr)
+	err = w.reconcileConfigMapCommon(ctx, cr, finalRemoteServersOptions(deferred, w.options())...)
 	cr.GetRuntime().UnlockCommonConfig()
 
 	w.includeAllHostsIntoCluster(ctx, cr)
@@ -1028,6 +1082,21 @@ func (w *worker) reconcileShardService(ctx context.Context, shard api.IShard) er
 	return err
 }
 
+// shouldRestoreHostToServiceOnDeferral reports whether a host whose reconcile ended in a deferral
+// must still be put back into the Services it was drained from. Extracted so the decision is
+// reachable from a test - the surrounding reconcileHost needs a live cluster.
+//
+// Only a host that already reached ObjectStatusCreated qualifies. A still-Requested host has never
+// carried a schema, and re-admitting one is the hazard the deferral exists to prevent; an existing
+// replica, by contrast, was serving before this pass and loses its ready mark to
+// reconcileHostPrepare, so leaving it out is a regression rather than a safeguard.
+func shouldRestoreHostToServiceOnDeferral(host *api.Host, err error) bool {
+	if !errors.Is(err, common.ErrCRUDDeferred) {
+		return false
+	}
+	return !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested)
+}
+
 // reconcileHost reconciles specified ClickHouse host
 func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
@@ -1057,6 +1126,18 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		return err
 	}
 	if err := w.reconcileHostMain(ctx, host); err != nil {
+		// reconcileHostPrepare drained this host, and includeHost is the only writer of the ready
+		// mark that the CR-, cluster- and shard-scope Services select on. Returning straight out of
+		// a DEFERRED failure therefore leaves an already-serving replica outside every Service for
+		// as long as the underlying object stays un-creatable, with the pod still reading Ready to
+		// kubectl - persistent Kubernetes state no later pass can undo, because the only writer
+		// sits past this return.
+		//
+		// A host that never reached ObjectStatusCreated stays out on purpose: re-admitting a
+		// replica that has no schema is the hazard this whole path exists to prevent.
+		if shouldRestoreHostToServiceOnDeferral(host, err) {
+			_ = w.reconcileHostIncludeIntoAllActivities(ctx, host)
+		}
 		return err
 	}
 	// Host is now added and functional
@@ -1193,7 +1274,18 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 
 	// Finalize main reconcile with domain activities
 	if err := w.reconcileHostMainDomain(ctx, host, migrateTableOpts); err != nil {
-		w.a.V(1).
+		// Count and surface only what actually propagates. The tolerated errors below fall
+		// through to HostReconcilesCompleted, so counting them here would break the
+		// started - completed ~= errors relation the ConfigMap and StatefulSet branches
+		// establish. WithError puts the cause on .status.errors, which is the only place an
+		// operator can see WHY a host was deferred - the event alone does not carry it.
+		propagates := errors.Is(err, common.ErrCRUDAbort) || errors.Is(err, common.ErrCRUDDeferred)
+		l := w.a.V(1)
+		if propagates {
+			metrics.HostReconcilesErrors(ctx, host.GetCR())
+			l = l.WithError(host.GetCR())
+		}
+		l.
 			M(host).F().
 			Warning("Reconcile Host Main - unable to reconcile domain reconcile. Host: %s Err: %v", host.GetName(), err)
 		// Propagate abort signals (e.g. runtime FIPS image-policy violation) so

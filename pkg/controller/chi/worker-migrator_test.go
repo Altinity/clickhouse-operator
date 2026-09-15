@@ -21,13 +21,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 )
 
 // migrateTables wraps a failed HostCreateTables in common.ErrCRUDDeferred. That wrap is
 // load-bearing, not decoration: reconcileHostMain propagates only the two CRUD sentinels and logs
 // anything else as a Warning before continuing, so a bare error would leave the reconcile marching
-// on to includeHost() and a Completed CHI - exactly the bug.
+// on to a Completed CR with the host's low-priority demotion cleared - exactly the bug.
 //
 // It must be Deferred and NOT Abort: Abort unwinds the shard walk, so one host with one
 // un-creatable object would halt every remaining shard mid-upgrade. Deferred lets the siblings
@@ -48,6 +49,10 @@ func TestMigrateTablesFailureIsDeferredSentinel(t *testing.T) {
 		"must NOT be Abort: that would unwind the shard walk and starve the sibling shards")
 	require.Contains(t, err.Error(), "0-0", "the host must be identifiable from the message")
 	require.Contains(t, err.Error(), "upstream connect error", "the underlying cause must survive")
+	// Both the sentinel and the cause are %w-wrapped, so a caller can match either. Folding the
+	// cause in with %v would still satisfy the Contains check above while breaking this one, which
+	// is what any transient-vs-permanent retry decision would need to inspect.
+	require.ErrorIs(t, err, underlying, "the underlying error must stay reachable via errors.Is")
 }
 
 // A host recorded in hostsWithTablesCreated is skipped by shouldMigrateTables forever after
@@ -90,4 +95,39 @@ func newTestHost() *api.Host {
 	host := &api.Host{}
 	host.SetCR(cr)
 	return host
+}
+
+// A deferred host must not be left outside the Services. reconcileHostPrepare drains the host by
+// deleting the ready mark, and includeHost is the only writer that restores it - so an early return
+// on the deferral strands an already-serving replica outside the CR-, cluster- and shard-scope
+// Services for as long as the underlying object stays un-creatable, while the pod still reads Ready.
+//
+// The exemption is a host that never reached ObjectStatusCreated: admitting a replica that has no
+// schema is precisely what the deferral is defending against.
+func TestShouldRestoreHostToServiceOnDeferral(t *testing.T) {
+	deferred := migrateTablesFailure(&api.Host{Name: "0-0"}, errors.New("boom"))
+
+	hostWithStatus := func(s types.ObjectStatus) *api.Host {
+		host := &api.Host{Name: "0-0"}
+		host.GetReconcileAttributes().SetStatus(s)
+		return host
+	}
+
+	t.Run("an existing host is restored to service", func(t *testing.T) {
+		require.True(t, shouldRestoreHostToServiceOnDeferral(hostWithStatus(types.ObjectStatusCreated), deferred))
+	})
+
+	t.Run("a never-created host stays out", func(t *testing.T) {
+		require.False(t, shouldRestoreHostToServiceOnDeferral(hostWithStatus(types.ObjectStatusRequested), deferred),
+			"a host with no schema must not be admitted to the Services")
+	})
+
+	t.Run("a hard error does not restore anything", func(t *testing.T) {
+		require.False(t, shouldRestoreHostToServiceOnDeferral(hostWithStatus(types.ObjectStatusCreated), common.ErrCRUDAbort),
+			"only a deferral leaves the host recoverable - an abort must not re-admit it")
+	})
+
+	t.Run("no error means the caller never reaches this path", func(t *testing.T) {
+		require.False(t, shouldRestoreHostToServiceOnDeferral(hostWithStatus(types.ObjectStatusCreated), nil))
+	})
 }
