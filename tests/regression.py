@@ -9,7 +9,10 @@ xfails = {
     # test_operator.py
     "/regression/e2e.test_operator/test_010021*": [(Fail, "Storage test is flaky on github")],
     "/regression/e2e.test_operator/test_010082_1*": [(Fail, "Canary via CHIT injection does not work")],
-    "/regression/e2e.test_operator/test_020005*": [(Fail, "Keeper scale-up/scale-down is flaky")],
+    # NOTE: the blanket test_020005* xfail ("Keeper scale-up/scale-down is flaky")
+    # is intentionally dropped on this branch. test_020005_2 must surface its
+    # split-brain assertion as a real, honest FAIL on the pre-fix operator -- an
+    # xfail would swallow exactly the red this branch exists to demonstrate.
 }
 
 
