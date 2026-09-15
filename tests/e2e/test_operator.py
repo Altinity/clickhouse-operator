@@ -4116,6 +4116,8 @@ def test_010035_3(self):
         delete_test_namespace()
 
 
+
+
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_EnableHttps("1.0"))
 @Name("test_010034. Check HTTPS support for health check")

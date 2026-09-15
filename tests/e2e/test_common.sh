@@ -86,6 +86,15 @@ PRELOAD_IMAGES_ALL=(
     "altinity/clickhouse-backup:stable"
     "altinity/clickhouse-backup:latest-fips"  # FIPS backup sidecar (manifests/chit/test-030003-backup-template.yaml)
     "alpine/openssl:3.3.3"
+    # Previous-release operator + exporter, installed by the upgrade-path scenarios
+    # (test_010009_1/_2 default to 0.27.0, test_010011_5 to 0.27.3). Without these the
+    # upgrade tests are the only scenarios that pull from the registry DURING the run,
+    # so a transient minikube DNS failure wedges them at "operator is installed" until
+    # the scenario times out - a registry outage becomes a red suite.
+    "altinity/clickhouse-operator:0.27.0"
+    "altinity/metrics-exporter:0.27.0"
+    "altinity/clickhouse-operator:0.27.3"
+    "altinity/metrics-exporter:0.27.3"
 )
 
 # =============================================================================

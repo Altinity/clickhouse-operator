@@ -153,28 +153,6 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
                 kubectl.wait_chk_status("clickhouse-keeper", 'Completed')
 
 
-
-def wait_clickhouse_cluster_ready(chi):
-    with Given("All expected pods present in system.clusters"):
-        all_pods_ready = False
-        while all_pods_ready is False:
-            all_pods_ready = True
-
-            for pod in chi["status"]["pods"]:
-                cluster_response = clickhouse.query(
-                    chi["metadata"]["name"],
-                    "SELECT host_name FROM system.clusters WHERE cluster='all-sharded'",
-                    pod=pod,
-                )
-                for host in chi["status"]["fqdns"]:
-                    svc_short_name = host.replace(f".{current().context.test_namespace}.svc.cluster.local.", "")
-                    svc_short_name = svc_short_name.replace(f".{current().context.test_namespace}.svc.cluster.local", "")
-                    if svc_short_name not in cluster_response:
-                        with Then("Not ready, sleep 5 seconds"):
-                            all_pods_ready = False
-                            time.sleep(5)
-
-
 def install_clickhouse_and_keeper(
     chi_file,
     chi_template_file,
@@ -310,7 +288,7 @@ def get_metrics(operator_pod=None, operator_namespace=None, container="metrics-e
 def _operator_install_envsubst_cmd(source_cmd, ns, version=None):
     """Build `source | envsubst` for the operator install template.
 
-    source_cmd is e.g. ``cat /path/to.yaml`` or ``curl -sL <url>``.
+    source_cmd is e.g. ``cat /path/to.yaml`` or ``curl -sfL <url>``.
     """
     if version is None:
         version = current().context.operator_version
@@ -418,7 +396,7 @@ def install_operator_version(version, shell=None):
     else:
         # Public release: fetch that version's install template from GitHub.
         source_cmd = (
-            "curl -sL "
+            "curl -sfL "
             f"https://github.com/Altinity/clickhouse-operator/raw/{version}/"
             "deploy/operator/clickhouse-operator-install-template.yaml"
         )
