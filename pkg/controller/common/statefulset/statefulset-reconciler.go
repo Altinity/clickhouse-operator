@@ -43,6 +43,7 @@ type Reconciler struct {
 
 	cr  interfaces.IKubeCR
 	sts interfaces.IKubeSTS
+	pod interfaces.IKubePod
 
 	fallback Fallback
 }
@@ -68,6 +69,7 @@ func NewReconciler(
 
 		cr:  kube.CR(),
 		sts: kube.STS(),
+		pod: kube.Pod(),
 
 		fallback: fallback,
 	}
@@ -533,6 +535,8 @@ func (r *Reconciler) doUpdateStatefulSet(
 
 // doDeleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count.
 // Scale-to-0 is best-effort; failures (e.g. 409 Conflict) must not block Delete.
+// A scale-to-0 wait timeout force-deletes the host pod so Delete can finish in
+// this pass instead of aborting Recreate with the host at Replicas=0 (#2078).
 func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) error {
 	// IMPORTANT
 	// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
@@ -566,9 +570,15 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 			log.V(1).M(host).F().Warning(
 				"Scale-to-0 update failed for StatefulSet %s/%s (%v) - proceeding to Delete",
 				namespace, name, err)
-		} else {
-			// Wait until StatefulSet scales down to 0 pods count.
-			_ = r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host)
+		} else if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
+			// Pod did not terminate in time. Escalate so Delete+Create can finish
+			// in this pass instead of leaving the host at Replicas=0 (#2078).
+			log.V(1).M(host).F().Warning(
+				"Scale-to-0 wait timed out for StatefulSet %s/%s - force-deleting pod so Delete can finish",
+				namespace, name)
+			if derr := r.deleteHostPod(ctx, host); derr != nil {
+				return derr
+			}
 		}
 	} else {
 		log.V(1).M(host).Info("StatefulSet %s/%s already at Replicas=0, skipping scale-down", namespace, name)
@@ -583,5 +593,26 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 		return err
 	}
 	log.V(1).M(host).Info("OK delete StatefulSet %s/%s", namespace, name)
+	return nil
+}
+
+// deleteHostPod removes the host's pod so a wedged graceful shutdown cannot block
+// StatefulSet deletion. Pod.Delete already uses grace period 0.
+func (r *Reconciler) deleteHostPod(ctx context.Context, host *api.Host) error {
+	if r.pod == nil {
+		return nil
+	}
+
+	namespace := host.Runtime.Address.Namespace
+	name := r.namer.Name(interfaces.NamePod, host)
+	if err := r.pod.Delete(ctx, namespace, name); err != nil {
+		if apiErrors.IsNotFound(err) {
+			log.V(1).M(host).Info("NEUTRAL not found Pod %s/%s", namespace, name)
+			return nil
+		}
+		log.V(1).M(host).F().Error("FAIL delete Pod %s/%s err: %v", namespace, name, err)
+		return err
+	}
+	log.V(1).M(host).Info("OK delete Pod %s/%s", namespace, name)
 	return nil
 }

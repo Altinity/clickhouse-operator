@@ -99,28 +99,58 @@ func (f *fakeSTS) List(ctx context.Context, namespace string, opts meta.ListOpti
 	return nil, nil
 }
 
-// fakeNamer returns a fixed name for the StatefulSet name lookup. doDeleteStatefulSet
-// only consults the namer for the StatefulSet name (which feeds straight into
-// r.sts.Delete) so we just hardcode the desired name here.
-type fakeNamer struct{ stsName string }
+// fakeNamer returns a fixed name for StatefulSet and Pod lookups.
+type fakeNamer struct {
+	stsName string
+	podName string
+}
 
 func (n *fakeNamer) Name(what interfaces.NameType, params ...any) string {
+	if what == interfaces.NamePod && n.podName != "" {
+		return n.podName
+	}
 	return n.stsName
 }
 func (n *fakeNamer) Names(what interfaces.NameType, params ...any) []string {
 	return nil
 }
 
-// fakePoller is a no-op IHostObjectsPoller — none of these doDeleteStatefulSet
-// code paths exercise the poller, but the field cannot be nil if any path
-// happens to invoke it.
-type fakePoller struct{}
+// fakePoller is an IHostObjectsPoller test double. The default zero value is a
+// successful wait; tests that need a scale-to-0 timeout set waitReadyErr.
+type fakePoller struct {
+	waitReadyCalls int
+	waitReadyErr   error
+}
 
 func (p *fakePoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error {
-	return nil
+	p.waitReadyCalls++
+	return p.waitReadyErr
 }
 func (p *fakePoller) WaitHostPodStarted(ctx context.Context, host *api.Host) error {
 	return nil
+}
+
+// fakePod is a minimal IKubePod test double. Only Delete is exercised by the
+// scale-to-0 escalate path; the other methods exist to satisfy the interface.
+type fakePod struct {
+	deleteCalls         int
+	deleteErr           error
+	lastDeleteNamespace string
+	lastDeleteName      string
+}
+
+func (f *fakePod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
+	return nil, nil
+}
+func (f *fakePod) GetAll(ctx context.Context, obj any) []*core.Pod { return nil }
+func (f *fakePod) Update(ctx context.Context, pod *core.Pod) (*core.Pod, error) {
+	return pod, nil
+}
+func (f *fakePod) Delete(ctx context.Context, namespace, name string) error {
+	f.deleteCalls++
+	f.lastDeleteNamespace = namespace
+	f.lastDeleteName = name
+	return f.deleteErr
 }
 
 // stsResource is the schema.GroupResource used for constructing typed API
@@ -137,7 +167,7 @@ func newReconciler(sts interfaces.IKubeSTS, stsName string) *Reconciler {
 	return &Reconciler{
 		a:                 announcer.NewAnnouncer(nil, nil),
 		hostObjectsPoller: &fakePoller{},
-		namer:             &fakeNamer{stsName: stsName},
+		namer:             &fakeNamer{stsName: stsName, podName: stsName + "-0"},
 		storage:           &storage.Reconciler{},
 		sts:               sts,
 	}
@@ -340,4 +370,108 @@ func TestCreateStatefulSet_AlreadyExistsPropagatesAsRecreate(t *testing.T) {
 	assert.Equal(t, common.ErrCRUDRecreate, err,
 		"createStatefulSet must propagate ErrCRUDRecreate so the caller retries on the next reconcile pass")
 	assert.Equal(t, 1, fake.createCalls, "Create should be attempted exactly once")
+}
+
+// TestDoDeleteStatefulSet_ScaleToZeroTimeoutForceDeletesPod is the #2078
+// escalate path: a successful scale-to-0 Update whose wait times out must
+// force-delete the host pod and then still run StatefulSet Delete, so
+// recreate can create the replacement in this pass.
+func TestDoDeleteStatefulSet_ScaleToZeroTimeoutForceDeletesPod(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	fake := &fakeSTS{getReturn: cur}
+	poller := &fakePoller{waitReadyErr: errors.New("wait timeout")}
+	pods := &fakePod{}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = poller
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, poller.waitReadyCalls, "scale-to-0 wait must be honored")
+	assert.Equal(t, 1, pods.deleteCalls, "wedged pod must be force-deleted")
+	assert.Equal(t, "ns", pods.lastDeleteNamespace)
+	assert.Equal(t, "chi-test-cluster-0-0-0", pods.lastDeleteName)
+	assert.Equal(t, 1, fake.deleteCalls, "StatefulSet Delete must still run after pod escalate")
+}
+
+// TestDoDeleteStatefulSet_ScaleToZeroTimeoutPodNotFoundStillDeletesSTS —
+// the pod may already be gone by the time we escalate; IsNotFound is
+// success and Delete of the StatefulSet must still proceed.
+func TestDoDeleteStatefulSet_ScaleToZeroTimeoutPodNotFoundStillDeletesSTS(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{
+		deleteErr: apiErrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "chi-test-cluster-0-0-0"),
+	}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = &fakePoller{waitReadyErr: errors.New("wait timeout")}
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.NoError(t, err, "IsNotFound on pod delete is benign")
+	assert.Equal(t, 1, pods.deleteCalls)
+	assert.Equal(t, 1, fake.deleteCalls)
+}
+
+// TestDoDeleteStatefulSet_ScaleToZeroTimeoutPodDeleteErrorAborts — a real
+// pod-delete failure cannot finish Recreate in this pass, so it must
+// propagate and skip StatefulSet Delete.
+func TestDoDeleteStatefulSet_ScaleToZeroTimeoutPodDeleteErrorAborts(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	podErr := errors.New("forbidden")
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{deleteErr: podErr}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = &fakePoller{waitReadyErr: errors.New("wait timeout")}
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.Error(t, err)
+	assert.Equal(t, podErr, err)
+	assert.Equal(t, 1, pods.deleteCalls)
+	assert.Equal(t, 0, fake.deleteCalls, "StatefulSet Delete must not run when pod escalate fails")
+}
+
+// TestDoDeleteStatefulSet_SuccessfulWaitDoesNotDeletePod — when the
+// scale-to-0 wait succeeds the pod is already gone, so escalate must not run.
+func TestDoDeleteStatefulSet_SuccessfulWaitDoesNotDeletePod(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{}
+	poller := &fakePoller{}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = poller
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, poller.waitReadyCalls)
+	assert.Equal(t, 0, pods.deleteCalls, "pod delete is only for a timed-out wait")
+	assert.Equal(t, 1, fake.deleteCalls)
+}
+
+// TestRecreateStatefulSet_ScaleToZeroTimeoutStillCreates — #2078 one-path
+// invariant: a wedged pod must not abort Recreate. After force-deleting the
+// pod, Delete+Create complete in this pass.
+func TestRecreateStatefulSet_ScaleToZeroTimeoutStillCreates(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = &fakePoller{waitReadyErr: errors.New("wait timeout")}
+	r.pod = pods
+
+	h := hostWithCR("ns", "test-chi")
+	h.Runtime.DesiredStatefulSet = stsWithReplicas(int32Ptr(1))
+
+	err := r.recreateStatefulSet(context.Background(), h, false /*register*/, NewReconcileStatefulSetOptions())
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, pods.deleteCalls, "wedged pod must be force-deleted")
+	assert.Equal(t, 1, fake.deleteCalls, "delete should complete after escalate")
+	assert.Equal(t, 1, fake.createCalls, "create must run in the same pass")
 }
