@@ -75,7 +75,11 @@ func (w *worker) dropZKReplicas(ctx context.Context, cr *api.ClickHouseInstallat
 		func(shard api.IShard) {
 		},
 		func(host *api.Host) {
-			_ = w.dropZKReplica(ctx, host, NewDropReplicaOptions().SetRegularDrop())
+			// host belongs to the old CR. Run the drop on a host that survives in the new CR -
+			// when hosts are removed from the head of the hosts list, the old shard's first
+			// host is one of the removed hosts and its pod/service is already gone.
+			hostToRunOn := cr.FindShard(host.Runtime.Address.ClusterName, host.Runtime.Address.ShardName).FirstHost()
+			_ = w.dropZKReplica(ctx, hostToRunOn, host, NewDropReplicaOptions().SetRegularDrop())
 			cnt++
 		},
 	)
@@ -456,17 +460,20 @@ func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 	return nil
 }
 
-// dropZKReplica drops replica's info from Zookeeper
-func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *dropReplicaOptions) error {
+// dropZKReplica drops replica's info from Zookeeper.
+// hostToRunOn is the host to run SQL statements on - it must be a host that stays in the
+// cluster. When nil, it falls back to the first host of hostToDrop's shard.
+func (w *worker) dropZKReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host, opts *dropReplicaOptions) error {
 	if hostToDrop == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
 
 	// Sometimes host to drop is already unavailable, so let's run SQL statement of the first replica in the shard
-	var hostToRunOn *api.Host
-	if shard := hostToDrop.GetShard(); shard != nil {
-		hostToRunOn = shard.FirstHost()
+	if hostToRunOn == nil {
+		if shard := hostToDrop.GetShard(); shard != nil {
+			hostToRunOn = shard.FirstHost()
+		}
 	}
 
 	if hostToRunOn == nil {

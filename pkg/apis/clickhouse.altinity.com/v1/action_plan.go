@@ -340,10 +340,49 @@ func (ap *ActionPlan) WalkRemoved(
 			shard := ap.specDiff.Removed[path].(IShard)
 			shardFunc(shard)
 		case *Host:
-			host := ap.specDiff.Removed[path].(*Host)
-			hostFunc(host)
+			// Deliberately not walked here. messagediff compares slices positionally
+			// (index-by-index), so removing a host from the head or the middle of the
+			// hosts list reports the TAIL host(s) as removed, while they survive by name
+			// and the actually removed host(s) are reported as modified (renamed).
+			// K8s objects are managed by name, so removed hosts are computed by name below.
 		}
 	}
+	ap.walkRemovedHostsByName(hostFunc)
+}
+
+// walkRemovedHostsByName walks hosts removed by name: hosts of the old CR whose cluster/shard
+// still exists in the new CR but whose name is no longer present there. Hosts that go away
+// together with their whole shard or cluster are not walked - they are covered by the
+// shard/cluster callbacks of WalkRemoved, keeping parity with the positional diff behavior.
+func (ap *ActionPlan) walkRemovedHostsByName(hostFunc func(host *Host)) {
+	if (ap.old == nil) || (ap.new == nil) {
+		return
+	}
+
+	// Set-based lookups over WalkHosts are used instead of Find*() chains, because
+	// old/new may carry typed-nil concrete CRs, while WalkHosts is nil-receiver-safe.
+	newShards := map[string]bool{}
+	newHosts := map[string]bool{}
+	ap.new.WalkHosts(func(host *Host) error {
+		address := host.GetRuntime().GetAddress()
+		shardKey := address.GetClusterName() + "/" + address.GetShardName()
+		newShards[shardKey] = true
+		newHosts[shardKey+"/"+address.GetHostName()] = true
+		return nil
+	})
+
+	ap.old.WalkHosts(func(host *Host) error {
+		address := host.GetRuntime().GetAddress()
+		shardKey := address.GetClusterName() + "/" + address.GetShardName()
+		if !newShards[shardKey] {
+			// The whole shard (or cluster) is gone - not a per-host removal
+			return nil
+		}
+		if !newHosts[shardKey+"/"+address.GetHostName()] {
+			hostFunc(host)
+		}
+		return nil
+	})
 }
 
 // WalkAdded walk added cluster items
