@@ -142,5 +142,10 @@ func (c *Pod) Delete(ctx context.Context, namespace, name string) error {
 			Name:      name,
 		},
 	}
-	return c.kubeClient.Delete(ctx, pod)
+	// Grace period 0, as the CHI adapter uses. Callers reach Delete to clear a pod that is
+	// already refusing to terminate, so re-issuing the default graceful delete it is ignoring
+	// would be a no-op. Deliberately NOT foreground propagation like CHI's shared delete options:
+	// that stamps a finalizer and makes the object linger for GC, the opposite of what is wanted
+	// here, and a Pod has no dependents for it to cascade to anyway.
+	return c.kubeClient.Delete(ctx, pod, client.GracePeriodSeconds(0))
 }
