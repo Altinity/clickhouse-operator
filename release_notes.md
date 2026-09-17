@@ -11,89 +11,89 @@
           key: pwduser1
   ```
 
-  by @sunsingerus
+  by [@sunsingerus](https://github.com/sunsingerus)
 
-* **Bumped the Go toolchain `1.26.5` → `1.26.8`** to address stdlib CVEs in the operator and metrics-exporter images (`GO-2026-6090`, `GO-2026-6089`, `GO-2026-6218`, `GO-2026-5972`, `GO-2026-5026`). No API or behavior changes. The FIPS module (`GOFIPS140=v1.0.0`) is unchanged. by @sunsingerus
+* **Bumped the Go toolchain `1.26.5` → `1.26.8`** to address stdlib CVEs in the operator and metrics-exporter images (`GO-2026-6090`, `GO-2026-6089`, `GO-2026-6218`, `GO-2026-5972`, `GO-2026-5026`). No API or behavior changes. The FIPS module (`GOFIPS140=v1.0.0`) is unchanged. by [@sunsingerus](https://github.com/sunsingerus)
 
-* **Bumped `go.opentelemetry.io/otel` `v1.43.0` → `v1.44.0`** to clear GO-2026-5158. `otel/sdk` is left at `v1.43.0` so the default metric cardinality limit does not change. by @sunsingerus
+* **Bumped `go.opentelemetry.io/otel` `v1.43.0` → `v1.44.0`** to clear GO-2026-5158. `otel/sdk` is left at `v1.43.0` so the default metric cardinality limit does not change. by [@sunsingerus](https://github.com/sunsingerus)
 
 ### Behavior Changes
-* **A pod that will not terminate is force-deleted so StatefulSet Recreate finishes in one pass.** A wedged shutdown previously aborted Recreate with the host left at `Replicas=0`. The operator now deletes that pod (grace period 0) after a full wait timeout, emits `HostPodForceDeleted`, and completes Delete+Create in the same pass. A terminating pod is no longer treated as a healthy shard peer. by @alex-zaitsev in #2080. Fixes #2078
+* **A pod that will not terminate is force-deleted so StatefulSet Recreate finishes in one pass.** A wedged shutdown previously aborted Recreate with the host left at `Replicas=0`. The operator now deletes that pod (grace period 0) after a full wait timeout, emits `HostPodForceDeleted`, and completes Delete+Create in the same pass. A terminating pod is no longer treated as a healthy shard peer. by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2080](https://github.com/Altinity/clickhouse-operator/pull/2080). Fixes [#2078](https://github.com/Altinity/clickhouse-operator/issues/2078)
 
-* **ZooKeeper endpoint changes no longer restart ClickHouse.** `configurationRestartPolicy` has advertised `zookeeper/*: "no"` since 0.25.6; the policy is now honored, so endpoint edits reload via `conf.d`. Turning ZooKeeper on or off still restarts. This also removes the one-time CHI→CHK restart noted in 0.27.2. After resizing an ensemble, wait for `system.zookeeper_connection` (or raise `reconcile.configMapPropagationTimeout`) before decommissioning old servers. by @identw in #2074
+* **ZooKeeper endpoint changes no longer restart ClickHouse.** `configurationRestartPolicy` has advertised `zookeeper/*: "no"` since 0.25.6; the policy is now honored, so endpoint edits reload via `conf.d`. Turning ZooKeeper on or off still restarts. This also removes the one-time CHI→CHK restart noted in 0.27.2. After resizing an ensemble, wait for `system.zookeeper_connection` (or raise `reconcile.configMapPropagationTimeout`) before decommissioning old servers. by [@identw](https://github.com/identw) in [#2074](https://github.com/Altinity/clickhouse-operator/pull/2074)
 
-* **Keeper rolling updates no longer take an ensemble below Raft quorum.** A Ready Keeper replica is deferred (`[RaftQuorumUnsafe]`) when disrupting it would lose majority; not-Ready replicas are recovered first. Affects `ClickHouseKeeperInstallation` rolls. by @alex-zaitsev in #2070. Fixes #2069
+* **Keeper rolling updates no longer take an ensemble below Raft quorum.** A Ready Keeper replica is deferred (`[RaftQuorumUnsafe]`) when disrupting it would lose majority; not-Ready replicas are recovered first. Affects `ClickHouseKeeperInstallation` rolls. by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2070](https://github.com/Altinity/clickhouse-operator/pull/2070). Fixes [#2069](https://github.com/Altinity/clickhouse-operator/issues/2069)
 
-* **Helm CRD-install hook uses `registry.k8s.io/kubectl:v1.36.3`** instead of `bitnami/kubectl:latest`. Air-gapped and mirrored installs must add that image before upgrade, or set `crdHook.image` / `crdHook.enabled: false`. Helm installs only. by @fhoekstra in #2065
+* **Helm CRD-install hook uses `registry.k8s.io/kubectl:v1.36.3`** instead of `bitnami/kubectl:latest`. Air-gapped and mirrored installs must add that image before upgrade, or set `crdHook.image` / `crdHook.enabled: false`. Helm installs only. by [@fhoekstra](https://github.com/fhoekstra) in [#2065](https://github.com/Altinity/clickhouse-operator/pull/2065)
 
-* **A failed schema migration no longer reports the CHI as `Completed`.** `HostCreateTables` errors now abort the pass instead of being recorded as success. A CHI that already had an un-creatable object (for example a Dictionary with an unreachable source) will turn `Aborted` on first reconcile after upgrade. by @Tyagiquamar in #2077. Fixes #2021
+* **A failed schema migration no longer reports the CHI as `Completed`.** `HostCreateTables` errors now abort the pass instead of being recorded as success. A CHI that already had an un-creatable object (for example a Dictionary with an unreachable source) will turn `Aborted` on first reconcile after upgrade. by [@Tyagiquamar](https://github.com/Tyagiquamar) in [#2077](https://github.com/Altinity/clickhouse-operator/pull/2077). Fixes [#2021](https://github.com/Altinity/clickhouse-operator/issues/2021)
 
 ### Fixed
-* **Host deletion is no longer reported as completed when the operator cannot tell whether the host still exists.** Only `NotFound` means the host is gone; other API errors now raise `DeleteFailed`. Present since 0.10.0. Residual PVC-orphan on finalizer removal is tracked in #2056. by @somanchi004-code in #2057
+* **Host deletion is no longer reported as completed when the operator cannot tell whether the host still exists.** Only `NotFound` means the host is gone; other API errors now raise `DeleteFailed`. Present since 0.10.0. Residual PVC-orphan on finalizer removal is tracked in [#2056](https://github.com/Altinity/clickhouse-operator/issues/2056). by [@somanchi004-code](https://github.com/somanchi004-code) in [#2057](https://github.com/Altinity/clickhouse-operator/pull/2057)
 
-* **Operator no longer keeps probing a ZooKeeper ensemble it can no longer reach.** A disconnected ZK session leaked the client and re-dialed stale addresses until operator restart. Every terminal state now closes the connection. Root-path ensure is cancellable, skipped on empty recovery passes, and raises `CreateFailed` after retries (still non-fatal). by @alex-zaitsev in #2073
+* **Operator no longer keeps probing a ZooKeeper ensemble it can no longer reach.** A disconnected ZK session leaked the client and re-dialed stale addresses until operator restart. Every terminal state now closes the connection. Root-path ensure is cancellable, skipped on empty recovery passes, and raises `CreateFailed` after retries (still non-fatal). by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2073](https://github.com/Altinity/clickhouse-operator/pull/2073)
 
-* **Oversized CRD ConfigMap broke GitOps installs of the Helm chart.** The CRD-install hook packed three CRDs into one ConfigMap past the 256Ki annotation ceiling, so ArgoCD client-side apply and `helm template | kubectl apply` failed. Each CRD now gets its own ConfigMap. `helm install` / `helm upgrade` were unaffected. by @sunsingerus
-* **Stale ClickHouse HTTP connection pools are reset after connection failures.** by @norrs in #2068
+* **Oversized CRD ConfigMap broke GitOps installs of the Helm chart.** The CRD-install hook packed three CRDs into one ConfigMap past the 256Ki annotation ceiling, so ArgoCD client-side apply and `helm template | kubectl apply` failed. Each CRD now gets its own ConfigMap. `helm install` / `helm upgrade` were unaffected. by [@sunsingerus](https://github.com/sunsingerus)
+* **Stale ClickHouse HTTP connection pools are reset after connection failures.** by [@norrs](https://github.com/norrs) in [#2068](https://github.com/Altinity/clickhouse-operator/pull/2068)
 
 ## Release 0.27.3
 ### New Features
-* **Helm `serviceMonitor.enabled` now covers Keeper metrics.** Enabling the chart ServiceMonitor now also scrapes `ClickHouseKeeper`. Helm installs only. by @Slach in #2048. Fixes #2038
+* **Helm `serviceMonitor.enabled` now covers Keeper metrics.** Enabling the chart ServiceMonitor now also scrapes `ClickHouseKeeper`. Helm installs only. by [@Slach](https://github.com/Slach) in [#2048](https://github.com/Altinity/clickhouse-operator/pull/2048). Fixes [#2038](https://github.com/Altinity/clickhouse-operator/issues/2038)
 
 ### Behavior Changes
-* **Unhealthy replicas in a shard are reconciled before healthy ones.** A disruptive restart is deferred when it would take down the last healthy replica; sibling shards keep converging. by @alex-zaitsev in #2046. Fixes #1704
-* **Cluster-scoped reconcile hooks skip unreachable hosts** instead of aborting. Emits `HookSkippedUnreachableHost`; the reconcile fails only if no target host was reachable. by @sunsingerus. Fixes #2052
+* **Unhealthy replicas in a shard are reconciled before healthy ones.** A disruptive restart is deferred when it would take down the last healthy replica; sibling shards keep converging. by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2046](https://github.com/Altinity/clickhouse-operator/pull/2046). Fixes [#1704](https://github.com/Altinity/clickhouse-operator/issues/1704)
+* **Cluster-scoped reconcile hooks skip unreachable hosts** instead of aborting. Emits `HookSkippedUnreachableHost`; the reconcile fails only if no target host was reachable. by [@sunsingerus](https://github.com/sunsingerus). Fixes [#2052](https://github.com/Altinity/clickhouse-operator/issues/2052)
 
 ### Fixed
-* **Operator no longer panics on watch reconnect.** Informer delete handlers unwrap `DeletedFinalStateUnknown` tombstones. The metrics-exporter config watcher is fixed the same way. by @27rohan in #2039. Fixes #2050. Fixes #1882
-* **`onLostVolume: "no"` now prevents `SYSTEM DROP REPLICA`.** The setting was ignored; it takes effect for the first time on upgrade. by @sunsingerus
-* **Reconcile SQL hooks run on every host.** Per-host substitution no longer blanks the stored query list after the first host. by @sunsingerus. Fixes #2052
-* **Image-only upgrades exclude the host before restart.** by @sunsingerus. Fixes #2055
-* **Reconcile runs again when the operator pod IP changes**, so generated `networks/ip` / `host_regexp` stay current. by @sunsingerus
-* **Transient Kubernetes API errors are retried** instead of failing the reconcile. by @aaron276h in #2025. Fixes #2026
+* **Operator no longer panics on watch reconnect.** Informer delete handlers unwrap `DeletedFinalStateUnknown` tombstones. The metrics-exporter config watcher is fixed the same way. by [@27rohan](https://github.com/27rohan) in [#2039](https://github.com/Altinity/clickhouse-operator/pull/2039). Fixes [#2050](https://github.com/Altinity/clickhouse-operator/issues/2050). Fixes [#1882](https://github.com/Altinity/clickhouse-operator/issues/1882)
+* **`onLostVolume: "no"` now prevents `SYSTEM DROP REPLICA`.** The setting was ignored; it takes effect for the first time on upgrade. by [@sunsingerus](https://github.com/sunsingerus)
+* **Reconcile SQL hooks run on every host.** Per-host substitution no longer blanks the stored query list after the first host. by [@sunsingerus](https://github.com/sunsingerus). Fixes [#2052](https://github.com/Altinity/clickhouse-operator/issues/2052)
+* **Image-only upgrades exclude the host before restart.** by [@sunsingerus](https://github.com/sunsingerus). Fixes [#2055](https://github.com/Altinity/clickhouse-operator/issues/2055)
+* **Reconcile runs again when the operator pod IP changes**, so generated `networks/ip` / `host_regexp` stay current. by [@sunsingerus](https://github.com/sunsingerus)
+* **Transient Kubernetes API errors are retried** instead of failing the reconcile. by [@aaron276h](https://github.com/aaron276h) in [#2025](https://github.com/Altinity/clickhouse-operator/pull/2025). Fixes [#2026](https://github.com/Altinity/clickhouse-operator/issues/2026)
 
 ### Documentation
-* **Added `docs/chi-examples/99-clickhouseoperatorconfiguration-max.yaml`.** `70-chop-config.yaml` remains the short starting point. by @sunsingerus
-* **Added third-party notices.** by @alex-zaitsev in #2061
+* **Added `docs/chi-examples/99-clickhouseoperatorconfiguration-max.yaml`.** `70-chop-config.yaml` remains the short starting point. by [@sunsingerus](https://github.com/sunsingerus)
+* **Added third-party notices.** by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2061](https://github.com/Altinity/clickhouse-operator/pull/2061)
 
 ### Security
-* **Bumped Go `1.26.4` → `1.26.5`**, `golang.org/x/net` `v0.55.0` → `v0.56.0`, and `golang.org/x/text` `v0.37.0` → `v0.39.0` (CVE-2026-39822, CVE-2026-42505, CVE-2026-46600, CVE-2026-56852). No API or behavior changes. The FIPS module is unchanged. by @sunsingerus
+* **Bumped Go `1.26.4` → `1.26.5`**, `golang.org/x/net` `v0.55.0` → `v0.56.0`, and `golang.org/x/text` `v0.37.0` → `v0.39.0` (CVE-2026-39822, CVE-2026-42505, CVE-2026-46600, CVE-2026-56852). No API or behavior changes. The FIPS module is unchanged. by [@sunsingerus](https://github.com/sunsingerus)
 
 ## Release 0.27.2
 ### New Features
-* **Keeper split client/peer Services.** Default Services are now a peer Service (`publishNotReadyAddresses: true`) for Raft and a `<peer>-client` Service (`publishNotReadyAddresses: false`) for ClickHouse. A user-supplied `replicaServiceTemplate` still produces a single Service. by @sunsingerus. Fixes #1982
-* **Configurable CHK reconcile concurrency.** `reconcile.runtime.reconcileCHKsThreadsNumber` defaults to `1`. by @miguel-signoz in #2033. Fixes #2032
-* **Helm `watchNamespaces` value.** Wires into `watch.namespaces.include`. Empty by default; `[".*"]` watches all namespaces. Helm installs only. by @jtomaszon in #2007. Fixes #1919
+* **Keeper split client/peer Services.** Default Services are now a peer Service (`publishNotReadyAddresses: true`) for Raft and a `<peer>-client` Service (`publishNotReadyAddresses: false`) for ClickHouse. A user-supplied `replicaServiceTemplate` still produces a single Service. by [@sunsingerus](https://github.com/sunsingerus). Fixes [#1982](https://github.com/Altinity/clickhouse-operator/issues/1982)
+* **Configurable CHK reconcile concurrency.** `reconcile.runtime.reconcileCHKsThreadsNumber` defaults to `1`. by [@miguel-signoz](https://github.com/miguel-signoz) in [#2033](https://github.com/Altinity/clickhouse-operator/pull/2033). Fixes [#2032](https://github.com/Altinity/clickhouse-operator/issues/2032)
+* **Helm `watchNamespaces` value.** Wires into `watch.namespaces.include`. Empty by default; `[".*"]` watches all namespaces. Helm installs only. by [@jtomaszon](https://github.com/jtomaszon) in [#2007](https://github.com/Altinity/clickhouse-operator/pull/2007). Fixes [#1919](https://github.com/Altinity/clickhouse-operator/issues/1919)
 
 ### Behavior Changes
-* **OLM install modes honor the OperatorGroup.** `WATCH_NAMESPACE` is no longer hard-wired to the operator namespace. Scope the OperatorGroup if you relied on own-namespace-only. OLM/OperatorHub only. by @sunsingerus. Fixes #2008
-* **One-time ClickHouse rolling restart for CHI→CHK keeper references.** Affected CHIs rewrite `<zookeeper>` endpoints to the new client Service. Superseded in 0.27.4, which no longer restarts on that change. by @sunsingerus. Fixes #1982
-* **Config rename:** `reconcile.recovery.from.{aborted,completed}` → `reconcile.recovery.onStatus.{aborted,completed}`. The obsolete `from` key is ignored; re-apply `onPodReady: none` under the new path if you disabled Aborted auto-recovery. See [docs/operator_upgrade.md](docs/operator_upgrade.md). by @dashashutosh80 in #1998
+* **OLM install modes honor the OperatorGroup.** `WATCH_NAMESPACE` is no longer hard-wired to the operator namespace. Scope the OperatorGroup if you relied on own-namespace-only. OLM/OperatorHub only. by [@sunsingerus](https://github.com/sunsingerus). Fixes [#2008](https://github.com/Altinity/clickhouse-operator/issues/2008)
+* **One-time ClickHouse rolling restart for CHI→CHK keeper references.** Affected CHIs rewrite `<zookeeper>` endpoints to the new client Service. Superseded in 0.27.4, which no longer restarts on that change. by [@sunsingerus](https://github.com/sunsingerus). Fixes [#1982](https://github.com/Altinity/clickhouse-operator/issues/1982)
+* **Config rename:** `reconcile.recovery.from.{aborted,completed}` → `reconcile.recovery.onStatus.{aborted,completed}`. The obsolete `from` key is ignored; re-apply `onPodReady: none` under the new path if you disabled Aborted auto-recovery. See [docs/operator_upgrade.md](docs/operator_upgrade.md). by [@dashashutosh80](https://github.com/dashashutosh80) in [#1998](https://github.com/Altinity/clickhouse-operator/pull/1998)
 
 ### Fixed
-* **Scaled-up replica no longer stays broken after `remote_servers` is published.** A newly added host that hit `CLUSTER_DOESNT_EXIST` is restarted once after the full config is published. by @oo007 in #2024. Fixes #2013
-* **Config values containing `&`, `<`, or `>` no longer break generated XML.** by @AruneshDwivedi in #2034. Fixes #1578
-* **Metrics-exporter drops excluded metrics during the SQL scan**, lowering memory use. Prometheus output is unchanged. by @dentiny in #2028. Fixes #2019
+* **Scaled-up replica no longer stays broken after `remote_servers` is published.** A newly added host that hit `CLUSTER_DOESNT_EXIST` is restarted once after the full config is published. by [@oo007](https://github.com/oo007) in [#2024](https://github.com/Altinity/clickhouse-operator/pull/2024). Fixes [#2013](https://github.com/Altinity/clickhouse-operator/issues/2013)
+* **Config values containing `&`, `<`, or `>` no longer break generated XML.** by [@AruneshDwivedi](https://github.com/AruneshDwivedi) in [#2034](https://github.com/Altinity/clickhouse-operator/pull/2034). Fixes [#1578](https://github.com/Altinity/clickhouse-operator/issues/1578)
+* **Metrics-exporter drops excluded metrics during the SQL scan**, lowering memory use. Prometheus output is unchanged. by [@dentiny](https://github.com/dentiny) in [#2028](https://github.com/Altinity/clickhouse-operator/pull/2028). Fixes [#2019](https://github.com/Altinity/clickhouse-operator/issues/2019)
 
 ### Security
-* **Operator metrics port no longer exposes `/debug/pprof`.** The listener uses a dedicated mux; `/metrics` is unchanged. by @sunsingerus
+* **Operator metrics port no longer exposes `/debug/pprof`.** The listener uses a dedicated mux; `/metrics` is unchanged. by [@sunsingerus](https://github.com/sunsingerus)
 
 ## Release 0.27.1
 ### New Features
-* **CHK `secure`/`insecure` flags** control ports with a single switch. by @sunsingerus
-* **FIPS 140-3 compatible operator and metrics-exporter images**, with operator-configuration hardening controls. See [docs/security_hardening_fips.md](docs/security_hardening_fips.md) and [docs/fips_setup.md](docs/fips_setup.md). by @sunsingerus
+* **CHK `secure`/`insecure` flags** control ports with a single switch. by [@sunsingerus](https://github.com/sunsingerus)
+* **FIPS 140-3 compatible operator and metrics-exporter images**, with operator-configuration hardening controls. See [docs/security_hardening_fips.md](docs/security_hardening_fips.md) and [docs/fips_setup.md](docs/fips_setup.md). by [@sunsingerus](https://github.com/sunsingerus)
 
 ### Behavior Changes
-* **StatefulSet create returning `AlreadyExists` is no longer treated as a successful create.** The reconciler now propagates the recreate sentinel so the host correctly enters the recreate path. Pre-existing CHIs stuck at `Replicas=0` while reported as reconciled now transition to `Aborted` on first reconcile after upgrade; re-apply the CHI spec to recover. by @dashashutosh80 in #1993. Fixes #1990
+* **StatefulSet create returning `AlreadyExists` is no longer treated as a successful create.** The reconciler now propagates the recreate sentinel so the host correctly enters the recreate path. Pre-existing CHIs stuck at `Replicas=0` while reported as reconciled now transition to `Aborted` on first reconcile after upgrade; re-apply the CHI spec to recover. by [@dashashutosh80](https://github.com/dashashutosh80) in [#1993](https://github.com/Altinity/clickhouse-operator/pull/1993). Fixes [#1990](https://github.com/Altinity/clickhouse-operator/issues/1990)
 
 ### Fixed
-* **Permanent ArgoCD diff on `resourceFieldRef.divisor`.** by @pkieszcz in #1989
-* **Inconsistent secret rendering in autogenerated `remote_servers`.** by @realyota in #1992. Fixes #1991
-* **Delete is no longer skipped when scale-to-0 Update fails.** by @dashashutosh80 in #1993. Fixes #1990
-* **`.status.usedTemplates` is cleaned when templates are removed.** by @sunsingerus
+* **Permanent ArgoCD diff on `resourceFieldRef.divisor`.** by [@pkieszcz](https://github.com/pkieszcz) in [#1989](https://github.com/Altinity/clickhouse-operator/pull/1989)
+* **Inconsistent secret rendering in autogenerated `remote_servers`.** by [@realyota](https://github.com/realyota) in [#1992](https://github.com/Altinity/clickhouse-operator/pull/1992). Fixes [#1991](https://github.com/Altinity/clickhouse-operator/issues/1991)
+* **Delete is no longer skipped when scale-to-0 Update fails.** by [@dashashutosh80](https://github.com/dashashutosh80) in [#1993](https://github.com/Altinity/clickhouse-operator/pull/1993). Fixes [#1990](https://github.com/Altinity/clickhouse-operator/issues/1990)
+* **`.status.usedTemplates` is cleaned when templates are removed.** by [@sunsingerus](https://github.com/sunsingerus)
 
 ### Security
-* **Bumped dependent libraries to address CVEs.** by @sunsingerus
+* **Bumped dependent libraries to address CVEs.** by [@sunsingerus](https://github.com/sunsingerus)
 
 ## Release 0.20.3
 ## What's Changed
