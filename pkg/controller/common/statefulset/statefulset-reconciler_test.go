@@ -17,6 +17,7 @@ package statefulset
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,6 +31,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	announcer "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
@@ -170,6 +172,8 @@ func newReconciler(sts interfaces.IKubeSTS, stsName string) *Reconciler {
 		namer:             &fakeNamer{stsName: stsName, podName: stsName + "-0"},
 		storage:           &storage.Reconciler{},
 		sts:               sts,
+		// Always wired, exactly as production does - r.pod is used unguarded, like r.sts.
+		pod: &fakePod{},
 	}
 }
 
@@ -372,23 +376,22 @@ func TestCreateStatefulSet_AlreadyExistsPropagatesAsRecreate(t *testing.T) {
 	assert.Equal(t, 1, fake.createCalls, "Create should be attempted exactly once")
 }
 
-// TestDoDeleteStatefulSet_ScaleToZeroTimeoutForceDeletesPod is the #2078
-// escalate path: a successful scale-to-0 Update whose wait times out must
-// force-delete the host pod and then still run StatefulSet Delete, so
-// recreate can create the replacement in this pass.
+// TestDoDeleteStatefulSet_ScaleToZeroTimeoutForceDeletesPod is the escalate path: a successful
+// scale-to-0 Update whose wait spends its whole budget must force-delete the host pod and then
+// still run StatefulSet Delete, so recreate can create the replacement in this pass.
 func TestDoDeleteStatefulSet_ScaleToZeroTimeoutForceDeletesPod(t *testing.T) {
 	cur := stsWithReplicas(int32Ptr(1))
 	fake := &fakeSTS{getReturn: cur}
-	poller := &fakePoller{waitReadyErr: errors.New("wait timeout")}
+	p := &fakePoller{waitReadyErr: fmt.Errorf("poll(x) - %w", poller.ErrTimeout)}
 	pods := &fakePod{}
 	r := newReconciler(fake, "chi-test-cluster-0-0")
-	r.hostObjectsPoller = poller
+	r.hostObjectsPoller = p
 	r.pod = pods
 
 	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
 
 	require.NoError(t, err)
-	assert.Equal(t, 1, poller.waitReadyCalls, "scale-to-0 wait must be honored")
+	assert.Equal(t, 1, p.waitReadyCalls, "scale-to-0 wait must be honored")
 	assert.Equal(t, 1, pods.deleteCalls, "wedged pod must be force-deleted")
 	assert.Equal(t, "ns", pods.lastDeleteNamespace)
 	assert.Equal(t, "chi-test-cluster-0-0-0", pods.lastDeleteName)
@@ -405,7 +408,7 @@ func TestDoDeleteStatefulSet_ScaleToZeroTimeoutPodNotFoundStillDeletesSTS(t *tes
 		deleteErr: apiErrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "chi-test-cluster-0-0-0"),
 	}
 	r := newReconciler(fake, "chi-test-cluster-0-0")
-	r.hostObjectsPoller = &fakePoller{waitReadyErr: errors.New("wait timeout")}
+	r.hostObjectsPoller = &fakePoller{waitReadyErr: fmt.Errorf("poll(x) - %w", poller.ErrTimeout)}
 	r.pod = pods
 
 	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
@@ -415,24 +418,65 @@ func TestDoDeleteStatefulSet_ScaleToZeroTimeoutPodNotFoundStillDeletesSTS(t *tes
 	assert.Equal(t, 1, fake.deleteCalls)
 }
 
-// TestDoDeleteStatefulSet_ScaleToZeroTimeoutPodDeleteErrorAborts — a real
-// pod-delete failure cannot finish Recreate in this pass, so it must
-// propagate and skip StatefulSet Delete.
-func TestDoDeleteStatefulSet_ScaleToZeroTimeoutPodDeleteErrorAborts(t *testing.T) {
+// TestDoDeleteStatefulSet_PodDeleteFailureStillDeletesSTS — the escalate is best-effort, exactly
+// like the scale-to-0 Update above it. A pod-delete failure must not block StatefulSet Delete:
+// Delete has its own chance to succeed, and returning here would make a transient Forbidden or
+// 429 strictly worse than never having attempted the force at all.
+func TestDoDeleteStatefulSet_PodDeleteFailureStillDeletesSTS(t *testing.T) {
 	cur := stsWithReplicas(int32Ptr(1))
-	podErr := errors.New("forbidden")
 	fake := &fakeSTS{getReturn: cur}
-	pods := &fakePod{deleteErr: podErr}
+	pods := &fakePod{deleteErr: errors.New("forbidden")}
 	r := newReconciler(fake, "chi-test-cluster-0-0")
-	r.hostObjectsPoller = &fakePoller{waitReadyErr: errors.New("wait timeout")}
+	r.hostObjectsPoller = &fakePoller{waitReadyErr: fmt.Errorf("poll(x) - %w", poller.ErrTimeout)}
 	r.pod = pods
 
 	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
 
-	require.Error(t, err)
-	assert.Equal(t, podErr, err)
+	require.NoError(t, err, "a failed force-delete must not block StatefulSet Delete")
 	assert.Equal(t, 1, pods.deleteCalls)
-	assert.Equal(t, 0, fake.deleteCalls, "StatefulSet Delete must not run when pod escalate fails")
+	assert.Equal(t, 1, fake.deleteCalls, "StatefulSet Delete must still run")
+}
+
+// TestDoDeleteStatefulSet_NonTimeoutWaitErrorDoesNotForce is the guard that keeps the force
+// honest. The poller returns early - within milliseconds - on any Get error that is not
+// NotFound, so an API blip outlasting the Get retries reaches this code having given the pod no
+// time at all. Escalating there would SIGKILL a host that had just been asked to stop and was
+// shutting down cleanly. Only a spent budget earns the force.
+func TestDoDeleteStatefulSet_NonTimeoutWaitErrorDoesNotForce(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = &fakePoller{waitReadyErr: errors.New("etcdserver: request timed out")}
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, pods.deleteCalls, "a transient Get failure must never force-delete a pod")
+	assert.Equal(t, 1, fake.deleteCalls, "StatefulSet Delete still proceeds, as it did before")
+}
+
+// TestDoDeleteStatefulSet_AlreadyAtZeroStillEscalates covers the recovery pass. A host stranded
+// by an earlier failed Delete comes back with Replicas already 0, so the scale-down is skipped -
+// but the wedged pod is still there and this is the pass that has to clear it. Without the wait
+// on this branch the escalate is unreachable for exactly the hosts that need it most.
+func TestDoDeleteStatefulSet_AlreadyAtZeroStillEscalates(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(0))
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{}
+	p := &fakePoller{waitReadyErr: fmt.Errorf("poll(x) - %w", poller.ErrTimeout)}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = p
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, fake.updateCalls, "already at 0 - no scale-down Update")
+	assert.Equal(t, 1, p.waitReadyCalls, "the wait must still run so a stranded pod is noticed")
+	assert.Equal(t, 1, pods.deleteCalls, "the pod stranded by the earlier pass must be force-deleted")
+	assert.Equal(t, 1, fake.deleteCalls)
 }
 
 // TestDoDeleteStatefulSet_SuccessfulWaitDoesNotDeletePod — when the
@@ -441,28 +485,27 @@ func TestDoDeleteStatefulSet_SuccessfulWaitDoesNotDeletePod(t *testing.T) {
 	cur := stsWithReplicas(int32Ptr(1))
 	fake := &fakeSTS{getReturn: cur}
 	pods := &fakePod{}
-	poller := &fakePoller{}
+	p := &fakePoller{}
 	r := newReconciler(fake, "chi-test-cluster-0-0")
-	r.hostObjectsPoller = poller
+	r.hostObjectsPoller = p
 	r.pod = pods
 
 	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
 
 	require.NoError(t, err)
-	assert.Equal(t, 1, poller.waitReadyCalls)
+	assert.Equal(t, 1, p.waitReadyCalls)
 	assert.Equal(t, 0, pods.deleteCalls, "pod delete is only for a timed-out wait")
 	assert.Equal(t, 1, fake.deleteCalls)
 }
 
-// TestRecreateStatefulSet_ScaleToZeroTimeoutStillCreates — #2078 one-path
-// invariant: a wedged pod must not abort Recreate. After force-deleting the
-// pod, Delete+Create complete in this pass.
+// TestRecreateStatefulSet_ScaleToZeroTimeoutStillCreates — the one-pass invariant: a wedged pod
+// must not abort Recreate. After force-deleting the pod, Delete+Create complete in this pass.
 func TestRecreateStatefulSet_ScaleToZeroTimeoutStillCreates(t *testing.T) {
 	cur := stsWithReplicas(int32Ptr(1))
 	fake := &fakeSTS{getReturn: cur}
 	pods := &fakePod{}
 	r := newReconciler(fake, "chi-test-cluster-0-0")
-	r.hostObjectsPoller = &fakePoller{waitReadyErr: errors.New("wait timeout")}
+	r.hostObjectsPoller = &fakePoller{waitReadyErr: fmt.Errorf("poll(x) - %w", poller.ErrTimeout)}
 	r.pod = pods
 
 	h := hostWithCR("ns", "test-chi")
