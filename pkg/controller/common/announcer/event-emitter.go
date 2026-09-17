@@ -74,6 +74,12 @@ const (
 	// a host restart because the pod has been Ready=False past the configured threshold.
 	EventReasonHostStuckNotReady = "HostStuckNotReady"
 
+	// EventReasonHostPodForceDeleted fires when a pod outlasts the whole scale-to-0 budget and
+	// is removed with grace period 0 so the StatefulSet delete can finish. This is the operator
+	// SIGKILLing a database, and the alternative it was weighed against - stranding the host with
+	// no pod - is invisible in kubectl, so the decision belongs in the event stream.
+	EventReasonHostPodForceDeleted = "HostPodForceDeleted"
+
 	// EventReasonKeeperUpdateNoEndpointChange fires when the operator observes a referenced
 	// CHK reconcile completing but decides not to trigger a CHI reconcile because the resolved
 	// zookeeper endpoints have not changed.
