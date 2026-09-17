@@ -16,6 +16,7 @@ package statefulset
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	apps "k8s.io/api/apps/v1"
@@ -26,6 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
@@ -535,8 +537,9 @@ func (r *Reconciler) doUpdateStatefulSet(
 
 // doDeleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count.
 // Scale-to-0 is best-effort; failures (e.g. 409 Conflict) must not block Delete.
-// A scale-to-0 wait timeout force-deletes the host pod so Delete can finish in
-// this pass instead of aborting Recreate with the host at Replicas=0 (#2078).
+// A pod that outlasts the scale-down budget is force-deleted so Delete can finish in this pass,
+// rather than aborting Recreate and stranding the host at Replicas=0 with no pod - a state
+// nothing re-enqueues, because the recovery trigger is a pod event and the host has no pod.
 func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) error {
 	// IMPORTANT
 	// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
@@ -562,6 +565,7 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 
 	// Scale cur host's StatefulSet down to 0 pods count - graceful path.
 	cur := host.Runtime.CurStatefulSet
+	var scaleDownErr error
 	if cur.Spec.Replicas == nil || *cur.Spec.Replicas != 0 {
 		var zero int32 = 0
 		cur.Spec.Replicas = &zero
@@ -570,18 +574,43 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 			log.V(1).M(host).F().Warning(
 				"Scale-to-0 update failed for StatefulSet %s/%s (%v) - proceeding to Delete",
 				namespace, name, err)
-		} else if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
-			// Pod did not terminate in time. Escalate so Delete+Create can finish
-			// in this pass instead of leaving the host at Replicas=0 (#2078).
-			log.V(1).M(host).F().Warning(
-				"Scale-to-0 wait timed out for StatefulSet %s/%s - force-deleting pod so Delete can finish",
-				namespace, name)
-			if derr := r.deleteHostPod(ctx, host); derr != nil {
-				return derr
-			}
+		} else {
+			scaleDownErr = r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host)
 		}
 	} else {
+		// Already at 0, but that is also the state an earlier pass leaves behind when its own
+		// Delete timed out - so the wedged pod may still be here, and this is the pass that has
+		// to clear it. What holds the wait open is readyReplicas: the StatefulSet controller
+		// excludes terminating pods from currentReplicas but still counts them as ready, and a
+		// pod wedged in shutdown keeps reporting Ready. With no pod left both are 0 and the wait
+		// settles on its first look, so this costs nothing in the common case.
 		log.V(1).M(host).Info("StatefulSet %s/%s already at Replicas=0, skipping scale-down", namespace, name)
+		scaleDownErr = r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host)
+	}
+
+	// Escalate ONLY on a spent budget. The poller also returns early - within milliseconds - when
+	// a Get fails for any reason other than NotFound, and an API blip outlasting the Get retries
+	// would otherwise SIGKILL a host that had just been asked to stop and was shutting down
+	// cleanly. Waiting out the budget is what earns the right to force.
+	if errors.Is(scaleDownErr, poller.ErrTimeout) {
+		// Events are POSTed straight at the API with Count:1 and a GenerateName (see
+		// announcer/event-emitter.go); there is no client-go correlator to aggregate repeats.
+		// Left ungated anyway, unlike announceCleanupPostponed: every firing here is a fresh
+		// destructive attempt on a pod that is still refusing to go, which is worth a record.
+		r.a.V(1).
+			WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonHostPodForceDeleted).
+			WithAction(host.GetCR()).
+			M(host).F().
+			Warning("Scale-to-0 wait timed out for StatefulSet %s/%s - force-deleting pod so Delete can finish",
+				namespace, name)
+		if derr := r.deleteHostPod(ctx, host); derr != nil {
+			// Best-effort, exactly as the scale-to-0 Update above: Delete still has its own
+			// chance to succeed, and blocking here would make a transient pod-delete failure
+			// strictly worse than not having tried at all.
+			log.V(1).M(host).F().Warning(
+				"Force-delete of pod for StatefulSet %s/%s failed (%v) - proceeding to Delete",
+				namespace, name, derr)
+		}
 	}
 
 	if err := r.sts.Delete(ctx, namespace, name); err != nil {
@@ -596,13 +625,10 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 	return nil
 }
 
-// deleteHostPod removes the host's pod so a wedged graceful shutdown cannot block
-// StatefulSet deletion. Pod.Delete already uses grace period 0.
+// deleteHostPod removes the host's pod so a wedged graceful shutdown cannot block StatefulSet
+// deletion. Both adapters delete with grace period 0 - anything longer is the graceful delete the
+// pod is already ignoring. Caller decides when this is warranted; it is unconditional here.
 func (r *Reconciler) deleteHostPod(ctx context.Context, host *api.Host) error {
-	if r.pod == nil {
-		return nil
-	}
-
 	namespace := host.Runtime.Address.Namespace
 	name := r.namer.Name(interfaces.NamePod, host)
 	if err := r.pod.Delete(ctx, namespace, name); err != nil {
@@ -610,7 +636,7 @@ func (r *Reconciler) deleteHostPod(ctx context.Context, host *api.Host) error {
 			log.V(1).M(host).Info("NEUTRAL not found Pod %s/%s", namespace, name)
 			return nil
 		}
-		log.V(1).M(host).F().Error("FAIL delete Pod %s/%s err: %v", namespace, name, err)
+		log.V(1).M(host).F().Error("FAIL delete Pod %s/%s err:%v", namespace, name, err)
 		return err
 	}
 	log.V(1).M(host).Info("OK delete Pod %s/%s", namespace, name)
