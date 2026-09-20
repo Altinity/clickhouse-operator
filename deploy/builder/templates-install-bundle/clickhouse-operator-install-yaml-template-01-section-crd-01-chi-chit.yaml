@@ -1652,7 +1652,6 @@ spec:
                               - ""
                               - "Unspecified"
                               - "unspecified"
-                              - "OnePerHost"
                               - "oneperhost"
                           podDistribution:
                             type: array

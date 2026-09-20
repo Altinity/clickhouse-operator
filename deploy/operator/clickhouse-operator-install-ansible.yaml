@@ -1659,7 +1659,6 @@ spec:
                               - ""
                               - "Unspecified"
                               - "unspecified"
-                              - "OnePerHost"
                               - "oneperhost"
                           podDistribution:
                             type: array
@@ -3512,7 +3511,6 @@ spec:
                               - ""
                               - "Unspecified"
                               - "unspecified"
-                              - "OnePerHost"
                               - "oneperhost"
                           podDistribution:
                             type: array
@@ -5225,7 +5223,6 @@ spec:
                               - ""
                               - "Unspecified"
                               - "unspecified"
-                              - "OnePerHost"
                               - "oneperhost"
                           podDistribution:
                             type: array
@@ -6543,7 +6540,11 @@ data:
           "podTemplates": [
             {
               "name": "chi-default-oneperhost-pod-template",
-              "distribution": "OnePerHost",
+              "podDistribution": [
+                {
+                  "type": "ClickHouseAntiAffinity"
+                }
+              ],
               "spec": {
                 "containers" : [
                   {
@@ -6581,7 +6582,8 @@ data:
       templates:
         podTemplates:
           - name: default-oneperhost-pod-template
-            distribution: "OnePerHost"
+            podDistribution:
+              - type: ClickHouseAntiAffinity
   default-storage-template.yaml.example: |
     apiVersion: "clickhouse.altinity.com/v1"
     kind: "ClickHouseInstallationTemplate"
