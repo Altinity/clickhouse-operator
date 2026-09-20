@@ -518,7 +518,7 @@ RQ_SRS_026_ClickHouseOperator_PodTemplates = Requirement(
         '* image reference for particular [ClickHouse] version\n'
         '* CPU/memory requests\n'
         '* affinity and anti-affinity rules that are also available as separate shortcuts:\n'
-        '  * `distribution`’ property streamlines OnePerHost semantics\n'
+        '  * `podDistribution` property streamlines pod anti-affinity semantics\n'
         '  * `zones` property streamlines multi-AZ deployment (tested with AWS)\n'
         '\n'
     ),
@@ -8540,7 +8540,7 @@ Pod templates SHALL support defining the following:
 * image reference for particular [ClickHouse] version
 * CPU/memory requests
 * affinity and anti-affinity rules that are also available as separate shortcuts:
-  * `distribution`’ property streamlines OnePerHost semantics
+  * `podDistribution` property streamlines pod anti-affinity semantics
   * `zones` property streamlines multi-AZ deployment (tested with AWS)
 
 ### Custom Service Templates

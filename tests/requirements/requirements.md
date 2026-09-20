@@ -1013,7 +1013,7 @@ Pod templates SHALL support defining the following:
 * image reference for particular [ClickHouse] version
 * CPU/memory requests
 * affinity and anti-affinity rules that are also available as separate shortcuts:
-  * `distribution`’ property streamlines OnePerHost semantics
+  * `podDistribution` property streamlines pod anti-affinity semantics
   * `zones` property streamlines multi-AZ deployment (tested with AWS)
 
 ### Custom Service Templates
