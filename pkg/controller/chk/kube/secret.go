@@ -30,12 +30,15 @@ import (
 
 type Secret struct {
 	kubeClient client.Client
-	namer      interfaces.INameManager
+	// apiReader reads live; see NewAdapter on why every by-name Get here bypasses the cache.
+	apiReader client.Reader
+	namer     interfaces.INameManager
 }
 
-func NewSecret(kubeClient client.Client, namer interfaces.INameManager) *Secret {
+func NewSecret(kubeClient client.Client, apiReader client.Reader, namer interfaces.INameManager) *Secret {
 	return &Secret{
 		kubeClient: kubeClient,
+		apiReader:  apiReader,
 		namer:      namer,
 	}
 }
@@ -64,7 +67,7 @@ func (c *Secret) Get(ctx context.Context, params ...any) (*core.Secret, error) {
 	}
 	return commonKube.GetWithRetry(ctx, func() (*core.Secret, error) {
 		service := &core.Secret{}
-		err := c.kubeClient.Get(ctx, types.NamespacedName{
+		err := c.apiReader.Get(ctx, types.NamespacedName{
 			Namespace: namespace,
 			Name:      name,
 		}, service)
