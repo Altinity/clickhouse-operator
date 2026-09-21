@@ -33,6 +33,9 @@ import (
 )
 
 type CR struct {
+	// Deliberately cached, unlike every narrowed type here: the ClickHouseKeeperInstallation is
+	// user-authored and carries no operator label, so it is never narrowed and a cached read of
+	// it cannot be filtered away. See NewAdapter.
 	kubeClient client.Client
 }
 
