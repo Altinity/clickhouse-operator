@@ -37,9 +37,10 @@ import (
 
 type STS struct {
 	kubeClient client.Client
-	// apiReader bypasses the controller-runtime cache for reads, giving up-to-date STS state.
-	// The cache is write-through but not synchronously invalidated, so a Get() immediately after
-	// an Update() can still return a stale object. Using a direct reader avoids that race.
+	// apiReader reads live; see NewAdapter on why every by-name Get here bypasses the cache.
+	// For StatefulSets the reason predates the label narrowing: the cache is not write-through, so
+	// an Update goes straight to the API server and the cache only catches up when the watch
+	// delivers it - a Get in between returns the pre-update object.
 	apiReader client.Reader
 	namer     interfaces.INameManager
 }
