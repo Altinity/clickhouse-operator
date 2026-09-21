@@ -26,16 +26,19 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 )
 
 type PVC struct {
 	kubeClient client.Client
+	// apiReader reads live; see NewAdapter on why every by-name Get here bypasses the cache.
+	apiReader client.Reader
 }
 
-func NewPVC(kubeClient client.Client) *PVC {
+func NewPVC(kubeClient client.Client, apiReader client.Reader) *PVC {
 	return &PVC{
 		kubeClient: kubeClient,
+		apiReader:  apiReader,
 	}
 }
 
@@ -47,7 +50,7 @@ func (c *PVC) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*cor
 func (c *PVC) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
 	return commonKube.GetWithRetry(ctx, func() (*core.PersistentVolumeClaim, error) {
 		pvc := &core.PersistentVolumeClaim{}
-		err := c.kubeClient.Get(ctx, types.NamespacedName{
+		err := c.apiReader.Get(ctx, types.NamespacedName{
 			Namespace: namespace,
 			Name:      name,
 		}, pvc)
@@ -98,10 +101,18 @@ func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.Persistent
 		LabelSelector: labels.SelectorFromSet(labeler(host.GetCR()).Selector(interfaces.SelectorHostScope, host)),
 		Namespace:     host.Runtime.Address.Namespace,
 	}
-	err := c.kubeClient.List(ctx, list, opts)
+	// Live, for consistency with the Get beside it rather than out of necessity: this selector
+	// already carries the same label pair the cache filters on, so a cached List would return the
+	// same set. Note that a PVC which lost the operator's labels is invisible here however it is
+	// read - that matters only if a Keeper path ever adopts this call, since today its sole
+	// consumer, WalkDiscoveredPVCs, is reached from the ClickHouse deleters alone.
+	err := c.apiReader.List(ctx, list, opts)
 	return list, err
 }
 
+// labeler is the Keeper labeler: this adapter serves ClickHouseKeeperInstallation objects, which
+// carry clickhouse-keeper.altinity.com/* labels. Using the CHI labeler here built a selector on
+// clickhouse.altinity.com/*, which matches no Keeper object at all.
 func labeler(cr api.ICustomResource) interfaces.ILabeler {
-	return chiLabeler.New(cr)
+	return chkLabeler.New(cr)
 }
