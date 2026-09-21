@@ -30,12 +30,15 @@ import (
 
 type Pod struct {
 	kubeClient client.Client
-	namer      interfaces.INameManager
+	// apiReader reads live; see NewAdapter on why every by-name Get here bypasses the cache.
+	apiReader client.Reader
+	namer     interfaces.INameManager
 }
 
-func NewPod(kubeClient client.Client, namer interfaces.INameManager) *Pod {
+func NewPod(kubeClient client.Client, apiReader client.Reader, namer interfaces.INameManager) *Pod {
 	return &Pod{
 		kubeClient: kubeClient,
+		apiReader:  apiReader,
 		namer:      namer,
 	}
 }
@@ -68,11 +71,16 @@ func (c *Pod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
 	}
 	return commonKube.GetWithRetry(ctx, func() (*core.Pod, error) {
 		pod := &core.Pod{}
-		err := c.kubeClient.Get(ctx, types.NamespacedName{
+		err := c.apiReader.Get(ctx, types.NamespacedName{
 			Namespace: namespace,
 			Name:      name,
 		}, pod)
-		return pod, err
+		if err != nil {
+			// nil on error, as every sibling in this package does: callers that check the object
+			// rather than the error must not receive a zero-valued Pod that looks real.
+			return nil, err
+		}
+		return pod, nil
 	})
 }
 
