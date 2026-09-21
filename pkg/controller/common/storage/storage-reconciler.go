@@ -405,14 +405,30 @@ func (w *Reconciler) reconcileVolumeAttributeClass(pvc *core.PersistentVolumeCla
 	return pvc
 }
 
+const (
+	// lostPVPollInterval is the gap between checks that a PVC whose PV is gone has actually been
+	// removed. Deletion is not instant: the PVC lingers while kube-controller-manager clears
+	// pvc-protection, and longer if a finalizer of our own has to be stripped first.
+	lostPVPollInterval = 10 * time.Second
+
+	// lostPVPollTimeout bounds the whole wait. Reaching it means the PVC is still there and the
+	// host stays unreconciled, so it is deliberately generous - a PV that comes back late is
+	// better than data recreated on top of one that was merely slow.
+	lostPVPollTimeout = time.Hour
+)
+
 func (w *Reconciler) deletePVC(ctx context.Context, pvc *core.PersistentVolumeClaim) bool {
 	log.V(1).M(pvc).F().S().Info("delete PVC with lost PV start: %s", util.NamespacedName(pvc))
 	defer log.V(1).M(pvc).F().E().Info("delete PVC with lost PV end: %s", util.NamespacedName(pvc))
 
+	// No cancellation check before the Delete. The caller discards this function's result and
+	// reports the PVC deleted either way, so skipping the Delete on a cancelled pass would leave
+	// it reporting a deletion that never happened. Cancellation is honoured by the waits below,
+	// which is what keeps a shutdown from having to outlast the whole lostPVPollTimeout.
 	log.V(2).M(pvc).F().Info("PVC with lost PV about to be deleted: %s", util.NamespacedName(pvc))
 	w.pvc.Delete(ctx, pvc.Namespace, pvc.Name)
 
-	for i := 0; i < 360; i++ {
+	for i := 0; i < int(lostPVPollTimeout/lostPVPollInterval); i++ {
 
 		// Check availability
 		log.V(2).M(pvc).F().Info("check PVC with lost PV availability: %s", util.NamespacedName(pvc))
@@ -423,6 +439,15 @@ func (w *Reconciler) deletePVC(ctx context.Context, pvc *core.PersistentVolumeCl
 				log.V(1).M(pvc).F().Warning("PVC with lost PV was deleted: %s", util.NamespacedName(pvc))
 				return true
 			}
+			// A read that is merely Forbidden, or that spent its retry budget, says nothing about
+			// whether the PVC is gone - and the CHK adapter returns a nil object with the error,
+			// so falling through would dereference it. Wait and look again instead.
+			log.V(1).M(pvc).F().Warning("cannot read PVC with lost PV, retrying: %s, err: %v",
+				util.NamespacedName(pvc), err)
+			if util.WaitContextDoneOrTimeout(ctx, lostPVPollInterval) {
+				return false
+			}
+			continue
 		}
 
 		// PVC is not deleted (yet?). May be it has finalizers installed. Need to clean them.
@@ -431,7 +456,9 @@ func (w *Reconciler) deletePVC(ctx context.Context, pvc *core.PersistentVolumeCl
 			curPVC.Finalizers = nil
 			w.pvc.UpdateOrCreate(ctx, curPVC)
 		}
-		time.Sleep(10 * time.Second)
+		if util.WaitContextDoneOrTimeout(ctx, lostPVPollInterval) {
+			return false
+		}
 	}
 
 	return false
