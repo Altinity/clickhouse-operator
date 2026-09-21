@@ -30,6 +30,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	kubeTypes "k8s.io/apimachinery/pkg/types"
 	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -542,7 +543,58 @@ func (c *Controller) addEventHandlersPod(
 	})
 }
 
-// addEventHandlers
+// NewInformerFactoryForCHOPGeneratedObjects builds the kube informer factory, narrowed at the
+// API server to objects the operator generated.
+//
+// Without the selector these caches, and the DeltaFIFO feeding them, scale with the size of the
+// whole cluster rather than with the number of managed installations: GetInformerNamespace falls
+// back to NamespaceAll for every watch-namespace form except a single literal name, which covers
+// the shipped kube-system bundle (where an empty include means watch-all) and OLM AllNamespaces
+// (which arrives as ".*" and fails the DNS-label check).
+//
+// Safe because these informers are an event source only - nothing takes a Lister or an Indexer off
+// this factory, and reads go through the kube client directly - and because every handler already
+// gates on the same label through isTrackedObject. The selector tests one of that gate's two
+// conjuncts - the gate also requires the namespace to be watched - so everything it drops was
+// already discarded by the handlers.
+//
+// One behaviour does change: an object that LOSES the label leaves the selector, and the API server
+// reports that to a filtered watch as a deletion carrying the last matching version. The handler
+// therefore runs, and for a Pod that means one log line and one PodDelete counter - nothing
+// destructive, and no further events for that object.
+//
+// EndpointSlices are watched but written by kube, not by us; they match only because the
+// EndpointSlice controller mirrors the Service's labels onto them.
+func NewInformerFactoryForCHOPGeneratedObjects(
+	kubeClient kube.Interface,
+	resyncPeriod time.Duration,
+) kubeInformers.SharedInformerFactory {
+	selector := k8sLabels.SelectorFromSet(chiLabeler.New(nil).CHOPGeneratedSelector()).String()
+
+	// This narrowing fails silently when it is wrong - the operator simply stops seeing objects -
+	// so the effective selector goes in the boot log, where support will look for it first.
+	// Unconditional, not V(1): one line at startup, and it is the first thing to check when the
+	// operator appears to ignore objects that exist.
+	log.F().Info("Kube informers label selector: '%s'", selector)
+
+	return kubeInformers.NewSharedInformerFactoryWithOptions(
+		kubeClient,
+		resyncPeriod,
+		kubeInformers.WithNamespace(chop.Config().GetInformerNamespace()),
+		kubeInformers.WithTweakListOptions(func(options *meta.ListOptions) {
+			options.LabelSelector = selector
+		}),
+	)
+}
+
+// addEventHandlers registers the handlers for every informer the operator consumes.
+//
+// NOTE on kubeInformerFactory: despite the name it is NOT every kube object. It is narrowed
+// server-side to those carrying the operator's app label (see
+// NewInformerFactoryForCHOPGeneratedObjects), so any informer taken from it delivers only
+// labelled objects - one added here for a type the operator does not label returns nothing at
+// all, silently. Types the operator creates are labelled; EndpointSlices are not created by us
+// and match only because kube mirrors the Service's labels onto them.
 func (c *Controller) addEventHandlers(
 	chopConfigInformerFactory chopInformers.SharedInformerFactory,
 	chopInformerFactory chopInformers.SharedInformerFactory,
