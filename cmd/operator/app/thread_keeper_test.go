@@ -7,14 +7,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
-
-func init() {
-	// keeperPredicate() → ShouldEnqueue() → chop.Config().IsNamespaceWatched(...),
-	// so the global chop singleton must be initialized before tests run.
-	chop.New(nil, nil, "")
-}
 
 // keeperPredicate intentionally does NOT pre-filter on Spec.Suspend (mirrors the
 // behavior of pkg/controller/chi/ShouldEnqueue). The CHK reconciler handles suspend
