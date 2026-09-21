@@ -15,13 +15,17 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	core "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 // A volume that was merely ADDED must never outrank a volume that was LOST. ReconcilePVCs walks a
@@ -77,4 +81,91 @@ func TestIsNewVolumeFailsSafeWithoutAncestor(t *testing.T) {
 
 	require.False(t, w.isNewVolume(host, mount),
 		"without an ancestor the volume must NOT be treated as new - it must fall through to lost")
+}
+
+// stubPVC implements just enough of IKubeStoragePVC to drive deletePVC. The embedded nil interface
+// means any method the test does not expect panics, which keeps the stub honest.
+type stubPVC struct {
+	interfaces.IKubeStoragePVC
+	getReturn   *core.PersistentVolumeClaim
+	getErr      error
+	getCalls    int
+	deleteCalls int
+	updateCalls int
+	// onGet fires on each Get, so a test can cancel the context from inside the poll.
+	onGet func()
+}
+
+func (s *stubPVC) Get(context.Context, string, string) (*core.PersistentVolumeClaim, error) {
+	s.getCalls++
+	if s.onGet != nil {
+		s.onGet()
+	}
+	if s.getErr == nil {
+		return s.getReturn, nil
+	}
+	// nil object with the error, as the CHK adapter does (chk/kube/pvc.go returns nil from the
+	// GetWithRetry closure). The CHI adapter hands back client-go's non-nil zero object instead,
+	// which is why the dereference this guards was only ever reachable on the Keeper path.
+	return nil, s.getErr
+}
+
+func (s *stubPVC) Delete(context.Context, string, string) error { s.deleteCalls++; return nil }
+
+func (s *stubPVC) UpdateOrCreate(_ context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+	s.updateCalls++
+	return pvc, nil
+}
+
+// TestDeletePVCSurvivesUnreadablePVC pins the in-loop guard against an unreadable PVC.
+//
+// deletePVC polls until the PVC is gone. A cached read essentially only ever answered NotFound, so
+// the non-NotFound branch fell through to curPVC.Finalizers on a nil object. Keeper reads now go
+// straight to the API server, where Forbidden and a spent retry budget both reach this
+// loop - and the Keeper adapter returns a nil object with the error, so that fall-through became a
+// live nil dereference that crashes the operator instead of retrying.
+//
+// The stub cancels from inside the read purely to stop the hour-long poll; the guard itself does
+// not depend on the context, and deletePVC has no pre-loop cancellation check by design.
+func TestDeletePVCSurvivesUnreadablePVC(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pvcAPI := &stubPVC{
+		getErr: apiErrors.NewForbidden(
+			schema.GroupResource{Resource: "persistentvolumeclaims"}, "pvc", errors.New("nope")),
+		onGet: cancel,
+	}
+	w := &Reconciler{pvc: pvcAPI}
+
+	pvc := &core.PersistentVolumeClaim{}
+	pvc.Namespace, pvc.Name = "ns", "pvc"
+
+	var deleted bool
+	require.NotPanics(t, func() { deleted = w.deletePVC(ctx, pvc) })
+
+	require.False(t, deleted, "the PVC was never confirmed gone, so this must not report success")
+	require.Equal(t, 1, pvcAPI.deleteCalls, "the Delete must still be issued - the caller reports it as done")
+	require.Equal(t, 1, pvcAPI.getCalls, "the poll must stop once the context is cancelled, not run for an hour")
+}
+
+// The success path has its own wait, and it is a separate mutation target: reverting only that one
+// to a blind time.Sleep left the suite green while re-introducing a poll that ignores shutdown.
+// Here the PVC is readable and still present - the normal "waiting for it to go away" case.
+func TestDeletePVCStopsPollingPresentPVCOnShutdown(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	present := &core.PersistentVolumeClaim{}
+	present.Namespace, present.Name = "ns", "pvc"
+	present.Finalizers = []string{"kubernetes.io/pvc-protection"}
+
+	pvcAPI := &stubPVC{getReturn: present, onGet: cancel}
+	w := &Reconciler{pvc: pvcAPI}
+
+	deleted := w.deletePVC(ctx, present)
+
+	require.False(t, deleted, "a PVC still present when shutdown arrives was not deleted")
+	require.Equal(t, 1, pvcAPI.getCalls, "the poll must honour cancellation on the success path too")
+	require.Equal(t, 1, pvcAPI.updateCalls, "a lingering finalizer must be cleared, or the PVC never goes away")
 }
