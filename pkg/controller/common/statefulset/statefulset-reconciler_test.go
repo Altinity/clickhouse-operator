@@ -518,3 +518,94 @@ func TestRecreateStatefulSet_ScaleToZeroTimeoutStillCreates(t *testing.T) {
 	assert.Equal(t, 1, fake.deleteCalls, "delete should complete after escalate")
 	assert.Equal(t, 1, fake.createCalls, "create must run in the same pass")
 }
+
+// TestReconcileStatefulSet_UnreadableDoesNotRecreate is the most destructive instance of a class
+// that appears throughout this codebase: a Get whose error is tested only for IsNotFound, with
+// everything else falling through as if the object were present.
+//
+// In production the fall-through reached updateStatefulSet with no usable current StatefulSet -
+// nil on the Keeper path, an empty one on the ClickHouse path, and IsStatefulSetReady rejects
+// both - which escalates to ErrCRUDRecreate, and onUpdateFailure defaults to recreate. The delete
+// lands once a re-read succeeds, so what destroys a healthy host is a blip that clears at the
+// wrong moment.
+//
+// This test does not walk that whole chain: it asserts only that the read error stops the
+// reconcile before any write is attempted. Its siblings cover the rest - NotFoundStillCreates
+// pins the branch that must still fire, because assertions of the form "nothing happened" are
+// equally satisfied by a reconciler that does nothing at all.
+func TestReconcileStatefulSet_UnreadableDoesNotRecreate(t *testing.T) {
+	sts := &fakeSTS{getErr: apiErrors.NewForbidden(stsResource, "sts", errors.New("rbac not propagated"))}
+	r := newReconciler(sts, "sts")
+
+	h := host("ns")
+	h.Runtime.DesiredStatefulSet = &apps.StatefulSet{
+		ObjectMeta: meta.ObjectMeta{Namespace: "ns", Name: "sts"},
+	}
+
+	err := r.ReconcileStatefulSet(context.Background(), h, false, nil)
+
+	require.Error(t, err, "an unreadable StatefulSet must surface, not be silently rebuilt")
+	require.True(t, apiErrors.IsForbidden(err), "the original read error must reach the caller: %v", err)
+	require.Zero(t, sts.deleteCalls, "a StatefulSet that may exist and be healthy must not be deleted")
+	require.Zero(t, sts.createCalls, "no write may be attempted while the current state is unknown")
+	require.Zero(t, sts.updateCalls, "there is nothing to update - the current state is unknown")
+}
+
+// The positive half. Every assertion in the test above is of the form "X did not happen", which a
+// reconciler that does nothing satisfies just as well - deleting the whole switch left it green,
+// and so did hoisting the error arm above the IsNotFound one, which would stop any StatefulSet
+// from ever being created. This pins the branch that must still fire.
+func TestReconcileStatefulSet_NotFoundStillCreates(t *testing.T) {
+	sts := &fakeSTS{getErr: apiErrors.NewNotFound(stsResource, "sts")}
+	r := newReconciler(sts, "sts")
+
+	h := host("ns")
+	h.Runtime.DesiredStatefulSet = &apps.StatefulSet{
+		ObjectMeta: meta.ObjectMeta{Namespace: "ns", Name: "sts"},
+	}
+
+	_ = r.ReconcileStatefulSet(context.Background(), h, false, nil)
+
+	require.Equal(t, 1, sts.createCalls, "an absent StatefulSet must still be created")
+	require.Zero(t, sts.deleteCalls, "creating an absent StatefulSet must not delete anything")
+}
+
+// The context arm has no other coverage: removing it, emptying it, or ordering it after the error
+// arm all left the entire suite green. Each of those turns an orderly shutdown into a host-level
+// failure and a ReconcileFailed Warning on every operator stop, because a cancelled read surfaces
+// as an error like any other.
+//
+// The context must be live when ReconcileStatefulSet is entered - the guard at the top of the
+// function returns before the switch otherwise - so the fake cancels from inside the Get.
+func TestReconcileStatefulSet_ContextDoneIsNotAFailure(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sts := &cancelOnGetSTS{cancel: cancel}
+	r := newReconciler(sts, "sts")
+
+	h := host("ns")
+	h.Runtime.DesiredStatefulSet = &apps.StatefulSet{
+		ObjectMeta: meta.ObjectMeta{Namespace: "ns", Name: "sts"},
+	}
+
+	err := r.ReconcileStatefulSet(ctx, h, false, nil)
+
+	require.NoError(t, err, "a cancelled reconcile is a shutdown, not a host failure")
+	require.Zero(t, sts.createCalls, "shutdown must not start writes")
+	require.Zero(t, sts.updateCalls, "shutdown must not start writes")
+	require.Zero(t, sts.deleteCalls, "shutdown must not start writes")
+}
+
+// cancelOnGetSTS cancels the reconcile context from inside the Get, reproducing a shutdown that
+// begins while a read is in flight - the only way to reach the switch with a dead context.
+type cancelOnGetSTS struct {
+	fakeSTS
+	cancel func()
+}
+
+func (f *cancelOnGetSTS) Get(_ context.Context, _ ...any) (*apps.StatefulSet, error) {
+	f.getCalls++
+	f.cancel()
+	return nil, context.Canceled
+}
