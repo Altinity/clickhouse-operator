@@ -180,6 +180,25 @@ func (r *Reconciler) ReconcileStatefulSet(
 	case apiErrors.IsNotFound(err):
 		// StatefulSet not found in k8s — create it
 		err = r.createStatefulSet(ctx, host, register, opts)
+	case util.IsContextDone(ctx):
+		// Shutting down. Return rather than fall through: without this the arm below would read a
+		// cancelled-context error as an unreadable StatefulSet and turn an orderly stop into a
+		// host failure and a Warning event on every shutdown. The sibling guards in this file -
+		// the one at the top of this function included - return nil here for the same reason.
+		log.V(1).M(host).F().Info("reconcile StatefulSet aborted, shutting down: %s",
+			util.NamespaceNameString(newStatefulSet))
+		return nil
+	case err != nil:
+		// The read failed for a reason that is not absence - Forbidden, or a spent retry budget.
+		// That says nothing about whether the StatefulSet exists, so falling through would treat
+		// it as present-but-broken: updateStatefulSet finds no usable current StatefulSet (nil on
+		// the Keeper path, an empty one on the ClickHouse path, and IsStatefulSetReady rejects
+		// both), and escalates to a recreate. That recreate deletes the StatefulSet, and its pods,
+		// as soon as a re-read succeeds - so a blip that clears at the wrong moment destroys a
+		// host that was healthy throughout. doDeleteStatefulSet already separates absence from
+		// unreadability; make the same distinction here and let the next pass re-read.
+		r.a.V(1).M(host).F().Error("FAIL to get StatefulSet: %s err: %v",
+			util.NamespaceNameString(newStatefulSet), err)
 	default:
 		// We have StatefulSet - try to update|recreate it
 		err = r.updateStatefulSet(ctx, host, register, opts)
