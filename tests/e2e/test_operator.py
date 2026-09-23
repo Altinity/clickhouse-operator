@@ -5224,6 +5224,87 @@ def test_010042_2(self):
             ver = clickhouse.query(chi, "select version()")
             assert version_3 in ver
 
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Tags("HEAVY")
+@Name("test_010042_3. Recreate of a wedged pod finishes in one pass")
+def test_010042_3(self):
+    """A pod that will not terminate used to abort Recreate and leave the host at
+    Replicas=0. The operator must force-delete it and complete Delete+Create in
+    the same pass (#2080).
+    """
+    create_shell_namespace_clickhouse_template()
+
+    cluster = "default"
+    chi = yaml_manifest.get_name(util.get_full_path("manifests/chi/test-042-recreate-wedge-1.yaml"))
+    pod = f"chi-{chi}-{cluster}-0-0-0"
+    sts = f"chi-{chi}-{cluster}-0-0"
+
+    with Given("Operator update timeout is short enough to spend the scale-to-0 budget"):
+        # Scale-to-0 wait uses the operator update timeout (default 300s).
+        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
+
+    with And("CHI is created with a pod that ignores SIGTERM (preStop sleep)"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-042-recreate-wedge-1.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+        grace = kubectl.get_field("pod", pod, ".spec.terminationGracePeriodSeconds")
+        assert grace == "600", error(
+            f"expected wedged-shutdown pod grace 600, got {grace!r}"
+        )
+        old_uid = kubectl.get_field("pod", pod, ".metadata.uid")
+        assert old_uid != "", error(f"could not read uid of {pod}")
+
+    with When("A volumeClaimTemplate size change forces Recreate"):
+        # Under provisioner StatefulSet, volumeClaimTemplates are immutable on
+        # the STS. Update fails and onUpdateFailure=recreate takes the #2080 path
+        # (scale-to-0, force-delete the wedged pod, Delete+Create in one pass).
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-042-recreate-wedge-2.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+            timeout=900,
+        )
+
+    with Then("CHI is Completed and the host is not stranded at Replicas=0"):
+        kubectl.wait_chi_status(chi, "Completed")
+        replicas = kubectl.get_field("sts", sts, ".spec.replicas")
+        assert replicas != "0", error(
+            f"Recreate left {sts} at Replicas=0 (wedged pod was not force-deleted)"
+        )
+        new_uid = kubectl.get_field("pod", pod, ".metadata.uid")
+        assert new_uid != "" and new_uid != old_uid, error(
+            f"expected a new pod after Recreate, uid {old_uid} -> {new_uid}"
+        )
+        kubectl.wait_pod_status(pod, "Running")
+
+    with And("HostPodForceDeleted was emitted"):
+        ev = kubectl.launch(
+            "get events --field-selector reason=HostPodForceDeleted",
+            ok_to_fail=True,
+        )
+        if "HostPodForceDeleted" not in ev:
+            operator_pod = kubectl.get_operator_pod(ns=current().context.test_namespace)
+            logs = ""
+            if operator_pod:
+                logs = kubectl.launch(
+                    f"logs {operator_pod} -c clickhouse-operator",
+                    ns=current().context.test_namespace,
+                    ok_to_fail=True,
+                )
+            assert "force-deleting pod" in logs, error(
+                f"expected HostPodForceDeleted event or force-delete log after wedged Recreate.\n"
+                f"events:\n{ev}\nlogs:\n{logs}"
+            )
 
     with Finally("I clean up"):
         delete_test_namespace()
