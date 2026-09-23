@@ -1625,6 +1625,67 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wai
                             retry_sleep(i, 5, f"{host} is not ready")
                         assert hosts.startswith(str(num_hosts))
 
+@TestScenario
+@Tags("HEAVY")
+@Name("test_010013_2. Failed schema migration does not mark CHI Completed")
+def test_010013_2(self):
+    """HostCreateTables failure must abort the pass and must not record the
+    new host in hostsWithTablesCreated (that listing feeds HasData() and
+    makes the failure permanent). Fixes #2021 / #2077.
+    """
+    create_shell_namespace_clickhouse_template()
+    with Given("I change operator statefullSet timeout for faster crash"):
+        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
+    chi = "test-013-schema-fail"
+    cluster = "default"
+    new_host = f"chi-{chi}-{cluster}-1-0"
+
+    with Given("A 1-replica CHI is Completed"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-013-schema-fail-1.yaml",
+            check={
+                "apply_templates": {current().context.clickhouse_template},
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("An MV whose source table has been dropped"):
+        clickhouse.query(chi, "CREATE TABLE src_2077 (a Int8) ENGINE = MergeTree ORDER BY tuple()")
+        clickhouse.query(chi, "CREATE MATERIALIZED VIEW bad_mv_2077 ENGINE = Log AS SELECT * FROM src_2077")
+        clickhouse.query(chi, "DROP TABLE src_2077")
+
+    with When("A second replica is added"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-013-schema-fail-2.yaml",
+            check={
+                "chi_status": "InProgress",
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("CHI is Aborted, not Completed"):
+        kubectl.wait_chi_status(chi, "Aborted")
+        hosts = kubectl.get("chi", chi)["status"].get("hostsWithTablesCreated") or []
+        domain = current().context.test_namespace + ".svc.cluster.local"
+        assert f"{new_host}.{domain}" not in hosts, error(
+            f"failed migration recorded {new_host} in hostsWithTablesCreated: {hosts}"
+        )
+
+    with When("The un-creatable MV is dropped and reconcile is forced"):
+        clickhouse.query(chi, "DROP VIEW bad_mv_2077", host=f"chi-{chi}-{cluster}-0-0")
+        kubectl.force_chi_reconcile(chi, "retry-after-drop")
+
+    with Then("CHI completes and the new host is eligible for a successful migration"):
+        kubectl.wait_chi_status(chi, "Completed")
+        hosts = kubectl.get("chi", chi)["status"].get("hostsWithTablesCreated") or []
+        assert f"{new_host}.{domain}" in hosts, error(
+            f"retry should record {new_host}, got {hosts}"
+        )
+
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 @TestScenario
 @Tags("HEAVY")
@@ -6603,6 +6664,8 @@ def test_010063(self):
             f"CHI <zookeeper> must resolve to the ready-only client Service (…-client); got:\n{zk_xml}"
         )
 
+    start_time = kubectl.get_clickhouse_start(chi)
+
     with When("Rescale Keeper to 3 nodes"):
         kubectl.create_and_check(
             manifest=chk_manifest_3nodes,
@@ -6627,6 +6690,9 @@ def test_010063(self):
                     break
                 retry_sleep(i, 5, f"Not ready ({node_count} nodes)")
             assert node_count == 3, error("ZooKeeper configuration should contain 3 nodes now")
+
+        with Then("ClickHouse is not restarted"):
+            assert start_time == kubectl.get_clickhouse_start(chi), error("CHI has been restarted")
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -6726,8 +6792,7 @@ def test_010064(self):
             # Zookeeper config changes do not require pod restart (configurationRestartPolicy
             # marks zookeeper/* as "no"). ClickHouse picks up the new server list via config
             # reload.
-            new_start_time = kubectl.get_clickhouse_start(chi)
-            assert new_start_time == start_time, error("CHI has been restarted")
+            assert start_time == kubectl.get_clickhouse_start(chi), error("CHI has been restarted")
 
         with Then("CHI is still connected to Keeper after config change"):
             # NOTE: connected_time is expected to differ here — when the zookeeper server
