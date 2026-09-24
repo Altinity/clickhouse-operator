@@ -63,6 +63,11 @@ expect_contains() {
     if render "$@" | grep -qF -- "${needle}"; then report "${name}" yes; else report "${name}" no "missing: ${needle}"; fi
 }
 
+expect_absent() {
+    local name="$1" needle="$2"; shift 2
+    if render "$@" | grep -qF -- "${needle}"; then report "${name}" no "unexpected: ${needle}"; else report "${name}" yes; fi
+}
+
 expect_renders() {
     local name="$1"; shift
     local out
@@ -113,6 +118,49 @@ if render --set serviceMonitor.enabled=true --set metrics.enabled=false | grep -
     report "ch-metrics is gated on metrics.enabled" no "ch-metrics rendered while metrics.enabled=false"
 else
     report "ch-metrics is gated on metrics.enabled" yes
+fi
+
+echo
+echo "crd-install hook"
+# The hook runs at pre-install/pre-upgrade, so anything wrong here fails the whole release with
+# only a Helm timeout to show for it. It shipped broken once (#2065): registry.k8s.io/kubectl
+# publishes no `latest` tag, and the image is distroless, so a floating tag or a shell wrapper
+# both make every install hang until --timeout and then fail.
+expect_absent "hook image is pinned, not :latest" "kubectl:latest"
+expect_contains "hook execs kubectl directly, without a shell" "- kubectl"
+# `apply -f <dir>` is non-recursive by design here: kubelet keeps `..data` and `..<timestamp>`
+# entries beside the projected CRDs, and -R would descend into them and apply stale duplicates.
+expect_absent "hook apply is not recursive" "- -R"
+expect_count "crdHook.enabled=false emits no Job" Job 0 --set crdHook.enabled=false
+
+# One CRD per ConfigMap. Grouping them pushed a single object past the 262144-byte
+# metadata.annotations ceiling, which breaks client-side `kubectl apply` (ArgoCD,
+# `helm template | kubectl apply`) while leaving `helm install` working - so it escapes CI.
+crd_count=0
+oversized=""
+for crd in "${CHART}"/crds/*.yaml; do
+    crd_count=$((crd_count + 1))
+    size="$(wc -c < "${crd}")"
+    if [[ "${size}" -gt 250000 ]]; then oversized="${oversized} $(basename "${crd}")=${size}"; fi
+done
+if [[ -z "${oversized}" ]]; then
+    report "every CRD fits one ConfigMap under the 262144 limit" yes
+else
+    report "every CRD fits one ConfigMap under the 262144 limit" no "too big to pair 1:1:${oversized}"
+fi
+
+hook_render="$(render)"
+cm_count="$(grep -cE '^  name: .*-crds-[0-9]+$' <<<"${hook_render}")"
+src_count="$(grep -cE '^ {14}name: .*-crds-[0-9]+$' <<<"${hook_render}")"
+if [[ "${cm_count}" == "${crd_count}" ]]; then
+    report "one crds ConfigMap per CRD file" yes
+else
+    report "one crds ConfigMap per CRD file" no "${crd_count} CRD files, ${cm_count} ConfigMaps"
+fi
+if [[ "${src_count}" == "${cm_count}" ]]; then
+    report "every crds ConfigMap is mounted by the Job" yes
+else
+    report "every crds ConfigMap is mounted by the Job" no "${cm_count} ConfigMaps, ${src_count} projected sources"
 fi
 
 echo

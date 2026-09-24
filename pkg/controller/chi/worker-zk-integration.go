@@ -15,13 +15,16 @@
 package chi
 
 import (
+	"context"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (w *worker) reconcileClusterZookeeperRootPath(cluster *api.Cluster) error {
+func (w *worker) reconcileClusterZookeeperRootPath(ctx context.Context, cluster *api.Cluster) error {
 	// Cluster ZK path reconciliation is optional
 	if !shouldReconcileClusterZookeeperPath(cluster) {
 		// Nothing to reconcile
@@ -48,7 +51,25 @@ func (w *worker) reconcileClusterZookeeperRootPath(cluster *api.Cluster) error {
 		M(cluster.GetCR()).F().
 		Info("Confirm ZK is configured for cluster %s/%s/%s", cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName())
 
-	ensureZkPath(cluster)
+	if err := ensureZkPath(ctx, cluster); err != nil {
+		if util.IsContextDone(ctx) {
+			// Superseded or shutting down. Not a failure, and the caller aborts on its
+			// own context check, so do not announce either outcome.
+			return nil
+		}
+		// Precreating the root path is a convenience, not a prerequisite: ClickHouse
+		// creates it itself on first DDL, which is exactly what the TLS-only branch
+		// above already relies on. Failing the reconcile here would stop the walk at
+		// this cluster - no StatefulSets for it, later clusters in the same CR skipped -
+		// over a step the cluster can recover from on its own.
+		w.a.
+			WithEvent(cluster.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(cluster.GetCR()).
+			M(cluster.GetCR()).F().
+			Warning("Unable to ensure ZK root for cluster %s/%s/%s, ClickHouse will create it on first DDL. err: %v",
+				cluster.GetCR().GetNamespace(), cluster.GetCR().GetName(), cluster.GetName(), err)
+		return nil
+	}
 
 	w.a.V(1).
 		WithEvent(cluster.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
@@ -77,7 +98,7 @@ func clusterZookeeperRequiresTLSDial(cluster *api.Cluster) bool {
 	return false
 }
 
-func ensureZkPath(cluster *api.Cluster) {
+func ensureZkPath(ctx context.Context, cluster *api.Cluster) error {
 	// Plumb cluster-level security.zookeeper.tls.{minVersion,verify} into the
 	// ZK dial. Defaults preserve current behavior (Go default TLS version,
 	// strict verify since RootCAs+ServerName are always set). CHOP-config
@@ -100,8 +121,9 @@ func ensureZkPath(cluster *api.Cluster) {
 	}
 	conn := zookeeper.NewConnection(cluster.Zookeeper.Nodes, params)
 	path := zookeeper.NewPathManager(conn)
-	path.Ensure(cluster.Zookeeper.Root)
-	path.Close()
+	err := path.Ensure(ctx, cluster.Zookeeper.Root)
+	_ = path.Close()
+	return err
 }
 
 func shouldReconcileClusterZookeeperPath(cluster *api.Cluster) bool {
@@ -111,6 +133,23 @@ func shouldReconcileClusterZookeeperPath(cluster *api.Cluster) bool {
 	}
 	if cluster.Zookeeper.IsEmpty() {
 		// Nothing to reconcile
+		return false
+	}
+
+	// Same generation as the last completed ancestor with no pending action-plan
+	// work means this pass is recovery-only (#1704 unhealthy / stuck hosts, or
+	// similar). The ZK root was already ensured when the generation last changed;
+	// re-dialing a down ensemble only floods dial timeouts. Spec changes bump
+	// generation (or leave action-plan work) and still ensure.
+	cr := cluster.GetCR()
+	if cr == nil {
+		return true
+	}
+	ancestor := cr.GetAncestorT()
+	ap := cr.EnsureRuntime().ActionPlan
+	if ancestor != nil &&
+		ancestor.GetGeneration() == cr.GetGeneration() &&
+		(ap == nil || !ap.HasActionsToDo()) {
 		return false
 	}
 

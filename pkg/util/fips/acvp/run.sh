@@ -14,7 +14,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
-GO_IMAGE="${GO_IMAGE:-golang:1.26-alpine}"
+GO_IMAGE="${GO_IMAGE:-golang:$(grep '^go ' "${REPO_ROOT}/go.mod" | awk '{print $2}')-alpine}"
 BORINGSSL_DIR="${BORINGSSL_DIR:-/tmp/boringssl}"
 ACVP_TESTDATA_DIR="${ACVP_TESTDATA_DIR:-/tmp/acvp-testdata}"
 BORINGSSL_COMMIT="${BORINGSSL_COMMIT:-baaf868e6e8f}"

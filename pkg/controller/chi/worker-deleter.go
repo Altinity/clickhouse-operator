@@ -16,10 +16,12 @@ package chi
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
 	core "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -29,6 +31,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
@@ -528,6 +531,8 @@ func (w *worker) deleteTables(ctx context.Context, host *api.Host) error {
 
 // deleteHost deletes all kubernetes resources related to a host
 // chi is the new CHI in which there will be no more this host
+// Returns an error when the host's StatefulSet could not be read: the resources below it
+// cannot be cleaned up safely without knowing whether the host still exists.
 func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Delete host is aborted. Host: %s ", host.GetName())
@@ -543,15 +548,37 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 		M(host).F().
 		Info("Delete host: %s/%s - started", host.Runtime.Address.ClusterName, host.GetName())
 
-	var err error
-	if host.Runtime.CurStatefulSet, err = w.c.kube.STS().Get(ctx, host); err != nil {
-		w.a.WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonDeleteCompleted).
-			WithAction(host.GetCR()).
+	sts, err := w.c.kube.STS().Get(ctx, host)
+	if err != nil {
+		// Never carry a StatefulSet we did not actually read. client-go's typed Get returns a
+		// non-nil zero-valued object alongside the error, and the previous value may be stale.
+		host.Runtime.CurStatefulSet = nil
+
+		if apiErrors.IsNotFound(err) {
+			w.a.WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonDeleteCompleted).
+				WithAction(host.GetCR()).
+				M(host).F().
+				Info("Delete host: %s/%s - completed StatefulSet not found - already deleted",
+					host.Runtime.Address.ClusterName, host.GetName())
+			return nil
+		}
+		// Unable to tell whether the StatefulSet exists. Not retried here: the Get already runs
+		// under GetWithRetry, and IsTransientAPIError excludes Forbidden, so an error arriving
+		// here is either terminal or an outage that already outlived the whole back-off budget.
+		//
+		// Do not report deletion as completed - the cleanup below is skipped, and the host's
+		// PVCs carry no owner reference (see model/common/creator/pvc.go), so nothing else
+		// would reclaim them.
+		//
+		// No WithError: it would write CR status through an uncancellable retry loop, and the
+		// CR is about to be finalized anyway. The event and the log line are what survive.
+		w.a.WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonDeleteFailed).
 			M(host).F().
-			Info("Delete host: %s/%s - completed StatefulSet not found - already deleted? err: %v",
+			Error("Delete host: %s/%s - unable to get StatefulSet, host deletion not performed. err: %v",
 				host.Runtime.Address.ClusterName, host.GetName(), err)
-		return nil
+		return err
 	}
+	host.Runtime.CurStatefulSet = sts
 
 	// Pre-delete host hooks: run BEFORE we touch the host's k8s objects so the pod is
 	// still up and SQL hooks can drain / de-register it. A pre-delete hook with
@@ -637,6 +664,9 @@ func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallatio
 		wg.Add(1)
 		go func(h *api.Host) {
 			defer wg.Done()
+			// TODO: propagate this error. deleteCHI uninstalls the finalizer regardless,
+			// so a failed host delete still lets the CR go away and orphans its PVCs.
+			// Needs an error sink shared across these goroutines (#2056).
 			_ = w.deleteHost(ctx, chi, h)
 		}(host)
 		return nil
@@ -764,4 +794,51 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 
 	// CR delete completed
 	return true
+}
+
+// removedHostFQDNs enumerates the FQDNs of the hosts this pass planned to remove.
+//
+// WalkRemoved dispatches on the diff entry's type, so a removed cluster or shard arrives as ONE
+// entry rather than as its constituent hosts - both are expanded back into hosts here, the same
+// way runHostPreDeleteHooksOnRemovedHosts does. nameFQDN is injected so the walk is reachable
+// from a test without a live name manager.
+func removedHostFQDNs(cr *api.ClickHouseInstallation, nameFQDN func(*api.Host) string) (fqdns []string) {
+	if cr == nil {
+		return nil
+	}
+	collect := func(host *api.Host) error {
+		if host != nil {
+			fqdns = append(fqdns, nameFQDN(host))
+		}
+		return nil
+	}
+	cr.EnsureRuntime().ActionPlan.WalkRemoved(
+		func(cluster api.ICluster) { cluster.WalkHosts(collect) },
+		func(shard api.IShard) { shard.WalkHosts(collect) },
+		func(host *api.Host) { _ = collect(host) },
+	)
+	return fqdns
+}
+
+// announceCleanupPostponed surfaces the one consequence of a deferred pass that is otherwise
+// invisible: clean() did not purge the removed hosts and dropZKReplicas did not drop their ZK
+// paths, so they keep consuming storage and keep showing up in system.replicas.
+//
+// Gated on there actually being removed hosts. Events here are created directly against the API
+// (chi/kube/event.go) with no client-go correlator to aggregate them, so an ungated call would
+// mint a fresh Event object on every deferred pass, forever. Deliberately no WithError: the
+// host-level branch already records WHY the pass deferred, and .status.errors holds only 10
+// entries - filling it with per-pass cleanup notices would evict the useful one.
+func (w *worker) announceCleanupPostponed(cr *api.ClickHouseInstallation) {
+	fqdns := removedHostFQDNs(cr, func(host *api.Host) string {
+		return w.c.namer.Name(interfaces.NameFQDN, host)
+	})
+	if len(fqdns) == 0 {
+		return
+	}
+	w.a.V(1).
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonCleanupPostponed).
+		M(cr).F().
+		Warning("Reconcile deferred - removed hosts are NOT cleaned up and remain on disk: %s",
+			util.StringHead(strings.Join(fqdns, ","), 1024))
 }

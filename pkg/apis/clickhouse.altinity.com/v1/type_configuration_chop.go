@@ -1942,7 +1942,7 @@ func (c *OperatorConfig) move() {
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
 	if c.CHScheme != "" {
-		c.ClickHouse.Access.Password = c.CHScheme
+		c.ClickHouse.Access.Scheme = c.CHScheme
 	}
 	if c.CHUsername != "" {
 		c.ClickHouse.Access.Username = c.CHUsername

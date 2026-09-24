@@ -1,6 +1,6 @@
 # altinity-clickhouse-operator
 
-![Version: 0.27.3](https://img.shields.io/badge/Version-0.27.3-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.27.3](https://img.shields.io/badge/AppVersion-0.27.3-informational?style=flat-square)
+![Version: 0.27.4](https://img.shields.io/badge/Version-0.27.4-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.27.4](https://img.shields.io/badge/AppVersion-0.27.4-informational?style=flat-square)
 
 Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
 
@@ -83,8 +83,8 @@ crdHook:
 | crdHook.containerSecurityContext | object | `{}` | container security context for CRD installation job check `kubectl explain pod.spec.containers.securityContext` for details |
 | crdHook.enabled | bool | `true` | enable automatic CRD installation/update via pre-install/pre-upgrade hooks when disabled, CRDs must be installed manually using kubectl apply |
 | crdHook.image.pullPolicy | string | `"IfNotPresent"` | image pull policy for CRD installation job |
-| crdHook.image.repository | string | `"bitnami/kubectl"` | image repository for CRD installation job |
-| crdHook.image.tag | string | `"latest"` | image tag for CRD installation job |
+| crdHook.image.repository | string | `"registry.k8s.io/kubectl"` | image repository for CRD installation job |
+| crdHook.image.tag | string | `"v1.36.3"` | image tag for CRD installation job. registry.k8s.io/kubectl publishes no `latest` tag, so this must name an explicit version |
 | crdHook.imagePullSecrets | list | `[]` | image pull secrets for CRD installation job possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |
 | crdHook.nodeSelector | object | `{}` | node selector for CRD installation job |
 | crdHook.podAnnotations | object | `{}` | additional annotations for CRD installation job pod template useful to opt out of service mesh injection, e.g. `sidecar.istio.io/inject: "false"` |

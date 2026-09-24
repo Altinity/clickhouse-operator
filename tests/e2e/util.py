@@ -1,4 +1,5 @@
 import os
+import re
 import time
 
 import e2e.clickhouse as clickhouse
@@ -152,28 +153,6 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
                 kubectl.wait_chk_status("clickhouse-keeper", 'Completed')
 
 
-
-def wait_clickhouse_cluster_ready(chi):
-    with Given("All expected pods present in system.clusters"):
-        all_pods_ready = False
-        while all_pods_ready is False:
-            all_pods_ready = True
-
-            for pod in chi["status"]["pods"]:
-                cluster_response = clickhouse.query(
-                    chi["metadata"]["name"],
-                    "SELECT host_name FROM system.clusters WHERE cluster='all-sharded'",
-                    pod=pod,
-                )
-                for host in chi["status"]["fqdns"]:
-                    svc_short_name = host.replace(f".{current().context.test_namespace}.svc.cluster.local.", "")
-                    svc_short_name = svc_short_name.replace(f".{current().context.test_namespace}.svc.cluster.local", "")
-                    if svc_short_name not in cluster_response:
-                        with Then("Not ready, sleep 5 seconds"):
-                            all_pods_ready = False
-                            time.sleep(5)
-
-
 def install_clickhouse_and_keeper(
     chi_file,
     chi_template_file,
@@ -272,7 +251,13 @@ def make_http_get_request(host, port, path):
     # return f"wget -O- -q http://{host}:{port}{path}"
     cmd = "export LC_ALL=C; unset headers_read; "
     cmd += f"exec 3<>/dev/tcp/{host}/{port} ; "
-    cmd += f'printf "GET {path} HTTP/1.1\\r\\nHost: {host}\\r\\nUser-Agent: bash\\r\\n\\r\\n" >&3 ; '
+    # HTTP/1.0 on purpose: the reader below does no transfer-decoding, and Go's net/http
+    # answers an HTTP/1.1 request for /metrics with Transfer-Encoding: chunked. The chunk
+    # size markers then land mid-body and split whichever metric line straddles a 2048-byte
+    # boundary, which silently defeats the anchored ^...$ patterns in check_metrics_monitoring.
+    # Chunked encoding is 1.1-only, so under 1.0 the server delimits the body by closing the
+    # connection - the read loop also ends on EOF instead of stalling on `read -t 1`.
+    cmd += f'printf "GET {path} HTTP/1.0\\r\\nHost: {host}\\r\\nUser-Agent: bash\\r\\n\\r\\n" >&3 ; '
     cmd += "IFS=; while read -r -t 1 line 0<&3; do "
     cmd += "line=${line//$'\"'\"'\\r'\"'\"'}; "
     cmd += "if [[ ! -v headers_read ]]; then if [[ -z $line ]]; then headers_read=yes; fi; continue; fi; "
@@ -288,94 +273,135 @@ def get_metrics(operator_pod=None, operator_namespace=None, container="metrics-e
         operator_namespace = current().context.operator_namespace
 
     url_cmd = make_http_get_request("127.0.0.1", port, "/metrics")
-    return kubectl.launch(
+    out = kubectl.launch(
         f"exec {operator_pod} -c {container} -- {url_cmd}",
         ns=operator_namespace,
     )
+    # A bare hex-only line is a chunked transfer-encoding size marker leaking into the body
+    # (see make_http_get_request). It splits metric lines, so anchored patterns stop matching
+    # and the caller retries against corrupt input until it times out. Fail loudly instead.
+    # No false positives: every real Prometheus line carries a space-separated value.
+    chunk_markers = [line for line in out.splitlines() if re.fullmatch(r"[0-9a-fA-F]{1,6}", line)]
+    assert not chunk_markers, error(f"chunked encoding leaked into /metrics: {chunk_markers[:5]}")
+    return out
 
-def _apply_operator_godebug(shell=None):
+def _operator_install_envsubst_cmd(source_cmd, ns, version=None):
+    """Build `source | envsubst` for the operator install template.
+
+    source_cmd is e.g. ``cat /path/to.yaml`` or ``curl -sfL <url>``.
+    """
+    if version is None:
+        version = current().context.operator_version
+    return (
+        f"{source_cmd} | "
+        f'OPERATOR_NAMESPACE="{ns}" '
+        f'OPERATOR_IMAGE="{current().context.operator_docker_repo}:{version}" '
+        f'OPERATOR_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
+        f'METRICS_EXPORTER_NAMESPACE="{ns}" '
+        f'METRICS_EXPORTER_IMAGE="{current().context.metrics_exporter_docker_repo}:{version}" '
+        f'METRICS_EXPORTER_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
+        f"envsubst"
+    )
+
+
+def _operator_godebug_value():
+    """Return e2e FIPS GODEBUG value, or None if unset/skipped."""
+    if hasattr(current().context, "skip_fips"):
+        return None
     mode = getattr(current().context, "fips140_mode", None)
     if not mode:
-        return
+        return None
+    return f"fips140={mode}"
 
-    ns = current().context.operator_namespace
-    expected = f"fips140={mode}"
 
-    kubectl.launch(
-        "set env deployment/clickhouse-operator "
-        f"--overwrite GODEBUG={expected}",
-        ns=ns,
-        shell=shell,
+def _inject_godebug_into_rendered_manifest(rendered, godebug):
+    """Insert GODEBUG as the first entry under each container ``env:`` block.
+
+    Matches the install-template Deployment indent (``          env:``). Avoids
+    parsing multi-megabyte CRD YAML just to add two env entries.
+    """
+    entry = (
+        "            - name: GODEBUG\n"
+        f'              value: "{godebug}"\n'
     )
+    out, n = re.subn(r"(?m)^(          env:\n)", r"\1" + entry, rendered)
+    assert n > 0, error("failed to inject GODEBUG: no container env: sections found")
+    return out
+
+
+def _apply_operator_install_manifest(source_cmd, ns, shell=None, version=None):
+    """Apply install manifest, baking e2e FIPS GODEBUG into the first revision.
+
+    kubectl set env after apply always creates a second ReplicaSet; inject before
+    apply so installs roll out once. Install templates stay unchanged.
+    """
+    import tempfile
+
+    envsubst_cmd = _operator_install_envsubst_cmd(source_cmd, ns, version=version)
+    godebug = _operator_godebug_value()
+    if not godebug:
+        kubectl.apply(ns=ns, manifest=envsubst_cmd, validate=False, shell=shell)
+    else:
+        rendered = _inject_godebug_into_rendered_manifest(
+            kubectl.run_shell(envsubst_cmd, timeout=600, shell=shell),
+            godebug,
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            f.write(rendered)
+            rendered_path = f.name
+        try:
+            kubectl.apply(ns=ns, manifest=rendered_path, validate=False, shell=shell)
+        finally:
+            os.unlink(rendered_path)
+
     kubectl.launch(
-        "rollout status deployment/clickhouse-operator",
+        "rollout status deployment.v1.apps/clickhouse-operator",
         ns=ns,
         timeout=600,
         shell=shell,
     )
+    if kubectl.get_count("pod", ns=ns, label=operator_label, shell=shell) == 0:
+        fail("clickhouse-operator pod did not start")
 
-def install_operator_if_not_exist(
-    reinstall=False,
-    manifest=None,
-    shell=None,
-):
-    if manifest is None:
-        manifest = get_full_path(current().context.clickhouse_operator_install_manifest)
 
+def install_operator_if_not_exist(reinstall=False, manifest=None, shell=None):
     if current().context.operator_install != "yes":
         return
 
     with Given(f"clickhouse-operator version {current().context.operator_version} is installed"):
-        if (
-            kubectl.get_count(
-                "pod",
-                ns=current().context.operator_namespace,
-                label="-l app=clickhouse-operator",
-                shell=shell
+        # Always apply via install manifest (images + optional FIPS GODEBUG in one
+        # revision). Do not kubectl set image / set env afterwards — each forces
+        # another ReplicaSet.
+        # Default path uses install_operator_version so public tags curl the
+        # matching release template while "dev"/current use the local manifest.
+        # An explicit manifest (e.g. test_010031 tempfile) is applied as-is.
+        if manifest is not None:
+            _apply_operator_install_manifest(
+                f"cat {manifest}",
+                current().context.operator_namespace,
+                shell=shell,
             )
-            == 0
-            or reinstall
-        ):
-            kubectl.apply(
-                ns=current().context.operator_namespace,
-                manifest=f"cat {manifest} | "
-                f'OPERATOR_NAMESPACE="{current().context.operator_namespace}" '
-                f'OPERATOR_IMAGE="{current().context.operator_docker_repo}:{current().context.operator_version}" '
-                f'OPERATOR_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
-                f'METRICS_EXPORTER_NAMESPACE="{current().context.operator_namespace}" '
-                f'METRICS_EXPORTER_IMAGE="{current().context.metrics_exporter_docker_repo}:{current().context.operator_version}" '
-                f'METRICS_EXPORTER_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
-                f"envsubst",
-                validate=False,
-                shell=shell
-            )
-        set_operator_version(current().context.operator_version, shell=shell)
-
-    if not hasattr(current().context, "skip_fips"):
-        _apply_operator_godebug(shell=shell)
+        else:
+            install_operator_version(current().context.operator_version, shell=shell)
 
 
 def install_operator_version(version, shell=None):
+    """Install a specific operator version (local tip or public release template)."""
+    ns = current().context.operator_namespace
     if version == current().context.operator_version or version == "dev":
-        manifest = get_full_path(current().context.clickhouse_operator_install_manifest)
-        manifest = f"cat {manifest}"
+        # Local tip / same as context: use the workspace install template.
+        # "dev" always means the local build even when context was temporarily
+        # set to an older tag (operator upgrade tests).
+        source_cmd = f"cat {get_full_path(current().context.clickhouse_operator_install_manifest)}"
     else:
-        manifest = f"https://github.com/Altinity/clickhouse-operator/raw/{version}/deploy/operator/clickhouse-operator-install-template.yaml"
-        manifest = f"curl -sL {manifest}"
+        # Public release: fetch that version's install template from GitHub.
+        source_cmd = (
+            "curl -sfL "
+            f"https://github.com/Altinity/clickhouse-operator/raw/{version}/"
+            "deploy/operator/clickhouse-operator-install-template.yaml"
+        )
 
-    kubectl.apply(
-        ns=current().context.operator_namespace,
-        manifest=f"{manifest} | "
-        f'OPERATOR_NAMESPACE="{current().context.operator_namespace}" '
-        f'OPERATOR_IMAGE="{current().context.operator_docker_repo}:{version}" '
-        f'OPERATOR_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
-        f'METRICS_EXPORTER_NAMESPACE="{current().context.operator_namespace}" '
-        f'METRICS_EXPORTER_IMAGE="{current().context.metrics_exporter_docker_repo}:{version}" '
-        f'METRICS_EXPORTER_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
-        f"envsubst",
-        validate=False,
-        shell=shell
-    )
+    _apply_operator_install_manifest(source_cmd, ns, shell=shell, version=version)
 
 
 def apply_operator_config(chopconf):

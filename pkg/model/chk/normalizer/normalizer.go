@@ -584,7 +584,7 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings) *chi
 	settings.Normalize()
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
-		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings, false)
+		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings)
 	})
 	return settings
 }

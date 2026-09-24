@@ -39,6 +39,20 @@ import (
 // Assert that zk.Conn implements ZKClient
 var _ ZKClient = (*zk.Conn)(nil)
 
+// Assert that zkLogger implements zk.Logger
+var _ zk.Logger = zkLogger{}
+
+// zkLogger adapts the announcer to the logger interface the zk library expects.
+// The library dials in an unbounded loop of its own, printing one line per failed
+// attempt straight to stderr unless given a logger.
+type zkLogger struct {
+	nodes api.ZookeeperNodes
+}
+
+func (l zkLogger) Printf(format string, args ...interface{}) {
+	log.V(1).Info("zk conn %v: "+format, append([]interface{}{l.nodes}, args...)...)
+}
+
 type Connection struct {
 	nodes api.ZookeeperNodes
 	ConnectionParams
@@ -46,8 +60,8 @@ type Connection struct {
 	mu         sync.Mutex
 	connection ZKClient
 
-	// retryDelayFn is configurable for testing
-	retryDelayFn func(i int)
+	// retryDelayFn is configurable for testing; must honor ctx cancellation.
+	retryDelayFn func(ctx context.Context, i int) error
 }
 
 // NewConnection creates a new Zookeeper connection with the provided nodes and parameters.
@@ -62,15 +76,14 @@ func NewConnection(nodes api.ZookeeperNodes, _params ...*ConnectionParams) *Conn
 	}
 }
 
-func retryDelayFnLinear() func(int) {
-	return func(i int) {
-		// Progressive delay
-		time.Sleep(time.Duration(i)*time.Second + time.Duration(rand.Int63n(int64(1*time.Second))))
+func retryDelayFnLinear() func(context.Context, int) error {
+	return func(ctx context.Context, i int) error {
+		return sleepContext(ctx, time.Duration(i)*time.Second+time.Duration(rand.Int63n(int64(1*time.Second))))
 	}
 }
 
-func retryDelayFnFlooredCappedLn(floor int, cap int) func(int) {
-	return func(i int) {
+func retryDelayFnFlooredCappedLn(floor int, cap int) func(context.Context, int) error {
+	return func(ctx context.Context, i int) error {
 		// Progressive delay
 		base := int(math.Ceil(math.Log(float64(i + 1))))
 		if base < floor {
@@ -88,7 +101,18 @@ func retryDelayFnFlooredCappedLn(floor int, cap int) func(int) {
 		if jitter > jitterCap {
 			jitter = jitterCap
 		}
-		time.Sleep(time.Duration(base+jitter) * time.Second)
+		return sleepContext(ctx, time.Duration(base+jitter)*time.Second)
+	}
+}
+
+func sleepContext(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
 	}
 }
 
@@ -162,13 +186,25 @@ func (c *Connection) retry(ctx context.Context, fn func(connection ZKClient) err
 
 	var errs []error
 	for i := 0; i < c.MaxRetriesNum; i++ {
+		if err := ctx.Err(); err != nil {
+			if len(errs) == 0 {
+				return err
+			}
+			return fmt.Errorf("retries cancelled after %d attempt(s): %w", len(errs), errors.Join(append(errs, err)...))
+		}
 		if i > 0 {
-			// Delay before each consequent retry
-			c.retryDelayFn(i)
+			// Delay before each consequent retry (interruptible via ctx)
+			if err := c.retryDelayFn(ctx, i); err != nil {
+				if len(errs) == 0 {
+					return err
+				}
+				return fmt.Errorf("retries cancelled after %d attempt(s): %w", len(errs), errors.Join(append(errs, err)...))
+			}
 		}
 
 		connection, err := c.ensureConnection(ctx)
 		if err != nil {
+			log.V(1).Info("zk connect attempt %d/%d failed: %v", i+1, c.MaxRetriesNum, err)
 			errs = append(errs, fmt.Errorf("retry %d: connection error: %w", i+1, err))
 			continue // Retry
 		}
@@ -186,11 +222,13 @@ func (c *Connection) retry(ctx context.Context, fn func(connection ZKClient) err
 				c.connection = nil
 			}
 			c.mu.Unlock()
+			log.V(1).Info("zk operation attempt %d/%d failed: connection closed: %v", i+1, c.MaxRetriesNum, err)
 			errs = append(errs, fmt.Errorf("retry %d: connection closed: %w", i+1, err))
 			continue // Retry
 		}
 
 		// Collect the errors
+		log.V(1).Info("zk operation attempt %d/%d failed: %v", i+1, c.MaxRetriesNum, err)
 		errs = append(errs, fmt.Errorf("retry %d: %w", i+1, err))
 	}
 
@@ -265,22 +303,20 @@ func shouldRejectAuthScheme(rejectDigest bool, scheme string) bool {
 
 func (c *Connection) connectionEventsProcessor(connection ZKClient, events <-chan zk.Event) {
 	for event := range events {
-		shouldCloseConnection := false
 		switch event.State {
 		case
 			zk.StateExpired,
-			zk.StateConnecting:
-			shouldCloseConnection = true
-			fallthrough
-		case zk.StateDisconnected:
+			zk.StateConnecting,
+			zk.StateDisconnected:
 			c.mu.Lock()
 			if c.connection == connection {
 				c.connection = nil
 			}
 			c.mu.Unlock()
-			if shouldCloseConnection {
-				connection.Close()
-			}
+			// Disconnected included: this goroutine returns right after, and nothing else
+			// holds the handle, so an unclosed zk.Conn would keep re-dialing its cached
+			// (by then dead) endpoints roughly once a second for the life of the process.
+			connection.Close()
 			log.Info("zk conn: session for addr %v ended: %v", c.nodes, event)
 			return
 		}
@@ -292,7 +328,7 @@ func (c *Connection) dial(ctx context.Context) (ZKClient, <-chan zk.Event, error
 	ctx, cancel := context.WithTimeout(ctx, c.TimeoutConnect)
 	defer cancel()
 
-	connection, events, err := c.connect(c.nodes.Servers())
+	connection, events, err := c.connect(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -314,13 +350,23 @@ func (c *Connection) dial(ctx context.Context) (ZKClient, <-chan zk.Event, error
 	}
 }
 
-func (c *Connection) connect(servers []string) (ZKClient, <-chan zk.Event, error) {
+func (c *Connection) connect(ctx context.Context) (ZKClient, <-chan zk.Event, error) {
+	servers := c.nodes.Servers()
+	// Resolve under ctx so a stuck/missing DNS name cannot ignore cancel the way
+	// zk.DNSHostProvider.Init (blocking net.LookupHost) does. Each dial attempt is
+	// still bounded by TimeoutConnect; outer retry keeps waiting for ZK to appear.
+	resolvedServers, err := resolveServers(ctx, servers)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	optionsDialer := zk.WithDialer(net.DialTimeout)
 	if c.CertFile != "" && c.KeyFile != "" {
 		if len(servers) > 1 {
 			log.Fatal("This TLS zk code requires that the all the zk servers validate to a single server name.")
 		}
 
+		// TLS ServerName must stay the configured hostname, not a resolved IP.
 		serverName := strings.Split(servers[0], ":")[0]
 
 		log.Info("Using TLS for %s", serverName)
@@ -353,8 +399,47 @@ func (c *Connection) connect(servers []string) (ZKClient, <-chan zk.Event, error
 		})
 	}
 
-	// May need to implement manually &zk.SimpleDNSHostProvider{} from github.com/z-division/go-zookeeper/zk
-	hostProvider := &zk.DNSHostProvider{}
-	optionsDNSHostProvider := zk.WithHostProvider(hostProvider)
-	return zk.Connect(servers, c.TimeoutKeepAlive, optionsDialer, optionsDNSHostProvider)
+	// Pass resolved IP:port strings; zk's default DNSHostProvider.Init only does a
+	// cheap literal lookup on those, so the ctx-aware resolve above remains the
+	// bound that matters for missing/stuck DNS.
+	return zk.Connect(resolvedServers, c.TimeoutKeepAlive, optionsDialer, zk.WithLogger(zkLogger{nodes: c.nodes}))
+}
+
+// lookupHostFn is overridable in tests.
+var lookupHostFn = func(ctx context.Context, host string) ([]string, error) {
+	return net.DefaultResolver.LookupHost(ctx, host)
+}
+
+// resolveServers resolves hostnames in host:port server strings using ctx so DNS
+// respects cancel and TimeoutConnect. Returns host:port list with literal addresses
+// for zk.Connect (whose default DNSHostProvider.Init is a cheap no-op on IP literals).
+func resolveServers(ctx context.Context, servers []string) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if len(servers) == 0 {
+		return nil, fmt.Errorf("zk: server list must not be empty")
+	}
+
+	found := make([]string, 0, len(servers))
+	for _, server := range servers {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		host, port, err := net.SplitHostPort(server)
+		if err != nil {
+			return nil, fmt.Errorf("zk: invalid server %q: %w", server, err)
+		}
+		addrs, err := lookupHostFn(ctx, host)
+		if err != nil {
+			return nil, fmt.Errorf("zk dns lookup %q: %w", host, err)
+		}
+		for _, addr := range addrs {
+			found = append(found, net.JoinHostPort(addr, port))
+		}
+	}
+	if len(found) == 0 {
+		return nil, fmt.Errorf("zk: no hosts found for addresses %q", servers)
+	}
+	return found, nil
 }

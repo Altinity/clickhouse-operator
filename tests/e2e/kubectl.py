@@ -17,6 +17,201 @@ import e2e.util as util
 current_dir = os.path.dirname(os.path.abspath(__file__))
 max_retries = 20
 
+# Reconcile statuses that mean the operator has STOPPED working on the CR. Polling for a
+# different value from here just burns the whole retry budget — 495s at retries=20/backoff=5 —
+# so a genuine regression shows up as a timeout instead of a failure. Mirrors StatusAborted in
+# pkg/apis/clickhouse.altinity.com/v1/type_status.go. StatusTerminating is deliberately absent:
+# DeleteStart() sets it and the object then disappears, so get_field returns "" anyway.
+_STATUS_COMPLETED = "Completed"
+_STATUS_ABORTED = "Aborted"
+_STATUS_IN_PROGRESS = "InProgress"
+_STATUS_TERMINATING = "Terminating"
+_TERMINAL_CR_STATUSES = frozenset({_STATUS_COMPLETED, _STATUS_ABORTED})
+
+# Aborted is NOT reliably terminal: reconcile.recovery.onStatus.aborted.onPodReady ships as
+# "retry", so a pod flipping NotReady -> Ready re-enqueues the CR and it transits
+# Aborted -> InProgress -> Completed on its own (test_010035). Two independent guards keep that
+# from turning into a flaky failure:
+#   - ARMED: a terminal status is only counted once a NON-terminal one has been observed first.
+#     Without this, the status left over from the PREVIOUS apply — before the operator has picked
+#     up the new spec — reads as a fresh failure.
+#   - HELD: it must then persist across this many consecutive polls AND this many seconds.
+# An Aborted CR additionally has to be provably unrecoverable (see _abort_needs_spec_edit) before
+# it is failed at all. Everything else runs the full budget: the operator's own recovery windows -
+# a 300s statefulSet.update.timeout, kubelet's 300s CrashLoop backoff cap - are the same order as
+# that budget, so there is no hold long enough to be safe and short enough to be worth having.
+_terminal_confirm_polls = 3
+# 120s of continuous hold, on top of arming. Poll times are 0,5,15,30,50,75,105,135, so the
+# earliest give-up is ~135s against a 495s budget.
+_terminal_confirm_sec = 120
+
+# Statuses the operator actually writes (type_status.go:35-38). Arming requires one of these:
+# get_field returns "" for a missing CR or a transient kubectl failure, and treating that as
+# "the operator is making progress" would arm the watch on noise.
+_KNOWN_CR_STATUSES = _TERMINAL_CR_STATUSES | {_STATUS_IN_PROGRESS, _STATUS_TERMINATING}
+
+# An Aborted CR is only unrecoverable when the SPEC itself must change. Mirror the operator
+# rather than guessing: normalizeTimeAbortReasons (pkg/controller/chi/worker-pod-retry.go:44-50)
+# is the authoritative list, and shouldTriggerAutoRecovery re-enqueues every OTHER Aborted CR on
+# any pod NotReady->Ready flip (default on). Crucially the commonest abort - a plain
+# statefulSet.update.timeout - carries NO reason tag at all and IS recoverable, so the test must
+# keep waiting for it. Whitelisting "self-clearing" reasons instead would have this backwards and
+# would fast-fail the recoverable majority.
+_SPEC_EDIT_ABORT_REASONS = (
+    "FIPSValidationFailed",
+    "RootCAConflict",
+    "RootCASecretUnresolved",
+    "FIPSImagePolicyViolation",
+    "RemovedSecretRefSyntax",
+)
+
+
+# container .state.waiting.reason values kubelet will never leave on its own: the image cannot be
+# pulled, or the container cannot be built from the given spec. Each needs a spec edit to clear,
+# so a readiness wait sitting on one is unsatisfiable and is pure dead time.
+#
+# CrashLoopBackOff is DELIBERATELY ABSENT. kubelet's restart backoff caps at 300s, so a pod that
+# boots on its sixth try - ClickHouse racing a not-yet-elected Keeper, or the test_010031 ConfigMap
+# mount race - shows this reason continuously for longer than any hold worth having against a 495s
+# budget. test_operator.py:1163 already hand-checks it where it genuinely is terminal.
+_TERMINAL_POD_WAITING_REASONS = frozenset({
+    "ImagePullBackOff",
+    "ErrImagePull",
+    "InvalidImageName",
+    "CreateContainerConfigError",
+    "CreateContainerError",
+})
+
+# Readings proving kubelet is actively working the pod, so the watch may arm. "<none>" is what
+# custom-columns prints for a container that is not waiting at all. "" means an absent pod or a
+# kubectl blip and must NOT arm - the same rule as _KNOWN_CR_STATUSES.
+_KNOWN_POD_WAITING_REASONS = _TERMINAL_POD_WAITING_REASONS | {
+    "<none>",
+    "ContainerCreating",
+    "PodInitializing",
+}
+
+
+def _is_unset(value):
+    """kubectl -o=custom-columns renders an absent field as the literal <none>, not ''."""
+    return (value is None) or (value.strip() in ("", "<none>"))
+
+
+def _terminal_pod_fail_on(kind, field):
+    """Terminal waiting reasons for a pod READINESS wait.
+
+    Scoped to waits for `.ready`. A test that waits FOR a waiting.reason on purpose - polling for
+    ErrImagePull or CrashLoopBackOff to appear - is watching a different field and derives the
+    empty set, so it keeps today's behaviour with no per-test edit.
+    """
+    if kind not in ("pod", "pods"):
+        return frozenset()
+    if not field.endswith(".ready"):
+        return frozenset()
+    return _TERMINAL_POD_WAITING_REASONS
+
+
+def _pod_waiting_reason(kind, name, field, ns, shell, fail_on):
+    """Read the sibling waiting.reason column and reduce it to one value.
+
+    A `[*]` field yields one comma-joined token per container, so a terminal token anywhere wins;
+    failing that, report any known token so the watch can arm.
+    """
+    raw = get_field(kind, name, field[: -len(".ready")] + ".state.waiting.reason", ns, shell=shell)
+    tokens = [t.strip() for t in raw.split(",")] if raw else []
+    return next(
+        (t for t in tokens if t in fail_on),
+        next((t for t in tokens if t in _KNOWN_POD_WAITING_REASONS), ""),
+    )
+
+
+def _abort_needs_spec_edit(newest_error):
+    """True when the CURRENT abort carries a reason the operator itself refuses to auto-recover.
+
+    ReconcileAbortWithReason emits "[Reason] message" and PushError prepends, so entry [0] is the
+    abort we are looking at. Only that entry is inspected: .status.errors is append-only and never
+    cleared, so a tag pushed earlier in the same test would otherwise make every later abort -
+    including a perfectly recoverable one - look permanent, and fail the wait early.
+    """
+    if _is_unset(newest_error):
+        return False
+    return any(newest_error.startswith(f"[{reason}]") for reason in _SPEC_EDIT_ABORT_REASONS)
+
+
+def _terminal_fail_on(kind, field, accepted):
+    """Terminal statuses that make this particular wait unsatisfiable.
+
+    Scoped deliberately. A wait for InProgress legitimately STARTS from a terminal status (a new
+    spec applied over an Aborted CR), and a wait that already accepts Aborted is opting out by
+    construction — so both derive the empty set and keep today's behaviour with no per-test edit.
+    Pod, PVC and StatefulSet waits never acquire CR-status vocabulary.
+    """
+    if kind not in ("chi", "chk"):
+        return frozenset()
+    if field != ".status.status":
+        return frozenset()
+    # Only a wait whose every acceptable value is itself terminal can conclude anything from
+    # seeing the OTHER terminal value. A wait for InProgress legitimately starts from a terminal
+    # status - a fresh spec applied over a Completed or Aborted CR - so it derives the empty set.
+    if not accepted or not accepted <= _TERMINAL_CR_STATUSES:
+        return frozenset()
+    return _TERMINAL_CR_STATUSES - accepted
+
+
+class _TerminalStatusWatch:
+    """Decides when a terminal-and-wrong status has been seen long enough to be believed.
+
+    Pure and side-effect free so the guard is testable without a cluster; `wait_field` owns the
+    polling and the reporting. `observe` returns True once the wait is provably unsatisfiable.
+    """
+
+    def __init__(self, fail_on, confirm_polls=None, confirm_sec=None, known=None):
+        self.fail_on = fail_on
+        self.known = _KNOWN_CR_STATUSES if known is None else known
+        self.confirm_polls = _terminal_confirm_polls if confirm_polls is None else confirm_polls
+        self.confirm_sec = _terminal_confirm_sec if confirm_sec is None else confirm_sec
+        self.armed = False
+        self.polls = 0
+        self.since = None
+
+    def observe(self, value, now):
+        if value not in self.fail_on:
+            # A reading the operator actually wrote, and not the wrong terminal one, proves it is
+            # still moving this CR: arm, and invalidate whatever streak preceded it. An unknown
+            # value ("" from a missing CR or a kubectl blip) proves nothing and is ignored.
+            if value in self.known:
+                self.armed = True
+                self.polls = 0
+                self.since = None
+            return False
+        if not self.armed:
+            # Terminal from the very first look: this is the previous apply's status, not a
+            # verdict on ours. Wait it out exactly as before.
+            return False
+        self.polls += 1
+        if self.since is None:
+            self.since = now
+        return (self.polls >= self.confirm_polls) and ((now - self.since) >= self.confirm_sec)
+
+
+def _terminal_status_report(kind, name, field, cur_value, desc, polls, held, ns, shell):
+    """Failure text naming the status reached and whatever the CR recorded about why."""
+    lines = [
+        f"{kind} {name} {field} reached terminal status {cur_value!r} and held it for "
+        f"{int(held)}s across {polls} consecutive polls while waiting for {desc}. "
+        f"The operator has finished reconciling this CR, so the remaining retries are dead "
+        f"time - failing now instead of timing out."
+    ]
+    status_error = get_field(kind, name, ".status.error", ns, shell=shell)
+    errors = get_field(kind, name, ".status.errors", ns, shell=shell)
+    if not _is_unset(status_error):
+        lines.append(f".status.error: {status_error}")
+    if not _is_unset(errors):
+        lines.append(f".status.errors: {errors}")
+    if _is_unset(status_error) and _is_unset(errors):
+        lines.append(".status.error / .status.errors: <empty>")
+    return "\n".join(lines)
+
 # A transient kube-apiserver/network outage (operator restart, etcd hiccup, brief
 # network loss, a minikube control-plane bounce) makes kubectl exit non-zero with
 # one of these connectivity signatures rather than a real command result. Matched
@@ -38,6 +233,11 @@ _TRANSIENT_APISERVER_ERRORS = (
     "etcdserver: leader changed",
     "the server is currently unable to handle the request",
     "transport is closing",
+    # Aggregated discovery has not caught up with a CRD that was just (re)installed. Reads like a
+    # deterministic error but is genuinely retryable: test_090099 deletes the CHI CRD, reinstalls
+    # the operator and immediately applies a CHI. Bounded by _transient_max_retries, not 500s.
+    "no matches for kind",
+    "could not find the requested resource",
 )
 # Bounded retry budget for transient kube-apiserver errors (see run_shell).
 _transient_max_retries = 5
@@ -69,8 +269,8 @@ def launch(command, ok_to_fail=False, ns=None, timeout=600, shell=None):
     # retry_transient: kubectl-only resilience (launch builds a kubectl command),
     # so a momentary apiserver blip is retried rather than hard-failing the test.
     # Direct run_shell() callers keep fail-fast: host tooling in steps_fips.py
-    # (`go version -m`, `--fips-info`, readelf) and the piped-manifest paths in
-    # apply()/delete(), which bypass launch() -- apply() wraps its own retries().
+    # (`go version -m`, `--fips-info`, readelf) and the piped-manifest path in
+    # delete(). apply()'s piped branch opts in explicitly, being a kubectl call.
     return run_shell(cmd, timeout, ok_to_fail, shell=shell, retry_transient=True)
 
 
@@ -500,18 +700,24 @@ def count_objects(label="", ns=None, shell=None):
 
 
 def apply(manifest, ns=None, validate=True, timeout=600, shell=None):
-    for attempt in retries(timeout=500, delay=1):
-        with attempt:
-            with When(f"{manifest} is applied"):
-                if " | " not in manifest:
-                    manifest = f'"{manifest}"'
-                    launch(f"apply --validate={validate} -f {manifest}", ns=ns, timeout=timeout, shell=shell)
-                else:
-                    run_shell(
-                        f"set -o pipefail && {manifest} | {current().context.kubectl_cmd} apply --server-side --force-conflicts --namespace={current().context.test_namespace} --validate={validate} -f -",
-                        timeout=timeout,
-                        shell=shell
-                    )
+    # No blanket retry loop. Both branches below already retry the transient apiserver signatures
+    # in _TRANSIENT_APISERVER_ERRORS, bounded to _transient_max_retries. Everything else a kubectl
+    # apply can fail with - CRD validation, a pruned unknown field, a malformed manifest - is
+    # deterministic: retrying it ~250 times cost 500s and buried the real error under the last
+    # attempt's identical copy of it.
+    with When(f"{manifest} is applied"):
+        if " | " not in manifest:
+            manifest = f'"{manifest}"'
+            launch(f"apply --validate={validate} -f {manifest}", ns=ns, timeout=timeout, shell=shell)
+        else:
+            # This piped server-side branch bypasses launch(), so it has to ask for the transient
+            # retry itself - it is the operator-install path that every test runs.
+            run_shell(
+                f"set -o pipefail && {manifest} | {current().context.kubectl_cmd} apply --server-side --force-conflicts --namespace={current().context.test_namespace} --validate={validate} -f -",
+                timeout=timeout,
+                shell=shell,
+                retry_transient=True,
+            )
 
 
 def apply_chi(manifest, ns=None, validate=True, timeout=600, shell=None):
@@ -653,14 +859,55 @@ def wait_field(
         # ["x", None] or [1, "1"]) don't raise TypeError before polling begins.
         desc = f"one of {sorted(map(repr, accepted))}"
     else:
+        accepted = {value}
         match = lambda v: v == value
         desc = repr(value)
 
+    fail_on = _terminal_fail_on(kind, field, accepted)
+    pod_fail_on = _terminal_pod_fail_on(kind, field)
+
     with Then(f"{kind} {name} {field} should be {desc}"):
         cur_value = get_field(kind, name, field, ns, shell=shell)
+        watch = _TerminalStatusWatch(fail_on)
+        pod_watch = _TerminalStatusWatch(pod_fail_on, known=_KNOWN_POD_WAITING_REASONS)
         for i in range(1, retries):
             if match(cur_value):
                 break
+            if pod_fail_on:
+                # Costs one extra read, and only on an iteration that was about to sleep anyway.
+                reason = _pod_waiting_reason(kind, name, field, ns, shell, pod_fail_on)
+                if pod_watch.observe(reason, time.time()):
+                    if throw_error is False:
+                        break
+                    assert False, error(
+                        f"pod {name} is waiting with reason {reason!r}, held for "
+                        f"{int(time.time() - pod_watch.since)}s across {pod_watch.polls} polls "
+                        f"while waiting for {field} to be {desc}. kubelet cannot clear this "
+                        f"without a spec change - failing now instead of timing out."
+                    )
+            if watch.observe(cur_value, time.time()):
+                held = time.time() - watch.since
+                # An Aborted CR is only failed early when its CURRENT abort is one the operator
+                # itself will not auto-recover. Everything else - above all the untagged
+                # update-timeout abort, the commonest of the lot - runs the full budget. The
+                # mirror case (waiting FOR Aborted, seeing Completed) has no reason to inspect.
+                unrecoverable = (cur_value != _STATUS_ABORTED) or _abort_needs_spec_edit(
+                    get_field(kind, name, ".status.errors[0]", ns, shell=shell)
+                )
+                if not unrecoverable:
+                    # Recoverable: drop the streak so the next verdict costs one read per confirm
+                    # window rather than one per poll, while still re-arming if it later aborts
+                    # with a spec-edit reason.
+                    watch.polls = 0
+                    watch.since = None
+                elif throw_error is False:
+                    break
+                else:
+                    assert False, error(
+                        _terminal_status_report(
+                            kind, name, field, cur_value, desc, watch.polls, held, ns, shell
+                        )
+                    )
             retry_sleep(i, backoff, f"Not ready ({cur_value})")
             cur_value = get_field(kind, name, field, ns, shell=shell)
         assert match(cur_value) or throw_error is False, error()
@@ -975,19 +1222,21 @@ def force_reconcile(name, kind, taskID, status="Completed", ns=None, shell=None)
     with Then(f"Trigger {kind} reconcile with taskID:\"{taskID}\""):
         cmd = f'patch {kind} {name} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"{taskID}"}}]\''
         launch(cmd, ns=ns, shell=shell)
-        # Wait for the CR to settle on Completed. We do NOT wait for InProgress
-        # first — a taskID-only patch can be processed so fast that the status
-        # field never visibly transitions to InProgress (the CHK reconciler in
-        # particular returns "No reconcile work" when only taskID changed,
-        # which means status stays Completed throughout). The older two-step
-        # wait raced against the fast path and stalled the whole test on the
-        # InProgress poll. The accept-set on the Completed wait below tolerates
-        # either "already Completed" or "InProgress → Completed" transitions.
+        # CHI waits STRICTLY for InProgress first. That wait is not cosmetic - it is the only
+        # thing proving the operator has observed this taskID. The CR is already Completed when
+        # force_reconcile is called, so accepting Completed here returns before the patch has
+        # been picked up, and the caller then reads pre-patch status as if the reconcile had run.
+        # A taskID patch edits .spec, so a CHI always produces a real reconcile and this wait
+        # always resolves.
+        #
+        # CHK takes an ACCEPT-SET because its reconciler genuinely may not transition: it returns
+        # "No reconcile work" when only taskID changed, leaving status Completed throughout, and a
+        # strict poll would burn its whole retry budget - 495s - before asserting.
         if kind == "chi":
             wait_chi_status(name, "InProgress", ns=ns, shell=shell)
             wait_chi_status(name, status, ns=ns, shell=shell)
         elif kind == "chk":
-            wait_chk_status(name, "InProgress", ns=ns, shell=shell)
+            wait_chk_status(name, ["InProgress", status], ns=ns, shell=shell)
             wait_chk_status(name, status, ns=ns, shell=shell)
         else:
             assert kind == "chi" or kind == "chk"

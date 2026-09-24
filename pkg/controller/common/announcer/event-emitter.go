@@ -65,14 +65,20 @@ const (
 	// reconcile was aborted, on observing a recovery signal (e.g. a pod became Ready).
 	EventReasonAutoRecoveryTriggered = "AutoRecoveryTriggered"
 
-	// EventReasonStuckHostRecoveryTriggered fires when the operator re-enqueues a
-	// Completed CHI for reconcile because one of its hosts has been Ready=False for
-	// longer than the configured threshold.
+	// EventReasonStuckHostRecoveryTriggered fires when the operator re-enqueues a CR for
+	// reconcile because one of its hosts has been Ready=False for longer than the threshold
+	// of whichever recovery scope the CR is in - Completed or Aborted.
 	EventReasonStuckHostRecoveryTriggered = "StuckHostRecoveryTriggered"
 
 	// EventReasonHostStuckNotReady fires when shouldForceRestartHost decides to force
 	// a host restart because the pod has been Ready=False past the configured threshold.
 	EventReasonHostStuckNotReady = "HostStuckNotReady"
+
+	// EventReasonHostPodForceDeleted fires when a pod outlasts the whole scale-to-0 budget and
+	// is removed with grace period 0 so the StatefulSet delete can finish. This is the operator
+	// SIGKILLing a database, and the alternative it was weighed against - stranding the host with
+	// no pod - is invisible in kubectl, so the decision belongs in the event stream.
+	EventReasonHostPodForceDeleted = "HostPodForceDeleted"
 
 	// EventReasonKeeperUpdateNoEndpointChange fires when the operator observes a referenced
 	// CHK reconcile completing but decides not to trigger a CHI reconcile because the resolved
@@ -88,6 +94,12 @@ const (
 	// run on one of its target hosts because that host's pod cannot serve SQL - during a
 	// scale-up it may not exist yet. The hook still succeeds on the hosts it could reach.
 	EventReasonHookSkippedUnreachableHost = "HookSkippedUnreachableHost"
+
+	// EventReasonCleanupPostponed fires when a deferred pass skips reconcileCR's success block, so
+	// removed hosts keep their StatefulSets, PVCs and ZooKeeper replica paths. Cleanup cannot run
+	// there: a deferred host never reaches RegistryReconciled, and clean() purges discovery minus
+	// that registry, so it would delete the live StatefulSet the deferral is protecting.
+	EventReasonCleanupPostponed = "CleanupPostponed"
 )
 
 type EventEmitter struct {

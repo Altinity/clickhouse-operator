@@ -12,6 +12,12 @@ spec:
   useTemplates:
     - name: test-030003-backup-template
   configuration:
+    users:
+      # Operator default user networks are localhost-only. The in-cluster
+      # fips-client Pod is a real remote peer (unlike host port-forward), so
+      # allow it for ExternalClient FIPS checks.
+      default/networks/ip:
+        - "::/0"
     clusters:
       - name: default
         secure: "yes"

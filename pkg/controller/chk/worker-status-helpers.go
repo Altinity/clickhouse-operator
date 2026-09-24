@@ -17,16 +17,27 @@ package chk
 import (
 	"context"
 
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
+// isPodCrushed reports whether the host's pod has crashed containers. An absent pod counts as
+// crushed - there is nothing to wait for and the StatefulSet must recreate it - but a pod that
+// merely could not be READ does not: the operator reads live, so a Forbidden or a spent retry
+// budget reaches here, and treating that as a crash sends a healthy Keeper into the force-restart
+// branch (which shouldForceRestartHost gates on an unknown running version).
 func (w *worker) isPodCrushed(ctx context.Context, host *api.Host) bool {
-	if pod, err := w.c.kube.Pod().Get(ctx, host); err == nil {
+	pod, err := w.c.kube.Pod().Get(ctx, host)
+	switch {
+	case err == nil:
 		return k8s.PodHasCrushedContainers(pod)
+	case apiErrors.IsNotFound(err):
+		return true
 	}
-	return true
+	return false
 }
 
 // areUsableOldAndNew checks whether there are old and new usable

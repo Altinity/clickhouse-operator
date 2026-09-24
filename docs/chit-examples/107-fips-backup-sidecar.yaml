@@ -20,7 +20,7 @@ spec:
                   mountPath: /var/lib/clickhouse
 
             - name: clickhouse-backup
-              image: altinity/clickhouse-backup:2.7.0-fips
+              image: altinity/clickhouse-backup:latest-fips
               imagePullPolicy: IfNotPresent
               command:
                 - /bin/clickhouse-backup

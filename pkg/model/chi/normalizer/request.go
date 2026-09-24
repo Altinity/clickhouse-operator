@@ -22,12 +22,30 @@ import (
 // Request specifies normalization Request
 type Request struct {
 	*normalizer.Request[api.ClickHouseInstallation]
+
+	// removedSecretRefReported records whether this pass has already aborted over a user field
+	// using the removed k8s_secret_ syntax, so the abort is raised once however many fields and
+	// users carry it. Pass-local on purpose: status.Errors is inherited into the next
+	// normalization target, so deduplicating against it would suppress the abort from the second
+	// reconcile onward and let the CR through.
+	removedSecretRefReported bool
+}
+
+// RemovedSecretRefReported reports whether this normalization pass already raised the removed
+// secret-ref abort, and marks it as raised. Returns false exactly once per pass.
+func (c *Request) RemovedSecretRefReported() bool {
+	if c == nil {
+		return true
+	}
+	reported := c.removedSecretRefReported
+	c.removedSecretRefReported = true
+	return reported
 }
 
 // NewRequest creates new Request
 func NewRequest(options *normalizer.Options[api.ClickHouseInstallation]) *Request {
 	return &Request{
-		normalizer.NewRequest(options),
+		Request: normalizer.NewRequest(options),
 	}
 }
 

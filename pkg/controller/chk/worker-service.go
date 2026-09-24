@@ -16,6 +16,7 @@ package chk
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	core "k8s.io/api/core/v1"
@@ -26,6 +27,10 @@ import (
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// errServiceTypeChanged marks the one update failure a recreate resolves: Kubernetes rejects a
+// change of Service type in place, so the object has to be replaced.
+var errServiceTypeChanged = errors.New("service type changed")
 
 // reconcileService reconciles core.Service
 func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, service, prevService *core.Service) error {
@@ -39,6 +44,25 @@ func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, s
 		// We have the Service - try to update it
 		w.a.V(1).M(cr).F().Info("Service found: %s. Will try to update", util.NamespaceNameString(service))
 		err = w.updateService(ctx, cr, curService, service, prevService)
+	}
+
+	// Recreate is for the two situations a recreate actually fixes: the Service is genuinely
+	// absent, or its type changed and Kubernetes will not mutate that in place. Any other error -
+	// a read that was Forbidden or spent its retry budget, an update that hit a Conflict - says
+	// nothing about whether the Service is healthy, so surface it and let the next pass re-read.
+	//
+	// Falling through calls delete-then-create. While the error persists the delete is a no-op,
+	// because deleteServiceIfExists reads first and treats its own failure as "nothing to
+	// delete"; what does the damage is an error that clears between those two reads, dropping
+	// the Service's endpoints and, for a non-headless one, its address.
+	if (err != nil) && !apiErrors.IsNotFound(err) && !errors.Is(err, errServiceTypeChanged) {
+		w.a.WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(cr).
+			WithError(cr).
+			M(cr).F().
+			Error("Reconcile Service: %s failed, leaving it alone. err: %v",
+				util.NamespaceNameString(service), err)
+		return err
 	}
 
 	if err != nil {
@@ -79,10 +103,10 @@ func (w *worker) updateService(
 	prevService *core.Service,
 ) error {
 	if curService.Spec.Type != targetService.Spec.Type {
-		return fmt.Errorf(
-			"just recreate the service in case of service type change '%s'=>'%s'",
-			curService.Spec.Type, targetService.Spec.Type,
-		)
+		// Sentinel, not a bare string: reconcileService must tell this apart from a transient
+		// update failure, because only this one is resolved by deleting and recreating.
+		return fmt.Errorf("%w: '%s'=>'%s'",
+			errServiceTypeChanged, curService.Spec.Type, targetService.Spec.Type)
 	}
 
 	// Updating a Service is a complicated business

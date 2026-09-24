@@ -17,12 +17,19 @@ package poller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// ErrTimeout marks the poll that ran out its budget, as opposed to one that stopped early
+// because a Get failed. Callers that escalate to a destructive action must tell the two apart:
+// a Get error can surface within milliseconds of the poll starting, so treating it as "the
+// object would not settle" would escalate against an object that was never given time.
+var ErrTimeout = errors.New("wait timeout")
 
 type Poller interface {
 	Poll() error
@@ -106,7 +113,7 @@ func (p *poller) Poll() error {
 		if time.Since(start) >= p.opts.Timeout {
 			// Timeout reached, no good result available, time to abort
 			log.V(1).M(p.name).F().Info("poll(%s) - TIMEOUT reached", p.name)
-			return fmt.Errorf("poll(%s) - wait timeout", p.name)
+			return fmt.Errorf("poll(%s) - %w", p.name, ErrTimeout)
 		}
 
 		// Continue polling

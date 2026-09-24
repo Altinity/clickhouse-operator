@@ -18,8 +18,6 @@ import (
 	"context"
 	"time"
 
-	kubeinformers "k8s.io/client-go/informers"
-
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
@@ -90,11 +88,8 @@ func initClickHouse(ctx context.Context) {
 	}
 
 	// Create Informers
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
-		kubeClient,
-		kubeInformerFactoryResyncPeriod,
-		kubeinformers.WithNamespace(chop.Config().GetInformerNamespace()),
-	)
+	kubeInformerFactory := chi.NewInformerFactoryForCHOPGeneratedObjects(
+		kubeClient, kubeInformerFactoryResyncPeriod)
 	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(
 		chopClient,
 		chopInformerFactoryResyncPeriod,

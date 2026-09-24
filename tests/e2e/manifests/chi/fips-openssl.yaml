@@ -1,0 +1,25 @@
+# In-cluster OpenSSL 3.x probe client for FIPS TLS e2e.
+# CHI/CHK images do not ship an openssl CLI; host openssl is often LibreSSL.
+# Mounts CA from the scenario TLS Secret (default: clickhouse-certs).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "fips-openssl"
+spec:
+  containers:
+    - name: openssl
+      image: alpine/openssl:3.3.3
+      imagePullPolicy: IfNotPresent
+      # Replace image ENTRYPOINT (openssl) so the container idles for kubectl exec.
+      command: ["sleep", "3600"]
+      volumeMounts:
+        - name: cert
+          mountPath: "/certs"
+          readOnly: true
+  volumes:
+    - name: cert
+      secret:
+        secretName: clickhouse-certs
+        items:
+          - key: ca.crt
+            path: ca.crt

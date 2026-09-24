@@ -52,23 +52,22 @@ spec:
       - name: crd-install
         image: "{{ .Values.crdHook.image.repository }}:{{ .Values.crdHook.image.tag }}"
         imagePullPolicy: {{ .Values.crdHook.image.pullPolicy | default "IfNotPresent" }}
+        # Invoked without a shell: the default image (registry.k8s.io/kubectl) is distroless
+        # and ships no /bin/sh. `apply -f <dir>` is not recursive and only reads
+        # *.json/*.yaml/*.yml, so it picks up the projected CRDs and skips the `..data`
+        # symlink and `..<timestamp>` directories kubelet maintains alongside them.
+        # Never add -R: it would descend into those and apply stale duplicates.
         command:
-        - /bin/sh
-        - -c
-        - |
-          set -e
-          echo "Installing/Updating ClickHouse Operator CRDs..."
-          for crd_file in /crds/*/*.yaml; do
-            echo "Applying $(basename $crd_file)..."
-            kubectl apply --server-side=true --force-conflicts -f "$crd_file"
-          done
-          echo "CRD installation completed successfully"
+        - kubectl
+        args:
+        - apply
+        - --server-side=true
+        - --force-conflicts
+        - -f
+        - /crds
         volumeMounts:
-        - name: crds-1
-          mountPath: /crds/1
-          readOnly: true
-        - name: crds-2
-          mountPath: /crds/2
+        - name: crds
+          mountPath: /crds
           readOnly: true
         {{- with .Values.crdHook.resources }}
         resources:
@@ -79,10 +78,17 @@ spec:
           {{- toYaml . | nindent 10 }}
         {{- end }}
       volumes:
-      - name: crds-1
-        configMap:
-          name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-1
-      - name: crds-2
-        configMap:
-          name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-2
+      # Projected into one directory so the apply above stays a fixed argument list as
+      # per-CRD ConfigMaps are added.
+      - name: crds
+        projected:
+          sources:
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-1
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-2
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-3
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-4
 {{- end }}

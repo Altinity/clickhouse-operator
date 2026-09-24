@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.27.3
+# OPERATOR_VERSION=0.27.4
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1038,13 +1038,9 @@ spec:
 
                     look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                    any key with prefix `k8s_secret_` shall has value with format namespace/secret/key or secret/key
-                    in this case value from secret will write directly into XML tag during render *-usersd ConfigMap
-
-                    any key with prefix `k8s_secret_env` shall has value with format namespace/secret/key or secret/key
-                    in this case value from secret will write into environment variable and write to XML tag via from_env=XXX
-
-                    look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+                    the `k8s_secret_` and `k8s_secret_env_` key prefixes were REMOVED in 0.27.4
+                    they accepted a namespace/secret/key value and could therefore read a secret from any namespace
+                    a CHI still using them is rejected with reason RemovedSecretRefSyntax - use `valueFrom`/`secretKeyRef` above
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 profiles:
@@ -1847,14 +1843,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.27.3
+# OPERATOR_VERSION=0.27.4
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2879,13 +2875,9 @@ spec:
 
                     look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                    any key with prefix `k8s_secret_` shall has value with format namespace/secret/key or secret/key
-                    in this case value from secret will write directly into XML tag during render *-usersd ConfigMap
-
-                    any key with prefix `k8s_secret_env` shall has value with format namespace/secret/key or secret/key
-                    in this case value from secret will write into environment variable and write to XML tag via from_env=XXX
-
-                    look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+                    the `k8s_secret_` and `k8s_secret_env_` key prefixes were REMOVED in 0.27.4
+                    they accepted a namespace/secret/key value and could therefore read a secret from any namespace
+                    a CHI still using them is rejected with reason RemovedSecretRefSyntax - use `valueFrom`/`secretKeyRef` above
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 profiles:
@@ -3691,7 +3683,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -3957,6 +3949,18 @@ spec:
                       description: |
                         List of regexps to match ClickHouse metrics to exclude from collection/export.
                         Regexps match internal metric names before Prometheus normalization and prefixing.
+            keeper:
+              type: object
+              description: |
+                Keeper-side counterparts of the `clickhouse` section - config-file paths and the
+                default Keeper user/network settings the operator generates for
+                ClickHouseKeeperInstallation resources.
+                Declared preserve-unknown-fields rather than fully modelled: without this the API
+                server PRUNES the whole section from a ClickHouseOperatorConfiguration CR and the
+                operator silently falls back to built-in defaults. The ConfigMap path was never
+                affected. Modelling the leaves properly would also buy validation - see the
+                coverage test in pkg/apis/clickhouse.altinity.com/v1.
+              x-kubernetes-preserve-unknown-fields: true
             security:
               type: object
               description: |
@@ -4210,6 +4214,65 @@ spec:
                                   - "allhosts"
                                   - "AllShards"
                                   - "allshards"
+                              events:
+                                type: array
+                                minItems: 1
+                                description: |
+                                  Reconcile lifecycle events that trigger this hook. Required, must be non-empty.
+                                  The hook is skipped on any reconcile whose classifier does not emit at least one
+                                  of the listed events. Supported values:
+                                    Any               - wildcard match: fires on every hook-evaluation point,
+                                                        including the pre-delete sweep on the dying host
+                                    HostCreate        - first reconcile that creates a host (no ancestor); best
+                                                        paired with POST hooks because PRE hooks on first creation
+                                                        are skipped (no live pod yet)
+                                    HostUpdate        - reconcile that has prior state for the host; catch-all
+                                                        for ongoing reconciles
+                                    HostStart         - host transitions from stopped to running
+                                    HostStop          - host is being stopped (current spec marks it stopped)
+                                    HostConfigRestart - in-place software restart for a configuration change
+                                    HostRollout       - pod-template change forces a StatefulSet rollout
+                                    HostShutdown      - aggregate: fires whenever the pod is going down for any
+                                                        reason (Stop, ConfigRestart, Rollout, or Delete)
+                                    HostDelete        - host is being removed from the cluster (downsize); fires
+                                                        on the dying host before tear-down. Always emitted
+                                                        alongside HostShutdown.
+                                items:
+                                  type: string
+                                  # Both PascalCase and all-lowercase forms are accepted; the
+                                  # runtime comparison is case-insensitive (strings.EqualFold).
+                                  enum:
+                                    - "Any"
+                                    - "any"
+                                    - "HostCreate"
+                                    - "hostcreate"
+                                    - "HostDelete"
+                                    - "hostdelete"
+                                    - "HostUpdate"
+                                    - "hostupdate"
+                                    - "HostStart"
+                                    - "hoststart"
+                                    - "HostStop"
+                                    - "hoststop"
+                                    - "HostConfigRestart"
+                                    - "hostconfigrestart"
+                                    - "HostRollout"
+                                    - "hostrollout"
+                                    - "HostShutdown"
+                                    - "hostshutdown"
+                              failurePolicy:
+                                type: string
+                                description: |
+                                  Controls what happens when this hook returns an error.
+                                  Fail (default): error propagates — pre-hook aborts reconcile / host deletion.
+                                  Ignore: error is logged and the reconcile continues.
+                                # Both PascalCase and all-lowercase forms are accepted; the
+                                # runtime normalizes via strings.EqualFold (Fail == fail).
+                                enum:
+                                  - "Fail"
+                                  - "fail"
+                                  - "Ignore"
+                                  - "ignore"
                         post:
                           type: array
                           description: "actions to execute after host reconcile"
@@ -4415,14 +4478,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.27.3
+# OPERATOR_VERSION=0.27.4
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.27.3
+    clickhouse-keeper.altinity.com/chop: 0.27.4
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -5364,7 +5427,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
 
 # Template Parameters:
 #
@@ -5389,7 +5452,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
 rules:
   #
   # Core API group
@@ -5609,7 +5672,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -5631,7 +5694,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -6034,17 +6097,10 @@ data:
         # Templates are added to the list of all templates and used when CHI is reconciled.
         # Templates are applied in sorted alpha-numeric order.
         path: chi/templates.d
-      chk:
-        # CHK template updates handling policy
-        # Possible policy values:
-        #   - ReadOnStart. Accept CHIT updates on the operators start only.
-        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
-        policy: ApplyOnNextReconcile
-
-        # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
-        # Templates are added to the list of all templates and used when CHI is reconciled.
-        # Templates are applied in sorted alpha-numeric order.
-        path: chk/templates.d
+      # NB there is deliberately no `chk:` section here. OperatorConfigTemplate declares only a CHI
+      # field, so any template.chk.* key unmarshals into nothing and is pruned by the chopconf CRD -
+      # it read as a supported knob while doing nothing. CHK templating is not implemented; adding
+      # the keys back requires the Go field and a reader first.
 
     ################################################
     ##
@@ -6171,7 +6227,7 @@ data:
           # Reaction when a referenced CHK resource changes:
           #   none      — do nothing (default, backward-compatible)
           #   reconcile — trigger CHI reconcile
-          # onKeeperResourceUpdate: none
+          onKeeperResourceUpdate: none
 
       ################################################
       ##
@@ -6343,7 +6399,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 data:
 ---
@@ -6359,7 +6415,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -6453,7 +6509,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -6551,7 +6607,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -6613,7 +6669,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 data:
 ---
@@ -6629,7 +6685,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -6723,7 +6779,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 data:
   readme: |
@@ -6741,7 +6797,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 data:
 ---
@@ -6749,7 +6805,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=${OPERATOR_NAMESPACE}
 #   COMMENT=
-#   OPERATOR_VERSION=0.27.3
+#   OPERATOR_VERSION=0.27.4
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -6759,7 +6815,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -6783,7 +6839,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -7015,7 +7071,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.27.3
+    clickhouse.altinity.com/chop: 0.27.4
     app: clickhouse-operator
 spec:
   ports:

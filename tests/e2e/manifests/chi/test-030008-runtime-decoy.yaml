@@ -16,13 +16,13 @@ spec:
     podTemplates:
       # Tag contains "fips" (admission passes) but image is the stable binary
       # (runtime SELECT version() lacks "fips"). Create the alias before the test:
-      #   docker tag altinity/clickhouse-server:25.8.16.10002.altinitystable \
-      #     altinity/clickhouse-server:25.8.16.10002.altinityfips-decoy
+      #   docker tag altinity/clickhouse-server:25.8.28.10001.altinitystable \
+      #     altinity/clickhouse-server:25.8.28.10001.altinityfips-decoy
       - name: decoy
         spec:
           containers:
             - name: clickhouse
-              image: altinity/clickhouse-server:25.8.16.10002.altinityfips-decoy
+              image: altinity/clickhouse-server:25.8.28.10001.altinityfips-decoy
               # Synthetic local-only alias (exists on no registry). The test loads
               # it into minikube via `minikube image load`; Never stops the kubelet
               # from attempting a registry pull (which would ImagePullBackOff).

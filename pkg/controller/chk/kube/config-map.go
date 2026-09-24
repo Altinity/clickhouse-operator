@@ -27,11 +27,14 @@ import (
 
 type ConfigMap struct {
 	kubeClient client.Client
+	// apiReader reads live; see NewAdapter on why every by-name Get here bypasses the cache.
+	apiReader client.Reader
 }
 
-func NewConfigMap(kubeClient client.Client) *ConfigMap {
+func NewConfigMap(kubeClient client.Client, apiReader client.Reader) *ConfigMap {
 	return &ConfigMap{
 		kubeClient: kubeClient,
+		apiReader:  apiReader,
 	}
 }
 
@@ -43,7 +46,7 @@ func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.Confi
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
 	return commonKube.GetWithRetry(ctx, func() (*core.ConfigMap, error) {
 		cm := &core.ConfigMap{}
-		err := c.kubeClient.Get(ctx, types.NamespacedName{
+		err := c.apiReader.Get(ctx, types.NamespacedName{
 			Namespace: namespace,
 			Name:      name,
 		}, cm)

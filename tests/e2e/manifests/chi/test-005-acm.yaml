@@ -13,7 +13,7 @@ spec:
           fsGroup: 101
         containers:
         - name: clickhouse-pod
-          image: altinity/clickhouse-server:25.8.16.10001.altinitystable
+          image: altinity/clickhouse-server:25.8.28.10001.altinitystable
           ports:
           - name: http
             containerPort: 8123

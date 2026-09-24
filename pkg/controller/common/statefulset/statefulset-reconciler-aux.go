@@ -31,7 +31,11 @@ type IHostObjectsPoller interface {
 	WaitHostPodStarted(ctx context.Context, host *api.Host) error
 }
 
-type fallback interface {
+// Fallback is the create/update failure policy a Reconciler was built with. Exported only so a
+// test in another package can assert which policy was wired in: CHK aborts the reconcile where
+// DefaultFallback ignores, and that choice is not observable anywhere else. (CHI supplies its own
+// config-driven policy rather than DefaultFallback.) No production code calls Reconciler.Fallback.
+type Fallback interface {
 	OnStatefulSetCreateFailed(ctx context.Context, host *api.Host) common.ErrorCRUD
 	OnStatefulSetUpdateFailed(ctx context.Context, oldStatefulSet *apps.StatefulSet, host *api.Host, sts interfaces.IKubeSTS) common.ErrorCRUD
 }

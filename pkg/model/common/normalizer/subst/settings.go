@@ -48,7 +48,6 @@ func substSettingsFieldWithDataFromDataSource(
 	dataSourceDefaultNamespace string,
 	dstField string,
 	srcSecretRefField string,
-	parseScalarString bool,
 	newSettingCreator func(types.ObjectAddress) (*api.Setting, error),
 ) bool {
 	// Has to have source field specified
@@ -59,7 +58,7 @@ func substSettingsFieldWithDataFromDataSource(
 
 	// Fetch data source address from the source setting field
 	setting := settings.Get(srcSecretRefField)
-	secretAddress, err := setting.FetchDataSourceAddress(dataSourceDefaultNamespace, parseScalarString)
+	secretAddress, err := setting.FetchDataSourceAddress(dataSourceDefaultNamespace)
 	if err != nil {
 		// This is not necessarily an error, just no address specified, most likely setting is not data source ref
 		// No substitution done
@@ -89,46 +88,21 @@ func substSettingsFieldWithDataFromDataSource(
 	return true
 }
 
-// ReplaceSettingsFieldWithSecretFieldValue substitute users settings field with the value read from k8s secret
-func ReplaceSettingsFieldWithSecretFieldValue(
-	req req,
-	settings settings,
-	dstField string,
-	srcSecretRefField string,
-	secretGet SecretGetter,
-) bool {
-	return substSettingsFieldWithDataFromDataSource(
-		settings,
-		req.GetTargetNamespace(),
-		dstField,
-		srcSecretRefField,
-		true,
-		func(secretAddress types.ObjectAddress) (*api.Setting, error) {
-			secretFieldValue, err := fetchSecretFieldValue(secretAddress, secretGet)
-			if err != nil {
-				return nil, err
-			}
-			// Create new setting with the value
-			return api.NewSettingScalar(secretFieldValue), nil
-		},
-	)
-}
-
-// ReplaceSettingsFieldWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
+// ReplaceSettingsFieldWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in.
+// Secrets are referenced through an ENV var on purpose - do not add a helper that inlines a
+// Secret's value into a setting, as that writes the plaintext into the generated ConfigMap.
 func ReplaceSettingsFieldWithEnvRefToSecretField(
 	req req,
 	settings settings,
 	dstField string,
 	srcSecretRefField string,
 	envVarNamePrefix string,
-	parseScalarString bool,
 ) bool {
 	return substSettingsFieldWithDataFromDataSource(
 		settings,
 		req.GetTargetNamespace(),
 		dstField,
 		srcSecretRefField,
-		parseScalarString,
 		func(secretAddress types.ObjectAddress) (*api.Setting, error) {
 			// ENV VAR name and value
 			// In case not OK env var name will be empty and config will be incorrect. CH may not start
@@ -162,7 +136,7 @@ func ReplaceSettingsFieldWithMountedFile(
 	srcSecretRefField string,
 ) bool {
 	var defaultMode int32 = 0644
-	return substSettingsFieldWithDataFromDataSource(settings, req.GetTargetNamespace(), "", srcSecretRefField, false,
+	return substSettingsFieldWithDataFromDataSource(settings, req.GetTargetNamespace(), "", srcSecretRefField,
 		func(secretAddress types.ObjectAddress) (*api.Setting, error) {
 			volumeName, ok1 := util.BuildRFC1035Label(srcSecretRefField)
 			volumeMountName, ok2 := util.BuildRFC1035Label(srcSecretRefField)
@@ -212,16 +186,11 @@ type SecretGetter func(namespace, name string) (*core.Secret, error)
 
 var ErrSecretValueNotFound = fmt.Errorf("secret value not found")
 
-// FetchSecretFieldValue fetches the value of the specified field in the specified
-// Secret. Exported wrapper around the internal fetcher so consumers outside the
-// Settings substitution path (e.g. security.tls.rootCASecretRef) can reuse it.
-func FetchSecretFieldValue(secretAddress types.ObjectAddress, secretGet SecretGetter) (string, error) {
-	return fetchSecretFieldValue(secretAddress, secretGet)
-}
-
-// fetchSecretFieldValue fetches the value of the specified field in the specified secret
+// FetchSecretFieldValue fetches the value of the specified field in the specified Secret.
+// Used by security.tls.rootCASecretRef resolution; settings substitution references Secrets
+// through an ENV var instead and never reads their values here.
 // TODO this is the only usage of k8s API in the normalizer. How to remove it?
-func fetchSecretFieldValue(secretAddress types.ObjectAddress, secretGet SecretGetter) (string, error) {
+func FetchSecretFieldValue(secretAddress types.ObjectAddress, secretGet SecretGetter) (string, error) {
 
 	// Fetch the secret
 	secret, err := secretGet(secretAddress.Namespace, secretAddress.Name)

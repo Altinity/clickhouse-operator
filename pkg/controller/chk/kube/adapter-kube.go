@@ -41,19 +41,46 @@ type Adapter struct {
 	sts        *STS
 }
 
+// NewAdapter wires the two readers this package uses, and the split between them is the whole
+// contract: LIST THROUGH THE CACHE, GET LIVE.
+//
+// The manager's cache is narrowed by label (see newKeeperCacheOptions), which is where the memory
+// saving comes from - the informers hold only operator-generated objects. The cost of a filter is
+// that a cached Get for an object outside it returns IsNotFound, indistinguishable from real
+// absence. Acting on absence is a hazard the cache did not create - the ClickHouse controller has
+// always read live and has the same fault - but a filter turns it from "the object is gone" into
+// "the object is unlabelled", which is far easier to reach. These paths act on absence: a PVC read as missing drives a StatefulSet
+// recreate, a ConfigMap or Service read as missing drives a create that then fails AlreadyExists.
+// So every by-name Get of a NARROWED type goes to apiReader, which consults the API server
+// directly. Three types read cached and are deliberately not narrowed, so no by-name Get of them
+// can be filtered away: the ClickHouseKeeperInstallation, which is user-authored, carries no
+// operator label, and is the reason the filter is per-type rather than cache-wide; and Deployment
+// and ReplicaSet, which have Get methods here but no caller on the Keeper path at all.
+//
+// Lists stay on the cache. Every one is issued by the discoverer with SelectorCRScope, which
+// constrains the same label plus namespace and CR name, so the cache filter is a strict superset
+// and cannot change a List result. PVC.ListForHost reads live as well, but only for consistency
+// with the Get beside it - its host-scoped selector already carries the same label pair, so the
+// filter could not have changed its result either.
+//
+// StatefulSet had its own reason to read live before any of this. The cache is not write-through:
+// Create and Update go straight to the API server and never touch it, and it catches up only when
+// the watch delivers the change - so a Get immediately after an Update can still return the
+// pre-update object and mislead a fingerprint comparison. Both reasons now apply to every
+// narrowed type.
 func NewAdapter(kubeClient client.Client, apiReader client.Reader, namer interfaces.INameManager) *Adapter {
 	return &Adapter{
 		cr: NewCR(kubeClient),
 
-		configMap:  NewConfigMap(kubeClient),
+		configMap:  NewConfigMap(kubeClient, apiReader),
 		deployment: NewDeployment(kubeClient),
 		event:      NewEvent(kubeClient),
-		pdb:        NewPDB(kubeClient),
-		pod:        NewPod(kubeClient, namer),
-		pvc:        storage.NewStoragePVC(NewPVC(kubeClient)),
+		pdb:        NewPDB(kubeClient, apiReader),
+		pod:        NewPod(kubeClient, apiReader, namer),
+		pvc:        storage.NewStoragePVC(NewPVC(kubeClient, apiReader)),
 		replicaSet: NewReplicaSet(kubeClient),
-		secret:     NewSecret(kubeClient, namer),
-		service:    NewService(kubeClient, namer),
+		secret:     NewSecret(kubeClient, apiReader, namer),
+		service:    NewService(kubeClient, apiReader, namer),
 		sts:        NewSTS(kubeClient, apiReader, namer),
 	}
 }

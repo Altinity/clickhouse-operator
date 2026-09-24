@@ -1,0 +1,16 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-020003-3-chi
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    zookeeper:
+      nodes:
+        - host: keeper-test-020003-3-chk
+          port: 2181
+    clusters:
+      - name: default
+        layout:
+          replicasCount: 2

@@ -17,6 +17,7 @@ package statefulset
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,6 +31,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	announcer "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
@@ -99,28 +101,58 @@ func (f *fakeSTS) List(ctx context.Context, namespace string, opts meta.ListOpti
 	return nil, nil
 }
 
-// fakeNamer returns a fixed name for the StatefulSet name lookup. doDeleteStatefulSet
-// only consults the namer for the StatefulSet name (which feeds straight into
-// r.sts.Delete) so we just hardcode the desired name here.
-type fakeNamer struct{ stsName string }
+// fakeNamer returns a fixed name for StatefulSet and Pod lookups.
+type fakeNamer struct {
+	stsName string
+	podName string
+}
 
 func (n *fakeNamer) Name(what interfaces.NameType, params ...any) string {
+	if what == interfaces.NamePod && n.podName != "" {
+		return n.podName
+	}
 	return n.stsName
 }
 func (n *fakeNamer) Names(what interfaces.NameType, params ...any) []string {
 	return nil
 }
 
-// fakePoller is a no-op IHostObjectsPoller — none of these doDeleteStatefulSet
-// code paths exercise the poller, but the field cannot be nil if any path
-// happens to invoke it.
-type fakePoller struct{}
+// fakePoller is an IHostObjectsPoller test double. The default zero value is a
+// successful wait; tests that need a scale-to-0 timeout set waitReadyErr.
+type fakePoller struct {
+	waitReadyCalls int
+	waitReadyErr   error
+}
 
 func (p *fakePoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error {
-	return nil
+	p.waitReadyCalls++
+	return p.waitReadyErr
 }
 func (p *fakePoller) WaitHostPodStarted(ctx context.Context, host *api.Host) error {
 	return nil
+}
+
+// fakePod is a minimal IKubePod test double. Only Delete is exercised by the
+// scale-to-0 escalate path; the other methods exist to satisfy the interface.
+type fakePod struct {
+	deleteCalls         int
+	deleteErr           error
+	lastDeleteNamespace string
+	lastDeleteName      string
+}
+
+func (f *fakePod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
+	return nil, nil
+}
+func (f *fakePod) GetAll(ctx context.Context, obj any) []*core.Pod { return nil }
+func (f *fakePod) Update(ctx context.Context, pod *core.Pod) (*core.Pod, error) {
+	return pod, nil
+}
+func (f *fakePod) Delete(ctx context.Context, namespace, name string) error {
+	f.deleteCalls++
+	f.lastDeleteNamespace = namespace
+	f.lastDeleteName = name
+	return f.deleteErr
 }
 
 // stsResource is the schema.GroupResource used for constructing typed API
@@ -137,9 +169,11 @@ func newReconciler(sts interfaces.IKubeSTS, stsName string) *Reconciler {
 	return &Reconciler{
 		a:                 announcer.NewAnnouncer(nil, nil),
 		hostObjectsPoller: &fakePoller{},
-		namer:             &fakeNamer{stsName: stsName},
+		namer:             &fakeNamer{stsName: stsName, podName: stsName + "-0"},
 		storage:           &storage.Reconciler{},
 		sts:               sts,
+		// Always wired, exactly as production does - r.pod is used unguarded, like r.sts.
+		pod: &fakePod{},
 	}
 }
 
@@ -340,4 +374,238 @@ func TestCreateStatefulSet_AlreadyExistsPropagatesAsRecreate(t *testing.T) {
 	assert.Equal(t, common.ErrCRUDRecreate, err,
 		"createStatefulSet must propagate ErrCRUDRecreate so the caller retries on the next reconcile pass")
 	assert.Equal(t, 1, fake.createCalls, "Create should be attempted exactly once")
+}
+
+// TestDoDeleteStatefulSet_ScaleToZeroTimeoutForceDeletesPod is the escalate path: a successful
+// scale-to-0 Update whose wait spends its whole budget must force-delete the host pod and then
+// still run StatefulSet Delete, so recreate can create the replacement in this pass.
+func TestDoDeleteStatefulSet_ScaleToZeroTimeoutForceDeletesPod(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	fake := &fakeSTS{getReturn: cur}
+	p := &fakePoller{waitReadyErr: fmt.Errorf("poll(x) - %w", poller.ErrTimeout)}
+	pods := &fakePod{}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = p
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, p.waitReadyCalls, "scale-to-0 wait must be honored")
+	assert.Equal(t, 1, pods.deleteCalls, "wedged pod must be force-deleted")
+	assert.Equal(t, "ns", pods.lastDeleteNamespace)
+	assert.Equal(t, "chi-test-cluster-0-0-0", pods.lastDeleteName)
+	assert.Equal(t, 1, fake.deleteCalls, "StatefulSet Delete must still run after pod escalate")
+}
+
+// TestDoDeleteStatefulSet_ScaleToZeroTimeoutPodNotFoundStillDeletesSTS —
+// the pod may already be gone by the time we escalate; IsNotFound is
+// success and Delete of the StatefulSet must still proceed.
+func TestDoDeleteStatefulSet_ScaleToZeroTimeoutPodNotFoundStillDeletesSTS(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{
+		deleteErr: apiErrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "chi-test-cluster-0-0-0"),
+	}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = &fakePoller{waitReadyErr: fmt.Errorf("poll(x) - %w", poller.ErrTimeout)}
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.NoError(t, err, "IsNotFound on pod delete is benign")
+	assert.Equal(t, 1, pods.deleteCalls)
+	assert.Equal(t, 1, fake.deleteCalls)
+}
+
+// TestDoDeleteStatefulSet_PodDeleteFailureStillDeletesSTS — the escalate is best-effort, exactly
+// like the scale-to-0 Update above it. A pod-delete failure must not block StatefulSet Delete:
+// Delete has its own chance to succeed, and returning here would make a transient Forbidden or
+// 429 strictly worse than never having attempted the force at all.
+func TestDoDeleteStatefulSet_PodDeleteFailureStillDeletesSTS(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{deleteErr: errors.New("forbidden")}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = &fakePoller{waitReadyErr: fmt.Errorf("poll(x) - %w", poller.ErrTimeout)}
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.NoError(t, err, "a failed force-delete must not block StatefulSet Delete")
+	assert.Equal(t, 1, pods.deleteCalls)
+	assert.Equal(t, 1, fake.deleteCalls, "StatefulSet Delete must still run")
+}
+
+// TestDoDeleteStatefulSet_NonTimeoutWaitErrorDoesNotForce is the guard that keeps the force
+// honest. The poller returns early - within milliseconds - on any Get error that is not
+// NotFound, so an API blip outlasting the Get retries reaches this code having given the pod no
+// time at all. Escalating there would SIGKILL a host that had just been asked to stop and was
+// shutting down cleanly. Only a spent budget earns the force.
+func TestDoDeleteStatefulSet_NonTimeoutWaitErrorDoesNotForce(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = &fakePoller{waitReadyErr: errors.New("etcdserver: request timed out")}
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, pods.deleteCalls, "a transient Get failure must never force-delete a pod")
+	assert.Equal(t, 1, fake.deleteCalls, "StatefulSet Delete still proceeds, as it did before")
+}
+
+// TestDoDeleteStatefulSet_AlreadyAtZeroStillEscalates covers the recovery pass. A host stranded
+// by an earlier failed Delete comes back with Replicas already 0, so the scale-down is skipped -
+// but the wedged pod is still there and this is the pass that has to clear it. Without the wait
+// on this branch the escalate is unreachable for exactly the hosts that need it most.
+func TestDoDeleteStatefulSet_AlreadyAtZeroStillEscalates(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(0))
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{}
+	p := &fakePoller{waitReadyErr: fmt.Errorf("poll(x) - %w", poller.ErrTimeout)}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = p
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, fake.updateCalls, "already at 0 - no scale-down Update")
+	assert.Equal(t, 1, p.waitReadyCalls, "the wait must still run so a stranded pod is noticed")
+	assert.Equal(t, 1, pods.deleteCalls, "the pod stranded by the earlier pass must be force-deleted")
+	assert.Equal(t, 1, fake.deleteCalls)
+}
+
+// TestDoDeleteStatefulSet_SuccessfulWaitDoesNotDeletePod — when the
+// scale-to-0 wait succeeds the pod is already gone, so escalate must not run.
+func TestDoDeleteStatefulSet_SuccessfulWaitDoesNotDeletePod(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{}
+	p := &fakePoller{}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = p
+	r.pod = pods
+
+	err := r.doDeleteStatefulSet(context.Background(), host("ns"))
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, p.waitReadyCalls)
+	assert.Equal(t, 0, pods.deleteCalls, "pod delete is only for a timed-out wait")
+	assert.Equal(t, 1, fake.deleteCalls)
+}
+
+// TestRecreateStatefulSet_ScaleToZeroTimeoutStillCreates — the one-pass invariant: a wedged pod
+// must not abort Recreate. After force-deleting the pod, Delete+Create complete in this pass.
+func TestRecreateStatefulSet_ScaleToZeroTimeoutStillCreates(t *testing.T) {
+	cur := stsWithReplicas(int32Ptr(1))
+	fake := &fakeSTS{getReturn: cur}
+	pods := &fakePod{}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	r.hostObjectsPoller = &fakePoller{waitReadyErr: fmt.Errorf("poll(x) - %w", poller.ErrTimeout)}
+	r.pod = pods
+
+	h := hostWithCR("ns", "test-chi")
+	h.Runtime.DesiredStatefulSet = stsWithReplicas(int32Ptr(1))
+
+	err := r.recreateStatefulSet(context.Background(), h, false /*register*/, NewReconcileStatefulSetOptions())
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, pods.deleteCalls, "wedged pod must be force-deleted")
+	assert.Equal(t, 1, fake.deleteCalls, "delete should complete after escalate")
+	assert.Equal(t, 1, fake.createCalls, "create must run in the same pass")
+}
+
+// TestReconcileStatefulSet_UnreadableDoesNotRecreate is the most destructive instance of a class
+// that appears throughout this codebase: a Get whose error is tested only for IsNotFound, with
+// everything else falling through as if the object were present.
+//
+// In production the fall-through reached updateStatefulSet with no usable current StatefulSet -
+// nil on the Keeper path, an empty one on the ClickHouse path, and IsStatefulSetReady rejects
+// both - which escalates to ErrCRUDRecreate, and onUpdateFailure defaults to recreate. The delete
+// lands once a re-read succeeds, so what destroys a healthy host is a blip that clears at the
+// wrong moment.
+//
+// This test does not walk that whole chain: it asserts only that the read error stops the
+// reconcile before any write is attempted. Its siblings cover the rest - NotFoundStillCreates
+// pins the branch that must still fire, because assertions of the form "nothing happened" are
+// equally satisfied by a reconciler that does nothing at all.
+func TestReconcileStatefulSet_UnreadableDoesNotRecreate(t *testing.T) {
+	sts := &fakeSTS{getErr: apiErrors.NewForbidden(stsResource, "sts", errors.New("rbac not propagated"))}
+	r := newReconciler(sts, "sts")
+
+	h := host("ns")
+	h.Runtime.DesiredStatefulSet = &apps.StatefulSet{
+		ObjectMeta: meta.ObjectMeta{Namespace: "ns", Name: "sts"},
+	}
+
+	err := r.ReconcileStatefulSet(context.Background(), h, false, nil)
+
+	require.Error(t, err, "an unreadable StatefulSet must surface, not be silently rebuilt")
+	require.True(t, apiErrors.IsForbidden(err), "the original read error must reach the caller: %v", err)
+	require.Zero(t, sts.deleteCalls, "a StatefulSet that may exist and be healthy must not be deleted")
+	require.Zero(t, sts.createCalls, "no write may be attempted while the current state is unknown")
+	require.Zero(t, sts.updateCalls, "there is nothing to update - the current state is unknown")
+}
+
+// The positive half. Every assertion in the test above is of the form "X did not happen", which a
+// reconciler that does nothing satisfies just as well - deleting the whole switch left it green,
+// and so did hoisting the error arm above the IsNotFound one, which would stop any StatefulSet
+// from ever being created. This pins the branch that must still fire.
+func TestReconcileStatefulSet_NotFoundStillCreates(t *testing.T) {
+	sts := &fakeSTS{getErr: apiErrors.NewNotFound(stsResource, "sts")}
+	r := newReconciler(sts, "sts")
+
+	h := host("ns")
+	h.Runtime.DesiredStatefulSet = &apps.StatefulSet{
+		ObjectMeta: meta.ObjectMeta{Namespace: "ns", Name: "sts"},
+	}
+
+	_ = r.ReconcileStatefulSet(context.Background(), h, false, nil)
+
+	require.Equal(t, 1, sts.createCalls, "an absent StatefulSet must still be created")
+	require.Zero(t, sts.deleteCalls, "creating an absent StatefulSet must not delete anything")
+}
+
+// The context arm has no other coverage: removing it, emptying it, or ordering it after the error
+// arm all left the entire suite green. Each of those turns an orderly shutdown into a host-level
+// failure and a ReconcileFailed Warning on every operator stop, because a cancelled read surfaces
+// as an error like any other.
+//
+// The context must be live when ReconcileStatefulSet is entered - the guard at the top of the
+// function returns before the switch otherwise - so the fake cancels from inside the Get.
+func TestReconcileStatefulSet_ContextDoneIsNotAFailure(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sts := &cancelOnGetSTS{cancel: cancel}
+	r := newReconciler(sts, "sts")
+
+	h := host("ns")
+	h.Runtime.DesiredStatefulSet = &apps.StatefulSet{
+		ObjectMeta: meta.ObjectMeta{Namespace: "ns", Name: "sts"},
+	}
+
+	err := r.ReconcileStatefulSet(ctx, h, false, nil)
+
+	require.NoError(t, err, "a cancelled reconcile is a shutdown, not a host failure")
+	require.Zero(t, sts.createCalls, "shutdown must not start writes")
+	require.Zero(t, sts.updateCalls, "shutdown must not start writes")
+	require.Zero(t, sts.deleteCalls, "shutdown must not start writes")
+}
+
+// cancelOnGetSTS cancels the reconcile context from inside the Get, reproducing a shutdown that
+// begins while a read is in flight - the only way to reach the switch with a dead context.
+type cancelOnGetSTS struct {
+	fakeSTS
+	cancel func()
+}
+
+func (f *cancelOnGetSTS) Get(_ context.Context, _ ...any) (*apps.StatefulSet, error) {
+	f.getCalls++
+	f.cancel()
+	return nil, context.Canceled
 }

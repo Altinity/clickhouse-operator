@@ -60,10 +60,7 @@ clickhouse_template = (
     # "manifests/chit/tpl-clickhouse-23.3.yaml"
     # "manifests/chit/tpl-clickhouse-23.8.yaml"
 )
-clickhouse_template_old = "manifests/chit/tpl-clickhouse-23.3.yaml"
-
 clickhouse_version = get_ch_version(clickhouse_template)
-clickhouse_version_old = get_ch_version(clickhouse_template_old)
 
 keeper_type = os.getenv("KEEPER_TYPE") if "KEEPER_TYPE" in os.environ else "zookeeper" # zookeeper | clickhouse_keeper
 

@@ -175,6 +175,30 @@ func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) (*statefulset.R
 	return stsReconcileOpts, migrateTableOpts
 }
 
+// hostPVCsDataVolumeAddedDetectedOptions is the response to a volume being ADDED to a host that
+// already has data.
+//
+// Two things are needed, and only two:
+//  1. Re-create the StatefulSet so the new mount takes effect.
+//  2. Force a table migration afterwards. Re-creating the pod wipes every non-persistent object the
+//     operator had migrated onto it - notably Engine=Memory databases and views, which live in RAM,
+//     are not ZK-replicated, and have nothing to restore them. HostCreateTables issues
+//     CREATE ... IF NOT EXISTS, so persistent objects are untouched. Dropping this step is what
+//     broke test_010036 ("checking view in Memory engine exists"): the view never came back.
+//
+// What must NOT happen is SetForceDropReplicaUponStorageLoss. Nothing was lost, so tearing the ZK
+// replica down and rebuilding it is destructive busywork - that is the whole point of splitting this
+// path away from hostPVCsDataLossDetectedOptions.
+func (w *worker) hostPVCsDataVolumeAddedDetectedOptions(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {
+	w.a.V(1).
+		M(host).F().
+		Info("Volume added to host: %s. Will recreate StatefulSet and re-migrate tables, without replica drop", host.GetName())
+
+	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
+	migrateTableOpts := NewMigrateTableOptions().SetForceMigrate()
+	return stsReconcileOpts, migrateTableOpts
+}
+
 func (w *worker) hostPVCsDataVolumeMissedDetectedOptions(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {
 	w.a.V(1).
 		M(host).F().

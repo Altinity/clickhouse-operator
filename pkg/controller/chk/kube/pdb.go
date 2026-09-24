@@ -27,11 +27,14 @@ import (
 
 type PDB struct {
 	kubeClient client.Client
+	// apiReader reads live; see NewAdapter on why every by-name Get here bypasses the cache.
+	apiReader client.Reader
 }
 
-func NewPDB(kubeClient client.Client) *PDB {
+func NewPDB(kubeClient client.Client, apiReader client.Reader) *PDB {
 	return &PDB{
 		kubeClient: kubeClient,
+		apiReader:  apiReader,
 	}
 }
 
@@ -43,7 +46,7 @@ func (c *PDB) Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*pol
 func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error) {
 	return commonKube.GetWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
 		pdb := &policy.PodDisruptionBudget{}
-		err := c.kubeClient.Get(ctx, types.NamespacedName{
+		err := c.apiReader.Get(ctx, types.NamespacedName{
 			Namespace: namespace,
 			Name:      name,
 		}, pdb)
