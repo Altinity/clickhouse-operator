@@ -141,13 +141,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fixed a bug when inconsistent cluster definition might result in a crash. Closes https://github.com/Altinity/clickhouse-operator/issues/1319
 * Fixed a bug when hosts-completed could be incorrectly reported in status when reconcile is re-started in the middle
 
-
 ## [0.23.2](https://github.com/Altinity/clickhouse-operator/compare/release-0.23.1...release-0.23.2)
 
 ### Changed
 * Fix environment variables generation for secrets that might be off in some cases. Closes https://github.com/Altinity/clickhouse-operator/issues/1344
 * Golang is upgraded to 1.20. Closes CVEs in dependent libraries.
-
 
 ## [0.23.1](https://github.com/Altinity/clickhouse-operator/compare/release-0.23.0...release-0.23.1)
 
@@ -160,7 +158,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fixed metrics-exporter that might fail to export metrics in some cases. Closes https://github.com/Altinity/clickhouse-operator/issues/1336
 * Fixed Keeper examples
 * Include installation of ClickhouseKeeperInstallations CRD in Helm chart readme by @echozio in https://github.com/Altinity/clickhouse-operator/pull/1330
-
 
 ## [0.23.0](https://github.com/Altinity/clickhouse-operator/compare/release-0.22.2...release-0.23.0)
 
@@ -308,11 +305,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fixed a bug when schema could not be created on new nodes, if nodes took too long to start
 * Fixed a bug when services were not reconciled in rare cases
 
-### New Contributors
-* @seeekr made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1219
-* @dmvolod made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1223
-* @farodin91 made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1255
-
 **Full Changelog**:
 
 ## [0.21.3](https://github.com/Altinity/clickhouse-operator/compare/release-0.21.2...release-0.21.3)
@@ -328,9 +320,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fix nil pointer deref in metrics exporter (#1187)  by @zcross in https://github.com/Altinity/clickhouse-operator/pull/1188
 * Migrate piechart plugin on Grafana Dashboard by @MiguelNdeCarvalho in https://github.com/Altinity/clickhouse-operator/pull/1190
 * Permission error when deleting Pod sometimes
-
-### New Contributors
-* @MiguelNdeCarvalho made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1190
 
 ## [0.21.2](https://github.com/Altinity/clickhouse-operator/compare/release-0.21.1...release-0.21.2)
 
@@ -349,12 +338,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 * fix crash when reconcilePVC() failed by @jewelzqiu in https://github.com/Altinity/clickhouse-operator/pull/1168
 * fix reconcile threads number by @jewelzqiu in https://github.com/Altinity/clickhouse-operator/pull/1170
-
-### New Contributors
-* @jewelzqiu made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1168
-* @xiedeyantu made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1169
-* @dmmarkov made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1012
-
 
 ## [0.21.1](https://github.com/Altinity/clickhouse-operator/compare/release-0.21.0...release-0.21.1)
 
@@ -423,11 +406,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fixed propagation of podTemplate environment variables from ClickHouseInstallationTemplate to ClickHouseInstallation
 * Fixed propagation of startup probe from ClickHouseInstallationTemplate to ClickHouseInstallation
 
-### New Contributors
-* @roimor made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1131
-* @Tvion made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1114
-* @zcross made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1115
-
 ## [0.20.3](https://github.com/Altinity/clickhouse-operator/compare/release-0.20.2...release-0.20.3)
 
 ### Changed
@@ -460,9 +438,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Address https://nvd.nist.gov/vuln/detail/CVE-2022-27664. Closes #1039
 * Fixed RBAC permissions for secrets. Closes #1051
 
-### New Contributors
-* @slamdev made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1049
-
 ## [0.20.0](https://github.com/Altinity/clickhouse-operator/compare/release-0.19.2...release-0.20.0)
 
 ### Changed
@@ -490,14 +465,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Delete duplicate return by @Abirdcfly in https://github.com/Altinity/clickhouse-operator/pull/987
 * Fixes #991 - fix watch namespace regex by @mcgrawia in https://github.com/Altinity/clickhouse-operator/pull/992
 * Address CVE-2022-32149 by @bkuschel in https://github.com/Altinity/clickhouse-operator/pull/1035
-
-### New Contributors
-* @Abirdcfly made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/987
-* @mcgrawia made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/992
-* @chhan-coupang made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/947
-* @luluz66 made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/993
-* @chancez made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/938
-* @antip00 made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/1034
 
 ## [0.19.3]( https://github.com/Altinity/clickhouse-operator/compare/release-0.19.2...release-0.19.3)
 
@@ -545,19 +512,11 @@ Previously, when adding shards only distributed tables and dependent objects wer
 * Improve grafana dashboards by @Slach in https://github.com/Altinity/clickhouse-operator/pull/952
 * Improve grafana-operator + prometheus-operator by @Slach in https://github.com/Altinity/clickhouse-operator/pull/953
 
-### New Contributors
-* @roshanths made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/936
-* @SuzyWangIBMer made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/940
-* @meob made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/949
-
 ## [0.18.5](https://github.com/Altinity/clickhouse-operator/compare/0.18.4...0.18.5)
 
 ### Changed
 * Dependencies were updated to address CVE-2022-21698 and CVE-2021-38561
 * generate_chart.sh by @ganievs in https://github.com/Altinity/clickhouse-operator/pull/925
-
-### New Contributors
-* @ganievs made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/925
 
 ## [0.18.4](https://github.com/Altinity/clickhouse-operator/compare/0.18.3...0.18.4)
 
@@ -567,17 +526,12 @@ Previously, when adding shards only distributed tables and dependent objects wer
 * Fixed number of SERVERS from 1 to 3 for a 3 node clickhouse-keeper deployment by @a-dot in https://github.com/Altinity/clickhouse-operator/pull/902
 * clickhouse-keeper and ZooKeeper manifests were updated  by @Slach in https://github.com/Altinity/clickhouse-operator/pull/911 and  https://github.com/Altinity/clickhouse-operator/pull/916
 
-### New Contributors
-* @a-dot made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/902
-* @bkuschel made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/912
-
 ## [0.18.3](https://github.com/Altinity/clickhouse-operator/compare/0.18.2...0.18.3)
 
 ### Changed
 * Fixed a bug that might result in broken CHI if operator has been restarted during the reconcile
 * Added 'AGE' to CHI status
 * Added ClickHouse Keeper examples
-
 
 ## [0.18.2](https://github.com/Altinity/clickhouse-operator/compare/0.18.1...0.18.2)
 
@@ -591,9 +545,6 @@ Previously, when adding shards only distributed tables and dependent objects wer
 ### Changed
 * fix non pointer mistake in metrics-exporter by @adu-bricks in https://github.com/Altinity/clickhouse-operator/pull/870
 * Helper files for operatorhub.io integration
-
-### New Contributors
-* @adu-bricks made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/870
 
 ## [0.18.0](https://github.com/Altinity/clickhouse-operator/compare/0.17.0...0.18.0)
 
@@ -611,11 +562,6 @@ Previously, when adding shards only distributed tables and dependent objects wer
 * Fixed a bug 'unable to decode watch event: no kind \"ClickHouseOperatorConfiguration\" is registered' that could appear in some k8s configurations.
 * Removed INFORMATION_SCHEMA from schema propagation. (closes https://github.com/Altinity/clickhouse-operator/issues/854)
 * Added a containerPort to metrics-exporter (https://github.com/Altinity/clickhouse-operator/pull/834)
-
-### New Contributors
-* @johnhummelAltinity made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/838
-* @jiangxinqi1995 made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/846
-* @johnny made their first contribution in https://github.com/Altinity/clickhouse-operator/pull/834
 
 ## [0.17.0](https://github.com/Altinity/clickhouse-operator/compare/0.16.1...0.17.0)
 
@@ -643,7 +589,6 @@ Previously, when adding shards only distributed tables and dependent objects wer
 ### Upgrade notes
 * CRD needs to be updated with this release
 * 0.16.0 had hardcoded 60 seconds for terminationGracePeriod that resulted in ClickHouse restarts when upgrading from 0.15.0 to 0.16.0. Upgrade from 0.15.0 to 0.16.1 does result in ClickHouse restarts. If you are upgrading from 0.16.0 to 0.16.1 set [terminationGracePeriod](https://github.com/Altinity/clickhouse-operator/blob/50134723c388eda208a8a02a3c333a8fca73133a/config/config.yaml#L163) to 60 in operator config file. Refer to [Operator Configuration](https://github.com/Altinity/clickhouse-operator/blob/master/docs/operator_configuration.md) for more details.
-
 
 ## [0.16.0](https://github.com/Altinity/clickhouse-operator/compare/0.15.0...0.16.0)
 
@@ -759,7 +704,6 @@ This release includes a number of improvements in order to eliminate unneeded re
 * LoadBalancer node ports are no longer modified on service upgrade. That reduces possible downtime
 * Service is re-created if it can not be updated for some reason (e.g. change from ClusterIP to LoadBalancer or vice versa)
 * Fixed several race conditions when creating/updating a cluster
-
 
 ## [0.11.0](https://github.com/Altinity/clickhouse-operator/compare/0.10.0...0.11.0)
 ### New features:
@@ -903,7 +847,6 @@ Documentation and examples has been updated to reflect recent changes.
 ### Upgrade notes:
 * There were changes in ClickHouseInstallation CRD. It is recommended to remove and re-install the operator. Existing ClickHouse clusters will be picked up automatically.
 * **IMPORTANT**: If you upgrade operator from 0.6.0 or earlier to 0.8.0 please make sure your ClickHouseInstallation name is shorter than 15 symbols. Otherwise DO NOT UPGRADE an operator.
-
 
 ## [0.7.0](https://github.com/Altinity/clickhouse-operator/compare/0.6.0...0.7.0)
 
