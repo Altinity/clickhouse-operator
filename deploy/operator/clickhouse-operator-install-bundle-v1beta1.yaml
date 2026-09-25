@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.27.4
+# OPERATOR_VERSION=0.28.0
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1843,14 +1843,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.27.4
+# OPERATOR_VERSION=0.28.0
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -3683,7 +3683,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -4478,14 +4478,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.27.4
+# OPERATOR_VERSION=0.28.0
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.27.4
+    clickhouse-keeper.altinity.com/chop: 0.28.0
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -5427,7 +5427,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
 
 # Template Parameters:
 #
@@ -5452,7 +5452,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
 rules:
   #
   # Core API group
@@ -5672,7 +5672,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -5705,7 +5705,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
 rules:
   #
   # Core API group
@@ -5925,7 +5925,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -5947,7 +5947,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -6652,7 +6652,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 data:
 ---
@@ -6668,7 +6668,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -6762,7 +6762,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -6860,7 +6860,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -6922,7 +6922,7 @@ metadata:
   name: etc-keeper-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 data:
 ---
@@ -6938,7 +6938,7 @@ metadata:
   name: etc-keeper-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 data:
   01-keeper-01-default-config.xml: |
@@ -7032,7 +7032,7 @@ metadata:
   name: etc-keeper-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 data:
   readme: |
@@ -7050,7 +7050,7 @@ metadata:
   name: etc-keeper-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 data:
 ---
@@ -7058,7 +7058,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=kube-system
 #   COMMENT=
-#   OPERATOR_VERSION=0.27.4
+#   OPERATOR_VERSION=0.28.0
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -7068,7 +7068,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -7079,9 +7079,9 @@ stringData:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.27.4
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.28.0
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.27.4
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.28.0
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -7092,7 +7092,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -7148,7 +7148,7 @@ spec:
             sizeLimit: 1Mi
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.27.4
+          image: altinity/clickhouse-operator:0.28.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -7228,7 +7228,7 @@ spec:
             - containerPort: 9999
               name: op-metrics
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.27.4
+          image: altinity/metrics-exporter:0.28.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -7324,7 +7324,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 spec:
   ports:
