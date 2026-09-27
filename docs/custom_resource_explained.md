@@ -576,8 +576,9 @@ with additional sections, such as:
 
         # Possible values for distribution are:
         # Unspecified
-        # OnePerHost
-        distribution: "Unspecified"
+        # ClickHouseAntiAffinity
+        podDistribution:
+          - type: ClickHouseAntiAffinity
 
         # type PodSpec struct {} from k8s.io/core/v1
         spec:
@@ -607,7 +608,8 @@ Example - how to place ClickHouse instances in AWS `us-east-1a` availability zon
         zone:
           values:
             - "us-east-1a"
-        distribution: "OnePerHost"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
 ```
 Example - how to place ClickHouse instances on nodes labeled as `clickhouse=allow` with one ClickHouse per host 
 ```yaml
@@ -615,7 +617,8 @@ Example - how to place ClickHouse instances on nodes labeled as `clickhouse=allo
           key: "clickhouse"
           values:
             - "allow"
-        distribution: "OnePerHost"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
 ```
 
 [custom-resource]: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
