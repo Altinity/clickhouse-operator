@@ -13,7 +13,7 @@ on:
         default: ''
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -140,6 +140,27 @@ jobs:
           name: cosign-evidence-${{ github.event.workflow_run.head_branch || github.ref_name }}
           path: cosign-evidence/
           retention-days: 365
+
+      - name: Attach cosign evidence to GitHub Release
+        if: ${{ steps.refs.outputs.images != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          CHO_RELEASE=$(cat release)
+          TAG=""
+          for candidate in "release-${CHO_RELEASE}" "${CHO_RELEASE}"; do
+            if gh release view "${candidate}" >/dev/null 2>&1; then
+              TAG="${candidate}"
+              break
+            fi
+          done
+          if [ -z "${TAG}" ]; then
+            echo "no GitHub Release for ${CHO_RELEASE} yet; skipping upload"
+            exit 0
+          fi
+          echo "Attaching cosign-evidence to GH Release ${TAG}"
+          gh release upload "${TAG}" cosign-evidence/* --clobber
 
       - name: Skip notice
         if: ${{ steps.refs.outputs.images == '' }}

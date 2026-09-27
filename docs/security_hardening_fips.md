@@ -535,7 +535,7 @@ still planned.
 
 #### What ships per release (automated)
 
-Every tag-push build of `build_branch.yaml` uploads a
+Every version-branch push and every published `release-*` GitHub Release of `build_branch.yaml` uploads a
 `release-evidence-<version>` GitHub Actions artifact containing, for each
 of `clickhouse-operator` and `metrics-exporter`:
 
