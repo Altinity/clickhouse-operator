@@ -121,6 +121,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	}
 	w.prepareMonitoring(new)
 	w.setHostStatusesPreliminary(ctx, new)
+	w.stageUncommittedScaleUpHosts(ctx, new)
 
 	if err := w.reconcile(ctx, new); err != nil {
 		if errors.Is(err, common.ErrCRUDDeferred) {
@@ -843,6 +844,13 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Warning("Reconcile Host Main - unable to reconcile Service. Host: %s Err: %v", host.GetName(), err)
 	}
 
+	// Admit this host into raft_configuration before creating its StatefulSet,
+	// so the new pod starts with itself already in the published membership.
+	// Remaining staged hosts stay excluded.
+	if host.GetReconcileAttributes().IsExclude() {
+		w.includeHostIntoRaftCluster(ctx, host)
+	}
+
 	// Snapshot the ensemble and reconcile the StatefulSet against that same snapshot.
 	snap, err := w.reconcileHostStatefulSetWithEnsembleSnapshot(ctx, host, stsReconcileOpts)
 	if err != nil {
@@ -917,8 +925,13 @@ func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, sn
 		return nil
 	}
 
+	// Staged 1→N joins already waited Ready on the STS. Do not sleep them.
+	if hostIsStagedScaleUpJoin(host) {
+		return w.verifyHostEnsembleMembership(ctx, host)
+	}
+
 	if !snap.rolling {
-		// Bootstrap / resume-from-stopped / recovery: peers start together;
+		// Fresh bootstrap / resume-from-stopped / recovery: peers start together;
 		// legacy pacing wait (Ready wait was skipped on STS).
 		util.WaitContextDoneOrTimeout(ctx, 7*time.Second)
 		return nil

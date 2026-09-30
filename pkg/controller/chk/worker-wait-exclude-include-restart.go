@@ -90,6 +90,7 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 		return nil
 	}
 
+	w.includeHostIntoRaftCluster(ctx, host)
 	return nil
 }
 
