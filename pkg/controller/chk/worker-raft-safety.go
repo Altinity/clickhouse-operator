@@ -89,6 +89,54 @@ func (f *chkStatefulSetFallback) OnStatefulSetUpdateFailed(
 // sizes defers every roll forever instead of preserving availability the user still has.
 const raftFaultTolerantMinMembers = 3
 
+// crHasEstablishedCluster is true when a previous generation already ran hosts.
+// Used to distinguish a join (1→3) from a fresh bootstrap (all servers new).
+func crHasEstablishedCluster(cr api.ICustomResource) bool {
+	return cr != nil && cr.GetAncestor() != nil && cr.GetAncestor().HostsCount() > 0
+}
+
+// stageUncommittedScaleUpHosts keeps not-yet-created members out of raft_configuration
+// so the published XML never lists more than one uncommitted server. Only hosts whose
+// StatefulSet is confirmed absent are tagged: an interrupted pass must not re-exclude
+// a member that is already running. Fresh bootstrap (no ancestor) is left alone —
+// NuRaft requires every first-generation server in the initial config.
+func (w *worker) stageUncommittedScaleUpHosts(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+	if cr == nil || !crHasEstablishedCluster(cr) || w.c == nil {
+		return
+	}
+	_ = cr.WalkHosts(func(host *api.Host) error {
+		if host == nil || !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
+			return nil
+		}
+		_, err := w.c.kube.STS().Get(ctx, host)
+		if err != nil && apiErrors.IsNotFound(err) {
+			host.GetReconcileAttributes().SetExclude()
+			w.a.V(1).M(host).F().Info(
+				"Staging new host out of raft_configuration until it is admitted: %s",
+				host.GetName(),
+			)
+		}
+		return nil
+	})
+}
+
+// hostIsStagedScaleUpJoin is a new member of an already-running ensemble that is too
+// small to protect quorum (1→N, 2→3). Those joins wait Ready after being published
+// one at a time. A 3→5 added host still skips Ready: existing members must roll
+// onto the config that admits it, and recovery-first orders the new host first.
+func hostIsStagedScaleUpJoin(host *api.Host) bool {
+	if host == nil || host.GetCR() == nil {
+		return false
+	}
+	if !crHasEstablishedCluster(host.GetCR()) {
+		return false
+	}
+	if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
+		return false
+	}
+	return !ensembleHasQuorumHeadroom(host.GetCR().GetAncestor().HostsCount())
+}
+
 // ensembleHasQuorumHeadroom reports whether the gate can ever pass for this ensemble size.
 func ensembleHasQuorumHeadroom(members int) bool {
 	return members >= raftFaultTolerantMinMembers
@@ -480,6 +528,10 @@ func (w *worker) prepareStsReconcileOptsWaitSection(
 	// no StatefulSet at all and so fails both terms. CurStatefulSet was refreshed moments ago by
 	// snapshotHostEnsemble.
 	joinedEnsemble := host.HasAncestor() || hostContributesReady(host)
+	// 1→N / 2→3: the new member is published alone into raft_configuration, then
+	// we wait Ready before creating the next STS. A 3→N added host still skips
+	// Ready (existing members have to roll onto the config that admits it).
+	stagedJoin := hostIsStagedScaleUpJoin(host)
 
 	// A host outside the live ensemble still has to wait to START. The code before this gate spelled
 	// this `probes.GetStartup().IsTrue() || !host.HasAncestor()`; narrowing it to !rolling alone
@@ -491,6 +543,9 @@ func (w *worker) prepareStsReconcileOptsWaitSection(
 	}
 
 	switch {
+	case stagedJoin && !probes.GetReadiness().IsFalse():
+		opts = opts.SetWaitUntilReady()
+		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (staged scale-up join)")
 	case rolling && joinedEnsemble && !probes.GetReadiness().IsFalse():
 		opts = opts.SetWaitUntilReady()
 		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (Keeper must become Ready)")
