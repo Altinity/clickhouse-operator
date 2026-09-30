@@ -8841,8 +8841,8 @@ def test_020005(self):
 def test_020005_2(self):
     """Fail-fast test for fire-and-forget CHK scale-up (#2041).
 
-    CHK only — no CHI. During 1→3, `sts_count <= ready_count + 1`.
-    Stops as soon as the third STS appears while only one member is Ready.
+    CHK only — no CHI. During 1→3, `sts_count <= ready_count + 1`,
+    and the scale-up must finish with three Ready Keepers.
     """
     create_shell_namespace_clickhouse_template()
 
