@@ -1384,8 +1384,6 @@ def test_010013_1(self):
         "CREATE TABLE table_for_materialized_view (when DateTime, userid UInt32, bytes Float32) ENGINE = MergeTree PARTITION BY toYYYYMM(when) ORDER BY (userid, when)",
         "CREATE MATERIALIZED VIEW materialized_view ENGINE = SummingMergeTree PARTITION BY toYYYYMM(day) ORDER BY (userid, day) "
           "POPULATE AS SELECT toStartOfDay(when) AS day, userid, count() as downloads, sum(bytes) AS bytes FROM table_for_materialized_view GROUP BY userid, day",
-        "CREATE TABLE table_for_live_vew (d DATE, a String, b UInt8, y Int8) ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/default/table_for_live_vew', '{replica}') PARTITION BY y ORDER BY d",
-        # "CREATE LIVE VIEW test_live_view AS SELECT * FROM table_for_live_vew",
         "CREATE TABLE table_for_window_view on cluster 'simple' (id UInt64, timestamp DateTime) ENGINE = ReplicatedMergeTree() order by id",
         "CREATE WINDOW VIEW wv ENGINE = Log() as select count(id), tumbleStart(w_id) as window_start from table_for_window_view group by tumble(timestamp, INTERVAL '10' SECOND) as w_id",
         "CREATE TABLE tinylog_table (id UInt64, value1 UInt8, value2 UInt16, value3 UInt32, value4 UInt64) ENGINE=TinyLog",
@@ -1725,7 +1723,6 @@ def test_010014_0(self):
         "test_local_014",
         "test_view_014",
         "test_mv_014",
-        # "test_lv_014",
         "test_buffer_014",
         "a_view_014",
         "test_local2_014",
@@ -1745,7 +1742,6 @@ def test_010014_0(self):
         "CREATE VIEW test_view_014 as SELECT * FROM test_local_014",
         "CREATE VIEW a_view_014 as SELECT * FROM test_view_014",
         "CREATE MATERIALIZED VIEW test_mv_014 Engine = Log as SELECT * from test_local_014",
-        # "CREATE LIVE VIEW test_lv_014 as SELECT * from test_local_014",
         "CREATE DICTIONARY test_dict_014 (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local_014' user 'default')) LAYOUT(FLAT()) LIFETIME(0)",
         "CREATE TABLE test_buffer_014(a Int8) Engine = Buffer(default, test_local_014, 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
         "CREATE DATABASE test_atomic_014 ON CLUSTER '{cluster}' Engine = Atomic",
@@ -8497,8 +8493,8 @@ def test_020003(self):
     chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
 
     cluster = "default"
-    keeper_version_from = "25.3"
-    keeper_version_to = "25.8"
+    keeper_version_from = "25.8"
+    keeper_version_to = "26.8"
 
     with Given("CHK with 3 replicas"):
         kubectl.create_and_check(
@@ -8635,7 +8631,7 @@ def test_020003_3(self):
     ]
     good_version = "clickhouse/clickhouse-keeper:25.8"
     broken_version = "clickhouse/clickhouse-keeper:25.8-broken"
-    new_version = "clickhouse/clickhouse-keeper:26.3"
+    new_version = "clickhouse/clickhouse-keeper:26.8"
 
     with Given("CHK with 3 replicas on a good image"):
         kubectl.create_and_check(
@@ -10085,8 +10081,8 @@ def test_030008(self):
         cleanup_admission_only_chi(chi=chi_case_insensitive)
 
     with When("runtime decoy image alias is prepared"):
-        decoy_tag = "altinity/clickhouse-server:25.8.28.10001.altinityfips-decoy"
-        stable_tag = "altinity/clickhouse-server:25.8.28.10001.altinitystable"
+        decoy_tag = "altinity/clickhouse-server:26.3.33.10001.altinityfips-decoy"
+        stable_tag = "altinity/clickhouse-server:26.3.33.10001.altinitystable"
         tag_result = subprocess.run(
             ["docker", "tag", stable_tag, decoy_tag],
             capture_output=True,

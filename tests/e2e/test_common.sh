@@ -71,12 +71,11 @@ PRELOAD_IMAGES_ALL=(
     "clickhouse/clickhouse-server:26.3"
     "clickhouse/clickhouse-server:latest"
     # Altinity builds (default stable template + FIPS)
-    "altinity/clickhouse-server:25.8.28.10001.altinitystable"  # default clickhouse_template
+    "altinity/clickhouse-server:26.3.33.10001.altinitystable"  # default clickhouse_template
     "altinity/clickhouse-server:25.3.8.30001.altinityfips"     # FIPS CHI (e.g. manifests/chk/test-020008-chi-fips.yaml)
     # ClickHouse Keeper versions
-    "clickhouse/clickhouse-keeper:25.3"
-    "clickhouse/clickhouse-keeper:25.8"
-    "clickhouse/clickhouse-keeper:26.3"
+    "clickhouse/clickhouse-keeper:25.8"  # upgrade-from (test_020003) and interrupted-roll start (test_020003_3)
+    "clickhouse/clickhouse-keeper:26.8"  # default keeper image in tests
     "altinity/clickhouse-keeper:25.3.8.30001.altinityfips"
     # Zookeeper
     "docker.io/zookeeper:3.8.4"

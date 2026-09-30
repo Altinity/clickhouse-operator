@@ -25,7 +25,6 @@ spec:
           shardsCount: 1
     profiles:
       default/database_atomic_wait_for_drop_and_detach_synchronously: 1
-      default/allow_experimental_live_view: 1
       default/allow_experimental_database_replicated: 1
     users:
       test_014/password: test_014
