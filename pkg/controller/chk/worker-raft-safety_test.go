@@ -411,6 +411,33 @@ func TestPrepareStsReconcileOptsWaitSection(t *testing.T) {
 		require.True(t, opts.WaitUntilStarted())
 	})
 
+	t.Run("interrupted 1→3 joiner still waits Ready after STS status is Same", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		joiner := hostAtOnCR(cr, 1)
+		require.False(t, joiner.HasAncestor(), "host 1 is absent from the 1-host ancestor")
+		// Production: PrepareHostStatefulSetWithStatus overwrites Requested once the
+		// joiner STS exists (cancelled Ready wait, operator restart).
+		joiner.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
+
+		require.True(t, hostIsStagedScaleUpJoin(joiner),
+			"staged-join identity is topological, not ObjectStatusRequested")
+		opts := w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
+		require.True(t, opts.WaitUntilReady(),
+			"retry must still wait Ready so the next STS is not created while only the original member is Ready")
+	})
+
+	t.Run("staged join waits Ready even when readiness is false", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		joiner := hostAtOnCR(cr, 1)
+		joiner.GetCluster().GetReconcile().Host.Wait.Probes.Readiness = types.NewStringBool(false)
+
+		opts := w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
+		require.True(t, opts.WaitUntilReady(),
+			"staged-join Ready wait is a Raft serialize-creates gate, not an optional probe")
+	})
+
 	t.Run("single-host post-restart still waits Ready", func(t *testing.T) {
 		w.countReadyEnsembleMembersFn = func(context.Context, api.ICustomResource) int { return 0 }
 		host := hostOnCR(chkWithAncestorHosts(1))

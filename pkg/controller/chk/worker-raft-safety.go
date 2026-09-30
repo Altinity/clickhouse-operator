@@ -142,11 +142,12 @@ func (w *worker) stageUncommittedScaleUpHosts(ctx context.Context, cr *apiChk.Cl
 }
 
 // hostIsStagedScaleUpJoin is a new member of an already-running ensemble that is too
-// small to protect quorum (1→N, 2→3). Those joins wait Ready after being published
-// one at a time so the host loop does not create the next STS yet. Ready is not
-// committed Raft membership (see verifyHostEnsembleMembership). 3→N is not staged:
-// existing members must roll onto the config that admits the new peer, and
-// recovery-first orders new hosts first.
+// small to protect quorum (1→N, 2→3). Identity is topological — established
+// ancestor without headroom, and this host is absent from that ancestor — not
+// ObjectStatusRequested. PrepareHostStatefulSetWithStatus overwrites Requested
+// to Same/Modified once the joiner STS exists, which is exactly the interrupted
+// Ready-wait retry this gate has to survive. Ready is not committed Raft
+// membership (see verifyHostEnsembleMembership). 3→N is not staged.
 func hostIsStagedScaleUpJoin(host *api.Host) bool {
 	if host == nil || host.GetCR() == nil {
 		return false
@@ -154,7 +155,7 @@ func hostIsStagedScaleUpJoin(host *api.Host) bool {
 	if !crHasEstablishedCluster(host.GetCR()) {
 		return false
 	}
-	if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
+	if host.HasAncestor() {
 		return false
 	}
 	return !ensembleHasQuorumHeadroom(host.GetCR().GetAncestor().HostsCount())
@@ -571,7 +572,9 @@ func (w *worker) prepareStsReconcileOptsWaitSection(
 	}
 
 	switch {
-	case stagedJoin && !probes.GetReadiness().IsFalse():
+	case stagedJoin:
+		// Raft serialize-creates gate, not an optional pacing probe. readiness:false
+		// would otherwise admit the next STS while this joiner is only Started.
 		opts = opts.SetWaitUntilReady()
 		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (staged scale-up join)")
 	case rolling && joinedEnsemble && !probes.GetReadiness().IsFalse():

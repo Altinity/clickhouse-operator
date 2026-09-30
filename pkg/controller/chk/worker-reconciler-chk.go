@@ -780,6 +780,17 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 // reconcileHostPrepare reconciles specified ClickHouse host
 func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error {
+	if host.GetReconcileAttributes().IsExclude() {
+		// Stay out of raft_configuration until immediately before STS create.
+		// Publishing here would leave the server in XML if ConfigMapHost / PVC
+		// abort before the StatefulSet exists.
+		w.a.V(1).
+			M(host).F().
+			Info("Skip raft include in prepare; host is staged. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return nil
+	}
+
 	w.a.V(1).
 		M(host).F().
 		Info("Include host into cluster. Host/shard/cluster: %d/%d/%s",
