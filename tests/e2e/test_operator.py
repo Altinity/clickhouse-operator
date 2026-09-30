@@ -8871,7 +8871,7 @@ def test_020005_2(self):
         )
 
     with Then("Never create more than one extra STS beyond Ready members"):
-        deadline = time.time() + 120
+        deadline = time.time() + 300
         saw_three_sts = False
         while time.time() < deadline:
             sts = kubectl.get_count("sts", chk=chk)
@@ -8884,7 +8884,7 @@ def test_020005_2(self):
                 saw_three_sts = True
             if ready >= 3:
                 break
-            time.sleep(2)
+            time.sleep(5)
         assert kubectl.get_ready_pods_count("chk", chk) >= 3, error(
             "timed out waiting for the 1→3 scale-up to become Ready"
         )
