@@ -8885,8 +8885,11 @@ def test_020005_2(self):
             if ready >= 3:
                 break
             time.sleep(2)
-        assert saw_three_sts or kubectl.get_ready_pods_count("chk", chk) >= 3, error(
-            "timed out waiting for the 1→3 scale-up to create the new replicas"
+        assert kubectl.get_ready_pods_count("chk", chk) >= 3, error(
+            "timed out waiting for the 1→3 scale-up to become Ready"
+        )
+        assert saw_three_sts or kubectl.get_count("sts", chk=chk) >= 3, error(
+            "1→3 completed Ready without three StatefulSets"
         )
 
     with Finally("I clean up"):

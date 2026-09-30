@@ -95,35 +95,58 @@ func crHasEstablishedCluster(cr api.ICustomResource) bool {
 	return cr != nil && cr.GetAncestor() != nil && cr.GetAncestor().HostsCount() > 0
 }
 
-// stageUncommittedScaleUpHosts keeps not-yet-created members out of raft_configuration
-// so the published XML never lists more than one uncommitted server. Only hosts whose
-// StatefulSet is confirmed absent are tagged: an interrupted pass must not re-exclude
-// a member that is already running. Fresh bootstrap (no ancestor) is left alone —
-// NuRaft requires every first-generation server in the initial config.
-func (w *worker) stageUncommittedScaleUpHosts(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+// stageUncommittedScaleUpHosts keeps not-yet-created members out of
+// raft_configuration on 1→N / 2→3, so the published XML lists at most one
+// extra server while the previous join is still coming up. Only hosts whose
+// StatefulSet is confirmed absent are tagged: an interrupted pass must not
+// re-exclude a member that is already running. A Get error other than NotFound
+// fails closed — nothing is staged and the caller must requeue rather than
+// publish an expanded membership. Fresh bootstrap and 3→N (ancestor already
+// has quorum headroom) are left alone.
+func (w *worker) stageUncommittedScaleUpHosts(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
 	if cr == nil || !crHasEstablishedCluster(cr) || w.c == nil {
-		return
+		return nil
 	}
+	if ensembleHasQuorumHeadroom(cr.GetAncestor().HostsCount()) {
+		return nil
+	}
+
+	var toStage []*api.Host
+	var getErr error
 	_ = cr.WalkHosts(func(host *api.Host) error {
 		if host == nil || !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 			return nil
 		}
 		_, err := w.c.kube.STS().Get(ctx, host)
-		if err != nil && apiErrors.IsNotFound(err) {
-			host.GetReconcileAttributes().SetExclude()
-			w.a.V(1).M(host).F().Info(
-				"Staging new host out of raft_configuration until it is admitted: %s",
-				host.GetName(),
-			)
+		if err == nil {
+			return nil
 		}
-		return nil
+		if apiErrors.IsNotFound(err) {
+			toStage = append(toStage, host)
+			return nil
+		}
+		getErr = err
+		return err
 	})
+	if getErr != nil {
+		return getErr
+	}
+	for _, host := range toStage {
+		host.GetReconcileAttributes().SetExclude()
+		w.a.V(1).M(host).F().Info(
+			"Staging new host out of raft_configuration until it is admitted: %s",
+			host.GetName(),
+		)
+	}
+	return nil
 }
 
 // hostIsStagedScaleUpJoin is a new member of an already-running ensemble that is too
 // small to protect quorum (1→N, 2→3). Those joins wait Ready after being published
-// one at a time. A 3→5 added host still skips Ready: existing members must roll
-// onto the config that admits it, and recovery-first orders the new host first.
+// one at a time so the host loop does not create the next STS yet. Ready is not
+// committed Raft membership (see verifyHostEnsembleMembership). 3→N is not staged:
+// existing members must roll onto the config that admits the new peer, and
+// recovery-first orders new hosts first.
 func hostIsStagedScaleUpJoin(host *api.Host) bool {
 	if host == nil || host.GetCR() == nil {
 		return false
@@ -402,11 +425,16 @@ func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) 
 // protect, and this falls back to the desired set (see the last paragraph). So read the result as
 // "what to size quorum on", never as "what is currently running".
 //
-// Membership is static. The generator emits keeper_server/raft_configuration as a plain config
-// section, and enable_reconfiguration is shipped explicitly disabled
-// (config/chk/keeper_config.d/01-keeper-03-enable-reconfig.xml), so a running Keeper holds the
-// membership it started with. Publishing the ConfigMap for a scale-up therefore does NOT admit the new
-// servers to the running Raft - they join only as the existing pods roll onto the new config.
+// Membership is static at the Raft protocol level: enable_reconfiguration is shipped
+// disabled, so there is no runtime reconfig command. The generator emits
+// keeper_server/raft_configuration as a mounted ConfigMap file. Publishing that
+// file does not mean live Raft has committed the new server_id — existing members
+// apply it when they reload or roll. Do not size quorum on the desired set as if
+// those servers were already voting.
+//
+// /ready on a newly created joiner is only a serialize-creates proxy for 1→N / 2→3
+// (hostIsStagedScaleUpJoin). It is not a committed-membership barrier;
+// verifyHostEnsembleMembership is the extension point for /keeper/config + mntr.
 //
 // Sizing growth on the desired set inflates the denominator against a membership that does not
 // exist yet, and the damage is in the unsafe direction: a 3->5 with one member already down
@@ -417,8 +445,8 @@ func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) 
 // An ancestor too small to tolerate a loss is not a quorum worth protecting, so fall back to the
 // desired set there. That also keeps growth classified as bootstrap: a 1->3 sized at 1 would read
 // rolling (members<=1 is rolling unconditionally), putting a Ready wait on the one EXISTING host
-// while the ensemble it must reach quorum with is still being created. The new hosts are already
-// safe either way - joinedEnsemble below denies them the Ready wait.
+// while the ensemble it must reach quorum with is still being created. 3→N added hosts still
+// skip Ready (joinedEnsemble); 1→N / 2→3 wait Ready on each staged joiner.
 func quorumSizingEnsemble(cr api.ICustomResource) api.ICustomResource {
 	if cr == nil {
 		return nil
@@ -528,9 +556,9 @@ func (w *worker) prepareStsReconcileOptsWaitSection(
 	// no StatefulSet at all and so fails both terms. CurStatefulSet was refreshed moments ago by
 	// snapshotHostEnsemble.
 	joinedEnsemble := host.HasAncestor() || hostContributesReady(host)
-	// 1→N / 2→3: the new member is published alone into raft_configuration, then
-	// we wait Ready before creating the next STS. A 3→N added host still skips
-	// Ready (existing members have to roll onto the config that admits it).
+	// 1→N / 2→3: serialize STS create on the joiner's /ready. That is not
+	// committed membership — see verifyHostEnsembleMembership. 3→N still skips
+	// Ready so existing members can roll onto the config that admits the peer.
 	stagedJoin := hostIsStagedScaleUpJoin(host)
 
 	// A host outside the live ensemble still has to wait to START. The code before this gate spelled
