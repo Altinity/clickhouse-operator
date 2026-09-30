@@ -502,12 +502,12 @@ func (w *worker) createTemplated(c *apiChk.ClickHouseKeeperInstallation, _opts .
 
 // getRaftGeneratorOptions build base set of RaftOptions
 func (w *worker) getRaftGeneratorOptions() *commonConfig.HostSelector {
-	// Hosts tagged exclude are omitted from raft_configuration. Scale-up marks
-	// not-yet-created members that way so the published XML never lists more than
-	// one uncommitted server (see stageUncommittedScaleUpHosts).
-	// Zero-value status (not ObjectStatusUnknown) so the selector matches the
-	// exclude tag only — NewReconcileAttributes() would also match every host
-	// still at status unknown.
+	// Hosts tagged exclude are omitted from raft_configuration. 1→N / 2→3
+	// scale-up marks not-yet-created members that way so the published XML
+	// lists at most one extra server while the previous join is still coming up
+	// (see stageUncommittedScaleUpHosts). Zero-value status (not
+	// ObjectStatusUnknown) so the selector matches the exclude tag only —
+	// NewReconcileAttributes() would also match every host still at status unknown.
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
 		(&types.ReconcileAttributes{}).SetExclude(),
 	)

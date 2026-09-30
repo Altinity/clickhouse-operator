@@ -90,20 +90,24 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 		return nil
 	}
 
-	w.includeHostIntoRaftCluster(ctx, host)
-	return nil
+	return w.includeHostIntoRaftCluster(ctx, host)
 }
 
-// includeHostIntoRaftCluster includes host into raft configuration
-func (w *worker) includeHostIntoRaftCluster(ctx context.Context, host *api.Host) {
+// includeHostIntoRaftCluster publishes the host into raft_configuration.
+// On ConfigMap failure the exclude tag is restored so the next pass retries
+// publication instead of creating a StatefulSet against stale XML.
+func (w *worker) includeHostIntoRaftCluster(ctx context.Context, host *api.Host) error {
 	w.a.V(1).
 		M(host).F().
 		Info("going to include host. Host/shard/cluster: %d/%d/%s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	// Specify in options to add this host into ClickHouse config file
 	host.GetCR().GetRuntime().LockCommonConfig()
 	host.GetReconcileAttributes().UnsetExclude()
-	_ = w.reconcileConfigMapCommon(ctx, host.GetCR(), w.options())
+	err := w.reconcileConfigMapCommon(ctx, host.GetCR(), w.options())
+	if err != nil {
+		host.GetReconcileAttributes().SetExclude()
+	}
 	host.GetCR().GetRuntime().UnlockCommonConfig()
+	return err
 }

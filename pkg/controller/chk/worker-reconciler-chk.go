@@ -121,7 +121,10 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	}
 	w.prepareMonitoring(new)
 	w.setHostStatusesPreliminary(ctx, new)
-	w.stageUncommittedScaleUpHosts(ctx, new)
+	if err := w.stageUncommittedScaleUpHosts(ctx, new); err != nil {
+		w.a.V(1).M(new).F().Warning("Unable to stage scale-up hosts: %v", err)
+		return err
+	}
 
 	if err := w.reconcile(ctx, new); err != nil {
 		if errors.Is(err, common.ErrCRUDDeferred) {
@@ -782,9 +785,7 @@ func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error
 		Info("Include host into cluster. Host/shard/cluster: %d/%d/%s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	w.includeHostIntoRaftCluster(ctx, host)
-
-	return nil
+	return w.includeHostIntoRaftCluster(ctx, host)
 }
 
 // reconcileHostMain reconciles specified ClickHouse host
@@ -848,7 +849,13 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	// so the new pod starts with itself already in the published membership.
 	// Remaining staged hosts stay excluded.
 	if host.GetReconcileAttributes().IsExclude() {
-		w.includeHostIntoRaftCluster(ctx, host)
+		if err := w.includeHostIntoRaftCluster(ctx, host); err != nil {
+			metrics.HostReconcilesErrors(ctx, host.GetCR())
+			w.a.V(1).
+				M(host).F().
+				Warning("Reconcile Host Main - unable to publish host into raft_configuration. Host: %s Err: %v", host.GetName(), err)
+			return err
+		}
 	}
 
 	// Snapshot the ensemble and reconcile the StatefulSet against that same snapshot.
