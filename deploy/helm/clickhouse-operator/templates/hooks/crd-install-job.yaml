@@ -22,6 +22,10 @@ spec:
       serviceAccountName: {{ include "altinity-clickhouse-operator.fullname" . }}-crd-install
       restartPolicy: OnFailure
       {{- with .Values.crdHook.nodeSelector }}
+      {{- with .Values.crdHook.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
