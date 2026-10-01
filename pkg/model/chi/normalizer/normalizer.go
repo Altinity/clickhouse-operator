@@ -16,6 +16,8 @@ package normalizer
 
 import (
 	"fmt"
+	"path"
+	"slices"
 	"sort"
 	"strings"
 
@@ -38,6 +40,7 @@ import (
 	commonfips "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/fips"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -106,11 +109,15 @@ func (n *Normalizer) applyInternalCRTemplatesOnTarget() {
 }
 
 func (n *Normalizer) applyExternalCRTemplatesOnTarget(templateRefSrc crTemplatesNormalizer.TemplateRefListSource) {
-	usedTemplates := crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), templateRefSrc)
-	n.req.GetTarget().EnsureStatus().PushUsedTemplate(usedTemplates...)
+	usedTemplateRefs, usedTemplates := crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), templateRefSrc)
+	n.req.GetTarget().EnsureStatus().PushUsedTemplate(usedTemplateRefs...)
+	for _, template := range usedTemplates {
+		n.req.AddPodTemplateLayer(templateLayerPrefix+util.NamespaceNameString(template), template.GetSpecT().GetTemplates().GetPodTemplates())
+	}
 }
 
 func (n *Normalizer) applyCROnTarget(cr *chi.ClickHouseInstallation) {
+	n.req.AddPodTemplateLayer(installationLayer, cr.GetSpecT().GetTemplates().GetPodTemplates())
 	n.migrateReconcilingBackwardCompatibility(cr)
 	n.req.GetTarget().MergeFrom(cr, chi.MergeTypeOverrideByNonEmptyValues)
 }
@@ -145,6 +152,7 @@ func (n *Normalizer) ensureSubject(subj *chi.ClickHouseInstallation) *chi.ClickH
 func (n *Normalizer) normalizeTarget() (*chi.ClickHouseInstallation, error) {
 	n.normalizeSpec()
 	n.finalize()
+	n.rejectInvalidPodTemplates()
 	n.enforceFIPSImagePolicy()
 	n.fillStatus()
 
@@ -1082,8 +1090,8 @@ func (n *Normalizer) normalizeClusterReconcile(reconcile *chi.ClusterReconcile) 
 	// Inherit from CHI-level reconcile settings (fill empty values only)
 	if chiReconcile := n.req.GetTarget().GetSpecT().Reconcile; chiReconcile != nil {
 		reconcile.Runtime = reconcile.Runtime.MergeFrom(chiReconcile.Runtime, chi.MergeTypeFillEmptyValues)
-		reconcile.StatefulSet = reconcile.StatefulSet.MergeFrom(chiReconcile.StatefulSet)
-		reconcile.Host = reconcile.Host.MergeFrom(chiReconcile.Host)
+		reconcile.StatefulSet = reconcile.StatefulSet.MergeFrom(chiReconcile.StatefulSet, chi.MergeTypeFillEmptyValues)
+		reconcile.Host = reconcile.Host.MergeFrom(chiReconcile.Host, chi.MergeTypeFillEmptyValues)
 	}
 
 	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
@@ -1226,6 +1234,138 @@ func (n *Normalizer) enforceFIPSImagePolicy() {
 			target.EnsureStatus().ReconcileAbortWithReason(reason, msg)
 		},
 	)
+}
+
+const (
+	// installationLayer and templateLayerPrefix name the layers a pod template is merged from, as
+	// rejectInvalidPodTemplates reports them.
+	installationLayer   = "the installation"
+	templateLayerPrefix = "template "
+
+	// podTemplateContainerPairingHint is how to fix a merged pod template rejected by
+	// rejectInvalidPodTemplates, which mostly arises from templates written for the positional merge.
+	podTemplateContainerPairingHint = "containers from two templates, or from a template and the installation, merge only when they have the same name"
+
+	// The official ClickHouse server image's entrypoint script, the prefix of the arguments it passes
+	// to the server, and the binaries and command that start the server when run directly.
+	clickHouseImageEntrypoint  = "entrypoint.sh"
+	clickHouseServerFlagPrefix = "--"
+	clickHouseServerBinary     = "clickhouse-server"
+	clickHouseBinary           = "clickhouse"
+	clickHouseServerCommand    = "server"
+)
+
+// rejectInvalidPodTemplates aborts the CR when a host's resolved pod template cannot run: a
+// container without a name or an image, or two containers of one name, or a pod template merged
+// from several layers that starts a duplicate ClickHouse server in another container - a pod is
+// meant to run one server, and two fight over one set of ports and one data directory. Templates
+// and the installation pair containers by name, so a template's `clickhouse-pod` next to an
+// installation's `clickhouse` is two containers, not one. Runs after finalize() so each host's pod
+// template reference has been resolved, and ahead of any write, so the StatefulSet the pods run
+// from stays as it is.
+func (n *Normalizer) rejectInvalidPodTemplates() {
+	target := n.req.GetTarget()
+	if target == nil {
+		return
+	}
+	checked := make(map[string]bool)
+	aborted := false
+	target.WalkHosts(func(host *chi.Host) error {
+		podTemplate, ok := host.GetPodTemplate()
+		if aborted || !ok || checked[podTemplate.Name] {
+			return nil
+		}
+		checked[podTemplate.Name] = true
+
+		layers := n.req.GetPodTemplateLayers(podTemplate.Name)
+		merged := len(layers) > 1
+		problem, invalid := describeInvalidContainers(&podTemplate.Spec)
+		if !invalid && merged {
+			problem, invalid = describeDuplicateClickHouseServer(&podTemplate.Spec)
+		}
+		if !invalid {
+			return nil
+		}
+		msg := fmt.Sprintf("pod template %q %s", podTemplate.Name, problem)
+		if merged {
+			msg = fmt.Sprintf("pod template %q (merged from %s) %s - %s",
+				podTemplate.Name, strings.Join(layers, ", "), problem, podTemplateContainerPairingHint)
+		}
+		target.EnsureStatus().ReconcileAbortWithReason(chi.StatusReasonInvalidPodTemplate, msg)
+		aborted = true
+		return nil
+	})
+}
+
+// describeInvalidContainers describes what keeps a container of the pod spec from running, if
+// anything - a missing name or image, or a name two containers share.
+func describeInvalidContainers(spec *core.PodSpec) (string, bool) {
+	names := make(map[string]bool)
+	for _, containers := range [][]core.Container{spec.InitContainers, spec.Containers} {
+		for i := range containers {
+			container := &containers[i]
+			if container.Name == "" {
+				return "has a container without a name", true
+			}
+			if names[container.Name] {
+				return fmt.Sprintf("has two containers named %q", container.Name), true
+			}
+			names[container.Name] = true
+			if container.Image == "" {
+				return fmt.Sprintf("has container %q without an image", container.Name), true
+			}
+		}
+	}
+	return "", false
+}
+
+// describeDuplicateClickHouseServer describes the container of a merged pod spec that would start a
+// duplicate ClickHouse server next to the ClickHouse container, if any. It is for merged pod specs
+// only: a single layer's pod spec runs what its author wrote, where a sidecar sharing the server
+// image's name - one registry repository tagged per product - need not start the server.
+func describeDuplicateClickHouseServer(spec *core.PodSpec) (string, bool) {
+	clickHouse, ok := k8s.PodSpecContainerGet(spec, config.ClickHouseContainerName, 0)
+	if !ok {
+		return "", false
+	}
+	serverImageNames := make(map[string]bool)
+	for _, image := range []string{clickHouse.Image, config.DefaultClickHouseDockerImage} {
+		if imageName, ok := k8s.ImageGetBaseName(image); ok {
+			serverImageNames[imageName] = true
+		}
+	}
+	for i := range spec.Containers {
+		container := &spec.Containers[i]
+		if container == clickHouse {
+			continue
+		}
+		if imageName, ok := k8s.ImageGetBaseName(container.Image); ok && serverImageNames[imageName] && startsClickHouseServer(container) {
+			return fmt.Sprintf("starts the ClickHouse server in two containers, %q and %q", container.Name, clickHouse.Name), true
+		}
+	}
+	return "", false
+}
+
+// startsClickHouseServer reports whether a container running a ClickHouse server image starts the
+// server. The image's entrypoint does so when given no arguments or arguments that start with
+// `--`, and runs any other command instead, so a sidecar that runs the client or keeper from the
+// same image starts no duplicate server.
+func startsClickHouseServer(container *core.Container) bool {
+	argv := slices.Concat(container.Command, container.Args)
+	if (len(argv) > 0) && (path.Base(argv[0]) == clickHouseImageEntrypoint) {
+		argv = argv[1:]
+	}
+	switch {
+	case len(argv) == 0:
+		return true
+	case strings.HasPrefix(argv[0], clickHouseServerFlagPrefix):
+		return true
+	case path.Base(argv[0]) == clickHouseServerBinary:
+		return true
+	case (path.Base(argv[0]) == clickHouseBinary) && (len(argv) > 1) && (argv[1] == clickHouseServerCommand):
+		return true
+	}
+	return false
 }
 
 // resolveClickHouseImage returns the image string the operator would deploy
