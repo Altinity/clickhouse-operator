@@ -81,8 +81,8 @@ const (
 	StatusReasonRemovedSecretRefSyntax = "RemovedSecretRefSyntax"
 	// StatusReasonInvalidPodTemplate: a host's resolved pod template has a container that cannot
 	// run - without a name or an image, or named like another - or, merged from several layers,
-	// starts the ClickHouse server in two containers, since a template's container named unlike the
-	// one it was meant to extend stays a second container. Caught at admission, before the
+	// starts a duplicate ClickHouse server, since a template's container named unlike the one it was
+	// meant to extend stays a container of its own. Caught at admission, before the
 	// StatefulSet is written. Requires an edit of the CR, or of its template, which reaches the CR
 	// only on its next reconcile as template.chi.policy allows - such as after a new taskID under
 	// ApplyOnNextReconcile, or after an operator restart under ReadOnStart.
