@@ -102,35 +102,10 @@ func (spec *ChkSpec) MergeFrom(from *ChkSpec, _type apiChi.MergeType) {
 		spec = &ChkSpec{}
 	}
 
-	switch _type {
-	case apiChi.MergeTypeFillEmptyValues:
-		if !spec.HasTaskID() {
-			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
-		}
-		if !spec.Stop.HasValue() {
-			spec.Stop = spec.Stop.MergeFrom(from.Stop)
-		}
-		if !spec.NamespaceDomainPattern.HasValue() {
-			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
-		}
-		if !spec.Suspend.HasValue() {
-			spec.Suspend = spec.Suspend.MergeFrom(from.Suspend)
-		}
-	case apiChi.MergeTypeOverrideByNonEmptyValues:
-		if from.HasTaskID() {
-			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
-		}
-		if from.Stop.HasValue() {
-			// Override by non-empty values only
-			spec.Stop = from.Stop
-		}
-		if from.NamespaceDomainPattern.HasValue() {
-			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
-		}
-		if from.Suspend.HasValue() {
-			spec.Suspend = from.Suspend
-		}
-	}
+	spec.TaskID = apiChi.MergeScalar(spec.TaskID, from.TaskID, _type)
+	spec.Stop = apiChi.MergeScalar(spec.Stop, from.Stop, _type)
+	spec.NamespaceDomainPattern = apiChi.MergeScalar(spec.NamespaceDomainPattern, from.NamespaceDomainPattern, _type)
+	spec.Suspend = apiChi.MergeScalar(spec.Suspend, from.Suspend, _type)
 
 	spec.Reconcile = spec.Reconcile.MergeFrom(from.Reconcile, _type)
 	spec.Defaults = spec.Defaults.MergeFrom(from.Defaults, _type)
