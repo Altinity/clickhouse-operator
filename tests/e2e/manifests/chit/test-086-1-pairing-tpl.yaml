@@ -1,0 +1,22 @@
+# test_010086_1
+#
+# A template written for the pre-0.28 positional merge: its ClickHouse container is `clickhouse-pod`
+# while the CHI's is `clickhouse`. 0.27 folded the two into one container; 0.28 pairs containers
+# by name, which would make them two ClickHouse servers in one pod.
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: test-086-1-pairing-tpl
+spec:
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: altinity/clickhouse-server:25.8.28.10001.altinitystable
+              env:
+                - name: TEST_ENV_FROM_CHIT
+                  value: TEST_ENV_FROM_CHIT_VALUE

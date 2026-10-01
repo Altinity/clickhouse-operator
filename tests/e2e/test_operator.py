@@ -3,6 +3,7 @@ import time
 import yaml
 import threading
 import re
+import hashlib
 
 from e2e.retry_sleep import retry_sleep
 
@@ -8308,6 +8309,218 @@ def test_010085(self):
                     pod=pod,
                 )
                 assert out == "1", error(f"replica {replica}: Memory-engine view did not survive")
+    finally:
+        with Finally("I clean up"):
+            delete_test_namespace()
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templating("1.0"))
+@Name("test_010086. CHI values win over a same-named auto template")
+def test_010086(self):
+    """A ClickHouseInstallationTemplate is merged INTO the CHI, and the CHI has priority: the CRD
+    documents useTemplates as "current chi settings have more priority than merged template chit".
+
+    For same-named pod templates, users and settings the merge used to run the other way round, so
+    a `templating.policy: auto` template carrying a pod template named like the CHI's own silently
+    replaced the CHI's image - on every CHI in every watched namespace. test_010023 shows that an auto
+    template is applied at all and that env vars from both sides survive, but its CHI sets no
+    competing image, user or setting, so it holds whichever side wins. Here the CHI and the
+    auto template disagree on all three, and the CHI must win each time.
+
+    The control CHI at the end declares the same-named pod template WITHOUT an image and no user
+    or setting: there the template must fill the gaps. That part holds whichever side wins and
+    is what proves the auto template is live in this namespace rather than silently ignored.
+    """
+    try:
+        create_shell_namespace_clickhouse_template()
+
+        chit_manifest = "manifests/chit/test-086-chi-wins-tpl.yaml"
+        chi_manifest = "manifests/chi/test-086-chi-wins.yaml"
+        control_manifest = "manifests/chi/test-086-chi-wins-control.yaml"
+
+        chit_data = yaml_manifest.get_manifest_data(util.get_full_path(chit_manifest))
+        chi_data = yaml_manifest.get_manifest_data(util.get_full_path(chi_manifest))
+        chit = chit_data["metadata"]["name"]
+        chi = chi_data["metadata"]["name"]
+        control = yaml_manifest.get_name(util.get_full_path(control_manifest))
+
+        chit_image = chit_data["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
+        chi_image = chi_data["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
+        chit_setting = str(chit_data["spec"]["configuration"]["settings"]["max_concurrent_queries"])
+        chi_setting = str(chi_data["spec"]["configuration"]["settings"]["max_concurrent_queries"])
+        user = "chi_wins_user"
+        chit_password = "chit_password"
+        chi_password = "chi_password"
+
+        with Given("The template and the CHI disagree on image, user password and setting"):
+            # A same-valued pair would hold whichever side wins and prove nothing.
+            assert chit_image != chi_image, error(f"same image on both sides: {chi_image}")
+            assert chit_setting != chi_setting, error(f"same setting on both sides: {chi_setting}")
+            for data, password in ((chit_data, chit_password), (chi_data, chi_password)):
+                assert data["spec"]["configuration"]["users"][f"{user}/password_sha256_hex"] == hashlib.sha256(
+                    password.encode()
+                ).hexdigest(), error(f"manifest {data['metadata']['name']} does not carry sha256({password})")
+
+        with Given("An auto template competing with the CHI is deployed"):
+            kubectl.apply(util.get_full_path(chit_manifest))
+        with And("Give the template some time to be applied"):
+            time.sleep(15)
+
+        with When("A CHI with the same-named pod template, user and setting is created"):
+            kubectl.create_and_check(
+                manifest=chi_manifest,
+                check={
+                    "pod_count": 1,
+                    "do_not_delete": 1,
+                },
+            )
+
+        with Then("The auto template was merged into the CHI"):
+            # Without this, "the CHI's image is on the pod" would also hold when the template was never applied.
+            used_templates = [t["name"] for t in (kubectl.get("chi", chi)["status"].get("usedTemplates") or [])]
+            note(f"usedTemplates: {used_templates}")
+            assert chit in used_templates, error(f"auto template {chit} is not in usedTemplates {used_templates}")
+
+        pod = kubectl.get_pod_spec(chi)
+        container = pod["containers"][0]
+        envs = {e["name"]: e.get("value") for e in container.get("env", [])}
+        note(f"pod image: {container['image']}, envs: {envs}")
+
+        with And("Template-only values are applied on the same pod template"):
+            assert envs.get("TEST_ENV_FROM_CHIT") == "TEST_ENV_FROM_CHIT_VALUE", error(f"envs: {envs}")
+            assert envs.get("TEST_ENV_FROM_CHI") == "TEST_ENV_FROM_CHI_VALUE", error(f"envs: {envs}")
+
+        with Then("Pod image is the CHI's, not the template's"):
+            assert container["image"] == chi_image, error(
+                f"expected CHI image {chi_image}, got {container['image']} (template image is {chit_image})"
+            )
+
+        with And("Server setting is the CHI's, not the template's"):
+            out = clickhouse.query(chi, "SELECT value FROM system.server_settings WHERE name = 'max_concurrent_queries'")
+            assert out == chi_setting, error(f"expected {chi_setting}, got {out} (template value is {chit_setting})")
+
+        with And("User password is the CHI's, not the template's"):
+            out = clickhouse.query_with_error(chi, "SELECT 1", user=user, pwd=chi_password)
+            assert out == "1", error(f"login with the CHI password failed: {out}")
+            out = clickhouse.query_with_error(chi, "SELECT 1", user=user, pwd=chit_password)
+            assert out != "1", error("login with the template password succeeded - the template password won")
+
+        with When("The CHI is replaced by a control CHI whose pod template sets no image, user or setting"):
+            kubectl.delete_chi(chi)
+            kubectl.create_and_check(
+                manifest=control_manifest,
+                check={
+                    "pod_count": 1,
+                    "pod_image": chit_image,
+                    "do_not_delete": 1,
+                },
+            )
+
+        with Then("Template values fill what the control CHI leaves unset"):
+            out = clickhouse.query(control, "SELECT value FROM system.server_settings WHERE name = 'max_concurrent_queries'")
+            assert out == chit_setting, error(f"expected template value {chit_setting}, got {out}")
+            out = clickhouse.query_with_error(control, "SELECT 1", user=user, pwd=chit_password)
+            assert out == "1", error(f"login with the template password failed: {out}")
+
+        with And("Control CHI and the template are removed"):
+            kubectl.delete_chi(control)
+            kubectl.delete_kind("chit", chit)
+    finally:
+        with Finally("I clean up"):
+            delete_test_namespace()
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templating("1.0"))
+@Name("test_010086_1. A template container named unlike the CHI's aborts the upgrade instead of breaking the pod")
+@Tags("NO_PARALLEL")
+def test_010086_1(self, version_from="0.27.4", version_to=None):
+    """Before 0.28 the containers of a template's pod template and the CHI's same-named one were
+    folded by position, so a template could name its ClickHouse container `clickhouse-pod` and the
+    CHI `clickhouse` and still get one container. 0.28 pairs containers by name, which makes them
+    two ClickHouse servers in one pod - fighting over ports and the data directory.
+
+    On upgrade the operator must refuse such a CHI (status=Aborted, reason InvalidPodTemplate)
+    before writing its StatefulSet: the running pod keeps serving from the StatefulSet the old
+    operator wrote. Naming the CHI's container like the template's - the name the old operator
+    deployed the folded container under - then reconciles it to that one container. Without the
+    refusal the StatefulSet would be updated to the two-server pod.
+    """
+    if version_to is None:
+        version_to = current().context.operator_version
+
+    self.context.skip_fips = True  # avoids setting GODEBUG to fips enforced for this test
+
+    chit_manifest = "manifests/chit/test-086-1-pairing-tpl.yaml"
+    chi_manifest = "manifests/chi/test-086-1-pairing.yaml"
+    chi_renamed_manifest = "manifests/chi/test-086-1-pairing-renamed.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
+    chit = yaml_manifest.get_name(util.get_full_path(chit_manifest))
+    sts = f"chi-{chi}-single-0-0"
+
+    def sts_containers():
+        return [c["name"] for c in kubectl.get("sts", sts)["spec"]["template"]["spec"]["containers"]]
+
+    try:
+        with Given(f"clickhouse-operator {version_from}"):
+            current().context.operator_version = version_from
+            create_shell_namespace_clickhouse_template()
+
+        with And("A CHI extends a template whose ClickHouse container has another name"):
+            kubectl.apply(util.get_full_path(chit_manifest))
+            kubectl.create_and_check(
+                manifest=chi_manifest,
+                check={
+                    "pod_count": 1,
+                    "do_not_delete": 1,
+                },
+            )
+
+        with Then(f"{version_from} folds the two containers into one"):
+            assert sts_containers() == ["clickhouse-pod"], error(f"containers: {sts_containers()}")
+            generation = kubectl.get("sts", sts)["metadata"]["generation"]
+
+        with When(f"upgrade operator to {version_to}"):
+            current().context.operator_version = version_to
+            util.install_operator_version(version_to)
+            time.sleep(15)
+
+        with Then("The CHI must be rejected"):
+            kubectl.wait_chi_status(chi, "Aborted", retries=20)
+
+        with And("The abort reason must be InvalidPodTemplate, naming both containers"):
+            errors = " ".join(kubectl.get("chi", chi)["status"].get("errors", []))
+            assert "InvalidPodTemplate" in errors, error(f"expected reason InvalidPodTemplate in status.errors, got: {errors}")
+            assert '"clickhouse-pod" and "clickhouse"' in errors, error(f"status.errors must name both containers: {errors}")
+
+        with And("The StatefulSet is untouched and ClickHouse keeps serving"):
+            assert kubectl.get("sts", sts)["metadata"]["generation"] == generation, error("StatefulSet was updated")
+            assert sts_containers() == ["clickhouse-pod"], error(f"containers: {sts_containers()}")
+            out = clickhouse.query(chi, "SELECT 1")
+            assert out == "1", error(f"ClickHouse stopped serving: {out}")
+
+        with When("The CHI's container is named like the template's"):
+            # Its normalized spec now matches what the old operator deployed, so this also proves
+            # that an abort does not latch once the spec is fixed.
+            kubectl.create_and_check(
+                manifest=chi_renamed_manifest,
+                check={
+                    "pod_count": 1,
+                    "do_not_delete": 1,
+                },
+            )
+
+        with Then("The two containers merge into the one the pods already run, carrying the template's env"):
+            assert sts_containers() == ["clickhouse-pod"], error(f"containers: {sts_containers()}")
+            envs = {e["name"]: e.get("value") for e in kubectl.get_pod_spec(chi)["containers"][0].get("env", [])}
+            assert envs.get("TEST_ENV_FROM_CHIT") == "TEST_ENV_FROM_CHIT_VALUE", error(f"envs: {envs}")
+            out = clickhouse.query(chi, "SELECT 1")
+            assert out == "1", error(f"ClickHouse is not serving after the rename: {out}")
+
+        with And("The CHI and the template are removed"):
+            kubectl.delete_chi(chi)
+            kubectl.delete_kind("chit", chit)
     finally:
         with Finally("I clean up"):
             delete_test_namespace()

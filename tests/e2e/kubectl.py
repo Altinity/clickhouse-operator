@@ -45,13 +45,13 @@ _terminal_confirm_polls = 3
 # earliest give-up is ~135s against a 495s budget.
 _terminal_confirm_sec = 120
 
-# Statuses the operator actually writes (type_status.go:35-38). Arming requires one of these:
+# Statuses the operator actually writes (type_status.go). Arming requires one of these:
 # get_field returns "" for a missing CR or a transient kubectl failure, and treating that as
 # "the operator is making progress" would arm the watch on noise.
 _KNOWN_CR_STATUSES = _TERMINAL_CR_STATUSES | {_STATUS_IN_PROGRESS, _STATUS_TERMINATING}
 
 # An Aborted CR is only unrecoverable when the SPEC itself must change. Mirror the operator
-# rather than guessing: normalizeTimeAbortReasons (pkg/controller/chi/worker-pod-retry.go:44-50)
+# rather than guessing: normalizeTimeAbortReasons (pkg/controller/chi/worker-pod-retry.go)
 # is the authoritative list, and shouldTriggerAutoRecovery re-enqueues every OTHER Aborted CR on
 # any pod NotReady->Ready flip (default on). Crucially the commonest abort - a plain
 # statefulSet.update.timeout - carries NO reason tag at all and IS recoverable, so the test must
@@ -63,6 +63,7 @@ _SPEC_EDIT_ABORT_REASONS = (
     "RootCASecretUnresolved",
     "FIPSImagePolicyViolation",
     "RemovedSecretRefSyntax",
+    "InvalidPodTemplate",
 )
 
 
