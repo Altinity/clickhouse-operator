@@ -197,7 +197,6 @@ def set_settings(self):
     self.context.release_version = define("release_version", open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../../release")).read(1024).strip(" \r\n\t"))
     self.context.operator_namespace = define("operator_namespace", os.getenv("OPERATOR_NAMESPACE") if "OPERATOR_NAMESPACE" in os.environ else self.context.test_namespace)
     self.context.operator_install = define("operator_install", os.getenv("OPERATOR_INSTALL") if "OPERATOR_INSTALL" in os.environ else "yes")
-    self.context.minio_namespace = define("minio_namespace", os.getenv("MINIO_NAMESPACE") if "MINIO_NAMESPACE" in os.environ else "minio")
     self.context.operator_docker_repo = define("operator_docker_repo", (
         os.getenv("OPERATOR_DOCKER_REPO") if "OPERATOR_DOCKER_REPO" in os.environ else "altinity/clickhouse-operator"
     ))
@@ -225,8 +224,6 @@ def set_settings(self):
     self.context.prometheus_scrape_interval = define("prometheus_scrape_interval", 10)
 
     self.context.keeper_type = define("keeper_type", os.getenv("KEEPER_TYPE") if "KEEPER_TYPE" in os.environ else "zookeeper") # zookeeper | clickhouse_keeper
-
-    self.context.minio_version = define("minio_version", "latest")
 
 
 @TestStep(Given)
