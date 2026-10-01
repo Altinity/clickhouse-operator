@@ -15,6 +15,8 @@
 package k8s
 
 import (
+	"path"
+
 	docker "github.com/novln/docker-parser"
 	core "k8s.io/api/core/v1"
 
@@ -24,6 +26,36 @@ import (
 // PodSpecAddContainer adds container to PodSpec
 func PodSpecAddContainer(podSpec *core.PodSpec, container core.Container) {
 	podSpec.Containers = append(podSpec.Containers, container)
+}
+
+// PodSpecContainerGet gets container from the PodSpec either by name or by index
+func PodSpecContainerGet(podSpec *core.PodSpec, namesOrIndexes ...any) (*core.Container, bool) {
+	for _, nameOrIndex := range namesOrIndexes {
+		switch typed := nameOrIndex.(type) {
+		// Find by name
+		case string:
+			name := typed
+			// Search for container name
+			if len(name) > 0 {
+				for i := range podSpec.Containers {
+					// Convenience wrapper
+					container := &podSpec.Containers[i]
+					if container.Name == name {
+						return container, true
+					}
+				}
+			}
+		// Find by index
+		case int:
+			index := typed
+			if (0 <= index) && (index < len(podSpec.Containers)) {
+				// Existing index, get specified container
+				return &podSpec.Containers[index], true
+			}
+		}
+	}
+
+	return nil, false
 }
 
 func ContainerWalkVolumeMounts(container *core.Container, f func(volumeMount *core.VolumeMount)) {
@@ -134,4 +166,14 @@ func ContainerGetImageTag(container *core.Container) (string, bool) {
 		return "", false
 	}
 	return parts.Tag(), true
+}
+
+// ImageGetBaseName gets the image name without its registry, organization and tag or digest - the
+// part that stays the same across mirrors and forks of one image.
+func ImageGetBaseName(image string) (string, bool) {
+	parts, err := docker.Parse(image)
+	if err != nil {
+		return "", false
+	}
+	return path.Base(parts.ShortName()), true
 }
