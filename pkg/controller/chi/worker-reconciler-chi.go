@@ -80,6 +80,12 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	// markReconcileStart below would overwrite Status=Aborted with InProgress.
 	// Recovery is via spec edit: informer UpdateFunc re-enqueues on next apply.
 	if new.EnsureStatus().GetStatus() == api.StatusAborted {
+		// Errors are prepended and normalization never carries status.status forward, so an Aborted
+		// status here was raised by this pass, with its error first.
+		abortErr := ""
+		if errs := new.EnsureStatus().GetErrors(); len(errs) > 0 {
+			abortErr = errs[0]
+		}
 		// Warning + event, not Info: the only other trace of a normalize abort is status.status,
 		// so without an event `kubectl describe chi` shows nothing at all and a rejected manifest
 		// looks like an operator that simply stopped reconciling.
@@ -87,7 +93,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 			WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithAction(new).
 			M(new).F().
-			Warning("Normalize marked CR Aborted — skipping reconcile (recovery via spec edit)")
+			Warning("Normalize marked CR Aborted — skipping reconcile (recovery via spec edit): %s", abortErr)
 		_ = w.c.updateCRObjectStatus(ctx, new, types.UpdateStatusOptions{
 			CopyStatusOptions: types.CopyStatusOptions{
 				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
