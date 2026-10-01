@@ -3,6 +3,8 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-058-root-ca"
 spec:
+  useTemplates:
+    - name: clickhouse-version
   configuration:
     clusters:
       - name: default
