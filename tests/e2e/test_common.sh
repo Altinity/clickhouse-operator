@@ -49,7 +49,7 @@ NO_CLEANUP="${NO_CLEANUP:-""}"
 #   - tests/e2e/manifests/chk/*.yaml                  (keeper tests, incl. FIPS)
 # Intentionally EXCLUDED from preload (verified — do not re-add):
 #   - Meant-to-fail / decoy images (preloading them would defeat the test that rejects them):
-#       clickhouse/clickhouse-server:24.3-broken / :24.822     (rollback tests)
+#       clickhouse/clickhouse-server:26.3-broken               (rollback / ImagePullBackOff tests)
 #       altinity/clickhouse-server:*.altinityfips-decoy        (test-030008-runtime-decoy)
 #       clickhouse/clickhouse-keeper:latest                    (test-020010 non-FIPS rejection)
 # Audit coverage (every default-suite image is listed below):
@@ -58,31 +58,29 @@ NO_CLEANUP="${NO_CLEANUP:-""}"
 
 # Single canonical preload list shared by ALL suites (operator, metrics, keeper).
 # One list, not per-suite lists: a per-suite list silently drifts from the manifests
-# another suite uses (e.g. the metrics suite once omitted server:24.3/24.8 that
+# another suite uses (e.g. the metrics suite once omitted server:25.8/26.3 that
 # test-017-multi-version needs, cold-pulling them on every fresh minikube and timing
 # out). Preloading the full set everywhere is cheap — common_preload_images runs in
 # parallel and skips images already present — and removes that whole class of flake.
 PRELOAD_IMAGES_ALL=(
     # ClickHouse server versions used in manifests and templates
-    "clickhouse/clickhouse-server:24.3"        # also base for 24.3-broken rollback tests; test-017-multi-version (metrics)
-    "clickhouse/clickhouse-server:24.8"        # test-017-multi-version (metrics)
+    "clickhouse/clickhouse-server:24.8"        # opt-in tpl-clickhouse-24.8.yaml; test_010042_2
     "clickhouse/clickhouse-server:25.3"
-    "clickhouse/clickhouse-server:25.8"
+    "clickhouse/clickhouse-server:25.8"        # test-017-multi-version; test_010083_1 from-image; test_010042_2
     "clickhouse/clickhouse-server:26.3"
     "clickhouse/clickhouse-server:latest"
     # Altinity builds (default stable template + FIPS)
-    "altinity/clickhouse-server:25.8.28.10001.altinitystable"  # default clickhouse_template
+    "altinity/clickhouse-server:25.8.28.10001.altinitystable"  # upgrade-from (test_010006 / _2 / test_010032)
+    "altinity/clickhouse-server:26.3.33.10001.altinitystable"  # default clickhouse_template
     "altinity/clickhouse-server:25.3.8.30001.altinityfips"     # FIPS CHI (e.g. manifests/chk/test-020008-chi-fips.yaml)
     # ClickHouse Keeper versions
-    "clickhouse/clickhouse-keeper:25.3"
-    "clickhouse/clickhouse-keeper:25.8"
-    "clickhouse/clickhouse-keeper:26.3"
+    "clickhouse/clickhouse-keeper:25.8"  # upgrade-from (test_020003) and interrupted-roll start (test_020003_3)
+    "clickhouse/clickhouse-keeper:26.8"  # default keeper image in tests
     "altinity/clickhouse-keeper:25.3.8.30001.altinityfips"
     # Zookeeper
     "docker.io/zookeeper:3.8.4"
     # Misc
     "registry.access.redhat.com/ubi8/ubi-minimal:latest"
-    "nginx:latest"
     "altinity/clickhouse-backup:stable"
     "altinity/clickhouse-backup:latest-fips"  # FIPS backup sidecar (manifests/chit/test-030003-backup-template.yaml)
     "alpine/openssl:3.3.3"
