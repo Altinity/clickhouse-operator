@@ -167,8 +167,8 @@ def test_010005(self):
 def test_010006(self):
     create_shell_namespace_clickhouse_template()
 
-    old_version = "clickhouse/clickhouse-server:24.8"
-    new_version = "clickhouse/clickhouse-server:25.3"
+    old_version = "altinity/clickhouse-server:25.8.28.10001.altinitystable"
+    new_version = "altinity/clickhouse-server:26.3.33.10001.altinitystable"
     chi = "test-006"
 
     with Then(f"Start CHI with version {old_version}"):
@@ -208,8 +208,8 @@ def test_010006(self):
 def test_010006_2(self):
     create_shell_namespace_clickhouse_template()
 
-    old_version = "clickhouse/clickhouse-server:25.3"
-    new_version = "clickhouse/clickhouse-server:25.8"
+    old_version = "altinity/clickhouse-server:25.8.28.10001.altinitystable"
+    new_version = "altinity/clickhouse-server:26.3.33.10001.altinitystable"
     chi = "test-006-2"
 
     with Then(f"Start CHI with version {old_version}"):
@@ -246,7 +246,7 @@ def test_010006_2(self):
         kubectl.wait_chi_status(chi, "Completed")
 
         with And("Confirm the setting is set"):
-            out = clickhouse.query(chi, "select value from system.merge_tree_settings where name ='write_marks_for_substreams_in_compact_parts'")
+            out = clickhouse.query(chi, "select value from system.merge_tree_settings where name ='vertical_merge_optimize_ttl_delete'")
             assert out == "0"
 
     with Finally("I clean up"):
@@ -376,46 +376,48 @@ def test_operator_restart(self, manifest, service, version=None):
         shell_2 = get_shell()
         shell_3 = get_shell()
 
-    Check("run query until receive stop event", test=run_select_query, parallel=True)(
-        host=service,
-        user="test_008",
-        password="test_008",
-        query="select count() from cluster('{cluster}', system.one)",
-        res1="2",
-        res2="1",
-        trigger_event=trigger_event,
-        shell=shell_1
-    )
+    try:
+        Check("run query until receive stop event", test=run_select_query, parallel=True)(
+            host=service,
+            user="test_008",
+            password="test_008",
+            query="select count() from cluster('{cluster}', system.one)",
+            res1="2",
+            res2="1",
+            trigger_event=trigger_event,
+            shell=shell_1
+        )
 
-    Check("insert into distributed table until receive stop event", test=run_insert_query, parallel=True)(
-        host=service,
-        user="test_008",
-        password="test_008",
-        query="insert into test_dist select number from numbers(2)",
-        trigger_event=trigger_event,
-        shell=shell_2
-    )
+        Check("insert into distributed table until receive stop event", test=run_insert_query, parallel=True)(
+            host=service,
+            user="test_008",
+            password="test_008",
+            query="insert into test_dist select number from numbers(2)",
+            trigger_event=trigger_event,
+            shell=shell_2
+        )
 
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
-        chi=chi,
-        check_shards = True,
-        check_replicas = True,
-        trigger_event=trigger_event,
-        shell=shell_3
-    )
+        Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
+            chi=chi,
+            check_shards = True,
+            check_replicas = True,
+            trigger_event=trigger_event,
+            shell=shell_3
+        )
 
-    check_operator_restart(
-        chi=chi,
-        wait_objects={
-            "statefulset": shards * replicas,
-            "pod": shards * replicas,
-            "service": shards * replicas + 1,
-        },
-        pod=f"chi-{chi}-{cluster}-0-0-0"
-    )
-    trigger_event.set()
-    time.sleep(5)   # let threads to finish
-    join()
+        check_operator_restart(
+            chi=chi,
+            wait_objects={
+                "statefulset": shards * replicas,
+                "pod": shards * replicas,
+                "service": shards * replicas + 1,
+            },
+            pod=f"chi-{chi}-{cluster}-0-0-0"
+        )
+    finally:
+        trigger_event.set()
+        time.sleep(5)
+        join()
 
     # with Then("I recreate shell"):
     #    shell = get_shell()
@@ -585,35 +587,36 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
         shell_2 = get_shell()
         # shell_3 = get_shell()
 
-    Check("run query until receive stop event", test=run_select_query, parallel=True)(
-        host=service,
-        user="test_009",
-        password="test_009",
-        query="select count() from cluster('{cluster}', system.one)",
-        res1="2",
-        res2="1",
-        trigger_event=trigger_event,
-        shell=shell_1
-    )
+    try:
+        Check("run query until receive stop event", test=run_select_query, parallel=True)(
+            host=service,
+            user="test_009",
+            password="test_009",
+            query="select count() from cluster('{cluster}', system.one)",
+            res1="2",
+            res2="1",
+            trigger_event=trigger_event,
+            shell=shell_1
+        )
 
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
-        chi=chi,
-        check_shards = True,
-        check_replicas = False,
-        trigger_event=trigger_event,
-        shell=shell_2
-    )
+        Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
+            chi=chi,
+            check_shards = True,
+            check_replicas = False,
+            trigger_event=trigger_event,
+            shell=shell_2
+        )
 
-    with When(f"upgrade operator to {version_to}"):
-        util.install_operator_version(version_to)
-        time.sleep(15)
+        with When(f"upgrade operator to {version_to}"):
+            util.install_operator_version(version_to)
+            time.sleep(15)
 
-        kubectl.wait_chi_status(chi, "Completed")
-        kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
-
-    trigger_event.set()
-    time.sleep(5) # let threads to finish
-    join()
+            kubectl.wait_chi_status(chi, "Completed")
+            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+    finally:
+        trigger_event.set()
+        time.sleep(5)
+        join()
 
     # with Then("I recreate shell"):
     #    shell = get_shell()
@@ -1330,6 +1333,7 @@ def test_010012(self):
     RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation("1.0"),
 )
 @Name("test_010013_1. Automatic schema propagation for shards")
+@Tags("HEAVY")
 def test_010013_1(self):
     """Check clickhouse operator supports automatic schema propagation for shards."""
     create_shell_namespace_clickhouse_template()
@@ -3774,7 +3778,6 @@ def test_010032(self):
         manifest=manifest,
         check={
             "apply_templates": {
-                self.context.clickhouse_template,
                 "manifests/chit/tpl-persistent-volume-100Mi.yaml",
             },
             "object_counts": {"statefulset": 4, "pod": 4, "service": 5},
@@ -3817,39 +3820,40 @@ def test_010032(self):
         shell_1 = get_shell()
         shell_2 = get_shell()
 
-    Check("run query until receive stop event", test=run_select_query, parallel=True)(
-        host="clickhouse-test-032-rescaling",
-        user="test_032",
-        password="test_032",
-        query="SELECT count() FROM test_distr_032",
-        res1=str(numbers),
-        res2=str(numbers // 2),
-        trigger_event=trigger_event,
-        shell=shell_1
-    )
-
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
-        chi=chi,
-        cluster="default",
-        check_shards = True,
-        check_replicas = False,
-        trigger_event=trigger_event,
-        shell=shell_2
-    )
-
-    with When("Change the image in the podTemplate by updating the chi version to test the rolling update logic"):
-        kubectl.create_and_check(
-            manifest="manifests/chi/test-032-rescaling-2.yaml",
-            check={
-                "object_counts": {"statefulset": 4, "pod": 4, "service": 5},
-                "do_not_delete": 1,
-            },
-            timeout=900,
+    try:
+        Check("run query until receive stop event", test=run_select_query, parallel=True)(
+            host="clickhouse-test-032-rescaling",
+            user="test_032",
+            password="test_032",
+            query="SELECT count() FROM test_distr_032",
+            res1=str(numbers),
+            res2=str(numbers // 2),
+            trigger_event=trigger_event,
+            shell=shell_1
         )
 
-    trigger_event.set()
-    time.sleep(5) # let threads to finish
-    join()
+        Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
+            chi=chi,
+            cluster="default",
+            check_shards = True,
+            check_replicas = False,
+            trigger_event=trigger_event,
+            shell=shell_2
+        )
+
+        with When("Change the image in the podTemplate by updating the chi version to test the rolling update logic"):
+            kubectl.create_and_check(
+                manifest="manifests/chi/test-032-rescaling-2.yaml",
+                check={
+                    "object_counts": {"statefulset": 4, "pod": 4, "service": 5},
+                    "do_not_delete": 1,
+                },
+                timeout=900,
+            )
+    finally:
+        trigger_event.set()
+        time.sleep(5)
+        join()
 
     # with Then("I recreate shell"):
     #    shell = get_shell()
@@ -5908,8 +5912,8 @@ def test_010054(self):
     create_shell_namespace_clickhouse_template()
     chi = yaml_manifest.get_name(util.get_full_path("manifests/chi/test-006-ch-upgrade-1.yaml"))
 
-    old_version = "clickhouse/clickhouse-server:24.8"
-    new_version = "clickhouse/clickhouse-server:25.3"
+    old_version = "altinity/clickhouse-server:25.8.28.10001.altinitystable"
+    new_version = "altinity/clickhouse-server:26.3.33.10001.altinitystable"
     with Then(f"Start CHI with version {old_version}"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-1.yaml",
@@ -8041,7 +8045,7 @@ def test_010083_1(self):
     protected_pod = f"chi-{chi}-{cluster}-0-1-0"
     protected_sts = f"chi-{chi}-{cluster}-0-1"
     sibling_pods = [f"chi-{chi}-{cluster}-1-0-0", f"chi-{chi}-{cluster}-1-1-0"]
-    good_version = "clickhouse/clickhouse-server:24.3"
+    good_version = "clickhouse/clickhouse-server:25.8"
     new_version = "clickhouse/clickhouse-server:26.3"
 
     with Given("A 2-shard / 2-replica CHI, all hosts on the same good image"):
