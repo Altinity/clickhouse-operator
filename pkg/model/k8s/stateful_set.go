@@ -21,32 +21,7 @@ import (
 
 // StatefulSetContainerGet gets container from the StatefulSet either by name or by index
 func StatefulSetContainerGet(statefulSet *apps.StatefulSet, namesOrIndexes ...any) (*core.Container, bool) {
-	for _, nameOrIndex := range namesOrIndexes {
-		switch typed := nameOrIndex.(type) {
-		// Find by name
-		case string:
-			name := typed
-			// Search for container name
-			if len(name) > 0 {
-				for i := range statefulSet.Spec.Template.Spec.Containers {
-					// Convenience wrapper
-					container := &statefulSet.Spec.Template.Spec.Containers[i]
-					if container.Name == name {
-						return container, true
-					}
-				}
-			}
-		// Find by index
-		case int:
-			index := typed
-			if (0 <= index) && (index < len(statefulSet.Spec.Template.Spec.Containers)) {
-				// Existing index, get specified container
-				return &statefulSet.Spec.Template.Spec.Containers[index], true
-			}
-		}
-	}
-
-	return nil, false
+	return PodSpecContainerGet(&statefulSet.Spec.Template.Spec, namesOrIndexes...)
 }
 
 // IsStatefulSetReconcileCompleted returns whether StatefulSet reconcile completed
