@@ -18,11 +18,10 @@ spec:
               emptyDir: {}
 
           containers:
-            - name: clickhouse-pod
-              # CHIT have more priority than CHI, and override whole volumeMounts section
+            # Named like the installation's container, so it merges into it: volume mounts pair by
+            # mount path, adding the cache mount next to the installation's own data mount
+            - name: clickhouse
               volumeMounts:
-                - name: data-storage-vc-template-1
-                  mountPath: /var/lib/clickhouse
                 - name: clickhouse-nvme-cache
                   mountPath: /var/lib/clickhouse/disks/s3_cache/
 

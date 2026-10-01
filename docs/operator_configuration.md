@@ -148,7 +148,8 @@ Defaults for ClickHouseInstallation can be provided by `ClickHouseInstallationTe
 
 `ClickHouseInstallationTemplate` has the same structure as `ClickHouseInstallation`, but all parts and fields are optional. Templates are included into an installation with 'useTemplates' syntax. For example, one can define a template for ClickHouse pod:
 
-```apiVersion: "clickhouse.altinity.com/v1"
+```yaml
+apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallationTemplate"
 
 metadata:
@@ -160,7 +161,7 @@ spec:
       - name: default
         spec:
           containers:
-            - name: clickhouse-pod
+            - name: clickhouse
               image: clickhouse/clickhouse-server:24.8
 ```
 
@@ -174,6 +175,29 @@ spec:
     - name: clickhouse-stable
 ...
 ```
+
+#### Template precedence
+
+A `ClickHouseInstallation` is applied on top of every template it uses, so when both set the same field the installation's own value wins and template values fill what the installation leaves unset. Templates applied with `templating.policy: auto` come before the ones listed in `useTemplates`, and a later template wins over an earlier one the same way. A template's `clusters` are never merged - the installation's replace them - so cluster-, shard- and host-level settings are the installation's. The operator's own configuration rules (`clickhouse.addons.rules` in its configuration) are the bottom layer, beneath every template, and like any default lose to a template or the installation that sets the same key. The default rules supply the grants the operator's own user needs to manage the installation, and server settings such as `display_secrets_in_show_and_select`. A template or the installation that turns off `display_secrets_in_show_and_select`, or the `clickhouse_operator` profile's `format_display_secrets_in_show_and_select`, has the operator copy definitions to a new or recovered host with `'[HIDDEN]'` in place of their credentials, so the copied tables, dictionaries and databases that carry credentials do not work there. On the operator's own user, a key written with the `{clickhouseOperatorUser}` placeholder - as the rules write the grants - overrides the same key written with the user's name, whichever layer sets either, since the placeholder is expanded after the merge.
+
+Pod, service and volume-claim templates merge with Kubernetes strategic-merge semantics: containers, env and volumes pair by name, volume mounts by mount path and ports by number and protocol, in the order the templates listed them, with the installation's own additions appended; a port that restates only some of its fields must restate a non-TCP `protocol` too, since an omitted protocol means TCP. A template's container therefore extends the installation's only under the same name - a template's `clickhouse-pod` next to the installation's `clickhouse` is two containers.
+
+The reconcile aborts with `InvalidPodTemplate` before anything is changed when a pod template has a container without a name or an image, or two containers of one name, and when a pod template merged from several layers starts a duplicate ClickHouse server in another container: one whose image has the ClickHouse container's image name - whatever its registry, organization or tag - or is `clickhouse-server`, and whose `command` and `args` do not run something other than the server.
+
+A template therefore sets defaults, not guardrails: a value it must enforce - an image, a `default` user's `networks`, `suspend` or `reconcile.statefulSet.recreate.onDataLoss` - holds only on installations that leave it unset. A configuration rule's value likewise holds only where neither a template nor the installation sets its key, though a grant spelled with the operator user's name, not the placeholder, still loses to the rules'.
+
+##### Upgrading from 0.27
+
+Before 0.28 each field followed one of two orders, and which one decides what an upgrade changes.
+
+- **The earlier layer won** - the operator's configuration rules beat templates and the installation, a template beat the installation, and an earlier template beat a later one - for same-named pod, host and volume-claim templates; `configuration.users`, `profiles`, `quotas`, `settings` and `files`; `spec.suspend`, `restart`, `taskID` and `namespaceDomainPattern`; `reconcile.statefulSet`, `reconcile.host` (whose hooks are the union of both) and `reconcile.macros`; `defaults.replicasUseFQDN`; and the `zookeeper` `keeper` reference and `use_compression`. A later layer's lists in a same-named service template - its ports, `externalIPs` and the like - were dropped.
+- **The later layer won** - the installation beat its templates - for `metadata.labels` and `annotations`; `security`; `stop`, `troubleshoot` and `templating`; a service template's `type` and its other scalars and metadata; `zookeeper` `root`, `identity` and timeouts; `reconcile.policy`, `configMapPropagationTimeout`, `cleanup` and `runtime`; and `defaults.distributedDDL`, `storageManagement` and `templates`. An env name both sides set on a container was listed twice, the installation's taking effect; on an init container the earlier layer's value won, as for the rest of the pod template.
+
+The first group now takes the installation's value, a later template's over an earlier one's, and a template's over a configuration rule's; the second group keeps its values, though an env name both sides set on a container is now listed once, which restarts the pods once.
+
+Two layers' containers, volumes, volume mounts and container ports - a template's and the installation's, or two templates' - were folded into one whenever they sat at the same position. They now pair by name, mounts by mount path and ports by number and protocol, so elements that differ are now two. Each such change restarts the pods once, with two exceptions. A template's container that was folded into a differently named one of the installation's - `clickhouse-pod` into `clickhouse` - is now a container of its own: without an image of its own, or starting the ClickHouse server, it aborts the reconcile with `InvalidPodTemplate` before anything is changed. The pods keep running as the previous operator deployed them, but until the installation reconciles the operator cannot query it - its user may connect only from the previous operator pod's address - so the installation's metrics stop. Naming the installation's container like the template's, the name its pods run under today, clears the abort; it also keeps that container as it is, provided the installation's container sets nothing the template's also sets - such as the image - since the installation's value now wins: drop those fields, or set them to the template's. An env name both set restarts the pods once either way, being listed once instead of twice. Renaming the template's container instead renames it in every installation using the template, and reaches each only on its next reconcile - see below - or, under `template.chi.policy: ReadOnStart`, only once the operator has restarted. And a change that newly mounts a volume-claim template changes the StatefulSet's immutable volume claims, so the StatefulSet is recreated - or, with `reconcile.statefulSet.recreate.onUpdateFailure: abort`, the reconcile aborts.
+
+To upgrade without surprises, before upgrading fix each installation that sets a first-group key its templates or the operator's configuration rules also set - such as `display_secrets_in_show_and_select`: delete the installation's value, so the value in effect today keeps applying, or set the installation's value to it. Fix the same way each template that sets a key the rules also set. Where a template sets a key an earlier template also sets, leave the template alone - editing it changes every installation using it, including those where no earlier template sets that key - and set the value in effect today on each installation that uses both. Give a template's container and the installation's container it is meant to extend the same name. To take the upgrade one installation at a time, set `spec.suspend: "yes"` on the installations beforehand and clear it on each in turn.
 
 #### Applying Changes from ClickHouseInstallationTemplates
 
