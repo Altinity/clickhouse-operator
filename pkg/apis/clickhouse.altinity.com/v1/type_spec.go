@@ -126,49 +126,12 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		spec = &ChiSpec{}
 	}
 
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		if !spec.HasTaskID() {
-			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
-		}
-		if !spec.Stop.HasValue() {
-			spec.Stop = spec.Stop.MergeFrom(from.Stop)
-		}
-		if !spec.Restart.HasValue() {
-			spec.Restart = spec.Restart.MergeFrom(from.Restart)
-		}
-		if !spec.Troubleshoot.HasValue() {
-			spec.Troubleshoot = spec.Troubleshoot.MergeFrom(from.Troubleshoot)
-		}
-		if !spec.NamespaceDomainPattern.HasValue() {
-			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
-		}
-		if !spec.Suspend.HasValue() {
-			spec.Suspend = spec.Suspend.MergeFrom(from.Suspend)
-		}
-	case MergeTypeOverrideByNonEmptyValues:
-		if from.HasTaskID() {
-			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
-		}
-		if from.Stop.HasValue() {
-			// Override by non-empty values only
-			spec.Stop = from.Stop
-		}
-		if from.Restart.HasValue() {
-			// Override by non-empty values only
-			spec.Restart = spec.Restart.MergeFrom(from.Restart)
-		}
-		if from.Troubleshoot.HasValue() {
-			// Override by non-empty values only
-			spec.Troubleshoot = from.Troubleshoot
-		}
-		if from.NamespaceDomainPattern.HasValue() {
-			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
-		}
-		if from.Suspend.HasValue() {
-			spec.Suspend = spec.Suspend.MergeFrom(from.Suspend)
-		}
-	}
+	spec.TaskID = MergeScalar(spec.TaskID, from.TaskID, _type)
+	spec.Stop = MergeScalar(spec.Stop, from.Stop, _type)
+	spec.Restart = MergeScalar(spec.Restart, from.Restart, _type)
+	spec.Troubleshoot = MergeScalar(spec.Troubleshoot, from.Troubleshoot, _type)
+	spec.NamespaceDomainPattern = MergeScalar(spec.NamespaceDomainPattern, from.NamespaceDomainPattern, _type)
+	spec.Suspend = MergeScalar(spec.Suspend, from.Suspend, _type)
 
 	spec.Templating = spec.Templating.MergeFrom(from.Templating, _type)
 	spec.Reconcile = spec.Reconcile.MergeFrom(from.Reconcile, _type)

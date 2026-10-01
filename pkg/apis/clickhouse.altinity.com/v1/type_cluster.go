@@ -220,7 +220,7 @@ func (cluster *Cluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 	if parentZk == nil {
 		return
 	}
-	cluster.Zookeeper = cluster.Zookeeper.MergeFrom(parentZk, MergeTypeFillEmptyValues)
+	cluster.Zookeeper = cluster.Zookeeper.InheritFrom(parentZk)
 }
 
 // InheritFilesFrom inherits files from CR
@@ -268,8 +268,8 @@ func (cluster *Cluster) InheritClusterReconcileFrom(chi *ClickHouseInstallation)
 	}
 	reconcile := cluster.GetReconcile()
 	reconcile.Runtime = reconcile.Runtime.MergeFrom(chi.Spec.Reconcile.Runtime, MergeTypeFillEmptyValues)
-	reconcile.StatefulSet = reconcile.StatefulSet.MergeFrom(chi.Spec.Reconcile.StatefulSet)
-	reconcile.Host = reconcile.Host.MergeFrom(chi.Spec.Reconcile.Host)
+	reconcile.StatefulSet = reconcile.StatefulSet.MergeFrom(chi.Spec.Reconcile.StatefulSet, MergeTypeFillEmptyValues)
+	reconcile.Host = reconcile.Host.MergeFrom(chi.Spec.Reconcile.Host, MergeTypeFillEmptyValues)
 	// Inherit CHI-level cluster hooks into this cluster's reconcile.hooks. The merge
 	// is dedup'd (see mergeHookActions) so re-running normalization is idempotent.
 	reconcile.Hooks = reconcile.Hooks.MergeFrom(chi.Spec.Reconcile.Cluster.GetHooks())

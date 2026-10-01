@@ -696,9 +696,9 @@ func (rh ReconcileHost) Normalize() ReconcileHost {
 	return rh
 }
 
-func (rh ReconcileHost) MergeFrom(from ReconcileHost) ReconcileHost {
-	rh.Wait = rh.Wait.MergeFrom(from.Wait)
-	rh.Drop = rh.Drop.MergeFrom(from.Drop)
+func (rh ReconcileHost) MergeFrom(from ReconcileHost, _type MergeType) ReconcileHost {
+	rh.Wait = rh.Wait.MergeFrom(from.Wait, _type)
+	rh.Drop = rh.Drop.MergeFrom(from.Drop, _type)
 	rh.Hooks = rh.Hooks.MergeFrom(from.Hooks)
 	return rh
 }
@@ -729,12 +729,12 @@ func (wait ReconcileHostWait) Normalize() ReconcileHostWait {
 	return wait
 }
 
-func (wait ReconcileHostWait) MergeFrom(from ReconcileHostWait) ReconcileHostWait {
-	wait.Exclude = wait.Exclude.MergeFrom(from.Exclude)
-	wait.Queries = wait.Queries.MergeFrom(from.Queries)
-	wait.Include = wait.Include.MergeFrom(from.Include)
-	wait.Replicas = wait.Replicas.MergeFrom(from.Replicas)
-	wait.Probes = wait.Probes.MergeFrom(from.Probes)
+func (wait ReconcileHostWait) MergeFrom(from ReconcileHostWait, _type MergeType) ReconcileHostWait {
+	wait.Exclude = MergeScalar(wait.Exclude, from.Exclude, _type)
+	wait.Queries = MergeScalar(wait.Queries, from.Queries, _type)
+	wait.Include = MergeScalar(wait.Include, from.Include, _type)
+	wait.Replicas = wait.Replicas.MergeFrom(from.Replicas, _type)
+	wait.Probes = wait.Probes.MergeFrom(from.Probes, _type)
 
 	return wait
 }
@@ -752,8 +752,8 @@ func (drop ReconcileHostDrop) Normalize() ReconcileHostDrop {
 	return drop
 }
 
-func (drop ReconcileHostDrop) MergeFrom(from ReconcileHostDrop) ReconcileHostDrop {
-	drop.Replicas = drop.Replicas.MergeFrom(from.Replicas)
+func (drop ReconcileHostDrop) MergeFrom(from ReconcileHostDrop, _type MergeType) ReconcileHostDrop {
+	drop.Replicas = drop.Replicas.MergeFrom(from.Replicas, _type)
 
 	return drop
 }
@@ -764,7 +764,7 @@ type ReconcileHostWaitReplicas struct {
 	Delay *types.Int32      `json:"delay,omitempty" yaml:"delay,omitempty"`
 }
 
-func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas) *ReconcileHostWaitReplicas {
+func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas, _type MergeType) *ReconcileHostWaitReplicas {
 	if from == nil {
 		// Nothing to merge from, keep original value
 		return r
@@ -779,9 +779,9 @@ func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas) *
 
 	// Both recipient and `from` are specified, need to walk over fields
 
-	r.All = r.All.MergeFrom(from.All)
-	r.New = r.New.MergeFrom(from.New)
-	r.Delay = r.Delay.MergeFrom(from.Delay)
+	r.All = MergeScalar(r.All, from.All, _type)
+	r.New = MergeScalar(r.New, from.New, _type)
+	r.Delay = MergeScalar(r.Delay, from.Delay, _type)
 
 	return r
 }
@@ -805,7 +805,7 @@ func (p *ReconcileHostWaitProbes) GetReadiness() *types.StringBool {
 	return p.Readiness
 }
 
-func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *ReconcileHostWaitProbes {
+func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes, _type MergeType) *ReconcileHostWaitProbes {
 	if from == nil {
 		// Nothing to merge from, keep original value
 		return p
@@ -820,8 +820,8 @@ func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *Reco
 
 	// Both recipient and `from` are specified, need to walk over fields
 
-	p.Startup = p.Startup.MergeFrom(from.Startup)
-	p.Readiness = p.Readiness.MergeFrom(from.Readiness)
+	p.Startup = MergeScalar(p.Startup, from.Startup, _type)
+	p.Readiness = MergeScalar(p.Readiness, from.Readiness, _type)
 
 	return p
 }
@@ -832,7 +832,7 @@ type ReconcileHostDropReplicas struct {
 	Active       *types.StringBool `json:"active,omitempty"       yaml:"active,omitempty"`
 }
 
-func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas) *ReconcileHostDropReplicas {
+func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas, _type MergeType) *ReconcileHostDropReplicas {
 	if from == nil {
 		// Nothing to merge from, keep original value
 		return r
@@ -847,9 +847,9 @@ func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas) *
 
 	// Both recipient and `from` are specified, need to walk over fields
 
-	r.OnDelete = r.OnDelete.MergeFrom(from.OnDelete)
-	r.OnLostVolume = r.OnLostVolume.MergeFrom(from.OnLostVolume)
-	r.Active = r.Active.MergeFrom(from.Active)
+	r.OnDelete = MergeScalar(r.OnDelete, from.OnDelete, _type)
+	r.OnLostVolume = MergeScalar(r.OnLostVolume, from.OnLostVolume, _type)
+	r.Active = MergeScalar(r.Active, from.Active, _type)
 
 	return r
 }

@@ -178,12 +178,12 @@ func (host *Host) InheritSettingsFrom(sources ...any) {
 		case IShard:
 			shard := typed
 			if shard.HasSettings() {
-				host.Settings = host.Settings.MergeFrom(shard.GetSettings())
+				host.Settings = host.Settings.MergeFrom(shard.GetSettings(), MergeTypeFillEmptyValues)
 			}
 		case IReplica:
 			replica := typed
 			if replica.HasSettings() {
-				host.Settings = host.Settings.MergeFrom(replica.GetSettings())
+				host.Settings = host.Settings.MergeFrom(replica.GetSettings(), MergeTypeFillEmptyValues)
 			}
 		}
 	}
@@ -199,12 +199,12 @@ func (host *Host) InheritFilesFrom(sources ...any) {
 		case IShard:
 			shard := typed
 			if shard.HasFiles() {
-				host.Files = host.Files.MergeFrom(shard.GetFiles())
+				host.Files = host.Files.MergeFrom(shard.GetFiles(), MergeTypeFillEmptyValues)
 			}
 		case IReplica:
 			replica := typed
 			if replica.HasFiles() {
-				host.Files = host.Files.MergeFrom(replica.GetFiles())
+				host.Files = host.Files.MergeFrom(replica.GetFiles(), MergeTypeFillEmptyValues)
 			}
 		}
 	}

@@ -47,12 +47,12 @@ func (replica *ChiReplica) GetName() string {
 
 // InheritSettingsFrom inherits settings from specified cluster
 func (replica *ChiReplica) InheritSettingsFrom(cluster *Cluster) {
-	replica.Settings = replica.Settings.MergeFrom(cluster.Settings)
+	replica.Settings = replica.Settings.MergeFrom(cluster.Settings, MergeTypeFillEmptyValues)
 }
 
 // InheritFilesFrom inherits files from specified cluster
 func (replica *ChiReplica) InheritFilesFrom(cluster *Cluster) {
-	replica.Files = replica.Files.MergeFrom(cluster.Files)
+	replica.Files = replica.Files.MergeFrom(cluster.Files, MergeTypeFillEmptyValues)
 }
 
 // InheritTemplatesFrom inherits templates from specified cluster

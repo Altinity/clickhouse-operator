@@ -125,11 +125,11 @@ func (c *Configuration) MergeFrom(from *Configuration, _type MergeType) *Configu
 	c = c.Ensure()
 
 	c.Zookeeper = c.Zookeeper.MergeFrom(from.Zookeeper, _type)
-	c.Users = c.Users.MergeFrom(from.Users)
-	c.Profiles = c.Profiles.MergeFrom(from.Profiles)
-	c.Quotas = c.Quotas.MergeFrom(from.Quotas)
-	c.Settings = c.Settings.MergeFrom(from.Settings)
-	c.Files = c.Files.MergeFrom(from.Files)
+	c.Users = c.Users.MergeFrom(from.Users, _type)
+	c.Profiles = c.Profiles.MergeFrom(from.Profiles, _type)
+	c.Quotas = c.Quotas.MergeFrom(from.Quotas, _type)
+	c.Settings = c.Settings.MergeFrom(from.Settings, _type)
+	c.Files = c.Files.MergeFrom(from.Files, _type)
 
 	// TODO merge clusters
 	// Copy Clusters for now

@@ -64,12 +64,12 @@ func (shard *ChiShard) GetInternalReplication() *types.StringBool {
 
 // InheritSettingsFrom inherits settings from specified cluster
 func (shard *ChiShard) InheritSettingsFrom(cluster *Cluster) {
-	shard.Settings = shard.Settings.MergeFrom(cluster.Settings)
+	shard.Settings = shard.Settings.MergeFrom(cluster.Settings, MergeTypeFillEmptyValues)
 }
 
 // InheritFilesFrom inherits files from specified cluster
 func (shard *ChiShard) InheritFilesFrom(cluster *Cluster) {
-	shard.Files = shard.Files.MergeFrom(cluster.Files)
+	shard.Files = shard.Files.MergeFrom(cluster.Files, MergeTypeFillEmptyValues)
 }
 
 // InheritTemplatesFrom inherits templates from specified cluster
