@@ -134,6 +134,8 @@ func TestShouldTriggerAutoRecovery(t *testing.T) {
 			withError(api.StatusReasonRootCASecretUnresolved, "secret/key not found"), false},
 		{"Aborted with FIPSImagePolicyViolation — reject",
 			withError(api.StatusReasonFIPSImagePolicyViolation, "image lacks fips marker"), false},
+		{"Aborted with InvalidPodTemplate — reject",
+			withError(api.StatusReasonInvalidPodTemplate, "container has no image"), false},
 		// Generic Aborted with an unrecognized reason tag — still a recovery target.
 		{"Aborted with unrecognized reason — accept",
 			withError("SomeOtherReason", "generic abort"), true},
