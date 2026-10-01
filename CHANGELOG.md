@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.0](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.4...release-0.28.0)
+
+### Changed
+* **BACKWARD INCOMPATIBLE.** **A `ClickHouseInstallation` now wins over the templates it uses.** Where a template used to beat it silently - same-named pod, host and volume-claim templates, `configuration.users`, `profiles`, `quotas`, `settings` and `files`, `suspend`, `restart`, `taskID`, `namespaceDomainPattern`, `reconcile.statefulSet` and `reconcile.host` among them - the installation now wins, templates fill what it leaves unset, and a later template beats an earlier one. The operator's configuration rules (`clickhouse.addons.rules`) now yield the same way to a template or the installation setting the same key, such as `display_secrets_in_show_and_select`, though a grant spelled with the operator user's name still loses to the rules', which use the `{clickhouseOperatorUser}` placeholder. Containers, volumes and env now pair by name, mounts by mount path and ports by number and protocol, so differently named containers at the same position are now two. [docs/operator_configuration.md](docs/operator_configuration.md#template-precedence) lists the fields and what an upgrade changes. by [@sunsingerus](https://github.com/sunsingerus)
+
+* **Upgrading reconciles every installation that conflicts with a template or the operator's configuration rules, all at once.** A rolling restart follows an image or resource change and a StatefulSet recreate a storage change; installations that set an env name their template also sets restart too, since that name used to be listed twice. Existing volumes keep their storage class. To avoid the rest, before upgrading make each conflicting installation, and each template that sets a key the rules also set, keep the value in effect today - drop its value or set that one; for a key two templates both set, set today's value on each installation using them instead - see [docs/operator_configuration.md](docs/operator_configuration.md#upgrading-from-027). by [@sunsingerus](https://github.com/sunsingerus)
+
+* **BACKWARD INCOMPATIBLE.** **A pod template that cannot run now aborts the reconcile with `InvalidPodTemplate`**, before anything is changed: a container without a name or an image, two containers of one name, or - in a pod template merged from several layers - a duplicate ClickHouse server started in another container, which pairing by name makes of a template's `clickhouse-pod` next to the installation's `clickhouse`. Naming the installation's container like the template's clears it, and keeps the pods' container as it is when the installation's sets nothing the template's also sets; a fixed template reaches an installation only on its next reconcile, such as a new `spec.taskID` - or, under `template.chi.policy: ReadOnStart`, after an operator restart. See [docs/operator_configuration.md](docs/operator_configuration.md#upgrading-from-027). by [@sunsingerus](https://github.com/sunsingerus)
+
+### Fixed
+* **Service template ports and other lists set in the installation, or in a later template, were dropped** whenever an earlier template defined a service template of the same name; they now merge, ports paired by number and protocol. by [@sunsingerus](https://github.com/sunsingerus)
+
+* **Host template `settings` set in the installation, or in a later template, were dropped** whenever an earlier template's same-named host template had settings of its own; they now merge per key. by [@sunsingerus](https://github.com/sunsingerus)
+
 ## [0.27.4](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.3...release-0.27.4)
 
 ### Security
