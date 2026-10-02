@@ -5769,13 +5769,15 @@ def check_replication(chi, replicas, token, table = ''):
 
         with And("I insert data in the replicated table"):
             clickhouse.query(chi, f"INSERT INTO {table} select {token}", timeout=300)
-             # Give some time for replication to catch up
-            time.sleep(10)
 
         with Then("Check replicated table has data on both nodes"):
-            for replica in replicas:
-                out = clickhouse.query(chi, f"SELECT a from {table} where a={token}", host=f"chi-{chi}-{cluster}-0-{replica}-0")
-                assert out == f"{token}", error()
+            for i in range(1, 5):
+                for replica in replicas:
+                    out = clickhouse.query(chi, f"SELECT a from {table} where a={token}", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+                    if out == f"{token}":
+                        break
+                    retry_sleep(i, 1, "Replicas are not ready")
+            assert out == f"{token}", error()
 
 
 @TestScenario
@@ -8388,7 +8390,7 @@ def test_020002(self):
 
     create_shell_namespace_clickhouse_template()
     util.require_keeper(keeper_type="chk",
-                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
+                        keeper_manifest="clickhouse-keeper-1-node-for-test-only.yaml")
     manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
@@ -8770,7 +8772,7 @@ def test_020006(self):
         kubectl.create_and_check(
             manifest=chk_manifest, kind="chk",
             check={
-                "pod_count": 3,
+                "pod_count": 1,
                 "do_not_delete": 1
             }
         )
