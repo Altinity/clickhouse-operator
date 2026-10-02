@@ -134,6 +134,19 @@ jobs:
           minikube image ls | grep -F "docker.io/altinity/clickhouse-operator:${CHO_RELEASE}"
           minikube image ls | grep -F "docker.io/altinity/metrics-exporter:${CHO_RELEASE}"
 
+      # Local runners (run_tests_operator_local.sh) call common_preload_images so
+      # the first CHI/CHK in the pool does not cold-pull 26.3 / 25.8 / keeper / ZK
+      # from the registry. CI never did, so those pulls serialized onto a 4-CPU
+      # runner and added tens of minutes. Skip when test_mask selects one test —
+      # same as the local ONLY= path — so a debug dispatch stays cheap.
+      - name: Preload ClickHouse images into minikube
+        if: ${{ github.event.inputs.test_mask == '' || github.event.inputs.test_mask == null }}
+        run: |
+          set -euxo pipefail
+          source ./tests/e2e/test_common.sh
+          export MINIKUBE_PRELOAD_IMAGES=yes
+          common_preload_images "${PRELOAD_IMAGES_ALL[@]}"
+
       - name: Deploy prometheus
         run: |
           cp ./deploy/prometheus/prometheus-sensitive-data.example.sh ./deploy/prometheus/prometheus-sensitive-data.sh
