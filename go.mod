@@ -1,6 +1,6 @@
 module github.com/altinity/clickhouse-operator
 
-go 1.26.8
+go 1.27.1
 
 replace (
 	github.com/emicklei/go-restful/v3 => github.com/emicklei/go-restful/v3 v3.10.0
