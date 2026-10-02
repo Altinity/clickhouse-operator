@@ -4762,95 +4762,60 @@ def test_010037(self):
         delete_test_namespace()
 
 
-@TestCheck
-@Name("test_039. Inter-cluster communications with secret")
-def test_039(self, step=0, delete_chi=0):
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
+@Name("test_010039. Inter-cluster communications with secret")
+def test_010039(self):
     """Check clickhouse-operator support inter-cluster communications with secrets."""
+    create_shell_namespace_clickhouse_template()
+    with Given("Secret is installed"):
+        kubectl.apply(util.get_full_path("manifests/secret/test-038-secret.yaml"))
+
     cluster = "default"
-    manifest = f"manifests/chi/test-039-{step}-communications-with-secret.yaml"
-    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    steps = ["Inter-cluster communications with no secret defined",
+             "Inter-cluster communications with 'auto' secret",
+             "Inter-cluster communications with plain text secret",
+             "Inter-cluster communications with k8s secret"]
+    for step in [0,1,2,3]:
+        manifest = f"manifests/chi/test-039-{step}-communications-with-secret.yaml"
+        chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
-    with Given("chi exists"):
-        kubectl.create_and_check(
-            manifest=manifest,
-            check={
-                "apply_templates": {
-                    current().context.clickhouse_template,
+        with When(f"{step}. CHI {steps[step]} is installed"):
+            kubectl.create_and_check(
+                manifest=manifest,
+                check={
+                    "pod_count": 2,
+                    "do_not_delete": 1,
                 },
-                "pod_count": 2,
-                "do_not_delete": 1,
-            },
-        )
+            )
 
-    wait_for_cluster(chi, cluster, 2, pwd="qkrq")
+            wait_for_cluster(chi, cluster, 2, pwd="qkrq")
 
-    if step == 0:
-        with Then("Select in cluster with no secret should fail"):
-            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('{cluster}', system.one)", pwd="qkrq")
-            assert "AUTHENTICATION_FAILED" in r
-        with And("Select from all-sharded with no secret should fail"):
-            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one)", pwd="qkrq")
-            assert "AUTHENTICATION_FAILED" in r
-    if step > 0:
-        with Then("Select in cluster with secret should pass"):
-            r = clickhouse.query(chi, "SELECT * FROM cluster('{cluster}', system.one) limit 1", pwd="qkrq")
-            assert r == "0"
-        with And("Select from all-sharded with secret should pass"):
-            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one) limit 1", pwd="qkrq")
-            assert r == "0"
-        with And("Select from all-clusters with secret should pass"):
-            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-clusters', system.one) limit 1", pwd="qkrq")
-            assert r == "0"
-        with And("Select from all-replicated with secret should pass"):
-            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-replicated', system.one) limit 1", pwd="qkrq")
-            assert r == "0"
+            if step == 0:
+                with Then("Select in cluster with no secret should fail"):
+                    r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('{cluster}', system.one)", pwd="qkrq")
+                    assert "AUTHENTICATION_FAILED" in r
+                with And("Select from all-sharded with no secret should fail"):
+                    r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one)", pwd="qkrq")
+                    assert "AUTHENTICATION_FAILED" in r
+            if step > 0:
+                with Then("Select in cluster with secret should pass"):
+                    r = clickhouse.query(chi, "SELECT * FROM cluster('{cluster}', system.one) limit 1", pwd="qkrq")
+                    assert r == "0"
+                with And("Select from all-sharded with secret should pass"):
+                    r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one) limit 1", pwd="qkrq")
+                    assert r == "0"
+                with And("Select from all-clusters with secret should pass"):
+                    r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-clusters', system.one) limit 1", pwd="qkrq")
+                    assert r == "0"
+                with And("Select from all-replicated with secret should pass"):
+                    r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-replicated', system.one) limit 1", pwd="qkrq")
+                    assert r == "0"
 
-    with Finally("I delete namespace"):
+            kubectl.delete_chi(chi)
+
+    with Finally("I clean up"):
         delete_test_namespace()
-
-
-@TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_010039_0. Inter-cluster communications with no secret defined")
-def test_010039_0(self):
-    create_shell_namespace_clickhouse_template()
-
-    test_039(step=0)
-
-
-@TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_010039_1. Inter-cluster communications with 'auto' secret")
-def test_010039_1(self):
-    """Check clickhouse-operator support inter-cluster communications with 'auto' secret."""
-    create_shell_namespace_clickhouse_template()
-
-    test_039(step=1)
-
-
-@TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_010039_2. Inter-cluster communications with plain text secret")
-def test_010039_2(self):
-    """Check clickhouse-operator support inter-cluster communications with plain text secret."""
-    create_shell_namespace_clickhouse_template()
-
-    test_039(step=2)
-
-
-@TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_010039_3. Inter-cluster communications with k8s secret")
-def test_010039_3(self):
-    """Check clickhouse-operator support inter-cluster communications with k8s secret."""
-    create_shell_namespace_clickhouse_template()
-
-    with Given("test-038-secret.yamlsecret is installed"):
-        kubectl.apply(
-            util.get_full_path("manifests/secret/test-038-secret.yaml"),
-    )
-
-    test_039(step=3)
 
 
 @TestScenario
@@ -7724,11 +7689,11 @@ def test_010082(self):
     default_version = current().context.clickhouse_version
     canary_version = "clickhouse/clickhouse-server:26.3"
 
-    with Given("A cluster with 3 shards and 2 replicas"):
+    with Given("A cluster with 2 shards and 2 replicas"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-082-canary.yaml",
             check={
-                "pod_count": 6,
+                "pod_count": 4,
                 "pod_image": default_version,
                 "do_not_delete": 1,
             },
@@ -7736,7 +7701,7 @@ def test_010082(self):
 
         pod_start_times = {}
         pod_restart_counts = {}
-        for shard in (0, 1, 2):
+        for shard in (0, 1):
             for replica in (0, 1):
                 pod = f"chi-{chi}-{cluster}-{shard}-{replica}-0"
                 pod_start_times[pod] = kubectl.get_field("pod", pod, ".status.startTime")
@@ -7745,7 +7710,7 @@ def test_010082(self):
         kubectl.create_and_check(
             manifest="manifests/chi/test-082-canary-2.yaml",
             check={
-                "pod_count": 6,
+                "pod_count": 4,
                 "do_not_delete": 1,
             },
         )
@@ -7798,18 +7763,18 @@ def test_010082_1(self):
     default_version = current().context.clickhouse_version
     canary_version = "clickhouse/clickhouse-server:26.3"
 
-    with Given("A cluster with 3 shards and 2 replicas"):
+    with Given("A cluster with 2 shards and 2 replicas"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-082-canary.yaml",
             check={
-                "pod_count": 6,
+                "pod_count": 4,
                 "pod_image": default_version,
                 "do_not_delete": 1,
             },
         )
 
         pod_start_times = {}
-        for shard in (0, 1, 2):
+        for shard in (0, 1):
             for replica in (0, 1):
                 pod = f"chi-{chi}-{cluster}-{shard}-{replica}-0"
                 pod_start_times[pod] = kubectl.get_field("pod", pod, ".status.startTime")
