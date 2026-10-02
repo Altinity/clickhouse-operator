@@ -335,6 +335,12 @@ separate `:<version>`-suffixed FIPS build.
   `image-prod` stage (resolves to `fips140=off` by default). Override at
   container-run time with `-e GODEBUG=fips140=on` (permissive), `=only`
   (strict), `=debug` (logging), or `-e GODEBUG=` (disable entirely).
+  The binaries are built with Go 1.27, which refuses to start when `GODEBUG`
+  sets a compatibility setting Go has removed back to its old value - for
+  example `tlsrsakex=1`, `tls10server=1`, `tls3des=1`, `x509keypairleaf=0`,
+  `asynctimerchan=1` or `x509sha1=1`: the operator and the metrics exporter
+  exit at once with `fatal error: removed GODEBUG ...`. Drop such settings
+  from the Pod env before upgrading.
 - `security.policy` chopconf knob: when `Enforced`, the operator coerces
   every per-component TLS toggle to Strict positions, rejects CHIs that
   cannot be served in a FIPS-compatible posture, and re-registers the
