@@ -9377,7 +9377,7 @@ def test_030003(self):
         )
 
     with Check("clickhouse-backup sidecars pass essential FIPS checks"):
-        backup_pods = run_backup_fips_checks(
+        run_backup_fips_checks(
             workload=chi,
             replica_count=2,
         )
@@ -9386,7 +9386,7 @@ def test_030003(self):
         fips_check_replication_across_replicas(chi_pods=chi_pods)
 
     with Check("backup and restore succeed through HTTPS API"):
-        check_clickhouse_backup_restore_roundtrip_https(pod=backup_pods[0])
+        check_clickhouse_backup_restore_roundtrip_https(pod=chi_pods[0])
 
     with Check("approved AES-256 TLS 1.3 cipher is negotiated"):
         fips_assert_aes256_tls13_probes(
