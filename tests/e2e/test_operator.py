@@ -485,23 +485,6 @@ def check_remote_servers(self, chi, check_shards, check_replicas, trigger_event,
     with Then(f"remote_servers were always correct {ok_runs} times"):
         assert ok_runs > 0
 
-
-@TestScenario
-@Name("test_010008_1. Test operator restart")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0"))
-def test_010008_1(self):
-    create_shell_namespace_clickhouse_template()
-
-    with Check("Test simple chi for operator restart"):
-        test_operator_restart(
-            manifest="manifests/chi/test-008-operator-restart-1.yaml",
-            service="clickhouse-test-008-1",
-        )
-
-    with Finally("I clean up"):
-        delete_test_namespace()
-
-
 @TestScenario
 @Name("test_010008_2. Test operator restart")
 def test_010008_2(self):
@@ -510,7 +493,7 @@ def test_010008_2(self):
     with Check("Test advanced chi for operator restart"):
         test_operator_restart(
             manifest="manifests/chi/test-008-operator-restart-2.yaml",
-            service="service-test-008-2",
+            service="clickhouse-test-008-2",
         )
 
     with Finally("I clean up"):
@@ -618,10 +601,6 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
         time.sleep(5)
         join()
 
-    # with Then("I recreate shell"):
-    #    shell = get_shell()
-    #    self.context.shell = shell
-
     with Then("Check that table is here"):
         tables = clickhouse.query(chi, "SHOW TABLES")
         assert "test_local" in tables
@@ -644,30 +623,10 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
     with Finally("I clean up"):
         delete_test_namespace()
 
-
 @TestScenario
-@Name("test_010009_1. Test operator upgrade")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
+@Name("test_010009. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_010009_1(self, version_from="0.27.0", version_to=None):
-    if version_to is None:
-        version_to = self.context.operator_version
-
-    self.context.skip_fips = True  # avoids setting GODEBUG to fips enforced for this test
-
-    with Check("Test simple chi for operator upgrade"):
-        test_operator_upgrade(
-            manifest="manifests/chi/test-009-operator-upgrade-1.yaml",
-            service="clickhouse-test-009-1",
-            version_from=version_from,
-            version_to=version_to,
-        )
-
-
-@TestScenario
-@Name("test_010009_2. Test operator upgrade")
-@Tags("NO_PARALLEL")
-def test_010009_2(self, version_from="0.27.0", version_to=None):
+def test_010009(self, version_from="0.27.0", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -676,7 +635,7 @@ def test_010009_2(self, version_from="0.27.0", version_to=None):
     with Check("Test advanced chi for operator upgrade"):
         test_operator_upgrade(
             manifest="manifests/chi/test-009-operator-upgrade-2.yaml",
-            service="service-test-009-2",
+            service="clickhouse-test-009-2",
             version_from=version_from,
             version_to=version_to,
         )

@@ -2,6 +2,8 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
   name: "test-009-2"
+  labels:
+    test: test
 spec:
   defaults:
     replicasUseFQDN: "0"
@@ -9,7 +11,7 @@ spec:
       profile: default
     templates:
       podTemplate: clickhouse-template
-      dataVolumeClaimTemplate: aws-ebs-volume-claim
+      dataVolumeClaimTemplate: default
       serviceTemplate: chi-service-template
   configuration:
     settings:
@@ -31,14 +33,14 @@ spec:
       - name: test-009-2
         templates:
           podTemplate: clickhouse-template
-          dataVolumeClaimTemplate: aws-ebs-volume-claim
+          dataVolumeClaimTemplate: default
         layout:
           shardsCount: 2
           replicasCount: 1
   templates:
     serviceTemplates:
       - name: chi-service-template
-        generateName: "service-{chi}"
+        generateName: "clickhouse-{chi}"
         spec:
           ports:
             - name: http
@@ -49,7 +51,7 @@ spec:
               targetPort: 9000
           type: LoadBalancer
     volumeClaimTemplates:
-      - name: aws-ebs-volume-claim
+      - name: default
         spec:
           accessModes:
             - ReadWriteOnce
@@ -71,10 +73,10 @@ spec:
                 - name: client
                   containerPort: 9000
               volumeMounts:
-                - name: aws-ebs-volume-claim
+                - name: default
                   mountPath: /var/lib/clickhouse
               command:
                 - /bin/bash
                 - -c
                 - /usr/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml
-          terminationGracePeriodSeconds: 360
+          terminationGracePeriodSeconds: 30
