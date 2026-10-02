@@ -8734,7 +8734,9 @@ def test_020005(self):
                 "do_not_delete": 1,
             },
         )
-
+    
+    # The more comprehensive re-scale logic checks are performed in test_020005_2
+    # For the purpose of this test we only need to make sure Keeper is ready
     with Then("Confirm all CHK pods are ready"):
         kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-0-0', '.status.containerStatuses[0].ready', 'true', retries=10)
         kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-1-0', '.status.containerStatuses[0].ready', 'true', retries=10)
@@ -8755,6 +8757,66 @@ def test_020005(self):
         kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-0-0', '.status.containerStatuses[0].ready', 'true', retries=10)
 
     check_replication(chi, {0, 1}, 5)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_020005_2. CHK scale-up must not create all new Raft members at once")
+def test_020005_2(self):
+    """Fail-fast test for fire-and-forget CHK scale-up (#2041).
+
+    CHK only — no CHI. During 1→3, `sts_count <= ready_count + 1`,
+    and the scale-up must finish with three Ready Keepers.
+    """
+    create_shell_namespace_clickhouse_template()
+
+    chk_manifest_1 = "manifests/chk/test-052-chk-rescale-1.yaml"
+    chk_manifest_3 = "manifests/chk/test-052-chk-rescale-3.yaml"
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest_1))
+
+    with Given("CHK with 1 replica"):
+        kubectl.create_and_check(
+            manifest=chk_manifest_1,
+            kind="chk",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with When("Scale CHK to 3 replicas"):
+        kubectl.create_and_check(
+            manifest=chk_manifest_3,
+            kind="chk",
+            check={
+                "chk_status": "InProgress",
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Never create more than one extra STS beyond Ready members"):
+        deadline = time.time() + 300
+        saw_three_sts = False
+        while time.time() < deadline:
+            sts = kubectl.get_count("sts", chk=chk)
+            ready = kubectl.get_ready_pods_count("chk", chk)
+            assert sts <= ready + 1, error(
+                f"fire-and-forget scale-up: {sts} StatefulSets while only {ready} Ready "
+                f"(expected sts <= ready + 1)"
+            )
+            if sts >= 3:
+                saw_three_sts = True
+            if ready >= 3:
+                break
+            time.sleep(5)
+        assert kubectl.get_ready_pods_count("chk", chk) >= 3, error(
+            "timed out waiting for the 1→3 scale-up to become Ready"
+        )
+        assert saw_three_sts or kubectl.get_count("sts", chk=chk) >= 3, error(
+            "1→3 completed Ready without three StatefulSets"
+        )
 
     with Finally("I clean up"):
         delete_test_namespace()
