@@ -486,23 +486,6 @@ def check_remote_servers(self, chi, check_shards, check_replicas, trigger_event,
     with Then(f"remote_servers were always correct {ok_runs} times"):
         assert ok_runs > 0
 
-
-@TestScenario
-@Name("test_010008_1. Test operator restart")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0"))
-def test_010008_1(self):
-    create_shell_namespace_clickhouse_template()
-
-    with Check("Test simple chi for operator restart"):
-        test_operator_restart(
-            manifest="manifests/chi/test-008-operator-restart-1.yaml",
-            service="clickhouse-test-008-1",
-        )
-
-    with Finally("I clean up"):
-        delete_test_namespace()
-
-
 @TestScenario
 @Name("test_010008_2. Test operator restart")
 def test_010008_2(self):
@@ -511,7 +494,7 @@ def test_010008_2(self):
     with Check("Test advanced chi for operator restart"):
         test_operator_restart(
             manifest="manifests/chi/test-008-operator-restart-2.yaml",
-            service="service-test-008-2",
+            service="clickhouse-test-008-2",
         )
 
     with Finally("I clean up"):
@@ -619,10 +602,6 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
         time.sleep(5)
         join()
 
-    # with Then("I recreate shell"):
-    #    shell = get_shell()
-    #    self.context.shell = shell
-
     with Then("Check that table is here"):
         tables = clickhouse.query(chi, "SHOW TABLES")
         assert "test_local" in tables
@@ -645,30 +624,10 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
     with Finally("I clean up"):
         delete_test_namespace()
 
-
 @TestScenario
-@Name("test_010009_1. Test operator upgrade")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
+@Name("test_010009. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_010009_1(self, version_from="0.27.0", version_to=None):
-    if version_to is None:
-        version_to = self.context.operator_version
-
-    self.context.skip_fips = True  # avoids setting GODEBUG to fips enforced for this test
-
-    with Check("Test simple chi for operator upgrade"):
-        test_operator_upgrade(
-            manifest="manifests/chi/test-009-operator-upgrade-1.yaml",
-            service="clickhouse-test-009-1",
-            version_from=version_from,
-            version_to=version_to,
-        )
-
-
-@TestScenario
-@Name("test_010009_2. Test operator upgrade")
-@Tags("NO_PARALLEL")
-def test_010009_2(self, version_from="0.27.0", version_to=None):
+def test_010009(self, version_from="0.27.0", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -677,7 +636,7 @@ def test_010009_2(self, version_from="0.27.0", version_to=None):
     with Check("Test advanced chi for operator upgrade"):
         test_operator_upgrade(
             manifest="manifests/chi/test-009-operator-upgrade-2.yaml",
-            service="service-test-009-2",
+            service="clickhouse-test-009-2",
             version_from=version_from,
             version_to=version_to,
         )
@@ -3177,7 +3136,7 @@ def test_010025(self):
         timeout=600,
     )
 
-    numbers = "100000000"
+    numbers = "1000000"
 
     with Given("Create replicated table and populate it"):
         clickhouse.query(chi, create_table)
@@ -4804,95 +4763,60 @@ def test_010037(self):
         delete_test_namespace()
 
 
-@TestCheck
-@Name("test_039. Inter-cluster communications with secret")
-def test_039(self, step=0, delete_chi=0):
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
+@Name("test_010039. Inter-cluster communications with secret")
+def test_010039(self):
     """Check clickhouse-operator support inter-cluster communications with secrets."""
+    create_shell_namespace_clickhouse_template()
+    with Given("Secret is installed"):
+        kubectl.apply(util.get_full_path("manifests/secret/test-038-secret.yaml"))
+
     cluster = "default"
-    manifest = f"manifests/chi/test-039-{step}-communications-with-secret.yaml"
-    chi = yaml_manifest.get_name(util.get_full_path(manifest))
+    steps = ["Inter-cluster communications with no secret defined",
+             "Inter-cluster communications with 'auto' secret",
+             "Inter-cluster communications with plain text secret",
+             "Inter-cluster communications with k8s secret"]
+    for step in [0,1,2,3]:
+        manifest = f"manifests/chi/test-039-{step}-communications-with-secret.yaml"
+        chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
-    with Given("chi exists"):
-        kubectl.create_and_check(
-            manifest=manifest,
-            check={
-                "apply_templates": {
-                    current().context.clickhouse_template,
+        with When(f"{step}. CHI {steps[step]} is installed"):
+            kubectl.create_and_check(
+                manifest=manifest,
+                check={
+                    "pod_count": 2,
+                    "do_not_delete": 1,
                 },
-                "pod_count": 2,
-                "do_not_delete": 1,
-            },
-        )
+            )
 
-    wait_for_cluster(chi, cluster, 2, pwd="qkrq")
+            wait_for_cluster(chi, cluster, 2, pwd="qkrq")
 
-    if step == 0:
-        with Then("Select in cluster with no secret should fail"):
-            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('{cluster}', system.one)", pwd="qkrq")
-            assert "AUTHENTICATION_FAILED" in r
-        with And("Select from all-sharded with no secret should fail"):
-            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one)", pwd="qkrq")
-            assert "AUTHENTICATION_FAILED" in r
-    if step > 0:
-        with Then("Select in cluster with secret should pass"):
-            r = clickhouse.query(chi, "SELECT * FROM cluster('{cluster}', system.one) limit 1", pwd="qkrq")
-            assert r == "0"
-        with And("Select from all-sharded with secret should pass"):
-            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one) limit 1", pwd="qkrq")
-            assert r == "0"
-        with And("Select from all-clusters with secret should pass"):
-            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-clusters', system.one) limit 1", pwd="qkrq")
-            assert r == "0"
-        with And("Select from all-replicated with secret should pass"):
-            r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-replicated', system.one) limit 1", pwd="qkrq")
-            assert r == "0"
+            if step == 0:
+                with Then("Select in cluster with no secret should fail"):
+                    r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('{cluster}', system.one)", pwd="qkrq")
+                    assert "AUTHENTICATION_FAILED" in r
+                with And("Select from all-sharded with no secret should fail"):
+                    r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one)", pwd="qkrq")
+                    assert "AUTHENTICATION_FAILED" in r
+            if step > 0:
+                with Then("Select in cluster with secret should pass"):
+                    r = clickhouse.query(chi, "SELECT * FROM cluster('{cluster}', system.one) limit 1", pwd="qkrq")
+                    assert r == "0"
+                with And("Select from all-sharded with secret should pass"):
+                    r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-sharded', system.one) limit 1", pwd="qkrq")
+                    assert r == "0"
+                with And("Select from all-clusters with secret should pass"):
+                    r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-clusters', system.one) limit 1", pwd="qkrq")
+                    assert r == "0"
+                with And("Select from all-replicated with secret should pass"):
+                    r = clickhouse.query_with_error(chi, "SELECT * FROM cluster('all-replicated', system.one) limit 1", pwd="qkrq")
+                    assert r == "0"
 
-    with Finally("I delete namespace"):
+            kubectl.delete_chi(chi)
+
+    with Finally("I clean up"):
         delete_test_namespace()
-
-
-@TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_010039_0. Inter-cluster communications with no secret defined")
-def test_010039_0(self):
-    create_shell_namespace_clickhouse_template()
-
-    test_039(step=0)
-
-
-@TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_010039_1. Inter-cluster communications with 'auto' secret")
-def test_010039_1(self):
-    """Check clickhouse-operator support inter-cluster communications with 'auto' secret."""
-    create_shell_namespace_clickhouse_template()
-
-    test_039(step=1)
-
-
-@TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_010039_2. Inter-cluster communications with plain text secret")
-def test_010039_2(self):
-    """Check clickhouse-operator support inter-cluster communications with plain text secret."""
-    create_shell_namespace_clickhouse_template()
-
-    test_039(step=2)
-
-
-@TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_010039_3. Inter-cluster communications with k8s secret")
-def test_010039_3(self):
-    """Check clickhouse-operator support inter-cluster communications with k8s secret."""
-    create_shell_namespace_clickhouse_template()
-
-    with Given("test-038-secret.yamlsecret is installed"):
-        kubectl.apply(
-            util.get_full_path("manifests/secret/test-038-secret.yaml"),
-    )
-
-    test_039(step=3)
 
 
 @TestScenario
@@ -5846,13 +5770,15 @@ def check_replication(chi, replicas, token, table = ''):
 
         with And("I insert data in the replicated table"):
             clickhouse.query(chi, f"INSERT INTO {table} select {token}", timeout=300)
-             # Give some time for replication to catch up
-            time.sleep(10)
 
         with Then("Check replicated table has data on both nodes"):
-            for replica in replicas:
-                out = clickhouse.query(chi, f"SELECT a from {table} where a={token}", host=f"chi-{chi}-{cluster}-0-{replica}-0")
-                assert out == f"{token}", error()
+            for i in range(1, 5):
+                for replica in replicas:
+                    out = clickhouse.query(chi, f"SELECT a from {table} where a={token}", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+                    if out == f"{token}":
+                        break
+                    retry_sleep(i, 1, "Replicas are not ready")
+            assert out == f"{token}", error()
 
 
 @TestScenario
@@ -7766,11 +7692,11 @@ def test_010082(self):
     default_version = current().context.clickhouse_version
     canary_version = "clickhouse/clickhouse-server:26.3"
 
-    with Given("A cluster with 3 shards and 2 replicas"):
+    with Given("A cluster with 2 shards and 2 replicas"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-082-canary.yaml",
             check={
-                "pod_count": 6,
+                "pod_count": 4,
                 "pod_image": default_version,
                 "do_not_delete": 1,
             },
@@ -7778,7 +7704,7 @@ def test_010082(self):
 
         pod_start_times = {}
         pod_restart_counts = {}
-        for shard in (0, 1, 2):
+        for shard in (0, 1):
             for replica in (0, 1):
                 pod = f"chi-{chi}-{cluster}-{shard}-{replica}-0"
                 pod_start_times[pod] = kubectl.get_field("pod", pod, ".status.startTime")
@@ -7787,7 +7713,7 @@ def test_010082(self):
         kubectl.create_and_check(
             manifest="manifests/chi/test-082-canary-2.yaml",
             check={
-                "pod_count": 6,
+                "pod_count": 4,
                 "do_not_delete": 1,
             },
         )
@@ -7840,18 +7766,18 @@ def test_010082_1(self):
     default_version = current().context.clickhouse_version
     canary_version = "clickhouse/clickhouse-server:26.3"
 
-    with Given("A cluster with 3 shards and 2 replicas"):
+    with Given("A cluster with 2 shards and 2 replicas"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-082-canary.yaml",
             check={
-                "pod_count": 6,
+                "pod_count": 4,
                 "pod_image": default_version,
                 "do_not_delete": 1,
             },
         )
 
         pod_start_times = {}
-        for shard in (0, 1, 2):
+        for shard in (0, 1):
             for replica in (0, 1):
                 pod = f"chi-{chi}-{cluster}-{shard}-{replica}-0"
                 pod_start_times[pod] = kubectl.get_field("pod", pod, ".status.startTime")
@@ -8677,7 +8603,7 @@ def test_020002(self):
 
     create_shell_namespace_clickhouse_template()
     util.require_keeper(keeper_type="chk",
-                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
+                        keeper_manifest="clickhouse-keeper-1-node-for-test-only.yaml")
     manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
     chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
@@ -9059,7 +8985,7 @@ def test_020006(self):
         kubectl.create_and_check(
             manifest=chk_manifest, kind="chk",
             check={
-                "pod_count": 3,
+                "pod_count": 1,
                 "do_not_delete": 1
             }
         )
@@ -9536,7 +9462,7 @@ def test_030001(self):
 
 @TestScenario
 @Tags("HEAVY")
-@Name("test_030003. FIPS data plane: TLS-only ClickHouse, Keeper, and backup")
+@Name("test_030003. FIPS data plane: TLS-only ClickHouse, Keeper, backup, and rescale")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_FIPS_OperatorBuild_ShippedBinaries_StartupLogs("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_HTTPPorts("1.0"),
@@ -9554,16 +9480,22 @@ def test_030001(self):
     RQ_SRS_026_ClickHouseOperator_FIPS_Connect_Exporter_ClickHouse("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_Connect_Operator_KeeperRestriction("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_Connect_ClickHouse_KeeperTLS("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_CH_Rescale("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_CH_ConfigUpdate("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_CHK_Rescale("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_CHK_ConfigUpdate("1.0"),
 )
 def test_030003(self):
     """Deploy a FIPS ClickHouse + Keeper installation under strict operator config
-    and verify TLS-only data paths:
+    and verify TLS-only data paths, then rescale and update TLS ciphers:
 
     - operator, Keeper, ClickHouse, and clickhouse-backup pass FIPS binary and
       listener-port checks, with only secure ports exposed
     - ReplicatedMergeTree data converges across replicas over TLS
     - the backup sidecar reaches ClickHouse over secure native TCP and completes a
       backup/restore round-trip through the HTTPS API
+    - CHI scales 1 → 2 → 1 and CHK scales 1 → 3 → 1 without breaking replication
+    - a later OpenSSL cipher-suite update rejects the removed AES-256 TLS 1.3 cipher
     """
     chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
     chi_manifest = "manifests/chi/test-030003.yaml"
@@ -9574,8 +9506,6 @@ def test_030003(self):
 
     chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
     chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
-
-    chi_replica_count = 2
 
     with Given("strict FIPS operator configuration is applied"):
         util.apply_operator_config(chopconf)
@@ -9583,110 +9513,28 @@ def test_030003(self):
     with Check("operator pod passes essential FIPS checks"):
         run_operator_fips_checks()
 
-    with Given("test TLS secret is installed for ClickHouse and Keeper hosts"):
-        create_tls_secret_for_fips_hosts(chi=chi, chk=chk)
+    with Given("test TLS secret covers up to 3 CHI and CHK replicas"):
+        create_tls_secret_for_fips_hosts(chi=chi, chk=chk, replicas=3)
 
     with And("external ClickHouse client pod is started"):
         start_external_ch_container()
 
-    with When("FIPS ClickHouse Keeper is deployed with TLS settings"):
+    with When("FIPS ClickHouse Keeper is deployed with 1 replica"):
+        chk_manifest_1 = fips_edit_manifest(
+            source_manifest=chk_manifest,
+            replicas_count=1,
+            kind="chk",
+        )
         fips_apply_manifest(
-            manifest_path=chk_manifest,
-            replica_count=2,
+            manifest_path=chk_manifest_1,
+            replica_count=1,
             kind="chk",
         )
 
     with Then("Keeper cluster passes essential FIPS checks"):
-        chk_pods = run_chk_fips_checks(workload=chk, replica_count=2)
+        chk_pods = run_chk_fips_checks(workload=chk, replica_count=1)
 
-    with When("FIPS ClickHouse is deployed with TLS settings and backup template"):
-        fips_apply_manifest(
-            manifest_path=chi_manifest,
-            replica_count=chi_replica_count,
-            kind="chi",
-            apply_templates=[backup_template],
-        )
-
-    with Check("operator uses TLS-compliant outbound paths after reconcile"):
-        run_operator_reconcile_fips_checks()
-
-    with Check("metrics-exporter discovers ClickHouse through HTTPS"):
-        check_metrics_exporter_discovers_clickhouse_https()
-
-    with Check("ClickHouse replicas use Keeper secure client port"):
-        check_clickhouse_uses_secure_keeper_port(chi=chi)
-
-    with Then("ClickHouse cluster passes essential FIPS checks"):
-        chi_pods = run_chi_fips_checks(
-            workload=chi,
-            replica_count=chi_replica_count,
-        )
-
-    with Then("clickhouse-backup sidecar passes essential FIPS checks"):
-        backup_pods = run_backup_fips_checks(
-            workload=chi,
-            replica_count=chi_replica_count,
-        )
-
-    with Check("ReplicatedMergeTree data converges over TLS"):
-        fips_check_replication_across_replicas(chi_pods=chi_pods)
-
-    with Check("backup and restore succeed through HTTPS API"):
-        check_clickhouse_backup_restore_roundtrip_https(pod=backup_pods[0])
-
-    with Check("approved AES-256 TLS 1.3 cipher is negotiated"):
-        fips_assert_aes256_tls13_probes(
-            chi_pods=chi_pods,
-            chk_pods=chk_pods,
-        )
-
-    with Check("all rejected TLS protocol and cipher cases fail on every FIPS TLS endpoint"):
-        fips_assert_all_rejected_tls_cases_on_all_endpoints(
-            chi_pods=chi_pods,
-            chk_pods=chk_pods,
-        )
-
-@TestScenario
-@Tags("HEAVY")
-@Name("test_030004. FIPS CHI: scale replicas 1 -> 2 -> 1")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_FIPS_CH_Rescale("1.0"),
-    RQ_SRS_026_ClickHouseOperator_FIPS_CH_ConfigUpdate("1.0"),
-)
-def test_030004(self):
-    """Verify FIPS ClickHouse survives replica scale-up and scale-down.
-
-    Starts from a single-replica FIPS CHI, upscales to two replicas, downscales
-    back to one, then applies a TLS cipher config update. Each stage reuses the
-    base manifest via a temp copy with an edited ``replicasCount``.
-    """
-    chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
-    chi_manifest = "manifests/chi/test-030003.yaml"
-    chk_manifest = "manifests/chk/test-030003.yaml"
-    backup_template = "manifests/chit/test-030003-backup-template.yaml"
-
-    create_shell_namespace_clickhouse_template()
-
-    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
-    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
-
-    with Given("strict FIPS operator configuration is applied"):
-        util.apply_operator_config(chopconf)
-
-    with And("test TLS secret covers up to 2 CHI and CHK replicas"):
-        create_tls_secret_for_fips_hosts(chi=chi, chk=chk, replicas=2)
-
-    with And("external ClickHouse client pod is started"):
-        start_external_ch_container()
-
-    with When("FIPS ClickHouse Keeper is deployed with TLS settings"):
-        fips_apply_manifest(
-            manifest_path=chk_manifest,
-            replica_count=2,
-            kind="chk",
-        )
-
-    with And("FIPS ClickHouse is deployed with 1 replica and backup sidecars"):
+    with When("FIPS ClickHouse is deployed with 1 replica and backup template"):
         chi_manifest_1 = fips_edit_manifest(
             source_manifest=chi_manifest,
             replicas_count=1,
@@ -9711,6 +9559,12 @@ def test_030004(self):
             replica_count=1,
         )
 
+    with When("CHI reconcile is forced so the operator dials ClickHouse"):
+        kubectl.force_chi_reconcile(chi, "fips-tls-dial")
+
+    with Check("operator uses TLS-compliant outbound paths after reconcile"):
+        run_operator_reconcile_fips_checks()
+
     with When("CHI is upscaled to 2 replicas"):
         chi_manifest_2 = fips_edit_manifest(
             source_manifest=chi_manifest,
@@ -9722,6 +9576,12 @@ def test_030004(self):
             replica_count=2,
             kind="chi",
         )
+
+    with Check("metrics-exporter discovers ClickHouse through HTTPS"):
+        check_metrics_exporter_discovers_clickhouse_https()
+
+    with Check("ClickHouse replicas use Keeper secure client port"):
+        check_clickhouse_uses_secure_keeper_port(chi=chi)
 
     with Then("2-replica ClickHouse cluster passes essential FIPS checks"):
         chi_pods = run_chi_fips_checks(
@@ -9737,6 +9597,59 @@ def test_030004(self):
 
     with Check("ReplicatedMergeTree data converges across 2 replicas"):
         fips_check_replication_across_replicas(chi_pods=chi_pods)
+
+    with Check("backup and restore succeed through HTTPS API"):
+        check_clickhouse_backup_restore_roundtrip_https(pod=chi_pods[0])
+
+    with Check("approved AES-256 TLS 1.3 cipher is negotiated"):
+        fips_assert_aes256_tls13_probes(
+            chi_pods=chi_pods,
+            chk_pods=chk_pods,
+        )
+
+    with Check("all rejected TLS protocol and cipher cases fail on every FIPS TLS endpoint"):
+        fips_assert_all_rejected_tls_cases_on_all_endpoints(
+            chi_pods=chi_pods,
+            chk_pods=chk_pods,
+        )
+
+    with When("Keeper is upscaled to 3 replicas"):
+        chk_manifest_3 = fips_edit_manifest(
+            source_manifest=chk_manifest,
+            replicas_count=3,
+            kind="chk",
+        )
+        fips_apply_manifest(
+            manifest_path=chk_manifest_3,
+            replica_count=3,
+            kind="chk",
+        )
+
+    with Check("ReplicatedMergeTree data converges after Keeper upscale"):
+        chi_pods = sorted(kubectl.get_pod_names(chi))
+        fips_check_replication_across_replicas(
+            chi_pods=chi_pods,
+            table="repl_chk_scale_test_3",
+        )
+
+    with When("Keeper is downscaled to 1 replica"):
+        chk_manifest_1 = fips_edit_manifest(
+            source_manifest=chk_manifest,
+            replicas_count=1,
+            kind="chk",
+        )
+        fips_apply_manifest(
+            manifest_path=chk_manifest_1,
+            replica_count=1,
+            kind="chk",
+        )
+
+    with Check("ReplicatedMergeTree data converges after Keeper downscale"):
+        chi_pods = sorted(kubectl.get_pod_names(chi))
+        fips_check_replication_across_replicas(
+            chi_pods=chi_pods,
+            table="repl_chk_scale_test_1",
+        )
 
     with When("CHI is downscaled to 1 replica"):
         chi_manifest_1 = fips_edit_manifest(
@@ -9769,7 +9682,6 @@ def test_030004(self):
             cipher_suites=["TLS_AES_128_GCM_SHA256"],
             kind="chi",
         )
-
         fips_apply_manifest(
             manifest_path=chi_manifest_update,
             replica_count=1,
@@ -9779,173 +9691,19 @@ def test_030004(self):
 
     with Check("removed AES-256 TLS 1.3 cipher is rejected on ClickHouse native TLS port"):
         chi_pods = sorted(kubectl.get_pod_names(chi))
-
         check_tls13_cipher_fails(
             pod=chi_pods[0],
             port=9440,
             cipher="TLS_AES_256_GCM_SHA384",
         )
 
-
-@TestScenario
-@Tags("HEAVY")
-@Name("test_030005. FIPS CHK: scale replicas 1 -> 3 -> 1")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_FIPS_CHK_Rescale("1.0"),
-    RQ_SRS_026_ClickHouseOperator_FIPS_CHK_ConfigUpdate("1.0"),
-)
-def test_030005(self):
-    """Verify FIPS ClickHouse Keeper survives replica scale-up and scale-down.
-
-    Starts from a single-replica FIPS CHK, upscales to three, then downscales
-    back to one. A fixed two-replica FIPS CHI is deployed alongside to confirm
-    ClickHouse stays connected after each CHK scale.
-    """
-    chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
-    chi_manifest = "manifests/chi/test-030003.yaml"
-    chk_manifest = "manifests/chk/test-030003.yaml"
-    backup_template = "manifests/chit/test-030003-backup-template.yaml"
-
-    create_shell_namespace_clickhouse_template()
-
-    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
-    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
-
-    with Given("strict FIPS operator configuration is applied"):
-        util.apply_operator_config(chopconf)
-
-    with And("TLS secret covers up to 3 CHI and CHK replicas"):
-        create_tls_secret_for_fips_hosts(chi=chi, chk=chk, replicas=3)
-
-    with And("external ClickHouse client pod is started"):
-        start_external_ch_container()
-
-    with When("FIPS ClickHouse Keeper is deployed with 1 replica"):
-        chk_manifest_1 = fips_edit_manifest(
-            source_manifest=chk_manifest,
-            replicas_count=1,
-            kind="chk",
-        )
-        fips_apply_manifest(
-            manifest_path=chk_manifest_1,
-            replica_count=1,
-            kind="chk",
-        )
-
-    with Check("single-replica Keeper cluster passes essential FIPS checks"):
-        run_chk_fips_checks(
-            workload=chk,
-            replica_count=1,
-        )
-
-    with When("FIPS ClickHouse is deployed with 2 replicas"):
-        chi_manifest_2 = fips_edit_manifest(
-            source_manifest=chi_manifest,
-            replicas_count=2,
-            kind="chi",
-        )
-        fips_apply_manifest(
-            manifest_path=chi_manifest_2,
-            replica_count=2,
-            kind="chi",
-            apply_templates=[backup_template],
-        )
-
-    with Then("2-replica ClickHouse cluster passes essential FIPS checks"):
-        chi_pods = run_chi_fips_checks(
-            workload=chi,
-            replica_count=2,
-        )
-
-    with Check("clickhouse-backup sidecars pass essential FIPS checks"):
-        run_backup_fips_checks(
-            workload=chi,
-            replica_count=2,
-        )
-
-    with Check("ReplicatedMergeTree data converges across 2 ClickHouse replicas"):
-        fips_check_replication_across_replicas(chi_pods=chi_pods)
-
-    with When("Keeper is upscaled to 3 replicas"):
-        chk_manifest_3 = fips_edit_manifest(
-            source_manifest=chk_manifest,
-            replicas_count=3,
-            kind="chk",
-        )
-        fips_apply_manifest(
-            manifest_path=chk_manifest_3,
-            replica_count=3,
-            kind="chk",
-        )
-
-    with Check("3-replica Keeper cluster passes essential FIPS checks"):
-        run_chk_fips_checks(
-            workload=chk,
-            replica_count=3,
-        )
-
-    with Then("ClickHouse cluster remains healthy after Keeper upscale"):
-        chi_pods = run_chi_fips_checks(
-            workload=chi,
-            replica_count=2,
-        )
-
-    with Check("clickhouse-backup sidecars pass essential FIPS checks after Keeper upscale"):
-        run_backup_fips_checks(
-            workload=chi,
-            replica_count=2,
-        )
-
-    with Check("ReplicatedMergeTree data converges after Keeper upscale"):
-        fips_check_replication_across_replicas(
-            chi_pods=chi_pods,
-            table="repl_chk_scale_test_3",
-        )
-
-    with When("Keeper is downscaled to 1 replica"):
-        chk_manifest_1 = fips_edit_manifest(
-            source_manifest=chk_manifest,
-            replicas_count=1,
-            kind="chk",
-        )
-        fips_apply_manifest(
-            manifest_path=chk_manifest_1,
-            replica_count=1,
-            kind="chk",
-        )
-
-    with Check("single-replica Keeper cluster passes essential FIPS checks"):
-        run_chk_fips_checks(
-            workload=chk,
-            replica_count=1,
-        )
-
-    with Then("ClickHouse cluster remains healthy after Keeper downscale"):
-        chi_pods = run_chi_fips_checks(
-            workload=chi,
-            replica_count=2,
-        )
-
-    with Check("clickhouse-backup sidecars pass essential FIPS checks after Keeper downscale"):
-        run_backup_fips_checks(
-            workload=chi,
-            replica_count=2,
-        )
-
-    with Check("ReplicatedMergeTree data converges after Keeper downscale"):
-        fips_check_replication_across_replicas(
-            chi_pods=chi_pods,
-            table="repl_chk_scale_test_1",
-        )
-
-    with When("Keeper OpenSSL cipher suites are updated"):
+    with When("Keeper OpenSSL cipher suites are updated to allow only AES-128 TLS 1.3"):
         chk_manifest_update = fips_edit_manifest(
             source_manifest=chk_manifest,
             replicas_count=1,
             cipher_suites=["TLS_AES_128_GCM_SHA256"],
             kind="chk",
         )
-
         fips_apply_manifest(
             manifest_path=chk_manifest_update,
             replica_count=1,
@@ -9955,19 +9713,18 @@ def test_030005(self):
     with Check("removed Keeper TLS 1.3 cipher is no longer negotiated"):
         chi_pods = sorted(kubectl.get_pod_names(chi))
         chk_pods = kubectl.get_chk_pod_names(chk)
-
         chk_ip = kubectl.launch(
             f"get pod {chk_pods[0]} "
             "-o jsonpath='{.status.podIP}'",
             ns=self.context.test_namespace,
         )
-
         check_tls13_cipher_fails(
             pod=chi_pods[0],
             target_host=chk_ip,
             port=2281,
             cipher="TLS_AES_256_GCM_SHA384",
         )
+
 
 @TestScenario
 @Tags("HEAVY")

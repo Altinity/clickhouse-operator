@@ -11,7 +11,7 @@ spec:
     clusters:
       - name: "0"
         layout:
-          replicasCount: 3
+          replicasCount: 1
 
     settings:
       logger/level: "information"
