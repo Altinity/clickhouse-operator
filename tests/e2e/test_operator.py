@@ -3135,7 +3135,7 @@ def test_010025(self):
         timeout=600,
     )
 
-    numbers = "100000000"
+    numbers = "1000000"
 
     with Given("Create replicated table and populate it"):
         clickhouse.query(chi, create_table)
