@@ -252,6 +252,25 @@ FIPS_LISTENER_REJECTED_TLS_CASES = (
     *fips_rejected_cipher_cases_from_ciphers_by_protocol(),
 )
 
+# One reject per *class*, not a sample of the full cipher list:
+#   - each legacy protocol (1.0 / 1.1 / 1.2) with the default suite
+#   - the only non-approved TLS 1.3 suite in ciphers_by_protocol (ChaCha)
+#   - one non-FIPS TLS 1.2 suite (ChaCha; same family as 030016's reject)
+# The full FIPS_LISTENER_REJECTED_TLS_CASES matrix is host-run 030017.
+FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE = (
+    *FIPS_REJECTED_PROTOCOL_CASES,
+    {
+        "name": "TLS 1.3 TLS_CHACHA20_POLY1305_SHA256",
+        "tls_version": "1.3",
+        "cipher_suite": "TLS_CHACHA20_POLY1305_SHA256",
+    },
+    {
+        "name": "TLS 1.2 ECDHE-RSA-CHACHA20-POLY1305",
+        "tls_version": "1.2",
+        "cipher_suite": "ECDHE-RSA-CHACHA20-POLY1305",
+    },
+)
+
 # clickhouse-backup's Go FIPS runtime pins ciphers but keeps stdlib default
 # MinVersion (TLS 1.2), so at TLS 1.2 it ACCEPTS any FIPS-approved suite it can
 # negotiate: bare `-tls1_2` (default → an approved suite) and any explicit cipher
@@ -259,12 +278,22 @@ FIPS_LISTENER_REJECTED_TLS_CASES = (
 # the ECDHE-ECDSA ones fail as "no shared cipher" but are excluded too so the sweep
 # stays cert-agnostic). Every non-approved 1.2 cipher and all legacy protocols
 # (1.0/1.1) stay in the rejected set.
-FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES = tuple(
-    case for case in FIPS_LISTENER_REJECTED_TLS_CASES
-    if not (
-        case["tls_version"] == "1.2"
-        and (case["cipher_suite"] is None or case["cipher_suite"] in approved_tls1_2_ciphers)
+def _fips_backup_rejected_tls_cases(cases):
+    """Backup accepts approved TLS 1.2; drop those from a rejected-case list."""
+    return tuple(
+        case for case in cases
+        if not (
+            case["tls_version"] == "1.2"
+            and (case["cipher_suite"] is None or case["cipher_suite"] in approved_tls1_2_ciphers)
+        )
     )
+
+
+FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES = _fips_backup_rejected_tls_cases(
+    FIPS_LISTENER_REJECTED_TLS_CASES
+)
+FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE = _fips_backup_rejected_tls_cases(
+    FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE
 )
 
 FIPS_APPROVED_TLS13_CIPHER_CASES = tuple(
@@ -1334,22 +1363,22 @@ def fips_assert_rejected_tls_cases_on_endpoint(
                 )
 
 
-@TestStep(Check)
-def fips_assert_all_rejected_tls_cases_on_all_endpoints(
-    self,
+def _fips_assert_rejected_tls_cases_on_all_endpoints(
     chi_pods,
     chk_pods,
+    chi_rejected_cases,
+    backup_rejected_cases,
     ns=None,
 ):
-    """Assert all rejected TLS cases fail on every FIPS TLS endpoint."""
-    ns = ns or self.context.test_namespace
+    """Run ``chi_rejected_cases`` on CH/Keeper listeners and backup cases on :7171."""
+    ns = ns or current().context.test_namespace
 
     endpoints = (
-        ("ClickHouse HTTPS", chi_pods[0], 8443, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("ClickHouse native TLS", chi_pods[0], 9440, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("ClickHouse interserver HTTPS", chi_pods[0], 9010, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("Keeper secure client", chk_pods[0], 2281, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("Backup API HTTPS", chi_pods[0], 7171, FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES),
+        ("ClickHouse HTTPS", chi_pods[0], 8443, chi_rejected_cases),
+        ("ClickHouse native TLS", chi_pods[0], 9440, chi_rejected_cases),
+        ("ClickHouse interserver HTTPS", chi_pods[0], 9010, chi_rejected_cases),
+        ("Keeper secure client", chk_pods[0], 2281, chi_rejected_cases),
+        ("Backup API HTTPS", chi_pods[0], 7171, backup_rejected_cases),
     )
 
     for label, pod, port, endpoint_rejected_cases in endpoints:
@@ -1360,6 +1389,40 @@ def fips_assert_all_rejected_tls_cases_on_all_endpoints(
             rejected_cases=endpoint_rejected_cases,
             ns=ns,
         )
+
+
+@TestStep(Check)
+def fips_assert_all_rejected_tls_cases_on_all_endpoints(
+    self,
+    chi_pods,
+    chk_pods,
+    ns=None,
+):
+    """Assert every case in FIPS_LISTENER_REJECTED_TLS_CASES fails on each endpoint."""
+    _fips_assert_rejected_tls_cases_on_all_endpoints(
+        chi_pods=chi_pods,
+        chk_pods=chk_pods,
+        chi_rejected_cases=FIPS_LISTENER_REJECTED_TLS_CASES,
+        backup_rejected_cases=FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES,
+        ns=ns,
+    )
+
+
+@TestStep(Check)
+def fips_assert_representative_rejected_tls_cases_on_all_endpoints(
+    self,
+    chi_pods,
+    chk_pods,
+    ns=None,
+):
+    """Assert FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE on each endpoint."""
+    _fips_assert_rejected_tls_cases_on_all_endpoints(
+        chi_pods=chi_pods,
+        chk_pods=chk_pods,
+        chi_rejected_cases=FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE,
+        backup_rejected_cases=FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE,
+        ns=ns,
+    )
 
 
 @TestStep(Then)
@@ -2631,6 +2694,27 @@ def check_fips_integrity_failure(self, binary_path, binary_label):
         )
 
     note(f"{binary_label}: integrity check successfully detected tampering")
+
+@TestStep(Then)
+def check_tls13_cipher_succeeds(
+    self,
+    pod,
+    port,
+    cipher,
+    ns=None,
+):
+    """Verify a TLS 1.3 cipher negotiates (via ``fips-openssl`` pod)."""
+    output = fips_run_openssl_s_client_on_pod_port(
+        pod=pod,
+        port=port,
+        cipher_suite=cipher,
+        tls_version="1.3",
+        ns=ns,
+    )
+    assert f"Cipher is {cipher}" in output, error(
+        f"{pod}:{port}: expected {cipher} to negotiate\n{output}"
+    )
+
 
 @TestStep(Then)
 def check_tls13_cipher_fails(

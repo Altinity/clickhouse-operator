@@ -4538,7 +4538,6 @@ def test_010036(self):
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
 @Name("test_010036_1. onLostVolume=no prohibits DROP REPLICA on volume loss")
-@Tags("NO_PARALLEL")
 def test_010036_1(self):
     """reconcile.host.drop.replicas.onLostVolume=no must refuse SYSTEM DROP REPLICA
     when the operator detects storage loss (ForceDrop path).
@@ -9481,21 +9480,18 @@ def test_030001(self):
     RQ_SRS_026_ClickHouseOperator_FIPS_Connect_Operator_KeeperRestriction("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_Connect_ClickHouse_KeeperTLS("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_CH_Rescale("1.0"),
-    RQ_SRS_026_ClickHouseOperator_FIPS_CH_ConfigUpdate("1.0"),
     RQ_SRS_026_ClickHouseOperator_FIPS_CHK_Rescale("1.0"),
-    RQ_SRS_026_ClickHouseOperator_FIPS_CHK_ConfigUpdate("1.0"),
 )
 def test_030003(self):
     """Deploy a FIPS ClickHouse + Keeper installation under strict operator config
-    and verify TLS-only data paths, then rescale and update TLS ciphers:
+    and verify TLS-only data paths, then rescale:
 
     - operator, Keeper, ClickHouse, and clickhouse-backup pass FIPS binary and
       listener-port checks, with only secure ports exposed
     - ReplicatedMergeTree data converges across replicas over TLS
     - the backup sidecar reaches ClickHouse over secure native TCP and completes a
       backup/restore round-trip through the HTTPS API
-    - CHI scales 1 → 2 → 1 and CHK scales 1 → 3 → 1 without breaking replication
-    - a later OpenSSL cipher-suite update rejects the removed AES-256 TLS 1.3 cipher
+    - CHI scales 1 → 2 → 1 and CHK scales 1 → 3 → 1 without breaking the FIPS snapshot
     """
     chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
     chi_manifest = "manifests/chi/test-030003.yaml"
@@ -9559,11 +9555,6 @@ def test_030003(self):
             replica_count=1,
         )
 
-    with When("CHI reconcile is forced so the operator dials ClickHouse"):
-        kubectl.force_chi_reconcile(chi, "fips-tls-dial")
-
-    with Check("operator uses TLS-compliant outbound paths after reconcile"):
-        run_operator_reconcile_fips_checks()
 
     with When("CHI is upscaled to 2 replicas"):
         chi_manifest_2 = fips_edit_manifest(
@@ -9577,12 +9568,6 @@ def test_030003(self):
             kind="chi",
         )
 
-    with Check("metrics-exporter discovers ClickHouse through HTTPS"):
-        check_metrics_exporter_discovers_clickhouse_https()
-
-    with Check("ClickHouse replicas use Keeper secure client port"):
-        check_clickhouse_uses_secure_keeper_port(chi=chi)
-
     with Then("2-replica ClickHouse cluster passes essential FIPS checks"):
         chi_pods = run_chi_fips_checks(
             workload=chi,
@@ -9594,6 +9579,15 @@ def test_030003(self):
             workload=chi,
             replica_count=2,
         )
+
+    with Check("operator uses TLS-compliant outbound paths after reconcile"):
+        run_operator_reconcile_fips_checks()
+
+    with Check("metrics-exporter discovers ClickHouse through HTTPS"):
+        check_metrics_exporter_discovers_clickhouse_https()
+
+    with Check("ClickHouse replicas use Keeper secure client port"):
+        check_clickhouse_uses_secure_keeper_port(chi=chi)
 
     with Check("ReplicatedMergeTree data converges across 2 replicas"):
         fips_check_replication_across_replicas(chi_pods=chi_pods)
@@ -9607,8 +9601,8 @@ def test_030003(self):
             chk_pods=chk_pods,
         )
 
-    with Check("all rejected TLS protocol and cipher cases fail on every FIPS TLS endpoint"):
-        fips_assert_all_rejected_tls_cases_on_all_endpoints(
+    with Check("representative rejected TLS cases fail on every FIPS TLS endpoint"):
+        fips_assert_representative_rejected_tls_cases_on_all_endpoints(
             chi_pods=chi_pods,
             chk_pods=chk_pods,
         )
@@ -9624,6 +9618,9 @@ def test_030003(self):
             replica_count=3,
             kind="chk",
         )
+
+    with Then("Keeper cluster passes essential FIPS checks"):
+        chk_pods = run_chk_fips_checks(workload=chk, replica_count=3)
 
     with Check("ReplicatedMergeTree data converges after Keeper upscale"):
         chi_pods = sorted(kubectl.get_pod_names(chi))
@@ -9643,6 +9640,9 @@ def test_030003(self):
             replica_count=1,
             kind="chk",
         )
+
+    with Then("Keeper cluster passes essential FIPS checks"):
+        chk_pods = run_chk_fips_checks(workload=chk, replica_count=1)
 
     with Check("ReplicatedMergeTree data converges after Keeper downscale"):
         chi_pods = sorted(kubectl.get_pod_names(chi))
@@ -9669,50 +9669,93 @@ def test_030003(self):
             replica_count=1,
         )
 
-    with Check("clickhouse-backup sidecar passes essential FIPS checks"):
-        run_backup_fips_checks(
-            workload=chi,
+
+@TestScenario
+@Tags("HEAVY")
+@Name("test_030004. FIPS CHI/CHK: OpenSSL cipher-suite config update")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_FIPS_CH_ConfigUpdate("1.0"),
+    RQ_SRS_026_ClickHouseOperator_FIPS_CHK_ConfigUpdate("1.0"),
+)
+def test_030004(self):
+    """Verify a FIPS CHI/CHK with AES-256-only cipherSuites accepts AES-256
+    and rejects AES-128.
+
+    Deployed already pinned — there is no pre-update assert, so a second
+    reconcile would only add roll time. The exhaustive client cipher matrix
+    is host-run ``test_030017``.
+    """
+    chopconf = "manifests/chopconf/test-030002-chopconf.yaml"
+    chi_manifest = "manifests/chi/test-030003.yaml"
+    chk_manifest = "manifests/chk/test-030003.yaml"
+    backup_template = "manifests/chit/test-030003-backup-template.yaml"
+
+    aes128 = "TLS_AES_128_GCM_SHA256"
+    aes256 = "TLS_AES_256_GCM_SHA384"
+
+    create_shell_namespace_clickhouse_template()
+
+    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
+
+    with Given("strict FIPS operator configuration is applied"):
+        util.apply_operator_config(chopconf)
+
+    with And("test TLS secret is installed for one CHI and CHK replica"):
+        create_tls_secret_for_fips_hosts(chi=chi, chk=chk, replicas=1)
+
+    with When("FIPS ClickHouse Keeper is deployed with AES-256-only TLS 1.3 ciphers"):
+        chk_manifest_1 = fips_edit_manifest(
+            source_manifest=chk_manifest,
+            replicas_count=1,
+            cipher_suites=[aes256],
+            kind="chk",
+        )
+        fips_apply_manifest(
+            manifest_path=chk_manifest_1,
             replica_count=1,
+            kind="chk",
         )
 
-    with When("CHI OpenSSL cipher suites are updated to allow only AES-128 TLS 1.3"):
-        chi_manifest_update = fips_edit_manifest(
+    with And("FIPS ClickHouse is deployed with AES-256-only TLS 1.3 ciphers"):
+        chi_manifest_1 = fips_edit_manifest(
             source_manifest=chi_manifest,
             replicas_count=1,
-            cipher_suites=["TLS_AES_128_GCM_SHA256"],
+            cipher_suites=[aes256],
             kind="chi",
         )
         fips_apply_manifest(
-            manifest_path=chi_manifest_update,
+            manifest_path=chi_manifest_1,
             replica_count=1,
             kind="chi",
             apply_templates=[backup_template],
         )
 
-    with Check("removed AES-256 TLS 1.3 cipher is rejected on ClickHouse native TLS port"):
-        chi_pods = sorted(kubectl.get_pod_names(chi))
+    chi_pods = sorted(kubectl.get_pod_names(chi))
+    chk_pods = kubectl.get_chk_pod_names(chk)
+
+    with Check("AES-256 TLS 1.3 cipher is accepted on ClickHouse native TLS port"):
+        check_tls13_cipher_succeeds(
+            pod=chi_pods[0],
+            port=9440,
+            cipher=aes256,
+        )
+
+    with Check("AES-128 TLS 1.3 cipher is rejected on ClickHouse native TLS port"):
         check_tls13_cipher_fails(
             pod=chi_pods[0],
             port=9440,
-            cipher="TLS_AES_256_GCM_SHA384",
+            cipher=aes128,
         )
 
-    with When("Keeper OpenSSL cipher suites are updated to allow only AES-128 TLS 1.3"):
-        chk_manifest_update = fips_edit_manifest(
-            source_manifest=chk_manifest,
-            replicas_count=1,
-            cipher_suites=["TLS_AES_128_GCM_SHA256"],
-            kind="chk",
-        )
-        fips_apply_manifest(
-            manifest_path=chk_manifest_update,
-            replica_count=1,
-            kind="chk",
+    with Check("AES-256 TLS 1.3 cipher is accepted on Keeper secure client port"):
+        check_tls13_cipher_succeeds(
+            pod=chk_pods[0],
+            port=2281,
+            cipher=aes256,
         )
 
-    with Check("removed Keeper TLS 1.3 cipher is no longer negotiated"):
-        chi_pods = sorted(kubectl.get_pod_names(chi))
-        chk_pods = kubectl.get_chk_pod_names(chk)
+    with Check("AES-128 TLS 1.3 cipher is rejected on Keeper secure client port"):
         chk_ip = kubectl.launch(
             f"get pod {chk_pods[0]} "
             "-o jsonpath='{.status.podIP}'",
@@ -9722,7 +9765,7 @@ def test_030003(self):
             pod=chi_pods[0],
             target_host=chk_ip,
             port=2281,
-            cipher="TLS_AES_256_GCM_SHA384",
+            cipher=aes128,
         )
 
 
