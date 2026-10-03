@@ -1,0 +1,9 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseRestore"
+metadata:
+  name: test-restore
+spec:
+  clickHouseInstallation: test-cluster-for-backups
+  backupName: e2e-backup
+  overwrite: true
+  validateTopology: true

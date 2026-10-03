@@ -1,0 +1,144 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhousebackupschedules.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.28.0
+spec:
+  group: clickhouse.altinity.com
+  scope: Namespaced
+  names:
+    kind: ClickHouseBackupSchedule
+    singular: clickhousebackupschedule
+    plural: clickhousebackupschedules
+    shortNames:
+      - chbs
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: installation
+          type: string
+          description: Target ClickHouseInstallation
+          jsonPath: .spec.clickHouseInstallation
+        - name: schedule
+          type: string
+          description: Cron schedule
+          jsonPath: .spec.schedule
+        - name: suspend
+          type: boolean
+          description: Whether the schedule is suspended
+          jsonPath: .spec.suspend
+        - name: last-schedule
+          type: date
+          jsonPath: .status.lastScheduleTime
+        - name: age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          description: "ClickHouseBackupSchedule defines a recurring backup of a ClickHouseInstallation"
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - clickHouseInstallation
+                - schedule
+              properties:
+                clickHouseInstallation:
+                  type: string
+                  description: "Name of the target ClickHouseInstallation in the same namespace"
+                schedule:
+                  type: string
+                  description: "Cron schedule in standard Kubernetes CronJob format"
+                suspend:
+                  type: boolean
+                  description: "Pause creation of new backup jobs"
+                concurrencyPolicy:
+                  type: string
+                  description: "How to treat concurrent executions"
+                  enum:
+                    - Allow
+                    - Forbid
+                    - Replace
+                startingDeadlineSeconds:
+                  type: integer
+                  format: int64
+                successfulJobsHistoryLimit:
+                  type: integer
+                  format: int32
+                failedJobsHistoryLimit:
+                  type: integer
+                  format: int32
+                backupTemplate:
+                  type: object
+                  description: "Backup specification stamped out on each scheduled run"
+                  properties:
+                    backupNamePrefix:
+                      type: string
+                    schemaOnly:
+                      type: boolean
+                    replicaSelection:
+                      type: string
+                      enum:
+                        - FirstPerShard
+                        - AllReplicas
+                    image:
+                      type: string
+                    clickHouseCredentialsSecretName:
+                      type: string
+                    tables:
+                      type: string
+                    partitions:
+                      type: array
+                      nullable: true
+                      items:
+                        type: string
+                    keepLastRemote:
+                      type: integer
+                      format: int32
+            status:
+              type: object
+              properties:
+                cronJobName:
+                  type: string
+                lastScheduleTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                conditions:
+                  type: array
+                  nullable: true
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      observedGeneration:
+                        type: integer
+                        format: int64

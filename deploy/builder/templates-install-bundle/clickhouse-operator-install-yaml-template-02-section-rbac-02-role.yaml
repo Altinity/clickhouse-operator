@@ -241,6 +241,60 @@ rules:
       - patch
       - create
       - delete
+
+  # clickhouse backup - related resources
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhousebackups
+      - clickhousebackupschedules
+      - clickhouserestores
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+      - update
+      - create
+      - delete
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhousebackups/finalizers
+      - clickhousebackupschedules/finalizers
+      - clickhouserestores/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhousebackups/status
+      - clickhousebackupschedules/status
+      - clickhouserestores/status
+    verbs:
+      - get
+      - update
+      - patch
+      - create
+      - delete
+
+  #
+  # batch.* resources - backup/restore Jobs and CronJobs
+  #
+
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+      - cronjobs
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+      - update
+      - create
+      - delete
 ---
 # Specifies either
 #   ClusterRoleBinding between ClusterRole and ServiceAccount.
