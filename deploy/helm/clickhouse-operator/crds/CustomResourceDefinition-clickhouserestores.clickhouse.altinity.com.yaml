@@ -1,0 +1,123 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhouserestores.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.28.0
+spec:
+  group: clickhouse.altinity.com
+  scope: Namespaced
+  names:
+    kind: ClickHouseRestore
+    singular: clickhouserestore
+    plural: clickhouserestores
+    shortNames:
+      - chr
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: installation
+          type: string
+          description: Target ClickHouseInstallation
+          jsonPath: .spec.clickHouseInstallation
+        - name: backup
+          type: string
+          description: Remote backup name being restored
+          jsonPath: .spec.backupName
+        - name: phase
+          type: string
+          description: Restore phase
+          jsonPath: .status.phase
+        - name: duration
+          type: integer
+          description: Restore duration (seconds)
+          jsonPath: .status.durationSeconds
+        - name: age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          description: "ClickHouseRestore defines a one-off restore of a remote backup into a ClickHouseInstallation"
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - clickHouseInstallation
+                - backupName
+              properties:
+                clickHouseInstallation:
+                  type: string
+                  description: "Name of the target ClickHouseInstallation in the same namespace (a fresh, empty installation is recommended)"
+                backupName:
+                  type: string
+                  description: "Remote backup to restore"
+                schemaOnly:
+                  type: boolean
+                  description: "Restore table/database definitions only (no data)"
+                overwrite:
+                  type: boolean
+                  description: "Allow restoring over existing, non-empty tables. When false (default) the restore is refused if target tables already contain data"
+                validateTopology:
+                  type: boolean
+                  description: "When true (default) the restore validates the target cluster topology is reachable before touching data"
+                image:
+                  type: string
+                  description: "Optional container image override for the restore job"
+                clickHouseCredentialsSecretName:
+                  type: string
+                  description: "Optional Secret with CLICKHOUSE_USER/CLICKHOUSE_PASSWORD"
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                jobName:
+                  type: string
+                startTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                completionTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                durationSeconds:
+                  type: integer
+                  format: int64
+                conditions:
+                  type: array
+                  nullable: true
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      observedGeneration:
+                        type: integer
+                        format: int64

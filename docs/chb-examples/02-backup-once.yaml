@@ -1,0 +1,17 @@
+# One-off backup of the "backup-demo" ClickHouseInstallation.
+# The operator creates a Kubernetes Job that triggers `create_remote` on the first
+# replica of each shard (correct for Replicated* tables).
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackup"
+metadata:
+  name: backup-demo-manual
+spec:
+  clickHouseInstallation: backup-demo
+  # backupName: ""            # optional; auto-generated when empty
+  schemaOnly: false
+  replicaSelection: FirstPerShard   # FirstPerShard (default) | AllReplicas
+  # tables: "mydb.*"               # optional: back up only matching tables
+  # partitions: ["202601"]         # optional: only these partitions
+  # diffFromRemote: prev-backup    # optional: incremental backup against an existing remote backup
+  # keepLastRemote: 7              # optional: retention - keep only the N most recent remote backups
+  # verify: true                   # optional: verify the backup is restorable afterwards
