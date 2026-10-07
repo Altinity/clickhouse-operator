@@ -1,0 +1,149 @@
+name: check_ubi9
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/check_ubi9.yaml
+      - .github/workflows/release_ubi9.yaml
+      - dockerfile/ubi9/**
+      - .dockerignore
+      - LICENSE
+      - THIRD_PARTY_NOTICES.md
+      - cmd/**
+      - config/**
+      - dev/go_build_*.sh
+      - go.mod
+      - go.sum
+      - pkg/**
+      - release
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: localhost
+  REGISTRY_NAMESPACE: ubi9-check
+  GO_TOOLSET_IMAGE: registry.access.redhat.com/ubi9/go-toolset:1.26.5
+  UBI_IMAGE: registry.access.redhat.com/ubi9/ubi:9.8
+  OPERATOR_IMAGE_NAME: clickhouse-operator
+  METRICS_IMAGE_NAME: metrics-exporter
+  IMAGE_RELEASE: "1"
+  GOFIPS140: v1.0.0
+  GODEBUG_FIPS140: off
+
+jobs:
+  dockerfiles:
+    name: Check UBI Dockerfiles
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify UBI-only base image declarations
+        run: |
+          set -euo pipefail
+          files=(
+            dockerfile/ubi9/operator/Dockerfile
+            dockerfile/ubi9/metrics-exporter/Dockerfile
+          )
+          for file in "${files[@]}"; do
+            grep -Fxq "ARG GO_TOOLSET_IMAGE=${GO_TOOLSET_IMAGE}" "${file}"
+            grep -Fxq "ARG UBI_IMAGE=${UBI_IMAGE}" "${file}"
+            if grep -nE '^FROM .*\b(golang|docker\.io|gcr\.io|quay\.io)/?' "${file}"; then
+              echo "Non-Red Hat base image declared in ${file}" >&2
+              exit 1
+            fi
+            docker buildx build --check --file "${file}" .
+          done
+
+  build:
+    name: Build ${{ matrix.component }} (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: operator
+            arch: amd64
+            platform: linux/amd64
+            dockerfile: dockerfile/ubi9/operator/Dockerfile
+            binary: clickhouse-operator
+          - component: operator
+            arch: arm64
+            platform: linux/arm64
+            dockerfile: dockerfile/ubi9/operator/Dockerfile
+            binary: clickhouse-operator
+          - component: metrics-exporter
+            arch: amd64
+            platform: linux/amd64
+            dockerfile: dockerfile/ubi9/metrics-exporter/Dockerfile
+            binary: metrics-exporter
+          - component: metrics-exporter
+            arch: arm64
+            platform: linux/arm64
+            dockerfile: dockerfile/ubi9/metrics-exporter/Dockerfile
+            binary: metrics-exporter
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build UBI image
+        env:
+          COMPONENT: ${{ matrix.component }}
+          PLATFORM: ${{ matrix.platform }}
+          ARCH: ${{ matrix.arch }}
+          DOCKERFILE: ${{ matrix.dockerfile }}
+        run: |
+          set -euo pipefail
+          GO_VERSION=$(awk '/^go / { print $2 }' go.mod)
+          VERSION=$(cat release)
+          TAG="ubi9-${ARCH}"
+          case "${COMPONENT}" in
+            operator) IMAGE_NAME="${OPERATOR_IMAGE_NAME}" ;;
+            metrics-exporter) IMAGE_NAME="${METRICS_IMAGE_NAME}" ;;
+            *) echo "Unknown component: ${COMPONENT}" >&2; exit 1 ;;
+          esac
+          IMAGE="${REGISTRY}/${REGISTRY_NAMESPACE}/${IMAGE_NAME}:${TAG}"
+          docker buildx build \
+            --load \
+            --pull \
+            --platform "${PLATFORM}" \
+            --target image-prod \
+            --file "${DOCKERFILE}" \
+            --tag "${IMAGE}" \
+            --build-arg "GO_VERSION=${GO_VERSION}" \
+            --build-arg "GO_TOOLSET_IMAGE=${GO_TOOLSET_IMAGE}" \
+            --build-arg "UBI_IMAGE=${UBI_IMAGE}" \
+            --build-arg "VERSION=${VERSION}" \
+            --build-arg "RELEASE=${IMAGE_RELEASE}" \
+            --build-arg "GOFIPS140=${GOFIPS140}" \
+            --build-arg "GODEBUG_FIPS140=${GODEBUG_FIPS140}" \
+            .
+          echo "IMAGE=${IMAGE}" >> "${GITHUB_ENV}"
+
+      - name: Verify UBI runtime
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          BINARY: ${{ matrix.binary }}
+        run: |
+          set -euo pipefail
+          expected_version=$(cat release)
+          configured_user=$(docker image inspect "${IMAGE}" --format '{{.Config.User}}')
+          base_label=$(docker image inspect "${IMAGE}" --format '{{index .Config.Labels "altinity.image.base"}}')
+          test "${configured_user}" = nobody
+          test "${base_label}" = "${UBI_IMAGE}"
+          actual_version=$(docker run --rm --platform "${PLATFORM}" "${IMAGE}" -version)
+          test "${actual_version}" = "${expected_version}"
+          docker run --rm --platform "${PLATFORM}" --user 0 --entrypoint /bin/bash "${IMAGE}" -lc \
+            "set -euo pipefail; grep -q '^Red Hat Enterprise Linux release 9\\.' /etc/redhat-release; test -x /${BINARY}; test -f /licenses/LICENSE; test -f /licenses/THIRD_PARTY_NOTICES.md; test -z \"\$(rpm -V bash curl-minimal)\""

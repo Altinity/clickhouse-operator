@@ -12,7 +12,10 @@ echo "==========================================================================
 echo "VERSION: ${VERSION}"
 echo "=================================================================================="
 
-OPERATORHUB_DIR="${SRC_ROOT}/deploy/operatorhub"
+# Callers that need an isolated bundle flavor (for example, the Red Hat
+# certified bundle) can direct generated files to a staging directory without
+# changing the existing community bundle tree.
+OPERATORHUB_DIR="${OPERATORHUB_DIR:-${SRC_ROOT}/deploy/operatorhub}"
 MANIFESTS_DIR="${OPERATORHUB_DIR}/${VERSION}"
 mkdir -p "${MANIFESTS_DIR}"
 

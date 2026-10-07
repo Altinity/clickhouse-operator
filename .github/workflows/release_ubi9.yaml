@@ -1,0 +1,245 @@
+name: release_ubi9
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      registry:
+        description: Registry hostname for the UBI images
+        required: true
+        default: docker.io
+        type: string
+      namespace:
+        description: Registry namespace for the UBI images
+        required: true
+        default: altinity
+        type: string
+      tag:
+        description: Image tag; defaults to <release>-ubi9
+        required: false
+        default: ""
+        type: string
+      submit_preflight:
+        description: Submit container Preflight results to Red Hat
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GO_TOOLSET_IMAGE: registry.access.redhat.com/ubi9/go-toolset:1.26.5
+  UBI_IMAGE: registry.access.redhat.com/ubi9/ubi:9.8
+  OPERATOR_IMAGE_NAME: clickhouse-operator
+  METRICS_IMAGE_NAME: metrics-exporter
+  IMAGE_RELEASE: "1"
+  GOFIPS140: v1.0.0
+  GODEBUG_FIPS140: off
+
+concurrency:
+  group: release-ubi9-${{ inputs.registry }}-${{ inputs.namespace }}-${{ inputs.tag || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and release UBI images
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.RED_HAT_CERTIFICATION_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      PREFLIGHT_VERSION: 1.21.0
+      PREFLIGHT_SHA256: 5e653135503c72f8702bbe31d7643197d12937c68086879133dd6b9650a9a449
+      REGISTRY: ${{ github.event_name == 'workflow_dispatch' && inputs.registry || vars.RED_HAT_REGISTRY }}
+      REGISTRY_NAMESPACE: ${{ github.event_name == 'workflow_dispatch' && inputs.namespace || vars.RED_HAT_REGISTRY_NAMESPACE }}
+      INPUT_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || '' }}
+      SUBMIT_PREFLIGHT: ${{ github.event_name == 'release' || inputs.submit_preflight }}
+      REGISTRY_USERNAME: ${{ secrets.UBI_REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.UBI_REGISTRY_PASSWORD }}
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.sha }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Resolve release configuration
+        run: |
+          set -euo pipefail
+          test -n "${REGISTRY}"
+          test -n "${REGISTRY_NAMESPACE}"
+          test -n "${REGISTRY_USERNAME}"
+          test -n "${REGISTRY_PASSWORD}"
+          VERSION=$(cat release)
+          if [[ "${GITHUB_EVENT_NAME}" == release && "${{ github.event.release.tag_name }}" != "release-${VERSION}" ]]; then
+            echo "Release tag must be release-${VERSION}" >&2
+            exit 1
+          fi
+          TAG="${INPUT_TAG:-${VERSION}-ubi9}"
+          if [[ "${TAG}" == latest ]]; then
+            echo "The floating 'latest' tag cannot be submitted for certification" >&2
+            exit 1
+          fi
+          OPERATOR_IMAGE="${REGISTRY}/${REGISTRY_NAMESPACE}/${OPERATOR_IMAGE_NAME}:${TAG}"
+          METRICS_IMAGE="${REGISTRY}/${REGISTRY_NAMESPACE}/${METRICS_IMAGE_NAME}:${TAG}"
+          {
+            echo "VERSION=${VERSION}"
+            echo "TAG=${TAG}"
+            echo "OPERATOR_IMAGE=${OPERATOR_IMAGE}"
+            echo "METRICS_IMAGE=${METRICS_IMAGE}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Login to UBI registry
+        run: echo "${REGISTRY_PASSWORD}" | docker login --username "${REGISTRY_USERNAME}" --password-stdin "${REGISTRY}"
+
+      - name: Build and push operator image
+        run: |
+          set -euo pipefail
+          GO_VERSION=$(awk '/^go / { print $2 }' go.mod)
+          docker buildx build \
+            --pull \
+            --push \
+            --platform linux/amd64,linux/arm64 \
+            --target image-prod \
+            --file dockerfile/ubi9/operator/Dockerfile \
+            --tag "${OPERATOR_IMAGE}" \
+            --build-arg "GO_VERSION=${GO_VERSION}" \
+            --build-arg "GO_TOOLSET_IMAGE=${GO_TOOLSET_IMAGE}" \
+            --build-arg "UBI_IMAGE=${UBI_IMAGE}" \
+            --build-arg "VERSION=${VERSION}" \
+            --build-arg "RELEASE=${IMAGE_RELEASE}" \
+            --build-arg "GOFIPS140=${GOFIPS140}" \
+            --build-arg "GODEBUG_FIPS140=${GODEBUG_FIPS140}" \
+            --sbom=true \
+            --provenance=mode=max \
+            --metadata-file operator-ubi9-build-metadata.json \
+            .
+
+      - name: Build and push metrics-exporter image
+        run: |
+          set -euo pipefail
+          GO_VERSION=$(awk '/^go / { print $2 }' go.mod)
+          docker buildx build \
+            --pull \
+            --push \
+            --platform linux/amd64,linux/arm64 \
+            --target image-prod \
+            --file dockerfile/ubi9/metrics-exporter/Dockerfile \
+            --tag "${METRICS_IMAGE}" \
+            --build-arg "GO_VERSION=${GO_VERSION}" \
+            --build-arg "GO_TOOLSET_IMAGE=${GO_TOOLSET_IMAGE}" \
+            --build-arg "UBI_IMAGE=${UBI_IMAGE}" \
+            --build-arg "VERSION=${VERSION}" \
+            --build-arg "RELEASE=${IMAGE_RELEASE}" \
+            --build-arg "GOFIPS140=${GOFIPS140}" \
+            --build-arg "GODEBUG_FIPS140=${GODEBUG_FIPS140}" \
+            --sbom=true \
+            --provenance=mode=max \
+            --metadata-file metrics-exporter-ubi9-build-metadata.json \
+            .
+
+      - name: Resolve immutable image references
+        run: |
+          set -euo pipefail
+          operator_digest=$(jq -er '."containerimage.digest"' operator-ubi9-build-metadata.json)
+          metrics_digest=$(jq -er '."containerimage.digest"' metrics-exporter-ubi9-build-metadata.json)
+          [[ "${operator_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "${metrics_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          OPERATOR_PINNED="${OPERATOR_IMAGE%:*}@${operator_digest}"
+          METRICS_PINNED="${METRICS_IMAGE%:*}@${metrics_digest}"
+          {
+            echo "OPERATOR_PINNED=${OPERATOR_PINNED}"
+            echo "METRICS_PINNED=${METRICS_PINNED}"
+          } >> "${GITHUB_ENV}"
+          printf '%s\n%s\n' "${OPERATOR_PINNED}" "${METRICS_PINNED}" > image-digests.txt
+
+      - name: Sign immutable image references
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${OPERATOR_PINNED}"
+          cosign sign --yes "${METRICS_PINNED}"
+          for image in "${OPERATOR_PINNED}" "${METRICS_PINNED}"; do
+            cosign verify \
+              --certificate-identity-regexp "https://github.com/${GITHUB_REPOSITORY}/.*" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "${image}"
+          done
+
+      - name: Install evidence tools
+        run: |
+          set -euo pipefail
+          if ! command -v syft >/dev/null 2>&1; then
+            curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
+          fi
+          curl -fsSLo /tmp/preflight "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-linux-amd64"
+          echo "${PREFLIGHT_SHA256}  /tmp/preflight" | sha256sum --check
+          sudo install -m 0755 /tmp/preflight /usr/local/bin/preflight
+          syft --version
+          preflight --version
+
+      - name: Capture release evidence
+        run: |
+          set -euo pipefail
+          mkdir -p release-evidence
+          cp operator-ubi9-build-metadata.json metrics-exporter-ubi9-build-metadata.json image-digests.txt release-evidence/
+          ./dev/release_evidence.sh "${OPERATOR_IMAGE}" release-evidence/
+          ./dev/release_evidence.sh "${METRICS_IMAGE}" release-evidence/
+
+      - name: Run container Preflight checks
+        env:
+          PYXIS_API_TOKEN: ${{ secrets.RED_HAT_PYXIS_API_TOKEN }}
+          OPERATOR_COMPONENT_ID: ${{ secrets.RED_HAT_OPERATOR_CERTIFICATION_COMPONENT_ID }}
+          METRICS_COMPONENT_ID: ${{ secrets.RED_HAT_METRICS_CERTIFICATION_COMPONENT_ID }}
+        run: |
+          set -euo pipefail
+          if [[ "${SUBMIT_PREFLIGHT}" == true ]]; then
+            test -n "${PYXIS_API_TOKEN}"
+            test -n "${OPERATOR_COMPONENT_ID}"
+            test -n "${METRICS_COMPONENT_ID}"
+          fi
+
+          run_preflight() {
+            local name="$1"
+            local image="$2"
+            local component_id="$3"
+            local submit_args=()
+            mkdir -p "preflight-artifacts/${name}"
+            if [[ "${SUBMIT_PREFLIGHT}" == true ]]; then
+              submit_args+=(--submit)
+            fi
+            # Preflight discovers and tests every architecture in a manifest
+            # list. Running once also prevents duplicate Partner Connect
+            # submissions for the same manifest digest.
+            PFLT_ARTIFACTS="preflight-artifacts/${name}" \
+            PFLT_LOGFILE="preflight-${name}.log" \
+            PFLT_DOCKERCONFIG="${HOME}/.docker/config.json" \
+            PFLT_PYXIS_API_TOKEN="${PYXIS_API_TOKEN}" \
+            PFLT_CERTIFICATION_COMPONENT_ID="${component_id}" \
+              preflight check container "${image}" "${submit_args[@]}"
+          }
+
+          run_preflight operator "${OPERATOR_PINNED}" "${OPERATOR_COMPONENT_ID}"
+          run_preflight metrics-exporter "${METRICS_PINNED}" "${METRICS_COMPONENT_ID}"
+
+      - name: Upload UBI release evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubi9-release-evidence-${{ inputs.tag || github.sha }}
+          path: |
+            release-evidence/
+            preflight-artifacts/
+            preflight-*.log
+          if-no-files-found: warn
+          retention-days: 365

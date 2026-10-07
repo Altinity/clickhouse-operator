@@ -13,7 +13,8 @@ set -euo pipefail
 # Prerequisites:
 #   - Local clones of both catalog repos (see REPO_ROOTS below):
 #       ~/dev/community-operators       — OperatorHub.io catalog
-#       ~/dev/community-operators-prod  — OpenShift / Red Hat catalog
+#       ~/dev/community-operators-prod  — OpenShift community catalog (not the
+#                                         Red Hat Certified Operators catalog)
 #     Each must have a git remote named "community" (or $UPSTREAM_REMOTE) pointing to the
 #     canonical upstream repo (e.g., k8s-operatorhub/community-operators).
 #   - yq installed (used to patch CSV for first-version edge case)
@@ -79,7 +80,7 @@ OPERATORHUB_DIR="${SRC_ROOT}/deploy/operatorhub"
 #
 # The operator is published to two community catalogs:
 #   1. community-operators       — OperatorHub.io (vanilla Kubernetes)
-#   2. community-operators-prod  — Red Hat OpenShift certified catalog
+#   2. community-operators-prod  — Red Hat OpenShift community catalog
 # Both follow the same directory layout: operators/clickhouse/<version>/manifests/
 # ==================================================================================
 

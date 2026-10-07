@@ -1,0 +1,238 @@
+name: publish_redhat_bundle
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: A release tag to check; empty checks recent releases
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-redhat-bundle
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    name: Find releases needing certification
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.RED_HAT_CERTIFICATION_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      releases: ${{ steps.releases.outputs.matrix }}
+    steps:
+      - name: Select release tags
+        id: releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+          PACKAGE_NAME: ${{ vars.RED_HAT_PACKAGE_NAME }}
+          START_VERSION: ${{ vars.RED_HAT_CERTIFICATION_START_VERSION }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${REQUESTED_TAG}" ]]; then
+            tags=$(jq -cn --arg tag "${REQUESTED_TAG}" '{tag: [$tag]}')
+          else
+            PACKAGE_NAME="${PACKAGE_NAME:-altinity-clickhouse-operator}"
+            : "${START_VERSION:?Set RED_HAT_CERTIFICATION_START_VERSION to the first release that should be certified}"
+            releases=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+              --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' |
+              sed -n 's/^release-//p' | sort -V)
+            existing=$(gh api \
+              "repos/redhat-openshift-ecosystem/certified-operators/contents/operators/${PACKAGE_NAME}?ref=main" \
+              --jq '.[].name' 2>/dev/null || true)
+            selected=""
+            while IFS= read -r version; do
+              [[ -z "${version}" ]] && continue
+              first=$(printf '%s\n%s\n' "${START_VERSION}" "${version}" | sort -V | head -1)
+              [[ "${first}" == "${START_VERSION}" ]] || continue
+              if ! grep -Fqx "${version}" <<< "${existing}"; then
+                selected="release-${version}"
+                break
+              fi
+            done <<< "${releases}"
+            tags=$(jq -cn --arg tag "${selected}" '{tag: (if $tag == "" then [] else [$tag] end)}')
+          fi
+          echo "matrix=${tags}" >> "${GITHUB_OUTPUT}"
+
+  publish:
+    name: Publish ${{ matrix.tag }} bundle
+    needs: discover
+    if: ${{ fromJSON(needs.discover.outputs.releases).tag[0] != null }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover.outputs.releases) }}
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ${{ vars.RED_HAT_REGISTRY }}
+      REGISTRY_NAMESPACE: ${{ vars.RED_HAT_REGISTRY_NAMESPACE }}
+      PACKAGE_NAME: ${{ vars.RED_HAT_PACKAGE_NAME }}
+      OPENSHIFT_VERSIONS: ${{ vars.RED_HAT_OPENSHIFT_VERSIONS }}
+      RELATED_IMAGES: ${{ vars.RED_HAT_RELATED_IMAGES }}
+      CERT_PROJECT_ID: ${{ vars.RED_HAT_BUNDLE_CERT_PROJECT_ID }}
+      CERTIFIED_OPERATORS_FORK: ${{ vars.RED_HAT_CERTIFIED_OPERATORS_FORK }}
+      OPERATOR_COMPONENT_ID: ${{ secrets.RED_HAT_OPERATOR_CERTIFICATION_COMPONENT_ID }}
+      METRICS_COMPONENT_ID: ${{ secrets.RED_HAT_METRICS_CERTIFICATION_COMPONENT_ID }}
+      RED_HAT_PYXIS_API_TOKEN: ${{ secrets.RED_HAT_PYXIS_API_TOKEN }}
+      GH_TOKEN: ${{ secrets.RED_HAT_CERTIFIED_OPERATORS_TOKEN }}
+
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.tag }}
+
+      - name: Resolve configuration and immutable images
+        id: images
+        run: |
+          set -euo pipefail
+          : "${REGISTRY:?Set the RED_HAT_REGISTRY repository variable}"
+          : "${REGISTRY_NAMESPACE:?Set the RED_HAT_REGISTRY_NAMESPACE repository variable}"
+          : "${OPENSHIFT_VERSIONS:?Set the RED_HAT_OPENSHIFT_VERSIONS repository variable}"
+          : "${RELATED_IMAGES:?Set RED_HAT_RELATED_IMAGES to every certified default operand/helper image}"
+          : "${CERT_PROJECT_ID:?Set the RED_HAT_BUNDLE_CERT_PROJECT_ID repository variable}"
+          : "${CERTIFIED_OPERATORS_FORK:?Set the RED_HAT_CERTIFIED_OPERATORS_FORK repository variable}"
+          : "${OPERATOR_COMPONENT_ID:?Set the operator certification component secret}"
+          : "${METRICS_COMPONENT_ID:?Set the metrics certification component secret}"
+          : "${RED_HAT_PYXIS_API_TOKEN:?Set the Pyxis API token secret}"
+          : "${GH_TOKEN:?Set the certified-operators fork token secret}"
+
+          VERSION=$(cat release)
+          if [[ "${{ matrix.tag }}" != "release-${VERSION}" ]]; then
+            echo "Release tag must be release-${VERSION}" >&2
+            exit 1
+          fi
+          PACKAGE_NAME="${PACKAGE_NAME:-altinity-clickhouse-operator}"
+          TAG="${VERSION}-ubi9"
+          operator_repository="${REGISTRY}/${REGISTRY_NAMESPACE}/clickhouse-operator"
+          metrics_repository="${REGISTRY}/${REGISTRY_NAMESPACE}/metrics-exporter"
+          if ! operator_digest=$(docker buildx imagetools inspect \
+            "${operator_repository}:${TAG}" --format '{{.Manifest.Digest}}'); then
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+            echo "No UBI operator image exists for ${{ matrix.tag }}; skipping this release."
+            exit 0
+          fi
+          if ! metrics_digest=$(docker buildx imagetools inspect \
+            "${metrics_repository}:${TAG}" --format '{{.Manifest.Digest}}'); then
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+            echo "No UBI metrics image exists for ${{ matrix.tag }}; skipping this release."
+            exit 0
+          fi
+          [[ "${operator_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "${metrics_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          {
+            echo "VERSION=${VERSION}"
+            echo "PACKAGE_NAME=${PACKAGE_NAME}"
+            echo "OPERATOR_DIGEST=${operator_digest}"
+            echo "METRICS_DIGEST=${metrics_digest}"
+            echo "OPERATOR_IMAGE=${operator_repository}@${operator_digest}"
+            echo "METRICS_IMAGE=${metrics_repository}@${metrics_digest}"
+          } >> "${GITHUB_ENV}"
+          echo "available=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Check Red Hat image publication
+        if: ${{ steps.images.outputs.available == 'true' }}
+        id: publication
+        run: |
+          set -euo pipefail
+          ready=true
+          ./deploy/certified-operator/check-image-published.sh \
+            "${OPERATOR_COMPONENT_ID}" "${OPERATOR_DIGEST}" || status=$?
+          if [[ "${status:-0}" -eq 3 ]]; then ready=false; elif [[ "${status:-0}" -ne 0 ]]; then exit "${status}"; fi
+          unset status
+          ./deploy/certified-operator/check-image-published.sh \
+            "${METRICS_COMPONENT_ID}" "${METRICS_DIGEST}" || status=$?
+          if [[ "${status:-0}" -eq 3 ]]; then ready=false; elif [[ "${status:-0}" -ne 0 ]]; then exit "${status}"; fi
+          echo "ready=${ready}" >> "${GITHUB_OUTPUT}"
+
+      - name: Explain pending certification
+        if: ${{ steps.images.outputs.available == 'true' && steps.publication.outputs.ready != 'true' }}
+        run: echo "The bundle will be proposed after both image manifests are certified and published by Red Hat."
+
+      - name: Install bundle tools
+        if: ${{ steps.publication.outputs.ready == 'true' }}
+        env:
+          YQ_VERSION: v4.47.2
+          OPERATOR_SDK_VERSION: v1.42.3
+        run: |
+          set -euo pipefail
+          sudo curl -fsSLo /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          sudo chmod 0755 /usr/local/bin/yq
+          curl -fsSLo /tmp/operator-sdk \
+            "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_linux_amd64"
+          sudo install -m 0755 /tmp/operator-sdk /usr/local/bin/operator-sdk
+
+      - name: Prepare certified-operators change
+        if: ${{ steps.publication.outputs.ready == 'true' }}
+        id: prepare
+        run: |
+          set -euo pipefail
+          [[ "${CERTIFIED_OPERATORS_FORK}" =~ ^[^/]+/[^/]+$ ]]
+          fork_owner="${CERTIFIED_OPERATORS_FORK%%/*}"
+          gh auth setup-git
+          gh repo clone "${CERTIFIED_OPERATORS_FORK}" /tmp/certified-operators
+          git -C /tmp/certified-operators remote add upstream \
+            https://github.com/redhat-openshift-ecosystem/certified-operators.git
+          git -C /tmp/certified-operators fetch upstream main
+
+          target="operators/${PACKAGE_NAME}/${VERSION}"
+          if git -C /tmp/certified-operators cat-file -e "upstream/main:${target}" 2>/dev/null; then
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+            echo "${PACKAGE_NAME} ${VERSION} is already in the certified catalog."
+            exit 0
+          fi
+
+          previous_version=$(git -C /tmp/certified-operators ls-tree -d --name-only \
+            "upstream/main:operators/${PACKAGE_NAME}" 2>/dev/null |
+            awk -v current="${VERSION}" '$0 != current' | sort -V | tail -1 || true)
+          export PREVIOUS_VERSION="${previous_version}"
+          OUTPUT_DIR="${PWD}/deploy/certified-operator/generated" \
+          CERT_MERGE=true \
+            ./deploy/certified-operator/build-bundle.sh
+          ./deploy/certified-operator/verify-bundle.sh
+
+          git -C /tmp/certified-operators checkout -B \
+            "certify-${PACKAGE_NAME}-${VERSION}" upstream/main
+          mkdir -p "/tmp/certified-operators/${target}"
+          cp -R deploy/certified-operator/generated/manifests \
+            deploy/certified-operator/generated/metadata "/tmp/certified-operators/${target}/"
+          cp deploy/certified-operator/generated/ci.yaml \
+            "/tmp/certified-operators/operators/${PACKAGE_NAME}/ci.yaml"
+          git -C /tmp/certified-operators config user.name "clickhouse-operator release bot"
+          git -C /tmp/certified-operators config user.email "actions@users.noreply.github.com"
+          git -C /tmp/certified-operators add "operators/${PACKAGE_NAME}"
+          git -C /tmp/certified-operators commit -m \
+            "operator ${PACKAGE_NAME} (${VERSION})"
+          git -C /tmp/certified-operators push --force-with-lease origin \
+            "HEAD:certify-${PACKAGE_NAME}-${VERSION}"
+          {
+            echo "exists=false"
+            echo "fork_owner=${fork_owner}"
+            echo "branch=certify-${PACKAGE_NAME}-${VERSION}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Open certified-operators pull request
+        if: ${{ steps.publication.outputs.ready == 'true' && steps.prepare.outputs.exists == 'false' }}
+        working-directory: /tmp/certified-operators
+        run: |
+          set -euo pipefail
+          existing=$(gh pr list \
+            --repo redhat-openshift-ecosystem/certified-operators \
+            --head "${{ steps.prepare.outputs.fork_owner }}:${{ steps.prepare.outputs.branch }}" \
+            --state open --json url --jq '.[0].url // empty')
+          if [[ -n "${existing}" ]]; then
+            echo "Existing pull request: ${existing}"
+          else
+            gh pr create \
+              --repo redhat-openshift-ecosystem/certified-operators \
+              --base main \
+              --head "${{ steps.prepare.outputs.fork_owner }}:${{ steps.prepare.outputs.branch }}" \
+              --title "operator ${PACKAGE_NAME} (${VERSION})" \
+              --body "Automated certified bundle submission for clickhouse-operator ${VERSION}."
+          fi

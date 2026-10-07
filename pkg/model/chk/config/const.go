@@ -14,7 +14,11 @@
 
 package config
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import (
+	"os"
+
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+)
 
 const (
 	// CommonConfigDir specifies folder's name, where generated common XML files for ClickHouse would be placed
@@ -64,12 +68,19 @@ const (
 )
 
 const (
-	// DefaultKeeperDockerImage specifies default ClickHouse docker image to be used
-	DefaultKeeperDockerImage = "clickhouse/clickhouse-keeper:latest"
-
 	// KeeperContainerName specifies name of the clickhouse container in the pod
 	KeeperContainerName = "clickhouse-keeper"
 )
+
+// DefaultKeeperDockerImage specifies the default ClickHouse Keeper image.
+var DefaultKeeperDockerImage = imageFromEnv("CLICKHOUSE_OPERATOR_DEFAULT_KEEPER_IMAGE", "clickhouse/clickhouse-keeper:latest")
+
+func imageFromEnv(name, fallback string) string {
+	if image := os.Getenv(name); image != "" {
+		return image
+	}
+	return fallback
+}
 
 const (
 	configServerId  = "server-id"

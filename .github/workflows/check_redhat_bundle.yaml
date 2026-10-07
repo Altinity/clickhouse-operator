@@ -1,0 +1,67 @@
+name: check_redhat_bundle
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/check_redhat_bundle.yaml
+      - .github/workflows/publish_redhat_bundle.yaml
+      - deploy/certified-operator/**
+      - deploy/operatorhub/metadata/annotations.yaml
+      - deploy/builder/operatorhub.sh
+      - deploy/builder/templates-operatorhub/**
+      - deploy/builder/templates-install-bundle/**
+      - docs/chi-examples/**
+      - docs/chk-examples/**
+      - config/**
+      - pkg/apis/**
+      - release
+      - releases
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  OPERATOR_SDK_VERSION: v1.42.3
+  YQ_VERSION: v4.47.2
+  OPERATOR_IMAGE: registry.example.invalid/altinity/clickhouse-operator@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  METRICS_IMAGE: registry.example.invalid/altinity/metrics-exporter@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  OPENSHIFT_VERSIONS: v4.18-v4.22
+  VALID_SUBSCRIPTION: No subscription required; optional commercial support is available from Altinity
+  RELATED_IMAGES: |
+    clickhouse-server=registry.example.invalid/altinity/clickhouse-server@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    clickhouse-keeper=registry.example.invalid/altinity/clickhouse-keeper@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+    clickhouse-log=registry.example.invalid/redhat/ubi-minimal@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+
+jobs:
+  validate:
+    name: Generate and validate certified bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install bundle tools
+        run: |
+          set -euo pipefail
+          sudo curl -fsSLo /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          sudo chmod 0755 /usr/local/bin/yq
+          curl -fsSLo /tmp/operator-sdk \
+            "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_linux_amd64"
+          sudo install -m 0755 /tmp/operator-sdk /usr/local/bin/operator-sdk
+
+      - name: Generate certified bundle
+        run: ./deploy/certified-operator/build-bundle.sh
+
+      - name: Validate certified bundle
+        run: ./deploy/certified-operator/verify-bundle.sh
+
+      - name: Build bundle image
+        run: |
+          docker build \
+            --file deploy/certified-operator/bundle.Dockerfile \
+            --build-arg BUNDLE_PACKAGE=altinity-clickhouse-operator \
+            --build-arg OPENSHIFT_VERSIONS="${OPENSHIFT_VERSIONS}" \
+            --tag localhost/altinity-clickhouse-operator-bundle:validation \
+            .

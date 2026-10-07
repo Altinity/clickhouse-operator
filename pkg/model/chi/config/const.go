@@ -14,7 +14,11 @@
 
 package config
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import (
+	"os"
+
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+)
 
 const (
 	// CommonConfigDir specifies folder's name, where generated common XML files for ClickHouse would be placed
@@ -67,14 +71,8 @@ const (
 )
 
 const (
-	// DefaultClickHouseDockerImage specifies default ClickHouse docker image to be used
-	DefaultClickHouseDockerImage = "clickhouse/clickhouse-server:latest"
-
 	// DefaultBusyBoxDockerImage specifies default BusyBox docker image to be used
 	DefaultBusyBoxDockerImage = "busybox"
-
-	// DefaultUbiDockerImage specifies default ubi docker image to be used
-	DefaultUbiDockerImage = "registry.access.redhat.com/ubi8/ubi-minimal:latest"
 
 	// Name of container within Pod with ClickHouse instance.
 	// Pod may have other containers included, such as monitoring, logging
@@ -85,6 +83,21 @@ const (
 	// ClickHouseLogContainerName specifies name of the logger container in the pod
 	ClickHouseLogContainerName = "clickhouse-log"
 )
+
+var (
+	// DefaultClickHouseDockerImage specifies default ClickHouse docker image to be used.
+	DefaultClickHouseDockerImage = imageFromEnv("CLICKHOUSE_OPERATOR_DEFAULT_CLICKHOUSE_IMAGE", "clickhouse/clickhouse-server:latest")
+
+	// DefaultUbiDockerImage specifies default UBI image to be used.
+	DefaultUbiDockerImage = imageFromEnv("CLICKHOUSE_OPERATOR_DEFAULT_LOG_IMAGE", "registry.access.redhat.com/ubi8/ubi-minimal:latest")
+)
+
+func imageFromEnv(name, fallback string) string {
+	if image := os.Getenv(name); image != "" {
+		return image
+	}
+	return fallback
+}
 
 const (
 	xmlTagYandex = "yandex"
