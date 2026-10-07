@@ -182,6 +182,9 @@ rbac:
   create: true
   # rbac.namespaceScoped -- specifies whether to create roles and rolebindings at the cluster level or namespace level
   namespaceScoped: false
+  aggregate:
+    # rbac.aggregate.enabled -- create ClusterRoles aggregated into the builtin `view`, `edit` and `admin` roles for the operator CRDs (requires rbac.create). ClickHouseInstallation is only aggregated into `edit` and `admin`: the operator writes password hashes into its status
+    enabled: true
 secret:
   # secret.create -- create a secret with operator credentials
   create: true
