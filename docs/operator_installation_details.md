@@ -70,6 +70,17 @@ helm upgrade clickhouse-operator clickhouse-operator/altinity-clickhouse-operato
 
 Look https://github.com/Altinity/clickhouse-operator/tree/master/deploy/helm/clickhouse-operator/ for details 
 
+The chart also creates `<release>-aggregate-view`, `<release>-aggregate-edit` (write) and `<release>-aggregate-view-sensitive` (read of `ClickHouseInstallation`, aggregated into `edit` and `admin` only) ClusterRoles carrying the `rbac.authorization.k8s.io/aggregate-to-*` labels, so the builtin roles cover the operator's CRDs (disable with `rbac.aggregate.enabled=false`):
+
+| Kind | view | edit, admin |
+|---|---|---|
+| `ClickHouseInstallation` | - | read, write |
+| `ClickHouseInstallationTemplate` | read | read, write |
+| `ClickHouseOperatorConfiguration` | read | read, write |
+| `ClickHouseKeeperInstallation` | read | read, write |
+
+`ClickHouseInstallation` is not readable by `view`: the operator writes the normalized CR, including derived `password_sha256_hex` user hashes, into its status. Pass credentials via `valueFrom.secretKeyRef` rather than inline, see [security hardening](security_hardening.md).
+
 ## Resources Description
 
 Let's walk over all resources created along with ClickHouse operator, which are:
