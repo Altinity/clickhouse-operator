@@ -172,6 +172,77 @@ else
 fi
 
 echo
+echo "aggregated RBAC"
+# ClickHouseInstallation status holds operator-written password hashes, so CHI must stay out of view.
+# Every other kind has a Secret-based credential path and is readable by view.
+# The role documents are parsed with awk only: the yq on CI (mikefarah) and the one on developer
+# machines (jq wrapper) share no expression syntax.
+expect_count "three aggregate ClusterRoles on top of the two operator ones" ClusterRole 5
+expect_contains "view aggregation label" 'rbac.authorization.k8s.io/aggregate-to-view: "true"'
+expect_contains "edit aggregation label" 'rbac.authorization.k8s.io/aggregate-to-edit: "true"'
+expect_contains "admin aggregation label" 'rbac.authorization.k8s.io/aggregate-to-admin: "true"'
+expect_absent "rbac.aggregate.enabled=false drops the aggregate roles" 'aggregate-to-' --set rbac.aggregate.enabled=false
+expect_absent "rbac.create=false drops the aggregate roles" 'aggregate-to-' --set rbac.create=false
+
+# role_info <name-suffix|*> <label|*> <labels|verbs|resources>: for every aggregate ClusterRole whose
+# name ends with <name-suffix> (or any) and which carries aggregate-to-<label> (or any), prints the
+# sorted unique aggregate-to-* labels, verbs or resources as one space-separated line.
+role_info() {
+    render --show-only templates/aggregated-clusterroles.yaml | awk -v suffix="$1" -v label="$2" -v what="$3" '
+        function flush(   i, n, keys) {
+            if (doc_kind == "ClusterRole" && (suffix == "*" || name ~ (suffix "$")) && (label == "*" || (label in labels))) {
+                if (what == "labels") { for (k in labels) out[k] = 1 }
+                if (what == "verbs") { for (k in verbs) out[k] = 1 }
+                if (what == "resources") { for (k in resources) out[k] = 1 }
+            }
+            doc_kind = ""; name = ""; mode = ""; delete labels; delete verbs; delete resources
+        }
+        /^---$/ { flush(); next }
+        /^kind: / { doc_kind = $2 }
+        /^  name: / { name = $2 }
+        /^    rbac.authorization.k8s.io\/aggregate-to-[a-z]+: "true"$/ { split($1, p, "aggregate-to-"); sub(/:$/, "", p[2]); labels[p[2]] = 1 }
+        /^  (apiGroups|resources|verbs):$/ { mode = $1; sub(/:$/, "", mode); next }
+        /^  - / { if (mode == "verbs") verbs[$2] = 1; if (mode == "resources") resources[$2] = 1; next }
+        { if ($0 !~ /^  - /) mode = "" }
+        END {
+            flush()
+            n = 0
+            for (k in out) keys[++n] = k
+            for (i = 1; i <= n; i++) for (j = i + 1; j <= n; j++) if (keys[j] < keys[i]) { t = keys[i]; keys[i] = keys[j]; keys[j] = t }
+            line = ""
+            for (i = 1; i <= n; i++) line = line (i > 1 ? " " : "") keys[i]
+            print line
+        }'
+}
+
+view_resources="$(role_info '*' view resources)"
+edit_resources="$(role_info '*' edit resources)"
+if grep -qE '(^| )clickhouseinstallations(/status)?( |$)' <<<"${view_resources}"; then
+    report "ClickHouseInstallation is not readable by view" no "view resources: ${view_resources}"
+else
+    report "ClickHouseInstallation is not readable by view" yes
+fi
+expect_eq() {
+    local name="$1" want="$2" got="$3"
+    if [[ "${got}" == "${want}" ]]; then report "${name}" yes; else report "${name}" no "want: ${want} got: ${got}"; fi
+}
+# the view role carries all three labels and read verbs only; the edit role carries edit+admin
+expect_eq "view role is aggregated into view, edit and admin" "admin edit view" "$(role_info '-aggregate-view' '*' labels)"
+expect_eq "view role has read verbs only" "get list watch" "$(role_info '-aggregate-view' '*' verbs)"
+expect_eq "write role is aggregated into edit and admin only" "admin edit" "$(role_info '-aggregate-edit' '*' labels)"
+expect_eq "write role has write verbs only" "create delete deletecollection patch update" "$(role_info '-aggregate-edit' '*' verbs)"
+# the sensitive read role is deliberately not aggregated into view
+expect_eq "view-sensitive role has no aggregate-to-view label" "admin edit" "$(role_info '-aggregate-view-sensitive' '*' labels)"
+expect_eq "view-sensitive role has read verbs only" "get list watch" "$(role_info '-aggregate-view-sensitive' '*' verbs)"
+expect_eq "view-sensitive role covers ClickHouseInstallation and its status" "clickhouseinstallations clickhouseinstallations/status" "$(role_info '-aggregate-view-sensitive' '*' resources)"
+for want in clickhouseinstallationtemplates clickhouseoperatorconfigurations clickhousekeeperinstallations; do
+    if grep -qw -- "${want}" <<<"${view_resources}"; then report "view role covers ${want}" yes; else report "view role covers ${want}" no "resources: ${view_resources}"; fi
+done
+for want in clickhouseinstallations clickhouseinstallationtemplates clickhouseoperatorconfigurations clickhousekeeperinstallations; do
+    if grep -qw -- "${want}" <<<"${edit_resources}"; then report "edit/admin role covers ${want}" yes; else report "edit/admin role covers ${want}" no "resources: ${edit_resources}"; fi
+done
+
+echo
 echo "docs"
 if [[ "${skip_docs}" == "yes" ]]; then
     echo "  skip README drift check - --skip-docs"

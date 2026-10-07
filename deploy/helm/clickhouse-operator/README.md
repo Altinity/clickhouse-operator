@@ -124,6 +124,7 @@ crdHook:
 | podAnnotations | object | check the `values.yaml` file | annotations to add to the clickhouse-operator pod, check `kubectl explain pod.spec.annotations` for details |
 | podLabels | object | `{}` | labels to add to the clickhouse-operator pod |
 | podSecurityContext | object | `{}` |  |
+| rbac.aggregate.enabled | bool | `true` | create ClusterRoles aggregated into the builtin `view`, `edit` and `admin` roles for the operator CRDs (requires rbac.create). ClickHouseInstallation is only aggregated into `edit` and `admin`: the operator writes password hashes into its status |
 | rbac.create | bool | `true` | specifies whether rbac resources should be created |
 | rbac.namespaceScoped | bool | `false` | specifies whether to create roles and rolebindings at the cluster level or namespace level |
 | secret.create | bool | `true` | create a secret with operator credentials |
