@@ -910,6 +910,15 @@
         "rbac": {
             "type": "object",
             "properties": {
+                "aggregate": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "description": "create ClusterRoles aggregated into the builtin `view`, `edit` and `admin` roles for the operator CRDs (requires rbac.create). ClickHouseInstallation is only aggregated into `edit` and `admin`: the operator writes password hashes into its status",
+                            "type": "boolean"
+                        }
+                    }
+                },
                 "create": {
                     "description": "specifies whether rbac resources should be created",
                     "type": "boolean"

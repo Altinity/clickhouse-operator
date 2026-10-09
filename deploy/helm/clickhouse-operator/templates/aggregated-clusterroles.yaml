@@ -1,0 +1,102 @@
+{{- if and .Values.rbac.create .Values.rbac.aggregate.enabled }}
+# ClusterRoles aggregated into the builtin view, edit and admin roles via rbac.authorization.k8s.io/aggregate-to-* labels.
+# The edit role carries the edit and admin labels: write verbs for the safe kinds and for ClickHouseInstallation.
+# The view-sensitive role carries the edit and admin labels only (deliberately NOT aggregate-to-view): reads of ClickHouseInstallation.
+# ClickHouseInstallation is NOT aggregated into view: the operator writes the normalized CR into
+# status.normalized/normalizedCompleted, including password_sha256_hex hashes it derives for users
+# (default password, operator access password). Every other kind has a Secret-based way to supply
+# credentials (valueFrom.secretKeyRef, access.secret) and the operator writes no credentials into it.
+# edit and admin can read all Secrets in a namespace anyway, so they may read and write ClickHouseInstallation.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "altinity-clickhouse-operator.fullname" . }}-aggregate-view
+  labels:
+    {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+- apiGroups:
+  - clickhouse.altinity.com
+  resources:
+  - clickhouseinstallationtemplates
+  - clickhouseinstallationtemplates/status
+  - clickhouseoperatorconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - clickhouse-keeper.altinity.com
+  resources:
+  - clickhousekeeperinstallations
+  - clickhousekeeperinstallations/status
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "altinity-clickhouse-operator.fullname" . }}-aggregate-edit
+  labels:
+    {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+- apiGroups:
+  - clickhouse.altinity.com
+  resources:
+  - clickhouseinstallationtemplates
+  - clickhouseoperatorconfigurations
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - patch
+  - update
+- apiGroups:
+  - clickhouse-keeper.altinity.com
+  resources:
+  - clickhousekeeperinstallations
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - patch
+  - update
+- apiGroups:
+  - clickhouse.altinity.com
+  resources:
+  - clickhouseinstallations
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - patch
+  - update
+---
+# Read role for the unsafe kind. Deliberately NOT labelled aggregate-to-view: ClickHouseInstallation
+# status holds derived password hashes, so only edit and admin may read it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "altinity-clickhouse-operator.fullname" . }}-aggregate-view-sensitive
+  labels:
+    {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+- apiGroups:
+  - clickhouse.altinity.com
+  resources:
+  - clickhouseinstallations
+  - clickhouseinstallations/status
+  verbs:
+  - get
+  - list
+  - watch
+{{- end }}

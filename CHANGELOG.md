@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.28.0](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.4...release-0.28.0)
 
+### Added
+* **The Helm chart now aggregates the operator's CRDs into the builtin `view`, `edit` and `admin` ClusterRoles.** `ClickHouseInstallationTemplate`, `ClickHouseOperatorConfiguration` and `ClickHouseKeeperInstallation` are readable by `view`; `edit` and `admin` can read and write all four operator kinds. `ClickHouseInstallation` is deliberately not readable by `view`, because the operator writes the normalized CR, including derived `password_sha256_hex` user hashes, into its status. Enabled by default, disable with `rbac.aggregate.enabled=false` (requires `rbac.create`).
+
 ### Changed
 * **BACKWARD INCOMPATIBLE.** **A `ClickHouseInstallation` now wins over the templates it uses.** Where a template used to beat it silently - same-named pod, host and volume-claim templates, `configuration.users`, `profiles`, `quotas`, `settings` and `files`, `suspend`, `restart`, `taskID`, `namespaceDomainPattern`, `reconcile.statefulSet` and `reconcile.host` among them - the installation now wins, templates fill what it leaves unset, and a later template beats an earlier one. The operator's configuration rules (`clickhouse.addons.rules`) now yield the same way to a template or the installation setting the same key, such as `display_secrets_in_show_and_select`, though a grant spelled with the operator user's name still loses to the rules', which use the `{clickhouseOperatorUser}` placeholder. Containers, volumes and env now pair by name, mounts by mount path and ports by number and protocol, so differently named containers at the same position are now two. [docs/operator_configuration.md](docs/operator_configuration.md#template-precedence) lists the fields and what an upgrade changes. by [@sunsingerus](https://github.com/sunsingerus)
 
