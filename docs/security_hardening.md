@@ -121,12 +121,12 @@ spec:
         valueFrom:
           secretKeyRef:
             name: clickhouse_secret
-            key: pwduser2          
+            key: pwduser2
       user3/password_double_sha1_hex:
         valueFrom:
           secretKeyRef:
             name: clickhouse_secret
-            key: pwduser3                
+            key: pwduser3
 ```
 
 The following example refers to the secret:
@@ -184,15 +184,12 @@ spec:
             key: pwduser2
 ```
 
-By default `valueFrom`/`secretKeyRef` passes the value through an environment variable
-(rendered as `from_env=...` in the generated XML). Kubernetes does not update environment
-variables in a running container, so a password change is picked up only after the Pod is
-recreated. The operator does not hash that value, so where you previously relied on
-`k8s_secret_password` being hashed into `password_sha256_hex` for you, store the already-hashed
-value in the secret and reference it from `password_sha256_hex` as shown above.
+### Rotating user passwords without Pod restarts
 
-`hotReload: true` is the opt-in for user `password`, `password_sha256_hex`, and
-`password_double_sha1_hex`. The Secret key is still the credential itself, not an XML document.
+By default, `valueFrom.secretKeyRef` passes the password through a container environment variable (`from_env` in the generated XML).
+Environment variables are not updated when a Kubernetes Secret changes, so the Pod must be recreated to apply a new password.
+
+To rotate passwords without restarting ClickHouse, set `hotReload: true`:
 
 ```yaml
 spec:
@@ -204,42 +201,25 @@ spec:
             name: clickhouse-secret
             key: pwduser1
           hotReload: true
-      user2/password_sha256_hex:
-        valueFrom:
-          secretKeyRef:
-            name: clickhouse-secret
-            key: pwduser2
-          hotReload: true
-      user3/password_double_sha1_hex:
-        valueFrom:
-          secretKeyRef:
-            name: clickhouse-secret
-            key: pwduser3
-          hotReload: true
 ```
 
-The operator reads that key from the CHI's own namespace, applies the same password normalization
-as a literal password, and writes that user to `chop-generated-hot-reload-users.xml` in a CHI-owned
-Secret. Users that do not set `hotReload` stay in `chop-generated-users.xml` in the users ConfigMap.
-Both files are projected into `users.d` on the ClickHouse container, without `subPath`, so a later
-Secret change is refreshed by kubelet and reloaded by ClickHouse without a Pod restart.
+The referenced Secret must be in the same namespace as the `ClickHouseInstallation`. Its key contains the password value, not an XML document.
 
-Every CHI reconciliation regenerates that document. The Secret object is updated only when the
-document changed. A missing, empty, or malformed hash leaves the last written Secret in place and
-aborts the reconcile; the account is not given the default password. `password_sha256_hex` must be
-64 hex characters and `password_double_sha1_hex` must be 40 hex characters. `hotReload` on any
-other field, including profiles, quotas, ClickHouse settings, and Keeper, is rejected.
+`hotReload` is supported for `password`, `password_sha256_hex`, and `password_double_sha1_hex` only. The operator applies its normal password processing rules; precomputed SHA-256 and double SHA-1 hashes must contain 64 and 40 hexadecimal characters, respectively.
 
-Automatic Secret-change detection watches references declared directly on the CHI. A reference that
-is inherited only from a ClickHouseInstallationTemplate is not watched and needs a manual
-reconciliation of the CHI.
+The operator stores the generated user configuration in a CHI-owned Kubernetes Secret and projects it into ClickHouse's `users.d`directory alongside the regular users ConfigMap.
+Changes to a referenced source Secret trigger reconciliation and update the generated Secret only when its contents change.
+ClickHouse then reloads the updated configuration without restarting the Pod.
 
-Turning `hotReload` off deletes the CHI-owned Secret after every Pod has stopped mounting it.
-Enabling `hotReload` the first time changes the Pod template to install the projected volume, so
-that step rolls the Pods once. Later password rotations do not.
+If the referenced Secret or key is missing, empty, or invalid, reconciliation fails and the last valid generated Secret remains unchanged.
 
-The operator is trusted to read those password keys and to write the derived Secret. The derived
-Secret contains password hashes, is owned by the CHI, and is not copied into a ConfigMap.
+**Limitations:**
+
+- Enabling hot reload for the first time requires a one-time Pod rollout to mount the generated Secret.
+- Automatic change detection applies only to Secret references declared directly in the CHI. References inherited from a `ClickHouseInstallationTemplate` require manual CHI reconciliation.
+- Disabling hot reload removes the generated Secret after Pods no longer reference it.
+
+The generated Secret contains sensitive authentication configuration and should be protected with appropriate Kubernetes access controls.
 
 ### Securing the 'default' user
 
@@ -443,7 +423,7 @@ spec:
 
 ```
 
-Certificate files can also be stored in secrets: 
+Certificate files can also be stored in secrets:
 
 ```yaml
 apiVersion: v1
