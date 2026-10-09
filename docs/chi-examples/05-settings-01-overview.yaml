@@ -19,11 +19,6 @@ stringData:
         </user_secret_ref_password_file>
       </users>
     </clickhouse>
-  settings.xml: |
-    <clickhouse>
-      <max_connections>128</max_connections>
-    </clickhouse>
-
 ---
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
@@ -123,14 +118,6 @@ spec:
           secretKeyRef:
             name: clickhouse-credentials
             key: disable_internal_dns_cache
-      # valueFrom.mappingType=file projects the Secret key into config.d as chop-secret-*.xml.
-      # The key must be a ClickHouse XML document. The operator does not read the Secret.
-      max_connections:
-        valueFrom:
-          secretKeyRef:
-            name: clickhouse-credentials
-            key: settings.xml
-          mappingType: file
 
     files:
       # will mount as separate volume inside /etc/clickhouse-server/secrets.d/example/clickhouse-credentials/example.xml

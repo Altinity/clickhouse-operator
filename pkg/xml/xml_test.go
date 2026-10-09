@@ -5,64 +5,6 @@ import (
 	"testing"
 )
 
-// stubSetting is a setting that renders only when marked scalar or vector.
-// The zero value matches a file-mapped source setting: it is kept in the tree
-// and buildXML writes no tag for it.
-type stubSetting struct {
-	scalar bool
-	vector bool
-	value  string
-	attrs  string
-	embed  bool
-	vec    []string
-}
-
-func (s stubSetting) String() string            { return s.value }
-func (s stubSetting) IsEmpty() bool             { return false }
-func (s stubSetting) IsScalar() bool            { return s.scalar }
-func (s stubSetting) IsVector() bool            { return s.vector }
-func (s stubSetting) Attributes() string        { return s.attrs }
-func (s stubSetting) VectorOfStrings() []string { return s.vec }
-func (s stubSetting) IsEmbed() bool             { return s.embed }
-
-func TestBuildXMLOmitsEmptyParentsOfUnrenderedSettings(t *testing.T) {
-	root := &xmlNode{}
-
-	kafka := root.addChild("kafka")
-	kafka.addChild("debug").value = stubSetting{scalar: true, value: "all"}
-	kafka.addChild("sasl_password").value = stubSetting{}
-
-	kafka2 := root.addChild("kafka2")
-	kafka2.addChild("sasl_username").value = stubSetting{}
-	kafka2.addChild("sasl_password").value = stubSetting{}
-
-	var buf strings.Builder
-	root.buildXML(&buf, 0, 4)
-	got := buf.String()
-
-	if strings.Contains(got, "kafka2") {
-		t.Fatalf("empty parent was written:\n%s", got)
-	}
-	if strings.Contains(got, "sasl_password") {
-		t.Fatalf("unrendered leaf was written:\n%s", got)
-	}
-	if !strings.Contains(got, "<debug>all</debug>") {
-		t.Fatalf("scalar child missing:\n%s", got)
-	}
-	if !strings.Contains(got, "<kafka>") || !strings.Contains(got, "</kafka>") {
-		t.Fatalf("parent of a rendered child missing:\n%s", got)
-	}
-}
-
-func TestWriteTagNoValueKeepsAttributeWithoutChildren(t *testing.T) {
-	n := &xmlNode{tag: "keep"}
-	var buf strings.Builder
-	n.writeTagNoValue(&buf, ` remove="1"`, 0, 4)
-	if !strings.Contains(buf.String(), `<keep remove="1">`) {
-		t.Fatalf("tag with an attribute was skipped:\n%s", buf.String())
-	}
-}
-
 func TestWriteValue(t *testing.T) {
 	cases := []struct {
 		name     string

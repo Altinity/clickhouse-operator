@@ -104,6 +104,15 @@ func StatefulSetAppendPersistentVolumeClaims(statefulSet *apps.StatefulSet, pvcs
 	)
 }
 
+// StatefulSetAppendVolumeMounts adds volumeMounts to one container.
+func StatefulSetAppendVolumeMounts(statefulSet *apps.StatefulSet, containerName string, volumeMounts ...core.VolumeMount) {
+	container, ok := StatefulSetContainerGet(statefulSet, containerName)
+	if !ok {
+		return
+	}
+	ContainerAppendVolumeMounts(container, volumeMounts...)
+}
+
 func StatefulSetAppendVolumeMountsInAllContainers(statefulSet *apps.StatefulSet, volumeMounts ...core.VolumeMount) {
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have VolumeMounts mounted as Volumes

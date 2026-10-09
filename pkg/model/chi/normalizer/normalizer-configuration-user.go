@@ -51,9 +51,6 @@ func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser)
 				user,
 				name,
 				envVarNamePrefixConfigurationUsers,
-				true,
-				api.SecretConfigFileTargetUsers,
-				"",
 			)
 		}
 	})

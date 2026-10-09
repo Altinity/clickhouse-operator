@@ -814,8 +814,6 @@ def test_010011(self):
                         sasl_username_env = e["name"]
                     if key == "KAFKA_SASL_PASSWORD":
                         sasl_password_env = e["name"]
-                    if key in ("kafka2-username.xml", "kafka2-password.xml"):
-                        assert False, error(e)
                     if key == "pwduser5":
                         user5_password_env = e["name"]
                     if key == "custom0":
@@ -837,7 +835,6 @@ def test_010011(self):
                 settings_xml = cfm["data"]["chop-generated-settings.xml"]
                 assert f"sasl_username from_env=\"{sasl_username_env}\"" in settings_xml
                 assert f"sasl_password from_env=\"{sasl_password_env}\"" in settings_xml
-                assert "kafka2" not in settings_xml, error(settings_xml)
 
             with By("Secrets are properly referenced from users.xml"):
                 cfm = kubectl.get("configmap", f"chi-{chi}-common-usersd")
@@ -845,40 +842,6 @@ def test_010011(self):
                 env_matches = [from_env.strip() for from_env in users_xml.splitlines() if "from_env" in from_env]
                 print(f"Found env substitutions: {env_matches}")
                 assert f"password from_env=\"{user5_password_env}\"" in users_xml
-
-        with And("only the referenced kafka2 keys are projected into config.d"):
-            out = kubectl.launch(
-                f"exec chi-{chi}-default-0-0-0 -- bash -c 'ls -la /etc/clickhouse-server/config.d; echo; for f in /etc/clickhouse-server/config.d/*; do echo ===== $f; cat \"$f\"; echo; done'"
-            )
-            print(out)
-
-            username_file = "chop-secret-test-011-secret-kafka2-username-xml.xml"
-            password_file = "chop-secret-test-011-secret-kafka2-password-xml.xml"
-            assert username_file in out, error(out)
-            assert password_file in out, error(out)
-            assert "<sasl_username>file_secret</sasl_username>" in out, error(out)
-            assert "<sasl_password>file_secret</sasl_password>" in out, error(out)
-            assert "pwduser1" not in out, error(out)
-
-            projected_keys = set()
-            for volume in kubectl.get_pod_spec(chi)["volumes"]:
-                projected = volume.get("projected")
-                if not projected:
-                    continue
-                for source in projected.get("sources", []):
-                    secret = source.get("secret")
-                    if not secret or secret.get("name") != "test-011-secret":
-                        continue
-                    items = secret.get("items")
-                    assert items, error(secret)
-                    for item in items:
-                        projected_keys.add(item["key"])
-            assert projected_keys == {"kafka2-username.xml", "kafka2-password.xml"}, error(projected_keys)
-
-            configd = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]
-            assert username_file not in configd, error(configd)
-            assert password_file not in configd, error(configd)
-            assert "file_secret" not in str(configd), error(configd)
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -1367,6 +1330,12 @@ def test_010011_6(self):
                 assert secret.get("items"), error(secret)
                 projected_keys.extend(item["key"] for item in secret["items"])
             assert projected_keys == ["user1.xml"], error(users_vol)
+            mounted_in = [
+                container["name"]
+                for container in kubectl.get_pod_spec(chi)["containers"]
+                if any(mount.get("name") == users_volume for mount in container.get("volumeMounts", []))
+            ]
+            assert mounted_in == ["clickhouse"], error(mounted_in)
 
         with And("user1 authenticates with the password from the XML fragment"):
             assert clickhouse.wait_config_applied(chi, user="user1", pwd="filepass1"), error(

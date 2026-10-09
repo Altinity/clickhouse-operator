@@ -16,21 +16,9 @@ package v1
 
 import core "k8s.io/api/core/v1"
 
-const (
-	// SecretConfigFileTargetUsers projects the Secret key into users.d.
-	SecretConfigFileTargetUsers = "users"
-	// SecretConfigFileTargetCommon projects the Secret key into config.d.
-	// spec.configuration.settings are projected there.
-	SecretConfigFileTargetCommon = "common"
-	// SecretConfigFileTargetHost projects the Secret key into that host's conf.d.
-	SecretConfigFileTargetHost = "host"
-)
-
-// SecretConfigFile is a Secret key projected into a ClickHouse config directory
-// so the kubelet refreshes it in place. Path is the file name inside that directory.
+// SecretConfigFile is a Secret key projected into users.d so the kubelet
+// refreshes it in place. Path is the file name inside that directory.
 type SecretConfigFile struct {
-	Target string
-	Host   string
 	Secret string
 	Key    string
 	Path   string
@@ -150,23 +138,12 @@ func (a *ComparableAttributes) AppendAdditionalVolumeMountIfNotExists(volumeMoun
 	a.AppendAdditionalVolumeMount(volumeMount)
 }
 
-// SecretConfigFiles returns projections for one config directory.
-// host is ignored unless target is SecretConfigFileTargetHost.
-func (a *ComparableAttributes) SecretConfigFiles(target, host string) []SecretConfigFile {
+// SecretConfigFiles returns Secret keys projected into users.d.
+func (a *ComparableAttributes) SecretConfigFiles() []SecretConfigFile {
 	if a == nil {
 		return nil
 	}
-	var out []SecretConfigFile
-	for _, file := range a.secretConfigFiles {
-		if file.Target != target {
-			continue
-		}
-		if target == SecretConfigFileTargetHost && file.Host != host {
-			continue
-		}
-		out = append(out, file)
-	}
-	return out
+	return a.secretConfigFiles
 }
 
 func (a *ComparableAttributes) AppendSecretConfigFile(file SecretConfigFile) {
@@ -174,8 +151,7 @@ func (a *ComparableAttributes) AppendSecretConfigFile(file SecretConfigFile) {
 		return
 	}
 	for _, existing := range a.secretConfigFiles {
-		if existing.Target == file.Target && existing.Host == file.Host &&
-			existing.Secret == file.Secret && existing.Key == file.Key {
+		if existing.Secret == file.Secret && existing.Key == file.Key {
 			return
 		}
 	}

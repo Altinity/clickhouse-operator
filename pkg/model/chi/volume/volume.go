@@ -65,25 +65,26 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 	configMapCommonUsersName := m.namer.Name(interfaces.NameConfigMapCommonUsers, m.cr)
 	configMapHostName := m.namer.Name(interfaces.NameConfigMapHost, host)
 
-	// mappingType=file secrets are projected next to the ConfigMap that serves
-	// them: config.d, users.d, or that host's conf.d. An empty list keeps the
-	// plain ConfigMap volume.
-	attrs := m.cr.GetRuntime().GetAttributes()
+	userSecrets := secretProjections(m.cr.GetRuntime().GetAttributes().SecretConfigFiles())
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
-		k8s.CreateConfigVolume(configMapCommonName, secretProjections(attrs.SecretConfigFiles(api.SecretConfigFileTargetCommon, ""))),
-		k8s.CreateConfigVolume(configMapCommonUsersName, secretProjections(attrs.SecretConfigFiles(api.SecretConfigFileTargetUsers, ""))),
-		k8s.CreateConfigVolume(configMapHostName, secretProjections(attrs.SecretConfigFiles(api.SecretConfigFileTargetHost, host.GetName()))),
+		k8s.CreateConfigVolume(configMapCommonName, nil),
+		k8s.CreateConfigVolume(configMapCommonUsersName, userSecrets),
+		k8s.CreateConfigVolume(configMapHostName, nil),
 	)
 
-	// And reference these Volumes in each Container via VolumeMount
-	// So Pod will have ConfigMaps mounted as Volumes in each Container
 	k8s.StatefulSetAppendVolumeMountsInAllContainers(
 		statefulSet,
 		k8s.CreateVolumeMount(configMapCommonName, config.DirPathConfigCommon),
-		k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathConfigUsers),
 		k8s.CreateVolumeMount(configMapHostName, config.DirPathConfigHost),
 	)
+	usersMount := k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathConfigUsers)
+	if len(userSecrets) == 0 {
+		k8s.StatefulSetAppendVolumeMountsInAllContainers(statefulSet, usersMount)
+		return
+	}
+	// users.d contains Secret keys. Mount it only on the ClickHouse server container.
+	k8s.StatefulSetAppendVolumeMounts(statefulSet, config.ClickHouseContainerName, usersMount)
 }
 
 // stsSetupVolumesUserDataWithFixedPaths

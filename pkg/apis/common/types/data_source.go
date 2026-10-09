@@ -24,10 +24,9 @@ const (
 	// MappingTypeVariable injects the Secret key as a container env var.
 	// ClickHouse reads it with from_env. This is the default.
 	MappingTypeVariable = "variable"
-	// MappingTypeFile projects the Secret key into the config directory ClickHouse
-	// already reloads (users.d, config.d, or conf.d) as an XML file. The kubelet
-	// refreshes that file when the Secret changes, so ClickHouse can reload it
-	// without a pod restart.
+	// MappingTypeFile projects the Secret key into users.d as a ClickHouse users
+	// XML document. The kubelet refreshes that file when the Secret changes, so
+	// ClickHouse can reload it without a pod restart. Settings do not use this.
 	MappingTypeFile = "file"
 )
 

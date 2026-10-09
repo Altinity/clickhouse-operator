@@ -18,9 +18,12 @@ import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
+	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
+	chiConfig "github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
@@ -47,20 +50,25 @@ func (c *Creator) stsSetupVolumes(what interfaces.VolumeType, statefulSet *apps.
 	c.vm.SetupVolumes(what, statefulSet, host)
 }
 
-// stsSetupVolumesForSecrets adds to each container in the Pod VolumeMount objects
+// stsSetupVolumesForSecrets mounts Secret-backed files on the server container.
+// These come from spec.configuration.files. Sidecars do not receive the mount.
 func (c *Creator) stsSetupVolumesForSecrets(statefulSet *apps.StatefulSet, host *api.Host) {
-	// Add all additional Volumes
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
 		host.GetCR().GetRuntime().GetAttributes().GetAdditionalVolumes()...,
 	)
-
-	// And reference these Volumes in each Container via VolumeMount
-	// So Pod will have additional volumes mounted as Volumes
-	k8s.StatefulSetAppendVolumeMountsInAllContainers(
+	k8s.StatefulSetAppendVolumeMounts(
 		statefulSet,
+		appContainerName(host.GetCR()),
 		host.GetCR().GetRuntime().GetAttributes().GetAdditionalVolumeMounts()...,
 	)
+}
+
+func appContainerName(cr api.ICustomResource) string {
+	if _, ok := cr.(*chk.ClickHouseKeeperInstallation); ok {
+		return chkConfig.KeeperContainerName
+	}
+	return chiConfig.ClickHouseContainerName
 }
 
 // stsSetupVolumesUserData performs VolumeClaimTemplate setup for Containers in PodTemplate of a StatefulSet

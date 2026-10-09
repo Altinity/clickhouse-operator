@@ -90,31 +90,24 @@ func substSettingsFieldWithDataFromDataSource(
 	return true
 }
 
-// ApplySecretKeyRef maps a valueFrom.secretKeyRef field.
-// valueFrom.mappingType=file projects the Secret key into a config directory
-// ClickHouse reloads (users.d, config.d, or conf.d) and leaves the setting out
-// of generated XML. mountFile is false while a setting is still being inherited
-// down to a host. Every other value, including omitted mappingType, stays an
-// env var + from_env.
+// ApplySecretKeyRef maps a valueFrom.secretKeyRef field on a user.
+// valueFrom.mappingType=file projects the Secret key into users.d. The key must
+// already be a ClickHouse users XML document. Every other value, including
+// omitted mappingType, stays an env var + from_env. Settings do not use this:
+// a Secret-backed settings file belongs in spec.configuration.files.
 func ApplySecretKeyRef(
 	req req,
 	settings settings,
 	field string,
 	envVarNamePrefix string,
-	mountFile bool,
-	target string,
-	host string,
 ) bool {
 	if settings.Get(field).IsFileMapping() {
-		if !mountFile {
-			return false
-		}
-		return mountSecretConfigFile(req, settings, field, target, host)
+		return mountSecretConfigFile(req, settings, field)
 	}
 	return ReplaceSettingsFieldWithEnvRefToSecretField(req, settings, field, field, envVarNamePrefix)
 }
 
-func mountSecretConfigFile(req req, settings settings, field, target, host string) bool {
+func mountSecretConfigFile(req req, settings settings, field string) bool {
 	setting := settings.Get(field)
 	secretAddress, err := setting.FetchDataSourceAddress(req.GetTargetNamespace())
 	if err != nil {
@@ -125,8 +118,6 @@ func mountSecretConfigFile(req req, settings settings, field, target, host strin
 		return false
 	}
 	req.AppendSecretConfigFile(api.SecretConfigFile{
-		Target: target,
-		Host:   host,
 		Secret: secretAddress.Name,
 		Key:    secretAddress.Key,
 		Path:   path,
@@ -137,8 +128,8 @@ func mountSecretConfigFile(req req, settings settings, field, target, host strin
 	return true
 }
 
-// secretConfigFileName is the file name inside users.d, config.d, or conf.d.
-// The secret key itself must already be a ClickHouse XML document.
+// secretConfigFileName is the file name inside users.d.
+// The secret key itself must already be a ClickHouse users XML document.
 func secretConfigFileName(secret, key string) string {
 	return chopSecretFileName(secret + "-" + key)
 }

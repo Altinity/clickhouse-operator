@@ -224,7 +224,7 @@ func (n *Normalizer) normalizeHostStage2(
 	log.V(2).M(src).F().Info("will be used as source for host: %s", host.GetName())
 
 	host.InheritSettingsFrom(src)
-	host.Settings = n.normalizeConfigurationSettings(host.Settings, host)
+	host.Settings = n.normalizeConfigurationSettings(host.Settings)
 	host.InheritFilesFrom(src)
 	host.Files = n.normalizeConfigurationFiles(host.Files)
 	host.InheritTemplatesFrom(src)

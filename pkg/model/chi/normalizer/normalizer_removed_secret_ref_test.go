@@ -129,7 +129,7 @@ func TestValueFromSecretKeyRefStillNormalizes(t *testing.T) {
 		"the modern secretKeyRef syntax must not be rejected")
 	require.True(t, user.Get("password").HasAttributes(),
 		"secretKeyRef must be substituted into an ENV reference, not silently dropped")
-	require.Empty(t, target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetUsers, ""))
+	require.Empty(t, target.GetRuntime().GetAttributes().SecretConfigFiles())
 }
 
 func TestValueFromSecretKeyRefFileMappingProjectsUsersFile(t *testing.T) {
@@ -158,7 +158,7 @@ func TestValueFromSecretKeyRefFileMappingProjectsUsersFile(t *testing.T) {
 	require.False(t, user.Get("password").HasAttribute("from_env"))
 	require.False(t, user.Has("password_sha256_hex"),
 		"a file-mapped password must not be replaced with the default hash")
-	files := target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetUsers, "")
+	files := target.GetRuntime().GetAttributes().SecretConfigFiles()
 	require.Len(t, files, 1)
 	require.Equal(t, "creds", files[0].Secret)
 	require.Equal(t, "user1.xml", files[0].Key)
@@ -172,58 +172,31 @@ func TestValueFromSecretKeyRefFileMappingProjectsUsersFile(t *testing.T) {
 	require.NotContains(t, xml, "user1.xml")
 }
 
-func TestValueFromSecretKeyRefFileMappingProjectsSettingsFile(t *testing.T) {
+func TestValueFromSecretKeyRefFileMappingIgnoredOnSettings(t *testing.T) {
 	target := &chi.ClickHouseInstallation{}
 	target.Name = "test-chi"
 	target.Namespace = "own-ns"
 	target.Spec.Reconcile = &chi.ChiReconcile{}
 
-	// nil getter: file mapping must not read the Secret. A read would panic.
 	n := New(nil)
 	n.req = NewRequest(nil)
 	n.req.SetTarget(target)
 
 	settings := chi.NewSettings()
-	for _, key := range []string{"kafka2-username.xml", "kafka2-password.xml"} {
-		field := "kafka2/sasl_password"
-		if key == "kafka2-username.xml" {
-			field = "kafka2/sasl_username"
-		}
-		settings.Set(field, chi.NewSettingSource(&chi.SettingSource{
-			ValueFrom: &types.DataSource{
-				SecretKeyRef: &core.SecretKeySelector{
-					LocalObjectReference: core.LocalObjectReference{Name: "creds"},
-					Key:                  key,
-				},
-				MappingType: types.MappingTypeFile,
+	settings.Set("kafka/sasl_password", chi.NewSettingSource(&chi.SettingSource{
+		ValueFrom: &types.DataSource{
+			SecretKeyRef: &core.SecretKeySelector{
+				LocalObjectReference: core.LocalObjectReference{Name: "creds"},
+				Key:                  "kafka.xml",
 			},
-		}))
-	}
-
-	// Cluster scope only inherits. Installation settings are projected into config.d.
-	n.normalizeConfigurationSettings(settings, &chi.Cluster{})
-	require.Empty(t, target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetCommon, ""))
-	require.True(t, settings.Get("kafka2/sasl_username").IsFileMapping())
-	require.True(t, settings.Get("kafka2/sasl_password").IsFileMapping())
+			MappingType: types.MappingTypeFile,
+		},
+	}))
 
 	n.normalizeConfigurationSettings(settings, target)
-	files := target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetCommon, "")
-	require.Len(t, files, 2)
-	keys := map[string]string{}
-	for _, file := range files {
-		require.Equal(t, "creds", file.Secret)
-		keys[file.Key] = file.Path
-	}
-	require.Equal(t, map[string]string{
-		"kafka2-username.xml": "chop-secret-creds-kafka2-username-xml.xml",
-		"kafka2-password.xml": "chop-secret-creds-kafka2-password-xml.xml",
-	}, keys)
-	require.Empty(t, target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetHost, "chi-0-0"))
-
-	generated := settings.ClickHouseConfig("")
-	require.NotContains(t, generated, "from_env")
-	require.NotContains(t, generated, "data source")
-	require.NotContains(t, generated, "kafka2")
+	require.True(t, settings.Get("kafka/sasl_password").HasAttribute("from_env"),
+		"mappingType on a setting is ignored; secretKeyRef stays an env reference")
+	require.Empty(t, target.GetRuntime().GetAttributes().SecretConfigFiles())
 }
 
 // Regression guard: status.Errors is inherited into the next normalization target

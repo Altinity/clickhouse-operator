@@ -188,12 +188,15 @@ By default `valueFrom.mappingType` is `variable`: the operator injects an enviro
 variable and renders `from_env`. Kubernetes does not update environment variables in a
 running container, so a Secret change is picked up only when the pod is recreated.
 
-`mappingType: file` projects that Secret key into a directory ClickHouse reloads.
-A user field goes to `users.d`. An installation setting goes to `config.d`. A cluster,
-shard, replica, or host setting goes to that host's `conf.d`. The key must already be a
-ClickHouse XML document. The operator records the Secret name and key on a projected
-volume and does not read or copy the Secret. The kubelet refreshes the file when the
-Secret changes, and ClickHouse reloads it.
+`mappingType: file` is for user fields. It projects that Secret key into `users.d` on
+the ClickHouse server container. The key must already be a ClickHouse users XML
+document. The operator records the Secret name and key on a projected volume and does
+not read or copy the Secret. The kubelet refreshes the file when the Secret changes,
+and ClickHouse reloads it. Sidecars do not receive that mount.
+
+A Secret-backed server settings file belongs in `spec.configuration.files`. That mounts
+the referenced Secret key under `secrets.d` on the ClickHouse server container and does
+not copy the value into a ConfigMap. `mappingType` is not used for settings.
 
 ```yaml
 apiVersion: v1
@@ -228,13 +231,12 @@ spec:
             name: clickhouse-secret
             key: user1.xml
           mappingType: file
-    settings:
-      kafka/sasl_password:
+    files:
+      kafka.xml:
         valueFrom:
           secretKeyRef:
             name: clickhouse-secret
             key: kafka.xml
-          mappingType: file
 ```
 
 The operator does not hash Secret-backed passwords. Where you previously relied on

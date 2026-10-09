@@ -1079,7 +1079,7 @@ spec:
 
                         valueFrom.mappingType defaults to `variable`: the value is injected as a container env var and rendered with from_env
                         a Secret change is picked up only when the pod is recreated
-                        valueFrom.mappingType=`file` projects the Secret key into config.d for this section, or into the host conf.d for cluster, shard, replica, and host settings, as chop-secret-*.xml. The key must be a ClickHouse XML document. The operator does not read or copy the Secret. The kubelet refreshes the file when the Secret changes
+                        mappingType is not applied to settings. A Secret-backed settings file belongs in configuration.files, which mounts the referenced Secret key under secrets.d on the ClickHouse server container
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
                     files: &TypeFiles

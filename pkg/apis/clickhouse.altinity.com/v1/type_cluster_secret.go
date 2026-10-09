@@ -77,7 +77,7 @@ func (s *ClusterSecret) GetSecretKeyRef() *core.SecretKeySelector {
 	if s == nil {
 		return nil
 	}
-	if s.ValueFrom == nil || s.ValueFrom.SecretKeyRef == nil {
+	if s.ValueFrom == nil {
 		return nil
 	}
 	return s.ValueFrom.SecretKeyRef
