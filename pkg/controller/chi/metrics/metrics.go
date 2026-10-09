@@ -60,83 +60,83 @@ type Metrics struct {
 	PodDeleteEvents metric.Int64Counter
 }
 
-func createMetrics() *Metrics {
+func createMetrics(meter metric.Meter) *Metrics {
 	m := &Metrics{}
 	// The unit u should be defined using the appropriate [UCUM](https://ucum.org) case-sensitive code.
-	m.CHIReconcilesStarted, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_chi_reconciles_started",
+	m.CHIReconcilesStarted, _ = meter.Int64Counter(
+		"clickhouse_operator_chi_reconciles_started_total",
 		metric.WithDescription("number of CHI reconciles started"),
 		metric.WithUnit("items"),
 	)
-	m.CHIReconcilesCompleted, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_chi_reconciles_completed",
+	m.CHIReconcilesCompleted, _ = meter.Int64Counter(
+		"clickhouse_operator_chi_reconciles_completed_total",
 		metric.WithDescription("number of CHI reconciles completed successfully"),
 		metric.WithUnit("items"),
 	)
-	m.CHIReconcilesAborted, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_chi_reconciles_aborted",
+	m.CHIReconcilesAborted, _ = meter.Int64Counter(
+		"clickhouse_operator_chi_reconciles_aborted_total",
 		metric.WithDescription("number of CHI reconciles aborted"),
 		metric.WithUnit("items"),
 	)
-	m.CHIAutoRecoveriesTriggered, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_chi_auto_recoveries_triggered",
+	m.CHIAutoRecoveriesTriggered, _ = meter.Int64Counter(
+		"clickhouse_operator_chi_auto_recoveries_triggered_total",
 		metric.WithDescription("number of CHI auto-recovery reconcile triggers (e.g. pod became Ready while CHI was Aborted)"),
 		metric.WithUnit("items"),
 	)
-	m.CHIKeeperUpdatesSkipped, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_chi_keeper_updates_skipped",
+	m.CHIKeeperUpdatesSkipped, _ = meter.Int64Counter(
+		"clickhouse_operator_chi_keeper_updates_skipped_total",
 		metric.WithDescription("number of CHI reconciles skipped after a referenced CHK reconcile completed because zookeeper endpoints did not change"),
 		metric.WithUnit("items"),
 	)
-	m.CHIReconcilesTimings, _ = operator.Meter().Float64Histogram(
+	m.CHIReconcilesTimings, _ = meter.Float64Histogram(
 		"clickhouse_operator_chi_reconciles_timings",
 		metric.WithDescription("timings of CHI reconciles completed successfully"),
 		metric.WithUnit("s"),
 	)
-	m.CHI, _ = operator.Meter().Int64UpDownCounter(
+	m.CHI, _ = meter.Int64UpDownCounter(
 		"clickhouse_operator_chi",
 		metric.WithDescription("number of CHI available"),
 		metric.WithUnit("items"),
 	)
 
-	m.HostReconcilesStarted, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_host_reconciles_started",
+	m.HostReconcilesStarted, _ = meter.Int64Counter(
+		"clickhouse_operator_host_reconciles_started_total",
 		metric.WithDescription("number of host reconciles started"),
 		metric.WithUnit("items"),
 	)
-	m.HostReconcilesCompleted, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_host_reconciles_completed",
+	m.HostReconcilesCompleted, _ = meter.Int64Counter(
+		"clickhouse_operator_host_reconciles_completed_total",
 		metric.WithDescription("number of host reconciles completed successfully"),
 		metric.WithUnit("items"),
 	)
-	m.HostReconcilesRestarts, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_host_reconciles_restarts",
+	m.HostReconcilesRestarts, _ = meter.Int64Counter(
+		"clickhouse_operator_host_reconciles_restarts_total",
 		metric.WithDescription("number of host restarts during reconciles"),
 		metric.WithUnit("items"),
 	)
-	m.HostReconcilesErrors, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_host_reconciles_errors",
+	m.HostReconcilesErrors, _ = meter.Int64Counter(
+		"clickhouse_operator_host_reconciles_errors_total",
 		metric.WithDescription("number of host reconciles errors"),
 		metric.WithUnit("items"),
 	)
-	m.HostReconcilesTimings, _ = operator.Meter().Float64Histogram(
+	m.HostReconcilesTimings, _ = meter.Float64Histogram(
 		"clickhouse_operator_host_reconciles_timings",
 		metric.WithDescription("timings of host reconciles completed successfully"),
 		metric.WithUnit("s"),
 	)
 
-	m.PodAddEvents, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_pod_add_events",
+	m.PodAddEvents, _ = meter.Int64Counter(
+		"clickhouse_operator_pod_add_events_total",
 		metric.WithDescription("number PodAdd events"),
 		metric.WithUnit("items"),
 	)
-	m.PodUpdateEvents, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_pod_update_events",
+	m.PodUpdateEvents, _ = meter.Int64Counter(
+		"clickhouse_operator_pod_update_events_total",
 		metric.WithDescription("number PodUpdate events"),
 		metric.WithUnit("items"),
 	)
-	m.PodDeleteEvents, _ = operator.Meter().Int64Counter(
-		"clickhouse_operator_pod_delete_events",
+	m.PodDeleteEvents, _ = meter.Int64Counter(
+		"clickhouse_operator_pod_delete_events_total",
 		metric.WithDescription("number PodDelete events"),
 		metric.WithUnit("items"),
 	)
@@ -148,7 +148,7 @@ var m *Metrics
 
 func ensureMetrics() *Metrics {
 	if m == nil {
-		m = createMetrics()
+		m = createMetrics(operator.Meter())
 	}
 	return m
 }
