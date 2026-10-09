@@ -246,6 +246,140 @@ func TestGeneratedUsersFileOmitsHotReloadUsers(t *testing.T) {
 	require.NotContains(t, hotXML, "<carol>")
 }
 
+func TestHotReloadMissingSecretThenSucceedsOnTheSameNormalizer(t *testing.T) {
+	var available bool
+	n := New(func(namespace, name string) (*core.Secret, error) {
+		if !available {
+			return nil, errNotFound
+		}
+		return &core.Secret{Data: map[string][]byte{
+			"alice_password": []byte("secret-value-1"),
+			"bob_password":   []byte("secret-value-2"),
+		}}, nil
+	})
+	cr := hotReloadUsersCHI()
+	opts := commonNormalizer.NewOptions[chi.ClickHouseInstallation]()
+
+	first, err := n.CreateTemplated(cr, opts)
+	require.NoError(t, err)
+	require.Equal(t, chi.StatusAborted, first.EnsureStatus().GetStatus())
+	errs := first.EnsureStatus().GetErrors()
+	require.Len(t, errs, 1, "a pass reports the first unresolved Secret and skips the rest")
+	require.Contains(t, errs[0], chi.StatusReasonHotReloadSecretUnresolved)
+	require.False(t, first.GetRuntime().GetAttributes().GetHotReloadUsers())
+
+	available = true
+	second, err := n.CreateTemplated(cr, opts)
+	require.NoError(t, err)
+	require.NotEqual(t, chi.StatusAborted, second.EnsureStatus().GetStatus())
+	require.True(t, second.GetRuntime().GetAttributes().GetHotReloadUsers())
+	require.True(t, second.GetSpecT().GetConfiguration().GetUsers().Get("alice/password").IsHotReload())
+	require.True(t, second.GetSpecT().GetConfiguration().GetUsers().Get("bob/password").IsHotReload())
+}
+
+func TestHotReloadRejectedOnProfilesAndQuotas(t *testing.T) {
+	n := New(secretGetter(map[string]string{"k": "v"}))
+	opts := commonNormalizer.NewOptions[chi.ClickHouseInstallation]()
+	for _, section := range []string{"profiles", "quotas"} {
+		got, err := n.CreateTemplated(hotReloadSectionCHI(section, "readonly"), opts)
+		require.NoError(t, err)
+		require.Equal(t, chi.StatusAborted, got.EnsureStatus().GetStatus(), section)
+		require.Contains(t, strings.Join(got.EnsureStatus().GetErrors(), " "), chi.StatusReasonHotReloadRejected, section)
+	}
+}
+
+func TestHotReloadRejectsMalformedPasswordHash(t *testing.T) {
+	const (
+		badSHA256 = "abcd"
+		badSHA1   = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+	)
+	for _, tc := range []struct {
+		field string
+		value string
+	}{
+		{"password_sha256_hex", badSHA256},
+		{"password_double_sha1_hex", badSHA1},
+	} {
+		target := &chi.ClickHouseInstallation{}
+		target.Namespace = "own-ns"
+		n := New(secretGetter(map[string]string{"credential": tc.value}))
+		n.req = NewRequest(nil)
+		n.req.SetTarget(target)
+
+		settings := chi.NewSettings()
+		settings.Set("bob/"+tc.field, hotReloadPassword("clickhouse-passwords", "credential"))
+		user := chi.NewSettingsUser(settings, "bob")
+		n.normalizeConfigurationUser(user)
+
+		require.Equal(t, chi.StatusAborted, target.EnsureStatus().GetStatus(), tc.field)
+		require.Contains(t, strings.Join(target.EnsureStatus().GetErrors(), " "), "not a valid password hash")
+		require.True(t, user.Get(tc.field).IsHotReload(), "a rejected hash must stay a Secret reference")
+		require.NotEqual(t, tc.value, user.Get(tc.field).String())
+		require.False(t, target.GetRuntime().GetAttributes().GetHotReloadUsers())
+
+		xml, err := RenderHotReloadUsersXML(settings, "own-ns", secretGetter(map[string]string{"credential": tc.value}))
+		require.Error(t, err)
+		require.Empty(t, xml)
+		require.True(t, settings.Get("bob/"+tc.field).IsHotReload(), "a failed render must not rewrite the CHI")
+	}
+}
+
+func TestHotReloadDefaultUserHashKeepsPasswordRemove(t *testing.T) {
+	const password = "secret-value-1"
+	sum := sha256.Sum256([]byte(password))
+	wantHash := hex.EncodeToString(sum[:])
+
+	settings := chi.NewSettings()
+	settings.Set("default/password", hotReloadPassword("clickhouse-passwords", "default_password"))
+	xml, err := RenderHotReloadUsersXML(settings, "own-ns", secretGetter(map[string]string{"default_password": password}))
+	require.NoError(t, err)
+	require.Contains(t, xml, wantHash)
+	require.Contains(t, xml, `remove="1"`)
+	require.NotContains(t, xml, password)
+	require.True(t, settings.Get("default/password").IsHotReload())
+}
+
+func hotReloadUsersCHI() *chi.ClickHouseInstallation {
+	users := chi.NewSettings()
+	users.Set("alice/password", hotReloadPassword("clickhouse-passwords", "alice_password"))
+	users.Set("bob/password", hotReloadPassword("clickhouse-passwords", "bob_password"))
+	cr := &chi.ClickHouseInstallation{}
+	cr.Name = "chi"
+	cr.Namespace = "own-ns"
+	cr.Spec.Configuration = &chi.Configuration{
+		Users: users,
+		Clusters: []*chi.Cluster{{
+			Name:   "default",
+			Layout: &chi.ChiClusterLayout{ShardsCount: 1, ReplicasCount: 1},
+		}},
+	}
+	return cr
+}
+
+func hotReloadSectionCHI(section, key string) *chi.ClickHouseInstallation {
+	cr := &chi.ClickHouseInstallation{}
+	cr.Name = "chi"
+	cr.Namespace = "own-ns"
+	settings := chi.NewSettings()
+	settings.Set(key, hotReloadPassword("clickhouse-passwords", "k"))
+	conf := &chi.Configuration{
+		Clusters: []*chi.Cluster{{
+			Name:   "default",
+			Layout: &chi.ChiClusterLayout{ShardsCount: 1, ReplicasCount: 1},
+		}},
+	}
+	switch section {
+	case "settings":
+		conf.Settings = settings
+	case "profiles":
+		conf.Profiles = settings
+	case "quotas":
+		conf.Quotas = settings
+	}
+	cr.Spec.Configuration = conf
+	return cr
+}
+
 var errNotFound = errString("not found")
 
 type errString string

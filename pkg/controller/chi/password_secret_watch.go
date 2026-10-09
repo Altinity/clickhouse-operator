@@ -100,7 +100,8 @@ func (c *Controller) onPasswordSecret(secret *core.Secret) {
 
 // chiReferencesHotReloadSecret reports whether the CHI, as stored by the user,
 // opts a password field into hotReload against this Secret. It does not read
-// Secret data.
+// Secret data. References that exist only on a ClickHouseInstallationTemplate
+// are not visible here; those need a manual CHI reconcile.
 func chiReferencesHotReloadSecret(cr *api.ClickHouseInstallation, secretName string) bool {
 	if cr == nil || secretName == "" {
 		return false

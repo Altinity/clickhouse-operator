@@ -98,11 +98,10 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 // The application container is the one named clickhouse, or the first container
 // when a PodTemplate renames it.
 func appendHotReloadUsersVolume(statefulSet *apps.StatefulSet, configMapName, secretName string) error {
-	volumeName := secretName
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
 		k8s.CreateProjectedConfigAndSecretVolume(
-			volumeName,
+			secretName,
 			configMapName,
 			secretName,
 			config.ChopGeneratedHotReloadUsersConfigFilename(),
@@ -118,7 +117,7 @@ func appendHotReloadUsersVolume(statefulSet *apps.StatefulSet, configMapName, se
 	if !ok {
 		return fmt.Errorf("application container not found")
 	}
-	k8s.ContainerAppendVolumeMounts(app, k8s.CreateVolumeMount(volumeName, config.DirPathConfigUsers))
+	k8s.ContainerAppendVolumeMounts(app, k8s.CreateVolumeMount(secretName, config.DirPathConfigUsers))
 	return nil
 }
 

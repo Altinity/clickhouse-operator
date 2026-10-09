@@ -41,7 +41,7 @@ func userHasHotReloadCredential(user *api.SettingsUser) bool {
 // the managed Secret.
 func (n *Normalizer) acceptHotReloadUserField(user *api.SettingsUser, name string, setting *api.Setting) {
 	if !api.IsHotReloadUserAuthField(name) || !setting.HasSecretKeyRef() {
-		n.rejectHotReload(user.Username() + "/" + name)
+		n.rejectUnsupportedHotReload(user.Username() + "/" + name)
 		return
 	}
 	if n.req == nil || n.req.GetTarget() == nil || n.secretGet == nil {
@@ -58,16 +58,46 @@ func (n *Normalizer) acceptHotReloadUserField(user *api.SettingsUser, name strin
 		n.rejectHotReloadSecret(user.Username(), name)
 		return
 	}
+	if !validHotReloadCredential(name, value) {
+		n.rejectHotReloadCredential(user.Username(), name)
+		return
+	}
 	n.req.GetTarget().GetRuntime().GetAttributes().SetHotReloadUsers(true)
 }
 
-func (n *Normalizer) rejectHotReload(name string) {
-	target := n.req.GetTarget()
-	if target == nil || n.hotReloadReported {
+// rejectHotReloadInSettings aborts when profiles, quotas, or any other settings
+// section opts into hotReload. Those sections are not user authentication fields.
+func (n *Normalizer) rejectHotReloadInSettings(settings *api.Settings) {
+	if settings == nil {
 		return
 	}
-	n.hotReloadReported = true
-	target.EnsureStatus().ReconcileAbortWithReason(
+	settings.WalkSafe(func(name string, setting *api.Setting) {
+		if setting.IsHotReload() {
+			n.rejectUnsupportedHotReload(name)
+		}
+	})
+}
+
+// rejectHotReload records the first hotReload failure of this normalization pass.
+// Status is not carried onto the next pass, so a later reconcile can abort again
+// without a flag on the Normalizer. A pass that is already aborted keeps its first error.
+func (n *Normalizer) rejectHotReload(reason, message string) {
+	if n.req == nil {
+		return
+	}
+	target := n.req.GetTarget()
+	if target == nil {
+		return
+	}
+	status := target.EnsureStatus()
+	if status.GetStatus() == api.StatusAborted {
+		return
+	}
+	status.ReconcileAbortWithReason(reason, message)
+}
+
+func (n *Normalizer) rejectUnsupportedHotReload(name string) {
+	n.rejectHotReload(
 		api.StatusReasonHotReloadRejected,
 		fmt.Sprintf(
 			"setting %q: hotReload is supported only on user password, password_sha256_hex, and password_double_sha1_hex with secretKeyRef",
@@ -76,15 +106,21 @@ func (n *Normalizer) rejectHotReload(name string) {
 	)
 }
 
+func (n *Normalizer) rejectHotReloadCredential(username, field string) {
+	n.rejectHotReload(
+		api.StatusReasonHotReloadRejected,
+		fmt.Sprintf("user %q: hotReload field %q: value is not a valid password hash", username, field),
+	)
+}
+
 func (n *Normalizer) rejectHotReloadSecret(username, field string) {
-	target := n.req.GetTarget()
-	if target == nil || n.hotReloadReported {
-		return
+	namespace := ""
+	if n.req != nil && n.req.GetTarget() != nil {
+		namespace = n.req.GetTargetNamespace()
 	}
-	n.hotReloadReported = true
-	target.EnsureStatus().ReconcileAbortWithReason(
+	n.rejectHotReload(
 		api.StatusReasonHotReloadSecretUnresolved,
-		fmt.Sprintf("user %q: hotReload field %q: unable to read the referenced Secret key in namespace %q", username, field, n.req.GetTargetNamespace()),
+		fmt.Sprintf("user %q: hotReload field %q: unable to read the referenced Secret key in namespace %q", username, field, namespace),
 	)
 }
 
@@ -135,6 +171,10 @@ func resolveHotReloadUser(user *api.SettingsUser, namespace string, secretGet su
 			err = fmt.Errorf("user %q: hotReload field %q: unable to read the referenced Secret key", user.Username(), name)
 			return
 		}
+		if !validHotReloadCredential(name, value) {
+			err = fmt.Errorf("user %q: hotReload field %q: value is not a valid password hash", user.Username(), name)
+			return
+		}
 		user.Set(name, api.NewSettingScalar(value))
 	})
 	return err
@@ -142,7 +182,51 @@ func resolveHotReloadUser(user *api.SettingsUser, namespace string, secretGet su
 
 // normalizeResolvedUserPassword applies the same authentication priority as
 // normalizeConfigurationUserPassword, on a copy whose hotReload fields are already scalars.
+// The default user's hash must still carry remove="1": stock users.xml ships an empty
+// <password>, and ClickHouse rejects the user when that element remains beside a hash.
 func normalizeResolvedUserPassword(user *api.SettingsUser) {
 	n := &Normalizer{}
 	n.normalizeConfigurationUserPassword(user)
+	if user.Username() == defaultUsername {
+		n.removePlainPassword(user)
+	}
+}
+
+// validHotReloadCredential checks a Secret value before it is written.
+// password is plaintext. The hash fields must already be hex of the length ClickHouse expects.
+func validHotReloadCredential(name, value string) bool {
+	switch hotReloadField(name) {
+	case "password":
+		return value != ""
+	case "password_sha256_hex":
+		return isHexLen(value, 64)
+	case "password_double_sha1_hex":
+		return isHexLen(value, 40)
+	default:
+		return false
+	}
+}
+
+func hotReloadField(name string) string {
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		return name[i+1:]
+	}
+	return name
+}
+
+func isHexLen(value string, n int) bool {
+	if len(value) != n {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		switch {
+		case c >= '0' && c <= '9':
+		case c >= 'a' && c <= 'f':
+		case c >= 'A' && c <= 'F':
+		default:
+			return false
+		}
+	}
+	return true
 }

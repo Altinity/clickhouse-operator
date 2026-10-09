@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 )
 
 func TestChiReferencesHotReloadSecret(t *testing.T) {
@@ -52,3 +54,92 @@ func TestChiReferencesHotReloadSecret(t *testing.T) {
 }
 
 func boolPtr(v bool) *bool { return &v }
+
+// A source Secret update does not change CHI generation. The watcher still
+// enqueues a reconcile, the gate lets it run, the rendered users document
+// changes, and the host is not restarted.
+func TestPasswordSecretChangeReconcilesWithoutRestart(t *testing.T) {
+	cr := &api.ClickHouseInstallation{}
+	cr.Namespace = "own-ns"
+	cr.Spec.Configuration = api.NewConfiguration()
+	cr.Spec.Configuration.Users = api.NewSettings()
+	cr.Spec.Configuration.Users.Set("alice/password", api.NewSettingSource(&api.SettingSource{
+		ValueFrom: &types.DataSource{
+			SecretKeyRef: &core.SecretKeySelector{
+				LocalObjectReference: core.LocalObjectReference{Name: "clickhouse-passwords"},
+				Key:                  "alice_password",
+			},
+			HotReload: boolPtr(true),
+		},
+	}))
+	require.True(t, chiReferencesHotReloadSecret(cr, "clickhouse-passwords"))
+
+	decision := decideReconcileGate(reconcileGateInputs{
+		generationTheSame:           true,
+		operatorIPTheSame:           true,
+		passwordSecretChanged:       true,
+		hasHostNeedingStuckRecovery: alwaysFalse,
+	})
+	require.Equal(t, gatePasswordSecretChanged, decision)
+	require.True(t, decision.proceeds())
+
+	render := func(password string) string {
+		xml, err := normalizer.RenderHotReloadUsersXML(cr.Spec.Configuration.Users, cr.Namespace, func(namespace, name string) (*core.Secret, error) {
+			return &core.Secret{Data: map[string][]byte{"alice_password": []byte(password)}}, nil
+		})
+		require.NoError(t, err)
+		return xml
+	}
+	require.NotEqual(t, render("secret-value-1"), render("secret-value-2"))
+
+	w := &worker{}
+	host := rollingUpdateHostWithAncestor()
+	secretCtx := context.WithValue(context.Background(), passwordSecretReconcileKey{}, true)
+	require.False(t, w.shouldForceRestartHost(secretCtx, host))
+	require.True(t, w.shouldForceRestartHost(context.Background(), host))
+}
+
+func rollingUpdateHostWithAncestor() *api.Host {
+	const (
+		clusterName = "default"
+		shardName   = "0"
+		hostName    = "r0"
+	)
+	host := &api.Host{Name: hostName}
+	host.Runtime.Address.ClusterName = clusterName
+	host.Runtime.Address.ShardName = shardName
+	host.Runtime.Address.HostName = hostName
+
+	ancestorHost := &api.Host{Name: hostName}
+	ancestorHost.Runtime.Address.HostName = hostName
+	ancestor := &api.ClickHouseInstallation{
+		Spec: api.ChiSpec{
+			Configuration: &api.Configuration{
+				Clusters: []*api.Cluster{{
+					Name: clusterName,
+					Layout: &api.ChiClusterLayout{
+						Shards: []*api.ChiShard{{Name: shardName, Hosts: []*api.Host{ancestorHost}}},
+					},
+				}},
+			},
+		},
+	}
+	ancestorHost.Runtime.SetCR(ancestor)
+
+	current := &api.ClickHouseInstallation{
+		Spec: api.ChiSpec{
+			Restart: types.NewString(api.RestartRollingUpdate),
+			Configuration: &api.Configuration{
+				Clusters: []*api.Cluster{{
+					Name: clusterName,
+					Layout: &api.ChiClusterLayout{
+						Shards: []*api.ChiShard{{Name: shardName, Hosts: []*api.Host{host}}},
+					},
+				}},
+			},
+		},
+	}
+	current.EnsureStatus().NormalizedCRCompleted = ancestor
+	host.Runtime.SetCR(current)
+	return host
+}
