@@ -40,20 +40,18 @@ import (
 
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	secretGet subst.SecretGetter
-	req       *Request
-	namer     interfaces.INameManager
-	macro     interfaces.IMacro
-	labeler   interfaces.ILabeler
+	req     *Request
+	namer   interfaces.INameManager
+	macro   interfaces.IMacro
+	labeler interfaces.ILabeler
 }
 
 // New creates new normalizer
-func New(secretGet subst.SecretGetter) *Normalizer {
+func New() *Normalizer {
 	return &Normalizer{
-		secretGet: secretGet,
-		namer:     managers.NewNameManager(managers.NameManagerTypeKeeper),
-		macro:     macro.New(),
-		labeler:   labeler.New(nil),
+		namer:   managers.NewNameManager(managers.NameManagerTypeKeeper),
+		macro:   macro.New(),
+		labeler: labeler.New(nil),
 	}
 }
 
@@ -585,27 +583,14 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings, scop
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
 		target, hostName, mountFile := settingsSecretFileMount(scope)
-		if setting.IsFileMapping() {
-			if !mountFile {
-				return
-			}
-			subst.RenderFileMappedSetting(
-				n.req,
-				settings,
-				name,
-				target,
-				hostName,
-				n.req.GetTarget().GetName(),
-				n.secretGet,
-			)
-			return
-		}
+		// mountFile is used only for mappingType=file. The Secret key is projected
+		// as-is and must already be ClickHouse XML. The operator does not read it.
 		subst.ApplySecretKeyRef(
 			n.req,
 			settings,
 			name,
 			envVarNamePrefixConfigurationSettings,
-			false,
+			mountFile,
 			target,
 			hostName,
 		)
@@ -613,9 +598,9 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings, scop
 	return settings
 }
 
-// settingsSecretFileMount reports where a mappingType=file setting is rendered.
+// settingsSecretFileMount reports where a mappingType=file setting is projected.
 // Installation settings are served from config.d. Nested settings are inherited
-// and rendered into the host conf.d only.
+// and projected into the host conf.d only.
 func settingsSecretFileMount(scope any) (target, host string, mount bool) {
 	switch typed := scope.(type) {
 	case *chi.Host:

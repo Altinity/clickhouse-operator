@@ -814,7 +814,7 @@ def test_010011(self):
                         sasl_username_env = e["name"]
                     if key == "KAFKA_SASL_PASSWORD":
                         sasl_password_env = e["name"]
-                    if key in ("KAFKA2_SASL_USERNAME", "KAFKA2_SASL_PASSWORD"):
+                    if key in ("kafka2-username.xml", "kafka2-password.xml"):
                         assert False, error(e)
                     if key == "pwduser5":
                         user5_password_env = e["name"]
@@ -846,16 +846,39 @@ def test_010011(self):
                 print(f"Found env substitutions: {env_matches}")
                 assert f"password from_env=\"{user5_password_env}\"" in users_xml
 
-        with And("kafka2 sasl settings are file-mapped into config.d"):
+        with And("only the referenced kafka2 keys are projected into config.d"):
             out = kubectl.launch(
                 f"exec chi-{chi}-default-0-0-0 -- bash -c 'ls -la /etc/clickhouse-server/config.d; echo; for f in /etc/clickhouse-server/config.d/*; do echo ===== $f; cat \"$f\"; echo; done'"
             )
             print(out)
 
-            rendered_name = "chop-secret-test-011-secret-kafka2-test-011-secrets.xml"
-            rendered = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"].get(rendered_name, "")
-            assert "<sasl_username>file_secret</sasl_username>" in rendered, error(rendered)
-            assert "<sasl_password>file_secret</sasl_password>" in rendered, error(rendered)
+            username_file = "chop-secret-test-011-secret-kafka2-username-xml.xml"
+            password_file = "chop-secret-test-011-secret-kafka2-password-xml.xml"
+            assert username_file in out, error(out)
+            assert password_file in out, error(out)
+            assert "<sasl_username>file_secret</sasl_username>" in out, error(out)
+            assert "<sasl_password>file_secret</sasl_password>" in out, error(out)
+            assert "pwduser1" not in out, error(out)
+
+            projected_keys = set()
+            for volume in kubectl.get_pod_spec(chi)["volumes"]:
+                projected = volume.get("projected")
+                if not projected:
+                    continue
+                for source in projected.get("sources", []):
+                    secret = source.get("secret")
+                    if not secret or secret.get("name") != "test-011-secret":
+                        continue
+                    items = secret.get("items")
+                    assert items, error(secret)
+                    for item in items:
+                        projected_keys.add(item["key"])
+            assert projected_keys == {"kafka2-username.xml", "kafka2-password.xml"}, error(projected_keys)
+
+            configd = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]
+            assert username_file not in configd, error(configd)
+            assert password_file not in configd, error(configd)
+            assert "file_secret" not in str(configd), error(configd)
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -1242,9 +1265,10 @@ def test_010011_5(self, version_from="0.27.3", version_to=None):
 def test_010011_6(self):
     """mappingType defaults to variable: the password is a container env var. A taskID
     reconcile does not change the pod template, so the running container keeps the old
-    value until the pod is restarted and kubelet injects the Secret again. mappingType=file
-    projects the Secret key into users.d, and ClickHouse reloads the new password without
-    a restart.
+    value until the pod is restarted and kubelet injects the Secret again. Switching to
+    mappingType=file also replaces that plain Secret value with a users XML document.
+    The operator projects only that key into users.d, and ClickHouse reloads a later
+    Secret change without a restart.
     """
     create_shell_namespace_clickhouse_template()
 
@@ -1315,7 +1339,11 @@ def test_010011_6(self):
                 "varpass1 should be rejected after the pod is restarted"
             )
 
-    with When("mappingType is switched to file"):
+    with When("mappingType is switched to file and the Secret key is replaced with users XML"):
+        # The plain password key is not valid users.d XML. File mapping projects the
+        # referenced key as-is, so the Secret has to gain that XML document. The old
+        # password key stays in the Secret and must not be projected.
+        kubectl.apply(util.get_full_path("manifests/secret/test-011-6-secret-filepass1.yaml"))
         kubectl.create_and_check(
             manifest="manifests/chi/test-011-6-file.yaml",
             check={
@@ -1324,22 +1352,28 @@ def test_010011_6(self):
             },
         )
 
-        with Then("the Secret key is projected into users.d and from_env is gone"):
+        with Then("only user1.xml is projected into users.d and from_env is gone"):
             users_xml = kubectl.get("configmap", users_cm)["data"]["chop-generated-users.xml"]
             assert "from_env" not in users_xml, error(users_xml)
             volumes = kubectl.get_pod_spec(chi)["volumes"]
             users_vol = next(v for v in volumes if v["name"] == users_volume)
             assert "projected" in users_vol, error(users_vol)
-            secret_sources = [
-                src["secret"]["name"]
-                for src in users_vol["projected"]["sources"]
-                if "secret" in src
-            ]
-            assert secret_sources == ["test-011-6-secret"], error(users_vol)
+            projected_keys = []
+            for src in users_vol["projected"]["sources"]:
+                secret = src.get("secret")
+                if not secret:
+                    continue
+                assert secret["name"] == "test-011-6-secret", error(users_vol)
+                assert secret.get("items"), error(secret)
+                projected_keys.extend(item["key"] for item in secret["items"])
+            assert projected_keys == ["user1.xml"], error(users_vol)
 
         with And("user1 authenticates with the password from the XML fragment"):
             assert clickhouse.wait_config_applied(chi, user="user1", pwd="filepass1"), error(
                 "filepass1 from the projected users XML should authenticate"
+            )
+            assert "Authentication failed" in login("varpass2"), error(
+                "the variable-mapping password should be rejected after the Secret is switched to XML"
             )
 
     with When("the Secret XML password is changed"):

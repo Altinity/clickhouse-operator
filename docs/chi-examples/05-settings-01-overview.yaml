@@ -11,6 +11,18 @@ stringData:
   quota: "test_quota"
   example.xml: |
     <yandex><!-- just an example --></yandex>
+  user-file.xml: |
+    <clickhouse>
+      <users>
+        <user_secret_ref_password_file>
+          <password_sha256_hex>65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5</password_sha256_hex>
+        </user_secret_ref_password_file>
+      </users>
+    </clickhouse>
+  settings.xml: |
+    <clickhouse>
+      <max_connections>128</max_connections>
+    </clickhouse>
 
 ---
 apiVersion: "clickhouse.altinity.com/v1"
@@ -111,8 +123,8 @@ spec:
           secretKeyRef:
             name: clickhouse-credentials
             key: disable_internal_dns_cache
-      # valueFrom.mappingType=file renders the Secret value into config.d.
-      # Settings that share a Secret and a top-level section are one XML file.
+      # valueFrom.mappingType=file projects the Secret key into config.d as chop-secret-*.xml.
+      # The key must be a ClickHouse XML document. The operator does not read the Secret.
       max_connections:
         valueFrom:
           secretKeyRef:

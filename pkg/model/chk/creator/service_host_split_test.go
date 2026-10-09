@@ -60,7 +60,7 @@ func normalizeSingleHostCHK(t *testing.T) (*chk.ClickHouseKeeperInstallation, in
 	t.Helper()
 	src := chk.NewClickHouseKeeperInstallation("kpr", "ns")
 	src.Spec.Configuration = &chk.Configuration{Clusters: []*chk.Cluster{{Name: "keeper"}}}
-	cr, err := chkNormalizer.New(nil).CreateTemplated(src, commonNormalizer.NewOptions[chk.ClickHouseKeeperInstallation]())
+	cr, err := chkNormalizer.New().CreateTemplated(src, commonNormalizer.NewOptions[chk.ClickHouseKeeperInstallation]())
 	require.NoError(t, err)
 	require.NotNil(t, cr)
 
@@ -130,7 +130,7 @@ func TestCreateServiceHostHonorsUserTemplate(t *testing.T) {
 			Spec: core.ServiceSpec{Type: core.ServiceTypeClusterIP},
 		}},
 	}
-	cr, err := chkNormalizer.New(nil).CreateTemplated(src, commonNormalizer.NewOptions[chk.ClickHouseKeeperInstallation]())
+	cr, err := chkNormalizer.New().CreateTemplated(src, commonNormalizer.NewOptions[chk.ClickHouseKeeperInstallation]())
 	require.NoError(t, err)
 
 	sm := managers.NewServiceManager(managers.ServiceManagerTypeKeeper)

@@ -188,15 +188,12 @@ By default `valueFrom.mappingType` is `variable`: the operator injects an enviro
 variable and renders `from_env`. Kubernetes does not update environment variables in a
 running container, so a Secret change is picked up only when the pod is recreated.
 
-`mappingType: file` for a user field projects that Secret key into `users.d`. The key
-must be a ClickHouse users XML fragment. The kubelet refreshes the file when the Secret
-changes, and ClickHouse reloads it. The operator does not read or hash that Secret.
-
-`mappingType: file` for a setting reads the Secret value and renders it into one XML
-file per Secret and top-level section: `config.d` for `spec.configuration.settings`, and
-the host `conf.d` for settings on a cluster, shard, replica, or host. `kafka/sasl_username`
-and `kafka/sasl_password` from the same Secret become a single `<kafka>` document. The
-operator rewrites that file on the next reconcile.
+`mappingType: file` projects that Secret key into a directory ClickHouse reloads.
+A user field goes to `users.d`. An installation setting goes to `config.d`. A cluster,
+shard, replica, or host setting goes to that host's `conf.d`. The key must already be a
+ClickHouse XML document. The operator records the Secret name and key on a projected
+volume and does not read or copy the Secret. The kubelet refreshes the file when the
+Secret changes, and ClickHouse reloads it.
 
 ```yaml
 apiVersion: v1
@@ -212,8 +209,13 @@ stringData:
         </user1>
       </users>
     </clickhouse>
-  KAFKA_SASL_USERNAME: kafka
-  KAFKA_SASL_PASSWORD: secret
+  kafka.xml: |
+    <clickhouse>
+      <kafka>
+        <sasl_username>kafka</sasl_username>
+        <sasl_password>secret</sasl_password>
+      </kafka>
+    </clickhouse>
 ```
 
 ```yaml
@@ -227,17 +229,11 @@ spec:
             key: user1.xml
           mappingType: file
     settings:
-      kafka/sasl_username:
-        valueFrom:
-          secretKeyRef:
-            name: clickhouse-secret
-            key: KAFKA_SASL_USERNAME
-          mappingType: file
       kafka/sasl_password:
         valueFrom:
           secretKeyRef:
             name: clickhouse-secret
-            key: KAFKA_SASL_PASSWORD
+            key: kafka.xml
           mappingType: file
 ```
 

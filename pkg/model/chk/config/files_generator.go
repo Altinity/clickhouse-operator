@@ -31,7 +31,6 @@ type FilesGenerator struct {
 
 type IConfigGeneratorGeneric interface {
 	GetGlobalSettings() string
-	GetRenderedSecretConfig(target, host string) map[string]string
 	GetSectionFromFiles(section chi.SettingsSection, includeUnspecified bool, host *chi.Host) map[string]string
 	GetHostSettings(host *chi.Host) string
 }
@@ -96,7 +95,6 @@ func (c *FilesGenerator) createConfigFilesGroupCommonDomain(configSections map[s
 func (c *FilesGenerator) createConfigFilesGroupCommonGeneric(configSections map[string]string, options *FilesGeneratorOptions) {
 	// common settings
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGeneratorGeneric.GetGlobalSettings())
-	util.MergeStringMapsOverwrite(configSections, c.configGeneratorGeneric.GetRenderedSecretConfig(chi.SecretConfigFileTargetCommon, ""))
 	// common files
 	util.MergeStringMapsOverwrite(configSections, c.configGeneratorGeneric.GetSectionFromFiles(chi.SectionCommon, true, nil))
 	// Extra user-specified config files
@@ -142,7 +140,6 @@ func (c *FilesGenerator) createConfigFilesGroupHostDomain(configSections map[str
 
 func (c *FilesGenerator) createConfigFilesGroupHostGeneric(configSections map[string]string, options *FilesGeneratorOptions) {
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGeneratorGeneric.GetHostSettings(options.GetHost()))
-	util.MergeStringMapsOverwrite(configSections, c.configGeneratorGeneric.GetRenderedSecretConfig(chi.SecretConfigFileTargetHost, options.GetHost().GetName()))
 	util.MergeStringMapsOverwrite(configSections, c.configGeneratorGeneric.GetSectionFromFiles(chi.SectionHost, true, options.GetHost()))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(configSections, c.pathsGetter.GetHostConfigFiles())

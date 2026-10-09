@@ -55,6 +55,8 @@ type SecretProjection struct {
 // CreateConfigVolume returns the ConfigMap volume, or a projected volume that
 // also contains Secret keys, when files is non-empty. Projected (not subPath)
 // so the kubelet refreshes Secret contents without recreating the pod.
+// Items lists only the referenced keys. An empty Items list would mount every
+// key in the Secret.
 func CreateConfigVolume(volumeName string, files []SecretProjection) core.Volume {
 	if len(files) == 0 {
 		return CreateVolumeForConfigMap(volumeName)

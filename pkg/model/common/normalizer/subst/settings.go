@@ -42,7 +42,6 @@ type req interface {
 	AppendAdditionalVolume(volume core.Volume)
 	AppendAdditionalVolumeMount(volumeMount core.VolumeMount)
 	AppendSecretConfigFile(file api.SecretConfigFile)
-	AppendRenderedSecretSetting(target, host, path, field, value string)
 }
 
 // substSettingsFieldWithDataFromDataSource substitute settings field with new setting built from the data source
@@ -115,43 +114,6 @@ func ApplySecretKeyRef(
 	return ReplaceSettingsFieldWithEnvRefToSecretField(req, settings, field, field, envVarNamePrefix)
 }
 
-// RenderFileMappedSetting reads a mappingType=file settings value and records it
-// for one rendered XML file. Settings that share a Secret and a top-level path
-// (kafka2/sasl_username and kafka2/sasl_password) land in the same file.
-// The source setting stays in place so generated settings XML skips it.
-func RenderFileMappedSetting(
-	req req,
-	settings settings,
-	field string,
-	target string,
-	host string,
-	crName string,
-	secretGet SecretGetter,
-) bool {
-	if secretGet == nil || !settings.Get(field).IsFileMapping() {
-		return false
-	}
-	setting := settings.Get(field)
-	secretAddress, err := setting.FetchDataSourceAddress(req.GetTargetNamespace())
-	if err != nil {
-		return false
-	}
-	value, err := FetchSecretFieldValue(secretAddress, secretGet)
-	if err != nil {
-		return false
-	}
-	section := field
-	if i := strings.IndexByte(field, '/'); i >= 0 {
-		section = field[:i]
-	}
-	path := secretSettingsFileName(secretAddress.Name, section, crName)
-	if path == "" {
-		return false
-	}
-	req.AppendRenderedSecretSetting(target, host, path, field, value)
-	return true
-}
-
 func mountSecretConfigFile(req req, settings settings, field, target, host string) bool {
 	setting := settings.Get(field)
 	secretAddress, err := setting.FetchDataSourceAddress(req.GetTargetNamespace())
@@ -175,17 +137,10 @@ func mountSecretConfigFile(req req, settings settings, field, target, host strin
 	return true
 }
 
-// secretConfigFileName is the file name inside users.d.
-// The secret key itself must already be a ClickHouse XML fragment.
+// secretConfigFileName is the file name inside users.d, config.d, or conf.d.
+// The secret key itself must already be a ClickHouse XML document.
 func secretConfigFileName(secret, key string) string {
 	return chopSecretFileName(secret + "-" + key)
-}
-
-// secretSettingsFileName is one rendered settings file for a Secret and a
-// top-level settings section on this CR. Example:
-// chop-secret-test-011-secret-kafka2-test-011-secrets.xml
-func secretSettingsFileName(secret, section, crName string) string {
-	return chopSecretFileName(secret + "-" + section + "-" + crName)
 }
 
 func chopSecretFileName(raw string) string {

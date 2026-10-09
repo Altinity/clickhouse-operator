@@ -19,7 +19,6 @@ import (
 	"errors"
 	"time"
 
-	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -96,16 +95,9 @@ func (c *Controller) newWorker() *worker {
 		c: c,
 		a: announcer,
 
-		normalizer: normalizer.New(func(namespace, name string) (*core.Secret, error) {
-			return c.kube.Secret().Get(context.TODO(), &core.Secret{
-				ObjectMeta: meta.ObjectMeta{
-					Namespace: namespace,
-					Name:      name,
-				},
-			})
-		}),
-		start: start,
-		task:  nil,
+		normalizer: normalizer.New(),
+		start:      start,
+		task:       nil,
 	}
 }
 

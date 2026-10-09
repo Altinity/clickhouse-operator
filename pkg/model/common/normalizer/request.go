@@ -92,10 +92,3 @@ func (c *Request[_]) AppendSecretConfigFile(file chi.SecretConfigFile) {
 	}
 	c.GetTarget().GetRuntime().GetAttributes().AppendSecretConfigFile(file)
 }
-
-func (c *Request[_]) AppendRenderedSecretSetting(target, host, path, field, value string) {
-	if c == nil {
-		return
-	}
-	c.GetTarget().GetRuntime().GetAttributes().AppendRenderedSecretSetting(target, host, path, field, value)
-}

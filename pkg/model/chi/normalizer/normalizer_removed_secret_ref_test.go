@@ -178,51 +178,47 @@ func TestValueFromSecretKeyRefFileMappingProjectsSettingsFile(t *testing.T) {
 	target.Namespace = "own-ns"
 	target.Spec.Reconcile = &chi.ChiReconcile{}
 
-	n := New(func(namespace, name string) (*core.Secret, error) {
-		return &core.Secret{
-			Data: map[string][]byte{
-				"sasl_username": []byte("file_user"),
-				"sasl_password": []byte("file_pass"),
-			},
-		}, nil
-	})
+	// nil getter: file mapping must not read the Secret. A read would panic.
+	n := New(nil)
 	n.req = NewRequest(nil)
 	n.req.SetTarget(target)
 
 	settings := chi.NewSettings()
-	settings.Set("kafka2/sasl_username", chi.NewSettingSource(&chi.SettingSource{
-		ValueFrom: &types.DataSource{
-			SecretKeyRef: &core.SecretKeySelector{
-				LocalObjectReference: core.LocalObjectReference{Name: "creds"},
-				Key:                  "sasl_username",
+	for _, key := range []string{"kafka2-username.xml", "kafka2-password.xml"} {
+		field := "kafka2/sasl_password"
+		if key == "kafka2-username.xml" {
+			field = "kafka2/sasl_username"
+		}
+		settings.Set(field, chi.NewSettingSource(&chi.SettingSource{
+			ValueFrom: &types.DataSource{
+				SecretKeyRef: &core.SecretKeySelector{
+					LocalObjectReference: core.LocalObjectReference{Name: "creds"},
+					Key:                  key,
+				},
+				MappingType: types.MappingTypeFile,
 			},
-			MappingType: types.MappingTypeFile,
-		},
-	}))
-	settings.Set("kafka2/sasl_password", chi.NewSettingSource(&chi.SettingSource{
-		ValueFrom: &types.DataSource{
-			SecretKeyRef: &core.SecretKeySelector{
-				LocalObjectReference: core.LocalObjectReference{Name: "creds"},
-				Key:                  "sasl_password",
-			},
-			MappingType: types.MappingTypeFile,
-		},
-	}))
+		}))
+	}
 
-	// Cluster scope only inherits. Installation settings are served from config.d.
+	// Cluster scope only inherits. Installation settings are projected into config.d.
 	n.normalizeConfigurationSettings(settings, &chi.Cluster{})
-	require.Empty(t, target.GetRuntime().GetAttributes().RenderedSecretConfig(chi.SecretConfigFileTargetCommon, ""))
+	require.Empty(t, target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetCommon, ""))
+	require.True(t, settings.Get("kafka2/sasl_username").IsFileMapping())
 	require.True(t, settings.Get("kafka2/sasl_password").IsFileMapping())
 
 	n.normalizeConfigurationSettings(settings, target)
-	rendered := target.GetRuntime().GetAttributes().RenderedSecretConfig(chi.SecretConfigFileTargetCommon, "")
-	require.Len(t, rendered, 1)
-	xml, ok := rendered["chop-secret-creds-kafka2-test-chi.xml"]
-	require.True(t, ok, rendered)
-	require.Contains(t, xml, "<sasl_username>file_user</sasl_username>")
-	require.Contains(t, xml, "<sasl_password>file_pass</sasl_password>")
-	require.Empty(t, target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetCommon, ""))
-	require.Empty(t, target.GetRuntime().GetAttributes().RenderedSecretConfig(chi.SecretConfigFileTargetHost, "chi-0-0"))
+	files := target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetCommon, "")
+	require.Len(t, files, 2)
+	keys := map[string]string{}
+	for _, file := range files {
+		require.Equal(t, "creds", file.Secret)
+		keys[file.Key] = file.Path
+	}
+	require.Equal(t, map[string]string{
+		"kafka2-username.xml": "chop-secret-creds-kafka2-username-xml.xml",
+		"kafka2-password.xml": "chop-secret-creds-kafka2-password-xml.xml",
+	}, keys)
+	require.Empty(t, target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetHost, "chi-0-0"))
 
 	generated := settings.ClickHouseConfig("")
 	require.NotContains(t, generated, "from_env")

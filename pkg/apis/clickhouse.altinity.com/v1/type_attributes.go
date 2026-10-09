@@ -20,7 +20,7 @@ const (
 	// SecretConfigFileTargetUsers projects the Secret key into users.d.
 	SecretConfigFileTargetUsers = "users"
 	// SecretConfigFileTargetCommon projects the Secret key into config.d.
-	// spec.configuration.settings are rendered there.
+	// spec.configuration.settings are projected there.
 	SecretConfigFileTargetCommon = "common"
 	// SecretConfigFileTargetHost projects the Secret key into that host's conf.d.
 	SecretConfigFileTargetHost = "host"
@@ -38,21 +38,11 @@ type SecretConfigFile struct {
 
 // ComparableAttributes specifies CHI attributes that are comparable
 type ComparableAttributes struct {
-	additionalEnvVars      []core.EnvVar            `json:"-" yaml:"-"`
-	additionalVolumes      []core.Volume            `json:"-" yaml:"-"`
-	additionalVolumeMounts []core.VolumeMount       `json:"-" yaml:"-"`
-	secretConfigFiles      []SecretConfigFile       `json:"-" yaml:"-"`
-	renderedSecretSettings []renderedSecretSettings `json:"-" yaml:"-"`
-	skipOwnerRef           bool                     `json:"-" yaml:"-"`
-}
-
-// renderedSecretSettings is one XML file built from file-mapped settings that
-// share a Secret and a top-level section.
-type renderedSecretSettings struct {
-	target   string
-	host     string
-	path     string
-	settings *Settings
+	additionalEnvVars      []core.EnvVar      `json:"-" yaml:"-"`
+	additionalVolumes      []core.Volume      `json:"-" yaml:"-"`
+	additionalVolumeMounts []core.VolumeMount `json:"-" yaml:"-"`
+	secretConfigFiles      []SecretConfigFile `json:"-" yaml:"-"`
+	skipOwnerRef           bool               `json:"-" yaml:"-"`
 }
 
 func (a *ComparableAttributes) GetAdditionalEnvVars() []core.EnvVar {
@@ -190,54 +180,6 @@ func (a *ComparableAttributes) AppendSecretConfigFile(file SecretConfigFile) {
 		}
 	}
 	a.secretConfigFiles = append(a.secretConfigFiles, file)
-}
-
-// AppendRenderedSecretSetting records one file-mapped setting value.
-// Settings that share target, host, and path are rendered as one XML file.
-func (a *ComparableAttributes) AppendRenderedSecretSetting(target, host, path, field, value string) {
-	if a == nil || path == "" || field == "" {
-		return
-	}
-	for _, group := range a.renderedSecretSettings {
-		if group.target == target && group.host == host && group.path == path {
-			group.settings.Set(field, NewSettingScalar(value))
-			return
-		}
-	}
-	settings := NewSettings()
-	settings.Set(field, NewSettingScalar(value))
-	a.renderedSecretSettings = append(a.renderedSecretSettings, renderedSecretSettings{
-		target:   target,
-		host:     host,
-		path:     path,
-		settings: settings,
-	})
-}
-
-// RenderedSecretConfig returns filename to XML for one config directory.
-// host is ignored unless target is SecretConfigFileTargetHost.
-func (a *ComparableAttributes) RenderedSecretConfig(target, host string) map[string]string {
-	if a == nil {
-		return nil
-	}
-	out := map[string]string{}
-	for _, group := range a.renderedSecretSettings {
-		if group.target != target {
-			continue
-		}
-		if target == SecretConfigFileTargetHost && group.host != host {
-			continue
-		}
-		xml := group.settings.ClickHouseConfig()
-		if xml == "" {
-			continue
-		}
-		out[group.path] = xml
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }
 
 func (a *ComparableAttributes) GetSkipOwnerRef() bool {
