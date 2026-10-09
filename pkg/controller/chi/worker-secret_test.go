@@ -21,24 +21,18 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 func TestShouldDeleteUnreferencedSecret(t *testing.T) {
 	const (
 		name = "chi-demo-users"
-		kind = "ClickHouseInstallation"
 		uid  = types.UID("chi-uid")
 	)
-	owned := &core.Secret{
-		ObjectMeta: meta.ObjectMeta{
-			Name: name,
-			OwnerReferences: []meta.OwnerReference{{
-				Kind: kind,
-				Name: "demo",
-				UID:  uid,
-			}},
-		},
-	}
+	owned := controlledSecret(name, "demo", uid)
+	owner := chiOwner("demo", uid)
+
 	projected := &core.Pod{
 		Spec: core.PodSpec{
 			Volumes: []core.Volume{{
@@ -65,10 +59,37 @@ func TestShouldDeleteUnreferencedSecret(t *testing.T) {
 		},
 	}
 
-	require.False(t, shouldDeleteUnreferencedSecret(owned, "demo", uid, kind, []*core.Pod{projected}))
-	require.True(t, shouldDeleteUnreferencedSecret(owned, "demo", uid, kind, []*core.Pod{other}))
-	require.True(t, shouldDeleteUnreferencedSecret(owned, "demo", uid, kind, nil))
-	require.False(t, shouldDeleteUnreferencedSecret(owned, "demo", "", kind, nil))
-	require.False(t, shouldDeleteUnreferencedSecret(owned, "other-chi", uid, kind, nil))
-	require.False(t, shouldDeleteUnreferencedSecret(&core.Secret{ObjectMeta: meta.ObjectMeta{Name: name}}, "demo", uid, kind, nil))
+	require.False(t, shouldDeleteUnreferencedSecret(owned, owner, []*core.Pod{projected}))
+	require.True(t, shouldDeleteUnreferencedSecret(owned, owner, []*core.Pod{other}))
+	require.True(t, shouldDeleteUnreferencedSecret(owned, owner, nil))
+	require.False(t, shouldDeleteUnreferencedSecret(owned, chiOwner("demo", ""), nil))
+	require.False(t, shouldDeleteUnreferencedSecret(owned, chiOwner("other-chi", types.UID("other-uid")), nil))
+	require.True(t, shouldDeleteUnreferencedSecret(owned, chiOwner("renamed", uid), nil))
+	require.False(t, shouldDeleteUnreferencedSecret(&core.Secret{ObjectMeta: meta.ObjectMeta{Name: name}}, owner, nil))
+
+	notController := controlledSecret(name, "demo", uid)
+	notController.OwnerReferences[0].Controller = nil
+	require.False(t, shouldDeleteUnreferencedSecret(notController, owner, nil))
+}
+
+func controlledSecret(name, ownerName string, uid types.UID) *core.Secret {
+	controller := true
+	return &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Name: name,
+			OwnerReferences: []meta.OwnerReference{{
+				Kind:       "ClickHouseInstallation",
+				Name:       ownerName,
+				UID:        uid,
+				Controller: &controller,
+			}},
+		},
+	}
+}
+
+func chiOwner(name string, uid types.UID) *api.ClickHouseInstallation {
+	cr := &api.ClickHouseInstallation{}
+	cr.Name = name
+	cr.UID = uid
+	return cr
 }

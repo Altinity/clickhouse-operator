@@ -132,9 +132,10 @@ func TestHotReloadKeepsProvidedSHA256(t *testing.T) {
 func TestHotReloadMissingSecretDoesNotApplyDefaultPassword(t *testing.T) {
 	target := &chi.ClickHouseInstallation{}
 	target.Namespace = "own-ns"
-	n := New(func(namespace, name string) (*core.Secret, error) {
+	getter := func(namespace, name string) (*core.Secret, error) {
 		return nil, errNotFound
-	})
+	}
+	n := New(getter)
 	n.req = NewRequest(nil)
 	n.req.SetTarget(target)
 
@@ -143,10 +144,15 @@ func TestHotReloadMissingSecretDoesNotApplyDefaultPassword(t *testing.T) {
 	user := chi.NewSettingsUser(settings, "alice")
 	n.normalizeConfigurationUser(user)
 
-	require.Equal(t, chi.StatusAborted, target.EnsureStatus().GetStatus())
-	require.Contains(t, strings.Join(target.EnsureStatus().GetErrors(), " "), chi.StatusReasonHotReloadSecretUnresolved)
-	require.False(t, user.Has("password_sha256_hex"), "a failed read must not fall back to the default password")
-	require.False(t, target.GetRuntime().GetAttributes().GetHotReloadUsers())
+	require.NotEqual(t, chi.StatusAborted, target.EnsureStatus().GetStatus())
+	require.True(t, target.GetRuntime().GetAttributes().GetHotReloadUsers())
+	require.True(t, user.Get("password").IsHotReload(), "normalization keeps the Secret reference")
+	require.False(t, user.Has("password_sha256_hex"), "a missing Secret must not fall back to the default password")
+
+	xml, err := RenderHotReloadUsersXML(settings, "own-ns", getter)
+	require.ErrorIs(t, err, ErrHotReloadSecretUnresolved)
+	require.Empty(t, xml)
+	require.True(t, settings.Get("alice/password").IsHotReload(), "a failed render must not rewrite the CHI")
 }
 
 func TestHotReloadRejectedOnUnsupportedUserField(t *testing.T) {
@@ -262,11 +268,14 @@ func TestHotReloadMissingSecretThenSucceedsOnTheSameNormalizer(t *testing.T) {
 
 	first, err := n.CreateTemplated(cr, opts)
 	require.NoError(t, err)
-	require.Equal(t, chi.StatusAborted, first.EnsureStatus().GetStatus())
-	errs := first.EnsureStatus().GetErrors()
-	require.Len(t, errs, 1, "a pass reports the first unresolved Secret and skips the rest")
-	require.Contains(t, errs[0], chi.StatusReasonHotReloadSecretUnresolved)
-	require.False(t, first.GetRuntime().GetAttributes().GetHotReloadUsers())
+	require.NotEqual(t, chi.StatusAborted, first.EnsureStatus().GetStatus())
+	require.True(t, first.GetRuntime().GetAttributes().GetHotReloadUsers())
+	users := first.GetSpecT().GetConfiguration().GetUsers()
+	xml, err := RenderHotReloadUsersXML(users, cr.Namespace, n.secretGet)
+	require.ErrorIs(t, err, ErrHotReloadSecretUnresolved)
+	require.Empty(t, xml)
+	require.True(t, users.Get("alice/password").IsHotReload())
+	require.True(t, users.Get("bob/password").IsHotReload())
 
 	available = true
 	second, err := n.CreateTemplated(cr, opts)
@@ -275,6 +284,10 @@ func TestHotReloadMissingSecretThenSucceedsOnTheSameNormalizer(t *testing.T) {
 	require.True(t, second.GetRuntime().GetAttributes().GetHotReloadUsers())
 	require.True(t, second.GetSpecT().GetConfiguration().GetUsers().Get("alice/password").IsHotReload())
 	require.True(t, second.GetSpecT().GetConfiguration().GetUsers().Get("bob/password").IsHotReload())
+	xml, err = RenderHotReloadUsersXML(second.GetSpecT().GetConfiguration().GetUsers(), cr.Namespace, n.secretGet)
+	require.NoError(t, err)
+	require.Contains(t, xml, "<alice>")
+	require.Contains(t, xml, "<bob>")
 }
 
 func TestHotReloadRejectedOnProfilesAndQuotas(t *testing.T) {
@@ -311,14 +324,13 @@ func TestHotReloadRejectsMalformedPasswordHash(t *testing.T) {
 		user := chi.NewSettingsUser(settings, "bob")
 		n.normalizeConfigurationUser(user)
 
-		require.Equal(t, chi.StatusAborted, target.EnsureStatus().GetStatus(), tc.field)
-		require.Contains(t, strings.Join(target.EnsureStatus().GetErrors(), " "), "not a valid password hash")
-		require.True(t, user.Get(tc.field).IsHotReload(), "a rejected hash must stay a Secret reference")
+		require.NotEqual(t, chi.StatusAborted, target.EnsureStatus().GetStatus(), tc.field)
+		require.True(t, target.GetRuntime().GetAttributes().GetHotReloadUsers(), tc.field)
+		require.True(t, user.Get(tc.field).IsHotReload(), "normalization keeps the Secret reference")
 		require.NotEqual(t, tc.value, user.Get(tc.field).String())
-		require.False(t, target.GetRuntime().GetAttributes().GetHotReloadUsers())
 
 		xml, err := RenderHotReloadUsersXML(settings, "own-ns", secretGetter(map[string]string{"credential": tc.value}))
-		require.Error(t, err)
+		require.ErrorIs(t, err, ErrHotReloadCredentialRejected)
 		require.Empty(t, xml)
 		require.True(t, settings.Get("bob/"+tc.field).IsHotReload(), "a failed render must not rewrite the CHI")
 	}

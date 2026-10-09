@@ -97,6 +97,10 @@ func TestPasswordSecretChangeReconcilesWithoutRestart(t *testing.T) {
 	secretCtx := context.WithValue(context.Background(), passwordSecretReconcileKey{}, true)
 	require.False(t, w.shouldForceRestartHost(secretCtx, host))
 	require.True(t, w.shouldForceRestartHost(context.Background(), host))
+
+	current := host.GetCR().(*api.ClickHouseInstallation)
+	current.EnsureRuntime().ActionPlan = api.MakeActionPlan(current.GetAncestorT(), current)
+	require.True(t, w.shouldForceRestartHost(secretCtx, host))
 }
 
 func rollingUpdateHostWithAncestor() *api.Host {
