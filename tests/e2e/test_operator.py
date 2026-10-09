@@ -871,6 +871,19 @@ def test_010011_6(self):
             retry_sleep(attempt, 3, f"{user} password is not active on every replica yet")
         assert False, error(f"{user} did not accept the password")
 
+    def wait_rejected(user, pwd):
+        last = []
+        for attempt in range(1, 25):
+            pods = kubectl.get_pod_names(chi)
+            outs = [
+                clickhouse.query_with_error(chi, "select 'OK'", user=user, pwd=pwd, pod=pod)
+                for pod in pods
+            ]
+            if pods and outs and all("OK" not in out for out in outs):
+                return
+            retry_sleep(attempt, 3, f"{user} previous password is still accepted on a replica")
+        assert False, error(f"{user} previous password was not rejected on every replica: {last}")
+
     with Given("test-011-hot-reload.yaml"):
         kubectl.apply(util.get_full_path("manifests/secret/test-011-hot-reload-secret.yaml"))
         kubectl.create_and_check(
@@ -899,6 +912,9 @@ def test_010011_6(self):
         kubectl.apply(util.get_full_path("manifests/secret/test-011-hot-reload-secret-2.yaml"))
         wait_login("alice", "secret-value-2")
         wait_login("bob", "bob-secret-2")
+        # Both replicas must reject the password from before this rotation.
+        wait_rejected("alice", "secret-value-1")
+        wait_rejected("bob", "bob-secret")
         # carol has no hotReload, so the Pod keeps the env value from start.
         wait_login("carol", "carol-secret-1")
         assert started_at() == started, error("Pods were restarted")

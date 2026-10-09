@@ -42,12 +42,10 @@ func hotReloadPassword(name, key string) *chi.Setting {
 				LocalObjectReference: core.LocalObjectReference{Name: name},
 				Key:                  key,
 			},
-			HotReload: boolPtr(true),
+			HotReload: true,
 		},
 	})
 }
-
-func boolPtr(v bool) *bool { return &v }
 
 func secretGetter(values map[string]string) func(namespace, name string) (*core.Secret, error) {
 	return func(namespace, name string) (*core.Secret, error) {

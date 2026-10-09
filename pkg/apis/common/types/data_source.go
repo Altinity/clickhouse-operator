@@ -24,15 +24,15 @@ type DataSource struct {
 	// The key is the credential value itself, never a configuration document.
 	SecretKeyRef *core.SecretKeySelector `json:"secretKeyRef,omitempty" yaml:"secretKeyRef,omitempty"`
 	// HotReload applies a Secret-backed user password without restarting ClickHouse.
-	// Omitted or false keeps the environment-variable mapping. Supported only on
+	// Omitted and false both keep the environment-variable mapping. Supported only on
 	// user password, password_sha256_hex, and password_double_sha1_hex.
-	HotReload *bool `json:"hotReload,omitempty" yaml:"hotReload,omitempty"`
+	HotReload bool `json:"hotReload,omitempty" yaml:"hotReload,omitempty"`
 }
 
 // IsHotReload reports whether the caller asked for password changes to apply
 // without restarting ClickHouse.
 func (in *DataSource) IsHotReload() bool {
-	return in != nil && in.HotReload != nil && *in.HotReload
+	return in != nil && in.HotReload
 }
 
 func (in *DataSource) DeepCopy() *DataSource {
@@ -50,9 +50,5 @@ func (in *DataSource) DeepCopyInto(out *DataSource) {
 		in, out := &in.SecretKeyRef, &out.SecretKeyRef
 		*out = new(core.SecretKeySelector)
 		(*in).DeepCopyInto(*out)
-	}
-	if in.HotReload != nil {
-		v := *in.HotReload
-		out.HotReload = &v
 	}
 }
