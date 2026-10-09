@@ -380,8 +380,9 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 	cr.GetRuntime().UnlockCommonConfig()
 
 	// CR users ConfigMap - common for all hosts.
-	// A hotReload failure returns before either object is written, so the last
-	// valid users configuration stays mounted.
+	// The managed users Secret is regenerated here when hotReload is on. A failed
+	// render returns before either object is written, so the last valid users
+	// configuration stays mounted.
 	if err := w.reconcileConfigMapCommonUsers(ctx, cr); err != nil {
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
 		return err
@@ -465,6 +466,18 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 
 	w.includeAllHostsIntoCluster(ctx, cr)
 	w.restartNewlyAddedHosts(ctx, cr)
+
+	// Host rollout has finished, so a Secret that hotReload no longer uses can
+	// be removed once the new Pods have dropped the projected volume. The
+	// preliminary pass keeps it while the previous Pods still mount it.
+	if !cr.GetRuntime().GetAttributes().GetHotReloadUsers() {
+		if delErr := w.deleteObsoleteHotReloadUsersSecret(ctx, cr); delErr != nil {
+			w.a.F().Error("failed to delete obsolete hot-reload users Secret. err: %v", delErr)
+			if err == nil {
+				err = delErr
+			}
+		}
+	}
 	return err
 }
 
@@ -613,10 +626,8 @@ func (w *worker) reconcileConfigMapCommon(
 // reconcileConfigMapCommonUsers reconciles all CHI's users ConfigMap
 // ConfigMap common for all users resources in CHI
 func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, cr api.ICustomResource) error {
-	chi, ok := cr.(*api.ClickHouseInstallation)
-	if ok && chi.GetRuntime().GetAttributes().GetHotReloadUsers() {
-		// Read and publish the Secret before touching the ConfigMap. A failed
-		// read returns here and leaves the previous users file in place.
+	if chi, ok := cr.(*api.ClickHouseInstallation); ok {
+		// Render failure returns here and leaves the previous Secret and ConfigMap in place.
 		if err := w.reconcileHotReloadUsersSecret(ctx, chi); err != nil {
 			return err
 		}

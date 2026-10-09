@@ -21,9 +21,11 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 )
@@ -74,10 +76,14 @@ func (w *worker) createSecret(ctx context.Context, cr api.ICustomResource, secre
 }
 
 // reconcileHotReloadUsersSecret regenerates chop-generated-hot-reload-users.xml
-// from the referenced Secret keys and writes it to the CHI-owned Secret. Normal
-// users stay in the users ConfigMap. The CHI spec is not modified. A read
-// failure returns before any write.
+// and updates the CHI-owned Secret only when that document changed. A render
+// failure returns before any write, so the last valid Secret stays mounted.
+// Deletion of an obsolete Secret happens after the rollout, in
+// deleteObsoleteHotReloadUsersSecret.
 func (w *worker) reconcileHotReloadUsersSecret(ctx context.Context, cr *api.ClickHouseInstallation) error {
+	if !cr.GetRuntime().GetAttributes().GetHotReloadUsers() {
+		return nil
+	}
 	usersXML, err := normalizer.RenderHotReloadUsersXML(
 		cr.GetSpecT().GetConfiguration().GetUsers(),
 		cr.GetNamespace(),
@@ -93,6 +99,8 @@ func (w *worker) reconcileHotReloadUsersSecret(ctx context.Context, cr *api.Clic
 			WithError(cr).
 			M(cr).F().
 			Error("FAILED to render hot-reload users configuration: %s", err)
+		// The managed Secret is left as it was. A failed render must not replace
+		// the last document the Pods are still loading.
 		return err
 	}
 	secret := w.task.Creator().CreateHotReloadUsersSecret(config.ChopGeneratedHotReloadUsersConfigFilename(), usersXML)
@@ -139,4 +147,123 @@ func (w *worker) reconcileHotReloadSecretData(ctx context.Context, cr api.ICusto
 		Info("Update Secret %s/%s", desired.Namespace, desired.Name)
 	w.task.RegistryReconciled().RegisterSecret(updated.GetObjectMeta())
 	return nil
+}
+
+// deleteObsoleteHotReloadUsersSecret removes chi-<chi>-users after hotReload
+// has been turned off. A Pod that still projects the Secret keeps it, and a
+// Secret this CHI does not own is left alone.
+func (w *worker) deleteObsoleteHotReloadUsersSecret(ctx context.Context, cr *api.ClickHouseInstallation) error {
+	name := w.c.namer.Name(interfaces.NameSecretCommonUsers, cr)
+	cur, err := w.c.getSecret(ctx, &core.Secret{
+		ObjectMeta: meta.ObjectMeta{Namespace: cr.GetNamespace(), Name: name},
+	})
+	if apiErrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	pods, err := w.podsOfCR(ctx, cr)
+	if err != nil {
+		w.a.V(1).M(cr).F().Warning("Leave Secret %s/%s in place: unable to list Pods that may still mount it: %v", cur.Namespace, cur.Name, err)
+		return nil
+	}
+	if !shouldDeleteUnreferencedSecret(cur, cr.GetName(), cr.GetUID(), api.ClickHouseInstallationCRDResourceKind, pods) {
+		w.a.V(1).M(cr).F().Info("Leave Secret %s/%s in place until no Pod mounts it and this CHI owns it", cur.Namespace, cur.Name)
+		return nil
+	}
+	err = w.c.kube.Secret().Delete(ctx, cur.Namespace, cur.Name)
+	if apiErrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		w.a.WithEvent(cr, a.EventActionDelete, a.EventReasonDeleteFailed).
+			WithAction(cr).
+			WithError(cr).
+			M(cr).F().
+			Error("Delete Secret %s/%s failed with error %v", cur.Namespace, cur.Name, err)
+		return err
+	}
+	w.a.V(1).
+		WithEvent(cr, a.EventActionDelete, a.EventReasonDeleteCompleted).
+		WithAction(cr).
+		M(cr).F().
+		Info("Delete Secret %s/%s", cur.Namespace, cur.Name)
+	return nil
+}
+
+// podsOfCR reads every host Pod. A missing Pod is skipped. Any other Get error
+// is returned so the caller does not treat an unknown Pod as "not mounting".
+func (w *worker) podsOfCR(ctx context.Context, cr *api.ClickHouseInstallation) ([]*core.Pod, error) {
+	var pods []*core.Pod
+	var failed error
+	cr.WalkHosts(func(host *api.Host) error {
+		if failed != nil {
+			return nil
+		}
+		pod, err := w.c.kube.Pod().Get(ctx, host)
+		if apiErrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			failed = err
+			return nil
+		}
+		pods = append(pods, pod)
+		return nil
+	})
+	return pods, failed
+}
+
+// shouldDeleteUnreferencedSecret reports whether secret may be removed.
+// This CHI must own it, and none of pods may still mount it.
+func shouldDeleteUnreferencedSecret(secret *core.Secret, ownerName string, ownerUID types.UID, ownerKind string, pods []*core.Pod) bool {
+	if secret == nil || secret.Name == "" || !secretOwnedBy(secret, ownerName, ownerUID, ownerKind) {
+		return false
+	}
+	for _, pod := range pods {
+		if podReferencesSecret(pod, secret.Name) {
+			return false
+		}
+	}
+	return true
+}
+
+// podReferencesSecret reports whether pod mounts secretName, either as a Secret
+// volume or as a projected Secret source.
+func podReferencesSecret(pod *core.Pod, secretName string) bool {
+	if pod == nil || secretName == "" {
+		return false
+	}
+	for i := range pod.Spec.Volumes {
+		vol := &pod.Spec.Volumes[i]
+		if vol.Secret != nil && vol.Secret.SecretName == secretName {
+			return true
+		}
+		if vol.Projected == nil {
+			continue
+		}
+		for j := range vol.Projected.Sources {
+			src := &vol.Projected.Sources[j]
+			if src.Secret != nil && src.Secret.Name == secretName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// secretOwnedBy reports whether secret has an owner reference for this object.
+// An empty UID does not match, so an unpopulated owner cannot authorize a delete.
+func secretOwnedBy(secret *core.Secret, ownerName string, ownerUID types.UID, ownerKind string) bool {
+	if secret == nil || ownerName == "" || ownerUID == "" || ownerKind == "" {
+		return false
+	}
+	for i := range secret.OwnerReferences {
+		ref := &secret.OwnerReferences[i]
+		if ref.UID == ownerUID && ref.Name == ownerName && ref.Kind == ownerKind {
+			return true
+		}
+	}
+	return false
 }

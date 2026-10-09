@@ -224,14 +224,22 @@ Secret. Users that do not set `hotReload` stay in `chop-generated-users.xml` in 
 Both files are projected into `users.d` on the ClickHouse container, without `subPath`, so a later
 Secret change is refreshed by kubelet and reloaded by ClickHouse without a Pod restart.
 
-The operator is trusted to read those password keys and to write the derived Secret. The derived
-Secret contains password hashes, is owned by the CHI, and is not copied into a ConfigMap. A
-missing or empty key aborts the reconcile and leaves the last written users configuration in
-place; the account is not given the default password. `hotReload` on any other field, including
-ClickHouse settings and Keeper, is rejected.
+Every CHI reconciliation regenerates that document. The Secret object is updated only when the
+document changed. A missing, empty, or malformed hash leaves the last written Secret in place and
+aborts the reconcile; the account is not given the default password. `password_sha256_hex` must be
+64 hex characters and `password_double_sha1_hex` must be 40 hex characters. `hotReload` on any
+other field, including profiles, quotas, ClickHouse settings, and Keeper, is rejected.
 
+Automatic Secret-change detection watches references declared directly on the CHI. A reference that
+is inherited only from a ClickHouseInstallationTemplate is not watched and needs a manual
+reconciliation of the CHI.
+
+Turning `hotReload` off deletes the CHI-owned Secret after every Pod has stopped mounting it.
 Enabling `hotReload` the first time changes the Pod template to install the projected volume, so
 that step rolls the Pods once. Later password rotations do not.
+
+The operator is trusted to read those password keys and to write the derived Secret. The derived
+Secret contains password hashes, is owned by the CHI, and is not copied into a ConfigMap.
 
 ### Securing the 'default' user
 

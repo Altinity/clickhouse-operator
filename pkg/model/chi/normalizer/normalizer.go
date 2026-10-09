@@ -47,12 +47,11 @@ import (
 
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	secretGet         subst.SecretGetter
-	req               *Request
-	namer             interfaces.INameManager
-	macro             interfaces.IMacro
-	labeler           interfaces.ILabeler
-	hotReloadReported bool
+	secretGet subst.SecretGetter
+	req       *Request
+	namer     interfaces.INameManager
+	macro     interfaces.IMacro
+	labeler   interfaces.ILabeler
 }
 
 // New creates new normalizer
@@ -851,6 +850,7 @@ func (n *Normalizer) normalizeConfigurationProfiles(profiles *chi.Settings, scop
 		return nil
 	}
 	profiles.Normalize(n.settingsNormalizerOptions(replacerProfiles, scope))
+	n.rejectHotReloadInSettings(profiles)
 	return profiles
 }
 
@@ -860,6 +860,7 @@ func (n *Normalizer) normalizeConfigurationQuotas(quotas *chi.Settings, scope an
 		return nil
 	}
 	quotas.Normalize(n.settingsNormalizerOptions(replacerQuotas, scope))
+	n.rejectHotReloadInSettings(quotas)
 	return quotas
 }
 
@@ -874,7 +875,7 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings, scop
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
 		if setting.IsHotReload() {
-			n.rejectHotReload(name)
+			n.rejectUnsupportedHotReload(name)
 			return
 		}
 		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings)
@@ -891,7 +892,7 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings, scope any)
 
 	files.WalkSafe(func(key string, setting *chi.Setting) {
 		if setting.IsHotReload() {
-			n.rejectHotReload(key)
+			n.rejectUnsupportedHotReload(key)
 			return
 		}
 		subst.ReplaceSettingsFieldWithMountedFile(n.req, files, key)
