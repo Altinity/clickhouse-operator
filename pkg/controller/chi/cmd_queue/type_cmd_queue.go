@@ -24,9 +24,10 @@ import (
 )
 
 const (
-	ReconcileAdd    = "add"
-	ReconcileUpdate = "update"
-	ReconcileDelete = "delete"
+	ReconcileAdd            = "add"
+	ReconcileUpdate         = "update"
+	ReconcileDelete         = "delete"
+	ReconcilePasswordSecret = "password-secret"
 )
 
 // PriorityQueueItem specifies item of the priority queue

@@ -18,9 +18,15 @@ import (
 	"context"
 
 	core "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 )
 
 // reconcileSecret reconciles core.Secret
@@ -66,4 +72,195 @@ func (w *worker) createSecret(ctx context.Context, cr api.ICustomResource, secre
 	}
 
 	return err
+}
+
+// reconcileHotReloadUsersSecret regenerates chop-generated-hot-reload-users.xml
+// and updates the CHI-owned Secret only when that document changed. A render
+// failure returns before any write, so the last valid Secret stays mounted.
+// Deletion of an obsolete Secret happens after the rollout, in
+// deleteObsoleteHotReloadUsersSecret.
+func (w *worker) reconcileHotReloadUsersSecret(ctx context.Context, cr *api.ClickHouseInstallation) error {
+	if !cr.GetRuntime().GetAttributes().GetHotReloadUsers() {
+		return nil
+	}
+	usersXML, err := normalizer.RenderHotReloadUsersXML(
+		cr.GetSpecT().GetConfiguration().GetUsers(),
+		cr.GetNamespace(),
+		func(namespace, name string) (*core.Secret, error) {
+			return w.c.kube.Secret().Get(ctx, &core.Secret{
+				ObjectMeta: meta.ObjectMeta{Namespace: namespace, Name: name},
+			})
+		},
+	)
+	if err != nil {
+		w.a.WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(cr).
+			WithError(cr).
+			M(cr).F().
+			Error("FAILED to render hot-reload users configuration: %s", err)
+		// The managed Secret is left as it was. A failed render must not replace
+		// the last document the Pods are still loading.
+		return err
+	}
+	secret := w.task.Creator().CreateHotReloadUsersSecret(config.ChopGeneratedHotReloadUsersConfigFilename(), usersXML)
+	return w.reconcileHotReloadSecretData(ctx, cr, secret)
+}
+
+// reconcileHotReloadSecretData creates the managed Secret, or updates it when
+// its data changed. An unchanged Secret is left alone so a resync does not
+// write and re-enqueue itself.
+func (w *worker) reconcileHotReloadSecretData(ctx context.Context, cr api.ICustomResource, desired *core.Secret) error {
+	cur, err := w.c.getSecret(ctx, desired)
+	if apiErrors.IsNotFound(err) {
+		err = w.createSecret(ctx, cr, desired)
+		if err == nil {
+			w.task.RegistryReconciled().RegisterSecret(desired.GetObjectMeta())
+		} else {
+			w.task.RegistryFailed().RegisterSecret(desired.GetObjectMeta())
+		}
+		return err
+	}
+	if err != nil {
+		w.task.RegistryFailed().RegisterSecret(desired.GetObjectMeta())
+		return err
+	}
+	if apiequality.Semantic.DeepEqual(cur.Data, desired.Data) {
+		w.task.RegistryReconciled().RegisterSecret(cur.GetObjectMeta())
+		return nil
+	}
+	cur.Data = desired.Data
+	updated, err := w.c.kube.Secret().Update(ctx, cur)
+	if err != nil {
+		w.a.WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateFailed).
+			WithAction(cr).
+			WithError(cr).
+			M(cr).F().
+			Error("Update Secret %s/%s failed with error %v", desired.Namespace, desired.Name, err)
+		w.task.RegistryFailed().RegisterSecret(desired.GetObjectMeta())
+		return err
+	}
+	w.a.V(1).
+		WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateCompleted).
+		WithAction(cr).
+		M(cr).F().
+		Info("Update Secret %s/%s", desired.Namespace, desired.Name)
+	w.task.RegistryReconciled().RegisterSecret(updated.GetObjectMeta())
+	return nil
+}
+
+// deleteObsoleteHotReloadUsersSecret removes chi-<chi>-users after hotReload
+// has been turned off. A Pod that still projects the Secret keeps it, and a
+// Secret this CHI does not own is left alone.
+func (w *worker) deleteObsoleteHotReloadUsersSecret(ctx context.Context, cr *api.ClickHouseInstallation) error {
+	name := w.c.namer.Name(interfaces.NameSecretCommonUsers, cr)
+	cur, err := w.c.getSecret(ctx, &core.Secret{
+		ObjectMeta: meta.ObjectMeta{Namespace: cr.GetNamespace(), Name: name},
+	})
+	if apiErrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	pods, err := w.podsOfCR(ctx, cr)
+	if err != nil {
+		w.a.V(1).M(cr).F().Warning("Leave Secret %s/%s in place: unable to list Pods that may still mount it: %v", cur.Namespace, cur.Name, err)
+		return nil
+	}
+	if !shouldDeleteUnreferencedSecret(cur, cr, pods) {
+		w.a.V(1).M(cr).F().Info("Leave Secret %s/%s in place until no Pod mounts it and this CHI owns it", cur.Namespace, cur.Name)
+		return nil
+	}
+	err = w.c.kube.Secret().Delete(ctx, cur.Namespace, cur.Name)
+	if apiErrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		w.a.WithEvent(cr, a.EventActionDelete, a.EventReasonDeleteFailed).
+			WithAction(cr).
+			WithError(cr).
+			M(cr).F().
+			Error("Delete Secret %s/%s failed with error %v", cur.Namespace, cur.Name, err)
+		return err
+	}
+	w.a.V(1).
+		WithEvent(cr, a.EventActionDelete, a.EventReasonDeleteCompleted).
+		WithAction(cr).
+		M(cr).F().
+		Info("Delete Secret %s/%s", cur.Namespace, cur.Name)
+	return nil
+}
+
+// podsOfCR reads host Pods for the desired CHI and for its ancestor. Hosts removed
+// in this reconcile exist only on the ancestor, and their Pods may still mount the
+// generated Secret. A missing Pod is skipped. Any other Get error is returned so
+// the caller does not treat an unknown Pod as "not mounting".
+func (w *worker) podsOfCR(ctx context.Context, cr *api.ClickHouseInstallation) ([]*core.Pod, error) {
+	var pods []*core.Pod
+	var failed error
+	seen := map[string]struct{}{}
+	collect := func(host *api.Host) error {
+		if failed != nil {
+			return nil
+		}
+		pod, err := w.c.kube.Pod().Get(ctx, host)
+		if apiErrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			failed = err
+			return nil
+		}
+		key := pod.Namespace + "/" + pod.Name
+		if _, ok := seen[key]; ok {
+			return nil
+		}
+		seen[key] = struct{}{}
+		pods = append(pods, pod)
+		return nil
+	}
+	cr.WalkHosts(collect)
+	if ancestor := cr.GetAncestorT(); ancestor != nil && failed == nil {
+		ancestor.WalkHosts(collect)
+	}
+	return pods, failed
+}
+
+// shouldDeleteUnreferencedSecret reports whether secret may be removed.
+// This CHI must be its controller, and none of pods may still mount it.
+// An empty UID is not a match: IsControlledBy treats two empty UIDs as equal.
+func shouldDeleteUnreferencedSecret(secret *core.Secret, owner meta.Object, pods []*core.Pod) bool {
+	if secret == nil || secret.Name == "" || owner == nil || owner.GetUID() == "" || !meta.IsControlledBy(secret, owner) {
+		return false
+	}
+	for _, pod := range pods {
+		if podReferencesSecret(pod, secret.Name) {
+			return false
+		}
+	}
+	return true
+}
+
+// podReferencesSecret reports whether pod mounts secretName, either as a Secret
+// volume or as a projected Secret source.
+func podReferencesSecret(pod *core.Pod, secretName string) bool {
+	if pod == nil || secretName == "" {
+		return false
+	}
+	for i := range pod.Spec.Volumes {
+		vol := &pod.Spec.Volumes[i]
+		if vol.Secret != nil && vol.Secret.SecretName == secretName {
+			return true
+		}
+		if vol.Projected == nil {
+			continue
+		}
+		for j := range vol.Projected.Sources {
+			src := &vol.Projected.Sources[j]
+			if src.Secret != nil && src.Secret.Name == secretName {
+				return true
+			}
+		}
+	}
+	return false
 }

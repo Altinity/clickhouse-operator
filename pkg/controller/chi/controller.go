@@ -49,6 +49,7 @@ import (
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
+	chiListerV1 "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
@@ -83,6 +84,10 @@ type Controller struct {
 	namer       interfaces.INameManager
 	ctrlLabeler *ctrlLabeler.Labeler
 	pvcDeleter  *volume.PVCDeleter
+
+	// chiLister lists ClickHouseInstallations so a source Secret change can
+	// find the CHIs that reference it. Nil in tests that do not watch Secrets.
+	chiLister chiListerV1.ClickHouseInstallationLister
 }
 
 // NewController creates instance of Controller
@@ -729,7 +734,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		variants := len(c.queues) - api.DefaultReconcileSystemThreadsNumber
 		index = api.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(handle, variants)
 		switch command.Cmd {
-		case cmd_queue.ReconcileAdd:
+		case cmd_queue.ReconcileAdd, cmd_queue.ReconcilePasswordSecret:
 			enqueue = prepareCHIAdd(command)
 		case cmd_queue.ReconcileUpdate:
 			enqueue = prepareCHIUpdate(command)

@@ -574,6 +574,21 @@ func (n *Normalizer) ensureClusters(clusters []*chk.Cluster) []*chk.Cluster {
 func (n *Normalizer) appendClusterSecretEnvVar(cluster chi.ICluster) {
 }
 
+// rejectHotReload aborts once per pass. hotReload is a ClickHouse user-password option.
+func (n *Normalizer) rejectHotReload(name string) {
+	if n.req == nil || n.req.GetTarget() == nil {
+		return
+	}
+	status := n.req.GetTarget().EnsureStatus()
+	if status.GetStatus() == chi.StatusAborted {
+		return
+	}
+	status.ReconcileAbortWithReason(
+		chi.StatusReasonHotReloadRejected,
+		fmt.Sprintf("setting %q: hotReload is supported only on ClickHouse user password, password_sha256_hex, and password_double_sha1_hex", name),
+	)
+}
+
 const envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS"
 
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
@@ -584,6 +599,10 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings) *chi
 	settings.Normalize()
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
+		if setting.IsHotReload() {
+			n.rejectHotReload(name)
+			return
+		}
 		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings)
 	})
 	return settings
@@ -597,6 +616,10 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings) *chi.Setti
 	files.Normalize()
 
 	files.WalkSafe(func(key string, setting *chi.Setting) {
+		if setting.IsHotReload() {
+			n.rejectHotReload(key)
+			return
+		}
 		subst.ReplaceSettingsFieldWithMountedFile(n.req, files, key)
 	})
 

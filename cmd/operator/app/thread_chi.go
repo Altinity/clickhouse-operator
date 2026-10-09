@@ -22,6 +22,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
+	kubeinformers "k8s.io/client-go/informers"
 )
 
 // Prometheus exporter defaults
@@ -112,6 +113,16 @@ func initClickHouse(ctx context.Context) {
 		kubeInformerFactory,
 	)
 
+	// User password Secrets do not carry the operator's app label, so they are
+	// invisible to kubeInformerFactory. This factory watches every Secret in the
+	// operator's namespace scope. Operator-generated Secrets are ignored in the handler.
+	secretInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
+		kubeClient,
+		kubeInformerFactoryResyncPeriod,
+		kubeinformers.WithNamespace(chop.Config().GetInformerNamespace()),
+	)
+	chiController.WatchPasswordSecrets(chopInformerFactory, secretInformerFactory)
+
 	// Start CHK watcher (if enabled by config)
 	chiController.StartCHKWatcher(ctx)
 
@@ -119,6 +130,7 @@ func initClickHouse(ctx context.Context) {
 	kubeInformerFactory.Start(ctx.Done())
 	chopInformerFactory.Start(ctx.Done())
 	chopConfigInformerFactory.Start(ctx.Done())
+	secretInformerFactory.Start(ctx.Done())
 }
 
 // runClickHouse is an entry point of the application

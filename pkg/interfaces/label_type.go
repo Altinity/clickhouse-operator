@@ -34,6 +34,7 @@ const (
 
 	LabelPDB         LabelType = "Label pdb"
 	LabelSecret      LabelType = "Label secret"
+	LabelSecretUsers LabelType = "Label secret users"
 	LabelSTS         LabelType = "Label STS"
 	LabelPodTemplate LabelType = "Label PodTemplate"
 )
