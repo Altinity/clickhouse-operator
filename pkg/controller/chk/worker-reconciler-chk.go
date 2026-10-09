@@ -121,6 +121,10 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	}
 	w.prepareMonitoring(new)
 	w.setHostStatusesPreliminary(ctx, new)
+	if err := w.stageUncommittedScaleUpHosts(ctx, new); err != nil {
+		w.a.V(1).M(new).F().Warning("Unable to stage scale-up hosts: %v", err)
+		return err
+	}
 
 	if err := w.reconcile(ctx, new); err != nil {
 		if errors.Is(err, common.ErrCRUDDeferred) {
@@ -776,14 +780,23 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 // reconcileHostPrepare reconciles specified ClickHouse host
 func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error {
+	if host.GetReconcileAttributes().IsExclude() {
+		// Stay out of raft_configuration until immediately before STS create.
+		// Publishing here would leave the server in XML if ConfigMapHost / PVC
+		// abort before the StatefulSet exists.
+		w.a.V(1).
+			M(host).F().
+			Info("Skip raft include in prepare; host is staged. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return nil
+	}
+
 	w.a.V(1).
 		M(host).F().
 		Info("Include host into cluster. Host/shard/cluster: %d/%d/%s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	w.includeHostIntoRaftCluster(ctx, host)
-
-	return nil
+	return w.includeHostIntoRaftCluster(ctx, host)
 }
 
 // reconcileHostMain reconciles specified ClickHouse host
@@ -841,6 +854,19 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host Main - unable to reconcile Service. Host: %s Err: %v", host.GetName(), err)
+	}
+
+	// Admit this host into raft_configuration before creating its StatefulSet,
+	// so the new pod starts with itself already in the published membership.
+	// Remaining staged hosts stay excluded.
+	if host.GetReconcileAttributes().IsExclude() {
+		if err := w.includeHostIntoRaftCluster(ctx, host); err != nil {
+			metrics.HostReconcilesErrors(ctx, host.GetCR())
+			w.a.V(1).
+				M(host).F().
+				Warning("Reconcile Host Main - unable to publish host into raft_configuration. Host: %s Err: %v", host.GetName(), err)
+			return err
+		}
 	}
 
 	// Snapshot the ensemble and reconcile the StatefulSet against that same snapshot.
@@ -917,8 +943,13 @@ func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, sn
 		return nil
 	}
 
+	// Staged 1→N joins already waited Ready on the STS. Do not sleep them.
+	if hostIsStagedScaleUpJoin(host) {
+		return w.verifyHostEnsembleMembership(ctx, host)
+	}
+
 	if !snap.rolling {
-		// Bootstrap / resume-from-stopped / recovery: peers start together;
+		// Fresh bootstrap / resume-from-stopped / recovery: peers start together;
 		// legacy pacing wait (Ready wait was skipped on STS).
 		util.WaitContextDoneOrTimeout(ctx, 7*time.Second)
 		return nil

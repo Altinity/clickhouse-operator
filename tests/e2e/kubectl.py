@@ -1035,6 +1035,14 @@ def get_obj_names(chi_name, obj_type="pods", kind = "chi", ns=None, shell=None):
     return obj_names[1:]
 
 
+def get_ready_pods_count(kind, name, ns=None, shell=None):
+    n = 0
+    for pod in get_obj_names(name, obj_type="pod", kind=kind, ns=ns, shell=shell):
+        if get_field("pod", pod, ".status.containerStatuses[0].ready", ns=ns, shell=shell) == "true":
+            n += 1
+    return n
+
+
 def get_obj_names_grepped(obj_type="pods", grep = '', ns=None, shell=None):
     obj_names = launch(
         f"get {obj_type} -o=custom-columns=type:.kind,name:.metadata.name",
