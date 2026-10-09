@@ -17,12 +17,16 @@ package chi
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 )
 
@@ -36,7 +40,7 @@ func TestChiReferencesHotReloadSecret(t *testing.T) {
 				LocalObjectReference: core.LocalObjectReference{Name: "clickhouse-passwords"},
 				Key:                  "alice_password",
 			},
-			HotReload: boolPtr(true),
+			HotReload: true,
 		},
 	}))
 	cr.Spec.Configuration.Users.Set("bob/password", api.NewSettingSource(&api.SettingSource{
@@ -53,8 +57,6 @@ func TestChiReferencesHotReloadSecret(t *testing.T) {
 	require.False(t, chiReferencesHotReloadSecret(cr, "missing"))
 }
 
-func boolPtr(v bool) *bool { return &v }
-
 // A source Secret update does not change CHI generation. The watcher still
 // enqueues a reconcile, the gate lets it run, the rendered users document
 // changes, and the host is not restarted.
@@ -69,7 +71,7 @@ func TestPasswordSecretChangeReconcilesWithoutRestart(t *testing.T) {
 				LocalObjectReference: core.LocalObjectReference{Name: "clickhouse-passwords"},
 				Key:                  "alice_password",
 			},
-			HotReload: boolPtr(true),
+			HotReload: true,
 		},
 	}))
 	require.True(t, chiReferencesHotReloadSecret(cr, "clickhouse-passwords"))
@@ -103,6 +105,53 @@ func TestPasswordSecretChangeReconcilesWithoutRestart(t *testing.T) {
 	require.True(t, w.shouldForceRestartHost(secretCtx, host))
 }
 
+func TestPasswordSecretRefreshRestartsUnhealthyHost(t *testing.T) {
+	secretCtx := context.WithValue(context.Background(), passwordSecretReconcileKey{}, true)
+
+	t.Run("crash loop", func(t *testing.T) {
+		host := rollingUpdateHostWithAncestor()
+		host.Runtime.Version = nil
+		w := workerWithPod(&core.Pod{
+			Status: core.PodStatus{
+				Phase: core.PodRunning,
+				ContainerStatuses: []core.ContainerStatus{{
+					State: core.ContainerState{
+						Waiting: &core.ContainerStateWaiting{Reason: "CrashLoopBackOff"},
+					},
+				}},
+			},
+		})
+		require.True(t, w.shouldForceRestartHost(secretCtx, host))
+	})
+
+	t.Run("sustained not ready", func(t *testing.T) {
+		cfg := chop.Config()
+		prev := cfg.Reconcile.Recovery.OnStatus.Completed.OnPodNotReady
+		cfg.Reconcile.Recovery.OnStatus.Completed.OnPodNotReady = types.NewString(api.RecoveryActionRetry)
+		t.Cleanup(func() {
+			cfg.Reconcile.Recovery.OnStatus.Completed.OnPodNotReady = prev
+		})
+
+		host := rollingUpdateHostWithAncestor()
+		w := workerWithPod(&core.Pod{
+			Status: core.PodStatus{
+				Phase: core.PodRunning,
+				Conditions: []core.PodCondition{{
+					Type:               core.PodReady,
+					Status:             core.ConditionFalse,
+					LastTransitionTime: meta.NewTime(time.Now().Add(-cfg.CompletedOnPodNotReadyThreshold() - time.Minute)),
+				}},
+				ContainerStatuses: []core.ContainerStatus{{Ready: false}},
+			},
+		})
+		require.True(t, w.shouldForceRestartHost(secretCtx, host))
+	})
+}
+
+func workerWithPod(pod *core.Pod) *worker {
+	return &worker{c: &Controller{kube: &statusFakeKube{pod: &statusFakePod{pod: pod}}}}
+}
+
 func rollingUpdateHostWithAncestor() *api.Host {
 	const (
 		clusterName = "default"
@@ -110,6 +159,9 @@ func rollingUpdateHostWithAncestor() *api.Host {
 		hostName    = "r0"
 	)
 	host := &api.Host{Name: hostName}
+	// A known version keeps this host out of the crash-recovery check, which
+	// only applies when the version is still unknown.
+	host.Runtime.Version = swversion.NewSoftWareVersion("25.3.1")
 	host.Runtime.Address.ClusterName = clusterName
 	host.Runtime.Address.ShardName = shardName
 	host.Runtime.Address.HostName = hostName

@@ -182,6 +182,23 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("Image change detected - deferring restart to STS rollout. Host: %s", host.GetName())
 		return false
 
+	// Recovery is ahead of the password shortcut. A Secret update must not leave
+	// a crashed or persistently unhealthy Pod in place.
+	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host):
+		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
+		return true
+
+	case chop.Config().ShouldRecoverCompletedOnPodNotReady() &&
+		w.isPodSustainedNotReady(ctx, host, chop.Config().CompletedOnPodNotReadyThreshold()):
+		// Closes the gap where Completed CHIs with a sustained-NotReady host
+		// were left stuck indefinitely.
+		threshold := chop.Config().CompletedOnPodNotReadyThreshold()
+		w.a.V(1).M(host).F().
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonHostStuckNotReady).
+			Info("Host pod has been Ready=False past threshold %s — force restart. Host: %s",
+				threshold, host.GetName())
+		return true
+
 	case passwordOnlyRefresh(ctx, host):
 		// The default restart policy is RollingUpdate, so a reconcile that exists
 		// only to refresh a password would otherwise software-restart every host.
@@ -199,21 +216,6 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 
 	case model.IsConfigurationChangeRequiresReboot(host):
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
-		return true
-
-	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host):
-		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
-		return true
-
-	case chop.Config().ShouldRecoverCompletedOnPodNotReady() &&
-		w.isPodSustainedNotReady(ctx, host, chop.Config().CompletedOnPodNotReadyThreshold()):
-		// Closes the gap where Completed CHIs with a sustained-NotReady host
-		// were left stuck indefinitely.
-		threshold := chop.Config().CompletedOnPodNotReadyThreshold()
-		w.a.V(1).M(host).F().
-			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonHostStuckNotReady).
-			Info("Host pod has been Ready=False past threshold %s — force restart. Host: %s",
-				threshold, host.GetName())
 		return true
 
 	default:
