@@ -15,6 +15,8 @@
 package k8s
 
 import (
+	"fmt"
+
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 )
@@ -102,6 +104,19 @@ func StatefulSetAppendPersistentVolumeClaims(statefulSet *apps.StatefulSet, pvcs
 		statefulSet.Spec.VolumeClaimTemplates,
 		pvcs...,
 	)
+}
+
+// StatefulSetAppendVolumeMounts adds volumeMounts to the container selected by
+// namesOrIndexes, the same lookup as StatefulSetContainerGet. A renamed ClickHouse
+// container is often the first one. An error is returned when no container matches,
+// so the caller does not silently skip the mount.
+func StatefulSetAppendVolumeMounts(statefulSet *apps.StatefulSet, volumeMounts []core.VolumeMount, namesOrIndexes ...any) error {
+	container, ok := StatefulSetContainerGet(statefulSet, namesOrIndexes...)
+	if !ok {
+		return fmt.Errorf("application container not found")
+	}
+	ContainerAppendVolumeMounts(container, volumeMounts...)
+	return nil
 }
 
 func StatefulSetAppendVolumeMountsInAllContainers(statefulSet *apps.StatefulSet, volumeMounts ...core.VolumeMount) {

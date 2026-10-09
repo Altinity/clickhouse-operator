@@ -150,3 +150,16 @@ func (c *FilesGenerator) createConfigFilesGroupHostGeneric(configSections map[st
 func createConfigSectionFilename(section string) string {
 	return "chop-generated-" + section + ".xml"
 }
+
+// ChopGeneratedUsersConfigFilename is the users file for accounts that do not
+// opt into hotReload. It stays in the users ConfigMap.
+func ChopGeneratedUsersConfigFilename() string {
+	return createConfigSectionFilename(configUsers)
+}
+
+// ChopGeneratedHotReloadUsersConfigFilename is the users file for accounts that
+// opt into hotReload. ClickHouse loads every XML file in users.d, so this file
+// is mounted beside chop-generated-users.xml.
+func ChopGeneratedHotReloadUsersConfigFilename() string {
+	return "chop-generated-hot-reload-users.xml"
+}

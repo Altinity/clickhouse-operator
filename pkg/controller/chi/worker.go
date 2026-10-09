@@ -182,6 +182,16 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("Image change detected - deferring restart to STS rollout. Host: %s", host.GetName())
 		return false
 
+	case passwordSecretReconcile(ctx):
+		// The default restart policy is RollingUpdate, so a reconcile that exists
+		// only to refresh a password would otherwise software-restart every host.
+		// The Pod template names the managed users Secret and does not carry its
+		// bytes; ClickHouse reloads users.d when that Secret is updated.
+		// Turning hotReload on is a CHI spec change, not this command, and that
+		// pass still rolls Pods once to install the projected volume.
+		w.a.V(1).M(host).F().Info("Password Secret refresh does not require host restart. Host: %s", host.GetName())
+		return false
+
 	case host.GetCR().IsRollingUpdate():
 		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
 		return true

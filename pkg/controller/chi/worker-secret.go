@@ -18,9 +18,14 @@ import (
 	"context"
 
 	core "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 )
 
 // reconcileSecret reconciles core.Secret
@@ -66,4 +71,72 @@ func (w *worker) createSecret(ctx context.Context, cr api.ICustomResource, secre
 	}
 
 	return err
+}
+
+// reconcileHotReloadUsersSecret regenerates chop-generated-hot-reload-users.xml
+// from the referenced Secret keys and writes it to the CHI-owned Secret. Normal
+// users stay in the users ConfigMap. The CHI spec is not modified. A read
+// failure returns before any write.
+func (w *worker) reconcileHotReloadUsersSecret(ctx context.Context, cr *api.ClickHouseInstallation) error {
+	usersXML, err := normalizer.RenderHotReloadUsersXML(
+		cr.GetSpecT().GetConfiguration().GetUsers(),
+		cr.GetNamespace(),
+		func(namespace, name string) (*core.Secret, error) {
+			return w.c.kube.Secret().Get(ctx, &core.Secret{
+				ObjectMeta: meta.ObjectMeta{Namespace: namespace, Name: name},
+			})
+		},
+	)
+	if err != nil {
+		w.a.WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(cr).
+			WithError(cr).
+			M(cr).F().
+			Error("FAILED to render hot-reload users configuration: %s", err)
+		return err
+	}
+	secret := w.task.Creator().CreateHotReloadUsersSecret(config.ChopGeneratedHotReloadUsersConfigFilename(), usersXML)
+	return w.reconcileHotReloadSecretData(ctx, cr, secret)
+}
+
+// reconcileHotReloadSecretData creates the managed Secret, or updates it when
+// its data changed. An unchanged Secret is left alone so a resync does not
+// write and re-enqueue itself.
+func (w *worker) reconcileHotReloadSecretData(ctx context.Context, cr api.ICustomResource, desired *core.Secret) error {
+	cur, err := w.c.getSecret(ctx, desired)
+	if apiErrors.IsNotFound(err) {
+		err = w.createSecret(ctx, cr, desired)
+		if err == nil {
+			w.task.RegistryReconciled().RegisterSecret(desired.GetObjectMeta())
+		} else {
+			w.task.RegistryFailed().RegisterSecret(desired.GetObjectMeta())
+		}
+		return err
+	}
+	if err != nil {
+		w.task.RegistryFailed().RegisterSecret(desired.GetObjectMeta())
+		return err
+	}
+	if apiequality.Semantic.DeepEqual(cur.Data, desired.Data) {
+		w.task.RegistryReconciled().RegisterSecret(cur.GetObjectMeta())
+		return nil
+	}
+	cur.Data = desired.Data
+	updated, err := w.c.kube.Secret().Update(ctx, cur)
+	if err != nil {
+		w.a.WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateFailed).
+			WithAction(cr).
+			WithError(cr).
+			M(cr).F().
+			Error("Update Secret %s/%s failed with error %v", desired.Namespace, desired.Name, err)
+		w.task.RegistryFailed().RegisterSecret(desired.GetObjectMeta())
+		return err
+	}
+	w.a.V(1).
+		WithEvent(cr, a.EventActionUpdate, a.EventReasonUpdateCompleted).
+		WithAction(cr).
+		M(cr).F().
+		Info("Update Secret %s/%s", desired.Namespace, desired.Name)
+	w.task.RegistryReconciled().RegisterSecret(updated.GetObjectMeta())
+	return nil
 }

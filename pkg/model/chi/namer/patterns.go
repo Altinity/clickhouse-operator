@@ -27,6 +27,9 @@ var patterns = types.List{
 	// patternConfigMapCommonUsersName is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
 	patternConfigMapCommonUsersName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-common-usersd",
 
+	// patternSecretCommonUsersName is the CHI-owned Secret that holds chop-generated-hot-reload-users.xml. "chi-{chi}-users"
+	patternSecretCommonUsersName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-users",
+
 	// patternConfigMapHostName is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
 	patternConfigMapHostName: "chi-" + macrosList.Get().Get(macro.MacrosCRName) + "-deploy-confd-" + macrosList.Get().Get(macro.MacrosClusterName) + "-" + macrosList.Get().Get(macro.MacrosHostName),
 

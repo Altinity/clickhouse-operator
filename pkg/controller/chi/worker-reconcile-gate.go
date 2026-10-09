@@ -27,6 +27,10 @@ const (
 	// gateOperatorIPChanged: the operator's pod IP moved, so the clickhouse-operator user's
 	// networks/host_regexp must be refreshed.
 	gateOperatorIPChanged reconcileGateDecision = "OperatorIPChanged"
+	// gatePasswordSecretChanged: a Secret referenced by hotReload changed. The CHI
+	// spec did not, so generation is unchanged, but the managed users Secret must
+	// be regenerated. The Pod template does not include the Secret's contents.
+	gatePasswordSecretChanged reconcileGateDecision = "PasswordSecretChanged"
 	// gateStuckHostRecovery: a host has been sustained-NotReady past its threshold.
 	gateStuckHostRecovery reconcileGateDecision = "StuckHostRecovery"
 	// gateUnhealthyHosts: a host is unhealthy, so the shard may need recovery (#1704).
@@ -59,6 +63,9 @@ type reconcileGateInputs struct {
 	generationTheSame               bool
 	hasUnhealthyHosts               bool
 	operatorIPTheSame               bool
+	// passwordSecretChanged is set when this reconcile was enqueued because a
+	// source Secret changed. It must be tested before the generation-same skip.
+	passwordSecretChanged bool
 	// hasHostNeedingStuckRecovery is lazy: it costs live pod reads, so it is only consulted once
 	// the cheaper reasons have been ruled out.
 	hasHostNeedingStuckRecovery func() bool
@@ -92,6 +99,8 @@ func decideReconcileGate(in reconcileGateInputs) reconcileGateDecision {
 		return gateFinalizerInstalled
 	case !in.operatorIPTheSame:
 		return gateOperatorIPChanged
+	case in.passwordSecretChanged:
+		return gatePasswordSecretChanged
 	case in.generationTheSame && !in.hasUnhealthyHosts:
 		return gateNothingToDo
 	case in.hasReconcileWork:

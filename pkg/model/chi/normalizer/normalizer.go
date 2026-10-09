@@ -47,11 +47,12 @@ import (
 
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	secretGet subst.SecretGetter
-	req       *Request
-	namer     interfaces.INameManager
-	macro     interfaces.IMacro
-	labeler   interfaces.ILabeler
+	secretGet         subst.SecretGetter
+	req               *Request
+	namer             interfaces.INameManager
+	macro             interfaces.IMacro
+	labeler           interfaces.ILabeler
+	hotReloadReported bool
 }
 
 // New creates new normalizer
@@ -872,6 +873,10 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings, scop
 	settings.Normalize(n.settingsNormalizerOptions(replacerSettings, scope))
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
+		if setting.IsHotReload() {
+			n.rejectHotReload(name)
+			return
+		}
 		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings)
 	})
 	return settings
@@ -885,6 +890,10 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings, scope any)
 	files.Normalize(n.settingsNormalizerOptions(replacerFiles, scope))
 
 	files.WalkSafe(func(key string, setting *chi.Setting) {
+		if setting.IsHotReload() {
+			n.rejectHotReload(key)
+			return
+		}
 		subst.ReplaceSettingsFieldWithMountedFile(n.req, files, key)
 	})
 

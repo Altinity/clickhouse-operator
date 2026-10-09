@@ -98,7 +98,9 @@ const (
 	configRemoteServers = "remote_servers"
 	configSettings      = "settings"
 	configUsers         = "users"
-	configZookeeper     = "zookeeper"
+	// UsersSection is the ClickHouse XML section generated as chop-generated-users.xml.
+	UsersSection    = configUsers
+	configZookeeper = "zookeeper"
 )
 
 const (

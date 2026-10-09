@@ -145,6 +145,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		hasUnhealthyHosts:               hasUnhealthyHosts,
 		operatorIPTheSame:               operatorIPTheSame,
 		hasHostNeedingStuckRecovery:     func() bool { return w.crHasHostNeedingStuckRecovery(ctx, new) },
+		passwordSecretChanged:           passwordSecretReconcile(ctx),
 	}); decision {
 	case gateReconcileWork:
 		w.a.M(new).F().Info("CR has reconcile work - continue reconcile")
@@ -152,6 +153,8 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
 	case gateOperatorIPChanged:
 		w.a.M(new).F().Info("Operator IP changed - continue reconcile to refresh clickhouse-operator user networks")
+	case gatePasswordSecretChanged:
+		w.a.M(new).F().Info("Referenced password Secret changed - continue reconcile to refresh users configuration")
 	case gateStuckHostRecovery:
 		w.a.M(new).F().Info("CR has a sustained-NotReady host - continue reconcile for stuck-host recovery")
 	case gateUnhealthyHosts:
@@ -376,9 +379,12 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 	}
 	cr.GetRuntime().UnlockCommonConfig()
 
-	// CR users ConfigMap - common for all hosts
+	// CR users ConfigMap - common for all hosts.
+	// A hotReload failure returns before either object is written, so the last
+	// valid users configuration stays mounted.
 	if err := w.reconcileConfigMapCommonUsers(ctx, cr); err != nil {
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
+		return err
 	}
 
 	return w.reconcileCRAuxObjectsPreliminaryDomain(ctx, cr)
@@ -607,6 +613,15 @@ func (w *worker) reconcileConfigMapCommon(
 // reconcileConfigMapCommonUsers reconciles all CHI's users ConfigMap
 // ConfigMap common for all users resources in CHI
 func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, cr api.ICustomResource) error {
+	chi, ok := cr.(*api.ClickHouseInstallation)
+	if ok && chi.GetRuntime().GetAttributes().GetHotReloadUsers() {
+		// Read and publish the Secret before touching the ConfigMap. A failed
+		// read returns here and leaves the previous users file in place.
+		if err := w.reconcileHotReloadUsersSecret(ctx, chi); err != nil {
+			return err
+		}
+	}
+
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommonUsers)
 	err := w.reconcileConfigMap(ctx, cr, configMapUsers)

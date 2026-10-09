@@ -184,10 +184,54 @@ spec:
             key: pwduser2
 ```
 
-Note that `valueFrom`/`secretKeyRef` always passes the value through an environment variable
-(rendered as `from_env=...` in the generated XML). The operator does not hash it, so where you
-previously relied on `k8s_secret_password` being hashed into `password_sha256_hex` for you, store
-the already-hashed value in the secret and reference it from `password_sha256_hex` as shown above.
+By default `valueFrom`/`secretKeyRef` passes the value through an environment variable
+(rendered as `from_env=...` in the generated XML). Kubernetes does not update environment
+variables in a running container, so a password change is picked up only after the Pod is
+recreated. The operator does not hash that value, so where you previously relied on
+`k8s_secret_password` being hashed into `password_sha256_hex` for you, store the already-hashed
+value in the secret and reference it from `password_sha256_hex` as shown above.
+
+`hotReload: true` is the opt-in for user `password`, `password_sha256_hex`, and
+`password_double_sha1_hex`. The Secret key is still the credential itself, not an XML document.
+
+```yaml
+spec:
+  configuration:
+    users:
+      user1/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: pwduser1
+          hotReload: true
+      user2/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: pwduser2
+          hotReload: true
+      user3/password_double_sha1_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: pwduser3
+          hotReload: true
+```
+
+The operator reads that key from the CHI's own namespace, applies the same password normalization
+as a literal password, and writes that user to `chop-generated-hot-reload-users.xml` in a CHI-owned
+Secret. Users that do not set `hotReload` stay in `chop-generated-users.xml` in the users ConfigMap.
+Both files are projected into `users.d` on the ClickHouse container, without `subPath`, so a later
+Secret change is refreshed by kubelet and reloaded by ClickHouse without a Pod restart.
+
+The operator is trusted to read those password keys and to write the derived Secret. The derived
+Secret contains password hashes, is owned by the CHI, and is not copied into a ConfigMap. A
+missing or empty key aborts the reconcile and leaves the last written users configuration in
+place; the account is not given the default password. `hotReload` on any other field, including
+ClickHouse settings and Keeper, is rejected.
+
+Enabling `hotReload` the first time changes the Pod template to install the projected volume, so
+that step rolls the Pods once. Later password rotations do not.
 
 ### Securing the 'default' user
 

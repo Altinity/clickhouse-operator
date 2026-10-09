@@ -114,7 +114,9 @@ func (m *ConfigMapManager) createConfigMapCommonUsers() *core.ConfigMap {
 			Annotations:     m.macro.Scope(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommonUsers)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
-		// Data contains several sections which are to be several xml chopConfig files
+		// Data contains several sections which are to be several xml chopConfig files.
+		// chop-generated-users.xml holds users that do not opt into hotReload.
+		// Hot-reload users are a separate file in the CHI-owned Secret.
 		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupUsers),
 	}
 	// And after the object is ready we can put version label

@@ -42,18 +42,22 @@ func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
 }
 
 func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser) {
-	user.WalkSafe(func(name string, _ *api.Setting) {
+	user.WalkSafe(func(name string, setting *api.Setting) {
 		if strings.HasPrefix(name, removedSecretRefFieldPrefix) {
 			n.rejectRemovedSecretRefField(user, name)
-		} else {
-			subst.ReplaceSettingsFieldWithEnvRefToSecretField(
-				n.req,
-				user,
-				name,
-				name,
-				envVarNamePrefixConfigurationUsers,
-			)
+			return
 		}
+		if setting.IsHotReload() {
+			n.acceptHotReloadUserField(user, name, setting)
+			return
+		}
+		subst.ReplaceSettingsFieldWithEnvRefToSecretField(
+			n.req,
+			user,
+			name,
+			name,
+			envVarNamePrefixConfigurationUsers,
+		)
 	})
 }
 
@@ -93,6 +97,14 @@ func (n *Normalizer) rejectRemovedSecretRefField(user *api.SettingsUser, name st
 
 // normalizeConfigurationUserPassword deals with user passwords
 func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
+	// A hotReload credential stays a Secret reference on the CR. Hashing it here would
+	// write the password into the normalized spec, which is stored in CHI status.
+	// The managed Secret is rendered from a copy. Leaving the field empty would also
+	// fall through to the default password below.
+	if userHasHotReloadCredential(user) {
+		return
+	}
+
 	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
 	if user.Has("password_double_sha1_hex") {
 		user.Delete("password_sha256_hex")
