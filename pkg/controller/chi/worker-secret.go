@@ -21,7 +21,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
@@ -168,7 +167,7 @@ func (w *worker) deleteObsoleteHotReloadUsersSecret(ctx context.Context, cr *api
 		w.a.V(1).M(cr).F().Warning("Leave Secret %s/%s in place: unable to list Pods that may still mount it: %v", cur.Namespace, cur.Name, err)
 		return nil
 	}
-	if !shouldDeleteUnreferencedSecret(cur, cr.GetName(), cr.GetUID(), api.ClickHouseInstallationCRDResourceKind, pods) {
+	if !shouldDeleteUnreferencedSecret(cur, cr, pods) {
 		w.a.V(1).M(cr).F().Info("Leave Secret %s/%s in place until no Pod mounts it and this CHI owns it", cur.Namespace, cur.Name)
 		return nil
 	}
@@ -192,12 +191,15 @@ func (w *worker) deleteObsoleteHotReloadUsersSecret(ctx context.Context, cr *api
 	return nil
 }
 
-// podsOfCR reads every host Pod. A missing Pod is skipped. Any other Get error
-// is returned so the caller does not treat an unknown Pod as "not mounting".
+// podsOfCR reads host Pods for the desired CHI and for its ancestor. Hosts removed
+// in this reconcile exist only on the ancestor, and their Pods may still mount the
+// generated Secret. A missing Pod is skipped. Any other Get error is returned so
+// the caller does not treat an unknown Pod as "not mounting".
 func (w *worker) podsOfCR(ctx context.Context, cr *api.ClickHouseInstallation) ([]*core.Pod, error) {
 	var pods []*core.Pod
 	var failed error
-	cr.WalkHosts(func(host *api.Host) error {
+	seen := map[string]struct{}{}
+	collect := func(host *api.Host) error {
 		if failed != nil {
 			return nil
 		}
@@ -209,16 +211,26 @@ func (w *worker) podsOfCR(ctx context.Context, cr *api.ClickHouseInstallation) (
 			failed = err
 			return nil
 		}
+		key := pod.Namespace + "/" + pod.Name
+		if _, ok := seen[key]; ok {
+			return nil
+		}
+		seen[key] = struct{}{}
 		pods = append(pods, pod)
 		return nil
-	})
+	}
+	cr.WalkHosts(collect)
+	if ancestor := cr.GetAncestorT(); ancestor != nil && failed == nil {
+		ancestor.WalkHosts(collect)
+	}
 	return pods, failed
 }
 
 // shouldDeleteUnreferencedSecret reports whether secret may be removed.
-// This CHI must own it, and none of pods may still mount it.
-func shouldDeleteUnreferencedSecret(secret *core.Secret, ownerName string, ownerUID types.UID, ownerKind string, pods []*core.Pod) bool {
-	if secret == nil || secret.Name == "" || !secretOwnedBy(secret, ownerName, ownerUID, ownerKind) {
+// This CHI must be its controller, and none of pods may still mount it.
+// An empty UID is not a match: IsControlledBy treats two empty UIDs as equal.
+func shouldDeleteUnreferencedSecret(secret *core.Secret, owner meta.Object, pods []*core.Pod) bool {
+	if secret == nil || secret.Name == "" || owner == nil || owner.GetUID() == "" || !meta.IsControlledBy(secret, owner) {
 		return false
 	}
 	for _, pod := range pods {
@@ -248,21 +260,6 @@ func podReferencesSecret(pod *core.Pod, secretName string) bool {
 			if src.Secret != nil && src.Secret.Name == secretName {
 				return true
 			}
-		}
-	}
-	return false
-}
-
-// secretOwnedBy reports whether secret has an owner reference for this object.
-// An empty UID does not match, so an unpopulated owner cannot authorize a delete.
-func secretOwnedBy(secret *core.Secret, ownerName string, ownerUID types.UID, ownerKind string) bool {
-	if secret == nil || ownerName == "" || ownerUID == "" || ownerKind == "" {
-		return false
-	}
-	for i := range secret.OwnerReferences {
-		ref := &secret.OwnerReferences[i]
-		if ref.UID == ownerUID && ref.Name == ownerName && ref.Kind == ownerKind {
-			return true
 		}
 	}
 	return false

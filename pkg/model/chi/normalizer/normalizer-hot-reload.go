@@ -15,12 +15,21 @@
 package normalizer
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
+)
+
+// ErrHotReloadSecretUnresolved and ErrHotReloadCredentialRejected are returned
+// by RenderHotReloadUsersXML. Callers must not publish users configuration when
+// either is set.
+var (
+	ErrHotReloadSecretUnresolved   = errors.New("unable to read the referenced Secret key")
+	ErrHotReloadCredentialRejected = errors.New("value is not a valid password hash")
 )
 
 func userHasHotReloadCredential(user *api.SettingsUser) bool {
@@ -35,31 +44,20 @@ func userHasHotReloadCredential(user *api.SettingsUser) bool {
 	return false
 }
 
-// acceptHotReloadUserField checks that hotReload is on a supported user password
-// field and that the Secret key can be read. The value is not kept: the CR continues
-// to store the reference, and RenderHotReloadUsersXML reads it again when writing
-// the managed Secret.
+// acceptHotReloadUserField checks that hotReload names a supported user password
+// field and a Secret key in this namespace. The Secret value is read later, by
+// RenderHotReloadUsersXML, so a missing or malformed credential fails the publish
+// and leaves the last written configuration in place.
 func (n *Normalizer) acceptHotReloadUserField(user *api.SettingsUser, name string, setting *api.Setting) {
 	if !api.IsHotReloadUserAuthField(name) || !setting.HasSecretKeyRef() {
 		n.rejectUnsupportedHotReload(user.Username() + "/" + name)
 		return
 	}
-	if n.req == nil || n.req.GetTarget() == nil || n.secretGet == nil {
-		n.rejectHotReloadSecret(user.Username(), name)
+	if n.req == nil || n.req.GetTarget() == nil {
 		return
 	}
-	addr, err := setting.FetchDataSourceAddress(n.req.GetTargetNamespace())
-	if err != nil {
+	if _, err := setting.FetchDataSourceAddress(n.req.GetTargetNamespace()); err != nil {
 		n.rejectHotReloadSecret(user.Username(), name)
-		return
-	}
-	value, err := subst.FetchSecretFieldValue(addr, n.secretGet)
-	if err != nil || value == "" {
-		n.rejectHotReloadSecret(user.Username(), name)
-		return
-	}
-	if !validHotReloadCredential(name, value) {
-		n.rejectHotReloadCredential(user.Username(), name)
 		return
 	}
 	n.req.GetTarget().GetRuntime().GetAttributes().SetHotReloadUsers(true)
@@ -103,13 +101,6 @@ func (n *Normalizer) rejectUnsupportedHotReload(name string) {
 			"setting %q: hotReload is supported only on user password, password_sha256_hex, and password_double_sha1_hex with secretKeyRef",
 			name,
 		),
-	)
-}
-
-func (n *Normalizer) rejectHotReloadCredential(username, field string) {
-	n.rejectHotReload(
-		api.StatusReasonHotReloadRejected,
-		fmt.Sprintf("user %q: hotReload field %q: value is not a valid password hash", username, field),
 	)
 }
 
@@ -163,16 +154,16 @@ func resolveHotReloadUser(user *api.SettingsUser, namespace string, secretGet su
 		}
 		addr, addrErr := setting.FetchDataSourceAddress(namespace)
 		if addrErr != nil {
-			err = fmt.Errorf("user %q: hotReload field %q: unable to read the referenced Secret key", user.Username(), name)
+			err = fmt.Errorf("user %q: hotReload field %q: %w", user.Username(), name, ErrHotReloadSecretUnresolved)
 			return
 		}
 		value, valueErr := subst.FetchSecretFieldValue(addr, secretGet)
 		if valueErr != nil || value == "" {
-			err = fmt.Errorf("user %q: hotReload field %q: unable to read the referenced Secret key", user.Username(), name)
+			err = fmt.Errorf("user %q: hotReload field %q: %w", user.Username(), name, ErrHotReloadSecretUnresolved)
 			return
 		}
 		if !validHotReloadCredential(name, value) {
-			err = fmt.Errorf("user %q: hotReload field %q: value is not a valid password hash", user.Username(), name)
+			err = fmt.Errorf("user %q: hotReload field %q: %w", user.Username(), name, ErrHotReloadCredentialRejected)
 			return
 		}
 		user.Set(name, api.NewSettingScalar(value))
