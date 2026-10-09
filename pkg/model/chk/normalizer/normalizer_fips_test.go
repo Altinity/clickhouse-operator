@@ -91,7 +91,7 @@ func hostName(i int) string { return fmt.Sprintf("h%d", i) }
 // callGate constructs a minimal CHK Normalizer with the given target and invokes
 // enforceFIPSImagePolicy. Returns the target so the test can inspect its status.
 func callGate(target *chk.ClickHouseKeeperInstallation) *chk.ClickHouseKeeperInstallation {
-	n := New()
+	n := New(nil)
 	n.req = NewRequest(nil)
 	n.req.SetTarget(target)
 	n.enforceFIPSImagePolicy()
@@ -147,7 +147,7 @@ func TestEnforceFIPSImagePolicy_CHK(t *testing.T) {
 
 	t.Run("nil target — no panic, no-op", func(t *testing.T) {
 		withFIPSImagePolicy(t, string(chi.FIPSImagePolicyRequired))
-		n := New()
+		n := New(nil)
 		n.req = NewRequest(nil)
 		n.req.SetTarget((*chk.ClickHouseKeeperInstallation)(nil))
 		require.NotPanics(t, n.enforceFIPSImagePolicy)
@@ -202,7 +202,7 @@ func TestRejectFIPSBypass(t *testing.T) {
 		target := &chk.ClickHouseKeeperInstallation{}
 		target.Name = "chk"
 		target.Namespace = "ns"
-		n := New()
+		n := New(nil)
 		n.req = NewRequest(nil)
 		n.req.SetTarget(target)
 		n.rejectFIPSBypass(security)
@@ -252,7 +252,7 @@ func TestRejectFIPSBypass(t *testing.T) {
 	})
 
 	t.Run("nil target — no panic", func(t *testing.T) {
-		n := New()
+		n := New(nil)
 		n.req = NewRequest(nil)
 		n.req.SetTarget((*chk.ClickHouseKeeperInstallation)(nil))
 		require.NotPanics(t, func() { n.rejectFIPSBypass(build(chTLS(string(chi.TLSVerifyNone), ""), nil)) })

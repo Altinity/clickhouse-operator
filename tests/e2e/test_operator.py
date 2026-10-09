@@ -757,6 +757,109 @@ def get_user_xml_from_configmap(chi, user):
     root_node = etree.fromstring(users_xml)
     return root_node.find(f"users/{user}")
 
+@TestScenario
+@Name("test_010011. Test k8s secrets usage")
+@Requirements(RQ_SRS_026_ClickHouseOperator_Secrets("1.0"))
+def test_010011(self):
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-011-secrets"
+
+    with Given("test-011-secrets.yaml with secret storage"):
+        kubectl.apply(
+            util.get_full_path("manifests/secret/test-011-secret.yaml"),
+        )
+
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-011-secrets.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+        with Then("Connection to localhost should succeed with user1/password from secretKeyRef"):
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user1", pwd="pwduser1")
+            assert out == "OK"
+
+        with And("Connection to localhost should succeed with user2/password_sha256_hex from secretKeyRef"):
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user2", pwd="pwduser2")
+            assert out == "OK"
+
+        with And("Connection to localhost should succeed with user3/password_double_sha1_hex from secretKeyRef"):
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user3", pwd="pwduser3")
+            assert out == "OK"
+
+        with And("Connection to localhost should succeed with user4/password from secretKeyRef"):
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user4", pwd="pwduser4")
+            assert out == "OK"
+
+        with And("Connection to localhost should succeed with user5/password defined in valueFrom/secretKeyRef"):
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user5", pwd="pwduser5")
+            assert out == "OK"
+
+        with And("Settings should be securely populated from a secret"):
+            pod = kubectl.get_pod_spec(chi)
+            envs = pod["containers"][0]["env"]
+            user5_password_env = ""
+            sasl_username_env = ""
+            sasl_password_env = ""
+            custom0_env = ""
+            custom1_env = ""
+            for e in envs:
+                if "valueFrom" in e:
+                    print(e["name"])
+                    key = e["valueFrom"]["secretKeyRef"]["key"]
+                    if key == "KAFKA_SASL_USERNAME":
+                        sasl_username_env = e["name"]
+                    if key == "KAFKA_SASL_PASSWORD":
+                        sasl_password_env = e["name"]
+                    if key in ("KAFKA2_SASL_USERNAME", "KAFKA2_SASL_PASSWORD"):
+                        assert False, error(e)
+                    if key == "pwduser5":
+                        user5_password_env = e["name"]
+                    if key == "custom0":
+                        custom0_env = e["name"]
+                    if key == "custom1":
+                        custom1_env = e["name"]
+
+            with By("Secrets are properly propagated to env variables"):
+                assert sasl_username_env != ""
+                assert sasl_password_env != ""
+                assert user5_password_env != ""
+
+            with By("Secrets are properly propagated to env variables for long settings names"):
+                assert custom0_env != ""
+                assert custom1_env != ""
+
+            with By("Secrets are properly referenced from settings.xml"):
+                cfm = kubectl.get("configmap", f"chi-{chi}-common-configd")
+                settings_xml = cfm["data"]["chop-generated-settings.xml"]
+                assert f"sasl_username from_env=\"{sasl_username_env}\"" in settings_xml
+                assert f"sasl_password from_env=\"{sasl_password_env}\"" in settings_xml
+                assert "kafka2" not in settings_xml, error(settings_xml)
+
+            with By("Secrets are properly referenced from users.xml"):
+                cfm = kubectl.get("configmap", f"chi-{chi}-common-usersd")
+                users_xml = cfm["data"]["chop-generated-users.xml"]
+                env_matches = [from_env.strip() for from_env in users_xml.splitlines() if "from_env" in from_env]
+                print(f"Found env substitutions: {env_matches}")
+                assert f"password from_env=\"{user5_password_env}\"" in users_xml
+
+        with And("kafka2 sasl settings are file-mapped into config.d"):
+            out = kubectl.launch(
+                f"exec chi-{chi}-default-0-0-0 -- bash -c 'ls -la /etc/clickhouse-server/config.d; echo; for f in /etc/clickhouse-server/config.d/*; do echo ===== $f; cat \"$f\"; echo; done'"
+            )
+            print(out)
+
+            rendered_name = "chop-secret-test-011-secret-kafka2-test-011-secrets.xml"
+            rendered = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"].get(rendered_name, "")
+            assert "<sasl_username>file_secret</sasl_username>" in rendered, error(rendered)
+            assert "<sasl_password>file_secret</sasl_password>" in rendered, error(rendered)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
 
 @TestScenario
 @Name("test_010011_1. Test user security and network isolation")
@@ -988,101 +1091,6 @@ def test_010011_2(self):
         delete_test_namespace()
 
 
-@TestScenario
-@Name("test_010011_3. Test k8s secrets usage")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Secrets("1.0"))
-def test_010011_3(self):
-    create_shell_namespace_clickhouse_template()
-
-    chi = "test-011-secrets"
-
-    with Given("test-011-secrets.yaml with secret storage"):
-        kubectl.apply(
-            util.get_full_path("manifests/secret/test-011-secret.yaml"),
-        )
-
-        kubectl.create_and_check(
-            manifest="manifests/chi/test-011-secrets.yaml",
-            check={
-                "pod_count": 1,
-                "do_not_delete": 1,
-            },
-        )
-
-        with Then("Connection to localhost should succeed with user1/password from secretKeyRef"):
-            out = clickhouse.query_with_error(chi, "select 'OK'", user="user1", pwd="pwduser1")
-            assert out == "OK"
-
-        with And("Connection to localhost should succeed with user2/password_sha256_hex from secretKeyRef"):
-            out = clickhouse.query_with_error(chi, "select 'OK'", user="user2", pwd="pwduser2")
-            assert out == "OK"
-
-        with And("Connection to localhost should succeed with user3/password_double_sha1_hex from secretKeyRef"):
-            out = clickhouse.query_with_error(chi, "select 'OK'", user="user3", pwd="pwduser3")
-            assert out == "OK"
-
-        with And("Connection to localhost should succeed with user4/password from secretKeyRef"):
-            out = clickhouse.query_with_error(chi, "select 'OK'", user="user4", pwd="pwduser4")
-            assert out == "OK"
-
-        with And("Connection to localhost should succeed with user5/password defined in valueFrom/secretKeyRef"):
-            out = clickhouse.query_with_error(chi, "select 'OK'", user="user5", pwd="pwduser5")
-            assert out == "OK"
-
-        with And("Settings should be securely populated from a secret"):
-            pod = kubectl.get_pod_spec(chi)
-            envs = pod["containers"][0]["env"]
-            user5_password_env = ""
-            sasl_username_env = ""
-            sasl_password_env = ""
-            custom0_env = ""
-            custom1_env = ""
-            for e in envs:
-                if "valueFrom" in e:
-                    print(e["name"])
-                    if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_USERNAME":
-                        sasl_username_env = e["name"]
-                    if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_PASSWORD":
-                        sasl_password_env = e["name"]
-                    if e["valueFrom"]["secretKeyRef"]["key"] == "pwduser5":
-                        user5_password_env = e["name"]
-                    if e["valueFrom"]["secretKeyRef"]["key"] == "custom0":
-                        custom0_env = e["name"]
-                    if e["valueFrom"]["secretKeyRef"]["key"] == "custom1":
-                        custom1_env = e["name"]
-
-            with By("Secrets are properly propagated to env variables"):
-                assert sasl_username_env != ""
-                assert sasl_password_env != ""
-                assert user5_password_env != ""
-
-            with By("Secrets are properly propagated to env variables for long settings names"):
-                assert custom0_env != ""
-                assert custom1_env != ""
-
-            with By("Secrets are properly referenced from settings.xml"):
-                cfm = kubectl.get("configmap", f"chi-{chi}-common-configd")
-                settings_xml = cfm["data"]["chop-generated-settings.xml"]
-                assert f"sasl_username from_env=\"{sasl_username_env}\"" in settings_xml
-                assert f"sasl_password from_env=\"{sasl_password_env}\"" in settings_xml
-
-            with By("Secrets are properly referenced from users.xml"):
-                cfm = kubectl.get("configmap", f"chi-{chi}-common-usersd")
-                users_xml = cfm["data"]["chop-generated-users.xml"]
-                env_matches = [from_env.strip() for from_env in users_xml.splitlines() if "from_env" in from_env]
-                print(f"Found env substitutions: {env_matches}")
-                assert f"password from_env=\"{user5_password_env}\"" in users_xml
-
-        kubectl.delete_chi(chi)
-        kubectl.launch(
-            "delete secret test-011-secret",
-            ns=self.context.test_namespace,
-            timeout=600,
-            ok_to_fail=True,
-        )
-
-    with Finally("I clean up"):
-        delete_test_namespace()
 
 
 @TestScenario
@@ -1223,6 +1231,138 @@ def test_010011_5(self, version_from="0.27.3", version_to=None):
         with And("user1 can log in with the secret-backed password"):
             out = clickhouse.query_with_error(chi, "select 'OK'", user="user1", pwd="pwduser1")
             assert out == "OK", error(f"expected the migrated CHI to work, got: {out}")
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_010011_6. secretKeyRef variable mapping needs a pod restart, file mapping hot-reloads")
+@Requirements(RQ_SRS_026_ClickHouseOperator_Secrets("1.0"))
+def test_010011_6(self):
+    """mappingType defaults to variable: the password is a container env var. A taskID
+    reconcile does not change the pod template, so the running container keeps the old
+    value until the pod is restarted and kubelet injects the Secret again. mappingType=file
+    projects the Secret key into users.d, and ClickHouse reloads the new password without
+    a restart.
+    """
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-011-6"
+    pod = f"chi-{chi}-default-0-0-0"
+    users_cm = f"chi-{chi}-common-usersd"
+    users_volume = users_cm
+
+    def login(pwd):
+        return clickhouse.query_with_error(chi, "select 'OK'", user="user1", pwd=pwd)
+
+    with Given("a 1-node CHI with user1 password from a Secret, default variable mapping"):
+        kubectl.apply(util.get_full_path("manifests/secret/test-011-6-secret.yaml"))
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-011-6.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+        with Then("user1 can log in with the Secret password"):
+            assert clickhouse.wait_config_applied(chi, user="user1", pwd="varpass1"), error(
+                "varpass1 should authenticate"
+            )
+
+        with And("users XML references the Secret via from_env"):
+            users_xml = kubectl.get("configmap", users_cm)["data"]["chop-generated-users.xml"]
+            assert "from_env" in users_xml, error(users_xml)
+
+    with When("the Secret password is changed"):
+        kubectl.apply(util.get_full_path("manifests/secret/test-011-6-secret-varpass2.yaml"))
+
+        with Then("the running container still has the old password"):
+            assert login("varpass1") == "OK", error("old password should keep working before restart")
+            assert "Authentication failed" in login("varpass2"), error(
+                "new password must not be visible before the container restarts"
+            )
+
+        with And("a reconcile leaves the pod running with the old password"):
+            started = kubectl.get_clickhouse_start(chi)
+            restarts = kubectl.get_container_restart_count(pod) or 0
+            assert started != "", error("could not read the ClickHouse container start time")
+
+            kubectl.force_chi_reconcile(chi, taskID="rotate-varpass")
+
+            assert kubectl.get_clickhouse_start(chi) == started, error(
+                "a taskID reconcile must not restart ClickHouse"
+            )
+            assert (kubectl.get_container_restart_count(pod) or 0) == restarts, error(
+                "a taskID reconcile must not restart the container"
+            )
+            assert login("varpass1") == "OK", error("old password should survive the reconcile")
+            assert "Authentication failed" in login("varpass2"), error(
+                "the new Secret value is not in the container environment yet"
+            )
+
+        with And("restarting the pod picks up the new environment"):
+            kubectl.launch(f"delete pod {pod}")
+            kubectl.wait_container_status(pod, "true")
+            assert kubectl.get_clickhouse_start(chi) != started, error(
+                "the recreated pod should have a new container start time"
+            )
+            assert clickhouse.wait_config_applied(chi, user="user1", pwd="varpass2"), error(
+                "varpass2 should authenticate after the pod is restarted"
+            )
+            assert "Authentication failed" in login("varpass1"), error(
+                "varpass1 should be rejected after the pod is restarted"
+            )
+
+    with When("mappingType is switched to file"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-011-6-file.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+        with Then("the Secret key is projected into users.d and from_env is gone"):
+            users_xml = kubectl.get("configmap", users_cm)["data"]["chop-generated-users.xml"]
+            assert "from_env" not in users_xml, error(users_xml)
+            volumes = kubectl.get_pod_spec(chi)["volumes"]
+            users_vol = next(v for v in volumes if v["name"] == users_volume)
+            assert "projected" in users_vol, error(users_vol)
+            secret_sources = [
+                src["secret"]["name"]
+                for src in users_vol["projected"]["sources"]
+                if "secret" in src
+            ]
+            assert secret_sources == ["test-011-6-secret"], error(users_vol)
+
+        with And("user1 authenticates with the password from the XML fragment"):
+            assert clickhouse.wait_config_applied(chi, user="user1", pwd="filepass1"), error(
+                "filepass1 from the projected users XML should authenticate"
+            )
+
+    with When("the Secret XML password is changed"):
+        started = kubectl.get_clickhouse_start(chi)
+        restarts = kubectl.get_container_restart_count(pod) or 0
+        assert started != "", error("could not read the ClickHouse container start time")
+
+        kubectl.apply(util.get_full_path("manifests/secret/test-011-6-secret-filepass2.yaml"))
+
+        with Then("the new password is picked up without a restart"):
+            # kubelet refreshes a projected Secret on its sync period (about a minute).
+            assert clickhouse.wait_config_applied(
+                chi, user="user1", pwd="filepass2", retries=40, delay=5
+            ), error("filepass2 should authenticate without restarting the pod")
+            assert kubectl.get_clickhouse_start(chi) == started, error(
+                "file mapping must not restart ClickHouse when the Secret changes"
+            )
+            assert (kubectl.get_container_restart_count(pod) or 0) == restarts, error(
+                "container restartCount must stay the same"
+            )
+            assert "Authentication failed" in login("filepass1"), error(
+                "filepass1 should be rejected after the Secret is reloaded"
+            )
 
     with Finally("I clean up"):
         delete_test_namespace()

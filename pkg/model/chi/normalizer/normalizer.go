@@ -864,6 +864,26 @@ func (n *Normalizer) normalizeConfigurationQuotas(quotas *chi.Settings, scope an
 
 const envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS"
 
+// settingsSecretFileMount reports where a mappingType=file setting is rendered.
+// spec.configuration.settings are served from config.d. Cluster, shard, and replica
+// settings are inherited and rendered into the host conf.d only.
+func settingsSecretFileMount(scope any) (target, host string, mount bool) {
+	switch typed := scope.(type) {
+	case *chi.Host:
+		if typed == nil {
+			return "", "", false
+		}
+		return chi.SecretConfigFileTargetHost, typed.GetName(), true
+	case *chi.ClickHouseInstallation:
+		if typed == nil {
+			return "", "", false
+		}
+		return chi.SecretConfigFileTargetCommon, "", true
+	default:
+		return "", "", false
+	}
+}
+
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
 func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings, scope any) *chi.Settings {
 	if settings == nil {
@@ -872,7 +892,31 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings, scop
 	settings.Normalize(n.settingsNormalizerOptions(replacerSettings, scope))
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
-		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings)
+		target, hostName, mountFile := settingsSecretFileMount(scope)
+		if setting.IsFileMapping() {
+			if !mountFile {
+				return
+			}
+			subst.RenderFileMappedSetting(
+				n.req,
+				settings,
+				name,
+				target,
+				hostName,
+				n.req.GetTarget().GetName(),
+				n.secretGet,
+			)
+			return
+		}
+		subst.ApplySecretKeyRef(
+			n.req,
+			settings,
+			name,
+			envVarNamePrefixConfigurationSettings,
+			false,
+			target,
+			hostName,
+		)
 	})
 	return settings
 }

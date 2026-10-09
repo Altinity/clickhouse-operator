@@ -80,6 +80,17 @@ spec:
             name: clickhouse-credentials
             key: password_double_sha1_hex
 
+      # valueFrom.mappingType=file projects the Secret key into users.d as chop-secret-*.xml.
+      # The key must be a users XML fragment. The kubelet refreshes it when the Secret
+      # changes, so ClickHouse can reload the password without a pod restart.
+      # mappingType defaults to variable (from_env), which does not hot-reload.
+      user_secret_ref_password_file/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: user-file.xml
+          mappingType: file
+
       # User 'readonly' has plain 'password' specified
       readonly/password: readonly_password
       readonly/profile: readonly
@@ -100,6 +111,14 @@ spec:
           secretKeyRef:
             name: clickhouse-credentials
             key: disable_internal_dns_cache
+      # valueFrom.mappingType=file renders the Secret value into config.d.
+      # Settings that share a Secret and a top-level section are one XML file.
+      max_connections:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: settings.xml
+          mappingType: file
 
     files:
       # will mount as separate volume inside /etc/clickhouse-server/secrets.d/example/clickhouse-credentials/example.xml

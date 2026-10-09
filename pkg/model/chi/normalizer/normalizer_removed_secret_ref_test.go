@@ -129,6 +129,105 @@ func TestValueFromSecretKeyRefStillNormalizes(t *testing.T) {
 		"the modern secretKeyRef syntax must not be rejected")
 	require.True(t, user.Get("password").HasAttributes(),
 		"secretKeyRef must be substituted into an ENV reference, not silently dropped")
+	require.Empty(t, target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetUsers, ""))
+}
+
+func TestValueFromSecretKeyRefFileMappingProjectsUsersFile(t *testing.T) {
+	target := &chi.ClickHouseInstallation{}
+	target.Namespace = "own-ns"
+
+	n := New(nil)
+	n.req = NewRequest(nil)
+	n.req.SetTarget(target)
+
+	settings := chi.NewSettings()
+	settings.Set("user1/password", chi.NewSettingSource(&chi.SettingSource{
+		ValueFrom: &types.DataSource{
+			SecretKeyRef: &core.SecretKeySelector{
+				LocalObjectReference: core.LocalObjectReference{Name: "creds"},
+				Key:                  "user1.xml",
+			},
+			MappingType: types.MappingTypeFile,
+		},
+	}))
+	user := chi.NewSettingsUser(settings, "user1")
+
+	n.normalizeConfigurationUser(user)
+
+	require.NotEqual(t, chi.StatusAborted, target.EnsureStatus().GetStatus())
+	require.False(t, user.Get("password").HasAttribute("from_env"))
+	require.False(t, user.Has("password_sha256_hex"),
+		"a file-mapped password must not be replaced with the default hash")
+	files := target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetUsers, "")
+	require.Len(t, files, 1)
+	require.Equal(t, "creds", files[0].Secret)
+	require.Equal(t, "user1.xml", files[0].Key)
+	require.Contains(t, files[0].Path, ".xml")
+
+	// The source setting stays so password normalization can see mappingType,
+	// but generated users XML must not publish it.
+	xml := user.ClickHouseConfig("users")
+	require.NotContains(t, xml, "data source")
+	require.NotContains(t, xml, "from_env")
+	require.NotContains(t, xml, "user1.xml")
+}
+
+func TestValueFromSecretKeyRefFileMappingProjectsSettingsFile(t *testing.T) {
+	target := &chi.ClickHouseInstallation{}
+	target.Name = "test-chi"
+	target.Namespace = "own-ns"
+	target.Spec.Reconcile = &chi.ChiReconcile{}
+
+	n := New(func(namespace, name string) (*core.Secret, error) {
+		return &core.Secret{
+			Data: map[string][]byte{
+				"sasl_username": []byte("file_user"),
+				"sasl_password": []byte("file_pass"),
+			},
+		}, nil
+	})
+	n.req = NewRequest(nil)
+	n.req.SetTarget(target)
+
+	settings := chi.NewSettings()
+	settings.Set("kafka2/sasl_username", chi.NewSettingSource(&chi.SettingSource{
+		ValueFrom: &types.DataSource{
+			SecretKeyRef: &core.SecretKeySelector{
+				LocalObjectReference: core.LocalObjectReference{Name: "creds"},
+				Key:                  "sasl_username",
+			},
+			MappingType: types.MappingTypeFile,
+		},
+	}))
+	settings.Set("kafka2/sasl_password", chi.NewSettingSource(&chi.SettingSource{
+		ValueFrom: &types.DataSource{
+			SecretKeyRef: &core.SecretKeySelector{
+				LocalObjectReference: core.LocalObjectReference{Name: "creds"},
+				Key:                  "sasl_password",
+			},
+			MappingType: types.MappingTypeFile,
+		},
+	}))
+
+	// Cluster scope only inherits. Installation settings are served from config.d.
+	n.normalizeConfigurationSettings(settings, &chi.Cluster{})
+	require.Empty(t, target.GetRuntime().GetAttributes().RenderedSecretConfig(chi.SecretConfigFileTargetCommon, ""))
+	require.True(t, settings.Get("kafka2/sasl_password").IsFileMapping())
+
+	n.normalizeConfigurationSettings(settings, target)
+	rendered := target.GetRuntime().GetAttributes().RenderedSecretConfig(chi.SecretConfigFileTargetCommon, "")
+	require.Len(t, rendered, 1)
+	xml, ok := rendered["chop-secret-creds-kafka2-test-chi.xml"]
+	require.True(t, ok, rendered)
+	require.Contains(t, xml, "<sasl_username>file_user</sasl_username>")
+	require.Contains(t, xml, "<sasl_password>file_pass</sasl_password>")
+	require.Empty(t, target.GetRuntime().GetAttributes().SecretConfigFiles(chi.SecretConfigFileTargetCommon, ""))
+	require.Empty(t, target.GetRuntime().GetAttributes().RenderedSecretConfig(chi.SecretConfigFileTargetHost, "chi-0-0"))
+
+	generated := settings.ClickHouseConfig("")
+	require.NotContains(t, generated, "from_env")
+	require.NotContains(t, generated, "data source")
+	require.NotContains(t, generated, "kafka2")
 }
 
 // Regression guard: status.Errors is inherited into the next normalization target

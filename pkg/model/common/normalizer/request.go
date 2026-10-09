@@ -85,3 +85,17 @@ func (c *Request[_]) AppendAdditionalVolumeMount(volumeMount core.VolumeMount) {
 	}
 	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeMountIfNotExists(volumeMount)
 }
+
+func (c *Request[_]) AppendSecretConfigFile(file chi.SecretConfigFile) {
+	if c == nil {
+		return
+	}
+	c.GetTarget().GetRuntime().GetAttributes().AppendSecretConfigFile(file)
+}
+
+func (c *Request[_]) AppendRenderedSecretSetting(target, host, path, field, value string) {
+	if c == nil {
+		return
+	}
+	c.GetTarget().GetRuntime().GetAttributes().AppendRenderedSecretSetting(target, host, path, field, value)
+}

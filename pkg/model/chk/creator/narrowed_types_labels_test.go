@@ -78,7 +78,7 @@ func normalizedCHK(t *testing.T) *chk.ClickHouseKeeperInstallation {
 			},
 		}},
 	}
-	cr, err := chkNormalizer.New().CreateTemplated(src, commonNormalizer.NewOptions[chk.ClickHouseKeeperInstallation]())
+	cr, err := chkNormalizer.New(nil).CreateTemplated(src, commonNormalizer.NewOptions[chk.ClickHouseKeeperInstallation]())
 	require.NoError(t, err)
 	require.NotNil(t, cr)
 	return cr

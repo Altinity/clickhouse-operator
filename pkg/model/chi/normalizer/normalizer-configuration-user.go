@@ -46,12 +46,14 @@ func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser)
 		if strings.HasPrefix(name, removedSecretRefFieldPrefix) {
 			n.rejectRemovedSecretRefField(user, name)
 		} else {
-			subst.ReplaceSettingsFieldWithEnvRefToSecretField(
+			subst.ApplySecretKeyRef(
 				n.req,
 				user,
 				name,
-				name,
 				envVarNamePrefixConfigurationUsers,
+				true,
+				api.SecretConfigFileTargetUsers,
+				"",
 			)
 		}
 	})
@@ -110,6 +112,12 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 	}
 
 	// From now on we either have a plaintext password specified (explicitly or via ENV), or no password at all
+
+	if user.Get("password").IsFileMapping() {
+		// The Secret is projected into users.d. It holds the password XML.
+		// Do not replace it with the default password.
+		return
+	}
 
 	if user.Get("password").HasAttributes() {
 		// Have plaintext password with attributes - means we have plaintext password explicitly specified via ENV var

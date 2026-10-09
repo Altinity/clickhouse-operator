@@ -48,9 +48,9 @@ type Normalizer struct {
 }
 
 // New creates new normalizer
-func New() *Normalizer {
+func New(secretGet subst.SecretGetter) *Normalizer {
 	return &Normalizer{
-		secretGet: nil,
+		secretGet: secretGet,
 		namer:     managers.NewNameManager(managers.NameManagerTypeKeeper),
 		macro:     macro.New(),
 		labeler:   labeler.New(nil),
@@ -303,7 +303,7 @@ func (n *Normalizer) normalizeConfigurationStage2(c *chk.Configuration) *chk.Con
 
 // normalizeConfigurationAllSettingsBasedSections normalizes Settings-based configuration
 func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *chk.Configuration) {
-	conf.Settings = n.normalizeConfigurationSettings(conf.Settings)
+	conf.Settings = n.normalizeConfigurationSettings(conf.Settings, n.req.GetTarget())
 	conf.Files = n.normalizeConfigurationFiles(conf.Files)
 }
 
@@ -577,16 +577,60 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster chi.ICluster) {
 const envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS"
 
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
-func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings) *chi.Settings {
+func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings, scope any) *chi.Settings {
 	if settings == nil {
 		return nil
 	}
 	settings.Normalize()
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
-		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings)
+		target, hostName, mountFile := settingsSecretFileMount(scope)
+		if setting.IsFileMapping() {
+			if !mountFile {
+				return
+			}
+			subst.RenderFileMappedSetting(
+				n.req,
+				settings,
+				name,
+				target,
+				hostName,
+				n.req.GetTarget().GetName(),
+				n.secretGet,
+			)
+			return
+		}
+		subst.ApplySecretKeyRef(
+			n.req,
+			settings,
+			name,
+			envVarNamePrefixConfigurationSettings,
+			false,
+			target,
+			hostName,
+		)
 	})
 	return settings
+}
+
+// settingsSecretFileMount reports where a mappingType=file setting is rendered.
+// Installation settings are served from config.d. Nested settings are inherited
+// and rendered into the host conf.d only.
+func settingsSecretFileMount(scope any) (target, host string, mount bool) {
+	switch typed := scope.(type) {
+	case *chi.Host:
+		if typed == nil {
+			return "", "", false
+		}
+		return chi.SecretConfigFileTargetHost, typed.GetName(), true
+	case *chk.ClickHouseKeeperInstallation:
+		if typed == nil {
+			return "", "", false
+		}
+		return chi.SecretConfigFileTargetCommon, "", true
+	default:
+		return "", "", false
+	}
 }
 
 // normalizeConfigurationFiles normalizes .spec.configuration.files
@@ -644,7 +688,7 @@ func (n *Normalizer) normalizeClusterStage2(cluster *chk.Cluster) *chk.Cluster {
 	// Inherit from .spec.defaults
 	cluster.InheritTemplatesFrom(n.req.GetTarget())
 
-	cluster.Settings = n.normalizeConfigurationSettings(cluster.Settings)
+	cluster.Settings = n.normalizeConfigurationSettings(cluster.Settings, nil)
 	cluster.Files = n.normalizeConfigurationFiles(cluster.Files)
 
 	cluster.PDBManaged = n.normalizePDBManaged(cluster.PDBManaged)
@@ -813,7 +857,7 @@ func (n *Normalizer) normalizeShardStage2(shard *chk.ChkShard, cluster *chk.Clus
 	n.normalizeShardWeight(shard)
 	// For each shard of this normalized cluster inherit from cluster
 	shard.InheritSettingsFrom(cluster)
-	shard.Settings = n.normalizeConfigurationSettings(shard.Settings)
+	shard.Settings = n.normalizeConfigurationSettings(shard.Settings, nil)
 	shard.InheritFilesFrom(cluster)
 	shard.Files = n.normalizeConfigurationFiles(shard.Files)
 	shard.InheritTemplatesFrom(cluster)
@@ -832,7 +876,7 @@ func (n *Normalizer) normalizeReplicaStage1(replica *chk.ChkReplica, cluster *ch
 func (n *Normalizer) normalizeReplicaStage2(replica *chk.ChkReplica, cluster *chk.Cluster, replicaIndex int) {
 	// For each replica of this normalized cluster inherit from cluster
 	replica.InheritSettingsFrom(cluster)
-	replica.Settings = n.normalizeConfigurationSettings(replica.Settings)
+	replica.Settings = n.normalizeConfigurationSettings(replica.Settings, nil)
 	replica.InheritFilesFrom(cluster)
 	replica.Files = n.normalizeConfigurationFiles(replica.Files)
 	replica.InheritTemplatesFrom(cluster)

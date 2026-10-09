@@ -59,10 +59,18 @@ func (s *SettingSource) GetSecretKeyRef() *core.SecretKeySelector {
 	if s == nil {
 		return nil
 	}
-	if s.ValueFrom == nil {
+	if s.ValueFrom == nil || s.ValueFrom.SecretKeyRef == nil {
 		return nil
 	}
 	return s.ValueFrom.SecretKeyRef
+}
+
+// IsFileMapping reports whether valueFrom.mappingType is file.
+func (s *SettingSource) IsFileMapping() bool {
+	if s == nil || s.ValueFrom == nil {
+		return false
+	}
+	return s.ValueFrom.IsFile()
 }
 
 // HasSecretKeyRef checks whether SecretKeySelector (typically named as SecretKeyRef) is available
@@ -115,6 +123,14 @@ func (s *Setting) GetSecretKeyRef() *core.SecretKeySelector {
 	}
 
 	return s.src.GetSecretKeyRef()
+}
+
+// IsFileMapping reports whether this source setting uses valueFrom.mappingType=file.
+func (s *Setting) IsFileMapping() bool {
+	if s == nil || !s.IsSource() {
+		return false
+	}
+	return s.src.IsFileMapping()
 }
 
 // HasSecretKeyRef checks whether SecretKeySelector (typically named as SecretKeyRef) is available

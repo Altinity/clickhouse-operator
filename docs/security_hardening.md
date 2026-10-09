@@ -184,10 +184,67 @@ spec:
             key: pwduser2
 ```
 
-Note that `valueFrom`/`secretKeyRef` always passes the value through an environment variable
-(rendered as `from_env=...` in the generated XML). The operator does not hash it, so where you
-previously relied on `k8s_secret_password` being hashed into `password_sha256_hex` for you, store
-the already-hashed value in the secret and reference it from `password_sha256_hex` as shown above.
+By default `valueFrom.mappingType` is `variable`: the operator injects an environment
+variable and renders `from_env`. Kubernetes does not update environment variables in a
+running container, so a Secret change is picked up only when the pod is recreated.
+
+`mappingType: file` for a user field projects that Secret key into `users.d`. The key
+must be a ClickHouse users XML fragment. The kubelet refreshes the file when the Secret
+changes, and ClickHouse reloads it. The operator does not read or hash that Secret.
+
+`mappingType: file` for a setting reads the Secret value and renders it into one XML
+file per Secret and top-level section: `config.d` for `spec.configuration.settings`, and
+the host `conf.d` for settings on a cluster, shard, replica, or host. `kafka/sasl_username`
+and `kafka/sasl_password` from the same Secret become a single `<kafka>` document. The
+operator rewrites that file on the next reconcile.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-secret
+stringData:
+  user1.xml: |
+    <clickhouse>
+      <users>
+        <user1>
+          <password_sha256_hex>65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5</password_sha256_hex>
+        </user1>
+      </users>
+    </clickhouse>
+  KAFKA_SASL_USERNAME: kafka
+  KAFKA_SASL_PASSWORD: secret
+```
+
+```yaml
+spec:
+  configuration:
+    users:
+      user1/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: user1.xml
+          mappingType: file
+    settings:
+      kafka/sasl_username:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: KAFKA_SASL_USERNAME
+          mappingType: file
+      kafka/sasl_password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: KAFKA_SASL_PASSWORD
+          mappingType: file
+```
+
+The operator does not hash Secret-backed passwords. Where you previously relied on
+`k8s_secret_password` being hashed into `password_sha256_hex` for you, store the
+already-hashed value in the secret, either as `password_sha256_hex` with the default
+`variable` mapping or inside the XML fragment used by `mappingType: file`.
 
 ### Securing the 'default' user
 

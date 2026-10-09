@@ -41,7 +41,7 @@ func TestKeeperTemplatesMergeIsNeutral(t *testing.T) {
 	settings.Set("keeper_server/tcp_port", chi.NewSettingScalar("2181"))
 	cr.Spec.Configuration = &chk.Configuration{Settings: settings}
 
-	got, err := New().CreateTemplated(cr, commonNormalizer.NewOptions[chk.ClickHouseKeeperInstallation]())
+	got, err := New(nil).CreateTemplated(cr, commonNormalizer.NewOptions[chk.ClickHouseKeeperInstallation]())
 	require.NoError(t, err)
 
 	require.Equal(t, "keeper-image", got.Spec.Templates.PodTemplates[0].Spec.Containers[0].Image)

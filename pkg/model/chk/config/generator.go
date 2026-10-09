@@ -43,6 +43,15 @@ func NewGenerator(cr chi.ICustomResource, namer interfaces.INameManager, opts *G
 	}
 }
 
+// GetRenderedSecretConfig returns file-mapped settings rendered into one XML
+// file per Secret and top-level section.
+func (c *Generator) GetRenderedSecretConfig(target, host string) map[string]string {
+	if c == nil || c.cr == nil {
+		return nil
+	}
+	return c.cr.GetRuntime().GetAttributes().RenderedSecretConfig(target, host)
+}
+
 // GetGlobalSettings creates data for global section of "settings.xml"
 func (c *Generator) GetGlobalSettings() string {
 	// No host specified means request to generate common config

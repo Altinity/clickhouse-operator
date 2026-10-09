@@ -147,6 +147,24 @@ func (n *xmlNode) NoValue() bool {
 	return (n.value == nil) || n.value.IsEmpty()
 }
 
+// renders reports whether buildXML writes a tag for this node.
+// A file-mapped source setting is not scalar or vector and writes nothing.
+func (n *xmlNode) renders() bool {
+	if n.value != nil && !n.value.IsEmpty() {
+		return n.value.IsScalar() || n.value.IsVector()
+	}
+	return n.hasRenderableChildren()
+}
+
+func (n *xmlNode) hasRenderableChildren() bool {
+	for i := range n.children {
+		if n.children[i].renders() {
+			return true
+		}
+	}
+	return false
+}
+
 // buildXML generates XML from xmlNode type linked list
 func (n *xmlNode) buildXML(w io.Writer, indent, tabSize uint8) {
 	switch {
@@ -175,6 +193,9 @@ func (n *xmlNode) buildXML(w io.Writer, indent, tabSize uint8) {
 //
 // </a>
 func (n *xmlNode) writeTagNoValue(w io.Writer, attributes string, indent, tabSize uint8) {
+	if !n.hasRenderableChildren() && attributes == "" {
+		return
+	}
 	n.writeTagOpen(w, indent, attributes, eol)
 	for i := range n.children {
 		n.children[i].buildXML(w, indent+tabSize, tabSize)

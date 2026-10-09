@@ -1033,8 +1033,9 @@ spec:
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers
 
                     any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
-                    secret value will pass in `pod.spec.containers.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/users.d/chop-generated-users.xml
-                    it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
+                    valueFrom.mappingType defaults to `variable`: the value is injected as a container env var and rendered with from_env in users.d/chop-generated-users.xml
+                    a Secret change is picked up only when the pod is recreated
+                    valueFrom.mappingType=`file` projects the Secret key into users.d as chop-secret-*.xml (the key must be a ClickHouse users XML fragment); the kubelet refreshes the file when the Secret changes
 
                     look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
@@ -1071,8 +1072,9 @@ spec:
                     any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
                     look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                    secret value will pass in `pod.spec.env`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
-                    it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
+                    valueFrom.mappingType defaults to `variable`: the value is injected as a container env var and rendered with from_env
+                    a Secret change is picked up only when the pod is recreated
+                    valueFrom.mappingType=`file` reads the Secret value and writes one chop-secret-<secret>-<section>-<name>.xml file in config.d for this section, or in the host conf.d for cluster, shard, replica, and host settings. Settings that share a Secret and a top-level section are combined. The operator rewrites the file on the next reconcile
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 files: &TypeFiles
@@ -2870,8 +2872,9 @@ spec:
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers
 
                     any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
-                    secret value will pass in `pod.spec.containers.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/users.d/chop-generated-users.xml
-                    it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
+                    valueFrom.mappingType defaults to `variable`: the value is injected as a container env var and rendered with from_env in users.d/chop-generated-users.xml
+                    a Secret change is picked up only when the pod is recreated
+                    valueFrom.mappingType=`file` projects the Secret key into users.d as chop-secret-*.xml (the key must be a ClickHouse users XML fragment); the kubelet refreshes the file when the Secret changes
 
                     look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
@@ -2908,8 +2911,9 @@ spec:
                     any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
                     look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                    secret value will pass in `pod.spec.env`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml
-                    it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
+                    valueFrom.mappingType defaults to `variable`: the value is injected as a container env var and rendered with from_env
+                    a Secret change is picked up only when the pod is recreated
+                    valueFrom.mappingType=`file` reads the Secret value and writes one chop-secret-<secret>-<section>-<name>.xml file in config.d for this section, or in the host conf.d for cluster, shard, replica, and host settings. Settings that share a Secret and a top-level section are combined. The operator rewrites the file on the next reconcile
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 files: &TypeFiles
@@ -5428,7 +5432,6 @@ metadata:
   namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.28.0
-
 # Template Parameters:
 #
 # NAMESPACE=${OPERATOR_NAMESPACE}

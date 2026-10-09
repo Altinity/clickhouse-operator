@@ -15,13 +15,36 @@
 package types
 
 import (
+	"strings"
+
 	core "k8s.io/api/core/v1"
 )
 
-// DataSource is a set of possible data sources
+const (
+	// MappingTypeVariable injects the Secret key as a container env var.
+	// ClickHouse reads it with from_env. This is the default.
+	MappingTypeVariable = "variable"
+	// MappingTypeFile projects the Secret key into the config directory ClickHouse
+	// already reloads (users.d, config.d, or conf.d) as an XML file. The kubelet
+	// refreshes that file when the Secret changes, so ClickHouse can reload it
+	// without a pod restart.
+	MappingTypeFile = "file"
+)
+
+// DataSource is a set of possible data sources.
+// mappingType selects how a secretKeyRef is presented to ClickHouse.
+// It is a property of the reference, not of the Secret.
 type DataSource struct {
-	// SecretKeyRef points to a secret and mirrors k8s SecretSource type
 	SecretKeyRef *core.SecretKeySelector `json:"secretKeyRef,omitempty" yaml:"secretKeyRef,omitempty"`
+	MappingType  string                  `json:"mappingType,omitempty"  yaml:"mappingType,omitempty"`
+}
+
+// IsFile reports whether mappingType is file.
+func (d *DataSource) IsFile() bool {
+	if d == nil {
+		return false
+	}
+	return strings.EqualFold(d.MappingType, MappingTypeFile)
 }
 
 func (in *DataSource) DeepCopy() *DataSource {
@@ -40,5 +63,4 @@ func (in *DataSource) DeepCopyInto(out *DataSource) {
 		*out = new(core.SecretKeySelector)
 		(*in).DeepCopyInto(*out)
 	}
-	return
 }

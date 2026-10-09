@@ -47,6 +47,14 @@ func (m *Manager) SetupVolumes(what interfaces.VolumeType, statefulSet *apps.Sta
 	panic("unknown volume type")
 }
 
+func secretProjections(files []api.SecretConfigFile) []k8s.SecretProjection {
+	out := make([]k8s.SecretProjection, 0, len(files))
+	for _, file := range files {
+		out = append(out, k8s.SecretProjection{Secret: file.Secret, Key: file.Key, Path: file.Path})
+	}
+	return out
+}
+
 func (m *Manager) SetCR(cr api.ICustomResource) {
 	m.cr = cr
 }
@@ -57,12 +65,15 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 	configMapCommonUsersName := m.namer.Name(interfaces.NameConfigMapCommonUsers, m.cr)
 	configMapHostName := m.namer.Name(interfaces.NameConfigMapHost, host)
 
-	// Add all ConfigMap objects as Volume objects of type ConfigMap
+	// mappingType=file secrets are projected next to the ConfigMap that serves
+	// them: config.d, users.d, or that host's conf.d. An empty list keeps the
+	// plain ConfigMap volume.
+	attrs := m.cr.GetRuntime().GetAttributes()
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
-		k8s.CreateVolumeForConfigMap(configMapCommonName),
-		k8s.CreateVolumeForConfigMap(configMapCommonUsersName),
-		k8s.CreateVolumeForConfigMap(configMapHostName),
+		k8s.CreateConfigVolume(configMapCommonName, secretProjections(attrs.SecretConfigFiles(api.SecretConfigFileTargetCommon, ""))),
+		k8s.CreateConfigVolume(configMapCommonUsersName, secretProjections(attrs.SecretConfigFiles(api.SecretConfigFileTargetUsers, ""))),
+		k8s.CreateConfigVolume(configMapHostName, secretProjections(attrs.SecretConfigFiles(api.SecretConfigFileTargetHost, host.GetName()))),
 	)
 
 	// And reference these Volumes in each Container via VolumeMount

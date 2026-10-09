@@ -45,6 +45,58 @@ func CreateVolumeForConfigMap(volumeName string) core.Volume {
 	}
 }
 
+// SecretProjection is one Secret key projected next to ConfigMap files.
+type SecretProjection struct {
+	Secret string
+	Key    string
+	Path   string
+}
+
+// CreateConfigVolume returns the ConfigMap volume, or a projected volume that
+// also contains Secret keys, when files is non-empty. Projected (not subPath)
+// so the kubelet refreshes Secret contents without recreating the pod.
+func CreateConfigVolume(volumeName string, files []SecretProjection) core.Volume {
+	if len(files) == 0 {
+		return CreateVolumeForConfigMap(volumeName)
+	}
+	var defaultMode int32 = 0644
+	sources := []core.VolumeProjection{
+		{
+			ConfigMap: &core.ConfigMapProjection{
+				LocalObjectReference: core.LocalObjectReference{Name: volumeName},
+			},
+		},
+	}
+	itemsBySecret := map[string][]core.KeyToPath{}
+	var secrets []string
+	for _, file := range files {
+		if _, ok := itemsBySecret[file.Secret]; !ok {
+			secrets = append(secrets, file.Secret)
+		}
+		itemsBySecret[file.Secret] = append(itemsBySecret[file.Secret], core.KeyToPath{
+			Key:  file.Key,
+			Path: file.Path,
+		})
+	}
+	for _, secret := range secrets {
+		sources = append(sources, core.VolumeProjection{
+			Secret: &core.SecretProjection{
+				LocalObjectReference: core.LocalObjectReference{Name: secret},
+				Items:                itemsBySecret[secret],
+			},
+		})
+	}
+	return core.Volume{
+		Name: volumeName,
+		VolumeSource: core.VolumeSource{
+			Projected: &core.ProjectedVolumeSource{
+				Sources:     sources,
+				DefaultMode: &defaultMode,
+			},
+		},
+	}
+}
+
 // CreateVolumeMount returns core.VolumeMount object with name and mount path
 func CreateVolumeMount(name, mountPath string) core.VolumeMount {
 	return core.VolumeMount{

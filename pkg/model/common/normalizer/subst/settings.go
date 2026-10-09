@@ -17,6 +17,7 @@ package subst
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	core "k8s.io/api/core/v1"
 
@@ -40,6 +41,8 @@ type req interface {
 	AppendAdditionalEnvVar(envVar core.EnvVar)
 	AppendAdditionalVolume(volume core.Volume)
 	AppendAdditionalVolumeMount(volumeMount core.VolumeMount)
+	AppendSecretConfigFile(file api.SecretConfigFile)
+	AppendRenderedSecretSetting(target, host, path, field, value string)
 }
 
 // substSettingsFieldWithDataFromDataSource substitute settings field with new setting built from the data source
@@ -86,6 +89,129 @@ func substSettingsFieldWithDataFromDataSource(
 
 	// Substitution done
 	return true
+}
+
+// ApplySecretKeyRef maps a valueFrom.secretKeyRef field.
+// valueFrom.mappingType=file projects the Secret key into a config directory
+// ClickHouse reloads (users.d, config.d, or conf.d) and leaves the setting out
+// of generated XML. mountFile is false while a setting is still being inherited
+// down to a host. Every other value, including omitted mappingType, stays an
+// env var + from_env.
+func ApplySecretKeyRef(
+	req req,
+	settings settings,
+	field string,
+	envVarNamePrefix string,
+	mountFile bool,
+	target string,
+	host string,
+) bool {
+	if settings.Get(field).IsFileMapping() {
+		if !mountFile {
+			return false
+		}
+		return mountSecretConfigFile(req, settings, field, target, host)
+	}
+	return ReplaceSettingsFieldWithEnvRefToSecretField(req, settings, field, field, envVarNamePrefix)
+}
+
+// RenderFileMappedSetting reads a mappingType=file settings value and records it
+// for one rendered XML file. Settings that share a Secret and a top-level path
+// (kafka2/sasl_username and kafka2/sasl_password) land in the same file.
+// The source setting stays in place so generated settings XML skips it.
+func RenderFileMappedSetting(
+	req req,
+	settings settings,
+	field string,
+	target string,
+	host string,
+	crName string,
+	secretGet SecretGetter,
+) bool {
+	if secretGet == nil || !settings.Get(field).IsFileMapping() {
+		return false
+	}
+	setting := settings.Get(field)
+	secretAddress, err := setting.FetchDataSourceAddress(req.GetTargetNamespace())
+	if err != nil {
+		return false
+	}
+	value, err := FetchSecretFieldValue(secretAddress, secretGet)
+	if err != nil {
+		return false
+	}
+	section := field
+	if i := strings.IndexByte(field, '/'); i >= 0 {
+		section = field[:i]
+	}
+	path := secretSettingsFileName(secretAddress.Name, section, crName)
+	if path == "" {
+		return false
+	}
+	req.AppendRenderedSecretSetting(target, host, path, field, value)
+	return true
+}
+
+func mountSecretConfigFile(req req, settings settings, field, target, host string) bool {
+	setting := settings.Get(field)
+	secretAddress, err := setting.FetchDataSourceAddress(req.GetTargetNamespace())
+	if err != nil {
+		return false
+	}
+	path := secretConfigFileName(secretAddress.Name, secretAddress.Key)
+	if path == "" {
+		return false
+	}
+	req.AppendSecretConfigFile(api.SecretConfigFile{
+		Target: target,
+		Host:   host,
+		Secret: secretAddress.Name,
+		Key:    secretAddress.Key,
+		Path:   path,
+	})
+	// Leave the source setting in place. It is not a scalar, so generated XML
+	// skips it, and user password normalization can still see mappingType=file
+	// and refrain from substituting the default password.
+	return true
+}
+
+// secretConfigFileName is the file name inside users.d.
+// The secret key itself must already be a ClickHouse XML fragment.
+func secretConfigFileName(secret, key string) string {
+	return chopSecretFileName(secret + "-" + key)
+}
+
+// secretSettingsFileName is one rendered settings file for a Secret and a
+// top-level settings section on this CR. Example:
+// chop-secret-test-011-secret-kafka2-test-011-secrets.xml
+func secretSettingsFileName(secret, section, crName string) string {
+	return chopSecretFileName(secret + "-" + section + "-" + crName)
+}
+
+func chopSecretFileName(raw string) string {
+	raw = strings.ToLower(raw)
+	var b strings.Builder
+	lastDash := false
+	for _, r := range raw {
+		ok := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if ok {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	name := strings.Trim(b.String(), "-")
+	if name == "" {
+		return ""
+	}
+	if len(name) > 200 {
+		name = name[:200]
+	}
+	return "chop-secret-" + name + ".xml"
 }
 
 // ReplaceSettingsFieldWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in.

@@ -1,0 +1,23 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-011-6
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    users:
+      default/password: default
+      # mappingType omitted: variable. The Secret key is injected as an env var
+      # and rendered with from_env. A new Secret value is visible only after
+      # the container is restarted.
+      user1/password:
+        valueFrom:
+          secretKeyRef:
+            name: test-011-6-secret
+            key: password
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1
