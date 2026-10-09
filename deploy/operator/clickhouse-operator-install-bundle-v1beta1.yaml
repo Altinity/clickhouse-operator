@@ -1033,8 +1033,10 @@ spec:
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers
 
                     any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
-                    secret value will pass in `pod.spec.containers.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/users.d/chop-generated-users.xml
-                    it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
+                    by default the secret value is passed in `pod.spec.containers.env` and generated with from_env=XXX in /etc/clickhouse-server/users.d/chop-generated-users.xml
+                    a password change is then picked up only after the Pod is recreated
+                    set `valueFrom.hotReload: true` on user password, password_sha256_hex, or password_double_sha1_hex to publish that user as chop-generated-hot-reload-users.xml in a CHI-owned Secret, mounted into users.d next to chop-generated-users.xml, and reload it without a Pod restart
+                    hotReload on any other field is rejected
 
                     look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
@@ -2870,8 +2872,10 @@ spec:
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers
 
                     any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
-                    secret value will pass in `pod.spec.containers.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/users.d/chop-generated-users.xml
-                    it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
+                    by default the secret value is passed in `pod.spec.containers.env` and generated with from_env=XXX in /etc/clickhouse-server/users.d/chop-generated-users.xml
+                    a password change is then picked up only after the Pod is recreated
+                    set `valueFrom.hotReload: true` on user password, password_sha256_hex, or password_double_sha1_hex to publish that user as chop-generated-hot-reload-users.xml in a CHI-owned Secret, mounted into users.d next to chop-generated-users.xml, and reload it without a Pod restart
+                    hotReload on any other field is rejected
 
                     look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
@@ -5428,7 +5432,6 @@ metadata:
   namespace: kube-system
   labels:
     clickhouse.altinity.com/chop: 0.28.0
-
 # Template Parameters:
 #
 # NAMESPACE=kube-system
@@ -5681,7 +5684,6 @@ subjects:
   - kind: ServiceAccount
     name: clickhouse-operator
     namespace: kube-system
-
 # Template Parameters:
 #
 # NAMESPACE=kube-system

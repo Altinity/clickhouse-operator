@@ -847,6 +847,67 @@ def test_010011(self):
 
 
 @TestScenario
+@Name("test_010011_6. Hot-reload user passwords from a Kubernetes Secret")
+@Requirements(RQ_SRS_026_ClickHouseOperator_Secrets("1.0"))
+def test_010011_6(self):
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-011-hot-reload"
+
+    def started_at():
+        return [
+            kubectl.get_field("pod", pod, ".status.containerStatuses[0].state.running.startedAt")
+            for pod in kubectl.get_pod_names(chi)
+        ]
+
+    def wait_login(user, pwd):
+        for attempt in range(1, 25):
+            outs = [
+                clickhouse.query_with_error(chi, "select 'OK'", user=user, pwd=pwd, pod=pod)
+                for pod in kubectl.get_pod_names(chi)
+            ]
+            if outs and all(out == "OK" for out in outs):
+                return
+            retry_sleep(attempt, 3, f"{user} password is not active on every replica yet")
+        assert False, error(f"{user} did not accept the password")
+
+    with Given("test-011-hot-reload.yaml"):
+        kubectl.apply(util.get_full_path("manifests/secret/test-011-hot-reload-secret.yaml"))
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-011-hot-reload.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+        wait_login("alice", "secret-value-1")
+        wait_login("bob", "bob-secret")
+        wait_login("carol", "carol-secret-1")
+        cm = kubectl.get("configmap", f"chi-{chi}-common-usersd")
+        users_xml = (cm.get("data") or {}).get("chop-generated-users.xml", "")
+        assert "<carol>" in users_xml, error("normal users must stay in chop-generated-users.xml")
+        assert "<alice>" not in users_xml and "<bob>" not in users_xml, error(
+            "hot-reload users must be published separately from chop-generated-users.xml"
+        )
+        secret = kubectl.get("secret", f"chi-{chi}-users")
+        assert "chop-generated-hot-reload-users.xml" in (secret.get("data") or {}), error(
+            "hot-reload users file is missing from the CHI Secret"
+        )
+        started = started_at()
+
+    with When("test-011-hot-reload-secret-2.yaml is applied"):
+        kubectl.apply(util.get_full_path("manifests/secret/test-011-hot-reload-secret-2.yaml"))
+        wait_login("alice", "secret-value-2")
+        wait_login("bob", "bob-secret-2")
+        # carol has no hotReload, so the Pod keeps the env value from start.
+        wait_login("carol", "carol-secret-1")
+        assert started_at() == started, error("Pods were restarted")
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
 @Name("test_010011_1. Test user security and network isolation")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0"))
 def test_010011_1(self):

@@ -584,6 +584,13 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings) *chi
 	settings.Normalize()
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
+		if setting.IsHotReload() {
+			n.req.GetTarget().EnsureStatus().ReconcileAbortWithReason(
+				chi.StatusReasonHotReloadRejected,
+				fmt.Sprintf("setting %q: hotReload is supported only on ClickHouse user password, password_sha256_hex, and password_double_sha1_hex", name),
+			)
+			return
+		}
 		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings)
 	})
 	return settings
@@ -597,6 +604,13 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings) *chi.Setti
 	files.Normalize()
 
 	files.WalkSafe(func(key string, setting *chi.Setting) {
+		if setting.IsHotReload() {
+			n.req.GetTarget().EnsureStatus().ReconcileAbortWithReason(
+				chi.StatusReasonHotReloadRejected,
+				fmt.Sprintf("setting %q: hotReload is supported only on ClickHouse user password, password_sha256_hex, and password_double_sha1_hex", key),
+			)
+			return
+		}
 		subst.ReplaceSettingsFieldWithMountedFile(n.req, files, key)
 	})
 

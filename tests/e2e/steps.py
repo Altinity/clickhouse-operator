@@ -38,6 +38,7 @@ def _test_run_failed(test=None):
     return False
 
 
+_dump_log_lines = 20
 def _dump_failed_test_namespace(test, ns, shell):
     """Best-effort cluster snapshot before namespace teardown."""
     operator_ns = getattr(test.context, "operator_namespace", None) or ns
@@ -52,17 +53,24 @@ def _dump_failed_test_namespace(test, ns, shell):
             print(f"failed to list {kind}: {exc}")
 
     try:
-        print("\n--- Operator log (last 10 lines) ---")
+        print(f"\n--- ClickHouse log (last {_dump_log_lines} lines) ---")
+        chis = kubectl.get_obj_names("", obj_type = "chi", kind = "", ns=ns, shell=shell)
+        for chi in chis:
+            names = kubectl.get_pod_names(chi, ns=ns, shell=shell)
+            for name in names:
+                logs = kubectl.launch(f"logs {name} --tail={_dump_log_lines}", ns=ns, ok_to_fail=True, shell=shell)
+                print(f"\n# {name}")
+                print(logs or "(empty ClickHouse log)")
+    except Exception as exc:
+        print(f"failed to fetch ClickHouse logs: {exc}")
+
+    try:
+        print(f"\n--- Operator log (last {_dump_log_lines} lines) ---")
         operator_pod = kubectl.get_operator_pod(ns=operator_ns, shell=shell)
         if not operator_pod:
             print(f"(operator pod not found in namespace {operator_ns})")
         else:
-            logs = kubectl.launch(
-                f"logs {operator_pod} -c clickhouse-operator --tail=10",
-                ns=operator_ns,
-                ok_to_fail=True,
-                shell=shell,
-            )
+            logs = kubectl.launch(f"logs {operator_pod} -c clickhouse-operator --tail={_dump_log_lines}", ns=operator_ns, ok_to_fail=True, shell=shell)
             print(logs or "(empty operator log)")
     except Exception as exc:
         print(f"failed to fetch operator logs: {exc}")

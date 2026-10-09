@@ -36,6 +36,8 @@ const (
 	LabelConfigMapValueCRStorage     = "CRStorage"
 	LabelConfigMapValueCRCommonUsers = "CRCommonUsers"
 	LabelConfigMapValueHost          = "Host"
+	LabelSecret                      = "APIGroupName" + "/" + "Secret"
+	LabelSecretValueUsers            = "Users"
 	LabelService                     = "APIGroupName" + "/" + "Service"
 	LabelServiceValueCR              = "chi or chk"
 	LabelServiceValueCluster         = "cluster"
