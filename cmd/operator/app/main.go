@@ -104,6 +104,7 @@ func Run() {
 	launchClickHouse(ctx, &wg)
 	launchClickHouseReconcilerMetricsExporter(ctx, &wg)
 	launchKeeper(ctx, &wg)
+	launchBackup(ctx, &wg)
 
 	// Wait for completion
 	<-ctx.Done()
@@ -221,6 +222,25 @@ func launchKeeper(ctx context.Context, wg *sync.WaitGroup) {
 			return
 		}
 		log.Info("Starting keeper OK")
+	}()
+}
+
+func launchBackup(ctx context.Context, wg *sync.WaitGroup) {
+	backupErr := initBackup(ctx)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if backupErr == nil {
+			log.Info("Starting backup")
+			backupErr = runBackup(ctx)
+			if backupErr == nil {
+				log.Info("Starting backup OK")
+			} else {
+				log.Warning("Starting backup FAILED with err: %v", backupErr)
+			}
+		} else {
+			log.Warning("Starting backup skipped due to failed initialization with err: %v", backupErr)
+		}
 	}()
 }
 

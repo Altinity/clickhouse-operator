@@ -1,0 +1,101 @@
+# Prerequisite for operator-managed backups: a ClickHouseInstallation whose pods run
+# the clickhouse-backup sidecar in server mode.
+#
+# The ClickHouseBackup / ClickHouseBackupSchedule / ClickHouseRestore controllers do NOT
+# inject this sidecar - they trigger it remotely through the system.backup_actions
+# integration table. The sidecar MUST therefore be present and configured with
+# API_CREATE_INTEGRATION_TABLES=true.
+#
+# For sharded clusters, configure a remote path that includes the {shard} macro so each
+# shard's backup is stored in a distinct location under the same backup name.
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-backup-s3
+type: Opaque
+stringData:
+  # Object storage credentials consumed by the clickhouse-backup sidecar.
+  S3_ACCESS_KEY: "minio-access-key"
+  S3_SECRET_KEY: "minio-secret-key"
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: backup-demo
+spec:
+  defaults:
+    templates:
+      podTemplate: clickhouse-with-backup-sidecar
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 2
+  templates:
+    podTemplates:
+      - name: clickhouse-with-backup-sidecar
+        metadata:
+          annotations:
+            # Expose the clickhouse-backup metrics endpoint to Prometheus.
+            clickhouse.backup/scrape: 'true'
+            clickhouse.backup/port: '7171'
+            clickhouse.backup/path: '/metrics'
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:24.8
+
+            - name: clickhouse-backup
+              image: altinity/clickhouse-backup:2.7.2
+              imagePullPolicy: IfNotPresent
+              command:
+                - bash
+                - -xc
+                - "/bin/clickhouse-backup server"
+              env:
+                - name: API_LISTEN
+                  value: "0.0.0.0:7171"
+                - name: API_ENABLE_METRICS
+                  value: "true"
+                # Required: lets the operator's jobs drive backups via system.backup_actions.
+                - name: API_CREATE_INTEGRATION_TABLES
+                  value: "true"
+                # Required for restoring Replicated* tables: schema is recreated ON CLUSTER
+                # so all replicas share one Keeper path and replication can sync the data.
+                - name: RESTORE_SCHEMA_ON_CLUSTER
+                  value: "{cluster}"
+                - name: REMOTE_STORAGE
+                  value: "s3"
+                - name: BACKUPS_TO_KEEP_REMOTE
+                  value: "7"
+                # Compression (sidecar-level, applies to every backup): tar|lz4|zstd|gzip|...
+                - name: COMPRESSION_FORMAT
+                  value: "zstd"
+                # Encryption at rest via object-storage server-side encryption (S3 example).
+                # For SSE-KMS also set SSE_KMS_KEY_ID; Azure uses SSE_KEY, GCS uses ENCRYPTION_KEY.
+                - name: S3_SSE
+                  value: "AES256"
+                - name: S3_ENDPOINT
+                  value: https://minio.minio
+                - name: S3_BUCKET
+                  value: clickhouse-backup
+                # {shard} macro keeps each shard's backup in its own remote path.
+                - name: S3_PATH
+                  value: backup/shard-{shard}
+                - name: S3_FORCE_PATH_STYLE
+                  value: "true"
+                - name: S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: clickhouse-backup-s3
+                      key: S3_ACCESS_KEY
+                - name: S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: clickhouse-backup-s3
+                      key: S3_SECRET_KEY
+              ports:
+                - name: backup-rest
+                  containerPort: 7171
