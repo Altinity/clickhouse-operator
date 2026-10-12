@@ -104,8 +104,9 @@ func (c *STS) get(ctx context.Context, namespace, name string) (*apps.StatefulSe
 func (c *STS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	yamlBytes, _ := yaml.Marshal(sts)
 	log.V(3).M(sts).Info("Going to create STS: %s\n%s", util.NamespaceNameString(sts), string(yamlBytes))
-	err := c.kubeClient.Create(ctx, sts)
-	return sts, err
+	return commonKube.CreateWithRetry(ctx, func() (*apps.StatefulSet, error) {
+		return sts, c.kubeClient.Create(ctx, sts)
+	})
 }
 
 func (c *STS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {

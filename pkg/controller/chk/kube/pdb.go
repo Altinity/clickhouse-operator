@@ -39,8 +39,9 @@ func NewPDB(kubeClient client.Client, apiReader client.Reader) *PDB {
 }
 
 func (c *PDB) Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	err := c.kubeClient.Create(ctx, pdb)
-	return pdb, err
+	return commonKube.CreateWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
+		return pdb, c.kubeClient.Create(ctx, pdb)
+	})
 }
 
 func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error) {
