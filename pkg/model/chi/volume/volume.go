@@ -69,11 +69,12 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 		k8s.CreateVolumeForConfigMap(configMapHostName),
 	)
 
-	// config.d and host conf.d are not credential-bearing and stay on every container.
+	// Mount order is common config.d, users.d, host conf.d. An upgrade compares the
+	// existing Pod template by index, so moving users.d changes both the name and
+	// the path of the following mount and rolls every Pod.
 	k8s.StatefulSetAppendVolumeMountsInAllContainers(
 		statefulSet,
 		k8s.CreateVolumeMount(configMapCommonName, config.DirPathConfigCommon),
-		k8s.CreateVolumeMount(configMapHostName, config.DirPathConfigHost),
 	)
 
 	if m.cr.GetRuntime().GetAttributes().GetHotReloadUsers() {
@@ -81,13 +82,16 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 		if err := appendHotReloadUsersVolume(statefulSet, configMapCommonUsersName, secretName); err != nil {
 			log.New().F().Error("unable to mount hot-reload users configuration: %s", err)
 		}
-		return
+	} else {
+		k8s.StatefulSetAppendVolumeMountsInAllContainers(
+			statefulSet,
+			k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathConfigUsers),
+		)
 	}
 
-	// No hot-reload credentials. Mount users.d on every container, as before.
 	k8s.StatefulSetAppendVolumeMountsInAllContainers(
 		statefulSet,
-		k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathConfigUsers),
+		k8s.CreateVolumeMount(configMapHostName, config.DirPathConfigHost),
 	)
 }
 
