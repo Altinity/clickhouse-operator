@@ -127,13 +127,14 @@ func GetWithRetry[T any](ctx context.Context, get func() (T, error)) (T, error) 
 
 // createRetryBackoff covers OwnerReferencesPermissionEnforcement's window after a CRD is
 // created (observed 5-23s, see https://github.com/Altinity/clickhouse-operator/issues/2094):
-// 1s, 2s, 4s, 8s, 10s, 10s - about 35s across 7 attempts. A var so tests can shrink it.
+// 1s, 2s, 4s, 8s, then 10s - about 75s across 11 attempts, leaving room for a slow apiserver.
+// A var so tests can shrink it.
 var createRetryBackoff = wait.Backoff{
 	Duration: time.Second,
 	Factor:   2.0,
 	Jitter:   0.1,
 	Cap:      10 * time.Second,
-	Steps:    6,
+	Steps:    10,
 }
 
 // IsOwnerRefAdmissionPending reports whether err is the OwnerReferencesPermissionEnforcement
