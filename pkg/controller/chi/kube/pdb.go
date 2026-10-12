@@ -40,8 +40,9 @@ func NewPDB(kubeClient kube.Interface) *PDB {
 }
 
 func (c *PDB) Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(ctx, pdb, controller.NewCreateOptions())
+	return commonKube.CreateWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
+		return c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(k8sCtx(ctx), pdb, controller.NewCreateOptions())
+	})
 }
 
 func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error) {

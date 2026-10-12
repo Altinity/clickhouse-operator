@@ -151,3 +151,62 @@ func TestGetWithRetry(t *testing.T) {
 		}
 	})
 }
+
+// ownerRefPending is the error OwnerReferencesPermissionEnforcement returns right after the
+// owner's CRD is created (https://github.com/Altinity/clickhouse-operator/issues/2094).
+func ownerRefPending() error {
+	return apiErrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "y", errors.New(
+		"cannot set blockOwnerDeletion in this case because cannot find RESTMapping for APIVersion "+
+			"clickhouse.altinity.com/v1 Kind ClickHouseInstallation: no matches for kind"))
+}
+
+func TestCreateWithRetry(t *testing.T) {
+	orig := createRetryBackoff
+	createRetryBackoff = wait.Backoff{Duration: time.Millisecond, Factor: 2.0, Cap: 4 * time.Millisecond, Steps: 3}
+	defer func() { createRetryBackoff = orig }()
+	gr := schema.GroupResource{Resource: "configmaps"}
+
+	tests := []struct {
+		name      string
+		errs      []error // returned by successive calls; nil once exhausted
+		wantCalls int
+		wantErr   func(error) bool
+	}{
+		{"owner-ref admission pending, then accepted", []error{ownerRefPending(), ownerRefPending()}, 3, nil},
+		{"transient, then accepted", []error{connRefused()}, 2, nil},
+		{"other forbidden is terminal", []error{apiErrors.NewForbidden(gr, "y", errors.New("RBAC"))}, 1, apiErrors.IsForbidden},
+		{"already exists is terminal", []error{apiErrors.NewAlreadyExists(gr, "y")}, 1, apiErrors.IsAlreadyExists},
+		{"gives up after Steps+1 attempts", []error{ownerRefPending(), ownerRefPending(), ownerRefPending(), ownerRefPending(), ownerRefPending()}, 4, IsOwnerRefAdmissionPending},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			_, err := CreateWithRetry(context.Background(), func() (int, error) {
+				calls++
+				if calls <= len(tt.errs) {
+					return 0, tt.errs[calls-1]
+				}
+				return 1, nil
+			})
+			if calls != tt.wantCalls {
+				t.Fatalf("calls=%d, want %d", calls, tt.wantCalls)
+			}
+			if (tt.wantErr == nil) != (err == nil) || (tt.wantErr != nil && !tt.wantErr(err)) {
+				t.Fatalf("unexpected err: %v", err)
+			}
+		})
+	}
+
+	t.Run("cancelled ctx stops retrying", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		calls := 0
+		_, err := CreateWithRetry(ctx, func() (int, error) {
+			calls++
+			return 0, ownerRefPending()
+		})
+		if calls != 1 || !IsOwnerRefAdmissionPending(err) {
+			t.Fatalf("calls=%d err=%v, want 1/owner-ref pending", calls, err)
+		}
+	})
+}
