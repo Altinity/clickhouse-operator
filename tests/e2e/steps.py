@@ -65,6 +65,18 @@ def _dump_failed_test_namespace(test, ns, shell):
         print(f"failed to fetch ClickHouse logs: {exc}")
 
     try:
+        print("\n--- CHI action plan ---")
+        chis = kubectl.get_obj_names("", obj_type = "chi", kind = "", ns=ns, shell=shell)
+        if not chis:
+            print("(no chi)")
+        for chi in chis:
+            plan = kubectl.get_actionPlan("chi", chi, ns=ns, shell=shell)
+            print(f"\n# chi-storage-{chi} status-actionPlan")
+            print(plan or "(empty action plan)")
+    except Exception as exc:
+        print(f"failed to fetch CHI action plan: {exc}")
+
+    try:
         print(f"\n--- Operator log (last {_dump_log_lines} lines) ---")
         operator_pod = kubectl.get_operator_pod(ns=operator_ns, shell=shell)
         if not operator_pod:
