@@ -777,6 +777,24 @@ spec:
                     terminationGracePeriod:
                       type: integer
                       description: "Optional duration in seconds the pod needs to terminate gracefully. \nLook details in `pod.spec.terminationGracePeriodSeconds`\n"
+                backup:
+                  type: object
+                  description: "EXPERIMENTAL. Defaults of operator-managed backup, see docs/backup.md"
+                  properties:
+                    remotePath:
+                      type: string
+                      description: |
+                        Where the clickhouse-backup sidecar of a host keeps its backups when the remote storage settings of its
+                        cluster set no path. A template clickhouse-backup expands with the macros of the host: {namespace},
+                        {installation}, {cluster}, {shard}, {replica}. Default: backup/{namespace}/{installation}/{cluster}/{shard}.
+                        Changing it rolls the pods of every backup-enabled cluster and leaves the backups made under the old path
+                        where they are
+                    objectDiskPath:
+                      type: string
+                      description: |
+                        Where the clickhouse-backup sidecar of a host keeps the object disk data of its backups when the remote
+                        storage settings of its cluster set no object disk path. A template like remotePath.
+                        Default: object_disks/{namespace}/{installation}/{cluster}/{shard}
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"
