@@ -33,6 +33,8 @@ func (c *Creator) stsSetupApplication(statefulSet *apps.StatefulSet, host *api.H
 	c.stsSetupAppContainer(statefulSet, host)
 	// Setup dedicated log container
 	c.stsSetupLogContainer(statefulSet, host)
+	// Setup backup sidecar container
+	c.stsSetupBackupContainer(statefulSet, host)
 	// Setup additional host alias(es)
 	c.stsSetupHostAliases(statefulSet, host)
 }
@@ -180,6 +182,18 @@ func (c *Creator) stsSetupLogContainer(statefulSet *apps.StatefulSet, host *api.
 		c.stsEnsureLogContainerSpecified(statefulSet)
 		c.a.V(1).F().Info("add log container for host: %s", host.Runtime.Address.HostName)
 	}
+}
+
+// stsSetupBackupContainer is a unification wrapper.
+// Ensures backup sidecar container is in place, if required
+func (c *Creator) stsSetupBackupContainer(statefulSet *apps.StatefulSet, host *api.Host) {
+	c.cm.EnsureBackupContainer(statefulSet, host)
+}
+
+// stsSetupBackupContainerStorage is a unification wrapper.
+// Runs after storage setup, so the backup sidecar gets every volume the app container has been given
+func (c *Creator) stsSetupBackupContainerStorage(statefulSet *apps.StatefulSet, host *api.Host) {
+	c.cm.EnsureBackupContainerVolumeMounts(statefulSet, host)
 }
 
 // stsGetAppContainer is a unification wrapper
