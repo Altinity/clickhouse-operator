@@ -24,9 +24,10 @@ import (
 type StringBool string
 
 // UnmarshalJSON accepts native JSON bool (true/false), integer (0/1, any other
-// int reads as 1), or string ("true", "yes", "On", "enabled", "1", etc.) and
-// keeps it as a string: a bool as True/False, an integer as 0/1, a string as
-// written. Lets users write `secure: true` (native YAML bool) or
+// integer that fits an int reads as 1), or any string (the vocabulary IsValid
+// accepts is "true", "yes", "On", "enabled", "1", etc.) and keeps it as a
+// string: a bool as True/False, an integer as 0/1, a string as written; null
+// leaves it unset. Lets users write `secure: true` (native YAML bool) or
 // `secure: "true"` (string) interchangeably in their CRs — kubectl converts
 // YAML to JSON before submitting, so this is the load-bearing surface. A whole
 // number written as 1.0 or 1e3 reaches it as the integer 1 or 1000: the YAML to
@@ -43,11 +44,12 @@ type StringBool string
 // its cache never syncs, and none of those resources is reconciled until the
 // value is fixed. A watch event that carries it breaks the watch the same way.
 //
-// A value of any other type — a fraction, an object, an array — is therefore
-// kept as its compacted JSON text. IsValid refuses it, as it refuses any string
-// outside the vocabulary, and the value fares as such a string does: the backup
-// resources, for instance, report InvalidSpec. Either way it stays with the one
-// resource that carries it.
+// Any other value — a fraction, an integer beyond an int, an object, an array —
+// is therefore kept as its compacted JSON text. IsValid refuses it, as it
+// refuses any string outside the vocabulary, and the value fares as such a
+// string does: the backup resources, for instance, report InvalidSpec. Whatever
+// a field makes of it, no decode fails: every other resource the informer
+// watches decodes as before.
 func (s *StringBool) UnmarshalJSON(data []byte) error {
 	// null → leave at zero value (the parent's *StringBool stays nil-like)
 	str := string(data)
