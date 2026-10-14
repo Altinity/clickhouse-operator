@@ -15,8 +15,8 @@
 package types
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
 	"strings"
 )
 
@@ -29,8 +29,25 @@ type StringBool string
 // `secure: "true"` (string) interchangeably in their CRs — kubectl converts
 // YAML to JSON before submitting, so this is the load-bearing surface.
 //
-// The CRD schema mirrors this polymorphism via `anyOf:[boolean,integer,string]`
-// at the &TypeStringBool anchor in deploy/builder/templates-install-bundle.
+// It never fails on a value the API server admits. The CRD schema cannot express
+// the bool|integer|string union, so the &TypeStringBool anchor in
+// deploy/builder/templates-install-bundle leaves the field untyped
+// (x-kubernetes-preserve-unknown-fields), and the API server stores any JSON
+// value: `secure: 1.5`, `suspend: {}` or `verify: [true]` apply cleanly. An error
+// here would not stay with the one resource that carries such a value: an
+// informer decodes all the resources of a kind as one list, so a single item that
+// fails to decode fails the whole list, the reflector retries it forever, its
+// cache never syncs, and no resource of the kind is reconciled in any namespace
+// until the value is fixed. A watch event that carries it breaks the watch the
+// same way.
+//
+// A value of any other type — a fraction, a number in exponent form (1e3), an
+// object, an array — is therefore kept as its JSON text. IsValid refuses it, as it
+// refuses any string outside the vocabulary, so the resource is turned down on its
+// own by whatever validates the field (the backup resources report InvalidSpec),
+// while every other resource of the kind decodes. The text is compacted, so that
+// one value reads alike however the manifest formats it: `{ "a" : [ 1, 2 ] }`
+// and `{"a":[1,2]}` both become `{"a":[1,2]}`.
 func (s *StringBool) UnmarshalJSON(data []byte) error {
 	// null → leave at zero value (the parent's *StringBool stays nil-like)
 	str := string(data)
@@ -66,7 +83,15 @@ func (s *StringBool) UnmarshalJSON(data []byte) error {
 		}
 		return nil
 	}
-	return fmt.Errorf("StringBool: cannot unmarshal %s — expected bool, integer (0/1), or string", str)
+	// Any other JSON value: kept as its compacted text, which IsValid refuses, see
+	// above. Compact cannot fail here: the decoder validated the JSON before
+	// handing the value over.
+	var written bytes.Buffer
+	if err := json.Compact(&written, data); err != nil {
+		return err
+	}
+	*s = StringBool(written.String())
+	return nil
 }
 
 // Set of string boolean constants
