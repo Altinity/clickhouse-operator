@@ -294,6 +294,16 @@ func (host *Host) GetPodTemplate() (*PodTemplate, bool) {
 	return host.GetCR().GetPodTemplate(name)
 }
 
+// GetBackupPodTemplate gets the pod template the clickhouse-backup sidecar of the host is built on, which the backup
+// of its cluster names
+func (host *Host) GetBackupPodTemplate() (*PodTemplate, bool) {
+	name := host.GetCluster().GetBackup().GetPodTemplate().Value()
+	if name == "" {
+		return nil, false
+	}
+	return host.GetCR().GetPodTemplate(name)
+}
+
 // GetServiceTemplate gets service template
 func (host *Host) GetServiceTemplate() (*ServiceTemplate, bool) {
 	if !host.GetTemplates().HasReplicaServiceTemplate() {
