@@ -16,6 +16,8 @@ package chop
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -241,6 +243,36 @@ func TestResolveRootCAFromSecret(t *testing.T) {
 			inline := tc.inline
 			resolveRootCAFromSecret(&inline, tc.secretName, tc.secretKey, tc.operatorNs, "test clickhouse.access", tc.get)
 			require.Equal(t, tc.wantRootCA, inline, "rootCA")
+		})
+	}
+}
+
+// TestInit_RefusesFIPSSwitchNotBoolean verifies that Init refuses a FIPS switch
+// of the configuration file that is not a boolean before its first network call:
+// the checks it runs before that call — the refusal of an insecure kubeconfig
+// among them — would read it as off.
+func TestInit_RefusesFIPSSwitchNotBoolean(t *testing.T) {
+	cases := []struct {
+		name    string
+		value   string
+		refused bool
+	}{
+		{"mistyped word", `"ture"`, true},
+		{"list", `[true]`, true},
+		{"bool", `true`, false},
+		{"word", `"no"`, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.yaml")
+			require.NoError(t, os.WriteFile(path, []byte("security:\n  fips:\n    enforced: "+tc.value+"\n"), 0o600))
+			cm := newConfigManager(nil, nil, path)
+			fileConfig, err := cm.getFileBasedConfig(path)
+			require.NoError(t, err, "the file decodes")
+			require.Equal(t, tc.refused, fileConfig.Security.GetFIPS().Validate() != nil)
+			if tc.refused {
+				require.ErrorIs(t, cm.Init(), api.ErrInvalidFIPSEnforced)
+			}
 		})
 	}
 }
