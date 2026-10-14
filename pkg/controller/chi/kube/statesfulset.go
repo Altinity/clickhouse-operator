@@ -76,8 +76,9 @@ func (c *STS) Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 }
 
 func (c *STS) Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, controller.NewCreateOptions())
+	return commonKube.CreateWithRetry(ctx, func() (*apps.StatefulSet, error) {
+		return c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(k8sCtx(ctx), statefulSet, controller.NewCreateOptions())
+	})
 }
 
 // Update is an internal function, used in reconcileStatefulSet only

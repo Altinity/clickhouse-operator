@@ -79,8 +79,9 @@ func (c *Secret) Get(ctx context.Context, params ...any) (*core.Secret, error) {
 }
 
 func (c *Secret) Create(ctx context.Context, svc *core.Secret) (*core.Secret, error) {
-	err := c.kubeClient.Create(ctx, svc)
-	return svc, err
+	return commonKube.CreateWithRetry(ctx, func() (*core.Secret, error) {
+		return svc, c.kubeClient.Create(ctx, svc)
+	})
 }
 
 func (c *Secret) Update(ctx context.Context, svc *core.Secret) (*core.Secret, error) {
