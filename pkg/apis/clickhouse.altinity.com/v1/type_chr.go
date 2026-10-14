@@ -24,7 +24,7 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClickHouseRestore defines a one-off restore of a remote backup into a ClickHouseInstallation.
+// ClickHouseRestore defines a one-off restore of a backup into a ClickHouseInstallation.
 // The operator reconciles it into a Kubernetes Job per cluster that restores the schema on every
 // replica of the cluster and the data on the first replica of each shard, from which native
 // replication fills the remaining replicas.
@@ -48,10 +48,10 @@ type ClickHouseRestoreSpec struct {
 	// Cluster optionally restricts the restore to one cluster of the CHI, immutable. Empty restores
 	// every backup-enabled cluster, each in a Job of its own.
 	Cluster string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
-	// BackupName is the remote backup to restore.
+	// BackupName is the backup to restore.
 	BackupName string `json:"backupName" yaml:"backupName"`
 	// SourceInstallation and SourceNamespace name the installation, and its namespace, that made the backup, when not
-	// the restored one, immutable: the restore reads the backup from the remote paths the {installation} and
+	// the restored one, immutable: the restore reads the backup from the storage paths the {installation} and
 	// {namespace} macros give there. Empty, each is that of the restored installation.
 	SourceInstallation string `json:"sourceInstallation,omitempty" yaml:"sourceInstallation,omitempty"`
 	SourceNamespace    string `json:"sourceNamespace,omitempty"    yaml:"sourceNamespace,omitempty"`
@@ -163,7 +163,7 @@ func (spec *ClickHouseRestoreSpec) Validate() error {
 type ClickHouseRestoreStatus struct {
 	// Phase is one of Pending, Running, Completed, Failed.
 	Phase OperationPhase `json:"phase,omitempty" yaml:"phase,omitempty"`
-	// BackupName is the remote backup the restore Jobs restore, as it was when the first Job was created.
+	// BackupName is the backup the restore Jobs restore, as it was when the first Job was created.
 	BackupName string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
 	// Cluster is the cluster spec.cluster named when the restore was validated, empty for a restore of every
 	// backup-enabled cluster. What the restore holds and whether it restores access entities follow it,

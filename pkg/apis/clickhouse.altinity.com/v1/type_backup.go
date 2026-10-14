@@ -66,7 +66,7 @@ type ClusterBackup struct {
 	// container sets is kept, and only what it lacks is filled in. Only that container is taken, not the other
 	// containers, volumes or pod settings of the template. Empty, the operator builds the sidecar on its own.
 	PodTemplate *types.String `json:"podTemplate,omitempty"            yaml:"podTemplate,omitempty"`
-	// Storages declares the storages backups may be kept in, each under a name of its own. A cluster takes
+	// Storages declares the storages the backups may be kept in, each under a name of its own. A cluster takes
 	// those of the installation along with its own, pairing them by name: a storage of its own that the
 	// installation declares too takes what it leaves out from the installation's. Templates contribute theirs
 	// alike.
@@ -157,7 +157,7 @@ func (spec *ChiSpec) DropBackupRecovery() {
 // IsEnabled reports whether operator-managed backup is on, nil-safe: the spec turns it on and names where the storage
 // settings of its sidecar come from. Turned on without that, backup stays off, see LacksStorage.
 func (b *ClusterBackup) IsEnabled() bool {
-	return b.IsRequested() && b.namesStorage()
+	return b.IsRequested() && b.namesStorageSettings()
 }
 
 // IsRequested reports whether the spec turns operator-managed backup on, whether or not it is on, nil-safe.
@@ -171,14 +171,14 @@ func (b *ClusterBackup) IsRequested() bool {
 // LacksStorage reports whether the spec turns operator-managed backup on without naming where the storage
 // settings of its sidecar come from, which leaves backup off, nil-safe.
 func (b *ClusterBackup) LacksStorage() bool {
-	return b.IsRequested() && !b.namesStorage()
+	return b.IsRequested() && !b.namesStorageSettings()
 }
 
-// namesStorage reports whether the backup names a source of the storage settings of its sidecar: the
+// namesStorageSettings reports whether the backup names a source of the storage settings of its sidecar: the
 // Secret of its storage, or the pod template whose container the sidecar is built on. Without either, the sidecar
 // runs the bundled image, which carries no configuration file, on the operator's environment alone, which sets
 // no storage: clickhouse-backup takes none then, and refuses every upload and download.
-func (b *ClusterBackup) namesStorage() bool {
+func (b *ClusterBackup) namesStorageSettings() bool {
 	return (b.GetStorageSecretName() != "") || (b.GetPodTemplate().Value() != "")
 }
 

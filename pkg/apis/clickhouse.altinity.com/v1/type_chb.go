@@ -100,7 +100,7 @@ const (
 	// BackupReasonValidated: the spec and the target installation passed validation.
 	BackupReasonValidated = "Validated"
 	// BackupReasonCHIRecovered: the spec and the target installation passed validation,
-	// and the installation was restored from a backup, so its remote storage path may be the one
+	// and the installation was restored from a backup, so its storage path may be the one
 	// of the installation the backup came from.
 	BackupReasonCHIRecovered = "CHIRecovered"
 	// BackupReasonInvalidSpec: the spec failed validation, or that of the schedule a backup runs.
@@ -123,9 +123,9 @@ const (
 	BackupReasonClusterNotFound = "ClusterNotFound"
 	// BackupReasonBackupDisabled: backup is not enabled on the target cluster(s).
 	BackupReasonBackupDisabled = "BackupDisabled"
-	// BackupReasonNoRemoteStorage: the target cluster(s) turn backup on without naming a remote storage, neither
-	// a storage with a secretRef nor podTemplate, which leaves their backup off.
-	BackupReasonNoRemoteStorage = "NoRemoteStorage"
+	// BackupReasonNoBackupStorage: the target cluster(s) turn backup on without the settings of a
+	// storage, neither a storage with a secretRef nor podTemplate, which leaves their backup off.
+	BackupReasonNoBackupStorage = "NoBackupStorage"
 	// BackupReasonNoTargetHosts: the target resolves to no hosts.
 	BackupReasonNoTargetHosts = "NoTargetHosts"
 	// BackupReasonOperationInProgress: another operation of the cluster runs (a backup, its verification or a restore),
@@ -196,11 +196,11 @@ const (
 	BackupReasonSuspendedForFailedRestore = "SuspendedForFailedRestore"
 	// BackupReasonSharesSourcePrefix: the schedule is held because the installation was restored from
 	// a backup carrying the backup name prefix the schedule defaults to: the installation that made the
-	// backup may run a schedule of the same name on the same remote storage path, and the two would
+	// backup may run a schedule of the same name on the same storage path, and the two would
 	// overwrite and prune each other's backups. Setting backupTemplate.backupNamePrefix releases it.
 	BackupReasonSharesSourcePrefix = "SharesSourcePrefix"
 	// BackupReasonUnprunedHosts: hosts left the hosts a schedule with retention backs up, so
-	// retention no longer prunes the remote backups they made. Only the event that announces it
+	// retention no longer prunes the backups they made. Only the event that announces it
 	// carries this reason; the schedule's status keeps the hosts.
 	BackupReasonUnprunedHosts = "UnprunedHosts"
 )
@@ -239,7 +239,7 @@ var (
 )
 
 var (
-	// backupNameRegexp bounds backup names: they become remote storage paths and the command
+	// backupNameRegexp bounds backup names: they become storage paths and the command
 	// line of clickhouse-backup actions. No "..", which clickhouse-backup strips from names, so
 	// the backup would land under a different name. Mirrored by the CRD schema patterns.
 	backupNameRegexp = regexp.MustCompile(`^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$`)
@@ -253,7 +253,7 @@ var (
 	// backupPartitionRegexp bounds one clickhouse-backup --partitions id.
 	backupPartitionRegexp = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 	// backupSourceRegexp bounds the installation and the namespace a restore reads the backup of: the values of the
-	// {installation} and {namespace} macros of the remote paths there, which a Job puts into the command line of
+	// {installation} and {namespace} macros of the storage paths there, which a Job puts into the command line of
 	// clickhouse-backup actions. Mirrored by the CRD schema patterns.
 	backupSourceRegexp = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 )
@@ -379,7 +379,7 @@ func (o *BackupOptions) Validate() error {
 
 // ClickHouseBackup defines a one-off backup of a ClickHouseInstallation. The operator
 // reconciles it into a Kubernetes Job per cluster that drives the clickhouse-backup sidecar the
-// operator runs in every backup-enabled cluster, creating and uploading a remote backup. Every
+// operator runs in every backup-enabled cluster, creating and uploading a backup. Every
 // cluster backs up under the same backup name.
 type ClickHouseBackup struct {
 	meta.TypeMeta   `json:",inline"            yaml:",inline"`
@@ -402,15 +402,15 @@ type ClickHouseBackupSpec struct {
 	// every backup-enabled cluster, each in a Job of its own. With ScheduleRef, one of the clusters the
 	// schedule backs up.
 	Cluster string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
-	// BackupName is the optional explicit remote backup name. When empty the operator generates a
+	// BackupName is the optional explicit backup name. When empty the operator generates a
 	// deterministic name from the CR name, or the backup name prefix of the schedule ScheduleRef names, and the
 	// time the backup is due. A name ending like the backups of a schedule, "-YYYYMMDD-HHMMSS", is refused.
 	BackupName string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
-	// DiffFromRemote, when set to an existing remote backup name, makes this an
+	// DiffFromRemote, when set to the name of a backup in the storage, makes this an
 	// incremental backup (clickhouse-backup --diff-from-remote).
 	DiffFromRemote string `json:"diffFromRemote,omitempty" yaml:"diffFromRemote,omitempty"`
 	// Verify, when true, runs a verification job after the backup that downloads the
-	// remote backup and checks its integrity (without touching cluster data).
+	// backup and checks its integrity (without touching cluster data).
 	Verify *types.StringBool `json:"verify,omitempty" yaml:"verify,omitempty"`
 	// ScheduledTime is the RFC 3339 time, with its offset, the backup is due at. Empty makes it due when it is
 	// created. It can be changed until the backup is validated, at that time or later.
@@ -528,7 +528,7 @@ func (spec *ClickHouseBackupSpec) Validate() error {
 type ClickHouseBackupStatus struct {
 	// Phase is one of Pending, Running, Completed, Failed.
 	Phase OperationPhase `json:"phase,omitempty" yaml:"phase,omitempty"`
-	// BackupName is the resolved remote backup name.
+	// BackupName is the resolved backup name.
 	BackupName string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
 	// Schedule is what a backup that runs a schedule takes from it, recorded anew on every reconcile until the backup
 	// is validated and kept from then on.

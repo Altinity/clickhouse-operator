@@ -70,7 +70,7 @@ type ClickHouseBackupScheduleSpec struct {
 
 // BackupRetention tells which backups of a schedule's series are deleted after each successful run.
 type BackupRetention struct {
-	// KeepLast, when greater than zero, keeps the N most recent remote backups of the series that hold
+	// KeepLast, when greater than zero, keeps the N most recent backups of the series that hold
 	// data, and apart from them the N most recent that hold none; older ones are deleted after each
 	// successful run. Zero keeps all.
 	KeepLast *int32 `json:"keepLast,omitempty" yaml:"keepLast,omitempty"`
@@ -164,7 +164,7 @@ func (spec *ClickHouseBackupTemplateSpec) Validate() error {
 // ClickHouseBackupScheduleStatus defines the observed state of a ClickHouseBackupSchedule.
 type ClickHouseBackupScheduleStatus struct {
 	// Clusters are the clusters the schedule backs up, and a cluster it no longer backs up while
-	// retention leaves remote backups of it unpruned, with the state of the runs on each.
+	// retention leaves backups of it unpruned, with the state of the runs on each.
 	// +listType=map
 	// +listMapKey=name
 	Clusters []ScheduleClusterStatus `json:"clusters,omitempty" yaml:"clusters,omitempty"`
@@ -173,7 +173,7 @@ type ClickHouseBackupScheduleStatus struct {
 	// LastSuccessfulTime is the oldest of the last successful runs of the clusters the schedule backs
 	// up: by then every cluster had a backup. Unset while a cluster has none.
 	LastSuccessfulTime *meta.Time `json:"lastSuccessfulTime,omitempty" yaml:"lastSuccessfulTime,omitempty"`
-	// LastBackupName is the newest remote backup a scheduled run made on every cluster the schedule
+	// LastBackupName is the newest backup a scheduled run made on every cluster the schedule
 	// backs up. While a cluster lags, the retention of the others may have pruned it already, so the
 	// per-cluster names tell what each cluster still holds.
 	LastBackupName string `json:"lastBackupName,omitempty" yaml:"lastBackupName,omitempty"`
@@ -197,17 +197,17 @@ type ScheduleClusterStatus struct {
 	LastScheduleTime *meta.Time `json:"lastScheduleTime,omitempty" yaml:"lastScheduleTime,omitempty"`
 	// LastSuccessfulTime is the last time a scheduled backup job of the cluster completed successfully.
 	LastSuccessfulTime *meta.Time `json:"lastSuccessfulTime,omitempty" yaml:"lastSuccessfulTime,omitempty"`
-	// LastBackupName is the remote backup the last successful scheduled run of the cluster made.
+	// LastBackupName is the backup the last successful scheduled run of the cluster made.
 	LastBackupName string `json:"lastBackupName,omitempty" yaml:"lastBackupName,omitempty"`
 	// LastFailureTime is the last time a scheduled backup job of the cluster failed.
 	LastFailureTime *meta.Time `json:"lastFailureTime,omitempty" yaml:"lastFailureTime,omitempty"`
 	// LastFailureMessage tells why the last failed scheduled backup job of the cluster failed.
 	LastFailureMessage string `json:"lastFailureMessage,omitempty" yaml:"lastFailureMessage,omitempty"`
 	// RetentionHosts lists the hosts of the cluster the schedule backs up that a scheduled run has backed
-	// up: those that hold its remote backups, which retention, when on, prunes.
+	// up: those that hold its backups, which retention, when on, prunes.
 	RetentionHosts []string `json:"retentionHosts,omitempty" yaml:"retentionHosts,omitempty"`
 	// UnprunedHosts lists the hosts that left RetentionHosts while retention was on. No run reaches
-	// them any more, so retention no longer prunes the remote backups they made, which stay until
+	// them any more, so retention no longer prunes the backups they made, which stay until
 	// deleted by hand. A host that rejoins RetentionHosts is dropped from it.
 	UnprunedHosts []string `json:"unprunedHosts,omitempty" yaml:"unprunedHosts,omitempty"`
 }
