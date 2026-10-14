@@ -22,10 +22,15 @@ spec:
           type: string
           description: Target ClickHouseInstallation
           jsonPath: .spec.clickHouseInstallation
+        - name: cluster
+          type: string
+          description: Target cluster, empty means every backup-enabled cluster
+          jsonPath: .spec.cluster
+          priority: 1
         - name: backup
           type: string
-          description: Remote backup name being restored
-          jsonPath: .spec.backupName
+          description: Remote backup the restore Job restores
+          jsonPath: .status.backupName
         - name: phase
           type: string
           description: Restore phase
@@ -41,7 +46,12 @@ spec:
         status: {}
       schema:
         openAPIV3Schema:
-          description: "ClickHouseRestore defines a one-off restore of a remote backup into a ClickHouseInstallation"
+          description: |
+            EXPERIMENTAL. ClickHouseRestore defines a one-off restore of a remote backup into a
+            ClickHouseInstallation. The operator runs one Job per backup-enabled cluster it targets,
+            each driving the clickhouse-backup sidecar it injects into the cluster (see
+            ClickHouseInstallation spec.backup). Restoring into a fresh, empty installation is
+            recommended. The API may change in a future release.
           type: object
           required:
             - spec
@@ -57,35 +67,138 @@ spec:
               required:
                 - clickHouseInstallation
                 - backupName
+              x-kubernetes-validations:
+                - rule: "self.clickHouseInstallation == oldSelf.clickHouseInstallation && (has(self.cluster) ? self.cluster : '') == (has(oldSelf.cluster) ? oldSelf.cluster : '')"
+                  message: "clickHouseInstallation and cluster are immutable; create a new resource"
+                - rule: "(has(self.sourceInstallation) ? self.sourceInstallation : '') == (has(oldSelf.sourceInstallation) ? oldSelf.sourceInstallation : '') && (has(self.sourceNamespace) ? self.sourceNamespace : '') == (has(oldSelf.sourceNamespace) ? oldSelf.sourceNamespace : '')"
+                  message: "sourceInstallation and sourceNamespace are immutable; create a new resource"
               properties:
                 clickHouseInstallation:
                   type: string
-                  description: "Name of the target ClickHouseInstallation in the same namespace (a fresh, empty installation is recommended)"
+                  minLength: 1
+                  maxLength: 253
+                  description: "Name of the target ClickHouseInstallation in the same namespace (a fresh, empty installation is recommended). Immutable"
+                cluster:
+                  type: string
+                  description: "Optional cluster of the ClickHouseInstallation to restore into. Empty restores every backup-enabled cluster, each in a Job of its own. Immutable"
+                  # Mirrors the ClickHouseInstallation cluster name constraint
+                  maxLength: 15
+                  pattern: "^[a-zA-Z0-9-]{0,15}$"
                 backupName:
                   type: string
                   description: "Remote backup to restore"
-                schemaOnly:
-                  type: boolean
+                  maxLength: 128
+                  pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
+                sourceInstallation:
+                  type: string
+                  description: |
+                    ClickHouseInstallation that made the backup, when not the restored one: the restore reads the backup from the
+                    remote paths the {installation} macro gives there. Empty, that of the restored installation. Immutable
+                  maxLength: 253
+                  pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+                sourceNamespace:
+                  type: string
+                  description: |
+                    Namespace of the ClickHouseInstallation that made the backup, when not that of the restored one: the restore
+                    reads the backup from the remote paths the {namespace} macro gives there. Empty, that of the restored installation. Immutable
+                  maxLength: 63
+                  pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+                schemaOnly: &TypeStringBool
                   description: "Restore table/database definitions only (no data)"
+                  # StringBool is polymorphic — accepts native YAML bool (true/false),
+                  # integer (0/1), or string from the recognized vocabulary.
+                  # See pkg/apis/common/types/string_bool.go (UnmarshalJSON + IsValid).
+                  # Structural-schema rules don't natively support bool|int|string
+                  # union, so we use x-kubernetes-preserve-unknown-fields: true.
+                  x-kubernetes-preserve-unknown-fields: true
                 overwrite:
-                  type: boolean
-                  description: "Allow restoring over existing, non-empty tables. When false (default) the restore is refused if target tables already contain data"
+                  !!merge <<: *TypeStringBool
+                  description: "Allow restoring over existing tables, which are dropped first. When false (default) the restore is refused if any target host already holds user tables"
                 validateTopology:
-                  type: boolean
-                  description: "When true (default) the restore validates the target cluster topology is reachable before touching data"
-                image:
+                  !!merge <<: *TypeStringBool
+                  description: "When true (default) the restore is refused unless every target shard holds the backup, so a backup taken from a different layout is not half-applied"
+                tables:
                   type: string
-                  description: "Optional container image override for the restore job"
-                clickHouseCredentialsSecretName:
-                  type: string
-                  description: "Optional Secret with CLICKHOUSE_USER/CLICKHOUSE_PASSWORD"
+                  description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated, restricting the schema and the data restored. Empty restores every table"
+                  maxLength: 1024
+                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                rbac:
+                  !!merge <<: *TypeStringBool
+                  description: |
+                    Also restore the users, roles, grants and other access entities the backup holds. They belong to the
+                    whole installation, so only a restore with an empty cluster may set it. Needs ClickHouse 23.3 or later
+                activeDeadlineSeconds:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  description: "How long the restore Job may run before it is stopped and the restore fails. Defaults to 24 hours"
             status:
               type: object
               properties:
                 phase:
                   type: string
-                jobName:
+                  description: "Lifecycle phase of the restore"
+                  enum:
+                    - Pending
+                    - Running
+                    - Completed
+                    - Failed
+                backupName:
                   type: string
+                  description: "Remote backup the restore Jobs restore, as it was when the first Job was created"
+                cluster:
+                  type: string
+                  description: "Cluster spec.cluster named when the restore was validated, empty for every backup-enabled cluster: what the restore holds and whether it restores access entities follow it"
+                clusters:
+                  type: array
+                  description: |
+                    The clusters the restore targets, resolved once it is validated, each run by a Job of its own,
+                    and the state of the restore on each
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - name
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                        description: "Name of the cluster"
+                      phase:
+                        type: string
+                        description: "Lifecycle phase of the restore on the cluster"
+                        enum:
+                          - Pending
+                          - Running
+                          - Completed
+                          - Failed
+                      jobName:
+                        type: string
+                        description: "Job that drives the restore on the cluster"
+                      hosts:
+                        type: array
+                        nullable: true
+                        description: "Hosts of the cluster the Job drives"
+                        items:
+                          type: string
+                      storage:
+                        type: string
+                        description: "Backup storage of the cluster the Job reads the backup from, as the Job was built"
+                      startTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      completionTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      reason:
+                        type: string
+                        description: "Why the cluster waits, or how the restore went on it, in one word"
+                      message:
+                        type: string
+                        description: "Why the cluster waits, or how the restore went on it"
                 startTime:
                   type: string
                   format: date-time
