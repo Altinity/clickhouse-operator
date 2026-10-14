@@ -23,9 +23,8 @@ import (
 // users can write `secure: true` (native YAML bool round-tripped to JSON bool
 // by kubectl), `secure: 1` (integer), or `secure: "true"` / `"yes"` / etc.
 // (string vocabulary) — and they all arrive at the operator as a StringBool
-// that reports IsTrue() correctly. The CRD's anyOf:[boolean,integer,string]
-// anchor mirrors this so the API server's structural-schema validator
-// accepts all three forms at admission time.
+// that reports IsTrue() correctly. The CRD's &TypeStringBool anchor leaves the
+// field untyped, so the API server accepts all three forms at admission time.
 func TestStringBool_UnmarshalJSON_Polymorphic(t *testing.T) {
 	type field struct {
 		Secure *StringBool `json:"secure"`
@@ -60,13 +59,12 @@ func TestStringBool_UnmarshalJSON_Polymorphic(t *testing.T) {
 		// Null / missing
 		{"null", `{"secure": null}`, false, false, true, false},
 		{"absent", `{}`, false, false, true, false},
-		// Empty string is a valid (recognized) StringBool — neither true nor false
+		// Empty string decodes, as neither true nor false
 		{"empty string", `{"secure": ""}`, false, false, false, false},
-		// Genuine rejections
-		{"int 42", `{"secure": 42}`, false, false, false, false}, // unrecognized int → falls through to "1" (any non-zero), still ok
-		{"float", `{"secure": 1.5}`, false, false, false, true},
-		{"object", `{"secure": {}}`, false, false, false, true},
-		{"array", `{"secure": []}`, false, false, false, true},
+		// Any integer but 0 decodes as "1"
+		{"int 42", `{"secure": 42}`, true, false, false, false},
+		// Malformed JSON never reaches a StringBool: the decoder refuses it first
+		{"malformed", `{"secure": tru}`, false, false, false, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -111,5 +109,41 @@ func TestStringBool_RoundTrip_Marshal(t *testing.T) {
 	}
 	if string(data) != `"True"` {
 		t.Fatalf("expected %q, got %s", `"True"`, data)
+	}
+}
+
+// The API server admits any JSON value of an untyped field, so a value of another JSON type than a bool, an
+// integer or a string reaches the operator: it is kept as its compacted JSON text, which IsValid refuses, rather
+// than failing the decode of the resource — and of the whole list of resources a watch reads with it.
+func TestStringBool_UnmarshalJSON_KeepsOtherValuesAsJSONText(t *testing.T) {
+	type field struct {
+		Secure *StringBool `json:"secure"`
+	}
+	type list struct {
+		Items []field `json:"items"`
+	}
+	for input, written := range map[string]string{
+		`1.5`:                "1.5",
+		`1e3`:                "1e3",
+		`{ "a" : [ 1, 2 ] }`: `{"a":[1,2]}`,
+		`[true]`:             "[true]",
+		`[]`:                 "[]",
+	} {
+		t.Run(input, func(t *testing.T) {
+			var got list
+			if err := json.Unmarshal([]byte(`{"items": [{"secure": true}, {"secure": `+input+`}]}`), &got); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !got.Items[0].Secure.IsTrue() {
+				t.Fatalf("the other item of the list is decoded as well, got %q", *got.Items[0].Secure)
+			}
+			value := got.Items[1].Secure
+			if (value == nil) || (value.String() != written) {
+				t.Fatalf("expected %q, got %v", written, value)
+			}
+			if value.IsValid() || value.IsTrue() || value.IsFalse() {
+				t.Fatalf("expected an invalid value, got IsValid=%t IsTrue=%t IsFalse=%t", value.IsValid(), value.IsTrue(), value.IsFalse())
+			}
+		})
 	}
 }
