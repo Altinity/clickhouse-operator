@@ -1,0 +1,22 @@
+# EXPERIMENTAL: operator-managed backup, see docs/backup.md
+#
+# The backup the "nightly" schedule (docs/chb-examples/04-backup-schedule.yaml) makes, made once now - before an
+# upgrade, say. It takes the installation, the clusters and the backup options of the schedule as they are when it is
+# validated, recorded in status.schedule, and is named with the schedule's prefix and the UTC time it is due as
+# YYYYMMDDTHHMMSS, e.g. default-backup-demo-nightly-20261012T101507: the schedule's retention never deletes it.
+# The backup options (schemaOnly, replicaSelection, tables, partitions, activeDeadlineSeconds) come from the
+# schedule alone; it runs while the schedule is suspended or held, too. Two of them due in the same second get one
+# name, and the second fails before it changes anything: give each its own backupName then.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackup"
+metadata:
+  name: backup-demo-pre-upgrade
+spec:
+  scheduleRef:
+    name: nightly                   # the schedule, in the same namespace (cannot be changed later)
+  # cluster: main                   # optional: only this cluster, one the schedule backs up
+  # backupName: demo-before-upgrade # optional: generated when empty, see status.backupName; not ending -YYYYMMDD-HHMMSS
+  # scheduledTime: "2026-10-20T02:00:00+02:00" # optional: due later instead, see 03-backup-later.yaml
+  # startingDeadlineSeconds: 3600   # optional: fail where the backup has not started an hour after it was due
+  # diffFromRemote: demo-base       # optional: incremental on top of an existing backup
+  verify: true                      # download the backup again and check it after the upload

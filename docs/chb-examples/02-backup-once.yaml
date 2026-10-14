@@ -1,17 +1,25 @@
-# One-off backup of the "backup-demo" ClickHouseInstallation.
-# The operator creates a Kubernetes Job that triggers `create_remote` on the first
-# replica of each shard (correct for Replicated* tables).
+# EXPERIMENTAL: operator-managed backup, see docs/backup.md
+#
+# One-off backup of every backup-enabled cluster of the "backup-demo" ClickHouseInstallation
+# (docs/chb-examples/01-chi-with-backup.yaml), one Job per cluster, all under one backup name. It
+# runs once, as soon as the installation can run it; to run it once at a later time, see
+# docs/chb-examples/03-backup-later.yaml, and to make the backup a schedule makes, 05. No schedule's
+# retention ever deletes it: delete it by hand when no longer needed.
+# Progress: kubectl describe chb backup-demo-once; per cluster in status.clusters.
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseBackup"
 metadata:
-  name: backup-demo-manual
+  name: backup-demo-once
 spec:
   clickHouseInstallation: backup-demo
-  # backupName: ""            # optional; auto-generated when empty
-  schemaOnly: false
-  replicaSelection: FirstPerShard   # FirstPerShard (default) | AllReplicas
-  # tables: "mydb.*"               # optional: back up only matching tables
-  # partitions: ["202601"]         # optional: only these partitions
-  # diffFromRemote: prev-backup    # optional: incremental backup against an existing remote backup
-  # keepLastRemote: 7              # optional: retention - keep only the N most recent remote backups
-  # verify: true                   # optional: verify the backup is restorable afterwards
+  # cluster: main                   # optional: only this cluster (cannot be changed later)
+  # backupName: demo-before-upgrade # optional: generated when empty, see status.backupName; not ending -YYYYMMDD-HHMMSS
+  # scheduledTime: "2026-10-20T02:00:00+02:00" # optional: due later, RFC 3339 with its offset (default: when created)
+  # startingDeadlineSeconds: 3600   # optional: fail where the backup has not started an hour after it was due
+  # replicaSelection: FirstPerShard # FirstPerShard (default) | AllReplicas
+  # schemaOnly: true                # optional: definitions only, no data
+  # tables: "mydb.*"                # optional: only matching tables
+  # partitions: ["202610"]          # optional: only these partitions
+  # diffFromRemote: demo-base       # optional: incremental on top of an existing backup
+  verify: true                      # download the backup again and check it after the upload
+  # activeDeadlineSeconds: 7200     # optional: stop the Job after 2 hours (default 24 hours)

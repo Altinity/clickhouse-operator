@@ -1,0 +1,30 @@
+# EXPERIMENTAL: operator-managed backup, see docs/backup.md
+#
+# Nightly backup of the "backup-demo" ClickHouseInstallation (docs/chb-examples/01-chi-with-backup.yaml),
+# keeping the 7 most recent ones. Each backup-enabled cluster gets a CronJob of its own, all on
+# this schedule, read in timeZone when set: in namespace "default", every cluster names a run's backup
+# default-backup-demo-nightly-YYYYMMDD-HHMMSS, the UTC time the run was due. These backups are the
+# schedule's series, and retention, per cluster, only ever deletes backups of it: never a one-off
+# backup, nor one that runs this schedule once (docs/chb-examples/05-backup-from-schedule.yaml).
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackupSchedule"
+metadata:
+  name: nightly
+spec:
+  clickHouseInstallation: backup-demo
+  # cluster: main                 # optional: only this cluster (cannot be changed later)
+  schedule: "0 2 * * *"
+  # timeZone: Europe/Berlin       # IANA time zone the schedule is read in; default: the controller manager's, UTC as a rule
+  suspend: false
+  concurrencyPolicy: Forbid       # Forbid (default) | Allow | Replace
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  backupTemplate:
+    # backupNamePrefix: nightly   # default: <namespace>-<installation>-<schedule>, here default-backup-demo-nightly
+    replicaSelection: FirstPerShard
+    # schemaOnly: false
+    # tables: "mydb.*"
+    # activeDeadlineSeconds: 14400
+  # Which backups of the schedule's series - named with backupNamePrefix and the time of a run - are deleted
+  retention:
+    keepLast: 7                   # 0 (default) keeps every backup

@@ -1,0 +1,76 @@
+# EXPERIMENTAL: operator-managed backup, see docs/backup.md
+#
+# A new ClickHouseInstallation that starts from a backup. Once its first reconcile completes, the
+# operator creates one ClickHouseRestore per backup-enabled cluster, named
+# <installation>-<cluster>-recovery (kubectl get chr), once, restoring users, roles and grants too
+# (ClickHouse 23.3 or newer; an older one loads them only at its next restart), and stamps the
+# clickhouse.altinity.com/recovered-from annotation when every one of them has completed.
+# spec.backup.recovery is read from the installation only, never from a
+# ClickHouseInstallationTemplate, and changing it restarts nothing. The installation must hold no
+# tables yet: a recovery never overwrites.
+#
+# A backup whose name starts with this installation's own <namespace>-<installation>-, as one of a
+# source of the same name in another Kubernetes cluster does, holds every backup schedule of this
+# installation that uses the default backupNamePrefix until it sets one (SharesSourcePrefix).
+#
+# Each recovery restore reads the backup of "backup-demo", of the same namespace, and holds the
+# backup schedules of the clusters of "backup-demo" it reads until it ends, as their retention
+# could delete that backup. Those production backups miss their runs meanwhile, of which at most the
+# latest starts once the restore ends: recover outside the backup window of "backup-demo".
+#
+# Cluster names and shard layout must match the source, and the storage Secret
+# (docs/chb-examples/01-chi-with-backup.yaml) must point at the same storage and exist before
+# this CHI is applied: the restore starts right after the first reconcile, before the sidecars
+# would pick up a Secret created later. The restore downloads the backup onto the data volume, so
+# it needs room for the data plus one copy.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: backup-demo-restored
+spec:
+  backup:
+    enabled: "yes"
+    storages:
+      - name: main
+        secretRef:
+          name: backup-demo-storage
+    recovery:
+      # The backup every cluster starts from, e.g. LAST-BACKUP of kubectl get chbs -o wide; check
+      # that it still exists on every cluster, or name each cluster's own backup, see docs/backup.md
+      backupName: "default-backup-demo-nightly-20261003-020000"
+      # The installation that made the backup: the default storage paths hold {namespace} and
+      # {installation}, so the backup lies under those of "backup-demo", not of this one. Its
+      # namespace too, when another
+      sourceInstallation: "backup-demo"
+      # sourceNamespace: "team-a"
+  defaults:
+    templates:
+      dataVolumeClaimTemplate: data-volume-template
+  configuration:
+    zookeeper:
+      keeper:
+        name: simple-1
+      # Its own root znode, so restored Replicated tables cannot join the replication of the source
+      # CHI when both share one Keeper.
+      root: /backup-demo-restored
+    clusters:
+      - name: main
+        layout:
+          shardsCount: 2
+          replicasCount: 2
+      # A cluster may start from another backup, or from none:
+      # - name: scratch
+      #   backup:
+      #     recovery:
+      #       backupName: ""   # not in the backup: nothing to recover
+      #   layout:
+      #     shardsCount: 1
+  templates:
+    volumeClaimTemplates:
+      - name: data-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
