@@ -134,6 +134,11 @@ func (c *Cluster) GetSecret() *apiChi.ClusterSecret {
 	return nil
 }
 
+// GetBackup is a getter. Keeper clusters have no operator-managed backup.
+func (c *Cluster) GetBackup() *apiChi.ClusterBackup {
+	return nil
+}
+
 // GetSecurity is a getter
 func (c *Cluster) GetSecurity() *apiChi.ClusterSecurity {
 	if c == nil {
