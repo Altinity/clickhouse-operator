@@ -15,174 +15,193 @@
 package chbackup
 
 import (
-	"fmt"
-	"strings"
+	_ "embed"
+	"strconv"
+
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 )
 
-// scriptPreamble defines the common shell helpers shared by backup and restore jobs.
-// It builds optional auth flags from the CLICKHOUSE_USER/CLICKHOUSE_PASSWORD env vars
-// (provided via an optional Secret) and a run_action helper that submits a command to
-// the clickhouse-backup integration table (system.backup_actions) of the sidecar
-// running inside the target host's pod and polls until it succeeds or fails.
-const scriptPreamble = `set -euo pipefail
-CH_PORT="${CLICKHOUSE_PORT:-9000}"
-CH_AUTH=""
-if [ -n "${CLICKHOUSE_USER:-}" ]; then CH_AUTH="--user=${CLICKHOUSE_USER}"; fi
-if [ -n "${CLICKHOUSE_PASSWORD:-}" ]; then CH_AUTH="${CH_AUTH} --password=${CLICKHOUSE_PASSWORD}"; fi
-MAX_POLLS="${MAX_POLLS:-1440}"
-POLL_INTERVAL="${POLL_INTERVAL:-5}"
+// Environment of the backup Job container. jobScript reads every input from these variables,
+// so no user-provided value is ever part of the script text.
+const (
+	// envOperation selects what the Job does: operationBackup, operationVerify or operationRestore
+	envOperation = "OPERATION"
+	// envAPIPort is the port of the clickhouse-backup REST API on every target host
+	envAPIPort = "API_PORT"
+	// envAPIUsername and envAPIPassword are the REST API credentials, taken from the backup Secret
+	envAPIUsername = config.ClickHouseBackupSecretKeyAPIUsername
+	envAPIPassword = config.ClickHouseBackupSecretKeyAPIPassword
+	// envPollInterval is the number of seconds between status polls, 5 when empty
+	envPollInterval = "POLL_INTERVAL"
+	// envTerminationMessagePath is the file the script writes why it failed to, or envNoDataMessage
+	// when it succeeded with a backup that holds no data, or envRBACNotRestoredMessage when it succeeded
+	// with a restore that left out the access entities of its backup: the termination message path of
+	// its container
+	envTerminationMessagePath = "TERMINATION_MESSAGE_PATH"
+	// envUnchangedExitCode is the exit code the script fails with when it has changed nothing
+	envUnchangedExitCode = "UNCHANGED_EXIT_CODE"
 
-run_action() {
-  svc="$1"; cmd="$2"
-  echo ">> ${svc}: ${cmd}"
-  clickhouse-client --host="${svc}" --port="${CH_PORT}" ${CH_AUTH} \
-    --query="INSERT INTO system.backup_actions(command) VALUES('${cmd}')"
-  n=0
-  while true; do
-    n=$((n+1))
-    status="$(clickhouse-client --host="${svc}" --port="${CH_PORT}" ${CH_AUTH} \
-      --query="SELECT status FROM system.backup_actions WHERE command='${cmd}' ORDER BY start DESC LIMIT 1")"
-    case "${status}" in
-      success) echo "   done"; return 0 ;;
-      error)
-        err="$(clickhouse-client --host="${svc}" --port="${CH_PORT}" ${CH_AUTH} \
-          --query="SELECT error FROM system.backup_actions WHERE command='${cmd}' ORDER BY start DESC LIMIT 1")"
-        echo "   FAILED on ${svc}: ${err}" >&2; return 1 ;;
-    esac
-    if [ "${n}" -ge "${MAX_POLLS}" ]; then echo "   TIMEOUT waiting for '${cmd}' on ${svc}" >&2; return 1; fi
-    sleep "${POLL_INTERVAL}"
-  done
+	// envCluster is the name of the cluster the Job targets, of which every host list holds hosts: a
+	// single token, as the installation normalizes cluster names
+	envCluster = "CLUSTER"
+	// envBackupName is the backup to create, verify or restore
+	envBackupName = "BACKUP_NAME"
+	// envBackupNamePrefix names a scheduled backup "<prefix>-<UTC timestamp>" when envBackupName is empty,
+	// and scopes retention to the backups named that way
+	envBackupNamePrefix = "BACKUP_NAME_PREFIX"
+	// envCronJobName is the name of the CronJob of a scheduled backup, which the names of its Jobs start with
+	envCronJobName = "CRON_JOB_NAME"
+	// envJobName is the name of the Job, from the Job name label of its pod: a scheduled run takes the
+	// timestamp of its backup name from it
+	envJobName = "JOB_NAME"
+	// envBackupHosts lists the space-separated hosts create_remote runs on
+	envBackupHosts = "BACKUP_HOSTS"
+	// envRetentionHosts lists the space-separated hosts whose backups retention prunes
+	envRetentionHosts = "RETENTION_HOSTS"
+	// envSchemaOnly restricts a backup or a restore to the schema, "true" or "false"
+	envSchemaOnly = "SCHEMA_ONLY"
+	// envTables is the clickhouse-backup table pattern of a backup or a restore
+	envTables = "TABLES"
+	// envPartitions is the comma-separated list of partitions of a backup
+	envPartitions = "PARTITIONS"
+	// envDiffFromRemote names the remote base backup of an incremental backup
+	envDiffFromRemote = "DIFF_FROM_REMOTE"
+	// envKeepLast is how many of the most recent scheduled backups retention keeps of
+	// those that hold data, and apart from them of those that hold none; 0 keeps all
+	envKeepLast = "KEEP_LAST"
+	// envNoDataMessage is the termination message the script leaves when the backup it made holds no
+	// data on any host
+	envNoDataMessage = "NO_DATA_MESSAGE"
+
+	// envVerifyHosts lists the space-separated hosts a backup is downloaded to for verification
+	envVerifyHosts = "VERIFY_HOSTS"
+	// envSchemaHosts lists the space-separated hosts the schema is restored on: every replica, as each
+	// restores it on its own, so that no ON CLUSTER DDL rewrites a table
+	envSchemaHosts = "SCHEMA_HOSTS"
+	// envDataHosts lists the space-separated hosts the data is restored on
+	envDataHosts = "DATA_HOSTS"
+	// envGuardHosts lists the space-separated hosts whose tables the overwrite guard checks: every
+	// replica, as the schema restore drops the tables of the backup on each of them
+	envGuardHosts = "GUARD_HOSTS"
+	// envOverwrite allows a restore over existing tables, "true" or "false"
+	envOverwrite = "OVERWRITE"
+	// envReplicated tells whether the installation configures ZooKeeper for the cluster, "true" or "false",
+	// empty taken as "true". An overwrite drops the tables of the backup ON CLUSTER whenever it drops a table
+	// of a Replicated engine, as ZooKeeper may come from a configuration file the installation does not show:
+	// this decides only when the engines of the tables cannot be told, failing an overwrite without ZooKeeper
+	envReplicated = "REPLICATED"
+	// envMaxTableSizeToDrop is the max_table_size_to_drop of the cluster in bytes, the smallest non-zero one of its
+	// hosts, 0 for no limit. An overwrite fails before it changes anything when its drop would stop half way: at a
+	// larger table on any host but the one that runs the drop ON CLUSTER, or at the second larger table of a database
+	// it drops as a whole on a host that drops that database on its own
+	envMaxTableSizeToDrop = "MAX_TABLE_SIZE_TO_DROP"
+	// envValidateTopology requires the backup in the storage of every restored host, "true" or "false"
+	envValidateTopology = "VALIDATE_TOPOLOGY"
+	// envRestoreRBAC restores the access entities of the backup on every schema host once its schema and
+	// data are restored, "true" or "false"
+	envRestoreRBAC = "RESTORE_RBAC"
+	// envRBACNotRestoredMessage is the termination message the script leaves when the restore it made
+	// succeeded and did not restore the access entities the backup holds on any host
+	envRBACNotRestoredMessage = "RBAC_NOT_RESTORED_MESSAGE"
+	// envSourceInstallation and envSourceNamespace name the installation, and its namespace, whose storage
+	// paths a restore reads the backup from: the values of the {installation} and {namespace} macros there.
+	// Unset or empty, the restore reads the paths of its own installation for either
+	envSourceInstallation = "SOURCE_INSTALLATION"
+	envSourceNamespace    = "SOURCE_NAMESPACE"
+)
+
+// Environment of the storage path check, which the script runs before a backup or a restore changes
+// anything: every shard of every backup-enabled cluster of the installation needs a storage path of
+// its own. The settings of each cluster are named by its index: pathClusterEnv(index, name).
+const (
+	// envPathClusters lists the space-separated indexes, from 0, of every backup-enabled cluster of
+	// the installation
+	envPathClusters = "PATH_CLUSTERS"
+	// envPathSelf is the index of the cluster the Job targets
+	envPathSelf = "PATH_SELF"
+	// envPathInstallation is the value of the {installation} macro: the name of the installation
+	envPathInstallation = "PATH_INSTALLATION"
+	// envPathNamespace is the value of the {namespace} macro: the namespace of the installation
+	envPathNamespace = "PATH_NAMESPACE"
+	// envPathReplicaSelection is the api.ReplicaSelection of a backup. A backup of every replica needs
+	// the {replica} macro in the path, one of the first replica of each shard must not have it
+	envPathReplicaSelection = "PATH_REPLICA_SELECTION"
+	// envDefaultPath and envDefaultObjectDiskPath are the paths the sidecar sets when the storage
+	// settings leave them unset; when absent, an unset path is the root of the storage. The
+	// pathClusterEnv of either, when set, takes its place for that cluster: set empty for a cluster
+	// whose sidecar sets no default
+	envDefaultPath           = "DEFAULT_PATH"
+	envDefaultObjectDiskPath = "DEFAULT_OBJECT_DISK_PATH"
+
+	// pathEnvCluster is the pathClusterEnv of the cluster name, the value of its {cluster} macro
+	pathEnvCluster = "CLUSTER"
+	// pathEnvShards is the pathClusterEnv of the space-separated values of the {shard} macro of the
+	// cluster, in shard order
+	pathEnvShards = "SHARDS"
+	// pathEnvUnverifiable is the pathClusterEnv of why the settings the operator gives of the cluster do not
+	// have to be those its sidecar takes, a single line, empty when they have to as far as the operator can
+	// tell. The check leaves such a cluster out, and a Job that targets it fails unless it is the only
+	// backup-enabled cluster; a configuration file the storage Secret names, which only the Job sees
+	// as the cluster's CLICKHOUSE_BACKUP_CONFIG setting, does the same.
+	pathEnvUnverifiable = "UNVERIFIABLE"
+)
+
+// pathEnvPrefix starts the name of every pathClusterEnv
+const pathEnvPrefix = "PATH_"
+
+// pathClusterEnv returns the name of the env var that holds the path check setting name of the cluster
+// at index: pathEnvCluster, pathEnvShards, pathEnvUnverifiable, one of the default paths or one of
+// PathCheckKeys.
+func pathClusterEnv(index int, name string) string {
+	return pathEnvPrefix + strconv.Itoa(index) + "_" + name
 }
-`
 
-func shellList(services []string) string {
-	return strings.Join(services, " ")
+// PathCheckKeys are the clickhouse-backup settings the storage path check reads of every cluster, as
+// pathClusterEnv(index, key): which type of storage it is, what tells one storage of its type from
+// another, its backup and object disk paths, and the configuration file that may set any of them, which
+// the check cannot read: only the storage Secret can name one here, as one named otherwise makes
+// the settings unverifiable to begin with. None of them is a credential. A cluster takes each
+// as its sidecar does: from an optional key of its storage Secret, which kubelet leaves unset
+// when the Secret lacks it, overridden by the env of the sidecar container of its pod template;
+// pathEnvUnverifiable tells when its sidecar may take them otherwise. An unset one
+// counts with the default clickhouse-backup gives it, an unset path with the one the sidecar sets.
+// The region of an S3 storage is none of them: a bucket name is global, the region only tells where
+// the requests to it go and what they are signed for, and the AWS SDK of the sidecar takes it from its
+// own environment when the setting is empty. A bucket of one name in another AWS partition then counts
+// as the same, which refuses a path rather than let a shared one through.
+var PathCheckKeys = []string{
+	"REMOTE_STORAGE",
+	"S3_BUCKET", "S3_ENDPOINT", "S3_PATH", "S3_OBJECT_DISK_PATH",
+	"GCS_BUCKET", "GCS_ENDPOINT", "GCS_PATH", "GCS_OBJECT_DISK_PATH",
+	"AZBLOB_ACCOUNT_NAME", "AZBLOB_CONTAINER", "AZBLOB_ENDPOINT_SUFFIX", "AZBLOB_PATH", "AZBLOB_OBJECT_DISK_PATH",
+	"COS_URL", "COS_PATH", "COS_OBJECT_DISK_PATH",
+	"FTP_ADDRESS", "FTP_PATH", "FTP_OBJECT_DISK_PATH",
+	"SFTP_ADDRESS", "SFTP_PORT", "SFTP_PATH", "SFTP_OBJECT_DISK_PATH",
+	config.ClickHouseBackupEnvConfig,
 }
 
-// BackupOpts collects the optional knobs for a create_remote backup.
-type BackupOpts struct {
-	SchemaOnly     bool
-	Tables         string   // clickhouse-backup --tables pattern
-	Partitions     []string // clickhouse-backup --partitions ids
-	DiffFromRemote string   // base backup name for an incremental backup
-	KeepLastRemote *int32   // retention: keep only the N most recent remote backups
-}
+// UnchangedExitCode is the value of envUnchangedExitCode: the Job container exits with it when the
+// script fails before any sidecar may have accepted a request that changes something.
+const UnchangedExitCode = 3
 
-func (o BackupOpts) createRemoteFlags() string {
-	flags := ""
-	if o.SchemaOnly {
-		flags += "--schema "
-	}
-	if o.DiffFromRemote != "" {
-		flags += "--diff-from-remote=" + o.DiffFromRemote + " "
-	}
-	if o.Tables != "" {
-		flags += "--tables=" + o.Tables + " "
-	}
-	if len(o.Partitions) > 0 {
-		flags += "--partitions=" + strings.Join(o.Partitions, ",") + " "
-	}
-	return flags
-}
+// NoDataMessage is the value of envNoDataMessage: the termination message of a Job container that
+// succeeded and made a backup that holds no data on any host.
+const NoDataMessage = "the backup holds no data"
 
-// BackupScript renders the shell script that triggers create_remote on each target host.
+// RBACNotRestoredMessage is the value of envRBACNotRestoredMessage: the termination message of a Job
+// container that succeeded and restored a backup without the access entities - users, roles, grants -
+// it holds.
+const RBACNotRestoredMessage = "the backup holds access entities that were not restored"
+
+// Values of envOperation
+const (
+	operationBackup  = "backup"
+	operationVerify  = "verify"
+	operationRestore = "restore"
+)
+
+// jobScript is the bash script a backup Job runs as ["bash", "-c", jobScript]. It drives the
+// clickhouse-backup sidecar REST API of the target hosts and fails the Job on any error.
 //
-// backupNameExpr is the shell expression assigned to BACKUP_NAME. For one-off backups it
-// is a quoted literal (e.g. "my-backup"); for scheduled backups it is a runtime expression
-// (e.g. "${PREFIX}$(date -u +%Y%m%d-%H%M%S)") so each run gets a unique name.
-//
-// When KeepLastRemote is set, a best-effort retention step prunes remote backups beyond the
-// N most recent (via system.backup_list + a `delete remote` action); retention failures never
-// fail the backup itself.
-func BackupScript(services []string, backupNameExpr string, opts BackupOpts) string {
-	flags := opts.createRemoteFlags()
-	var b strings.Builder
-	b.WriteString(scriptPreamble)
-	b.WriteString(fmt.Sprintf("\nBACKUP_NAME=%s\n", backupNameExpr))
-	b.WriteString(fmt.Sprintf("SERVICES=%q\n", shellList(services)))
-	b.WriteString(fmt.Sprintf("for svc in ${SERVICES}; do run_action \"${svc}\" \"create_remote %s${BACKUP_NAME}\"; done\n", flags))
-	b.WriteString("echo \"Backup ${BACKUP_NAME} completed on all shards.\"\n")
-
-	if opts.KeepLastRemote != nil {
-		// Remote storage is shared per shard; prune from the first targeted host. Best-effort.
-		b.WriteString(fmt.Sprintf("\necho \"Retention: keeping last %d remote backups\"\n", *opts.KeepLastRemote))
-		b.WriteString("RETAIN_SVC=\"$(echo ${SERVICES} | awk '{print $1}')\"\n")
-		b.WriteString(fmt.Sprintf("OLD_BACKUPS=\"$(clickhouse-client --host=\"${RETAIN_SVC}\" --port=\"${CH_PORT}\" ${CH_AUTH} --query=\"SELECT name FROM system.backup_list WHERE location='remote' ORDER BY created DESC LIMIT 1000000 OFFSET %d\" 2>/dev/null || true)\"\n", *opts.KeepLastRemote))
-		// Serialize the deletes via run_action: the sidecar runs one action at a time, so
-		// firing them all at once yields "another operation is currently running". Tolerant:
-		// a failed prune (e.g. an object store that rejects the delete) never fails the backup.
-		b.WriteString("for old in ${OLD_BACKUPS}; do echo \"  pruning ${old}\"; run_action \"${RETAIN_SVC}\" \"delete remote ${old}\" || true; done\n")
-	}
-	return b.String()
-}
-
-// VerifyScript renders a best-effort verification: download the remote backup to each
-// shard-first host, confirm it materializes locally (system.backup_list), then drop the
-// local copy. It touches no cluster data; it only proves the remote backup is pullable.
-func VerifyScript(services []string, backupName string) string {
-	var b strings.Builder
-	b.WriteString(scriptPreamble)
-	b.WriteString(fmt.Sprintf("\nBACKUP_NAME=%q\n", backupName))
-	b.WriteString(fmt.Sprintf("SERVICES=%q\n", shellList(services)))
-	b.WriteString("for svc in ${SERVICES}; do\n")
-	b.WriteString("  echo \">> verifying ${BACKUP_NAME} on ${svc}\"\n")
-	// create_remote leaves a local copy; drop it so the download genuinely pulls from remote.
-	b.WriteString("  clickhouse-client --host=\"${svc}\" --port=\"${CH_PORT}\" ${CH_AUTH} --query=\"INSERT INTO system.backup_actions(command) VALUES('delete local ${BACKUP_NAME}')\" || true\n")
-	b.WriteString("  for i in $(seq 1 30); do lc=\"$(clickhouse-client --host=\"${svc}\" --port=\"${CH_PORT}\" ${CH_AUTH} --query=\"SELECT count() FROM system.backup_list WHERE name='${BACKUP_NAME}' AND location='local'\")\"; [ \"${lc}\" = \"0\" ] && break; sleep 2; done\n")
-	b.WriteString("  run_action \"${svc}\" \"download ${BACKUP_NAME}\"\n")
-	b.WriteString("  cnt=\"$(clickhouse-client --host=\"${svc}\" --port=\"${CH_PORT}\" ${CH_AUTH} --query=\"SELECT count() FROM system.backup_list WHERE name='${BACKUP_NAME}' AND location='local'\")\"\n")
-	b.WriteString("  if [ \"${cnt}\" -lt 1 ]; then echo \"verify failed: ${BACKUP_NAME} not present locally on ${svc} after download\" >&2; exit 1; fi\n")
-	b.WriteString("  clickhouse-client --host=\"${svc}\" --port=\"${CH_PORT}\" ${CH_AUTH} --query=\"INSERT INTO system.backup_actions(command) VALUES('delete local ${BACKUP_NAME}')\" || true\n")
-	b.WriteString("done\n")
-	b.WriteString("echo \"Backup ${BACKUP_NAME} verified.\"\n")
-	return b.String()
-}
-
-// RestoreScript renders the shell script that restores a remote backup.
-//
-// Before touching any data it runs preflight safety checks:
-//   - topology check (when validateTopology is true): every schema host must be reachable,
-//     ensuring the full target cluster is up before a ReplicatedMergeTree restore;
-//   - overwrite guard (when overwrite is false): refuses if any target data host already
-//     holds user tables, preventing accidental data loss.
-//
-// Schema and data are then restored on the first replica of each shard. For Replicated*
-// tables the sidecar must set restore_schema_on_cluster so the schema CREATE is issued
-// ON CLUSTER from that node and reaches every replica with an identical Keeper path;
-// native replication then clones the data to the remaining replicas. When overwrite is
-// true, existing tables are dropped first via clickhouse-backup's --rm.
-func RestoreScript(schemaServices, dataServices []string, backupName string, schemaOnly, overwrite, validateTopology bool) string {
-	rm := ""
-	if overwrite {
-		rm = "--rm "
-	}
-	var b strings.Builder
-	b.WriteString(scriptPreamble)
-	b.WriteString(fmt.Sprintf("\nBACKUP_NAME=%q\n", backupName))
-	b.WriteString(fmt.Sprintf("SCHEMA_SERVICES=%q\n", shellList(schemaServices)))
-	b.WriteString(fmt.Sprintf("DATA_SERVICES=%q\n", shellList(dataServices)))
-
-	if validateTopology {
-		b.WriteString("echo \"Preflight: validating target topology is reachable...\"\n")
-		b.WriteString("for svc in ${SCHEMA_SERVICES}; do\n")
-		b.WriteString("  clickhouse-client --host=\"${svc}\" --port=\"${CH_PORT}\" ${CH_AUTH} --query=\"SELECT 1\" >/dev/null \\\n")
-		b.WriteString("    || { echo \"topology check failed: host ${svc} is not reachable\" >&2; exit 1; }\n")
-		b.WriteString("done\n")
-	}
-	if !overwrite {
-		b.WriteString("echo \"Preflight: overwrite guard (refuse non-empty target)...\"\n")
-		b.WriteString("for svc in ${DATA_SERVICES}; do\n")
-		b.WriteString("  cnt=\"$(clickhouse-client --host=\"${svc}\" --port=\"${CH_PORT}\" ${CH_AUTH} --query=\"SELECT count() FROM system.tables WHERE database NOT IN ('system','INFORMATION_SCHEMA','information_schema') AND is_temporary=0\")\"\n")
-		b.WriteString("  if [ \"${cnt}\" -gt 0 ]; then echo \"refusing restore: target ${svc} already has ${cnt} user table(s); set spec.overwrite=true to proceed\" >&2; exit 1; fi\n")
-		b.WriteString("done\n")
-	}
-
-	b.WriteString("echo \"Restoring schema...\"\n")
-	b.WriteString(fmt.Sprintf("for svc in ${SCHEMA_SERVICES}; do run_action \"${svc}\" \"restore_remote --schema %s${BACKUP_NAME}\"; done\n", rm))
-	if !schemaOnly {
-		b.WriteString("echo \"Restoring data...\"\n")
-		b.WriteString("for svc in ${DATA_SERVICES}; do run_action \"${svc}\" \"restore_remote --data ${BACKUP_NAME}\"; done\n")
-	}
-	b.WriteString("echo \"Restore ${BACKUP_NAME} completed.\"\n")
-	return b.String()
-}
+//go:embed scripts/job.sh
+var jobScript string
