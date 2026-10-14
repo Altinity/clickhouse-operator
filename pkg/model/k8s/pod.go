@@ -18,17 +18,28 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-// Maps container name => restarts count
-func PodContainersRestartCountsGet(pod *core.Pod) map[string]int {
+// Maps container name => restarts count. Given names or indexes, it maps only the container PodSpecContainerGet
+// finds by them.
+func PodContainersRestartCountsGet(pod *core.Pod, namesOrIndexes ...any) map[string]int {
 	if pod == nil {
 		return nil
 	}
 	if len(pod.Status.ContainerStatuses) < 1 {
 		return nil
 	}
+	only := ""
+	if len(namesOrIndexes) > 0 {
+		container, ok := PodSpecContainerGet(&pod.Spec, namesOrIndexes...)
+		if !ok {
+			return nil
+		}
+		only = container.Name
+	}
 	res := map[string]int{}
 	for _, containerStatus := range pod.Status.ContainerStatuses {
-		res[containerStatus.Name] = int(containerStatus.RestartCount)
+		if (only == "") || (containerStatus.Name == only) {
+			res[containerStatus.Name] = int(containerStatus.RestartCount)
+		}
 	}
 	return res
 }

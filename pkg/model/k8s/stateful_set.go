@@ -76,17 +76,9 @@ func StatefulSetHasVolumeClaimTemplateByName(statefulSet *apps.StatefulSet, name
 	return false
 }
 
+// StatefulSetHasVolumeByName checks whether the pod template of the StatefulSet declares a volume of the name given
 func StatefulSetHasVolumeByName(statefulSet *apps.StatefulSet, name string) bool {
-	for i := range statefulSet.Spec.Template.Spec.Volumes {
-		// Convenience wrapper
-		volume := &statefulSet.Spec.Template.Spec.Volumes[i]
-		if volume.Name == name {
-			// This Volume name is already listed in statefulSet.Spec.Template.Spec.Volumes
-			return true
-		}
-	}
-
-	return false
+	return PodSpecHasVolumeByName(&statefulSet.Spec.Template.Spec, name)
 }
 
 // StatefulSetAppendVolumes appends multiple Volume(s) to the specified StatefulSet
