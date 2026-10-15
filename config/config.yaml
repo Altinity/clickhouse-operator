@@ -676,6 +676,21 @@ pod:
 
 ################################################
 ##
+## Backup section
+##
+################################################
+backup:
+  # EXPERIMENTAL. Where in its storage the clickhouse-backup sidecar of a host keeps its backups,
+  # and their object disk data, when the settings of that storage set no path of their own.
+  # Templates clickhouse-backup expands with the macros of the host: {namespace},
+  # {installation}, {cluster}, {shard}, {replica}. Changing them rolls the pods of every
+  # backup-enabled cluster and leaves the backups made under the old paths where they are.
+  # See docs/backup.md#storage-paths.
+  storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
+  storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
+
+################################################
+##
 ## Log parameters section
 ##
 ################################################
