@@ -42,7 +42,7 @@ spec:
           priority: 1
         - name: backup
           type: string
-          description: Remote backup name
+          description: Backup name
           jsonPath: .status.backupName
         - name: phase
           type: string
@@ -63,7 +63,7 @@ spec:
             EXPERIMENTAL. ClickHouseBackup defines a one-off backup of a ClickHouseInstallation.
             The operator runs one Job per backup-enabled cluster it targets, each driving the
             clickhouse-backup sidecar it injects into the cluster (see ClickHouseInstallation
-            spec.backup), creating and uploading a remote backup under one name. The API may change
+            spec.backup), creating and uploading a backup under one name. The API may change
             in a future release.
           type: object
           required:
@@ -117,7 +117,7 @@ spec:
                 backupName: &TypeBackupName
                   type: string
                   description: |
-                    Optional explicit remote backup name, which must not end like the backups of a schedule (-YYYYMMDD-HHMMSS).
+                    Optional explicit backup name, which must not end like the backups of a schedule (-YYYYMMDD-HHMMSS).
                     Generated from the resource name, or the schedule's backupNamePrefix, and the time the backup is due when empty
                   maxLength: 128
                   pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
@@ -137,7 +137,7 @@ spec:
                     created by then fails, as does the backup when it is not validated by then. Unset waits as long as it takes
                 diffFromRemote:
                   !!merge <<: *TypeBackupName
-                  description: "Existing remote backup to take this backup incrementally against (clickhouse-backup --diff-from-remote). The base backup must stay in remote storage while this backup is kept"
+                  description: "Existing backup to take this backup incrementally against (clickhouse-backup --diff-from-remote). The base backup must stay in the backup storage while this backup is kept"
                 verify: &TypeStringBool
                   description: "Run a verification Job after the backup that downloads it and checks it is restorable, without touching cluster data"
                   # StringBool is polymorphic — accepts native YAML bool (true/false),
@@ -188,7 +188,7 @@ spec:
                     - Failed
                 backupName:
                   type: string
-                  description: "Resolved remote backup name, the same on every cluster"
+                  description: "Resolved backup name, the same on every cluster"
                 schedule:
                   type: object
                   description: |

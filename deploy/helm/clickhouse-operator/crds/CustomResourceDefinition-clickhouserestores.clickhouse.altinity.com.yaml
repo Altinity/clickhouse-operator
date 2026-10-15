@@ -29,7 +29,7 @@ spec:
           priority: 1
         - name: backup
           type: string
-          description: Remote backup the restore Job restores
+          description: Backup the restore Job restores
           jsonPath: .status.backupName
         - name: phase
           type: string
@@ -47,7 +47,7 @@ spec:
       schema:
         openAPIV3Schema:
           description: |
-            EXPERIMENTAL. ClickHouseRestore defines a one-off restore of a remote backup into a
+            EXPERIMENTAL. ClickHouseRestore defines a one-off restore of a backup into a
             ClickHouseInstallation. The operator runs one Job per backup-enabled cluster it targets,
             each driving the clickhouse-backup sidecar it injects into the cluster (see
             ClickHouseInstallation spec.backup). Restoring into a fresh, empty installation is
@@ -86,21 +86,21 @@ spec:
                   pattern: "^[a-zA-Z0-9-]{0,15}$"
                 backupName:
                   type: string
-                  description: "Remote backup to restore"
+                  description: "Backup to restore"
                   maxLength: 128
                   pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
                 sourceInstallation:
                   type: string
                   description: |
                     ClickHouseInstallation that made the backup, when not the restored one: the restore reads the backup from the
-                    remote paths the {installation} macro gives there. Empty, that of the restored installation. Immutable
+                    storage paths the {installation} macro gives there. Empty, that of the restored installation. Immutable
                   maxLength: 253
                   pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
                 sourceNamespace:
                   type: string
                   description: |
                     Namespace of the ClickHouseInstallation that made the backup, when not that of the restored one: the restore
-                    reads the backup from the remote paths the {namespace} macro gives there. Empty, that of the restored installation. Immutable
+                    reads the backup from the storage paths the {namespace} macro gives there. Empty, that of the restored installation. Immutable
                   maxLength: 63
                   pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
                 schemaOnly: &TypeStringBool
@@ -145,7 +145,7 @@ spec:
                     - Failed
                 backupName:
                   type: string
-                  description: "Remote backup the restore Jobs restore, as it was when the first Job was created"
+                  description: "Backup the restore Jobs restore, as it was when the first Job was created"
                 cluster:
                   type: string
                   description: "Cluster spec.cluster named when the restore was validated, empty for every backup-enabled cluster: what the restore holds and whether it restores access entities follow it"

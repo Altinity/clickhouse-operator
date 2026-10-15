@@ -707,10 +707,10 @@ configs:
           # Templates are added to the list of all templates and used when CHI is reconciled.
           # Templates are applied in sorted alpha-numeric order.
           path: chi/templates.d
-        # NB there is deliberately no `chk:` section here. OperatorConfigTemplate declares only a CHI
-        # field, so any template.chk.* key unmarshals into nothing and is pruned by the chopconf CRD -
-        # it read as a supported knob while doing nothing. CHK templating is not implemented; adding
-        # the keys back requires the Go field and a reader first.
+          # NB there is deliberately no `chk:` section here. OperatorConfigTemplate declares only a CHI
+          # field, so any template.chk.* key unmarshals into nothing and is pruned by the chopconf CRD -
+          # it read as a supported knob while doing nothing. CHK templating is not implemented; adding
+          # the keys back requires the Go field and a reader first.
       ################################################
       ##
       ## Reconcile section
@@ -867,11 +867,11 @@ configs:
               # Minimum duration a pod must stay Ready=False before recovery fires, once enabled
               # (Go duration string; default 5m). Raise it for slow-recovering replicas.
               onPodNotReadyThreshold: 5m
-            # Future scopes (not yet implemented):
-            # failed:
-            #   onPodReady: retry
-            # broken:
-            #   onPodReady: retry
+              # Future scopes (not yet implemented):
+              # failed:
+              #   onPodReady: retry
+              # broken:
+              #   onPodReady: retry
           # Future global policy knobs (not yet implemented) — flat peers of `onStatus`,
           # apply across all recovery scopes:
           #
@@ -968,6 +968,20 @@ configs:
         # SIGTERM and SIGKILL during Pod termination process.
         # Increase this number is case of slow shutdown.
         terminationGracePeriod: 30
+      ################################################
+      ##
+      ## Backup section
+      ##
+      ################################################
+      backup:
+        # EXPERIMENTAL. Where in its storage the clickhouse-backup sidecar of a host keeps its backups,
+        # and their object disk data, when the settings of that storage set no path of their own.
+        # Templates clickhouse-backup expands with the macros of the host: {namespace},
+        # {installation}, {cluster}, {shard}, {replica}. Changing them rolls the pods of every
+        # backup-enabled cluster and leaves the backups made under the old paths where they are.
+        # See docs/backup.md#storage-paths.
+        storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
+        storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
       ################################################
       ##
       ## Log parameters section

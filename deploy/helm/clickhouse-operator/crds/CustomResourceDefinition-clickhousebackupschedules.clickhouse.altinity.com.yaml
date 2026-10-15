@@ -49,7 +49,7 @@ spec:
           jsonPath: .status.lastSuccessfulTime
         - name: last-backup
           type: string
-          description: Newest remote backup a scheduled run made on every cluster
+          description: Newest backup a scheduled run made on every cluster
           jsonPath: .status.lastBackupName
           priority: 1
         - name: last-failure
@@ -209,7 +209,7 @@ spec:
                   type: array
                   description: |
                     The clusters the schedule backs up, each by a CronJob of its own, and a cluster it no longer backs up
-                    while retention leaves remote backups of it unpruned, with the state of the runs on each
+                    while retention leaves backups of it unpruned, with the state of the runs on each
                   x-kubernetes-list-type: map
                   x-kubernetes-list-map-keys:
                     - name
@@ -239,7 +239,7 @@ spec:
                         description: "Last time a scheduled backup Job of the cluster completed successfully"
                       lastBackupName:
                         type: string
-                        description: "Remote backup the last successful scheduled run of the cluster made"
+                        description: "Backup the last successful scheduled run of the cluster made"
                       lastFailureTime:
                         type: string
                         format: date-time
@@ -253,7 +253,7 @@ spec:
                         nullable: true
                         description: |
                           Hosts of the cluster the schedule backs up that a scheduled run has backed up: those that hold its
-                          remote backups, which retention, when on, prunes
+                          backups, which retention, when on, prunes
                         items:
                           type: string
                       unprunedHosts:
@@ -261,7 +261,7 @@ spec:
                         nullable: true
                         description: |
                           Hosts that left retentionHosts while retention was on. No run reaches them any more, so retention
-                          no longer prunes the remote backups they made, which stay until deleted by hand. A host that
+                          no longer prunes the backups they made, which stay until deleted by hand. A host that
                           rejoins retentionHosts is dropped from it.
                         items:
                           type: string
@@ -277,7 +277,7 @@ spec:
                   description: "Oldest of the last successful runs of the clusters the schedule backs up: by then every cluster had a backup. Unset while a cluster has none"
                 lastBackupName:
                   type: string
-                  description: "Newest remote backup a scheduled run made on every cluster the schedule backs up. While a cluster lags, the retention of the others may have pruned it already: the per-cluster names tell what each cluster still holds"
+                  description: "Newest backup a scheduled run made on every cluster the schedule backs up. While a cluster lags, the retention of the others may have pruned it already: the per-cluster names tell what each cluster still holds"
                 lastFailureTime:
                   type: string
                   format: date-time
