@@ -15,6 +15,8 @@
 package annotator
 
 import (
+	"slices"
+
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	core "k8s.io/api/core/v1"
 
@@ -156,9 +158,11 @@ func (a *Annotator) GetHostScope(host *api.Host) map[string]string {
 	return a.filterOutAnnotationsToBeSkipped(a.appendCRProvidedAnnotations(nil))
 }
 
-// filterOutAnnotationsToBeSkipped filters out annotations that have to be skipped
+// filterOutAnnotationsToBeSkipped filters out annotations that have to be skipped.
+// Backup annotations are among them: they steer the operator, and copied into a pod template
+// stamping one would restart every host of the CR.
 func (a *Annotator) filterOutAnnotationsToBeSkipped(m map[string]string) map[string]string {
-	return util.CopyMapFilter(m, nil, util.AnnotationsToBeSkipped)
+	return util.CopyMapFilter(m, nil, slices.Concat(util.AnnotationsToBeSkipped, api.BackupAnnotations))
 }
 
 // appendCRProvidedAnnotations appends CR-provided annotations to specified annotations
