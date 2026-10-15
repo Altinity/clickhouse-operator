@@ -1,0 +1,10 @@
+# test_010087
+# Aimed at the cluster that opted out of backup: must be refused without creating a Job.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackup"
+metadata:
+  name: disabled-backup
+spec:
+  clickHouseInstallation: test-087-backup
+  cluster: disabled
+  backupName: e2e-087-disabled

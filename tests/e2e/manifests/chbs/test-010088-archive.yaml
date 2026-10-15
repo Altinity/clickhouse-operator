@@ -1,0 +1,16 @@
+# test_010088
+# A backup name prefix of its own, which no schedule of the installation the backup came from
+# defaults to: held on the cluster to be recovered while it waits to be, on the cluster that recovers
+# nothing only while the recovery restore, which restores access objects, is validated and running,
+# and released once the installation is recovered. Due once a year, so it never runs during the
+# scenario.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackupSchedule"
+metadata:
+  name: archive
+spec:
+  clickHouseInstallation: test-088-dr
+  schedule: "0 0 1 1 *"
+  concurrencyPolicy: Forbid
+  backupTemplate:
+    backupNamePrefix: e2e-088-archive

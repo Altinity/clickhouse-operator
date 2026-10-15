@@ -1,0 +1,12 @@
+# test_010087
+# Same spec as test-010087-restore.yaml, applied once that restore has filled the target:
+# with overwrite at its default (false) the overwrite guard must refuse it.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseRestore"
+metadata:
+  name: restore-again
+spec:
+  clickHouseInstallation: test-087-backup
+  cluster: cold
+  backupName: e2e-087-full
+  tables: "test_087.*"

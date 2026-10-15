@@ -56,7 +56,8 @@ _KNOWN_CR_STATUSES = _TERMINAL_CR_STATUSES | {_STATUS_IN_PROGRESS, _STATUS_TERMI
 # any pod NotReady->Ready flip (default on). Crucially the commonest abort - a plain
 # statefulSet.update.timeout - carries NO reason tag at all and IS recoverable, so the test must
 # keep waiting for it. Whitelisting "self-clearing" reasons instead would have this backwards and
-# would fast-fail the recoverable majority.
+# would fast-fail the recoverable majority. TestE2ESpecEditAbortReasonsMatchTheOperator in
+# pkg/controller/chi/worker-pod-retry_test.go parses this tuple and fails when the two lists differ.
 _SPEC_EDIT_ABORT_REASONS = (
     "FIPSValidationFailed",
     "RootCAConflict",
@@ -64,6 +65,7 @@ _SPEC_EDIT_ABORT_REASONS = (
     "FIPSImagePolicyViolation",
     "RemovedSecretRefSyntax",
     "InvalidPodTemplate",
+    "InvalidBackupStorage",
 )
 
 

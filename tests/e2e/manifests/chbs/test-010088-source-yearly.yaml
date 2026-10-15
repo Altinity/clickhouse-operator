@@ -1,0 +1,16 @@
+# test_010088
+# A schedule of the source, due once a year, so it never runs during the scenario. The scenario sets its
+# backupNamePrefix to the default prefix of schedule nightly of test-088-dr, <namespace>-test-088-dr-nightly,
+# and runs it once, now, for the backup the new installation is recovered from: the recovery reads that
+# backup from the storage paths of test-088-src, so it holds this schedule while it reads, as it holds every
+# schedule of that installation, whatever its retention.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackupSchedule"
+metadata:
+  name: source-yearly
+spec:
+  clickHouseInstallation: test-088-src
+  schedule: "0 0 1 1 *"
+  concurrencyPolicy: Forbid
+  backupTemplate:
+    backupNamePrefix: set-by-the-scenario

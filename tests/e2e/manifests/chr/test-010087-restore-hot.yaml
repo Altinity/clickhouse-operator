@@ -1,0 +1,15 @@
+# test_010087
+# Restores the hot cluster with overwrite, the tables matching spec.tables, once rows the backup does
+# not hold were added to them. Every shard of the hot cluster has one replica, which no other replica
+# could clone old parts back to: every host drops the tables of the backup on its own, without a drop
+# ON CLUSTER.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseRestore"
+metadata:
+  name: restore-hot
+spec:
+  clickHouseInstallation: test-087-backup
+  cluster: hot
+  backupName: e2e-087-full
+  tables: "test_087.*"
+  overwrite: true
