@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.28.0](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.4...release-0.28.0)
 
+### Security
+* **Bumped `golang.org/x/net` `v0.56.0` → `v0.60.0` and `golang.org/x/text` `v0.39.0` → `v0.42.0`** to address CVEs in the operator and metrics-exporter images (`CVE-2026-78663`, `CVE-2026-78659`, `CVE-2026-78669`, `CVE-2026-78660`, `CVE-2026-97032`, `CVE-2026-56851`). No API or behavior changes. The FIPS module is unchanged.
+
 ### Changed
 * **BACKWARD INCOMPATIBLE.** **A `ClickHouseInstallation` now wins over the templates it uses.** Where a template used to beat it silently - same-named pod, host and volume-claim templates, `configuration.users`, `profiles`, `quotas`, `settings` and `files`, `suspend`, `restart`, `taskID`, `namespaceDomainPattern`, `reconcile.statefulSet` and `reconcile.host` among them - the installation now wins, templates fill what it leaves unset, and a later template beats an earlier one. The operator's configuration rules (`clickhouse.addons.rules`) now yield the same way to a template or the installation setting the same key, such as `display_secrets_in_show_and_select`, though a grant spelled with the operator user's name still loses to the rules', which use the `{clickhouseOperatorUser}` placeholder. Containers, volumes and env now pair by name, mounts by mount path and ports by number and protocol, so differently named containers at the same position are now two. [docs/operator_configuration.md](docs/operator_configuration.md#template-precedence) lists the fields and what an upgrade changes. by [@sunsingerus](https://github.com/sunsingerus)
 
