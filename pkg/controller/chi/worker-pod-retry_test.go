@@ -15,6 +15,8 @@
 package chi
 
 import (
+	"os"
+	"regexp"
 	"strconv"
 	"testing"
 	"time"
@@ -136,6 +138,11 @@ func TestShouldTriggerAutoRecovery(t *testing.T) {
 			withError(api.StatusReasonFIPSImagePolicyViolation, "image lacks fips marker"), false},
 		{"Aborted with InvalidPodTemplate — reject",
 			withError(api.StatusReasonInvalidPodTemplate, "container has no image"), false},
+		{"Aborted with InvalidBackupStorage — reject",
+			withError(api.StatusReasonInvalidBackupStorage, `backup.storage "dr" names no declared storage`), false},
+		// The backup Secret may be readable by the time a pod turns Ready - no spec edit needed.
+		{"Aborted with BackupSecretUnresolved — accept",
+			withError(api.StatusReasonBackupSecretUnresolved, "backup Secret cannot be read"), true},
 		// Generic Aborted with an unrecognized reason tag — still a recovery target.
 		{"Aborted with unrecognized reason — accept",
 			withError("SomeOtherReason", "generic abort"), true},
@@ -146,6 +153,24 @@ func TestShouldTriggerAutoRecovery(t *testing.T) {
 			require.Equal(t, tc.expected, shouldTriggerAutoRecovery(tc.cr))
 		})
 	}
+}
+
+// e2eKubectlPath is the e2e helper module whose copy of normalizeTimeAbortReasons tells which aborts need a spec edit
+const e2eKubectlPath = "../../../tests/e2e/kubectl.py"
+
+// The e2e suite fails fast on an abort only a spec edit clears, telling it by a copy of normalizeTimeAbortReasons: a
+// reason missing there makes a run wait out its whole budget on such an abort, one listed there alone fails a run
+// the operator would recover.
+func TestE2ESpecEditAbortReasonsMatchTheOperator(t *testing.T) {
+	source, err := os.ReadFile(e2eKubectlPath)
+	require.NoError(t, err)
+	tuple := regexp.MustCompile(`(?s)_SPEC_EDIT_ABORT_REASONS = \((.*?)\)`).FindSubmatch(source)
+	require.NotNil(t, tuple, "kubectl.py no longer defines _SPEC_EDIT_ABORT_REASONS")
+	var reasons []string
+	for _, reason := range regexp.MustCompile(`"([^"]+)"`).FindAllSubmatch(tuple[1], -1) {
+		reasons = append(reasons, string(reason[1]))
+	}
+	require.ElementsMatch(t, normalizeTimeAbortReasons, reasons)
 }
 
 // TestIsPodReadyToNotReadyTransition verifies the dual of isPodNotReadyToReadyTransition:

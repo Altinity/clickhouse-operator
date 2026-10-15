@@ -543,6 +543,20 @@ func (c *Controller) addEventHandlersPod(
 	})
 }
 
+func (c *Controller) addEventHandlersSecret(
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
+) {
+	kubeInformerFactory.Core().V1().Secrets().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		DeleteFunc: deleteHandler("secretInformer.DeleteFunc", func(secret *core.Secret) {
+			if !c.isTrackedObject(&secret.ObjectMeta) {
+				return
+			}
+			log.V(3).M(secret).Info("secretInformer.DeleteFunc")
+			c.enqueueBackupSecretOwner(secret)
+		}),
+	})
+}
+
 // NewInformerFactoryForCHOPGeneratedObjects builds the kube informer factory, narrowed at the
 // API server to objects the operator generated.
 //
@@ -609,6 +623,7 @@ func (c *Controller) addEventHandlers(
 	c.addEventHandlersConfigMap(kubeInformerFactory)
 	c.addEventHandlersStatefulSet(kubeInformerFactory)
 	c.addEventHandlersPod(kubeInformerFactory)
+	c.addEventHandlersSecret(kubeInformerFactory)
 }
 
 // isTrackedObject checks whether operator is interested in changes of this object

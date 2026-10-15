@@ -73,7 +73,11 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	// the normalized CR would make a previous pass's Aborted latch at the check below and freeze
 	// the CR permanently.
 
-	new = w.buildCR(ctx, new)
+	raw := new
+	new = w.buildCR(ctx, raw)
+	new, backupSecretChanged := w.prepareBackupSecret(ctx, new, func() *api.ClickHouseInstallation {
+		return w.buildCR(ctx, raw)
+	})
 
 	// If buildCR's normalize already aborted the CR (e.g. FIPS strict rejected
 	// plain-text ZooKeeper), persist the abort and skip reconcile — otherwise
@@ -144,6 +148,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		generationTheSame:               generationTheSame,
 		hasUnhealthyHosts:               hasUnhealthyHosts,
 		operatorIPTheSame:               operatorIPTheSame,
+		backupSecretChanged:             backupSecretChanged,
 		hasHostNeedingStuckRecovery:     func() bool { return w.crHasHostNeedingStuckRecovery(ctx, new) },
 	}); decision {
 	case gateReconcileWork:
@@ -152,6 +157,8 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
 	case gateOperatorIPChanged:
 		w.a.M(new).F().Info("Operator IP changed - continue reconcile to refresh clickhouse-operator user networks")
+	case gateBackupSecretChanged:
+		w.a.M(new).F().Info("Backup Secret created or completed - continue reconcile to give the backup user its new password")
 	case gateStuckHostRecovery:
 		w.a.M(new).F().Info("CR has a sustained-NotReady host - continue reconcile for stuck-host recovery")
 	case gateUnhealthyHosts:
@@ -221,7 +228,8 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 
 func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 	// Resolve all keeper references before normalization — populates ZookeeperConfig.Nodes from KeeperRef
-	if err := w.resolveAllKeeperReferences(ctx, _cr); err != nil {
+	_cr, err := w.resolveAllKeeperReferences(ctx, _cr)
+	if err != nil {
 		w.a.V(1).M(_cr).F().
 			WithEvent(_cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			Warning("Failed to resolve keeper references: %v", err)
@@ -385,7 +393,10 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 }
 
 func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr *api.ClickHouseInstallation) error {
-	return nil
+	w.warnBackupWithoutStorage(cr)
+	w.warnMissingStorageSecrets(ctx, cr)
+	w.warnUnpublishedBackupAPI(cr)
+	return w.reconcileBackupSecret(ctx, cr)
 }
 
 // reconcileCRServicePreliminary runs first stage of CR reconcile process

@@ -27,6 +27,10 @@ const (
 	// gateOperatorIPChanged: the operator's pod IP moved, so the clickhouse-operator user's
 	// networks/host_regexp must be refreshed.
 	gateOperatorIPChanged reconcileGateDecision = "OperatorIPChanged"
+	// gateBackupSecretChanged: this pass created the backup Secret or filled in its missing keys,
+	// with new random values. The sidecars restart with them, so the backup user's password in the
+	// users config must follow, or the sidecars are locked out of ClickHouse.
+	gateBackupSecretChanged reconcileGateDecision = "BackupSecretChanged"
 	// gateStuckHostRecovery: a host has been sustained-NotReady past its threshold.
 	gateStuckHostRecovery reconcileGateDecision = "StuckHostRecovery"
 	// gateUnhealthyHosts: a host is unhealthy, so the shard may need recovery (#1704).
@@ -59,6 +63,8 @@ type reconcileGateInputs struct {
 	generationTheSame               bool
 	hasUnhealthyHosts               bool
 	operatorIPTheSame               bool
+	// backupSecretChanged is set when the backup Secret was created or completed ahead of the gate.
+	backupSecretChanged bool
 	// hasHostNeedingStuckRecovery is lazy: it costs live pod reads, so it is only consulted once
 	// the cheaper reasons have been ruled out.
 	hasHostNeedingStuckRecovery func() bool
@@ -92,6 +98,8 @@ func decideReconcileGate(in reconcileGateInputs) reconcileGateDecision {
 		return gateFinalizerInstalled
 	case !in.operatorIPTheSame:
 		return gateOperatorIPChanged
+	case in.backupSecretChanged:
+		return gateBackupSecretChanged
 	case in.generationTheSame && !in.hasUnhealthyHosts:
 		return gateNothingToDo
 	case in.hasReconcileWork:
