@@ -1223,7 +1223,7 @@ spec:
                               so turning it on or off rolls the cluster's Pods. Customize the sidecar through a container named
                               clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the storage
                               the cluster uses has a `secretRef`, or `podTemplate` is set: without either the sidecar would have no
-                              remote storage, so backup stays off and the operator warns.
+                              backup storage, so backup stays off and the operator warns.
                               See docs/backup.md for details.
                             properties:
                               enabled:
@@ -1231,7 +1231,7 @@ spec:
                                 description: |
                                   Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
                                   the cluster. Takes effect only with a storage that has a `secretRef`, or `podTemplate` set, which name where the
-                                  sidecar takes its remote storage from: without either, backup stays off
+                                  sidecar takes its storage from: without either, backup stays off
                               podTemplate:
                                 type: string
                                 description: |
@@ -1241,7 +1241,7 @@ spec:
                               storages:
                                 type: array
                                 description: |
-                                  Remote storages backups may be kept in, each under a name of its own; one per level for now. A cluster takes
+                                  Storages the backups may be kept in, each under a name of its own; one per level for now. A cluster takes
                                   those of the installation along with its own, pairing them by name: a storage of its own that the installation
                                   declares too takes what it leaves out from the installation's. Templates contribute theirs alike
                                 maxItems: 1
@@ -1263,7 +1263,7 @@ spec:
                                       type: object
                                       description: |
                                         Secret in the installation's namespace whose keys are passed to the sidecar as environment variables,
-                                        configuring the remote storage, e.g. REMOTE_STORAGE, S3_BUCKET, S3_PATH, S3_ACCESS_KEY, S3_SECRET_KEY.
+                                        configuring the storage, e.g. REMOTE_STORAGE, S3_BUCKET, S3_PATH, S3_ACCESS_KEY, S3_SECRET_KEY.
                                         Without one, of its own or of the storage of the same name it pairs with, the storage is configured by the
                                         container of the Pod template `podTemplate` names
                                       properties:
@@ -1282,28 +1282,28 @@ spec:
                               recovery:
                                 type: object
                                 description: |
-                                  Restore a new installation from a remote backup once it has completed its first reconcile: the operator
+                                  Restore a new installation from a backup once it has completed its first reconcile: the operator
                                   creates a ClickHouseRestore of every backup-enabled cluster that inherits a backup name, users, roles and
                                   grants included, and records the recovery in the `clickhouse.altinity.com/recovered-from` annotation.
                                   Changing it changes no Pod. Taken from the installation only, never from a ClickHouseInstallationTemplate.
                                 properties:
                                   backupName:
                                     type: string
-                                    description: "Remote backup to recover from. An explicit empty name on a cluster leaves the cluster out of a recovery the installation asks for"
+                                    description: "Backup to recover from. An explicit empty name on a cluster leaves the cluster out of a recovery the installation asks for"
                                     maxLength: 128
                                     pattern: '^([A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?)?$'
                                   sourceInstallation:
                                     type: string
                                     description: |
                                       ClickHouseInstallation that made the backup, when not this one: the recovery reads the backup from the
-                                      remote paths the {installation} macro gives there. Empty, this installation
+                                      storage paths the {installation} macro gives there. Empty, this installation
                                     maxLength: 253
                                     pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
                                   sourceNamespace:
                                     type: string
                                     description: |
                                       Namespace of the ClickHouseInstallation that made the backup, when not this one: the recovery reads the
-                                      backup from the remote paths the {namespace} macro gives there. Empty, the namespace of this installation
+                                      backup from the storage paths the {namespace} macro gives there. Empty, the namespace of this installation
                                     maxLength: 63
                                     pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
                           pdbManaged:
@@ -1915,7 +1915,7 @@ spec:
                     them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
                     When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
                     so turning it on or off rolls the cluster's Pods. Backup takes effect only where the storage a cluster
-                    uses has a `secretRef`, or `podTemplate` is set: without either the sidecar would have no remote storage,
+                    uses has a `secretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
                     so backup stays off and the operator warns.
                     See docs/backup.md for details.
                 useTemplates:
