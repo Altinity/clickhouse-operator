@@ -250,6 +250,26 @@ spec:
 
 See [Keeper Reference](keeper_reference.md) for details on how CHI references CHK resources.
 
+## Backup
+
+EXPERIMENTAL. The `backup:` block sets the defaults of operator-managed backup: where in its storage
+the `clickhouse-backup` sidecar of a host keeps its backups, and their object disk data, when the
+settings of that storage set no path of their own.
+
+```yaml
+backup:
+  storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
+  storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
+```
+
+| Setting | Default | Description |
+|---|---|---|
+| `storagePath` | `backup/{namespace}/{installation}/{cluster}/{shard}` | Storage path template, expanded on every host with its macros: `{namespace}`, `{installation}`, `{cluster}`, `{shard}`, `{replica}` |
+| `storageObjectDiskPath` | `object_disks/{namespace}/{installation}/{cluster}/{shard}` | Object disk path template, the same way |
+
+Changing either rolls the Pods of every backup-enabled cluster, and leaves the backups made under the
+old paths where they are. See [Storage paths](backup.md#storage-paths).
+
 ## Security
 
 The `security:` block at the chopconf top level (sibling of `clickhouse:`) holds operator-wide hardening defaults across three orthogonal axes: transport hardening (`security.policy`), FIPS cryptographic-module enforcement (`security.fips.enforced`), and workload supply-chain gating (`security.images.policy`). Per-component sub-blocks under it cover ClickHouse-client TLS, ZooKeeper-client TLS, Kubernetes-client TLS, and the operator↔metrics-exporter IPC channel.

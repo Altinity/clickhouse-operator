@@ -49,6 +49,12 @@ default) or `fips140=on` (escape-hatch). The gate lives in
 symmetrically because the metrics-exporter ships its own copy of the FIPS
 module.
 
+The value takes the forms the operator's other on/off settings take (`true`,
+`false`, `"yes"`, `"on"`, `1`, ...); an empty value counts as unset. Any other
+value — a mistyped word, or one of another type — makes the operator and the
+metrics exporter refuse to start, naming the value, rather than read it as off
+and run without the FIPS gate.
+
 When `true` at startup:
 
 - If `crypto/fips140` reports not-Enabled (binary built without `GOFIPS140`),
@@ -95,12 +101,24 @@ normalizer as a defensive alias but is not documented as a supported value.
 
 ### Detection signals
 
-- **Admission (deploy-time)** — the operator's normalizer inspects each host's
-  resolved PodTemplate `spec.containers[clickhouse].image` (or `keeper` for CHK)
-  for the substring `fips` (case-insensitive) in the TAG portion of the
-  reference. Registry-path substrings don't count. Hosts with no PodTemplate
+- **Admission (deploy-time)** — the operator's normalizer inspects the image of
+  each host's ClickHouse container (or `keeper` for CHK) in its resolved
+  PodTemplate - the one named `clickhouse`, else the first that is none of the
+  operator's sidecars - for the substring `fips` (case-insensitive) in the TAG
+  portion of the reference. Registry-path substrings don't count. Hosts with no PodTemplate
   use the operator default `clickhouse/clickhouse-server:latest` (or the
   Keeper equivalent), which by construction fails Required.
+- **Backup image (deploy-time)** — for a CHI with
+  [operator-managed backup](backup.md), the same tag check applies to the
+  clickhouse-backup sidecar image of every host of a backup-enabled cluster -
+  the image of the `clickhouse-backup` container of the pod template
+  `spec.backup.podTemplate` names, else the default
+  one - which the backup/restore Jobs run as well. The default
+  backup image is not a FIPS build, so `FIPSRequired` needs an explicit
+  FIPS-built image such as `altinity/clickhouse-backup:<version>-fips`. There
+  is no runtime check for it. The FIPS settings do not cover backup traffic:
+  the sidecar REST API stays plain HTTP with basic auth (see the security
+  notes in [backup.md](backup.md)).
 - **Runtime (post-Ready)** — after the host responds to `SELECT version()`,
   the operator checks the reply for the same substring. Altinity FIPS builds
   bake the tag suffix (e.g. `.altinityfips`) into the binary's version
