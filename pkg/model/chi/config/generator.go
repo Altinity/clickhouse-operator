@@ -496,6 +496,8 @@ func (c *Generator) getHostMacros(host *chi.Host) string {
 
 	// <installation>CHI-name-macros-value</installation>
 	util.Iline(b, 8, "<installation>%s</installation>", host.Runtime.Address.CHIName)
+	// <namespace>CHI-namespace-macros-value</namespace>
+	util.Iline(b, 8, "<namespace>%s</namespace>", host.Runtime.Address.Namespace)
 
 	// <CLUSTER_NAME>cluster-name-macros-value</CLUSTER_NAME>
 	// util.Iline(b, 8, "<%s>%[2]s</%[1]s>", replica.Address.ClusterName, c.getMacrosCluster(replica.Address.ClusterName))
