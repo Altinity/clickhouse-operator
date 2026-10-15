@@ -19,6 +19,7 @@ import (
 	"path"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	core "k8s.io/api/core/v1"
@@ -98,6 +99,14 @@ func (n *Normalizer) buildTargetFromTemplates(subj *chi.ClickHouseInstallation) 
 	// Apply external CR templates - both auto and explicitly requested - on top of target
 	n.applyExternalCRTemplatesOnTarget(subj)
 
+	// The clusters the templates give the target are theirs, shared by every installation they apply to:
+	// the target normalizes copies of its own
+	n.req.GetTarget().GetSpecT().Configuration.OwnClusters()
+
+	// A recovery restores one installation from one backup: one coming from a template would restore
+	// that backup into every installation the template applies to
+	n.req.GetTarget().GetSpecT().DropBackupRecovery()
+
 	// After all CR templates applied, place provided 'subject' on top of the whole target stack
 	n.applyCROnTarget(subj)
 }
@@ -152,8 +161,14 @@ func (n *Normalizer) ensureSubject(subj *chi.ClickHouseInstallation) *chi.ClickH
 func (n *Normalizer) normalizeTarget() (*chi.ClickHouseInstallation, error) {
 	n.normalizeSpec()
 	n.finalize()
-	n.rejectInvalidPodTemplates()
-	n.enforceFIPSImagePolicy()
+	// A backup storage that cannot be resolved tells nothing about the pod templates, which are checked all the same
+	n.rejectInvalidBackupStorages()
+	// The FIPS image policy reads the images of the pod templates. One error at a time keeps the cause in front: an
+	// image read from an invalid pod template need not be the image a container would run
+	invalidHostTemplates, invalidBackupTemplates := n.rejectInvalidPodTemplates()
+	if !invalidHostTemplates {
+		n.enforceFIPSImagePolicy(!invalidBackupTemplates)
+	}
 	n.fillStatus()
 
 	return n.req.GetTarget(), nil
@@ -810,6 +825,12 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings, scope any)
 	// Ensure and normalize target user settings
 	users = users.Ensure().Normalize(n.settingsNormalizerOptions(replacerUsers, scope, clickhouseOperatorUserMacroReplacer()))
 
+	// Users are common for all clusters, thus the backup user exists as soon as any cluster has backup enabled.
+	// Added once keys are normalized, so no spelling of its keys in the CR can survive next to the operator's.
+	if n.req.GetTarget().IsBackupEnabled() {
+		n.ensureBackupUser(users)
+	}
+
 	// Add special "default" user to the list of users, which is used/required for:
 	//   1. ClickHouse hosts to communicate with each other
 	//   2. Specify host_regexp for default user as "allowed hosts to visit from"
@@ -839,8 +860,8 @@ func (n *Normalizer) removePlainPassword(user *chi.SettingsUser) {
 	// If user has any of encrypted password(s) specified, we need to delete existing plaintext password.
 	// Set 'remove' flag for user's plaintext 'password' setting, which is specified as empty in stock ClickHouse users.xml,
 	// thus we need to overwrite it.
-	if user.Has("password_double_sha1_hex") || user.Has("password_sha256_hex") {
-		user.Set("password", chi.NewSettingScalar("").SetAttribute("remove", "1"))
+	if user.Has(userFieldPasswordDoubleSHA1Hex) || user.Has(userFieldPasswordSHA256Hex) {
+		user.Set(userFieldPassword, chi.NewSettingScalar("").SetAttribute("remove", "1"))
 	}
 }
 
@@ -931,6 +952,8 @@ func (n *Normalizer) normalizeClusterStage2(cluster *chi.Cluster) *chi.Cluster {
 	cluster.InheritClusterReconcileFrom(n.req.GetTarget())
 	// Inherit from .spec.security
 	cluster.InheritClusterSecurityFrom(n.req.GetTarget())
+	// Inherit from .spec.backup
+	cluster.InheritClusterBackupFrom(n.req.GetTarget())
 	// Inherit from .spec.defaults
 	cluster.InheritTemplatesFrom(n.req.GetTarget())
 
@@ -1213,11 +1236,15 @@ func (n *Normalizer) rejectFIPSBypass(security *chi.ClusterSecurity) {
 // (config-side TLS strict mode) — the two posture knobs gate independently.
 //
 // Runs after finalize() so each host's PodTemplate reference has been resolved.
-// Walks the host's resolved PodTemplate.Spec.Containers[ClickHouseContainerName]
-// (the operator's canonical CH container); other sidecars are out of scope.
-// Hosts with no PodTemplate at all use the default `clickhouse/clickhouse-server:latest`,
+// Checks the ClickHouse container of the host's resolved PodTemplate, found as the
+// creator finds it; user sidecars are out of scope.
+// Hosts with no PodTemplate at all, or one holding only the operator's sidecars, use the
+// default `clickhouse/clickhouse-server:latest`,
 // which by construction lacks "fips" — so they fail-closed under Required.
-func (n *Normalizer) enforceFIPSImagePolicy() {
+// Hosts of backup-enabled clusters run the operator's clickhouse-backup sidecar as well, whose image
+// the backup Jobs run, so it is held to the policy too — unless checkBackupSidecars is off, as it is
+// once a pod template a backup names was found invalid.
+func (n *Normalizer) enforceFIPSImagePolicy(checkBackupSidecars bool) {
 	if !chop.Config().Security.GetImages().IsRequired() {
 		return
 	}
@@ -1225,15 +1252,54 @@ func (n *Normalizer) enforceFIPSImagePolicy() {
 	if target == nil {
 		return
 	}
+	aborted := false
+	abort := func(reason, msg string) {
+		aborted = true
+		target.EnsureStatus().ReconcileAbortWithReason(reason, msg)
+	}
 	commonfips.EnforceFIPSImagePolicy(
 		target,
 		resolveClickHouseImage,
 		config.ClickHouseContainerName,
 		chi.StatusReasonFIPSImagePolicyViolation,
-		func(reason, msg string) {
-			target.EnsureStatus().ReconcileAbortWithReason(reason, msg)
-		},
+		abort,
 	)
+	if aborted || !checkBackupSidecars {
+		return
+	}
+	commonfips.EnforceFIPSImagePolicy(
+		backupHosts{target},
+		resolveBackupSidecarImage,
+		config.ClickHouseBackupContainerName,
+		chi.StatusReasonFIPSImagePolicyViolation,
+		abort,
+	)
+}
+
+// backupHosts walks the hosts of the backup-enabled clusters of a CR only
+type backupHosts struct {
+	cr *chi.ClickHouseInstallation
+}
+
+func (b backupHosts) WalkHosts(f func(host *chi.Host) error) []error {
+	return b.cr.WalkHosts(func(host *chi.Host) error {
+		if !host.GetCluster().GetBackup().IsEnabled() {
+			return nil
+		}
+		return f(host)
+	})
+}
+
+// resolveBackupSidecarImage returns the image the host's clickhouse-backup sidecar runs, as the creator resolves
+// it: that of the container of the sidecar's name of the pod template the cluster's backup names, if it names one,
+// or else the default one
+func resolveBackupSidecarImage(host *chi.Host) string {
+	if podTemplate, ok := host.GetBackupPodTemplate(); ok {
+		if container, ok := k8s.PodSpecContainerGet(&podTemplate.Spec, config.ClickHouseBackupContainerName); ok && (container.Image != "") {
+			return container.Image
+		}
+	}
+	return config.DefaultClickHouseBackupDockerImage
 }
 
 const (
@@ -1246,6 +1312,22 @@ const (
 	// rejectInvalidPodTemplates, which mostly arises from templates written for the positional merge.
 	podTemplateContainerPairingHint = "containers from two templates, or from a template and the installation, merge only when they have the same name"
 
+	// backupPodTemplateField is the backup field naming the pod template the clickhouse-backup sidecar is built on
+	backupPodTemplateField = "backup.podTemplate"
+
+	// backupStorageField is the backup field naming the storage the clickhouse-backup sidecar keeps the backups in
+	backupStorageField = "backup.storage"
+
+	// backupPodTemplateVolumeHint is how to fix the pod template a backup names rejected for a volume its
+	// clickhouse-backup container uses that only that pod template declares.
+	backupPodTemplateVolumeHint = "the sidecar takes the container alone, not the volumes of its pod template: " +
+		"declare the volume in a pod template the hosts run"
+
+	// backupPodTemplateHint is how to fix a pod template of a backup-enabled cluster rejected for a clickhouse-backup
+	// container of its own, which the pod runs the operator's sidecar in place of.
+	backupPodTemplateHint = "the operator builds its sidecar of that name on the container of the pod template " +
+		backupPodTemplateField + " names - name this one there"
+
 	// The official ClickHouse server image's entrypoint script, the prefix of the arguments it passes
 	// to the server, and the binaries and command that start the server when run directly.
 	clickHouseImageEntrypoint  = "entrypoint.sh"
@@ -1255,51 +1337,231 @@ const (
 	clickHouseServerCommand    = "server"
 )
 
-// rejectInvalidPodTemplates aborts the CR when a host's resolved pod template cannot run: a
-// container without a name or an image, or two containers of one name, or a pod template merged
-// from several layers that starts a duplicate ClickHouse server in another container - a pod is
-// meant to run one server, and two fight over one set of ports and one data directory. Templates
-// and the installation pair containers by name, so a template's `clickhouse-pod` next to an
-// installation's `clickhouse` is two containers, not one. Runs after finalize() so each host's pod
-// template reference has been resolved, and ahead of any write, so the StatefulSet the pods run
-// from stays as it is.
-func (n *Normalizer) rejectInvalidPodTemplates() {
+// rejectInvalidBackupStorages aborts the CR when a cluster that turns backup on uses a storage that neither it nor
+// the installation declares, or declares several without naming the one it uses: its sidecar would take no storage,
+// or another one than meant. Runs ahead of any write, so the StatefulSets stay as they are. It reports the first
+// such cluster only.
+func (n *Normalizer) rejectInvalidBackupStorages() {
 	target := n.req.GetTarget()
 	if target == nil {
 		return
 	}
-	checked := make(map[string]bool)
+	aborted := false
+	target.WalkClusters(func(cluster chi.ICluster) error {
+		backup := cluster.GetBackup()
+		if aborted || !backup.IsRequested() {
+			return nil
+		}
+		if _, err := backup.ResolveStorage(); err != nil {
+			field := backupStorageField
+			if storage := backup.GetStorage().Value(); storage != "" {
+				field += " " + strconv.Quote(storage)
+			}
+			declared := "none"
+			if storages := backup.GetStorages(); len(storages) > 0 {
+				names := make([]string, 0, len(storages))
+				for _, storage := range storages {
+					names = append(names, strconv.Quote(storage.Name))
+				}
+				declared = strings.Join(names, ", ")
+			}
+			target.EnsureStatus().ReconcileAbortWithReason(chi.StatusReasonInvalidBackupStorage,
+				fmt.Sprintf("backup of cluster %q, its own or inherited: %s %v (declared: %s)", cluster.GetName(), field, err, declared))
+			aborted = true
+		}
+		return nil
+	})
+}
+
+// rejectInvalidPodTemplates aborts the CR when a host's resolved pod template cannot run: a
+// container without a name or an image, two containers of one name, a clickhouse-backup container
+// of a backup-enabled cluster other than the one its sidecar is built on, or a pod template merged
+// from several layers that starts a duplicate ClickHouse server in another container - a pod is
+// meant to run one server, and two fight over one set of ports and one data directory. Templates
+// and the installation pair containers by name, so a template's `clickhouse-pod` next to an
+// installation's `clickhouse` is two containers, not one. It aborts the CR as well when the pod
+// template a backup names cannot serve as the base of the sidecar. Runs after finalize() so each
+// host's pod template reference has been resolved, and ahead of any write, so the StatefulSet the
+// pods run from stays as it is. Reports whether it aborted the CR over a pod template the hosts run,
+// or over one a backup names.
+func (n *Normalizer) rejectInvalidPodTemplates() (invalidHostTemplates, invalidBackupTemplates bool) {
+	target := n.req.GetTarget()
+	if target == nil {
+		return false, false
+	}
+	// A pod template is checked once per backup setting of the hosts it serves: on hosts of a backup-enabled cluster
+	// the operator fills in the image of a clickhouse-backup container, which only the pod template the backup
+	// names may have. A cluster that turns backup on without a storage counts as well: the container is
+	// meant for its sidecar, and naming its pod template in the backup is what turns backup on there.
+	type podTemplateUse struct {
+		name           string
+		backup         bool
+		backupTemplate string
+	}
+	checked := make(map[podTemplateUse]bool)
 	aborted := false
 	target.WalkHosts(func(host *chi.Host) error {
 		podTemplate, ok := host.GetPodTemplate()
-		if aborted || !ok || checked[podTemplate.Name] {
+		if aborted || !ok {
 			return nil
 		}
-		checked[podTemplate.Name] = true
+		backup := host.GetCluster().GetBackup()
+		use := podTemplateUse{name: podTemplate.Name, backup: backup.IsRequested(), backupTemplate: backup.GetPodTemplate().Value()}
+		if checked[use] {
+			return nil
+		}
+		checked[use] = true
+
+		var imageProvided []string
+		if use.backup {
+			imageProvided = append(imageProvided, config.ClickHouseBackupContainerName)
+		}
 
 		layers := n.req.GetPodTemplateLayers(podTemplate.Name)
 		merged := len(layers) > 1
-		problem, invalid := describeInvalidContainers(&podTemplate.Spec)
+		problem, invalid := describeInvalidContainers(&podTemplate.Spec, imageProvided...)
 		if !invalid && merged {
 			problem, invalid = describeDuplicateClickHouseServer(&podTemplate.Spec)
+		}
+		hint := ""
+		if invalid && merged {
+			hint = podTemplateContainerPairingHint
+		}
+		if !invalid && use.backup && (use.backupTemplate != podTemplate.Name) {
+			if _, ok := k8s.PodSpecContainerGet(&podTemplate.Spec, config.ClickHouseBackupContainerName); ok {
+				problem = fmt.Sprintf("has container %q on cluster %q, whose spec enables backup",
+					config.ClickHouseBackupContainerName, host.GetCluster().GetName())
+				invalid, hint = true, backupPodTemplateHint
+			}
 		}
 		if !invalid {
 			return nil
 		}
 		msg := fmt.Sprintf("pod template %q %s", podTemplate.Name, problem)
 		if merged {
-			msg = fmt.Sprintf("pod template %q (merged from %s) %s - %s",
-				podTemplate.Name, strings.Join(layers, ", "), problem, podTemplateContainerPairingHint)
+			msg = fmt.Sprintf("pod template %q (merged from %s) %s", podTemplate.Name, strings.Join(layers, ", "), problem)
+		}
+		if hint != "" {
+			msg += " - " + hint
 		}
 		target.EnsureStatus().ReconcileAbortWithReason(chi.StatusReasonInvalidPodTemplate, msg)
 		aborted = true
 		return nil
 	})
+	if aborted {
+		return true, false
+	}
+
+	// The pod template a backup names is checked once, for its clickhouse-backup container alone, as the
+	// sidecar takes nothing else of it
+	checkedBackup := make(map[string]bool)
+	target.WalkClusters(func(cluster chi.ICluster) error {
+		backup := cluster.GetBackup()
+		name := backup.GetPodTemplate().Value()
+		if aborted || !backup.IsEnabled() || (name == "") || checkedBackup[name] {
+			return nil
+		}
+		checkedBackup[name] = true
+		if problem, invalid := describeInvalidBackupPodTemplate(target, name); invalid {
+			target.EnsureStatus().ReconcileAbortWithReason(chi.StatusReasonInvalidPodTemplate,
+				fmt.Sprintf("%s of cluster %q names pod template %q, which %s", backupPodTemplateField, cluster.GetName(), name, problem))
+			aborted = true
+		}
+		return nil
+	})
+	if aborted {
+		return false, true
+	}
+
+	// A volume the sidecar's container uses that only its pod template declares is missing from the pods, which the
+	// API server refuses to run: checked once per pod template of the hosts and pod template of the sidecar
+	type sidecarTemplateUse struct {
+		hostTemplate   string
+		backupTemplate string
+	}
+	checkedVolumes := make(map[sidecarTemplateUse]bool)
+	target.WalkHosts(func(host *chi.Host) error {
+		backupTemplate, ok := host.GetBackupPodTemplate()
+		if aborted || !ok || !host.GetCluster().GetBackup().IsEnabled() {
+			return nil
+		}
+		hostTemplate, _ := host.GetPodTemplate()
+		use := sidecarTemplateUse{hostTemplate: hostTemplate.GetName(), backupTemplate: backupTemplate.Name}
+		if checkedVolumes[use] {
+			return nil
+		}
+		checkedVolumes[use] = true
+		if problem, invalid := describeMissingBackupVolume(target, backupTemplate, hostTemplate); invalid {
+			target.EnsureStatus().ReconcileAbortWithReason(chi.StatusReasonInvalidPodTemplate,
+				fmt.Sprintf("%s of cluster %q names pod template %q, which %s - %s",
+					backupPodTemplateField, host.GetCluster().GetName(), backupTemplate.Name, problem, backupPodTemplateVolumeHint))
+			aborted = true
+		}
+		return nil
+	})
+	return false, aborted
+}
+
+// describeMissingBackupVolume describes a volume the clickhouse-backup container of the sidecar's pod template uses
+// that only that pod template declares - neither the pod template the hosts run nor a volume claim template of the
+// CR - if any.
+func describeMissingBackupVolume(cr *chi.ClickHouseInstallation, backupTemplate, hostTemplate *chi.PodTemplate) (string, bool) {
+	sidecar, ok := k8s.PodSpecContainerGet(&backupTemplate.Spec, config.ClickHouseBackupContainerName)
+	if !ok {
+		return "", false
+	}
+	var names []string
+	for _, mount := range sidecar.VolumeMounts {
+		names = append(names, mount.Name)
+	}
+	for _, device := range sidecar.VolumeDevices {
+		names = append(names, device.Name)
+	}
+	for _, name := range names {
+		inBackupTemplate := k8s.PodSpecHasVolumeByName(&backupTemplate.Spec, name)
+		inHostTemplate := (hostTemplate != nil) && k8s.PodSpecHasVolumeByName(&hostTemplate.Spec, name)
+		_, claimed := cr.GetVolumeClaimTemplate(name)
+		if !inBackupTemplate || inHostTemplate || claimed {
+			continue
+		}
+		if hostTemplate == nil {
+			return fmt.Sprintf("has container %q using volume %q, which only that pod template declares, while the hosts "+
+				"run no pod template", sidecar.Name, name), true
+		}
+		return fmt.Sprintf("has container %q using volume %q, which only that pod template declares, not pod template %q "+
+			"the hosts run", sidecar.Name, name, hostTemplate.Name), true
+	}
+	return "", false
+}
+
+// describeInvalidBackupPodTemplate describes what keeps the named pod template from serving as the base of the
+// clickhouse-backup sidecar, if anything: it has to exist and to have one container of the sidecar's name, which
+// asks for no REST API over TLS.
+func describeInvalidBackupPodTemplate(cr *chi.ClickHouseInstallation, name string) (string, bool) {
+	podTemplate, ok := cr.GetPodTemplate(name)
+	if !ok {
+		return "does not exist", true
+	}
+	var sidecars []*core.Container
+	for i := range podTemplate.Spec.Containers {
+		if podTemplate.Spec.Containers[i].Name == config.ClickHouseBackupContainerName {
+			sidecars = append(sidecars, &podTemplate.Spec.Containers[i])
+		}
+	}
+	switch len(sidecars) {
+	case 0:
+		return fmt.Sprintf("has no container %q to build the sidecar on", config.ClickHouseBackupContainerName), true
+	case 1:
+		return describeInvalidBackupContainer(sidecars[0])
+	default:
+		return fmt.Sprintf("has two containers named %q", config.ClickHouseBackupContainerName), true
+	}
 }
 
 // describeInvalidContainers describes what keeps a container of the pod spec from running, if
-// anything - a missing name or image, or a name two containers share.
-func describeInvalidContainers(spec *core.PodSpec) (string, bool) {
+// anything - a missing name or image, or a name two containers share. Containers named in
+// imageProvided get their image from the operator, so they need not have one.
+func describeInvalidContainers(spec *core.PodSpec, imageProvided ...string) (string, bool) {
 	names := make(map[string]bool)
 	for _, containers := range [][]core.Container{spec.InitContainers, spec.Containers} {
 		for i := range containers {
@@ -1311,10 +1573,30 @@ func describeInvalidContainers(spec *core.PodSpec) (string, bool) {
 				return fmt.Sprintf("has two containers named %q", container.Name), true
 			}
 			names[container.Name] = true
-			if container.Image == "" {
+			if (container.Image == "") && !slices.Contains(imageProvided, container.Name) {
 				return fmt.Sprintf("has container %q without an image", container.Name), true
 			}
 		}
+	}
+	return "", false
+}
+
+// describeInvalidBackupContainer describes what keeps a clickhouse-backup container from serving as the base of the
+// operator's sidecar, if anything. A REST API over TLS, which the container asks for, no backup Job could call: the
+// operator serves it over plain HTTP whatever the container sets, so it refuses such a pod template rather than turn
+// TLS off unasked. Of two entries of one name kubelet sets the last; one taken from a source the operator cannot read
+// is pinned off.
+func describeInvalidBackupContainer(sidecar *core.Container) (string, bool) {
+	for i := len(sidecar.Env) - 1; i >= 0; i-- {
+		envVar := &sidecar.Env[i]
+		if envVar.Name != config.ClickHouseBackupEnvAPISecure {
+			continue
+		}
+		if secure, err := strconv.ParseBool(envVar.Value); (envVar.ValueFrom == nil) && (err == nil) && secure {
+			return fmt.Sprintf("has container %q with %s=%s, while the backup Jobs call its REST API over plain HTTP",
+				sidecar.Name, envVar.Name, envVar.Value), true
+		}
+		break
 	}
 	return "", false
 }
@@ -1324,7 +1606,7 @@ func describeInvalidContainers(spec *core.PodSpec) (string, bool) {
 // only: a single layer's pod spec runs what its author wrote, where a sidecar sharing the server
 // image's name - one registry repository tagged per product - need not start the server.
 func describeDuplicateClickHouseServer(spec *core.PodSpec) (string, bool) {
-	clickHouse, ok := k8s.PodSpecContainerGet(spec, config.ClickHouseContainerName, 0)
+	clickHouse, ok := podSpecContainerGetClickHouse(spec)
 	if !ok {
 		return "", false
 	}
@@ -1368,18 +1650,19 @@ func startsClickHouseServer(container *core.Container) bool {
 	return false
 }
 
+// podSpecContainerGetClickHouse returns the ClickHouse container of the pod spec as the creator finds it: the one named
+// so, else the first container that is none of the operator's sidecars
+func podSpecContainerGetClickHouse(spec *core.PodSpec) (*core.Container, bool) {
+	return k8s.PodSpecContainerGetOrFirstOther(spec, config.ClickHouseContainerName, config.ClickHouseSidecarContainerNames...)
+}
+
 // resolveClickHouseImage returns the image string the operator would deploy
 // for this host's ClickHouse container — the resolved PodTemplate's container
 // override, or the operator default when no PodTemplate is set.
 func resolveClickHouseImage(host *chi.Host) string {
-	pt, ok := host.GetPodTemplate()
-	if !ok || (pt == nil) {
-		return config.DefaultClickHouseDockerImage
-	}
-	for i := range pt.Spec.Containers {
-		c := &pt.Spec.Containers[i]
-		if c.Name == config.ClickHouseContainerName {
-			return c.Image
+	if podTemplate, ok := host.GetPodTemplate(); ok {
+		if clickHouse, ok := podSpecContainerGetClickHouse(&podTemplate.Spec); ok {
+			return clickHouse.Image
 		}
 	}
 	return config.DefaultClickHouseDockerImage
