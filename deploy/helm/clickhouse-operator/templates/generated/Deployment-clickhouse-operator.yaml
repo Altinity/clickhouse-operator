@@ -25,15 +25,15 @@ spec:
       labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}
       annotations:
         {{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations | nindent 8 }}{{ end }}
-        checksum/files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-files.yaml") . | sha256sum }}
-        checksum/confd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-confd-files.yaml") . | sha256sum }}
-        checksum/configd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-configd-files.yaml") . | sha256sum }}
-        checksum/templatesd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-templatesd-files.yaml") . | sha256sum }}
-        checksum/usersd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-usersd-files.yaml") . | sha256sum }}
-        checksum/keeper-confd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-confd-files.yaml") . | sha256sum }}
-        checksum/keeper-configd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-configd-files.yaml") . | sha256sum }}
-        checksum/keeper-templatesd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-templatesd-files.yaml") . | sha256sum }}
-        checksum/keeper-usersd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-usersd-files.yaml") . | sha256sum }}
+        checksum/files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-files.yaml") }}
+        checksum/confd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-confd-files.yaml") }}
+        checksum/configd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-configd-files.yaml") }}
+        checksum/templatesd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-templatesd-files.yaml") }}
+        checksum/usersd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-usersd-files.yaml") }}
+        checksum/keeper-confd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-keeper-operator-confd-files.yaml") }}
+        checksum/keeper-configd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-keeper-operator-configd-files.yaml") }}
+        checksum/keeper-templatesd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-keeper-operator-templatesd-files.yaml") }}
+        checksum/keeper-usersd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-keeper-operator-usersd-files.yaml") }}
     spec:
       serviceAccountName: {{ include "altinity-clickhouse-operator.serviceAccountName" . }}
       volumes:
