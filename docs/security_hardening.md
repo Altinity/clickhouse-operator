@@ -121,12 +121,12 @@ spec:
         valueFrom:
           secretKeyRef:
             name: clickhouse_secret
-            key: pwduser2          
+            key: pwduser2
       user3/password_double_sha1_hex:
         valueFrom:
           secretKeyRef:
             name: clickhouse_secret
-            key: pwduser3                
+            key: pwduser3
 ```
 
 The following example refers to the secret:
@@ -184,10 +184,42 @@ spec:
             key: pwduser2
 ```
 
-Note that `valueFrom`/`secretKeyRef` always passes the value through an environment variable
-(rendered as `from_env=...` in the generated XML). The operator does not hash it, so where you
-previously relied on `k8s_secret_password` being hashed into `password_sha256_hex` for you, store
-the already-hashed value in the secret and reference it from `password_sha256_hex` as shown above.
+### Rotating user passwords without Pod restarts
+
+By default, `valueFrom.secretKeyRef` passes the password through a container environment variable (`from_env` in the generated XML).
+Environment variables are not updated when a Kubernetes Secret changes, so the Pod must be recreated to apply a new password.
+
+To rotate passwords without restarting ClickHouse, set `hotReload: true`:
+
+```yaml
+spec:
+  configuration:
+    users:
+      user1/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: pwduser1
+          hotReload: true
+```
+
+The referenced Secret must be in the same namespace as the `ClickHouseInstallation`. Its key contains the password value, not an XML document.
+
+`hotReload` is supported for `password`, `password_sha256_hex`, and `password_double_sha1_hex` only. The operator applies its normal password processing rules; precomputed SHA-256 and double SHA-1 hashes must contain 64 and 40 hexadecimal characters, respectively.
+
+The operator stores the generated user configuration in a CHI-owned Kubernetes Secret and projects it into ClickHouse's `users.d`directory alongside the regular users ConfigMap.
+Changes to a referenced source Secret trigger reconciliation and update the generated Secret only when its contents change.
+ClickHouse then reloads the updated configuration without restarting the Pod.
+
+If the referenced Secret or key is missing, empty, or invalid, reconciliation fails and the last valid generated Secret remains unchanged.
+
+**Limitations:**
+
+- Enabling hot reload for the first time requires a one-time Pod rollout to mount the generated Secret.
+- Automatic change detection applies only to Secret references declared directly in the CHI. References inherited from a `ClickHouseInstallationTemplate` require manual CHI reconciliation.
+- Disabling hot reload removes the generated Secret after Pods no longer reference it.
+
+The generated Secret contains sensitive authentication configuration and should be protected with appropriate Kubernetes access controls.
 
 ### Securing the 'default' user
 
@@ -391,7 +423,7 @@ spec:
 
 ```
 
-Certificate files can also be stored in secrets: 
+Certificate files can also be stored in secrets:
 
 ```yaml
 apiVersion: v1

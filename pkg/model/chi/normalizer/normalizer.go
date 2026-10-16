@@ -850,6 +850,7 @@ func (n *Normalizer) normalizeConfigurationProfiles(profiles *chi.Settings, scop
 		return nil
 	}
 	profiles.Normalize(n.settingsNormalizerOptions(replacerProfiles, scope))
+	n.rejectHotReloadInSettings(profiles)
 	return profiles
 }
 
@@ -859,6 +860,7 @@ func (n *Normalizer) normalizeConfigurationQuotas(quotas *chi.Settings, scope an
 		return nil
 	}
 	quotas.Normalize(n.settingsNormalizerOptions(replacerQuotas, scope))
+	n.rejectHotReloadInSettings(quotas)
 	return quotas
 }
 
@@ -872,6 +874,10 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings, scop
 	settings.Normalize(n.settingsNormalizerOptions(replacerSettings, scope))
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
+		if setting.IsHotReload() {
+			n.rejectUnsupportedHotReload(name)
+			return
+		}
 		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings)
 	})
 	return settings
@@ -885,6 +891,10 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings, scope any)
 	files.Normalize(n.settingsNormalizerOptions(replacerFiles, scope))
 
 	files.WalkSafe(func(key string, setting *chi.Setting) {
+		if setting.IsHotReload() {
+			n.rejectUnsupportedHotReload(key)
+			return
+		}
 		subst.ReplaceSettingsFieldWithMountedFile(n.req, files, key)
 	})
 

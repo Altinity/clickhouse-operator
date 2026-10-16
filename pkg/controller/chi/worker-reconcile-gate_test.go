@@ -95,6 +95,16 @@ func TestDecideReconcileGate(t *testing.T) {
 			want: gateNothingToDo,
 		},
 		{
+			name: "password Secret changed, generation unchanged",
+			in: reconcileGateInputs{
+				generationTheSame:           true,
+				operatorIPTheSame:           true,
+				passwordSecretChanged:       true,
+				hasHostNeedingStuckRecovery: alwaysFalse,
+			},
+			want: gatePasswordSecretChanged,
+		},
+		{
 			// a1be5bb63 - the clickhouse-operator user's networks/host_regexp carry the
 			// operator's pod IP and must be refreshed when it moves.
 			name: "operator IP changed",
@@ -158,12 +168,13 @@ func TestDecideReconcileGate(t *testing.T) {
 // the reconcile. Stated separately so a future decision added to the enum has to be classified.
 func TestReconcileGateDecisionProceeds(t *testing.T) {
 	proceeds := map[reconcileGateDecision]bool{
-		gateNothingToDo:        false,
-		gateReconcileWork:      true,
-		gateFinalizerInstalled: true,
-		gateOperatorIPChanged:  true,
-		gateStuckHostRecovery:  true,
-		gateUnhealthyHosts:     true,
+		gateNothingToDo:           false,
+		gateReconcileWork:         true,
+		gateFinalizerInstalled:    true,
+		gateOperatorIPChanged:     true,
+		gatePasswordSecretChanged: true,
+		gateStuckHostRecovery:     true,
+		gateUnhealthyHosts:        true,
 	}
 	for decision, want := range proceeds {
 		require.Equal(t, want, decision.proceeds(), "decision %s", decision)

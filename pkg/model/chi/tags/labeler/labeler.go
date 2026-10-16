@@ -40,6 +40,8 @@ func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]str
 		return l.labelConfigMapCRCommon()
 	case interfaces.LabelConfigMapCommonUsers:
 		return l.labelConfigMapCRCommonUsers()
+	case interfaces.LabelSecretUsers:
+		return l.labelSecretUsers()
 	case interfaces.LabelConfigMapStorage:
 		return l.labelConfigMapCRStorage()
 	case interfaces.LabelConfigMapHost:
@@ -65,6 +67,14 @@ func (l *Labeler) labelConfigMapCRCommon() map[string]string {
 		l.GetCRScope(),
 		map[string]string{
 			l.Get(labeler.LabelConfigMap): l.Get(labeler.LabelConfigMapValueCRCommon),
+		})
+}
+
+func (l *Labeler) labelSecretUsers() map[string]string {
+	return util.MergeStringMapsOverwrite(
+		l.GetCRScope(),
+		map[string]string{
+			l.Get(labeler.LabelSecret): l.Get(labeler.LabelSecretValueUsers),
 		})
 }
 

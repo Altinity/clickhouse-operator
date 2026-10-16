@@ -70,6 +70,12 @@ func (w *worker) processReconcileCHI(ctx context.Context, cmd *cmd_queue.Reconci
 	switch cmd.Cmd {
 	case cmd_queue.ReconcileAdd:
 		return w.updateCHI(ctx, nil, cmd.New)
+	case cmd_queue.ReconcilePasswordSecret:
+		// A source Secret change does not change the CHI generation. The context
+		// flag lets the reconcile gate run anyway. shouldForceRestartHost sees
+		// the same flag and does not restart Pods: the template names the managed
+		// users Secret and does not carry its bytes.
+		return w.updateCHI(context.WithValue(ctx, passwordSecretReconcileKey{}, true), nil, cmd.New)
 	case cmd_queue.ReconcileUpdate:
 		return w.updateCHI(ctx, cmd.Old, cmd.New)
 	case cmd_queue.ReconcileDelete:

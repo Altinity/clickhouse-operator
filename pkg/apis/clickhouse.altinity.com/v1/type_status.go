@@ -79,6 +79,14 @@ const (
 	// leaves the account on the default password from ClickHouse.Config.User.Default.Password.
 	// Requires a spec edit to migrate to valueFrom.secretKeyRef.
 	StatusReasonRemovedSecretRefSyntax = "RemovedSecretRefSyntax"
+	// StatusReasonHotReloadRejected: hotReload is set on a field that is not a
+	// user password, password_sha256_hex, or password_double_sha1_hex, or it is
+	// set without secretKeyRef. The Secret key is a credential, not a config document.
+	StatusReasonHotReloadRejected = "HotReloadRejected"
+	// StatusReasonHotReloadSecretUnresolved: a hotReload password points at a Secret
+	// or key that cannot be read. Reconcile aborts and the last written users
+	// configuration is left in place. The account must not fall back to the default password.
+	StatusReasonHotReloadSecretUnresolved = "HotReloadSecretUnresolved"
 	// StatusReasonInvalidPodTemplate: a host's resolved pod template has a container that cannot
 	// run - without a name or an image, or named like another - or, merged from several layers,
 	// starts a duplicate ClickHouse server, since a template's container named unlike the one it was

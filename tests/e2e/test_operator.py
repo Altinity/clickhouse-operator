@@ -597,6 +597,12 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
 
             kubectl.wait_chi_status(chi, "Completed")
             kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+
+            with Then("ClickHouse pods should not be restarted during upgrade"):
+                new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+                assert start_time == new_start_time, error(
+                    f"{start_time} != {new_start_time}, pod restarted after operator upgrade"
+        )
     finally:
         trigger_event.set()
         time.sleep(5)
@@ -607,19 +613,6 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
         assert "test_local" in tables
         out = clickhouse.query(chi, "SELECT count() FROM test_local")
         assert out == "1"
-
-    with Then("ClickHouse pods should not be restarted during upgrade"):
-        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-        if start_time != new_start_time:
-            kubectl.launch(f"describe chi -n {self.context.test_namespace} {chi}")
-            kubectl.launch(
-                # In my env "pod/: prefix is already returned by $(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator)
-                # f"logs -n {current().context.operator_namespace} pod/$(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
-                f"logs -n {current().context.operator_namespace} $(kubectl get pods -o name -n {current().context.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
-            )
-            assert start_time == new_start_time, error(
-                f"{start_time} != {new_start_time}, pod restarted after operator upgrade"
-            )
 
     with Finally("I clean up"):
         delete_test_namespace()
@@ -841,6 +834,108 @@ def test_010011(self):
                 env_matches = [from_env.strip() for from_env in users_xml.splitlines() if "from_env" in from_env]
                 print(f"Found env substitutions: {env_matches}")
                 assert f"password from_env=\"{user5_password_env}\"" in users_xml
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_010011_6. Hot-reload user passwords from a Kubernetes Secret")
+@Requirements(RQ_SRS_026_ClickHouseOperator_Secrets("1.0"))
+def test_010011_6(self):
+    create_shell_namespace_clickhouse_template()
+
+    chi = "test-011-hot-reload"
+
+    def wait_login(user, pwd):
+        for attempt in range(1, 25):
+            outs = [
+                clickhouse.query_with_error(chi, "select 'OK'", user=user, pwd=pwd, pod=pod)
+                for pod in kubectl.get_pod_names(chi)
+            ]
+            if outs and all(out == "OK" for out in outs):
+                return
+            retry_sleep(attempt, 3, f"{user} password is not active on every replica yet")
+        assert False, error(f"{user} did not accept the password")
+
+    def wait_rejected(user, pwd):
+        last = []
+        for attempt in range(1, 25):
+            pods = kubectl.get_pod_names(chi)
+            outs = [
+                clickhouse.query_with_error(chi, "select 'OK'", user=user, pwd=pwd, pod=pod)
+                for pod in pods
+            ]
+            if pods and outs and all("OK" not in out for out in outs):
+                return
+            retry_sleep(attempt, 3, f"{user} previous password is still accepted on a replica")
+        assert False, error(f"{user} previous password was not rejected on every replica: {last}")
+
+    with Given("test-011-hot-reload.yaml"):
+        kubectl.apply(util.get_full_path("manifests/secret/test-011-hot-reload-secret.yaml"))
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-011-hot-reload.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+        wait_login("alice", "secret-value-1")
+        wait_login("bob", "bob-secret")
+        wait_login("carol", "carol-secret-1")
+        cm = kubectl.get("configmap", f"chi-{chi}-common-usersd")
+        users_xml = (cm.get("data") or {}).get("chop-generated-users.xml", "")
+        with Then("Only normal users must stay in chop-generated-users.xml"):
+            assert "<carol>" in users_xml, error("normal users must stay in chop-generated-users.xml")
+            assert "<alice>" not in users_xml and "<bob>" not in users_xml, error(
+                "hot-reload users must be published separately from chop-generated-users.xml"
+            )
+        with And("Hot-reload users must be in hop-generated-hot-reload-users.xml"):
+            secret = kubectl.get("secret", f"chi-{chi}-users")
+            assert "chop-generated-hot-reload-users.xml" in (secret.get("data") or {}), error(
+                "hot-reload users file is missing from the CHI Secret"
+            )
+
+        # hotReload projects both files into users.d: chop-generated-users.xml for
+        # accounts that stay in the ConfigMap, and chop-generated-hot-reload-users.xml
+        # from the CHI Secret.
+        users_dir = "/etc/clickhouse-server/users.d"
+        regular = "chop-generated-users.xml"
+        hot = "chop-generated-hot-reload-users.xml"
+        with And(f"And both {regular} and {hot} are mounted into {users_dir}"):
+            for pod in kubectl.get_pod_names(chi):
+                listing = kubectl.launch(f"exec {pod} -c clickhouse-pod -- ls {users_dir}")
+                print(f"{pod} {users_dir}:\n{listing}")
+                names = listing.split()
+                assert regular in names and hot in names, error(
+                    f"{pod} users.d should contain {regular} and {hot}: {listing}"
+                )
+                regular_xml = kubectl.launch(f"exec {pod} -c clickhouse-pod -- cat {users_dir}/{regular}")
+                hot_xml = kubectl.launch(f"exec {pod} -c clickhouse-pod -- cat {users_dir}/{hot}")
+                assert "<carol>" in regular_xml and "<alice>" not in regular_xml and "<bob>" not in regular_xml, error(
+                    f"{pod} {regular} should hold only the regular users"
+                )
+                assert "<alice>" in hot_xml and "<bob>" in hot_xml, error(
+                    f"{pod} {hot} should hold the hot-reload users"
+                )
+    started = kubectl.get_clickhouse_start(chi)
+
+    with When("test-011-hot-reload-secret-2.yaml is applied"):
+        kubectl.apply(util.get_full_path("manifests/secret/test-011-hot-reload-secret-2.yaml"))
+
+        with Then("Users with hotReload get new password"):
+            wait_login("alice", "secret-value-2")
+            wait_login("bob", "bob-secret-2")
+            # Both replicas must reject the password from before this rotation.
+            wait_rejected("bob", "bob-secret")
+            wait_rejected("alice", "secret-value-1")
+
+        with And("Users without hotReload keep old passwords"):
+            # carol has no hotReload, so the Pod keeps the env value from start.
+            wait_login("carol", "carol-secret-1")
+
+        with And("Pods were not restarted"):
+            assert kubectl.get_clickhouse_start(chi) == started, error("Pods were restarted")
 
     with Finally("I clean up"):
         delete_test_namespace()

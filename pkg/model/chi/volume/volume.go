@@ -15,8 +15,12 @@
 package volume
 
 import (
-	apps "k8s.io/api/apps/v1"
+	"fmt"
 
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
@@ -65,14 +69,60 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 		k8s.CreateVolumeForConfigMap(configMapHostName),
 	)
 
-	// And reference these Volumes in each Container via VolumeMount
-	// So Pod will have ConfigMaps mounted as Volumes in each Container
+	// Mount order is common config.d, users.d, host conf.d. An upgrade compares the
+	// existing Pod template by index, so moving users.d changes both the name and
+	// the path of the following mount and rolls every Pod.
 	k8s.StatefulSetAppendVolumeMountsInAllContainers(
 		statefulSet,
 		k8s.CreateVolumeMount(configMapCommonName, config.DirPathConfigCommon),
-		k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathConfigUsers),
+	)
+
+	if m.cr.GetRuntime().GetAttributes().GetHotReloadUsers() {
+		secretName := m.namer.Name(interfaces.NameSecretCommonUsers, m.cr)
+		if err := appendHotReloadUsersVolume(statefulSet, configMapCommonUsersName, secretName); err != nil {
+			log.New().F().Error("unable to mount hot-reload users configuration: %s", err)
+		}
+	} else {
+		k8s.StatefulSetAppendVolumeMountsInAllContainers(
+			statefulSet,
+			k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathConfigUsers),
+		)
+	}
+
+	k8s.StatefulSetAppendVolumeMountsInAllContainers(
+		statefulSet,
 		k8s.CreateVolumeMount(configMapHostName, config.DirPathConfigHost),
 	)
+}
+
+// appendHotReloadUsersVolume projects the users ConfigMap and the hot-reload users
+// Secret into users.d on the ClickHouse container only. The ConfigMap keeps
+// chop-generated-users.xml for users that do not opt in. The Secret adds
+// chop-generated-hot-reload-users.xml. Sidecars get the ConfigMap alone.
+// The application container is the one named clickhouse, or the first container
+// when a PodTemplate renames it.
+func appendHotReloadUsersVolume(statefulSet *apps.StatefulSet, configMapName, secretName string) error {
+	k8s.StatefulSetAppendVolumes(
+		statefulSet,
+		k8s.CreateProjectedConfigAndSecretVolume(
+			secretName,
+			configMapName,
+			secretName,
+			config.ChopGeneratedHotReloadUsersConfigFilename(),
+		),
+	)
+	app, ok := k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseContainerName, 0)
+	k8s.StatefulSetWalkContainers(statefulSet, func(container *core.Container) {
+		if ok && container == app {
+			return
+		}
+		k8s.ContainerAppendVolumeMounts(container, k8s.CreateVolumeMount(configMapName, config.DirPathConfigUsers))
+	})
+	if !ok {
+		return fmt.Errorf("application container not found")
+	}
+	k8s.ContainerAppendVolumeMounts(app, k8s.CreateVolumeMount(secretName, config.DirPathConfigUsers))
+	return nil
 }
 
 // stsSetupVolumesUserDataWithFixedPaths
