@@ -85,6 +85,8 @@ spec:
                 # schemaOnly takes any value a StringBool does, which CEL cannot type: the operator refuses it
                 - rule: "!has(self.scheduleRef) || !(has(self.replicaSelection) || has(self.tables) || has(self.partitions) || has(self.activeDeadlineSeconds))"
                   message: "a backup that runs a schedule takes its options from it: replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef"
+                - rule: "!has(self.scheduleRef) || (has(self.backupName) ? self.backupName : '') == ''"
+                  message: "a backup that runs a schedule is named with the schedule's backupNamePrefix: backupName is not set with scheduleRef"
                 - rule: "!has(self.backupName) || !self.backupName.matches('-[0-9]{8}-[0-9]{6}$')"
                   message: "backupName must not end like the backups of a schedule, -YYYYMMDD-HHMMSS, which the retention of a schedule of that prefix would prune"
               properties:
@@ -97,8 +99,9 @@ spec:
                   type: object
                   description: |
                     ClickHouseBackupSchedule in the same namespace whose backup this one makes once, now or at scheduledTime: the
-                    installation, the backup options and, unless cluster narrows them to one, the clusters are the schedule's,
-                    as they are when the backup is validated. The backup is named with the schedule's backupNamePrefix and stays out of its retention.
+                    installation, the backup options, the backupNamePrefix and, unless cluster narrows them to one, the clusters
+                    are the schedule's, as they are when the backup is validated. The backup is named with that prefix,
+                    never with backupName, and stays out of the schedule's retention.
                     Exactly one of it and clickHouseInstallation is set. Immutable
                   required:
                     - name
@@ -118,7 +121,8 @@ spec:
                   type: string
                   description: |
                     Optional explicit backup name, which must not end like the backups of a schedule (-YYYYMMDD-HHMMSS).
-                    Generated from the resource name, or the schedule's backupNamePrefix, and the time the backup is due when empty
+                    Generated from the resource name and the time the backup is due when empty. Not set with scheduleRef,
+                    whose backup is named with the schedule's backupNamePrefix
                   maxLength: 128
                   pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
                 scheduledTime:
@@ -210,7 +214,7 @@ spec:
                       description: "Cluster the backup targets, empty for every cluster the schedule backs up"
                     backupNamePrefix:
                       type: string
-                      description: "Backup name prefix of the schedule, which names the backup without backupName"
+                      description: "The schedule's backupNamePrefix, which names the backup"
                     schemaOnly:
                       type: string
                       description: "The schedule's schemaOnly"
