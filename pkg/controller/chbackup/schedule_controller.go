@@ -462,7 +462,7 @@ func (c *ScheduleController) validated(chbs *api.ClickHouseBackupSchedule, targe
 // prefix is held, whatever cluster it backs up, from the moment the recovery is asked for. An explicit
 // prefix, even the same one, is an informed choice and releases the hold.
 func sharesSourcePrefix(chbs *api.ClickHouseBackupSchedule, chi *api.ClickHouseInstallation) *pending {
-	if chbs.Spec.BackupTemplate.BackupNamePrefix != "" {
+	if chbs.Spec.BackupNamePrefix != "" {
 		return nil
 	}
 	sources := model.RecoveredBackupNames(chi.GetAnnotations()[api.AnnotationRecoveredFrom])
@@ -478,8 +478,8 @@ func sharesSourcePrefix(chbs *api.ClickHouseBackupSchedule, chi *api.ClickHouseI
 				message: fmt.Sprintf("ClickHouseInstallation %s is, or is to be, recovered from backup %s, which carries the backup "+
 					"name prefix the schedules of the installation default to: the installation that made the backup may run "+
 					"schedules on the same storage paths, which would overwrite and prune the backups this schedule makes "+
-					"with its default prefix %s, and the other way round. Set backupTemplate.backupNamePrefix, to this prefix or "+
-					"another one, to run the schedule",
+					"with its default prefix %s, and the other way round. Set spec.backupNamePrefix, which can be set once "+
+					"and is immutable after, to this prefix or another one, to run the schedule",
 					chi.GetName(), source, model.BackupNamePrefix(chbs)),
 				requeue: targetRequeueInterval,
 			}

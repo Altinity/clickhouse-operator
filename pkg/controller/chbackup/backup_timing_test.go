@@ -147,7 +147,7 @@ func TestBackupRunsASchedule(t *testing.T) {
 	require.Zero(t, jobCount(t, f.client))
 
 	chbs := newScheduleCR("nightly")
-	chbs.Spec.BackupTemplate.Tables = "db.*"
+	chbs.Spec.Tables = "db.*"
 	require.NoError(t, f.client.Create(context.Background(), chbs))
 	f.reconcile("pre-upgrade")
 	got := f.backup("pre-upgrade")
@@ -167,7 +167,7 @@ func TestBackupRunsASchedule(t *testing.T) {
 
 	edited := &api.ClickHouseBackupSchedule{}
 	require.NoError(t, f.client.Get(context.Background(), key("nightly"), edited))
-	edited.Spec.BackupTemplate.Tables = "other.*"
+	edited.Spec.Tables = "other.*"
 	require.NoError(t, f.client.Update(context.Background(), edited))
 	f.reconcile("pre-upgrade")
 	require.Equal(t, "db.*", f.backup("pre-upgrade").Status.Schedule.Tables, "a validated backup keeps what it recorded")

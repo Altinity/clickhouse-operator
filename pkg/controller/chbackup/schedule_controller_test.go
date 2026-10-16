@@ -160,7 +160,7 @@ func TestScheduleHoldsItsCronJobWhileTheSpecIsInvalid(t *testing.T) {
 	f.reconcile("s1")
 
 	chbs := f.schedule("s1")
-	chbs.Spec.BackupTemplate.BackupNamePrefix = "-invalid"
+	chbs.Spec.BackupNamePrefix = "-invalid"
 	require.NoError(t, f.client.Update(context.Background(), chbs))
 	require.Equal(t, ctrl.Result{}, f.reconcile("s1"), "only a change to the spec can fix it")
 	require.True(t, ptr.Deref(f.cronJob("s1-main-backup").Spec.Suspend, false))
@@ -168,7 +168,7 @@ func TestScheduleHoldsItsCronJobWhileTheSpecIsInvalid(t *testing.T) {
 	require.Equal(t, api.BackupReasonInvalidSpec, readyReason(t, f.schedule("s1")))
 
 	chbs = f.schedule("s1")
-	chbs.Spec.BackupTemplate.BackupNamePrefix = "fixed"
+	chbs.Spec.BackupNamePrefix = "fixed"
 	require.NoError(t, f.client.Update(context.Background(), chbs))
 	f.reconcile("s1")
 	require.False(t, ptr.Deref(f.cronJob("s1-main-backup").Spec.Suspend, true))
@@ -807,7 +807,7 @@ func TestScheduleReadyTellsTheReconcileRatherThanAHoldSinceGone(t *testing.T) {
 	require.Equal(t, api.BackupReasonScheduled, readyReason(t, f.schedule("s1")))
 
 	invalid := f.schedule("s1")
-	invalid.Spec.BackupTemplate.BackupNamePrefix = "-invalid"
+	invalid.Spec.BackupNamePrefix = "-invalid"
 	require.NoError(t, f.client.Update(context.Background(), invalid))
 	f.reconcile("s1")
 	require.Equal(t, api.BackupReasonInvalidSpec, readyReason(t, f.schedule("s1")))
@@ -815,7 +815,7 @@ func TestScheduleReadyTellsTheReconcileRatherThanAHoldSinceGone(t *testing.T) {
 
 	cr.set(withStatus(readyInstallation(t), api.StatusInProgress))
 	fixed := f.schedule("s1")
-	fixed.Spec.BackupTemplate.BackupNamePrefix = ""
+	fixed.Spec.BackupNamePrefix = ""
 	require.NoError(t, f.client.Update(context.Background(), fixed))
 	f.reconcile("s1")
 	ready := condition(t, f.schedule("s1").Status.Conditions, api.BackupConditionReady)
@@ -856,7 +856,7 @@ func TestScheduleInvalidSpecLeavesOutAClusterWithoutStorage(t *testing.T) {
 	require.Equal(t, &newer, f.schedule("s1").Status.LastSuccessfulTime)
 
 	invalid := f.schedule("s1")
-	invalid.Spec.BackupTemplate.BackupNamePrefix = "-invalid"
+	invalid.Spec.BackupNamePrefix = "-invalid"
 	require.NoError(t, f.client.Update(context.Background(), invalid))
 	f.reconcile("s1")
 	require.Equal(t, api.BackupReasonInvalidSpec, readyReason(t, f.schedule("s1")))
@@ -1062,7 +1062,7 @@ func TestScheduleReportsARunWithoutData(t *testing.T) {
 	const cause = `the tables pattern "db.*" matches no table, or none of the tables it matches holds data; ` +
 		"it does not count toward the 7 backups with data that retention keeps"
 	chbs := newScheduleCR("s1")
-	chbs.Spec.BackupTemplate.Tables = "db.*"
+	chbs.Spec.Tables = "db.*"
 	chbs.Spec.Retention.KeepLast = ptr.To(int32(7))
 	f := newScheduleFixture(t, newFakeCR(readyInstallation(t)), nil, chbs)
 	f.reconcile("s1")
@@ -1120,8 +1120,8 @@ func TestScheduleTellsTheCauseOfARunWithoutDataAsItsJobRan(t *testing.T) {
 	const cause = `the tables pattern "db.*" matches no table, or none of the tables it matches holds data in the partitions ` +
 		`"202601,202602"; it does not count toward the 7 backups with data that retention keeps`
 	chbs := newScheduleCR("s1")
-	chbs.Spec.BackupTemplate.Tables = "db.*"
-	chbs.Spec.BackupTemplate.Partitions = []string{"202601", "202602"}
+	chbs.Spec.Tables = "db.*"
+	chbs.Spec.Partitions = []string{"202601", "202602"}
 	chbs.Spec.Retention.KeepLast = ptr.To(int32(7))
 	f := newScheduleFixture(t, newFakeCR(readyInstallation(t)), nil, chbs)
 	f.reconcile("s1")
@@ -1130,8 +1130,8 @@ func TestScheduleTellsTheCauseOfARunWithoutDataAsItsJobRan(t *testing.T) {
 	finishJobAt(t, f.client, run.Name, batch.JobComplete, "", firstRunDue.Add(time.Minute))
 
 	edited := f.schedule("s1")
-	edited.Spec.BackupTemplate.Tables = ""
-	edited.Spec.BackupTemplate.Partitions = nil
+	edited.Spec.Tables = ""
+	edited.Spec.Partitions = nil
 	edited.Spec.Retention.KeepLast = ptr.To(int32(3))
 	require.NoError(t, f.client.Update(context.Background(), edited))
 	f.reconcile("s1")
@@ -1233,7 +1233,7 @@ func TestScheduleOutcomeGaugesComeBackFromTheStatus(t *testing.T) {
 func retainingSchedule(selection api.ReplicaSelection) *api.ClickHouseBackupSchedule {
 	chbs := newScheduleCR("s1")
 	chbs.Spec.Retention.KeepLast = ptr.To(int32(3))
-	chbs.Spec.BackupTemplate.ReplicaSelection = selection
+	chbs.Spec.ReplicaSelection = selection
 	return chbs
 }
 
@@ -1256,7 +1256,7 @@ func (f *scheduleFixture) ranAt(due time.Time) {
 func (f *scheduleFixture) selectReplicas(selection api.ReplicaSelection) {
 	f.t.Helper()
 	chbs := f.schedule("s1")
-	chbs.Spec.BackupTemplate.ReplicaSelection = selection
+	chbs.Spec.ReplicaSelection = selection
 	require.NoError(f.t, f.client.Update(context.Background(), chbs))
 }
 
@@ -1707,11 +1707,11 @@ func TestScheduleHoldsWhileItSharesTheSourcePrefix(t *testing.T) {
 			ready := condition(t, f.schedule("s1").Status.Conditions, api.BackupConditionReady)
 			require.Equal(t, api.BackupReasonSharesSourcePrefix, ready.Reason)
 			require.Contains(t, ready.Message, source)
-			require.Contains(t, ready.Message, "backupTemplate.backupNamePrefix")
+			require.Contains(t, ready.Message, "spec.backupNamePrefix")
 			require.Len(t, eventMessagesOfType(t, f.client, api.BackupReasonSharesSourcePrefix, core.EventTypeWarning), 1)
 
 			chbs := f.schedule("s1")
-			chbs.Spec.BackupTemplate.BackupNamePrefix = "ns-demo-s1"
+			chbs.Spec.BackupNamePrefix = "ns-demo-s1"
 			require.NoError(t, f.client.Update(context.Background(), chbs))
 			f.reconcile("s1")
 			require.NotEqual(t, api.BackupReasonSharesSourcePrefix, readyReason(t, f.schedule("s1")))
@@ -1770,7 +1770,7 @@ func TestScheduleRecordsWhenItSuspendsACronJob(t *testing.T) {
 	require.NotContains(t, f.cronJob("s1-main-backup").Annotations, model.AnnotationCronJobSuspendedAt)
 
 	invalid := f.schedule("s1")
-	invalid.Spec.BackupTemplate.BackupNamePrefix = "-invalid"
+	invalid.Spec.BackupNamePrefix = "-invalid"
 	require.NoError(t, f.client.Update(context.Background(), invalid))
 	f.reconcile("s1")
 	require.Contains(t, f.cronJob("s1-main-backup").Annotations, model.AnnotationCronJobSuspendedAt, "a hold records it alike")

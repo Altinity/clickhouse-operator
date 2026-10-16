@@ -108,7 +108,7 @@ func TestScheduleHoldsEveryDefaultPrefixOfARecoveredInstallation(t *testing.T) {
 		ready := condition(t, f.schedule(schedule).Status.Conditions, api.BackupConditionReady)
 		require.Equal(t, api.BackupReasonSharesSourcePrefix, ready.Reason)
 		require.Contains(t, ready.Message, "ClickHouseInstallation demo is, or is to be, recovered from backup "+source)
-		require.Contains(t, ready.Message, "backupTemplate.backupNamePrefix")
+		require.Contains(t, ready.Message, "spec.backupNamePrefix")
 	}
 
 	t.Run("a cluster the recovery leaves out", func(t *testing.T) {
@@ -137,7 +137,7 @@ func TestScheduleHoldsEveryDefaultPrefixOfARecoveredInstallation(t *testing.T) {
 		requireHeld(t, f, "hourly", "hourly-main-backup")
 
 		hourly := f.schedule("hourly")
-		hourly.Spec.BackupTemplate.BackupNamePrefix = model.BackupNamePrefix(hourly)
+		hourly.Spec.BackupNamePrefix = model.BackupNamePrefix(hourly)
 		require.NoError(t, f.client.Update(context.Background(), hourly))
 		f.reconcile("hourly")
 		require.False(t, ptr.Deref(f.cronJob("hourly-main-backup").Spec.Suspend, false), "an explicit prefix, even the default one, releases it")
@@ -199,7 +199,7 @@ func TestScheduleRewritesASuspensionRecordItCannotRead(t *testing.T) {
 		f.reconcile("s1")
 		garble(t, f)
 		invalid := f.schedule("s1")
-		invalid.Spec.BackupTemplate.BackupNamePrefix = "-invalid"
+		invalid.Spec.BackupNamePrefix = "-invalid"
 		require.NoError(t, f.client.Update(context.Background(), invalid))
 		f.reconcile("s1")
 		requireRecorded(t, f)

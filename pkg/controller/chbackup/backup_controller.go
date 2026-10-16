@@ -227,7 +227,7 @@ func (c *BackupController) recordSchedule(ctx context.Context, chb *api.ClickHou
 		ClickHouseInstallation: chbs.Spec.ClickHouseInstallation,
 		Cluster:                cluster,
 		BackupNamePrefix:       model.BackupNamePrefix(chbs),
-		BackupOptions:          *chbs.Spec.BackupTemplate.BackupOptions.DeepCopy(),
+		BackupOptions:          *chbs.Spec.BackupOptions.DeepCopy(),
 	}
 	return nil, nil
 }

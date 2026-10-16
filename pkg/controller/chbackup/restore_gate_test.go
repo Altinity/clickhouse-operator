@@ -314,7 +314,7 @@ func TestRecoveryOfAccessEntitiesHoldsEveryCluster(t *testing.T) {
 	cr := newFakeCR(installationFrom(t, spec, api.StatusCompleted))
 	archive := newScheduleCR("archive")
 	archive.Spec.Cluster = "cold"
-	archive.Spec.BackupTemplate.BackupNamePrefix = "archive"
+	archive.Spec.BackupNamePrefix = "archive"
 	c := newClient(t, nil, spec, archive)
 	schedules := NewScheduleController(c, c, c.Scheme(), cr)
 	restores := NewRestoreController(c, c, c.Scheme(), cr)
