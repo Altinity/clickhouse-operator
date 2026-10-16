@@ -192,7 +192,7 @@ func TestNoUserValueReachesTheCommand(t *testing.T) {
 	chr := testRestore("r1")
 	chr.Spec.BackupName = hostile
 	chbs := testSchedule("s1")
-	chbs.Spec.BackupTemplate.BackupNamePrefix = hostile
+	chbs.Spec.BackupNamePrefix = hostile
 
 	for name, spec := range map[string]core.PodSpec{
 		"backup":  BuildBackupJob(chb, testInstallation(), testTopology()).Spec.Template.Spec,
@@ -410,7 +410,7 @@ func TestJobDeadlineComesFromTheSpec(t *testing.T) {
 	require.Equal(t, int64(900), ptr.Deref(BuildRestoreJob(chr, testInstallation(), testTopology()).Spec.ActiveDeadlineSeconds, 0))
 
 	chbs := testSchedule("s1")
-	chbs.Spec.BackupTemplate.ActiveDeadlineSeconds = ptr.To(int64(1200))
+	chbs.Spec.ActiveDeadlineSeconds = ptr.To(int64(1200))
 	cronJob := BuildBackupCronJob(chbs, testInstallation(), testTopology(), false)
 	require.Equal(t, int64(1200), ptr.Deref(cronJob.Spec.JobTemplate.Spec.ActiveDeadlineSeconds, 0))
 }
@@ -524,8 +524,8 @@ func TestBackupCronJobFollowsTheScriptContract(t *testing.T) {
 	require.False(t, ptr.Deref(cronJob.Spec.Suspend, true))
 	require.Equal(t, cronJob.Labels, cronJob.Spec.JobTemplate.Labels, "scheduled Jobs must carry the labels the cache selects by")
 
-	chbs.Spec.BackupTemplate.ReplicaSelection = api.ReplicaSelectionAllReplicas
-	chbs.Spec.BackupTemplate.BackupNamePrefix = "custom"
+	chbs.Spec.ReplicaSelection = api.ReplicaSelectionAllReplicas
+	chbs.Spec.BackupNamePrefix = "custom"
 	values = env(container(t, BuildBackupCronJob(chbs, testInstallation(), testTopology(), true).Spec.JobTemplate.Spec.Template.Spec))
 	require.Equal(t, "custom", values[envBackupNamePrefix])
 	require.Equal(t, "chi-demo-main-0-0 chi-demo-main-0-1 chi-demo-main-1-0 chi-demo-main-1-1", values[envRetentionHosts])
@@ -547,9 +547,9 @@ func TestBackupCronJobReadsTheScheduleInItsTimeZone(t *testing.T) {
 // pushes a backup of the schedule out. Its Jobs make it as the schedule's runs do, with the options it recorded.
 func TestBackupThatRunsAScheduleStaysOutOfItsSeries(t *testing.T) {
 	chbs := testSchedule("nightly")
-	chbs.Spec.BackupTemplate.Tables = "db.*"
-	chbs.Spec.BackupTemplate.ReplicaSelection = api.ReplicaSelectionAllReplicas
-	chbs.Spec.BackupTemplate.ActiveDeadlineSeconds = ptr.To(int64(600))
+	chbs.Spec.Tables = "db.*"
+	chbs.Spec.ReplicaSelection = api.ReplicaSelectionAllReplicas
+	chbs.Spec.ActiveDeadlineSeconds = ptr.To(int64(600))
 	chb := testBackup("pre-upgrade")
 	chb.Spec.ClickHouseInstallation = ""
 	chb.Spec.ScheduleRef = &api.BackupScheduleRef{Name: chbs.GetName()}
@@ -557,7 +557,7 @@ func TestBackupThatRunsAScheduleStaysOutOfItsSeries(t *testing.T) {
 		Name:                   chbs.GetName(),
 		ClickHouseInstallation: chbs.Spec.ClickHouseInstallation,
 		BackupNamePrefix:       BackupNamePrefix(chbs),
-		BackupOptions:          chbs.Spec.BackupTemplate.BackupOptions,
+		BackupOptions:          chbs.Spec.BackupOptions,
 	}
 
 	name := ResolveBackupName(chb)
@@ -565,9 +565,9 @@ func TestBackupThatRunsAScheduleStaysOutOfItsSeries(t *testing.T) {
 	series := regexp.MustCompile("^" + regexp.QuoteMeta(BackupNamePrefix(chbs)) + "-[0-9]{8}-[0-9]{6}$")
 	require.False(t, series.MatchString(name), "the retention of the schedule prunes only the backups of its runs")
 	require.True(t, HasDefaultBackupNamePrefix(testNamespace, "demo", name))
-	named := chb.DeepCopy()
+	named := testBackup("named")
 	named.Spec.BackupName = name
-	require.NoError(t, named.Spec.Validate())
+	require.NoError(t, named.Spec.Validate(), "a valid backup name, which no retention of a schedule prunes")
 
 	chb.Spec.ScheduledTime = "2026-10-20T02:00:00+02:00"
 	require.Equal(t, "ns-demo-nightly-20261020T000000", ResolveBackupName(chb), "due at its scheduled time, in UTC")
@@ -581,6 +581,18 @@ func TestBackupThatRunsAScheduleStaysOutOfItsSeries(t *testing.T) {
 	require.Equal(t, int64(600), ptr.Deref(job.Spec.ActiveDeadlineSeconds, 0))
 	require.Equal(t, LabelValue("demo"), job.Labels[LabelBackupCHI], "the Jobs are locked and held by the installation of the schedule")
 	require.NotContains(t, values, envKeepLast, "only the runs of a schedule prune")
+}
+
+// Only a backup that runs a schedule is named with the prefix it recorded of it: where the API server does not
+// enforce the immutable scheduleRef, a backup edited to name its installation is named as any other backup, by
+// its explicit name or after its own name, whatever record of a schedule its status still holds.
+func TestBackupNamedWithTheSchedulePrefixOnlyWithScheduleRef(t *testing.T) {
+	chb := testBackup("b1")
+	chb.Spec.BackupName = "explicit"
+	chb.Status.Schedule = &api.BackupScheduleRecord{Name: "nightly", BackupNamePrefix: "ns-demo-nightly"}
+	require.Equal(t, "explicit", ResolveBackupName(chb))
+	chb.Spec.BackupName = ""
+	require.Equal(t, "b1-1700000000", ResolveBackupName(chb))
 }
 
 // A plain backup due at a scheduled time is named after that time, as one due when created is after its creation.
@@ -655,7 +667,7 @@ func TestResolvedBackupNamesPassValidation(t *testing.T) {
 	chbs := testSchedule(strings.Repeat("s", 250))
 	prefix := BackupNamePrefix(chbs)
 	require.LessOrEqual(t, len(prefix)+api.BackupNameScheduleSuffixLength, api.BackupNameMaxLength, "a scheduled backup name must fit the backup name limit")
-	chbs.Spec.BackupTemplate.BackupNamePrefix = prefix
+	chbs.Spec.BackupNamePrefix = prefix
 	require.NoError(t, chbs.Spec.Validate())
 }
 
@@ -666,7 +678,7 @@ func TestScheduledBackupNameSuffixFitsTheBackupNameLimit(t *testing.T) {
 	require.Equal(t, api.BackupNameScheduleSuffixLength, len("-"+scheduleTimestampLayout))
 
 	chbs := testSchedule("nightly")
-	chbs.Spec.BackupTemplate.BackupNamePrefix = strings.Repeat("p", api.BackupNamePrefixMaxLength)
+	chbs.Spec.BackupNamePrefix = strings.Repeat("p", api.BackupNamePrefixMaxLength)
 	require.NoError(t, chbs.Spec.Validate())
 	name := ScheduledBackupName(scheduledRun(chbs, time.Date(2026, time.January, 2, 3, 4, 0, 0, time.UTC)))
 	require.Len(t, name, api.BackupNameMaxLength)
@@ -697,14 +709,14 @@ func TestBackupNamePrefixDefaultsToNamespaceInstallationAndSchedule(t *testing.T
 	for _, chbs := range []*api.ClickHouseBackupSchedule{source, clone, sameName, long, longToo} {
 		prefix := BackupNamePrefix(chbs)
 		require.LessOrEqual(t, len(prefix), api.BackupNamePrefixMaxLength, prefix)
-		chbs.Spec.BackupTemplate.BackupNamePrefix = prefix
+		chbs.Spec.BackupNamePrefix = prefix
 		require.NoError(t, chbs.Spec.Validate(), prefix)
-		chbs.Spec.BackupTemplate.BackupNamePrefix = ""
+		chbs.Spec.BackupNamePrefix = ""
 	}
 	require.Equal(t, BackupNamePrefix(long), BackupNamePrefix(long.DeepCopy()), "the prefix must not change between reconciles")
 	require.NotEqual(t, BackupNamePrefix(long), BackupNamePrefix(longToo), "shortened prefixes must stay distinct")
 
-	source.Spec.BackupTemplate.BackupNamePrefix = "custom"
+	source.Spec.BackupNamePrefix = "custom"
 	require.Equal(t, "custom", BackupNamePrefix(source))
 }
 
@@ -914,13 +926,13 @@ func TestJobTables(t *testing.T) {
 // CronJob tells the hosts its runs prune on as it was last built.
 func TestScheduledJobEnvironment(t *testing.T) {
 	chbs := testSchedule("nightly")
-	chbs.Spec.BackupTemplate.Partitions = []string{"202601", "202602"}
+	chbs.Spec.Partitions = []string{"202601", "202602"}
 	chbs.Spec.Retention.KeepLast = ptr.To(int32(7))
 	cronJob := BuildBackupCronJob(chbs, testInstallation(), testTopology(), false)
 	run := scheduledRun(chbs, time.Date(2026, time.January, 2, 3, 0, 0, 0, time.UTC))
-	chbs.Spec.BackupTemplate.Partitions = nil
+	chbs.Spec.Partitions = nil
 	chbs.Spec.Retention.KeepLast = nil
-	chbs.Spec.BackupTemplate.ReplicaSelection = api.ReplicaSelectionAllReplicas
+	chbs.Spec.ReplicaSelection = api.ReplicaSelectionAllReplicas
 
 	require.Equal(t, "202601,202602", JobPartitions(run))
 	require.Equal(t, int32(7), JobKeepLast(run))
@@ -1191,7 +1203,7 @@ func TestJobsCarryWhatThePathCheckNeeds(t *testing.T) {
 	require.NoError(t, err)
 
 	chbs := testSchedule("s1")
-	chbs.Spec.BackupTemplate.ReplicaSelection = api.ReplicaSelectionAllReplicas
+	chbs.Spec.ReplicaSelection = api.ReplicaSelectionAllReplicas
 	for name, tc := range map[string]struct {
 		spec      core.PodSpec
 		self      string

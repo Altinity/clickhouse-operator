@@ -278,18 +278,19 @@ func CronJobName(chbs *api.ClickHouseBackupSchedule, cluster string) string {
 	return boundedName(joinName(chbs.GetName(), cluster), jobNameSuffixBackup, cronJobNameMaxLength)
 }
 
-// ResolveBackupName returns the backup name of a one-off backup. Without an explicit name
-// it is derived from the time the backup is due and the CR name, or, for a backup that runs a
-// schedule, the schedule's backup name prefix, so every reconcile resolves the same name. A backup
-// that runs a schedule carries the prefix, which the recovery prefix guard tells, and stays out of
-// the series the schedule's retention prunes.
+// ResolveBackupName returns the backup name of a one-off backup. A generated name is derived from the
+// time the backup is due, not the time of the reconcile, so every reconcile resolves the same name. A
+// backup that runs a schedule, which takes no explicit name, is named with the backup name prefix it
+// recorded of the schedule: the prefix lets the recovery prefix guard tell where it came from, and the
+// form of the time keeps it out of the series the schedule's retention prunes. Any other backup takes
+// its explicit name, or one derived from the CR name.
 func ResolveBackupName(chb *api.ClickHouseBackup) string {
+	due := chb.DueTime().UTC()
+	if prefix := chb.Status.Schedule.GetBackupNamePrefix(); (chb.Spec.ScheduleRef != nil) && (prefix != "") {
+		return joinName(prefix, due.Format(runNowTimestampLayout))
+	}
 	if chb.Spec.BackupName != "" {
 		return chb.Spec.BackupName
-	}
-	due := chb.DueTime().UTC()
-	if prefix := chb.Status.Schedule.GetBackupNamePrefix(); prefix != "" {
-		return joinName(prefix, due.Format(runNowTimestampLayout))
 	}
 	return boundedName(chb.GetName(), strconv.FormatInt(due.Unix(), 10), api.BackupNameMaxLength)
 }
@@ -300,8 +301,8 @@ func ResolveBackupName(chb *api.ClickHouseBackup) string {
 // is often of the same name in another namespace, and a schedule of the same name on each must not
 // prune the backups of the other.
 func BackupNamePrefix(chbs *api.ClickHouseBackupSchedule) string {
-	if chbs.Spec.BackupTemplate.BackupNamePrefix != "" {
-		return chbs.Spec.BackupTemplate.BackupNamePrefix
+	if chbs.Spec.BackupNamePrefix != "" {
+		return chbs.Spec.BackupNamePrefix
 	}
 	return boundedName(joinName(chbs.GetNamespace(), chbs.Spec.ClickHouseInstallation, chbs.GetName()), "", api.BackupNamePrefixMaxLength)
 }
@@ -635,7 +636,7 @@ func BuildRecoveryRestore(chi *api.ClickHouseInstallation, recovery ClusterRecov
 // its own host, while on replicas sharing a path every prune after the first finds nothing left
 // to do.
 func RetentionHosts(chbs *api.ClickHouseBackupSchedule, topology *Topology) []string {
-	return topology.hosts(chbs.Spec.BackupTemplate.GetReplicaSelection())
+	return topology.hosts(chbs.Spec.GetReplicaSelection())
 }
 
 // BuildBackupCronJob builds the CronJob that runs a backup schedule on the cluster the topology
@@ -644,7 +645,7 @@ func RetentionHosts(chbs *api.ClickHouseBackupSchedule, topology *Topology) []st
 // so the runs of one slot make one backup name on every cluster.
 func BuildBackupCronJob(chbs *api.ClickHouseBackupSchedule, chi api.ICustomResource, topology *Topology, suspend bool) *batch.CronJob {
 	cluster := topology.cluster()
-	template := &chbs.Spec.BackupTemplate
+	options := &chbs.Spec.BackupOptions
 	env := append(commonEnv(operationBackup, chi, cluster),
 		envVar(envBackupNamePrefix, BackupNamePrefix(chbs)),
 		envVar(envCronJobName, CronJobName(chbs, cluster)),
@@ -652,7 +653,7 @@ func BuildBackupCronJob(chbs *api.ClickHouseBackupSchedule, chi api.ICustomResou
 		envVar(envKeepLast, strconv.FormatInt(int64(chbs.Spec.Retention.GetKeepLast()), 10)),
 		envVar(envRetentionHosts, joinHosts(RetentionHosts(chbs, topology))),
 	)
-	env = append(env, backupOptionsEnv(&template.BackupOptions, topology)...)
+	env = append(env, backupOptionsEnv(options, topology)...)
 	labels := Labels(api.ClickHouseBackupScheduleCRDResourceKind, chbs.GetName(), chbs.Spec.ClickHouseInstallation, cluster,
 		topology.storage())
 
@@ -677,7 +678,7 @@ func BuildBackupCronJob(chbs *api.ClickHouseBackupSchedule, chi api.ICustomResou
 			FailedJobsHistoryLimit:     chbs.Spec.FailedJobsHistoryLimit,
 			JobTemplate: batch.JobTemplateSpec{
 				ObjectMeta: meta.ObjectMeta{Labels: labels},
-				Spec:       newJobSpec(labels, template.GetActiveDeadlineSeconds(), topology, env),
+				Spec:       newJobSpec(labels, options.GetActiveDeadlineSeconds(), topology, env),
 			},
 		},
 	}

@@ -2315,7 +2315,7 @@ func TestJobScriptNamesScheduledBackupsAfterTheirSlot(t *testing.T) {
 func TestJobScriptScheduledBackupNameFitsTheBackupNameLimit(t *testing.T) {
 	chbs := testSchedule("nightly")
 	prefix := strings.Repeat("p", api.BackupNamePrefixMaxLength)
-	chbs.Spec.BackupTemplate.BackupNamePrefix = prefix
+	chbs.Spec.BackupNamePrefix = prefix
 	run := scheduledRun(chbs, time.Date(2026, time.January, 2, 3, 4, 0, 0, time.UTC))
 
 	for name, jobName := range map[string]string{
