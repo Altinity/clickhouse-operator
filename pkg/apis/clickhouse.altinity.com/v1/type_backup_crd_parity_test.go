@@ -51,17 +51,25 @@ const backupImmutableRule = "(has(self.clickHouseInstallation) ? self.clickHouse
 	"(has(self.scheduleRef) ? self.scheduleRef.name : '') == (has(oldSelf.scheduleRef) ? oldSelf.scheduleRef.name : '') && " +
 	"(has(self.cluster) ? self.cluster : '') == (has(oldSelf.cluster) ? oldSelf.cluster : '')"
 
-// backupRules are the rules of a one-off backup's spec beyond its immutability: one target, the options of a backup
-// that runs a schedule taken from the schedule alone, but schemaOnly, which CEL cannot type and only Validate refuses,
-// and no name of the series a schedule's retention prunes.
+// backupRules are the rules of a one-off backup's spec beyond its immutability: one target, the options and the name
+// of a backup that runs a schedule taken from the schedule alone, but schemaOnly, which CEL cannot type and only
+// Validate refuses, and no name of the series a schedule's retention prunes.
 var backupRules = map[string]string{
 	"has(self.clickHouseInstallation) != has(self.scheduleRef)": "exactly one of clickHouseInstallation and scheduleRef is required",
 	"!has(self.scheduleRef) || !(has(self.replicaSelection) || has(self.tables) || has(self.partitions) || " +
 		"has(self.activeDeadlineSeconds))": "a backup that runs a schedule takes its options from it: " +
 		"replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef",
+	"!has(self.scheduleRef) || (has(self.backupName) ? self.backupName : '') == ''": "a backup that runs a schedule is " +
+		"named with the schedule's backupNamePrefix: backupName is not set with scheduleRef",
 	"!has(self.backupName) || !self.backupName.matches('" + scheduledBackupNameRegexp.String() + "')": "backupName must not " +
 		"end like the backups of a schedule, " + BackupNameScheduleSuffix + ", which the retention of a schedule of that prefix would prune",
 }
+
+// backupNamePrefixSetOnceRule keeps the backup name prefix of a schedule what it was first set to, the series its
+// retention prunes: a changed prefix would leave the backups named with the former one unpruned. It reads an absent
+// prefix as empty, so that setting one later is allowed and removing it is a change.
+const backupNamePrefixSetOnceRule = "(has(oldSelf.backupNamePrefix) ? oldSelf.backupNamePrefix : '') == '' || " +
+	"(has(self.backupNamePrefix) ? self.backupNamePrefix : '') == oldSelf.backupNamePrefix"
 
 // restoreSourceImmutableRule keeps the installation a restore reads the backup of as the restore was created: every
 // Job of the restore reads the backup from one place.
@@ -225,9 +233,10 @@ func TestBackupCRDStringBoolsArePolymorphic(t *testing.T) {
 	require.Equal(t, len(backupStringBoolFields), declared, "every on/off field is checked")
 }
 
-// The target of a backup, a schedule and a restore is immutable, which the API server enforces. The
-// rule compares the optional cluster as it reads when absent, so that adding or removing it is a
-// change too; it is a transition rule, which a create never trips.
+// The target of a backup, a schedule and a restore is immutable, which the API server enforces, and so are the
+// backup name prefix of a schedule once set and the source of a restore. The rule compares the optional cluster as
+// it reads when absent, so that adding or removing it is a change too; it is a transition rule, which a create
+// never trips.
 func TestBackupCRDTargetIsImmutable(t *testing.T) {
 	t.Run("clickhousebackups.clickhouse.altinity.com", func(t *testing.T) {
 		spec := schemaProperty(loadCRDSchema(t, backupCRDTemplatePath, "clickhousebackups.clickhouse.altinity.com"), "spec")
@@ -243,22 +252,22 @@ func TestBackupCRDTargetIsImmutable(t *testing.T) {
 		}
 		require.Equal(t, want, declared)
 	})
-	for name, rulesCount := range map[string]int{
-		"clickhousebackupschedules.clickhouse.altinity.com": 1,
-		"clickhouserestores.clickhouse.altinity.com":        2,
+	for name, next := range map[string]struct{ rule, message string }{
+		"clickhousebackupschedules.clickhouse.altinity.com": {backupNamePrefixSetOnceRule, "backupNamePrefix can be set once " +
+			"and is immutable after: a changed prefix would leave the former series unpruned; create a new resource"},
+		"clickhouserestores.clickhouse.altinity.com": {restoreSourceImmutableRule,
+			"sourceInstallation and sourceNamespace are immutable; create a new resource"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			spec := schemaProperty(loadCRDSchema(t, backupCRDTemplatePath, name), "spec")
 			rules, _ := spec["x-kubernetes-validations"].([]any)
-			require.Len(t, rules, rulesCount)
+			require.Len(t, rules, 2)
 			rule, _ := rules[0].(map[string]any)
 			require.Equal(t, backupTargetImmutableRule, rule["rule"])
 			require.Equal(t, "clickHouseInstallation and cluster are immutable; create a new resource", rule["message"])
-			if rulesCount > 1 {
-				rule, _ = rules[1].(map[string]any)
-				require.Equal(t, restoreSourceImmutableRule, rule["rule"])
-				require.Equal(t, "sourceInstallation and sourceNamespace are immutable; create a new resource", rule["message"])
-			}
+			rule, _ = rules[1].(map[string]any)
+			require.Equal(t, next.rule, rule["rule"])
+			require.Equal(t, next.message, rule["message"])
 		})
 	}
 }
@@ -379,7 +388,7 @@ func optionalPattern(re *regexp.Regexp) string {
 func TestBackupCRDTablesPatternMatchesTheTypes(t *testing.T) {
 	for name, path := range map[string]string{
 		"clickhousebackups.clickhouse.altinity.com":         "spec.tables",
-		"clickhousebackupschedules.clickhouse.altinity.com": "spec.backupTemplate.tables",
+		"clickhousebackupschedules.clickhouse.altinity.com": "spec.tables",
 		"clickhouserestores.clickhouse.altinity.com":        "spec.tables",
 	} {
 		t.Run(name, func(t *testing.T) {

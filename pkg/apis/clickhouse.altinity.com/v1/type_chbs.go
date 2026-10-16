@@ -61,8 +61,17 @@ type ClickHouseBackupScheduleSpec struct {
 	SuccessfulJobsHistoryLimit *int32 `json:"successfulJobsHistoryLimit,omitempty" yaml:"successfulJobsHistoryLimit,omitempty"`
 	// FailedJobsHistoryLimit is how many failed finished jobs to retain, at least 1. Default 1.
 	FailedJobsHistoryLimit *int32 `json:"failedJobsHistoryLimit,omitempty" yaml:"failedJobsHistoryLimit,omitempty"`
-	// BackupTemplate is the backup specification stamped out on each scheduled run.
-	BackupTemplate ClickHouseBackupTemplateSpec `json:"backupTemplate,omitempty" yaml:"backupTemplate,omitempty"`
+
+	// BackupOptions are the options every run makes its backup with, as a ClickHouseBackup sets them.
+	BackupOptions `json:",inline" yaml:",inline"`
+
+	// BackupNamePrefix is prepended to the generated, timestamped backup name of every run. It also names the
+	// series retention prunes: only backups named with this prefix and the time of a run. Defaults to
+	// "<namespace>-<installation>-<schedule>", shortened with a hash when longer than BackupNamePrefixMaxLength.
+	// It can be set once and is immutable after, as a changed prefix would leave the backups of the former series
+	// unpruned. Setting it later replaces the default prefix the same way: it is meant for a schedule that has not
+	// run yet, such as one held for a recovery.
+	BackupNamePrefix string `json:"backupNamePrefix,omitempty" yaml:"backupNamePrefix,omitempty"`
 	// Retention tells which of the backups the schedule made are deleted: a rule of the series of backups
 	// named with its backupNamePrefix, not of any one of them.
 	Retention BackupRetention `json:"retention,omitempty" yaml:"retention,omitempty"`
@@ -133,29 +142,10 @@ func (spec *ClickHouseBackupScheduleSpec) Validate() error {
 	if (spec.FailedJobsHistoryLimit != nil) && (*spec.FailedJobsHistoryLimit < 1) {
 		return fmt.Errorf("%w: failedJobsHistoryLimit must be at least 1", ErrInvalidBackupSpec)
 	}
-	if err := spec.Retention.Validate(); err != nil {
+	if err := validateBackupName("backupNamePrefix", spec.BackupNamePrefix, BackupNamePrefixMaxLength); err != nil {
 		return err
 	}
-	return spec.BackupTemplate.Validate()
-}
-
-// ClickHouseBackupTemplateSpec is the backup specification applied to each scheduled backup.
-type ClickHouseBackupTemplateSpec struct {
-	// BackupNamePrefix is prepended to the generated, timestamped backup name. It also names the
-	// series retention prunes: only backups named with this prefix and the time of a run. Defaults to
-	// "<namespace>-<installation>-<schedule>", shortened with a hash when longer than
-	// BackupNamePrefixMaxLength.
-	BackupNamePrefix string `json:"backupNamePrefix,omitempty" yaml:"backupNamePrefix,omitempty"`
-
-	BackupOptions `json:",inline" yaml:",inline"`
-}
-
-// Validate checks the template against the allowed character sets and values.
-func (spec *ClickHouseBackupTemplateSpec) Validate() error {
-	if spec == nil {
-		return nil
-	}
-	if err := validateBackupName("backupNamePrefix", spec.BackupNamePrefix, BackupNamePrefixMaxLength); err != nil {
+	if err := spec.Retention.Validate(); err != nil {
 		return err
 	}
 	return spec.BackupOptions.Validate()

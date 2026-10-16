@@ -57,6 +57,10 @@ func TestBackupSpecValidate(t *testing.T) {
 			return (&ClickHouseBackupSpec{ScheduleRef: &BackupScheduleRef{Name: "nightly"},
 				BackupOptions: BackupOptions{Partitions: []string{}}}).Validate()
 		}, false},
+		// The schedule's backup name prefix names it, which keeps it recognizable as the schedule's
+		"a schedule with a name of its own": {func() error {
+			return (&ClickHouseBackupSpec{ScheduleRef: &BackupScheduleRef{Name: "nightly"}, BackupName: "nightly-once"}).Validate()
+		}, false},
 		// A schedule's retention would take it for one of its own backups
 		"a name of a schedule's series": {func() error {
 			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupName: "nightly-20261012-020000"}).Validate()
@@ -126,7 +130,40 @@ func TestBackupSpecValidate(t *testing.T) {
 		// The "-YYYYMMDD-HHMMSS" suffix of a scheduled run must still fit the name.
 		"a prefix too long for the timestamp": {func() error {
 			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
-				BackupTemplate: ClickHouseBackupTemplateSpec{BackupNamePrefix: longPrefix}}).Validate()
+				BackupNamePrefix: longPrefix}).Validate()
+		}, false},
+		"the longest prefix": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+				BackupNamePrefix: strings.Repeat("a", BackupNamePrefixMaxLength)}).Validate()
+		}, true},
+		"a dotted prefix": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+				BackupNamePrefix: "nightly.eu"}).Validate()
+		}, true},
+		"a prefix that is a command": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+				BackupNamePrefix: "x$(touch F)"}).Validate()
+		}, false},
+		"a prefix that reads as a flag": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+				BackupNamePrefix: "-nightly"}).Validate()
+		}, false},
+		"options of a schedule": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+				BackupOptions: BackupOptions{SchemaOnly: types.NewStringBool(true), ReplicaSelection: ReplicaSelectionAllReplicas,
+					Tables: "db.*", Partitions: []string{"202610"}, ActiveDeadlineSeconds: ptr.To(int64(3600))}}).Validate()
+		}, true},
+		"an unknown replica selection of a schedule": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+				BackupOptions: BackupOptions{ReplicaSelection: "Some"}}).Validate()
+		}, false},
+		"a table pattern of a schedule that reads as a flag": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+				BackupOptions: BackupOptions{Tables: "-db.*"}}).Validate()
+		}, false},
+		"a partition of a schedule with a space": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+				BackupOptions: BackupOptions{Partitions: []string{"2026 10"}}}).Validate()
 		}, false},
 		// The operator learns how a run went from its Job, which must outlive the run.
 		"no successful Job kept": {func() error {
@@ -223,13 +260,12 @@ func TestActiveDeadlineSeconds(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			options := BackupOptions{ActiveDeadlineSeconds: tc.deadline}
 			backup := &ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: options}
-			schedule := &ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
-				BackupTemplate: ClickHouseBackupTemplateSpec{BackupOptions: options}}
+			schedule := &ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *", BackupOptions: options}
 			restore := &ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000",
 				ActiveDeadlineSeconds: tc.deadline}
 
 			require.Equal(t, tc.expected, backup.GetActiveDeadlineSeconds())
-			require.Equal(t, tc.expected, schedule.BackupTemplate.GetActiveDeadlineSeconds())
+			require.Equal(t, tc.expected, schedule.GetActiveDeadlineSeconds())
 			require.Equal(t, tc.expected, restore.GetActiveDeadlineSeconds())
 			for kind, err := range map[string]error{"backup": backup.Validate(), "schedule": schedule.Validate(), "restore": restore.Validate()} {
 				if tc.valid {

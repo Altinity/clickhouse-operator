@@ -197,7 +197,7 @@ const (
 	// BackupReasonSharesSourcePrefix: the schedule is held because the installation was restored from
 	// a backup carrying the backup name prefix the schedule defaults to: the installation that made the
 	// backup may run a schedule of the same name on the same storage path, and the two would
-	// overwrite and prune each other's backups. Setting backupTemplate.backupNamePrefix releases it.
+	// overwrite and prune each other's backups. Setting spec.backupNamePrefix releases it.
 	BackupReasonSharesSourcePrefix = "SharesSourcePrefix"
 	// BackupReasonUnprunedHosts: hosts left the hosts a schedule with retention backs up, so
 	// retention no longer prunes the backups they made. Only the event that announces it
@@ -395,16 +395,18 @@ type ClickHouseBackupSpec struct {
 	// ScheduleRef is set.
 	ClickHouseInstallation string `json:"clickHouseInstallation,omitempty" yaml:"clickHouseInstallation,omitempty"`
 	// ScheduleRef names a ClickHouseBackupSchedule in the same namespace whose backup this one makes once,
-	// immutable: the installation, the backup options and, unless Cluster narrows them to one, the clusters are the
-	// schedule's, as they are when the backup is validated. Its backup stays out of the schedule's retention.
+	// immutable: the installation, the backup options, the backup name prefix and, unless Cluster narrows them to
+	// one, the clusters are the schedule's, as they are when the backup is validated. Its backup stays out of the
+	// schedule's retention.
 	ScheduleRef *BackupScheduleRef `json:"scheduleRef,omitempty" yaml:"scheduleRef,omitempty"`
 	// Cluster optionally restricts the backup to one cluster of the CHI, immutable. Empty backs up
 	// every backup-enabled cluster, each in a Job of its own. With ScheduleRef, one of the clusters the
 	// schedule backs up.
 	Cluster string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
 	// BackupName is the optional explicit backup name. When empty the operator generates a
-	// deterministic name from the CR name, or the backup name prefix of the schedule ScheduleRef names, and the
-	// time the backup is due. A name ending like the backups of a schedule, "-YYYYMMDD-HHMMSS", is refused.
+	// deterministic name from the CR name and the time the backup is due. A name ending like the backups of a
+	// schedule, "-YYYYMMDD-HHMMSS", is refused, and so is any name with ScheduleRef: such a backup is always named
+	// with the schedule's backup name prefix, which keeps it recognizable as the schedule's.
 	BackupName string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
 	// DiffFromRemote, when set to the name of a backup in the storage, makes this an
 	// incremental backup (clickhouse-backup --diff-from-remote).
@@ -499,6 +501,9 @@ func (spec *ClickHouseBackupSpec) Validate() error {
 	case spec.BackupOptions.isSet():
 		return fmt.Errorf("%w: a backup that runs a schedule takes its options from the schedule: schemaOnly, "+
 			"replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef", ErrInvalidBackupSpec)
+	case spec.BackupName != "":
+		return fmt.Errorf("%w: a backup that runs a schedule is named with the schedule's backupNamePrefix: "+
+			"backupName is not set with scheduleRef", ErrInvalidBackupSpec)
 	}
 	if err := validateBackupName("backupName", spec.BackupName, BackupNameMaxLength); err != nil {
 		return err
@@ -558,7 +563,7 @@ type BackupScheduleRecord struct {
 	ClickHouseInstallation string `json:"clickHouseInstallation,omitempty" yaml:"clickHouseInstallation,omitempty"`
 	// Cluster is the cluster the backup targets, empty for every cluster the schedule backs up.
 	Cluster string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
-	// BackupNamePrefix is the backup name prefix of the schedule, which names the backup without backupName.
+	// BackupNamePrefix is the backup name prefix of the schedule, which names the backup.
 	BackupNamePrefix string `json:"backupNamePrefix,omitempty" yaml:"backupNamePrefix,omitempty"`
 
 	BackupOptions `json:",inline" yaml:",inline"`
