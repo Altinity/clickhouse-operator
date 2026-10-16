@@ -4,12 +4,17 @@
 # The operator injects a clickhouse-backup sidecar into every Pod of the cluster and generates
 # the Secret "backup-demo-auto-backup-secret" with the sidecar's credentials.
 #
-# The sidecar works on ClickHouse's data volume directly, so the data lives on a persistent
-# volume. Without one, the operator shares an emptyDir between the two containers, which is
-# lost whenever the Pod is deleted.
+# ClickHouse has to keep its data on a real PersistentVolume, as data-volume-template below does.
 #
 # Replicated tables need ZooKeeper or ClickHouse Keeper; this example references the
 # ClickHouseKeeperInstallation from docs/chk-examples/01-simple-1.yaml.
+#
+# No example names a namespace: kubectl creates each in the namespace given with -n, or else in that
+# of its current context, "default" unless the context names another. Apply them all to one
+# namespace, together with the ClickHouseKeeperInstallation: every reference these examples make
+# names a resource in the namespace of the one making it. The names of the schedule's backups the
+# examples quote, such as default-backup-demo-nightly-20261003-020000, start with "default", as the
+# default spec.backupNamePrefix of a schedule starts with its namespace.
 ---
 apiVersion: v1
 kind: Secret
@@ -64,8 +69,9 @@ spec:
         layout:
           shardsCount: 2
           replicasCount: 2
-      # A cluster can override any field, e.g. opt out of backup. Every backup, schedule and
-      # restore runs one Job per backup-enabled cluster, all under one backup name.
+      # A cluster can override any field of spec.backup in its own
+      # spec.configuration.clusters[].backup, e.g. opt out of backup. Every backup, schedule and
+      # restore runs one Job per backup-enabled cluster it targets, all under one backup name.
       # - name: scratch
       #   backup:
       #     enabled: "no"

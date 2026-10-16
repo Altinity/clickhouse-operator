@@ -1,11 +1,16 @@
 # EXPERIMENTAL: operator-managed backup, see docs/backup.md
 #
-# Nightly backup of the "backup-demo" ClickHouseInstallation (docs/chb-examples/01-chi-with-backup.yaml),
-# keeping the 7 most recent ones. Each backup-enabled cluster gets a CronJob of its own, all on
-# this schedule, read in timeZone when set: in namespace "default", every cluster names a run's backup
-# default-backup-demo-nightly-YYYYMMDD-HHMMSS, the UTC time the run was due. These backups are the
-# schedule's series, and retention, per cluster, only ever deletes backups of it: never a one-off
-# backup, nor one that runs this schedule once (docs/chb-examples/05-backup-from-schedule.yaml).
+# Nightly backup of the "backup-demo" ClickHouseInstallation
+# (docs/chb-examples/01-chi-with-backup.yaml), keeping the 7 most recent ones. A schedule makes its
+# backups by itself, with no ClickHouseBackup resource: each backup-enabled cluster gets a CronJob
+# of its own, all on this schedule, whose runs report in the status of this schedule. Every
+# cluster names a run's backup <namespace>-backup-demo-nightly-YYYYMMDD-HHMMSS, the UTC time the
+# run was due, as the default spec.backupNamePrefix starts with the schedule's namespace; the
+# examples take "default", see docs/chb-examples/01-chi-with-backup.yaml. These backups are the
+# schedule's series, the only backups retention, per cluster, deletes: never a one-off backup, nor
+# one that runs this schedule once. A ClickHouseBackup that names this schedule in its
+# spec.scheduleRef makes such a backup now, once, with the settings of this schedule
+# (docs/chb-examples/05-backup-from-schedule.yaml).
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseBackupSchedule"
 metadata:
@@ -17,32 +22,40 @@ spec:
   # installation.
   # cluster: main
 
-  # When the runs start, as the schedule of a Kubernetes CronJob: five fields, minute, hour, day of
-  # the month, month and day of the week, with no field for seconds. "0 2 * * *" starts a run every
-  # day at 02:00, "*/30 * * * *" every half hour; macros such as @daily or @hourly work too. It is
-  # read in timeZone, below. The schedule takes any expression, but one the API server refuses for
-  # the CronJob, such as one with a sixth field for seconds or with a CRON_TZ= prefix, makes the
-  # schedule InvalidSpec, and no run starts until it is fixed.
+  # When the runs start, as the spec.schedule of a Kubernetes CronJob: five fields, minute, hour,
+  # day of the month, month and day of the week, with no field for seconds. "0 2 * * *" starts a run
+  # every day at 02:00, "*/30 * * * *" every half hour; macros such as @daily or @hourly work too.
+  # It is read in spec.timeZone, below. The schedule takes any expression, but one the API server
+  # refuses for the CronJob, such as one with a sixth field for seconds or with a CRON_TZ= prefix,
+  # makes the schedule InvalidSpec, and no run starts until it is fixed.
   schedule: "0 2 * * *"
 
-  # IANA time zone the schedule is read in; by default the controller manager's, UTC as a rule
+  # The IANA time zone of spec.schedule; by default the controller manager's, usually UTC
   # timeZone: Europe/Berlin
 
   # True stops the CronJob of every cluster from starting runs: a run already in progress
   # finishes, and Ready turns False with the reason Suspended. Retention prunes in the runs only,
   # so no backup is deleted meanwhile, and a backup that runs the schedule once
   # (05-backup-from-schedule.yaml) runs all the same. Back to false, each CronJob starts the latest
-  # run it missed at once, unless that is past startingDeadlineSeconds, and skips the others.
+  # run it missed at once, unless that is past spec.startingDeadlineSeconds, and skips the others.
   suspend: false
 
   # What a run due while the previous run of the same cluster is still running does. Forbid, the
   # default, starts it once the previous run has finished, late, and only the latest of the runs
-  # missed meanwhile; not at all past startingDeadlineSeconds. Allow starts it at once, and on each
-  # host its backup waits until the sidecar has finished the previous one, as a sidecar runs one
-  # operation at a time. Replace deletes the running Job, whose run then goes unreported, and starts
-  # the new one; the backup that Job started keeps running on the sidecars, and the new run waits
-  # for it there.
+  # missed meanwhile; not at all past spec.startingDeadlineSeconds. Allow starts it at once, and on
+  # each host its backup waits until the sidecar has finished the previous one, as a sidecar runs
+  # one operation at a time. Replace deletes the running Job, whose run then goes unreported, and
+  # starts the new one; the backup that Job started keeps running on the sidecars, and the new run
+  # waits for it there.
   concurrencyPolicy: Forbid
+
+  # How many seconds after it was due a run that could not start then may still start, as the
+  # spec.startingDeadlineSeconds of a Kubernetes CronJob: a run waits while the controller manager
+  # is down, for instance, or, with Forbid, while the previous run is still running. Past it, the
+  # run is skipped, and the next one starts at its own time. Unset, the latest run missed starts
+  # whenever it can; of several missed runs, the earlier ones are skipped either way. How long a Job
+  # may run once started is spec.activeDeadlineSeconds, below.
+  # startingDeadlineSeconds: 3600
 
   # How many Jobs of successful runs the CronJob of each cluster keeps, with their Pods and logs,
   # deleting older ones: 3 by default, and at least 1, as the operator learns from the Job of a run
@@ -54,44 +67,51 @@ spec:
   # hosts it backed up. Raise it to keep the logs of more failed runs to look into.
   failedJobsHistoryLimit: 1
 
-  backupTemplate:
-    # By default <namespace>-<installation>-<schedule>, here default-backup-demo-nightly
-    # backupNamePrefix: nightly
+  # Table and database definitions only, no data
+  # schemaOnly: false
 
-    # Table and database definitions only, no data
-    # schemaOnly: false
+  # Which replicas of each shard upload the backup. FirstPerShard, the default, backs up only the
+  # first replica of each shard. That is complete for Replicated* tables, as every replica holds
+  # their data, and the storage path must then not hold {replica}. AllReplicas makes every replica
+  # upload a copy of its own, for tables that are not replicated, whose data differs between the
+  # replicas. It takes that much more storage, and the path must hold {replica}, e.g.
+  # backup/{namespace}/{installation}/{cluster}/{shard}/{replica}. Either way, a restore loads the
+  # data on the first replica of each shard only, and replication brings it to the others: the data
+  # the other replicas hold in tables that are not replicated is backed up, but not restored.
+  replicaSelection: FirstPerShard
 
-    # Which replicas of each shard upload the backup. FirstPerShard, the default, backs up only the
-    # first replica of each shard. That is complete for Replicated* tables, as every replica holds
-    # their data, and the storage path must then not hold {replica}. AllReplicas makes every replica
-    # upload a copy of its own, for tables that are not replicated, whose data differs between the
-    # replicas. It takes that much more storage, and the path must hold {replica}, e.g.
-    # backup/{namespace}/{installation}/{cluster}/{shard}/{replica}. Either way, a restore loads the
-    # data on the first replica of each shard only, and replication brings it to the others: the
-    # data the other replicas hold in tables that are not replicated is backed up, but not restored.
-    replicaSelection: FirstPerShard
+  # Only the matching tables: a clickhouse-backup pattern such as db.table or db.*, comma-separated
+  # tables: "mydb.*"
 
-    # Only the matching tables: a clickhouse-backup pattern such as db.table or db.*,
-    # comma-separated
-    # tables: "mydb.*"
+  # How long each Job may run, in seconds counted from its start, before Kubernetes stops it, as the
+  # spec.activeDeadlineSeconds of a Kubernetes Job: 24 hours by default. Each Job gets this long:
+  # the backup Job of each cluster, and its verification Job, if any. A Job stopped at the deadline
+  # fails the backup, or the verification, of its cluster with the reason DeadlineExceeded, as each
+  # Job makes a single attempt. Raise it for a backup too large to upload in a day.
+  # activeDeadlineSeconds: 14400
 
-    # How long each Job may run, in seconds counted from its start, before Kubernetes stops it, as
-    # the activeDeadlineSeconds of a Kubernetes Job: 24 hours by default. Each Job gets this long:
-    # the backup Job of each cluster, and its verification Job, if any. A Job stopped at the
-    # deadline fails the backup, or the verification, of its cluster with the reason
-    # DeadlineExceeded, as each Job makes a single attempt. Raise it for a backup too large to
-    # upload in a day.
-    # activeDeadlineSeconds: 14400
+  # The prefix of the backup names: each run names its backup <prefix>-YYYYMMDD-HHMMSS, the UTC
+  # time it was due, and a backup that runs the schedule once (05-backup-from-schedule.yaml) is
+  # named <prefix>-YYYYMMDDTHHMMSS. By default <namespace>-<installation>-<schedule>, shortened with
+  # a hash past 112 characters, here default-backup-demo-nightly. It names the series that
+  # spec.retention, below, deletes from, so it can be set once and is immutable after: the API
+  # server refuses to change or remove it, as the backups of the former prefix would be left
+  # unpruned. Set it when the schedule is created: set later to anything but the default, it changes
+  # the prefix the runs so far used, which suits only a schedule that has not run yet, such as one
+  # of a recovered installation held until it sets one (SharesSourcePrefix, see
+  # 07-recover-from-backup.yaml). For another prefix, create a new schedule, and delete the backups
+  # of this one from the storage by hand.
+  # backupNamePrefix: nightly
 
-  # Deletes the schedule's older backups: each successful run keeps the keepLast newest backups of
-  # the series on every host it backed up, and deletes the older ones there. Only the series counts,
-  # the backups the runs name backupNamePrefix-YYYYMMDD-HHMMSS: no other backup is ever deleted, not
-  # even one that runs this schedule once. So a backupNamePrefix set by hand must not be another
-  # schedule's on the same storage path. Left out, no backup is deleted.
+  # Deletes the schedule's older backups: each successful run keeps the spec.retention.keepLast
+  # newest backups of the series on every host it backed up, and deletes the older ones there. Only
+  # the series counts, the backups the runs name <prefix>-YYYYMMDD-HHMMSS: no other backup is ever
+  # deleted, not even one that runs this schedule once. So a spec.backupNamePrefix set by hand must
+  # not be another schedule's on the same storage path. Left out, no backup is deleted.
   retention:
     # How many backups of the series to keep, here a week of nightly ones; 0, the default, deletes
-    # none. Backups without data, of a tables pattern that matches nothing any more for instance,
-    # are counted apart: up to 7 of them are kept besides, so they never push out a backup that
-    # holds data. An incomplete backup, such as a failed upload, counts toward neither. The backup
-    # the run has just made is never deleted, nor one that another backup is based on.
+    # none. Backups without data, of a spec.tables pattern that matches nothing any more for
+    # instance, are counted apart: up to 7 of them are kept besides, so they never push out a backup
+    # that holds data. An incomplete backup, such as a failed upload, counts toward neither. The
+    # backup the run has just made is never deleted, nor one that another backup is based on.
     keepLast: 7

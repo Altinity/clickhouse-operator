@@ -5,36 +5,56 @@
 # (e.g. a copy of docs/chb-examples/01-chi-with-backup.yaml under another name).
 #
 # Before anything is changed, the restore Job of each cluster checks the storage paths and every
-# target host: each shard must hold the backup (validateTopology), and no replica may already hold
-# a table the restore would replace - without tables, any table - unless overwrite is true. The
-# schema is restored on every replica, the data on one replica per shard.
-# With overwrite, a table larger than max_table_size_to_drop (50 GB by default) may need that limit
-# lifted for the restore: set max_table_size_to_drop: 0 wherever the target CHI's settings set a
-# limit - installation, cluster, shard, replica or host - as any of them can keep one. On a cluster
-# whose shards have replicas, a restore that drops replicated tables drops them ON CLUSTER first,
-# and every shard's backup must then hold the same tables.
+# target host: each shard must hold the backup (spec.validateTopology), and no replica may already
+# hold a table the restore would replace - without spec.tables, any table - unless spec.overwrite is
+# true. The schema is restored on every replica, the data on one replica per shard.
+# With spec.overwrite, a table larger than max_table_size_to_drop (50 GB by default) may need that
+# limit lifted for the restore: set max_table_size_to_drop: 0 wherever the target CHI's settings set
+# a limit - installation, cluster, shard, replica or host - as any of them can keep one. On a
+# cluster whose shards have replicas, a restore that drops replicated tables drops them ON CLUSTER
+# first, and every shard's backup must then hold the same tables.
 # While the source keeps running on the same ZooKeeper or Keeper, give the copy its own
-# zookeeper.root, or its Replicated* tables join the source's replication (see docs/backup.md).
+# spec.configuration.zookeeper.root, or its Replicated* tables join the source's replication (see
+# docs/backup.md).
 # Until it completes, the restore holds the backup schedules of the clusters it restores and, as it
 # reads the backup of "backup-demo" of the same namespace, those of the clusters of "backup-demo" it
-# reads, each until it finishes there, as their retention could delete that backup; it also waits for
-# a scheduled run there to finish. Of the runs missed there meanwhile, at most the latest starts once
-# the schedule is released, so restore outside the backup window of "backup-demo". A restore of a
-# backup of another namespace (sourceNamespace) holds nothing there.
+# reads, each until it finishes there, as their retention could delete that backup; it also waits
+# for a scheduled run there to finish. Of the runs missed there meanwhile, at most the latest starts
+# once the schedule is released, so restore outside the backup window of "backup-demo". A restore of
+# a backup of another namespace (spec.sourceNamespace) holds nothing there.
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseRestore"
 metadata:
   name: backup-demo-restore
 spec:
   clickHouseInstallation: backup-demo-restored
+
+  # Only this cluster (cannot be changed later); left out, every backup-enabled cluster of the
+  # installation.
+  # cluster: main
+
+  # The backup to restore, e.g. LAST-BACKUP of kubectl get chbs -o wide; check that it still exists
+  # on every cluster.
   backupName: default-backup-demo-nightly-20261003-020000
+
   # The installation that made the backup: the default storage paths hold {namespace} and
-  # {installation}, so the backup lies under those of "backup-demo" (cannot be changed later)
+  # {installation}, so the backup lies under those of "backup-demo", not of this one (cannot be
+  # changed later).
   sourceInstallation: backup-demo
-  # sourceNamespace: team-a   # its namespace, when another (cannot be changed later)
-  # cluster: main          # optional: only this cluster (cannot be changed later)
-  # tables: "mydb.*"       # optional: only matching tables
-  # schemaOnly: true       # optional: definitions only, no data
-  # rbac: true             # optional: also users, roles, grants...; only without cluster
-  overwrite: false         # true drops and recreates tables that already exist
+
+  # The namespace of that installation, when another (cannot be changed later)
+  # sourceNamespace: team-a
+
+  # Table and database definitions only, no data
+  # schemaOnly: true
+
+  # Only the matching tables: a clickhouse-backup pattern such as db.table or db.*, comma-separated
+  # tables: "mydb.*"
+
+  # Also users, roles, grants...; only without spec.cluster
+  # rbac: true
+
+  # When true, drops and recreates tables that already exist
+  overwrite: false
+
   validateTopology: true

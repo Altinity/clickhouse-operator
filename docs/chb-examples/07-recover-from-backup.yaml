@@ -11,7 +11,9 @@
 #
 # A backup whose name starts with this installation's own <namespace>-<installation>-, as one of a
 # source of the same name in another Kubernetes cluster does, holds every backup schedule of this
-# installation that uses the default backupNamePrefix until it sets one (SharesSourcePrefix).
+# installation that uses the default spec.backupNamePrefix until it sets one (SharesSourcePrefix).
+# The prefix can be set once and is immutable after: choose it deliberately, see Storage paths in
+# docs/backup.md.
 #
 # Each recovery restore reads the backup of "backup-demo", of the same namespace, and holds the
 # backup schedules of the clusters of "backup-demo" it reads until it ends, as their retention
@@ -30,18 +32,19 @@ metadata:
 spec:
   backup:
     enabled: "yes"
+    # The storage the backups are kept in, configured by the Secret of 01-chi-with-backup.yaml
     storages:
       - name: main
         secretRef:
           name: backup-demo-storage
     recovery:
-      # The backup every cluster starts from, e.g. LAST-BACKUP of kubectl get chbs -o wide; check
-      # that it still exists on every cluster, or name each cluster's own backup, see docs/backup.md
+      # The backup to restore, e.g. LAST-BACKUP of kubectl get chbs -o wide; check that it still
+      # exists on every cluster, or name each cluster's own backup, see docs/backup.md.
       backupName: "default-backup-demo-nightly-20261003-020000"
       # The installation that made the backup: the default storage paths hold {namespace} and
-      # {installation}, so the backup lies under those of "backup-demo", not of this one. Its
-      # namespace too, when another
+      # {installation}, so the backup lies under those of "backup-demo", not of this one.
       sourceInstallation: "backup-demo"
+      # The namespace of that installation, when another
       # sourceNamespace: "team-a"
   defaults:
     templates:
@@ -62,7 +65,8 @@ spec:
       # - name: scratch
       #   backup:
       #     recovery:
-      #       backupName: ""   # not in the backup: nothing to recover
+      #       # Not in the backup: nothing to recover
+      #       backupName: ""
       #   layout:
       #     shardsCount: 1
   templates:
@@ -73,4 +77,5 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
+              # Room for the data plus one downloaded copy of a backup (verify, restore)
               storage: 10Gi
