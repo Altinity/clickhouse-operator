@@ -12,19 +12,86 @@ metadata:
   name: nightly
 spec:
   clickHouseInstallation: backup-demo
-  # cluster: main                 # optional: only this cluster (cannot be changed later)
+
+  # Only this cluster (cannot be changed later); left out, every backup-enabled cluster of the
+  # installation.
+  # cluster: main
+
+  # When the runs start, as the schedule of a Kubernetes CronJob: five fields, minute, hour, day of
+  # the month, month and day of the week, with no field for seconds. "0 2 * * *" starts a run every
+  # day at 02:00, "*/30 * * * *" every half hour; macros such as @daily or @hourly work too. It is
+  # read in timeZone, below. The schedule takes any expression, but one the API server refuses for
+  # the CronJob, such as one with a sixth field for seconds or with a CRON_TZ= prefix, makes the
+  # schedule InvalidSpec, and no run starts until it is fixed.
   schedule: "0 2 * * *"
-  # timeZone: Europe/Berlin       # IANA time zone the schedule is read in; default: the controller manager's, UTC as a rule
+
+  # IANA time zone the schedule is read in; by default the controller manager's, UTC as a rule
+  # timeZone: Europe/Berlin
+
+  # True stops the CronJob of every cluster from starting runs: a run already in progress
+  # finishes, and Ready turns False with the reason Suspended. Retention prunes in the runs only,
+  # so no backup is deleted meanwhile, and a backup that runs the schedule once
+  # (05-backup-from-schedule.yaml) runs all the same. Back to false, each CronJob starts the latest
+  # run it missed at once, unless that is past startingDeadlineSeconds, and skips the others.
   suspend: false
-  concurrencyPolicy: Forbid       # Forbid (default) | Allow | Replace
+
+  # What a run due while the previous run of the same cluster is still running does. Forbid, the
+  # default, starts it once the previous run has finished, late, and only the latest of the runs
+  # missed meanwhile; not at all past startingDeadlineSeconds. Allow starts it at once, and on each
+  # host its backup waits until the sidecar has finished the previous one, as a sidecar runs one
+  # operation at a time. Replace deletes the running Job, whose run then goes unreported, and starts
+  # the new one; the backup that Job started keeps running on the sidecars, and the new run waits
+  # for it there.
+  concurrencyPolicy: Forbid
+
+  # How many Jobs of successful runs the CronJob of each cluster keeps, with their Pods and logs,
+  # deleting older ones: 3 by default, and at least 1, as the operator learns from the Job of a run
+  # the backup it made, whether that backup holds data and the hosts it backed up.
   successfulJobsHistoryLimit: 3
+
+  # How many Jobs of failed runs the CronJob of each cluster keeps, with their Pods and logs: 1 by
+  # default, and at least 1, as the operator learns from the Job of a run why it failed and the
+  # hosts it backed up. Raise it to keep the logs of more failed runs to look into.
   failedJobsHistoryLimit: 1
+
   backupTemplate:
-    # backupNamePrefix: nightly   # default: <namespace>-<installation>-<schedule>, here default-backup-demo-nightly
-    replicaSelection: FirstPerShard
+    # By default <namespace>-<installation>-<schedule>, here default-backup-demo-nightly
+    # backupNamePrefix: nightly
+
+    # Table and database definitions only, no data
     # schemaOnly: false
+
+    # Which replicas of each shard upload the backup. FirstPerShard, the default, backs up only the
+    # first replica of each shard. That is complete for Replicated* tables, as every replica holds
+    # their data, and the storage path must then not hold {replica}. AllReplicas makes every replica
+    # upload a copy of its own, for tables that are not replicated, whose data differs between the
+    # replicas. It takes that much more storage, and the path must hold {replica}, e.g.
+    # backup/{namespace}/{installation}/{cluster}/{shard}/{replica}. Either way, a restore loads the
+    # data on the first replica of each shard only, and replication brings it to the others: the
+    # data the other replicas hold in tables that are not replicated is backed up, but not restored.
+    replicaSelection: FirstPerShard
+
+    # Only the matching tables: a clickhouse-backup pattern such as db.table or db.*,
+    # comma-separated
     # tables: "mydb.*"
+
+    # How long each Job may run, in seconds counted from its start, before Kubernetes stops it, as
+    # the activeDeadlineSeconds of a Kubernetes Job: 24 hours by default. Each Job gets this long:
+    # the backup Job of each cluster, and its verification Job, if any. A Job stopped at the
+    # deadline fails the backup, or the verification, of its cluster with the reason
+    # DeadlineExceeded, as each Job makes a single attempt. Raise it for a backup too large to
+    # upload in a day.
     # activeDeadlineSeconds: 14400
-  # Which backups of the schedule's series - named with backupNamePrefix and the time of a run - are deleted
+
+  # Deletes the schedule's older backups: each successful run keeps the keepLast newest backups of
+  # the series on every host it backed up, and deletes the older ones there. Only the series counts,
+  # the backups the runs name backupNamePrefix-YYYYMMDD-HHMMSS: no other backup is ever deleted, not
+  # even one that runs this schedule once. So a backupNamePrefix set by hand must not be another
+  # schedule's on the same storage path. Left out, no backup is deleted.
   retention:
-    keepLast: 7                   # 0 (default) keeps every backup
+    # How many backups of the series to keep, here a week of nightly ones; 0, the default, deletes
+    # none. Backups without data, of a tables pattern that matches nothing any more for instance,
+    # are counted apart: up to 7 of them are kept besides, so they never push out a backup that
+    # holds data. An incomplete backup, such as a failed upload, counts toward neither. The backup
+    # the run has just made is never deleted, nor one that another backup is based on.
+    keepLast: 7
