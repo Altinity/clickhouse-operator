@@ -37,6 +37,10 @@ ClickHouseRestore        ──► Job per cluster ─────┘
 ## Quick start
 
 ```bash
+# The examples name no namespace: kubectl creates each in the namespace given with -n, or else in
+# the context's, "default" when it names none. Apply them all to one namespace, together with
+# docs/chk-examples/01-simple-1.yaml, the ClickHouseKeeperInstallation the CHI uses.
+
 # 1. Storage Secret + a CHI with backup enabled (edit the Secret first)
 kubectl apply -f docs/chb-examples/01-chi-with-backup.yaml
 
@@ -145,11 +149,13 @@ metadata:
 spec:
   backup:
     enabled: "yes"
-    storages:          # the storages the backups may be kept in, one per level for now
+    # The storages the backups may be kept in, one per level for now
+    storages:
       - name: main
         secretRef:
           name: backup-demo-storage
-    # storage: main    # the storage the sidecar uses; left out, the only one declared
+    # The storage the sidecar uses; left out, the only one declared
+    # storage: main
   configuration:
     clusters:
       - name: main
@@ -158,7 +164,8 @@ spec:
           replicasCount: 2
       - name: scratch
         backup:
-          enabled: "no"   # this cluster gets no sidecar and cannot be backed up
+          # This cluster gets no sidecar and cannot be backed up
+          enabled: "no"
 ```
 
 | Field                    | Meaning                                                                                                                                                                                                                                                    |
@@ -410,13 +417,16 @@ metadata:
 type: Opaque
 stringData:
   REMOTE_STORAGE: "s3"
-  S3_ENDPOINT: "https://s3.us-east-1.amazonaws.com"   # MinIO: http://minio-hl.minio:9000
+  # With MinIO, http://minio-hl.minio:9000
+  S3_ENDPOINT: "https://s3.us-east-1.amazonaws.com"
   S3_REGION: "us-east-1"
   S3_BUCKET: "clickhouse-backups"
-  S3_PATH: "backup/{namespace}/{installation}/{cluster}/{shard}"   # the default, see Storage paths
+  # The default, see Storage paths
+  S3_PATH: "backup/{namespace}/{installation}/{cluster}/{shard}"
   S3_ACCESS_KEY: "..."
   S3_SECRET_KEY: "..."
-  # S3_FORCE_PATH_STYLE: "true"   # MinIO and most S3-compatible stores
+  # Needed by MinIO and most S3-compatible stores
+  # S3_FORCE_PATH_STYLE: "true"
 ```
 
 Other storage types use the same scheme, for example `REMOTE_STORAGE: "gcs"` with `GCS_BUCKET`,
@@ -463,8 +473,10 @@ spec:
           name: backup-demo-storage
   configuration:
     clusters:
-      - name: hot     # keeps its backups in main
-      - name: cold    # keeps its backups in cold
+      # Keeps its backups in main
+      - name: hot
+      # Keeps its backups in cold
+      - name: cold
         backup:
           storages:
             - name: cold
@@ -608,7 +620,8 @@ changes, such a restore therefore refuses a host that holds a local copy of the 
 of the same name at its own storage path - unless both CHIs have one storage path, their object disk
 paths alone differing - or, unless `validateTopology` is `false`, a backup named as the one the
 backup is incremental from: the host would restore that one in place of the backup it reads. Keep
-the backup names of the two CHIs apart, as the default `backupNamePrefix` of their schedules does.
+the backup names of the two CHIs apart, as the default `backupNamePrefix` of their schedules does,
+unless their names joined with dashes coincide.
 It also refuses an object disk path that is the same for both CHIs while the storage path is not:
 deleting the copy it downloads would delete the object disk data of the backup.
 
@@ -624,8 +637,9 @@ and so does every schedule of either. Their backups are told apart by name only:
 `<backupNamePrefix>-YYYYMMDD-HHMMSS`, and a run refuses a name that is already in the
 storage. Two schedules with the same `backupNamePrefix` on one storage path therefore delete each
 other's backups, and fail each other's runs when they are due at the same time. The default prefix,
-`<namespace>-<chi>-<schedule>`, keeps apart the schedules of one Kubernetes cluster; an explicit
-prefix must be unique among all schedules that write to the same storage path.
+`<namespace>-<chi>-<schedule>`, keeps apart the schedules of one Kubernetes cluster, unless their
+names joined with dashes coincide (see below); an explicit prefix must be unique among all
+schedules that write to the same storage path.
 
 A CHI of the same name in the same namespace of another Kubernetes cluster - a disaster recovery
 copy - gets the same default prefixes: give the schedules of such a copy a `backupNamePrefix` of
@@ -642,10 +656,11 @@ the same namespace has its schedules held as well, until they get a `backupNameP
 
 The hold starts as soon as `spec.backup.recovery` names such a backup, before any restore, and stays
 when a recovery restore fails, whether or not it changed anything. It ends for a schedule when you
-set its `backupTemplate.backupNamePrefix` - to a prefix of its own, or, once the CHI's storage
-points at a path of its own and the sidecars have picked that up (see
-[Secret changes](#secret-changes)), even to the default value: setting it is the sign that the
-choice was made. Before the recovery is recorded,
+set its `backupNamePrefix` - to a prefix of its own, or, once the CHI's storage points at a path of
+its own and the sidecars have picked that up (see [Secret changes](#secret-changes)), even to the
+default value: setting it is the sign that the choice was made. The choice is final, as the prefix
+can be set once and is immutable after (see [ClickHouseBackupSchedule](#clickhousebackupschedule)):
+choose it deliberately. Before the recovery is recorded,
 [giving the recovery up](#recover-a-new-chi-from-a-backup) ends it for every schedule; after that,
 only `backupNamePrefix` does. Any other schedule of a recovered CHI reports the possibly shared path
 as a warning event and in its `Validated` condition (reason `CHIRecovered`).
@@ -715,21 +730,21 @@ spec:
   clickHouseInstallation: backup-demo
 ```
 
-| Field                    | Default         | Meaning                                                                                                                                                                                                                      |
-|--------------------------|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `clickHouseInstallation` | one of the two  | CHI to back up, in the same namespace. Exactly one of it and `scheduleRef` is set.                                                                                                                                           |
-| `scheduleRef.name`       |                 | Make the backup of this `ClickHouseBackupSchedule` once, with its CHI, cluster and options, see [Run a schedule now](#run-a-schedule-now).                                                                                     |
-| `cluster`                | all             | Back up only this cluster. Empty means every cluster with backup enabled, each in a Job of its own; with `scheduleRef`, every cluster the schedule backs up.                                                                 |
-| `backupName`             | generated       | Backup name, the same on every cluster. Generated from the resource name and the time the backup is due when empty; the resolved name is in `status.backupName`. A name ending like a schedule's, `-YYYYMMDD-HHMMSS`, is refused. |
-| `scheduledTime`          | when created    | RFC 3339 time, with its offset, the backup is due at, see [Back up at a later time](#back-up-at-a-later-time).                                                                                                                |
-| `startingDeadlineSeconds` |                | How late, from the time it is due, the backup may start on a cluster; unset, it waits as long as it takes.                                                                                                                  |
-| `diffFromRemote`         |                 | Make this an [incremental backup](#incremental-backups) on top of this existing backup.                                                                                                                                      |
-| `verify`                 | `false`         | [Verify](#verification) the backup after it is uploaded.                                                                                                                                                                     |
-| `schemaOnly`             | `false`         | Back up table and database definitions only, no data.                                                                                                                                                                        |
-| `replicaSelection`       | `FirstPerShard` | `FirstPerShard` backs up one replica of each shard, which is complete for `Replicated*` tables. `AllReplicas` backs up every replica, needed when a cluster holds non-replicated tables whose data differs between replicas. |
-| `tables`                 | all             | `clickhouse-backup --tables` pattern, e.g. `db.table`, `db.*`, comma-separated.                                                                                                                                              |
-| `partitions`             | all             | List of partition ids to back up.                                                                                                                                                                                            |
-| `activeDeadlineSeconds`  | `86400` (24h)   | How long each Job may run before it is stopped and the backup of its cluster fails.                                                                                                                                          |
+| Field                     | Default         | Meaning                                                                                                                                                                                                                      |
+|---------------------------|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `clickHouseInstallation`  | one of the two  | CHI to back up, in the same namespace. Exactly one of it and `scheduleRef` is set.                                                                                                                                           |
+| `scheduleRef.name`        |                 | Make the backup of this `ClickHouseBackupSchedule` once, with its CHI, clusters, options and `backupNamePrefix`, see [Run a schedule now](#run-a-schedule-now).                                                              |
+| `cluster`                 | all             | Back up only this cluster. Empty means every cluster with backup enabled, each in a Job of its own; with `scheduleRef`, every cluster the schedule backs up.                                                                 |
+| `backupName`              | generated       | Backup name, the same on every cluster; generated from the resource name and the time it is due when empty, see `status.backupName`. Refused with `scheduleRef`, or if it ends like a schedule's, `-YYYYMMDD-HHMMSS`.        |
+| `scheduledTime`           | when created    | RFC 3339 time, with its offset, the backup is due at, see [Back up at a later time](#back-up-at-a-later-time).                                                                                                               |
+| `startingDeadlineSeconds` |                 | How late, from the time it is due, the backup may start on a cluster; unset, it waits as long as it takes.                                                                                                                   |
+| `diffFromRemote`          |                 | Make this an [incremental backup](#incremental-backups) on top of this existing backup.                                                                                                                                      |
+| `verify`                  | `false`         | [Verify](#verification) the backup after it is uploaded.                                                                                                                                                                     |
+| `schemaOnly`              | `false`         | Back up table and database definitions only, no data.                                                                                                                                                                        |
+| `replicaSelection`        | `FirstPerShard` | `FirstPerShard` backs up one replica of each shard, which is complete for `Replicated*` tables. `AllReplicas` backs up every replica, needed when a cluster holds non-replicated tables whose data differs between replicas. |
+| `tables`                  | all             | `clickhouse-backup --tables` pattern, e.g. `db.table`, `db.*`, comma-separated.                                                                                                                                              |
+| `partitions`              | all             | List of partition ids to back up.                                                                                                                                                                                            |
+| `activeDeadlineSeconds`   | `86400` (24h)   | How long each Job may run before it is stopped and the backup of its cluster fails.                                                                                                                                          |
 
 The spec is validated when the resource is created: backup names (`backupName`, `diffFromRemote`,
 `backupNamePrefix`) start with a letter or digit, contain only letters, digits and `_ - .`, never two
@@ -768,18 +783,20 @@ spec:
   # verify: true
 ```
 
-* It takes the CHI, the clusters (unless `cluster` names one of them) and every option of the
-  schedule's `backupTemplate` (`schemaOnly`, `replicaSelection`, `tables`, `partitions`,
+* It takes the CHI, the clusters (unless `cluster` names one of them), the `backupNamePrefix` and
+  every backup option of the schedule (`schemaOnly`, `replicaSelection`, `tables`, `partitions`,
   `activeDeadlineSeconds`) as they are when the backup is validated, and records them in
   `status.schedule`: an edit of the schedule afterwards changes nothing about it. None of these
-  options can be set on the backup itself; its own fields, `cluster` (one of the clusters the
-  schedule backs up), `verify`, `diffFromRemote`, `backupName`, `scheduledTime` and
+  options can be set on the backup itself, nor can `backupName`; its own fields, `cluster` (one of
+  the clusters the schedule backs up), `verify`, `diffFromRemote`, `scheduledTime` and
   `startingDeadlineSeconds`, keep their meaning.
-* It is named `<backupNamePrefix>-<UTC time it is due, as YYYYMMDDTHHMMSS>`, e.g.
-  `default-backup-demo-nightly-20261012T101507`. The `T` keeps it out of the schedule's series:
-  [retention](#retention) never deletes it, and creating such backups never pushes one of the
-  schedule's out - delete it by hand when it is no longer needed. The prefix still tells the
-  [recovery prefix guard](#storage-paths) where it came from.
+* It is always named `<backupNamePrefix>-<UTC time it is due, as YYYYMMDDTHHMMSS>`, e.g.
+  `default-backup-demo-nightly-20261012T101507`: a `backupName` is refused with `scheduleRef`
+  (`a backup that runs a schedule is named with the schedule's backupNamePrefix: backupName is not
+  set with scheduleRef`), so the name always tells the schedule the backup came from. The `T` keeps
+  it out of the schedule's series: [retention](#retention) never deletes it, and creating such
+  backups never pushes one of the schedule's out - delete it by hand when it is no longer needed.
+  The prefix also lets the [recovery prefix guard](#storage-paths) tell where it came from.
 * It runs as any `ClickHouseBackup` does, also while the schedule is suspended or held for a restore:
   it is not part of the series those protect. A schedule that does not exist yet - both applied at
   once - is waited for (`ScheduleNotFound`), as is one whose spec the operator finds invalid
@@ -787,9 +804,11 @@ spec:
   the backup uses neither. A `cluster` the schedule does not back up refuses the backup
   (`ClusterNotFound`).
 * Two of them due in the same second get the same name: on a cluster both back up, the second fails,
-  before it changes anything, as the backup exists already. Give each its own `backupName`; one kept
-  in git that may be created again gets a new name only with neither `backupName` nor
-  `scheduledTime`, from the time it is created.
+  before it changes anything, as the backup exists already. Delete the failed one and create it
+  again without `scheduledTime`, which names it after its new creation time, or give each its own
+  `scheduledTime`. Likewise, one kept in git that may be created again gets a new name only without
+  `scheduledTime`, from the time it is created; with it, it gets its former name again, and fails
+  while the backup of that name is still in the storage.
 
 It replaces `kubectl create job --from=cronjob/...`, which still works: such a Job names its backup
 after the time it runs, as one of the series, so the schedule's retention counts it, it ignores
@@ -842,20 +861,20 @@ spec:
     keepLast: 7
 ```
 
-| Field                                                                                                | Default                               | Meaning                                                                                                                                                                                                                       |
-|------------------------------------------------------------------------------------------------------|---------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `clickHouseInstallation`                                                                             | required                              | CHI to back up, in the same namespace.                                                                                                                                                                                        |
-| `cluster`                                                                                            | all                                   | Back up only this cluster. Empty means every cluster with backup enabled, each through a CronJob of its own.                                                                                                                  |
-| `schedule`                                                                                           | required                              | Cron expression, as in a Kubernetes `CronJob`.                                                                                                                                                                                |
-| `timeZone`                                                                                           | the controller manager's, usually UTC | IANA time zone `schedule` is read in, e.g. `Europe/Berlin`, as the `CronJob`'s, which Kubernetes before 1.25 ignores. Backup names carry UTC times either way.                                                                |
-| `suspend`                                                                                            | `false`                               | Stop starting new runs. A run already in progress continues.                                                                                                                                                                  |
-| `concurrencyPolicy`                                                                                  | `Forbid`                              | What to do when a run is due while the previous one still runs: `Forbid` starts it only once that one has finished, and not at all past `startingDeadlineSeconds`; `Allow` starts it anyway; `Replace` stops the running one. |
-| `startingDeadlineSeconds`                                                                            |                                       | How late a missed run may still start.                                                                                                                                                                                        |
-| `successfulJobsHistoryLimit`                                                                         | `3`                                   | Finished successful Jobs to keep, at least 1: the operator learns from its Job which backup a run made and whether it holds data.                                                                                             |
-| `failedJobsHistoryLimit`                                                                             | `1`                                   | Failed Jobs to keep, at least 1: the operator learns from its Job why a run failed.                                                                                                                                           |
-| `backupTemplate.backupNamePrefix`                                                                    | `<namespace>-<chi>-<schedule>`        | Backup names are `<prefix>-<UTC time the run was due>`, e.g. `default-backup-demo-nightly-20261003-020000`. Also scopes [retention](#retention).                                                                              |
-| `retention.keepLast`                                                                                 | `0` (keep all)                        | [Retention](#retention): how many of this schedule's backups with data, and apart from them without, to keep.                                                                                                                 |
-| `backupTemplate.schemaOnly`, `.replicaSelection`, `.tables`, `.partitions`, `.activeDeadlineSeconds` |                                       | As in `ClickHouseBackup`; `activeDeadlineSeconds` bounds each run.                                                                                                                                                            |
+| Field                                                                             | Default                               | Meaning                                                                                                                                                                                                                       |
+|-----------------------------------------------------------------------------------|---------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `clickHouseInstallation`                                                          | required                              | CHI to back up, in the same namespace.                                                                                                                                                                                        |
+| `cluster`                                                                         | all                                   | Back up only this cluster. Empty means every cluster with backup enabled, each through a CronJob of its own.                                                                                                                  |
+| `schedule`                                                                        | required                              | Cron expression, as in a Kubernetes `CronJob`.                                                                                                                                                                                |
+| `timeZone`                                                                        | the controller manager's, usually UTC | IANA time zone `schedule` is read in, e.g. `Europe/Berlin`, as the `CronJob`'s, which Kubernetes before 1.25 ignores. Backup names carry UTC times either way.                                                                |
+| `suspend`                                                                         | `false`                               | Stop starting new runs. A run already in progress continues.                                                                                                                                                                  |
+| `concurrencyPolicy`                                                               | `Forbid`                              | What to do when a run is due while the previous one still runs: `Forbid` starts it only once that one has finished, and not at all past `startingDeadlineSeconds`; `Allow` starts it anyway; `Replace` stops the running one. |
+| `startingDeadlineSeconds`                                                         |                                       | How late a missed run may still start.                                                                                                                                                                                        |
+| `successfulJobsHistoryLimit`                                                      | `3`                                   | Finished successful Jobs to keep, at least 1: the operator learns from its Job which backup a run made and whether it holds data.                                                                                             |
+| `failedJobsHistoryLimit`                                                          | `1`                                   | Failed Jobs to keep, at least 1: the operator learns from its Job why a run failed.                                                                                                                                           |
+| `schemaOnly`, `replicaSelection`, `tables`, `partitions`, `activeDeadlineSeconds` |                                       | As in [`ClickHouseBackup`](#clickhousebackup); `activeDeadlineSeconds` bounds each Job of a run.                                                                                                                              |
+| `backupNamePrefix`                                                                | `<namespace>-<chi>-<schedule>`        | Backup names are `<prefix>-<UTC time the run was due>`, e.g. `default-backup-demo-nightly-20261003-020000`. Also scopes [retention](#retention). Can be set once and is immutable after, see below.                           |
+| `retention.keepLast`                                                              | `0` (keep all)                        | [Retention](#retention): how many of this schedule's backups with data, and apart from them without, to keep.                                                                                                                 |
 
 A schedule runs one CronJob for each cluster it backs up, named after the schedule and the cluster,
 with the cluster's own Pod settings; `concurrencyPolicy` and the history limits apply to each of
@@ -869,6 +888,16 @@ The default prefix joins the namespace, CHI and schedule names, shortened with a
 characters, so that schedules of the same name of different CHIs, or of CHIs of the same name in
 different namespaces, get different prefixes; see [Storage paths](#storage-paths) for why that
 matters.
+
+`backupNamePrefix` can be set once and is immutable after (`backupNamePrefix can be set once and is
+immutable after: a changed prefix would leave the former series unpruned; create a new resource`),
+which Kubernetes enforces from 1.25 on: [retention](#retention) knows the current prefix only, and
+would never prune the backups of a former series. Set it when the schedule is created, or later only
+on a schedule that has not run yet, such as one held for a [recovery](#storage-paths), which setting
+it releases: on a schedule that has run, any prefix but the default changes the one its runs so far
+used. To change the prefix of a schedule that has run, create a new schedule. Either way, the
+backups of the former prefix stay in the storage until they are deleted by hand. Choose an explicit
+prefix deliberately, unique among the schedules that write to the same storage path.
 
 Each run names its backup after the time it was due - the minute of its schedule slot, which the
 CronJob controller puts in the name of every Job it creates - not after the time it happens to start.
@@ -937,19 +966,19 @@ spec:
   backupName: default-backup-demo-nightly-20261003-020000
 ```
 
-| Field                    | Default            | Meaning                                                                                                                                 |
-|--------------------------|--------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-| `clickHouseInstallation` | required           | CHI to restore into, in the same namespace. A fresh, empty CHI is recommended.                                                          |
-| `cluster`                | all                | Restore only into this cluster. Empty means every cluster with backup enabled, each in a Job of its own.                                |
-| `backupName`             | required           | Backup to restore.                                                                                                                      |
+| Field                    | Default            | Meaning                                                                                                                                   |
+|--------------------------|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `clickHouseInstallation` | required           | CHI to restore into, in the same namespace. A fresh, empty CHI is recommended.                                                            |
+| `cluster`                | all                | Restore only into this cluster. Empty means every cluster with backup enabled, each in a Job of its own.                                  |
+| `backupName`             | required           | Backup to restore.                                                                                                                        |
 | `sourceInstallation`     | the restored CHI   | CHI that made the backup, when another: the backup is read from the paths its name gives, see [Storage paths](#storage-paths). Immutable. |
-| `sourceNamespace`        | the restored CHI's | Namespace of the CHI that made the backup, when another and the paths hold `{namespace}`. Immutable.                                    |
-| `tables`                 | all                | Restore only the matching tables: a `clickhouse-backup` pattern as for a backup, e.g. `db.table`, `db.*`, comma-separated.              |
-| `schemaOnly`             | `false`            | Restore table and database definitions only, no data.                                                                                   |
-| `rbac`                   | `false`            | Also restore the [access entities](#access-entities) of the backup. Only with an empty `cluster`.                                       |
-| `overwrite`              | `false`            | Allow restoring over existing tables, which are dropped first. See [Restore safety](#restore-safety).                                   |
-| `validateTopology`       | `true`             | Refuse the restore unless every target shard holds the backup, and, from another CHI, a backup named as its base at the own paths.     |
-| `activeDeadlineSeconds`  | `86400` (24h)      | How long each Job may run before it is stopped and the restore of its cluster fails.                                                    |
+| `sourceNamespace`        | the restored CHI's | Namespace of the CHI that made the backup, when another and the paths hold `{namespace}`. Immutable.                                      |
+| `schemaOnly`             | `false`            | Restore table and database definitions only, no data.                                                                                     |
+| `tables`                 | all                | Restore only the matching tables: a `clickhouse-backup` pattern as for a backup, e.g. `db.table`, `db.*`, comma-separated.                |
+| `rbac`                   | `false`            | Also restore the [access entities](#access-entities) of the backup. Only with an empty `cluster`.                                         |
+| `overwrite`              | `false`            | Allow restoring over existing tables, which are dropped first. See [Restore safety](#restore-safety).                                     |
+| `validateTopology`       | `true`             | Refuse the restore unless every target shard holds the backup, and, from another CHI, a backup named as its base at the own paths.        |
+| `activeDeadlineSeconds`  | `86400` (24h)      | How long each Job may run before it is stopped and the restore of its cluster fails.                                                      |
 
 `tables` follows the rules of a backup's `tables`. The target CHI needs backup enabled and the same
 backup storage configuration as the source, with the same cluster names and shard layout; a backup
@@ -1210,15 +1239,17 @@ token is mounted. Each Job makes a single attempt, bounded by `activeDeadlineSec
 `retention.keepLast: N` makes every successful run of a schedule delete that schedule's older
 backups on the cluster it ran on, keeping the `N` most recent that hold data and, apart from them,
 the `N` most recent that hold none (see below). Retention is a rule of the schedule's series - the
-backups its runs name `<backupNamePrefix>-YYYYMMDD-HHMMSS` - not of any one backup, which is why it is
-set on the schedule, apart from the `backupTemplate` every run is made with. It is deliberately
-narrow:
+backups its runs name `<backupNamePrefix>-YYYYMMDD-HHMMSS` - not of any one backup, which is why a
+`ClickHouseBackup` sets none, not even one that [runs the schedule](#run-a-schedule-now). As the
+prefix names the series, it can be set once and is immutable after (see
+[ClickHouseBackupSchedule](#clickhousebackupschedule)): retention would never prune the backups of
+a former prefix. Retention is deliberately narrow:
 
 * it only considers the backups of the series, so backups of other schedules and one-off backups are
   never touched - the backups that [run a schedule now](#run-a-schedule-now) included, and a one-off
   `backupName` of the series' form is refused. Give each schedule its own prefix. The default
-  prefix, `<namespace>-<chi>-<schedule>`, is unique per schedule of one Kubernetes cluster even
-  across CHIs that share a storage path, as a CHI restored from another CHI's backup usually does; a
+  prefix, `<namespace>-<chi>-<schedule>`, differs between the schedules of one Kubernetes cluster,
+  even across CHIs that share a storage path, unless their names joined with dashes coincide; a
   prefix set by hand must be unique among all schedules writing to that path, or each schedule's
   retention deletes the other's backups (see [Storage paths](#storage-paths));
 * it works per cluster: each cluster's runs prune on every host of that cluster the backup ran on,
@@ -1484,11 +1515,13 @@ spec:
   configuration:
     clusters:
       - name: main
-      - name: events      # backed up by a schedule of its own
+      # Backed up by a schedule of its own
+      - name: events
         backup:
           recovery:
             backupName: default-backup-demo-events-20261003-023000
-      - name: scratch     # new in this CHI, in no backup
+      # New in this CHI, in no backup
+      - name: scratch
         backup:
           recovery:
             backupName: ""
@@ -1729,8 +1762,10 @@ storage keeps them, as its spec still asks for backups: an alert on their age fi
 * **A Secret change restarts the sidecars.** Each sidecar restarts once it is idle, also while a
   backup or restore works on other hosts, which takes its Pod out of the CHI's Service for a moment;
   a key removed from a Secret is not noticed, see [Secret changes](#secret-changes).
-* **Targets are immutable on Kubernetes 1.25 and newer only.** Older versions, and the `v1beta1`
-  bundle, accept an edit of `clickHouseInstallation` or `cluster`. A backup or a restore keeps the
+* **Targets and a schedule's prefix are immutable on Kubernetes 1.25 and newer only.** Older
+  versions, and the `v1beta1` bundle, accept an edit of `clickHouseInstallation` or `cluster`, and a
+  change of a schedule's `backupNamePrefix`, which leaves the backups of the former series unpruned,
+  as setting one on a schedule that has run does on any version. A backup or a restore keeps the
   cluster it recorded when it was validated, but an edit of `clickHouseInstallation` moves it, as a
   whole, to the other CHI; a schedule, which records no target, follows either edit, as if the
   clusters it no longer targets had left it (see
