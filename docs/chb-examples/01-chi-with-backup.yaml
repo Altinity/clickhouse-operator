@@ -22,7 +22,8 @@ stringData:
   # backup and restore Jobs can check the storage paths: with several backup-enabled clusters, they
   # refuse to run when the sidecar reads a configuration file.
   REMOTE_STORAGE: "s3"
-  S3_ENDPOINT: "http://minio-hl.minio:9000"   # MinIO installed with deploy/minio
+  # MinIO installed with deploy/minio
+  S3_ENDPOINT: "http://minio-hl.minio:9000"
   S3_BUCKET: "clickhouse-backup"
   # Left unset, the path is the default of the operator configuration (backup.storagePath, and
   # backup.storageObjectDiskPath for S3_OBJECT_DISK_PATH), by default this one: {namespace},
