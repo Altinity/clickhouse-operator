@@ -574,7 +574,7 @@ with additional sections, such as:
         #  values:
         #    - "us-east-1a"
 
-        # Possible values for distribution are:
+        # Possible values for podDistribution are:
         # Unspecified
         # ClickHouseAntiAffinity
         podDistribution:
@@ -599,9 +599,9 @@ with additional sections, such as:
 `.spec.templates.podTemplates` represents [Pod Templates][pod-templates] 
 with additional sections, such as:
 1. `zone`
-1. `distribution`
+1. `podDistribution`
 
-**`zone`** and **`distribution`** together define zoned layout of ClickHouse instances over nodes. Internally it is a shortcut to `affinity.nodeAffinity` and `affinity.podAntiAffinity` properly filled.
+**`zone`** and **`podDistribution`** together define zoned layout of ClickHouse instances over nodes. Internally it is a shortcut to `affinity.nodeAffinity` and `affinity.podAntiAffinity` properly filled.
 
 Example - how to place ClickHouse instances in AWS `us-east-1a` availability zone with one ClickHouse per host 
 ```yaml
