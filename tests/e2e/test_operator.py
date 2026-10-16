@@ -8461,6 +8461,10 @@ backup_label_cluster = "clickhouse.altinity.com/backup-cluster"
 backup_annotation_recovered_from = "clickhouse.altinity.com/recovered-from"
 # The message of the validation rule that keeps the target of a backup, restore or schedule as it was created.
 backup_target_immutable_message = "clickHouseInstallation and cluster are immutable"
+# The messages of the validation rules that name every backup of a schedule with its backupNamePrefix: a
+# backup that runs the schedule takes no backupName, and the prefix of a schedule cannot change once set.
+backup_name_with_schedule_message = "backupName is not set with scheduleRef"
+backup_name_prefix_immutable_message = "backupNamePrefix can be set once and is immutable after"
 # Sidecar contract, mirrored from pkg/model/chi/config/const.go (ClickHouseBackup*).
 backup_sidecar = "clickhouse-backup"
 backup_api_port = 7171
@@ -8647,9 +8651,9 @@ def backup_patch(kind, name, patch, ok_to_fail=False):
     return kubectl.launch(f"patch {kind} {name} --type=merge -p '{body}' 2>&1", ok_to_fail=ok_to_fail)
 
 
-def backup_apply_edited(manifest, edit):
+def backup_apply_edited(manifest, edit, ok_to_fail=False):
     """Applies a manifest once edit(data) has filled in what only the run knows, such as names carrying its
-    namespace."""
+    namespace. With ok_to_fail, returns the output, which carries the error of a refused manifest."""
     import tempfile
 
     data = yaml_manifest.get_manifest_data(util.get_full_path(manifest))
@@ -8658,6 +8662,8 @@ def backup_apply_edited(manifest, edit):
         yaml.safe_dump(data, f, default_flow_style=False)
         path = f.name
     try:
+        if ok_to_fail:
+            return kubectl.launch(f'apply -f "{path}" 2>&1', ok_to_fail=True)
         kubectl.apply(path)
     finally:
         os.unlink(path)
@@ -8737,11 +8743,13 @@ def test_010087(self):
     the rows of its backup once, the Distributed tables are unchanged, and the restore holds the CronJob of
     the hot cluster, never the one of the cold cluster.
 
-    The targets of a restore and of a schedule cannot be edited. The schedule runs one CronJob per cluster,
-    keeps one backup per (cluster, shard) path with its prefix and reports every cluster, as well as the
-    newest backup every cluster completed; the one-off backup carries another name and survives the
-    pruning. Last, a storage path without {cluster} would make shard 0 of both clusters upload to one path:
-    the Job of every cluster refuses such a backup before it changes anything, naming the other cluster.
+    The targets of a restore and of a schedule cannot be edited, nor can the backup name prefix of a schedule
+    once set, and a backup that runs the schedule takes no backupName: it is named with the schedule's prefix.
+    The schedule runs one CronJob per cluster, keeps one backup per (cluster, shard) path with its prefix and
+    reports every cluster, as well as the newest backup every cluster completed; the one-off backups carry
+    other names and survive the pruning. Last, a storage path without {cluster} would make shard 0 of both
+    clusters upload to one path: the Job of every cluster refuses such a backup before it changes anything,
+    naming the other cluster.
     """
     chi_manifest = "manifests/chi/test-010087-backup.yaml"
     storage_manifest = "manifests/secret/test-010087-backup-storage.yaml"
@@ -8777,7 +8785,9 @@ def test_010087(self):
     restore_hot = restore_hot_data["metadata"]["name"]
     schedule = schedule_data["metadata"]["name"]
     from_schedule = manifest_data(from_schedule_manifest)["metadata"]["name"]
-    schedule_prefix = schedule_data["spec"]["backupTemplate"]["backupNamePrefix"]
+    # A backup that runs the schedule as from_schedule does, under a backupName of its own: the API server refuses it.
+    named_from_schedule, named_from_schedule_name = f"{from_schedule}-named", "e2e-087-from-schedule"
+    schedule_prefix = schedule_data["spec"]["backupNamePrefix"]
     keep_last = schedule_data["spec"]["retention"]["keepLast"]
 
     hot, cold = "hot", "cold"
@@ -9147,6 +9157,17 @@ def test_010087(self):
                 pod_labels = (template.get("metadata") or {}).get("labels") or {}
                 assert pod_labels.get(backup_label_cluster) == cluster, error(f"CronJob {name}: pod labels {pod_labels}")
 
+        with When("A backup that names the schedule is given a backupName of its own"):
+            def name_from_schedule(data):
+                data["metadata"]["name"] = named_from_schedule
+                data["spec"]["backupName"] = named_from_schedule_name
+
+            out = backup_apply_edited(from_schedule_manifest, name_from_schedule, ok_to_fail=True)
+
+        with Then("The API server refuses it: a backup that runs a schedule is named with the schedule's prefix"):
+            assert backup_name_with_schedule_message in out, error(f"{named_from_schedule} was not refused: {out}")
+            assert kubectl.get_count(backup_kind, name=named_from_schedule) == 0, error(f"{named_from_schedule} was created")
+
         with When("The schedule's backup is made once now, by a backup that names the schedule"):
             kubectl.apply(util.get_full_path(from_schedule_manifest))
 
@@ -9321,21 +9342,27 @@ def test_010087(self):
         with And(f"The schedule resumes the {hot} cluster"):
             kubectl.wait_field("cronjob", cronjobs[hot], ".spec.suspend", "false")
 
-        with When("The targets of the restore and of the schedule are edited"):
+        with When("The targets of the restore and of the schedule, and the backup name prefix of the schedule, are edited"):
             edits = (
-                (restore_kind, restore, {"spec": {"cluster": hot}}),
-                (restore_kind, restore, {"spec": {"cluster": None}}),
-                (schedule_kind, schedule, {"spec": {"cluster": hot}}),
+                (restore_kind, restore, {"spec": {"cluster": hot}}, backup_target_immutable_message),
+                (restore_kind, restore, {"spec": {"cluster": None}}, backup_target_immutable_message),
+                (schedule_kind, schedule, {"spec": {"cluster": hot}}, backup_target_immutable_message),
+                # Another prefix, or none, would leave the backups the schedule made under its prefix unpruned.
+                (schedule_kind, schedule, {"spec": {"backupNamePrefix": f"{schedule_prefix}-other"}}, backup_name_prefix_immutable_message),
+                (schedule_kind, schedule, {"spec": {"backupNamePrefix": None}}, backup_name_prefix_immutable_message),
             )
-            outputs = [backup_patch(kind, name, patch, ok_to_fail=True) for kind, name, patch in edits]
+            outputs = [backup_patch(kind, name, patch, ok_to_fail=True) for kind, name, patch, _ in edits]
 
-        with Then("The API server refuses every edit, and the targets stay as they were"):
-            for (kind, name, patch), out in zip(edits, outputs):
-                assert backup_target_immutable_message in out, error(f"{kind} {name}: {patch} was not refused: {out}")
+        with Then("The API server refuses every edit, and the targets and the prefix stay as they were"):
+            for (kind, name, patch, message), out in zip(edits, outputs):
+                assert message in out, error(f"{kind} {name}: {patch} was not refused: {out}")
             target = kubectl.get(restore_kind, restore)["spec"].get("cluster")
             assert target == cold, error(f"{restore}: spec.cluster is {target}")
-            target = kubectl.get(schedule_kind, schedule)["spec"].get("cluster")
-            assert backup_unset(target), error(f"{schedule}: spec.cluster is {target}")
+            schedule_spec = kubectl.get(schedule_kind, schedule)["spec"]
+            assert backup_unset(schedule_spec.get("cluster")), error(f"{schedule}: spec.cluster is {schedule_spec.get('cluster')}")
+            assert schedule_spec.get("backupNamePrefix") == schedule_prefix, error(
+                f"{schedule}: spec.backupNamePrefix is {schedule_spec.get('backupNamePrefix')}, expected {schedule_prefix}"
+            )
 
         with And("At least two scheduled backups succeed on every backup-enabled cluster"):
             succeeded = {}
@@ -9467,6 +9494,7 @@ def test_010087(self):
                             (schedule_kind, schedule),
                             (backup_kind, backup),
                             (backup_kind, from_schedule),
+                            (backup_kind, named_from_schedule),
                             (backup_kind, disabled_backup),
                             (backup_kind, shared_path_backup),
                             (restore_kind, restore),
@@ -9603,7 +9631,7 @@ def test_010088(self):
         assert source_backup_name in (ready.get("message") or ""), error(f"{schedule}: Ready condition {ready} does not name the backup")
         return cronjobs
 
-    archive_prefix = yaml_manifest.get_manifest_data(util.get_full_path(archive_manifest))["spec"]["backupTemplate"]["backupNamePrefix"]
+    archive_prefix = yaml_manifest.get_manifest_data(util.get_full_path(archive_manifest))["spec"]["backupNamePrefix"]
     assert archive_prefix, error(f"{archive_manifest} must give schedule {archive} a backup name prefix of its own")
 
     try:
@@ -9668,7 +9696,7 @@ def test_010088(self):
 
         with When(f"Schedule {source_schedule} of the source, with prefix {nightly_default_prefix}, is run once, now"):
             def prefix_source_schedule(data):
-                data["spec"]["backupTemplate"]["backupNamePrefix"] = nightly_default_prefix
+                data["spec"]["backupNamePrefix"] = nightly_default_prefix
 
             backup_apply_edited(source_schedule_manifest, prefix_source_schedule)
             kubectl.apply(util.get_full_path(source_backup_manifest))
@@ -9879,7 +9907,8 @@ def test_010088(self):
                     assert set(limits.values()) == {2}, error(f"{nightly}: failedJobsHistoryLimit of the CronJobs {limits}")
 
         with When(f"Schedule {nightly} is given its prefix explicitly, even the default one"):
-            backup_patch(schedule_kind, nightly, {"spec": {"backupTemplate": {"backupNamePrefix": nightly_default_prefix}}})
+            # A schedule without a prefix can be given one, once: the API server refuses any change of it after.
+            backup_patch(schedule_kind, nightly, {"spec": {"backupNamePrefix": nightly_default_prefix}})
 
         with Then(f"That informed choice releases it, and it alone: {hourly} stays held"):
             for attempt in retries(timeout=120, delay=5):

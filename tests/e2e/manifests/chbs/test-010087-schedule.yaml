@@ -12,8 +12,7 @@ spec:
   # Kept above the two runs the scenario waits for, so finished runs stay countable.
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
-  backupTemplate:
-    # Unlike the one-off backup's name, so retention must leave that one alone.
-    backupNamePrefix: e2e-087-sched
+  # Unlike the one-off backup's name, so retention must leave that one alone.
+  backupNamePrefix: e2e-087-sched
   retention:
     keepLast: 1

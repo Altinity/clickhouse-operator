@@ -12,5 +12,4 @@ spec:
   clickHouseInstallation: test-088-dr
   schedule: "0 0 1 1 *"
   concurrencyPolicy: Forbid
-  backupTemplate:
-    backupNamePrefix: e2e-088-archive
+  backupNamePrefix: e2e-088-archive
