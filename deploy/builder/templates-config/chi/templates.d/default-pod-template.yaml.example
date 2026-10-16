@@ -6,4 +6,5 @@ spec:
   templates:
     podTemplates:
       - name: default-oneperhost-pod-template
-        distribution: "OnePerHost"
+        podDistribution:
+          - type: ClickHouseAntiAffinity

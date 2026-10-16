@@ -1022,7 +1022,11 @@ configs:
             "podTemplates": [
               {
                 "name": "chi-default-oneperhost-pod-template",
-                "distribution": "OnePerHost",
+                "podDistribution": [
+                  {
+                    "type": "ClickHouseAntiAffinity"
+                  }
+                ],
                 "spec": {
                   "containers" : [
                     {
@@ -1059,7 +1063,8 @@ configs:
         templates:
           podTemplates:
             - name: default-oneperhost-pod-template
-              distribution: "OnePerHost"
+              podDistribution:
+                - type: ClickHouseAntiAffinity
     default-storage-template.yaml.example: |
       apiVersion: "clickhouse.altinity.com/v1"
       kind: "ClickHouseInstallationTemplate"

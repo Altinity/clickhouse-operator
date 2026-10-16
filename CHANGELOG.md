@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Host template `settings` set in the installation, or in a later template, were dropped** whenever an earlier template's same-named host template had settings of its own; they now merge per key. by [@sunsingerus](https://github.com/sunsingerus)
 
+### Security
+* **Bumped `golang.org/x/net` `v0.56.0` → `v0.60.0` and `golang.org/x/text` `v0.39.0` → `v0.42.0`** to address CVEs in the operator and metrics-exporter images (`CVE-2026-78663`, `CVE-2026-78659`, `CVE-2026-78669`, `CVE-2026-78660`, `CVE-2026-97032`, `CVE-2026-56851`). No API or behavior changes. The FIPS module is unchanged.
+
 ## [0.27.4](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.3...release-0.27.4)
 
 ### Security

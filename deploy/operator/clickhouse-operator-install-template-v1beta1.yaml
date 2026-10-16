@@ -1723,16 +1723,6 @@ spec:
                             # nullable: true
                             items:
                               type: string
-                      distribution:
-                        type: string
-                        description: "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
-                        enum:
-                          # both humped and all-lowercase accepted
-                          - ""
-                          - "Unspecified"
-                          - "unspecified"
-                          - "OnePerHost"
-                          - "oneperhost"
                       podDistribution:
                         type: array
                         description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
@@ -3662,16 +3652,6 @@ spec:
                             # nullable: true
                             items:
                               type: string
-                      distribution:
-                        type: string
-                        description: "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
-                        enum:
-                          # both humped and all-lowercase accepted
-                          - ""
-                          - "Unspecified"
-                          - "unspecified"
-                          - "OnePerHost"
-                          - "oneperhost"
                       podDistribution:
                         type: array
                         description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
@@ -5462,16 +5442,6 @@ spec:
                                 # nullable: true
                                 items:
                                   type: string
-                          distribution:
-                            type: string
-                            description: "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
-                            enum:
-                              # both humped and all-lowercase accepted
-                              - ""
-                              - "Unspecified"
-                              - "unspecified"
-                              - "OnePerHost"
-                              - "oneperhost"
                           podDistribution:
                             type: array
                             description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
@@ -6839,7 +6809,7 @@ data:
     #   CH_PASSWORD_PLAIN=
     #   CH_CREDENTIALS_SECRET_NAMESPACE=
     #   CH_CREDENTIALS_SECRET_NAME=clickhouse-operator
-    #   VERBOSITY=2
+    #   VERBOSITY=1
 
     ################################################
     ##
@@ -7525,7 +7495,7 @@ data:
     logger:
       logtostderr: "true"
       alsologtostderr: "false"
-      v: "2"
+      v: "1"
       stderrthreshold: ""
       vmodule: ""
       log_backtrace_at: ""
@@ -7682,7 +7652,11 @@ data:
           "podTemplates": [
             {
               "name": "chi-default-oneperhost-pod-template",
-              "distribution": "OnePerHost",
+              "podDistribution": [
+                {
+                  "type": "ClickHouseAntiAffinity"
+                }
+              ],
               "spec": {
                 "containers" : [
                   {
@@ -7719,7 +7693,8 @@ data:
       templates:
         podTemplates:
           - name: default-oneperhost-pod-template
-            distribution: "OnePerHost"
+            podDistribution:
+              - type: ClickHouseAntiAffinity
   default-storage-template.yaml.example: |
     apiVersion: "clickhouse.altinity.com/v1"
     kind: "ClickHouseInstallationTemplate"
