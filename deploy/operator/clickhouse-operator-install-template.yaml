@@ -5757,6 +5757,8 @@ spec:
                 # schemaOnly takes any value a StringBool does, which CEL cannot type: the operator refuses it
                 - rule: "!has(self.scheduleRef) || !(has(self.replicaSelection) || has(self.tables) || has(self.partitions) || has(self.activeDeadlineSeconds))"
                   message: "a backup that runs a schedule takes its options from it: replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef"
+                - rule: "!has(self.scheduleRef) || (has(self.backupName) ? self.backupName : '') == ''"
+                  message: "a backup that runs a schedule is named with the schedule's backupNamePrefix: backupName is not set with scheduleRef"
                 - rule: "!has(self.backupName) || !self.backupName.matches('-[0-9]{8}-[0-9]{6}$')"
                   message: "backupName must not end like the backups of a schedule, -YYYYMMDD-HHMMSS, which the retention of a schedule of that prefix would prune"
               properties:
@@ -5769,8 +5771,9 @@ spec:
                   type: object
                   description: |
                     ClickHouseBackupSchedule in the same namespace whose backup this one makes once, now or at scheduledTime: the
-                    installation, the backup options and, unless cluster narrows them to one, the clusters are the schedule's,
-                    as they are when the backup is validated. The backup is named with the schedule's backupNamePrefix and stays out of its retention.
+                    installation, the backup options, the backupNamePrefix and, unless cluster narrows them to one, the clusters
+                    are the schedule's, as they are when the backup is validated. The backup is named with that prefix,
+                    never with backupName, and stays out of the schedule's retention.
                     Exactly one of it and clickHouseInstallation is set. Immutable
                   required:
                     - name
@@ -5790,7 +5793,8 @@ spec:
                   type: string
                   description: |
                     Optional explicit backup name, which must not end like the backups of a schedule (-YYYYMMDD-HHMMSS).
-                    Generated from the resource name, or the schedule's backupNamePrefix, and the time the backup is due when empty
+                    Generated from the resource name and the time the backup is due when empty. Not set with scheduleRef,
+                    whose backup is named with the schedule's backupNamePrefix
                   maxLength: 128
                   pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
                 scheduledTime:
@@ -5882,7 +5886,7 @@ spec:
                       description: "Cluster the backup targets, empty for every cluster the schedule backs up"
                     backupNamePrefix:
                       type: string
-                      description: "Backup name prefix of the schedule, which names the backup without backupName"
+                      description: "The schedule's backupNamePrefix, which names the backup"
                     schemaOnly:
                       type: string
                       description: "The schedule's schemaOnly"
@@ -6077,6 +6081,8 @@ spec:
               x-kubernetes-validations:
                 - rule: "self.clickHouseInstallation == oldSelf.clickHouseInstallation && (has(self.cluster) ? self.cluster : '') == (has(oldSelf.cluster) ? oldSelf.cluster : '')"
                   message: "clickHouseInstallation and cluster are immutable; create a new resource"
+                - rule: "(has(oldSelf.backupNamePrefix) ? oldSelf.backupNamePrefix : '') == '' || (has(self.backupNamePrefix) ? self.backupNamePrefix : '') == oldSelf.backupNamePrefix"
+                  message: "backupNamePrefix can be set once and is immutable after: a changed prefix would leave the former series unpruned; create a new resource"
               properties:
                 clickHouseInstallation:
                   type: string
@@ -6136,48 +6142,47 @@ spec:
                   description: |
                     How many failed finished Jobs to keep, at least 1: the operator learns from the Job of a run why
                     it failed and the hosts it backed up. Defaults to 1
-                backupTemplate:
-                  type: object
-                  description: "Backup specification applied to every scheduled run"
-                  properties:
-                    backupNamePrefix:
-                      type: string
-                      description: |
-                        Prefix of the backup names; each run appends the UTC time it was due. Retention only
-                        ever prunes backups named with this prefix and such a time. Defaults to
-                        "<namespace>-<installation>-<schedule>", shortened with a hash when longer. At most
-                        112 characters, so the name with its "-YYYYMMDD-HHMMSS" suffix stays within 128.
-                      maxLength: 112
-                      pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
-                    schemaOnly:
-                      <<: *TypeStringBool
-                      description: "Back up table/database definitions only (no data)"
-                    replicaSelection:
-                      type: string
-                      description: |
-                        Which replicas to back up.
-                        FirstPerShard (default) backs up one replica per shard, which is enough for Replicated* tables.
-                        AllReplicas backs up every replica; use it when the cluster holds non-replicated tables.
-                      enum:
-                        - FirstPerShard
-                        - AllReplicas
-                    tables:
-                      type: string
-                      description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated. Empty backs up every table"
-                      maxLength: 1024
-                      pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
-                    partitions:
-                      type: array
-                      description: "Optional partition ids to back up (clickhouse-backup --partitions)"
-                      nullable: true
-                      items:
-                        type: string
-                        pattern: "^[A-Za-z0-9_-]{1,128}$"
-                    activeDeadlineSeconds:
-                      type: integer
-                      format: int64
-                      minimum: 1
-                      description: "How long each backup Job may run before it is stopped and the run fails. Defaults to 24 hours"
+                schemaOnly:
+                  <<: *TypeStringBool
+                  description: "Back up table/database definitions only (no data)"
+                replicaSelection:
+                  type: string
+                  description: |
+                    Which replicas to back up.
+                    FirstPerShard (default) backs up one replica per shard, which is enough for Replicated* tables.
+                    AllReplicas backs up every replica; use it when the cluster holds non-replicated tables.
+                  enum:
+                    - FirstPerShard
+                    - AllReplicas
+                tables:
+                  type: string
+                  description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated. Empty backs up every table"
+                  maxLength: 1024
+                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                partitions:
+                  type: array
+                  description: "Optional partition ids to back up (clickhouse-backup --partitions)"
+                  nullable: true
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z0-9_-]{1,128}$"
+                activeDeadlineSeconds:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  description: "How long each backup Job may run before it is stopped and the run fails. Defaults to 24 hours"
+                backupNamePrefix:
+                  type: string
+                  description: |
+                    Prefix of the backup names; each run appends the UTC time it was due. Retention only
+                    ever prunes backups named with this prefix and such a time. Defaults to
+                    "<namespace>-<installation>-<schedule>", shortened with a hash when longer. At most
+                    112 characters, so the name with its "-YYYYMMDD-HHMMSS" suffix stays within 128.
+                    Can be set once and is immutable after, as a changed prefix would leave the backups of the
+                    former series unpruned. Set later, it replaces the default prefix the same way: meant for a
+                    schedule that has not run yet, such as one held for a recovery
+                  maxLength: 112
+                  pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
                 retention:
                   type: object
                   description: |
@@ -6916,7 +6921,7 @@ data:
     #   CH_PASSWORD_PLAIN=
     #   CH_CREDENTIALS_SECRET_NAMESPACE=
     #   CH_CREDENTIALS_SECRET_NAME=clickhouse-operator
-    #   VERBOSITY=1
+    #   VERBOSITY=2
     
     ################################################
     ##
@@ -7602,7 +7607,7 @@ data:
     logger:
       logtostderr: "true"
       alsologtostderr: "false"
-      v: "1"
+      v: "2"
       stderrthreshold: ""
       vmodule: ""
       log_backtrace_at: ""
