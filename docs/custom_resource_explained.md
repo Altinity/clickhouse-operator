@@ -603,7 +603,7 @@ with additional sections, such as:
 
 **`zone`** and **`podDistribution`** together define zoned layout of ClickHouse instances over nodes. Internally it is a shortcut to `affinity.nodeAffinity` and `affinity.podAntiAffinity` properly filled.
 
-Example - how to place ClickHouse instances in AWS `us-east-1a` availability zone with one ClickHouse per host 
+Example - how to place ClickHouse instances in AWS `us-east-1a` availability zone, ensuring Pods from the same ClickHouse cluster are scheduled on different Kubernetes nodes. 
 ```yaml
         zone:
           values:
@@ -611,7 +611,7 @@ Example - how to place ClickHouse instances in AWS `us-east-1a` availability zon
         podDistribution:
           - type: ClickHouseAntiAffinity
 ```
-Example - how to place ClickHouse instances on nodes labeled as `clickhouse=allow` with one ClickHouse per host 
+Example - how to place ClickHouse instances on nodes labeled `clickhouse=allow`, preventing Pods from the same ClickHouse cluster from sharing a Kubernetes node. 
 ```yaml
         zone:
           key: "clickhouse"
