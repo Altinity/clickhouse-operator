@@ -52,9 +52,6 @@ const (
 	PodDistributionScopeNamespace = "Namespace"
 	// No Pods can co-exist on one node
 	PodDistributionScopeGlobal = "Global"
-
-	// Deprecated value
-	PodDistributionOnePerHost = "OnePerHost"
 )
 
 // Possible port distributions
@@ -80,7 +77,6 @@ var podDistributionTypes = []string{
 	PodDistributionPreviousTailAffinity,
 	PodDistributionMaxNumberPerNode,
 	PodDistributionCircularReplication,
-	PodDistributionOnePerHost,
 }
 
 // podDistributionScopes enumerates every recognized PodDistribution.Scope value in canonical (humped) form.

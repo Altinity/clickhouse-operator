@@ -574,10 +574,11 @@ with additional sections, such as:
         #  values:
         #    - "us-east-1a"
 
-        # Possible values for distribution are:
+        # Possible values for podDistribution are:
         # Unspecified
-        # OnePerHost
-        distribution: "Unspecified"
+        # ClickHouseAntiAffinity
+        podDistribution:
+          - type: ClickHouseAntiAffinity
 
         # type PodSpec struct {} from k8s.io/core/v1
         spec:
@@ -598,24 +599,26 @@ with additional sections, such as:
 `.spec.templates.podTemplates` represents [Pod Templates][pod-templates] 
 with additional sections, such as:
 1. `zone`
-1. `distribution`
+1. `podDistribution`
 
-**`zone`** and **`distribution`** together define zoned layout of ClickHouse instances over nodes. Internally it is a shortcut to `affinity.nodeAffinity` and `affinity.podAntiAffinity` properly filled.
+**`zone`** and **`podDistribution`** together define zoned layout of ClickHouse instances over nodes. Internally it is a shortcut to `affinity.nodeAffinity` and `affinity.podAntiAffinity` properly filled.
 
-Example - how to place ClickHouse instances in AWS `us-east-1a` availability zone with one ClickHouse per host 
+Example - how to place ClickHouse instances in AWS `us-east-1a` availability zone, ensuring Pods from the same ClickHouse cluster are scheduled on different Kubernetes nodes. 
 ```yaml
         zone:
           values:
             - "us-east-1a"
-        distribution: "OnePerHost"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
 ```
-Example - how to place ClickHouse instances on nodes labeled as `clickhouse=allow` with one ClickHouse per host 
+Example - how to place ClickHouse instances on nodes labeled `clickhouse=allow`, preventing Pods from the same ClickHouse cluster from sharing a Kubernetes node. 
 ```yaml
         zone:
           key: "clickhouse"
           values:
             - "allow"
-        distribution: "OnePerHost"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
 ```
 
 [custom-resource]: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
