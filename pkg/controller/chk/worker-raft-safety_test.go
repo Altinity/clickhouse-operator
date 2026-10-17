@@ -399,6 +399,45 @@ func TestPrepareStsReconcileOptsWaitSection(t *testing.T) {
 		}
 	})
 
+	t.Run("1→3 staged join waits Ready", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		added := hostAtOnCR(cr, 1)
+		added.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+
+		opts := w.prepareStsReconcileOptsWaitSection(added, nil, false)
+		require.True(t, opts.WaitUntilReady(),
+			"a 1→3 join is published alone then must become Ready before the next STS is created")
+		require.True(t, opts.WaitUntilStarted())
+	})
+
+	t.Run("interrupted 1→3 joiner still waits Ready after STS status is Same", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		joiner := hostAtOnCR(cr, 1)
+		require.False(t, joiner.HasAncestor(), "host 1 is absent from the 1-host ancestor")
+		// Production: PrepareHostStatefulSetWithStatus overwrites Requested once the
+		// joiner STS exists (cancelled Ready wait, operator restart).
+		joiner.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
+
+		require.True(t, hostIsStagedScaleUpJoin(joiner),
+			"staged-join identity is topological, not ObjectStatusRequested")
+		opts := w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
+		require.True(t, opts.WaitUntilReady(),
+			"retry must still wait Ready so the next STS is not created while only the original member is Ready")
+	})
+
+	t.Run("staged join waits Ready even when readiness is false", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		joiner := hostAtOnCR(cr, 1)
+		joiner.GetCluster().GetReconcile().Host.Wait.Probes.Readiness = types.NewStringBool(false)
+
+		opts := w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
+		require.True(t, opts.WaitUntilReady(),
+			"staged-join Ready wait is a Raft serialize-creates gate, not an optional probe")
+	})
+
 	t.Run("single-host post-restart still waits Ready", func(t *testing.T) {
 		w.countReadyEnsembleMembersFn = func(context.Context, api.ICustomResource) int { return 0 }
 		host := hostOnCR(chkWithAncestorHosts(1))
@@ -684,6 +723,86 @@ func TestUpscaleFromSingleMemberClassifiesAsBootstrap(t *testing.T) {
 	require.False(t, snap.rolling,
 		"1->3 must classify bootstrap: a rolling pass waits for a Ready that needs a peer it has not created yet")
 	require.Equal(t, 3, snap.members, "a 1-member ancestor cannot lose a member, so sizing falls back to the desired set")
+}
+
+func TestStageUncommittedScaleUpHosts(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("1→3 excludes only hosts whose STS is absent", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		h0 := hostAtOnCR(cr, 0)
+		h1 := hostAtOnCR(cr, 1)
+		h2 := hostAtOnCR(cr, 2)
+		h1.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+		h2.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+
+		fake := newRaftFakeSTS()
+		fake.setReady(h0, 1)
+		w := raftWorkerWithSTS(fake)
+		w.a = a.NewAnnouncer(nil, nil)
+		require.NoError(t, w.stageUncommittedScaleUpHosts(ctx, cr))
+
+		require.False(t, h0.GetReconcileAttributes().IsExclude())
+		require.True(t, h1.GetReconcileAttributes().IsExclude(), "new host without STS must be staged")
+		require.True(t, h2.GetReconcileAttributes().IsExclude(), "new host without STS must be staged")
+	})
+
+	t.Run("does not re-exclude a new host that already has an STS", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		h1 := hostAtOnCR(cr, 1)
+		h1.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+
+		fake := newRaftFakeSTS()
+		fake.setReady(h1, 0)
+		w := raftWorkerWithSTS(fake)
+		w.a = a.NewAnnouncer(nil, nil)
+		require.NoError(t, w.stageUncommittedScaleUpHosts(ctx, cr))
+
+		require.False(t, h1.GetReconcileAttributes().IsExclude(),
+			"an interrupted pass must not roll back a member whose STS already exists")
+	})
+
+	t.Run("fresh bootstrap is not staged", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		h0 := hostAtOnCR(cr, 0)
+		h0.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+		w := raftWorkerWithSTS(newRaftFakeSTS())
+		w.a = a.NewAnnouncer(nil, nil)
+		require.NoError(t, w.stageUncommittedScaleUpHosts(ctx, cr))
+		require.False(t, h0.GetReconcileAttributes().IsExclude())
+	})
+
+	t.Run("3→5 is not staged", func(t *testing.T) {
+		cr := chkWithHosts(5)
+		cr.SetAncestor(chkWithHosts(3))
+		h3 := hostAtOnCR(cr, 3)
+		h3.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+		w := raftWorkerWithSTS(newRaftFakeSTS())
+		w.a = a.NewAnnouncer(nil, nil)
+		require.NoError(t, w.stageUncommittedScaleUpHosts(ctx, cr))
+		require.False(t, h3.GetReconcileAttributes().IsExclude(),
+			"3→N is outside this staging pass; existing members must roll first")
+	})
+
+	t.Run("STS get error fails closed", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		h1 := hostAtOnCR(cr, 1)
+		h2 := hostAtOnCR(cr, 2)
+		h1.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+		h2.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+
+		fake := newRaftFakeSTS()
+		fake.err = errors.New("apiserver timeout")
+		w := raftWorkerWithSTS(fake)
+		w.a = a.NewAnnouncer(nil, nil)
+		require.Error(t, w.stageUncommittedScaleUpHosts(ctx, cr))
+		require.False(t, h1.GetReconcileAttributes().IsExclude(),
+			"unknown STS state must not publish an expanded membership")
+		require.False(t, h2.GetReconcileAttributes().IsExclude())
+	})
 }
 
 // TestDegradedUpscaleKeepsGateArmed pins the growth direction against the unsafe half.
