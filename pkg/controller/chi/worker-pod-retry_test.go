@@ -26,8 +26,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	commonlabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 // pod is a small builder for a Pod with one container and the given readiness flag.
@@ -89,41 +87,6 @@ func TestIsPodNotReadyToReadyTransition(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			got := isPodNotReadyToReadyTransition(tc.old, tc.new)
-			require.Equal(t, tc.expected, got)
-		})
-	}
-}
-
-func podWithOperatorReadyLabel(cr *api.ClickHouseInstallation, ready bool) *core.Pod {
-	l := chiLabeler.New(cr)
-	labels := map[string]string{
-		l.Get(commonlabeler.LabelReadyName): l.Get(commonlabeler.LabelReadyValueNotReady),
-	}
-	if ready {
-		labels[l.Get(commonlabeler.LabelReadyName)] = l.Get(commonlabeler.LabelReadyValueReady)
-	}
-	return &core.Pod{ObjectMeta: meta.ObjectMeta{Labels: labels}}
-}
-
-// TestIsPodOperatorReadyLabelNotReadyToReadyTransition verifies the service-label gate
-// used by recoverAbortedReconcileOnPodReady.
-func TestIsPodOperatorReadyLabelNotReadyToReadyTransition(t *testing.T) {
-	cr := &api.ClickHouseInstallation{
-		ObjectMeta: meta.ObjectMeta{Name: "chi", Namespace: "ns"},
-	}
-	tests := []struct {
-		name     string
-		old, new *core.Pod
-		expected bool
-	}{
-		{"nil old", nil, podWithOperatorReadyLabel(cr, true), false},
-		{"no → yes (target case)", podWithOperatorReadyLabel(cr, false), podWithOperatorReadyLabel(cr, true), true},
-		{"yes → yes", podWithOperatorReadyLabel(cr, true), podWithOperatorReadyLabel(cr, true), false},
-		{"kubelet ready but label still no", pod(false), pod(true), false},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := isPodOperatorReadyLabelNotReadyToReadyTransition(tc.old, tc.new, cr)
 			require.Equal(t, tc.expected, got)
 		})
 	}

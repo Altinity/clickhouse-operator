@@ -26,8 +26,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
-	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	commonlabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
@@ -54,22 +52,27 @@ var normalizeTimeAbortReasons = []string{
 }
 
 // recoverAbortedReconcileOnPodReady inspects a pod update event and re-enqueues the parent
-// CHI for reconcile when the pod's operator "ready" service label transitions to Ready and the CHI is Aborted.
+// CHI for reconcile when the pod transitioned NotReady → Ready and the CHI is Aborted.
 // Controlled by reconcile.recovery.onStatus.aborted.onPodReady config option (default: retry).
 // The decision to re-enqueue is based on the CHI's Status alone, not on ActionPlan —
 // see shouldTriggerAutoRecovery for the rationale.
+//
+// Peer-safety during the recovery reconcile itself is enforced by
+// isHostHealthyForReconcile, which requires clickhouse.altinity.com/ready=yes so a
+// container-Ready but Service-excluded replica cannot authorize disruption of its
+// last eligible sibling (#2106).
 func (w *worker) recoverAbortedReconcileOnPodReady(ctx context.Context, oldPod, newPod *core.Pod) {
 	if !chop.Config().ShouldRecoverAbortedOnPodReady() {
+		return
+	}
+
+	if !isPodNotReadyToReadyTransition(oldPod, newPod) {
 		return
 	}
 
 	// Reverse-lookup parent CHI via the clickhouse.altinity.com/chi label.
 	cr, err := w.c.GetCR(&newPod.ObjectMeta)
 	if err != nil || cr == nil {
-		return
-	}
-
-	if !isPodOperatorReadyLabelNotReadyToReadyTransition(oldPod, newPod, cr) {
 		return
 	}
 
@@ -81,7 +84,7 @@ func (w *worker) recoverAbortedReconcileOnPodReady(ctx context.Context, oldPod, 
 	w.a.V(1).M(cr).F().
 		WithEvent(cr, a.EventActionReconcile, a.EventReasonAutoRecoveryTriggered).
 		Info(
-			"Auto-recovery: pod %s operator-ready label became Yes while CHI %s/%s is Aborted — re-enqueuing reconcile",
+			"Auto-recovery: pod %s became Ready while CHI %s/%s is Aborted — re-enqueuing reconcile",
 			newPod.Name, cr.Namespace, cr.Name,
 		)
 	metrics.CRAutoRecoveriesTriggered(ctx, cr)
@@ -145,31 +148,6 @@ func isPodNotReadyToReadyTransition(oldPod, newPod *core.Pod) bool {
 	wasNotReady := k8s.PodHasNotReadyContainers(oldPod)
 	isReadyNow := !k8s.PodHasNotReadyContainers(newPod)
 	return wasNotReady && isReadyNow
-}
-
-func podHasOperatorServiceReadyLabel(pod *core.Pod, cr *api.ClickHouseInstallation) bool {
-	if pod == nil || cr == nil {
-		return false
-	}
-	l := chiLabeler.New(cr)
-	labels := pod.GetLabels()
-	if labels == nil {
-		return false
-	}
-	return labels[l.Get(commonlabeler.LabelReadyName)] == l.Get(commonlabeler.LabelReadyValueReady)
-}
-
-// isPodOperatorReadyLabelNotReadyToReadyTransition reports whether the operator's
-// clickhouse.altinity.com/ready service selector label transitioned to "yes".
-// Kubelet container readiness alone is not sufficient: aborted reconciles can leave
-// a pod excluded from the chop-generated Service while containers are already Ready.
-func isPodOperatorReadyLabelNotReadyToReadyTransition(oldPod, newPod *core.Pod, cr *api.ClickHouseInstallation) bool {
-	if oldPod == nil || newPod == nil || cr == nil {
-		return false
-	}
-	wasReady := podHasOperatorServiceReadyLabel(oldPod, cr)
-	isReadyNow := podHasOperatorServiceReadyLabel(newPod, cr)
-	return !wasReady && isReadyNow
 }
 
 // recoverCompletedReconcileOnPodNotReady is the symmetric counterpart of
