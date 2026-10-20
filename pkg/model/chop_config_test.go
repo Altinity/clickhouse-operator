@@ -351,6 +351,38 @@ func TestServerSettingsRestartAdviceHasPriorityOverPolicy(t *testing.T) {
 	})
 }
 
+func TestIsServerSettingsChanged(t *testing.T) {
+	t.Run("unchanged", func(t *testing.T) {
+		host := hostWithZKAndSettings(nil, nil, nil, nil)
+		if IsServerSettingsChanged(host) {
+			t.Fatal("unchanged settings must not be reported as changed")
+		}
+	})
+
+	t.Run("global setting", func(t *testing.T) {
+		host := settingChange("max_concurrent_queries", "10", "20")
+		if !IsServerSettingsChanged(host) {
+			t.Fatal("a global server setting edit must be reported as changed")
+		}
+	})
+
+	t.Run("local setting", func(t *testing.T) {
+		host := hostWithZKAndSettings(nil, nil, nil, nil)
+		host.GetAncestor().Settings = api.NewSettings().SetScalarsFromMap(map[string]string{"max_thread_pool_size": "1000"})
+		host.Settings = api.NewSettings().SetScalarsFromMap(map[string]string{"max_thread_pool_size": "2000"})
+		if !IsServerSettingsChanged(host) {
+			t.Fatal("a local server setting edit must be reported as changed")
+		}
+	})
+
+	t.Run("zookeeper only", func(t *testing.T) {
+		host := hostWithZKAndSettings(nil, zkConfig("zk-0"), nil, nil)
+		if IsServerSettingsChanged(host) {
+			t.Fatal("a ZooKeeper edit is not a server setting change")
+		}
+	})
+}
+
 func TestNewServerSettingsRestartAdvice(t *testing.T) {
 	advice := NewServerSettingsRestartAdvice(
 		[]string{"hot", "cold", "odd", ""},

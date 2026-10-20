@@ -294,6 +294,30 @@ const (
 	configurationRestartPolicyRulesSectionZookeeper = "zookeeper"
 )
 
+// IsServerSettingsChanged reports whether global or local server settings differ from the ancestor.
+// Profiles, quotas, files and ZooKeeper are not server settings.
+func IsServerSettingsChanged(host *api.Host) bool {
+	if host == nil {
+		return false
+	}
+	var oldGlobal, newGlobal *api.Settings
+	if host.HasAncestorCR() {
+		oldGlobal = host.GetAncestorCR().GetSpec().GetConfiguration().GetSettings()
+	}
+	if host.HasCR() {
+		newGlobal = host.GetCR().GetSpec().GetConfiguration().GetSettings()
+	}
+	if _, equal := messagediff.DeepDiff(oldGlobal, newGlobal); !equal {
+		return true
+	}
+	var oldLocal *api.Settings
+	if host.HasAncestor() {
+		oldLocal = host.GetAncestor().GetSettings()
+	}
+	_, equal := messagediff.DeepDiff(oldLocal, host.Settings)
+	return !equal
+}
+
 // IsConfigurationChangeRequiresReboot checks whether configuration changes requires a reboot.
 // advice carries system.server_settings.changeable_without_restart when that column exists.
 // The zero advice leaves the decision to configurationRestartPolicy.

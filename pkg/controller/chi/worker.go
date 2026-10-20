@@ -186,7 +186,7 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
 		return true
 
-	case model.IsConfigurationChangeRequiresReboot(host, w.serverSettingsRestartAdvice(ctx, host)):
+	case w.configurationChangeRequiresReboot(ctx, host):
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 
@@ -211,9 +211,19 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 	}
 }
 
+// configurationChangeRequiresReboot reports whether a configuration change requires a restart.
+// ClickHouse is asked for changeable_without_restart only when server settings differ.
+func (w *worker) configurationChangeRequiresReboot(ctx context.Context, host *api.Host) bool {
+	advice := model.ServerSettingsRestartAdvice{}
+	if model.IsServerSettingsChanged(host) {
+		advice = w.serverSettingsRestartAdvice(ctx, host)
+	}
+	return model.IsConfigurationChangeRequiresReboot(host, advice)
+}
+
 // serverSettingsRestartAdvice asks this host whether system.server_settings has
 // changeable_without_restart and, when it does, what that column says.
-// A query failure leaves the restart decision to configurationRestartPolicy.
+// A query failure leaves the decision to configurationRestartPolicy.
 func (w *worker) serverSettingsRestartAdvice(ctx context.Context, host *api.Host) model.ServerSettingsRestartAdvice {
 	if util.IsContextDone(ctx) || host == nil {
 		return model.ServerSettingsRestartAdvice{}
