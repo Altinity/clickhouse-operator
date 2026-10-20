@@ -64,6 +64,7 @@ spec:
 ### Macros
 Operator provides set of [macros][macros], which are:
  1. `{installation}` -- ClickHouse Installation name
+ 1. `{namespace}` -- namespace of the ClickHouse Installation
  1. `{cluster}` -- primary cluster name
  1. `{replica}` -- replica name in the cluster, maps to pod service name
  1. `{shard}` -- shard id

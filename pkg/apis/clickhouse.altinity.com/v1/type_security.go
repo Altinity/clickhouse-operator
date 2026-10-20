@@ -15,6 +15,9 @@
 package v1
 
 import (
+	"errors"
+	"fmt"
+
 	core "k8s.io/api/core/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -553,6 +556,20 @@ func (s *OperatorConfigSecurity) GetFIPS() *OperatorConfigSecurityFIPS {
 		return nil
 	}
 	return s.FIPS
+}
+
+// ErrInvalidFIPSEnforced is returned when security.fips.enforced holds a value that is no boolean.
+var ErrInvalidFIPSEnforced = errors.New("FIPS: chopconf security.fips.enforced is not a boolean")
+
+// Validate refuses an enforced value that is no boolean, nil-safe. Read as off, such a value would run the binary
+// without the FIPS module the configuration means to ask for: neither the configuration file nor the CRD schema of
+// the configuration restricts the value of an on/off field, so the gate fails closed instead. An empty value counts
+// as unset.
+func (f *OperatorConfigSecurityFIPS) Validate() error {
+	if (f == nil) || (f.Enforced.String() == "") || f.Enforced.IsValid() {
+		return nil
+	}
+	return fmt.Errorf("%w: %q — set security.fips.enforced=true or security.fips.enforced=false", ErrInvalidFIPSEnforced, f.Enforced.String())
 }
 
 // IsEnforced reports whether security.fips.enforced=true is configured.

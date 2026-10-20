@@ -38,7 +38,6 @@ operator_version = (
 )
 operator_namespace = os.getenv("OPERATOR_NAMESPACE") if "OPERATOR_NAMESPACE" in os.environ else test_namespace
 operator_install = os.getenv("OPERATOR_INSTALL") if "OPERATOR_INSTALL" in os.environ else "yes"
-minio_namespace = os.getenv("MINIO_NAMESPACE") if "MINIO_NAMESPACE" in os.environ else "minio"
 operator_docker_repo = (
     os.getenv("OPERATOR_DOCKER_REPO") if "OPERATOR_DOCKER_REPO" in os.environ else "altinity/clickhouse-operator"
 )
@@ -67,8 +66,6 @@ keeper_type = os.getenv("KEEPER_TYPE") if "KEEPER_TYPE" in os.environ else "zook
 prometheus_namespace = "prometheus"
 prometheus_operator_version = "0.78.1"
 prometheus_scrape_interval = 5
-
-minio_version = "latest"
 
 no_cleanup = os.environ.get("NO_CLEANUP", "").lower() in ("1", "true", "yes")
 

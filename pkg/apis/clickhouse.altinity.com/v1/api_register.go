@@ -45,6 +45,12 @@ func init() {
 		&ClickHouseInstallationTemplateList{},
 		&ClickHouseOperatorConfiguration{},
 		&ClickHouseOperatorConfigurationList{},
+		&ClickHouseBackup{},
+		&ClickHouseBackupList{},
+		&ClickHouseBackupSchedule{},
+		&ClickHouseBackupScheduleList{},
+		&ClickHouseRestore{},
+		&ClickHouseRestoreList{},
 	)
 }
 

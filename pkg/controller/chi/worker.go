@@ -37,6 +37,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
@@ -44,7 +45,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
-	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -217,11 +217,11 @@ func (w *worker) isImageChangeRequested(host *api.Host) bool {
 	if host.Runtime.CurStatefulSet == nil || host.Runtime.DesiredStatefulSet == nil {
 		return false
 	}
-	curContainer, ok := k8s.StatefulSetContainerGet(host.Runtime.CurStatefulSet, config.ClickHouseContainerName, 0)
+	curContainer, ok := chiCreator.StatefulSetContainerGetClickHouse(host.Runtime.CurStatefulSet)
 	if !ok {
 		return false
 	}
-	desiredContainer, ok := k8s.StatefulSetContainerGet(host.Runtime.DesiredStatefulSet, config.ClickHouseContainerName, 0)
+	desiredContainer, ok := chiCreator.StatefulSetContainerGetClickHouse(host.Runtime.DesiredStatefulSet)
 	if !ok {
 		return false
 	}

@@ -1,0 +1,321 @@
+# Template Parameters:
+#
+# OPERATOR_VERSION=0.28.0
+#
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhousebackups.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.28.0
+spec:
+  group: clickhouse.altinity.com
+  scope: Namespaced
+  names:
+    kind: ClickHouseBackup
+    singular: clickhousebackup
+    plural: clickhousebackups
+    shortNames:
+      - chb
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: installation
+          type: string
+          description: Target ClickHouseInstallation
+          jsonPath: .spec.clickHouseInstallation
+        - name: schedule
+          type: string
+          description: ClickHouseBackupSchedule whose backup this one makes once
+          jsonPath: .spec.scheduleRef.name
+        - name: cluster
+          type: string
+          description: Target cluster, empty means every backup-enabled cluster
+          jsonPath: .spec.cluster
+          priority: 1
+        - name: scheduled
+          type: string
+          description: Time the backup is due at, empty for when it is created
+          jsonPath: .spec.scheduledTime
+          priority: 1
+        - name: backup
+          type: string
+          description: Backup name
+          jsonPath: .status.backupName
+        - name: phase
+          type: string
+          description: Backup phase
+          jsonPath: .status.phase
+        - name: duration
+          type: integer
+          description: Backup duration (seconds)
+          jsonPath: .status.durationSeconds
+        - name: age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          description: |
+            EXPERIMENTAL. ClickHouseBackup defines a one-off backup of a ClickHouseInstallation.
+            The operator runs one Job per backup-enabled cluster it targets, each driving the
+            clickhouse-backup sidecar it injects into the cluster (see ClickHouseInstallation
+            spec.backup), creating and uploading a backup under one name. The API may change
+            in a future release.
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              x-kubernetes-validations:
+                - rule: "has(self.clickHouseInstallation) != has(self.scheduleRef)"
+                  message: "exactly one of clickHouseInstallation and scheduleRef is required"
+                - rule: "(has(self.clickHouseInstallation) ? self.clickHouseInstallation : '') == (has(oldSelf.clickHouseInstallation) ? oldSelf.clickHouseInstallation : '') && (has(self.scheduleRef) ? self.scheduleRef.name : '') == (has(oldSelf.scheduleRef) ? oldSelf.scheduleRef.name : '') && (has(self.cluster) ? self.cluster : '') == (has(oldSelf.cluster) ? oldSelf.cluster : '')"
+                  message: "clickHouseInstallation, scheduleRef and cluster are immutable; create a new resource"
+                # schemaOnly takes any value a StringBool does, which CEL cannot type: the operator refuses it
+                - rule: "!has(self.scheduleRef) || !(has(self.replicaSelection) || has(self.tables) || has(self.partitions) || has(self.activeDeadlineSeconds))"
+                  message: "a backup that runs a schedule takes its options from it: replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef"
+                - rule: "!has(self.scheduleRef) || (has(self.backupName) ? self.backupName : '') == ''"
+                  message: "a backup that runs a schedule is named with the schedule's backupNamePrefix: backupName is not set with scheduleRef"
+                - rule: "!has(self.backupName) || !self.backupName.matches('-[0-9]{8}-[0-9]{6}$')"
+                  message: "backupName must not end like the backups of a schedule, -YYYYMMDD-HHMMSS, which the retention of a schedule of that prefix would prune"
+              properties:
+                clickHouseInstallation:
+                  type: string
+                  minLength: 1
+                  maxLength: 253
+                  description: "Name of the target ClickHouseInstallation in the same namespace. Exactly one of it and scheduleRef is set. Immutable"
+                scheduleRef:
+                  type: object
+                  description: |
+                    ClickHouseBackupSchedule in the same namespace whose backup this one makes once, now or at scheduledTime: the
+                    installation, the backup options, the backupNamePrefix and, unless cluster narrows them to one, the clusters
+                    are the schedule's, as they are when the backup is validated. The backup is named with that prefix,
+                    never with backupName, and stays out of the schedule's retention.
+                    Exactly one of it and clickHouseInstallation is set. Immutable
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                      minLength: 1
+                      maxLength: 253
+                      description: "Name of the ClickHouseBackupSchedule"
+                cluster:
+                  type: string
+                  description: "Optional cluster of the ClickHouseInstallation to back up. Empty backs up every backup-enabled cluster, each in a Job of its own, under one backup name; with scheduleRef, every cluster the schedule backs up. Immutable"
+                  # Mirrors the ClickHouseInstallation cluster name constraint
+                  maxLength: 15
+                  pattern: "^[a-zA-Z0-9-]{0,15}$"
+                backupName: &TypeBackupName
+                  type: string
+                  description: |
+                    Optional explicit backup name, which must not end like the backups of a schedule (-YYYYMMDD-HHMMSS).
+                    Generated from the resource name and the time the backup is due when empty. Not set with scheduleRef,
+                    whose backup is named with the schedule's backupNamePrefix
+                  maxLength: 128
+                  pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
+                scheduledTime:
+                  type: string
+                  description: |
+                    RFC 3339 time, with its offset, the backup is due at, e.g. 2026-10-20T02:00:00+02:00. Empty makes it due
+                    when it is created. Can be changed until the backup is validated, at that time or later
+                  pattern: '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$'
+                startingDeadlineSeconds:
+                  type: integer
+                  format: int64
+                  minimum: 0
+                  maximum: 2147483647
+                  description: |
+                    How late, counted from the time the backup is due, it may start on a cluster: a cluster whose Job is not
+                    created by then fails, as does the backup when it is not validated by then. Unset waits as long as it takes
+                diffFromRemote:
+                  !!merge <<: *TypeBackupName
+                  description: "Existing backup to take this backup incrementally against (clickhouse-backup --diff-from-remote). The base backup must stay in the backup storage while this backup is kept"
+                verify: &TypeStringBool
+                  description: "Run a verification Job after the backup that downloads it and checks it is restorable, without touching cluster data"
+                  # StringBool is polymorphic — accepts native YAML bool (true/false),
+                  # integer (0/1), or string from the recognized vocabulary.
+                  # See pkg/apis/common/types/string_bool.go (UnmarshalJSON + IsValid).
+                  # Structural-schema rules don't natively support bool|int|string
+                  # union, so we use x-kubernetes-preserve-unknown-fields: true.
+                  x-kubernetes-preserve-unknown-fields: true
+                schemaOnly:
+                  !!merge <<: *TypeStringBool
+                  description: "Back up table/database definitions only (no data)"
+                replicaSelection:
+                  type: string
+                  description: |
+                    Which replicas to back up.
+                    FirstPerShard (default) backs up one replica per shard, which is enough for Replicated* tables.
+                    AllReplicas backs up every replica; use it when the cluster holds non-replicated tables.
+                  enum:
+                    - FirstPerShard
+                    - AllReplicas
+                tables:
+                  type: string
+                  description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated. Empty backs up every table"
+                  maxLength: 1024
+                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                partitions:
+                  type: array
+                  description: "Optional partition ids to back up (clickhouse-backup --partitions)"
+                  nullable: true
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z0-9_-]{1,128}$"
+                activeDeadlineSeconds:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  description: "How long the Job may run before it is stopped and the operation fails. Defaults to 24 hours"
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  description: "Lifecycle phase of the operation"
+                  enum:
+                    - Pending
+                    - Running
+                    - Completed
+                    - Failed
+                backupName:
+                  type: string
+                  description: "Resolved backup name, the same on every cluster"
+                schedule:
+                  type: object
+                  description: |
+                    What a backup that runs a schedule takes from it, recorded anew on every reconcile until the backup is
+                    validated and kept from then on: the backup is made with these, whatever the schedule becomes
+                  properties:
+                    name:
+                      type: string
+                      description: "Name of the ClickHouseBackupSchedule"
+                    generation:
+                      type: integer
+                      format: int64
+                      description: "Generation of the schedule the record was taken of"
+                    clickHouseInstallation:
+                      type: string
+                      description: "ClickHouseInstallation the schedule backs up"
+                    cluster:
+                      type: string
+                      description: "Cluster the backup targets, empty for every cluster the schedule backs up"
+                    backupNamePrefix:
+                      type: string
+                      description: "The schedule's backupNamePrefix, which names the backup"
+                    schemaOnly:
+                      type: string
+                      description: "The schedule's schemaOnly"
+                    replicaSelection:
+                      type: string
+                      description: "The schedule's replicaSelection"
+                    tables:
+                      type: string
+                      description: "The schedule's tables"
+                    partitions:
+                      type: array
+                      nullable: true
+                      description: "The schedule's partitions"
+                      items:
+                        type: string
+                    activeDeadlineSeconds:
+                      type: integer
+                      format: int64
+                      description: "The schedule's activeDeadlineSeconds"
+                clusters:
+                  type: array
+                  description: |
+                    The clusters the backup targets, resolved once it is validated, each run by a Job of its own,
+                    and the state of the backup on each
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - name
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                        description: "Name of the cluster"
+                      phase:
+                        type: string
+                        description: "Lifecycle phase of the backup on the cluster"
+                        enum:
+                          - Pending
+                          - Running
+                          - Completed
+                          - Failed
+                      jobName:
+                        type: string
+                        description: "Job that drives the backup on the cluster"
+                      hosts:
+                        type: array
+                        nullable: true
+                        description: "Hosts of the cluster the Job drives"
+                        items:
+                          type: string
+                      storage:
+                        type: string
+                        description: "Backup storage of the cluster the Job keeps the backup in, or reads it from, as the Job was built"
+                      startTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      completionTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      reason:
+                        type: string
+                        description: "Why the cluster waits, or how the backup went on it, in one word"
+                      message:
+                        type: string
+                        description: "Why the cluster waits, or how the backup went on it"
+                startTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                completionTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                durationSeconds:
+                  type: integer
+                  format: int64
+                conditions:
+                  type: array
+                  nullable: true
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      observedGeneration:
+                        type: integer
+                        format: int64

@@ -51,6 +51,17 @@ func (n *Namer) createPodHostnameRegexp(chi api.ICustomResource, template string
 	return n.macro.Scope(chi).Line(template)
 }
 
+// createBackupAutoSecretName creates name of the Secret where the auto-generated credentials of the
+// operator-managed clickhouse-backup sidecar are kept. Unlike cluster auto secrets it carries no
+// cluster name, so it can not collide with "{cr name}-{cluster name}-auto-secret".
+func createBackupAutoSecretName(cr api.ICustomResource) string {
+	return fmt.Sprintf(
+		// "{cr name}-auto-backup-secret"
+		"%s-auto-backup-secret",
+		cr.GetName(),
+	)
+}
+
 // createClusterAutoSecretName creates Secret name where auto-generated secret is kept
 func createClusterAutoSecretName(cluster api.ICluster) string {
 	if cluster.HasName() {

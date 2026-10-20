@@ -28,7 +28,7 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: Always
-              image: "clickhouse/clickhouse-keeper:25.3"
+              image: "clickhouse/clickhouse-keeper:26.8"
     volumeClaimTemplates:
       - name: data-volume
         spec:

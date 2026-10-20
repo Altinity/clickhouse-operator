@@ -202,14 +202,8 @@ func (cr *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type 
 	}
 
 	// Merge Meta
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta)
-		_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta)
-	case MergeTypeOverrideByNonEmptyValues:
-		_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta, mergo.WithOverride)
-		_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta, mergo.WithOverride)
-	}
+	_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta, MergoOptions(_type)...)
+	_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta, MergoOptions(_type)...)
 	// Exclude skipped annotations
 	cr.SetAnnotations(
 		util.CopyMapFilter(

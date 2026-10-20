@@ -1,0 +1,83 @@
+# test_010087, test_010088
+# Single-node S3 store inside the test namespace, credentials and bucket taken from the
+# storage Secret. pgsty/minio is the community build of MinIO with the same layout as
+# the official image (minio, mc, curl): the official minio/minio and quay.io/minio images no
+# longer pull anonymously.
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+spec:
+  selector:
+    app: test-010087-minio
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: 9000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-010087-minio
+  template:
+    metadata:
+      labels:
+        app: test-010087-minio
+    spec:
+      terminationGracePeriodSeconds: 5
+      containers:
+        - name: minio
+          image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: backup-storage
+                  key: S3_ACCESS_KEY
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backup-storage
+                  key: S3_SECRET_KEY
+            - name: S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: backup-storage
+                  key: S3_BUCKET
+          command:
+            - bash
+            - -c
+          # The bucket is created by the server's own container, so the pod turns Ready only
+          # once the bucket exists - no separate client Job or image.
+          args:
+            - |
+              minio server /data --address :9000 &
+              pid=$!
+              trap 'kill -TERM "${pid}"' TERM INT
+              until mc alias set local http://127.0.0.1:9000 "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" \
+                && mc mb --ignore-existing "local/${S3_BUCKET}"; do
+                sleep 1
+              done
+              touch /tmp/bucket-ready
+              wait "${pid}"
+          ports:
+            - name: s3
+              containerPort: 9000
+          readinessProbe:
+            exec:
+              command:
+                - cat
+                - /tmp/bucket-ready
+            periodSeconds: 2
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}

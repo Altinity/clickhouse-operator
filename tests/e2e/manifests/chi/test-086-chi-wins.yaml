@@ -1,0 +1,32 @@
+# test_010086
+#
+# Declares the same pod template name, user and server setting as
+# manifests/chit/test-086-chi-wins-tpl.yaml, with different values. The CHI's values must win.
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-086-chi-wins
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    clusters:
+      - name: single
+    users:
+      # sha256("chi_password")
+      chi_wins_user/password_sha256_hex: dd8e3b5dff882a94fc45a0501b29068172a1164dfaf6954c9e291b554397385b
+    settings:
+      max_concurrent_queries: 222
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: altinity/clickhouse-server:25.8.28.10001.altinitystable
+              env:
+                - name: TEST_ENV_FROM_CHI
+                  value: TEST_ENV_FROM_CHI_VALUE

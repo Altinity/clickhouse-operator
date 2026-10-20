@@ -1,0 +1,26 @@
+# test_010086
+#
+# Control: the same-named `default` pod template without an image, and no user or setting.
+# Here manifests/chit/test-086-chi-wins-tpl.yaml must fill the gaps, whichever side has priority.
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-086-chi-wins-ctl
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    clusters:
+      - name: single
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-pod
+              env:
+                - name: TEST_ENV_FROM_CHI
+                  value: TEST_ENV_FROM_CHI_VALUE

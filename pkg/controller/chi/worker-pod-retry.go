@@ -49,6 +49,8 @@ var normalizeTimeAbortReasons = []string{
 	api.StatusReasonRootCASecretUnresolved,
 	api.StatusReasonFIPSImagePolicyViolation,
 	api.StatusReasonRemovedSecretRefSyntax,
+	api.StatusReasonInvalidPodTemplate,
+	api.StatusReasonInvalidBackupStorage,
 }
 
 // recoverAbortedReconcileOnPodReady inspects a pod update event and re-enqueues the parent

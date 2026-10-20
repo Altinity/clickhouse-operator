@@ -104,7 +104,7 @@ func callGate(target *chi.ClickHouseInstallation) *chi.ClickHouseInstallation {
 	n := New(nil)
 	n.req = NewRequest(nil)
 	n.req.SetTarget(target)
-	n.enforceFIPSImagePolicy()
+	n.enforceFIPSImagePolicy(true)
 	return target
 }
 
@@ -163,7 +163,7 @@ func TestEnforceFIPSImagePolicy(t *testing.T) {
 		n := New(nil)
 		n.req = NewRequest(nil)
 		n.req.SetTarget((*chi.ClickHouseInstallation)(nil))
-		require.NotPanics(t, n.enforceFIPSImagePolicy)
+		require.NotPanics(t, func() { n.enforceFIPSImagePolicy(true) })
 	})
 }
 

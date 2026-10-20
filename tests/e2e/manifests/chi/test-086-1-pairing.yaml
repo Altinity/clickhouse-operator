@@ -1,0 +1,27 @@
+# test_010086_1
+#
+# Extends the same-named `default` pod template of manifests/chit/test-086-1-pairing-tpl.yaml, whose
+# container is named `clickhouse-pod` while this one is `clickhouse`. Both run the same image, so
+# which side wins the image does not matter to the test.
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-086-1-pairing
+spec:
+  useTemplates:
+    - name: test-086-1-pairing-tpl
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    clusters:
+      - name: single
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse
+              image: altinity/clickhouse-server:25.8.28.10001.altinitystable

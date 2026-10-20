@@ -64,6 +64,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 	c.stsSetupPodTemplate(statefulSet, host)
 	c.stsSetupApplication(statefulSet, host)
 	c.stsSetupStorage(statefulSet, host)
+	c.stsSetupBackupContainerStorage(statefulSet, host)
 
 	c.labeler.MakeObjectVersion(statefulSet.GetObjectMeta(), statefulSet)
 

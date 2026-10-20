@@ -60,7 +60,10 @@ F1="${SRC_ROOT}/docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml"
 F2="${SRC_ROOT}/docs/chi-examples/50-CHIT-02-manual-template-with-selector.yaml"
 F3="${SRC_ROOT}/docs/chi-examples/70-chop-config.yaml"
 F4="${SRC_ROOT}/docs/chk-examples/01-simple-1.yaml"
-yq -n -I=2 -o=json ".[0] = load(\"${F1}\") | .[1] = load(\"${F2}\") | .[2] = load(\"${F3}\") | .[3] = load(\"${F4}\")" > "${EXAMPLES_FILE}"
+F5="${SRC_ROOT}/docs/chb-examples/02-backup-once.yaml"
+F6="${SRC_ROOT}/docs/chb-examples/04-backup-schedule.yaml"
+F7="${SRC_ROOT}/docs/chb-examples/06-restore.yaml"
+yq -n -I=2 -o=json ".[0] = load(\"${F1}\") | .[1] = load(\"${F2}\") | .[2] = load(\"${F3}\") | .[3] = load(\"${F4}\") | .[4] = load(\"${F5}\") | .[5] = load(\"${F6}\") | .[6] = load(\"${F7}\")" > "${EXAMPLES_FILE}"
 yq -i ".metadata.annotations.alm-examples = strload(\"${EXAMPLES_FILE}\")" "${CVV_FILE_TEMPLATE}"
 rm "${EXAMPLES_FILE}"
 
@@ -88,6 +91,9 @@ CHI="clickhouseinstallations.clickhouse.altinity.com"
 CHIT="clickhouseinstallationtemplates.clickhouse.altinity.com"
 CONF="clickhouseoperatorconfigurations.clickhouse.altinity.com"
 CHK="clickhousekeeperinstallations.clickhouse-keeper.altinity.com"
+CHB="clickhousebackups.clickhouse.altinity.com"
+CHBS="clickhousebackupschedules.clickhouse.altinity.com"
+CHR="clickhouserestores.clickhouse.altinity.com"
 
 # Build partial .yaml manifest(s)
 MANIFEST_PRINT_CRD="yes" \
@@ -120,6 +126,16 @@ MANIFEST_PRINT_RBAC_NAMESPACED="no" \
 MANIFEST_PRINT_DEPLOYMENT="no" \
 MANIFEST_PRINT_SERVICE_METRICS="no" \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" | yq "select(.metadata.name == \"${CHK}\")" > "${MANIFESTS_DIR}/${CHK}.crd.yaml"
+
+# Backup CRDs: ClickHouseBackup, ClickHouseBackupSchedule, ClickHouseRestore
+for CRD in "${CHB}" "${CHBS}" "${CHR}"; do
+    MANIFEST_PRINT_CRD="yes" \
+    MANIFEST_PRINT_RBAC_CLUSTERED="no" \
+    MANIFEST_PRINT_RBAC_NAMESPACED="no" \
+    MANIFEST_PRINT_DEPLOYMENT="no" \
+    MANIFEST_PRINT_SERVICE_METRICS="no" \
+    "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" | yq "select(.metadata.name == \"${CRD}\")" > "${MANIFESTS_DIR}/${CRD}.crd.yaml"
+done
 
 # TODO
 # Package file not used any more?

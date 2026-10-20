@@ -138,3 +138,23 @@ func (v PVCReclaimPolicy) IsSpecified() bool {
 func (v PVCReclaimPolicy) String() string {
 	return string(v)
 }
+
+// GetName returns template name
+func (s *VolumeClaimTemplate) GetName() string {
+	if s == nil {
+		return ""
+	}
+	return s.Name
+}
+
+// MergeFrom merges volume claim template by k8s strategic-merge semantics, direction decided by merge type
+func (s *VolumeClaimTemplate) MergeFrom(from *VolumeClaimTemplate, _type MergeType) *VolumeClaimTemplate {
+	if from == nil {
+		return s
+	}
+	if s == nil {
+		s = new(VolumeClaimTemplate)
+	}
+	mergeTemplate(s, from, _type)
+	return s
+}

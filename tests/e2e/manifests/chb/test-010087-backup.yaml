@@ -1,0 +1,11 @@
+# test_010087
+# No spec.cluster: every backup-enabled cluster is backed up, by a Job of its own and under one
+# backup name, so the opted-out cluster of the installation must be left out on its own.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackup"
+metadata:
+  name: full-backup
+spec:
+  clickHouseInstallation: test-087-backup
+  backupName: e2e-087-full
+  verify: true

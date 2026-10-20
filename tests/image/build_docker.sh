@@ -19,11 +19,6 @@ MINIKUBE_PRELOADED_TARBALL="preloaded-images-k8s-v18-v${K8S_VERSION}-docker-over
 MINIKUBE_KICBASE_IMAGE=${MINIKUBE_KICBASE_IMAGE:-"gcr.io/k8s-minikube/kicbase:v0.0.42"}
 MINIKUBE_STORAGE_IMAGE=${MINIKUBE_STORAGE_IMAGE:="gcr.io/k8s-minikube/storage-provisioner:v20210514"}
 
-MINIO_IMAGE=${MINIO_IMAGE:="minio/minio:RELEASE.2021-06-17T00-10-46Z"}
-MINIO_CONSOLE_IMAGE=${MINIO_CONSOLE_IMAGE:="minio/console:latest"}
-MINIO_CLIENT_IMAGE=${MINIO_CLIENT_IMAGE:="minio/mc:latest"}
-MINIO_OPERATOR_IMAGE=${MINIO_OPERATOR_IMAGE:="minio/operator:v4.1.3"}
-
 PROMETHEUS_RELOADER_IMAGE=${PROMETHEUS_RELOADER_IMAGE:="quay.io/prometheus-operator/prometheus-config-reloader:v0.68.0"}
 PROMETHEUS_OPERATOR_IMAGE=${PROMETHEUS_OPERATOR_IMAGE:="quay.io/prometheus-operator/prometheus-operator:v0.68.0"}
 PROMETHEUS_IMAGE=${PROMETHEUS_IMAGE:="quay.io/prometheus/prometheus:v2.47.0"}
@@ -52,10 +47,6 @@ ALL_IMAGES=(
   "${OPERATOR_IMAGE_OLD} operator_old"
   "${METRICS_EXPORTER_IMAGE} metrics_exporter"
   "${METRICS_EXPORTER_IMAGE_OLD} metrics_exporter_old"
-  "${MINIO_IMAGE} minio"
-  "${MINIO_CONSOLE_IMAGE} minio_console"
-  "${MINIO_CLIENT_IMAGE} minio_image"
-  "${MINIO_OPERATOR_IMAGE} minio_operator"
   "${PROMETHEUS_RELOADER_IMAGE} prometheus_preloader"
   "${PROMETHEUS_OPERATOR_IMAGE} prometheus_operator"
   "${PROMETHEUS_IMAGE} prometheus"

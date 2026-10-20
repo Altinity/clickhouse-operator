@@ -30,6 +30,7 @@ type Cluster struct {
 	Secure            *types.StringBool `json:"secure,omitempty"            yaml:"secure,omitempty"`
 	Secret            *ClusterSecret    `json:"secret,omitempty"            yaml:"secret,omitempty"`
 	Security          *ClusterSecurity  `json:"security,omitempty"          yaml:"security,omitempty"`
+	Backup            *ClusterBackup    `json:"backup,omitempty"            yaml:"backup,omitempty"`
 	PDBManaged        *types.StringBool `json:"pdbManaged,omitempty"        yaml:"pdbManaged,omitempty"`
 	PDBMaxUnavailable *types.Int32      `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
 	Reconcile         *ClusterReconcile `json:"reconcile,omitempty"         yaml:"reconcile,omitempty"`
@@ -220,7 +221,7 @@ func (cluster *Cluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 	if parentZk == nil {
 		return
 	}
-	cluster.Zookeeper = cluster.Zookeeper.MergeFrom(parentZk, MergeTypeFillEmptyValues)
+	cluster.Zookeeper = cluster.Zookeeper.InheritFrom(parentZk)
 }
 
 // InheritFilesFrom inherits files from CR
@@ -240,6 +241,23 @@ func (cluster *Cluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 
 		return false
 	})
+}
+
+// GetBackup returns the cluster-level Backup block, nil-safe.
+func (c *Cluster) GetBackup() *ClusterBackup {
+	if c == nil {
+		return nil
+	}
+	return c.Backup
+}
+
+// InheritClusterBackupFrom inherits backup settings from the CHI spec into this cluster.
+// Fills only empty fields, so cluster-level overrides win over CHI-level.
+func (cluster *Cluster) InheritClusterBackupFrom(chi *ClickHouseInstallation) {
+	if chi == nil {
+		return
+	}
+	cluster.Backup = cluster.Backup.MergeFrom(chi.Spec.GetBackup(), MergeTypeFillEmptyValues)
 }
 
 // InheritClusterSecurityFrom inherits security knobs from the CHI spec into this
@@ -268,8 +286,8 @@ func (cluster *Cluster) InheritClusterReconcileFrom(chi *ClickHouseInstallation)
 	}
 	reconcile := cluster.GetReconcile()
 	reconcile.Runtime = reconcile.Runtime.MergeFrom(chi.Spec.Reconcile.Runtime, MergeTypeFillEmptyValues)
-	reconcile.StatefulSet = reconcile.StatefulSet.MergeFrom(chi.Spec.Reconcile.StatefulSet)
-	reconcile.Host = reconcile.Host.MergeFrom(chi.Spec.Reconcile.Host)
+	reconcile.StatefulSet = reconcile.StatefulSet.MergeFrom(chi.Spec.Reconcile.StatefulSet, MergeTypeFillEmptyValues)
+	reconcile.Host = reconcile.Host.MergeFrom(chi.Spec.Reconcile.Host, MergeTypeFillEmptyValues)
 	// Inherit CHI-level cluster hooks into this cluster's reconcile.hooks. The merge
 	// is dedup'd (see mergeHookActions) so re-running normalization is idempotent.
 	reconcile.Hooks = reconcile.Hooks.MergeFrom(chi.Spec.Reconcile.Cluster.GetHooks())

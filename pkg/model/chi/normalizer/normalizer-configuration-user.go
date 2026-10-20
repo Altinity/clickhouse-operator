@@ -18,22 +18,89 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
+
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
 )
 
 const envVarNamePrefixConfigurationUsers = "CONFIGURATION_USERS"
+
+// Fields of a user's settings
+const (
+	userFieldProfile               = "profile"
+	userFieldQuota                 = "quota"
+	userFieldPassword              = "password"
+	userFieldPasswordSHA256Hex     = "password_sha256_hex"
+	userFieldPasswordDoubleSHA1Hex = "password_double_sha1_hex"
+	userFieldNetworksIP            = "networks/ip"
+	userFieldNetworksHostRegexp    = "networks/host_regexp"
+)
 
 // removedSecretRefFieldPrefix is the user settings field prefix removed in 0.27.4. It covers
 // `k8s_secret_env_` too, which shares it. The syntax took a namespace/name/key triple and read
 // the Secret with the operator's own ServiceAccount, so it could reach any namespace.
 // Superseded by valueFrom.secretKeyRef, which cannot name a namespace at all.
 const removedSecretRefFieldPrefix = "k8s_secret_"
+
+// ensureBackupUser sets up the user the clickhouse-backup sidecars connect to ClickHouse as. The operator owns
+// it: whatever the CR sets for it, its profile and quota aside, is dropped - another authentication method or
+// network would lock the sidecars out or let the user in from outside the pod.
+//
+// Its password is read from the backup Secret here rather than passed through an env var: users are common for
+// all clusters, so the env var would go into every ClickHouse container of the CR, and enabling backup on one
+// cluster would restart every host. Set as plaintext, the password is replaced by its hash like any user's; it
+// is random, so the hash in the users ConfigMap gives nothing away. Until the Secret is there - the operator
+// creates it before it normalizes the CR for reconcile - the user is left out altogether.
+func (n *Normalizer) ensureBackupUser(users *api.Settings) {
+	password, ok := n.fetchBackupPassword()
+	user := api.NewSettingsUser(users, config.ClickHouseBackupUsername)
+	users.WalkKeysSafe(func(key string, _ *api.Setting) {
+		name, own := strings.CutPrefix(key, user.Name2Key(""))
+		keep := ok && ((name == userFieldProfile) || (name == userFieldQuota))
+		if own && !keep {
+			users.DeleteKey(key)
+		}
+	})
+	if !ok {
+		return
+	}
+
+	user.Set(userFieldPassword, api.NewSettingScalar(password))
+	user.Set(userFieldNetworksIP, api.NewSettingVector(slices.Clone(config.ClickHouseBackupUserNetworksIP)))
+}
+
+// fetchBackupPassword fetches the password of the backup user from the backup Secret, reporting whether there is
+// one. Only a Secret not there yet, or not filled in yet, leaves the user pending: the operator completes the
+// Secret and normalizes anew. A Secret that cannot be read for any other reason aborts the CR, as going on
+// without the user would lock every sidecar out.
+func (n *Normalizer) fetchBackupPassword() (string, bool) {
+	if n.secretGet == nil {
+		return "", false
+	}
+	namespace := n.req.GetTargetNamespace()
+	name := n.namer.Name(interfaces.NameBackupAutoSecret, n.req.GetTarget())
+	secret, err := n.secretGet(namespace, name)
+	switch {
+	case apiErrors.IsNotFound(err):
+		return "", false
+	case err != nil:
+		n.req.GetTarget().EnsureStatus().ReconcileAbortWithReason(
+			api.StatusReasonBackupSecretUnresolved,
+			fmt.Sprintf("backup Secret %s/%s cannot be read: %v", namespace, name, err),
+		)
+		return "", false
+	}
+	password := string(secret.Data[config.ClickHouseBackupSecretKeyClickHousePassword])
+	return password, password != ""
+}
 
 func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
 	n.normalizeConfigurationUserSecretRef(user)
@@ -94,24 +161,24 @@ func (n *Normalizer) rejectRemovedSecretRefField(user *api.SettingsUser, name st
 // normalizeConfigurationUserPassword deals with user passwords
 func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
 	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
-	if user.Has("password_double_sha1_hex") {
-		user.Delete("password_sha256_hex")
-		user.Delete("password")
+	if user.Has(userFieldPasswordDoubleSHA1Hex) {
+		user.Delete(userFieldPasswordSHA256Hex)
+		user.Delete(userFieldPassword)
 		// This is all for this user
 		return
 	}
 
 	// Than by priority goes password_sha256_hex, thus keep it only
-	if user.Has("password_sha256_hex") {
-		user.Delete("password_double_sha1_hex")
-		user.Delete("password")
+	if user.Has(userFieldPasswordSHA256Hex) {
+		user.Delete(userFieldPasswordDoubleSHA1Hex)
+		user.Delete(userFieldPassword)
 		// This is all for this user
 		return
 	}
 
 	// From now on we either have a plaintext password specified (explicitly or via ENV), or no password at all
 
-	if user.Get("password").HasAttributes() {
+	if user.Get(userFieldPassword).HasAttributes() {
 		// Have plaintext password with attributes - means we have plaintext password explicitly specified via ENV var
 		// This is fine
 		// This is all for this user
@@ -120,7 +187,7 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 
 	// From now on we either have plaintext password specified as an explicit string, or no password at all
 
-	passwordPlaintext := user.Get("password").String()
+	passwordPlaintext := user.Get(userFieldPassword).String()
 
 	// Apply default password for password-less non-default users
 	// 1. NB "default" user keeps empty password in here.
@@ -153,10 +220,10 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 	// Password shouldn't be used when ssl_certificate set
 	if !user.Has("ssl_certificates/common_name") {
 		passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-		user.Set("password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+		user.Set(userFieldPasswordSHA256Hex, api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
 		// And keep only one password specification - delete all the rest (if any exists)
-		user.Delete("password_double_sha1_hex")
-		user.Delete("password")
+		user.Delete(userFieldPasswordDoubleSHA1Hex)
+		user.Delete(userFieldPassword)
 	}
 }
 
@@ -189,6 +256,13 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 		quota = ""
 		ips = []string{ip}
 		hostRegexp = ""
+	case config.ClickHouseBackupUsername:
+		// User the clickhouse-backup sidecars connect as - from inside the pod only, never from the default networks.
+		// Without operator-managed backup a user of this name is the installation's own.
+		if n.req.GetTarget().IsBackupEnabled() {
+			ips = slices.Clone(config.ClickHouseBackupUserNetworksIP)
+			hostRegexp = ""
+		}
 	}
 
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
@@ -211,15 +285,15 @@ type userFields struct {
 func setMandatoryUserFields(user *api.SettingsUser, fields *userFields) {
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
 	if fields.profile != "" {
-		user.SetIfNotExists("profile", api.NewSettingScalar(fields.profile))
+		user.SetIfNotExists(userFieldProfile, api.NewSettingScalar(fields.profile))
 	}
 	if fields.quota != "" {
-		user.SetIfNotExists("quota", api.NewSettingScalar(fields.quota))
+		user.SetIfNotExists(userFieldQuota, api.NewSettingScalar(fields.quota))
 	}
 	if len(fields.ips) > 0 {
-		user.Set("networks/ip", api.NewSettingVector(fields.ips).MergeFrom(user.Get("networks/ip")))
+		user.Set(userFieldNetworksIP, api.NewSettingVector(fields.ips).MergeFrom(user.Get(userFieldNetworksIP)))
 	}
 	if fields.hostRegexp != "" {
-		user.SetIfNotExists("networks/host_regexp", api.NewSettingScalar(fields.hostRegexp))
+		user.SetIfNotExists(userFieldNetworksHostRegexp, api.NewSettingScalar(fields.hostRegexp))
 	}
 }

@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -354,4 +355,27 @@ func TestStatusReasonFIPSValidationFailed(t *testing.T) {
 	require.True(t, strings.HasPrefix(s.Errors[0], "[FIPSValidationFailed] "),
 		"reason tag must be at the START of the error (auto-recovery skip prefix-matches): got %q", s.Errors[0])
 	require.Contains(t, s.Errors[0], "ZooKeeper")
+}
+
+// The FIPS switch fails closed: a value of security.fips.enforced that is no boolean - a mistyped word, or a value
+// of another JSON type, which the configuration decodes as written - is refused rather than read as off, which
+// would run the binary without the FIPS module the configuration means to ask for.
+func TestOperatorConfigSecurityFIPSValidate(t *testing.T) {
+	for value, valid := range map[string]bool{
+		`true`: true, `false`: true, `"yes"`: true, `1`: true, `0`: true, `""`: true, `null`: true,
+		`"ture"`: false, `1.5`: false, `[true]`: false, `{"on": true}`: false,
+	} {
+		t.Run(value, func(t *testing.T) {
+			security := &OperatorConfigSecurity{}
+			require.NoError(t, json.Unmarshal([]byte(`{"fips": {"enforced": `+value+`}}`), security))
+			err := security.GetFIPS().Validate()
+			if valid {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, ErrInvalidFIPSEnforced)
+			require.False(t, security.GetFIPS().IsEnforced())
+		})
+	}
+	require.NoError(t, (*OperatorConfigSecurityFIPS)(nil).Validate())
 }

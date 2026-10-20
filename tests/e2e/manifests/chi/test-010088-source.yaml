@@ -1,0 +1,42 @@
+# test_010088
+# The installation the backup is made of. Its default user manages access, so the scenario can
+# create a SQL user and a row policy, which the recovery must bring back.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-088-src"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  backup:
+    enabled: "yes"
+    storages:
+      - name: main
+        secretRef:
+          name: backup-storage
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    users:
+      default/access_management: 1
+    clusters:
+      - name: main
+        layout:
+          shardsCount: 2
+          replicasCount: 1
+  defaults:
+    templates:
+      # The sidecar freezes and restores parts through the data directory, so the data has to
+      # live on a volume both containers mount rather than in the container filesystem.
+      dataVolumeClaimTemplate: default
+  templates:
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

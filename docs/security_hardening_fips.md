@@ -49,6 +49,12 @@ default) or `fips140=on` (escape-hatch). The gate lives in
 symmetrically because the metrics-exporter ships its own copy of the FIPS
 module.
 
+The value takes the forms the operator's other on/off settings take (`true`,
+`false`, `"yes"`, `"on"`, `1`, ...); an empty value counts as unset. Any other
+value — a mistyped word, or one of another type — makes the operator and the
+metrics exporter refuse to start, naming the value, rather than read it as off
+and run without the FIPS gate.
+
 When `true` at startup:
 
 - If `crypto/fips140` reports not-Enabled (binary built without `GOFIPS140`),
@@ -95,12 +101,24 @@ normalizer as a defensive alias but is not documented as a supported value.
 
 ### Detection signals
 
-- **Admission (deploy-time)** — the operator's normalizer inspects each host's
-  resolved PodTemplate `spec.containers[clickhouse].image` (or `keeper` for CHK)
-  for the substring `fips` (case-insensitive) in the TAG portion of the
-  reference. Registry-path substrings don't count. Hosts with no PodTemplate
+- **Admission (deploy-time)** — the operator's normalizer inspects the image of
+  each host's ClickHouse container (or `keeper` for CHK) in its resolved
+  PodTemplate - the one named `clickhouse`, else the first that is none of the
+  operator's sidecars - for the substring `fips` (case-insensitive) in the TAG
+  portion of the reference. Registry-path substrings don't count. Hosts with no PodTemplate
   use the operator default `clickhouse/clickhouse-server:latest` (or the
   Keeper equivalent), which by construction fails Required.
+- **Backup image (deploy-time)** — for a CHI with
+  [operator-managed backup](backup.md), the same tag check applies to the
+  clickhouse-backup sidecar image of every host of a backup-enabled cluster -
+  the image of the `clickhouse-backup` container of the pod template
+  `spec.backup.podTemplate` names, else the default
+  one - which the backup/restore Jobs run as well. The default
+  backup image is not a FIPS build, so `FIPSRequired` needs an explicit
+  FIPS-built image such as `altinity/clickhouse-backup:<version>-fips`. There
+  is no runtime check for it. The FIPS settings do not cover backup traffic:
+  the sidecar REST API stays plain HTTP with basic auth (see the security
+  notes in [backup.md](backup.md)).
 - **Runtime (post-Ready)** — after the host responds to `SELECT version()`,
   the operator checks the reply for the same substring. Altinity FIPS builds
   bake the tag suffix (e.g. `.altinityfips`) into the binary's version
@@ -335,6 +353,12 @@ separate `:<version>`-suffixed FIPS build.
   `image-prod` stage (resolves to `fips140=off` by default). Override at
   container-run time with `-e GODEBUG=fips140=on` (permissive), `=only`
   (strict), `=debug` (logging), or `-e GODEBUG=` (disable entirely).
+  The binaries are built with Go 1.27, which refuses to start when `GODEBUG`
+  sets a compatibility setting Go has removed back to its old value - for
+  example `tlsrsakex=1`, `tls10server=1`, `tls3des=1`, `x509keypairleaf=0`,
+  `asynctimerchan=1` or `x509sha1=1`: the operator and the metrics exporter
+  exit at once with `fatal error: removed GODEBUG ...`. Drop such settings
+  from the Pod env before upgrading.
 - `security.policy` chopconf knob: when `Enforced`, the operator coerces
   every per-component TLS toggle to Strict positions, rejects CHIs that
   cannot be served in a FIPS-compatible posture, and re-registers the
@@ -535,7 +559,7 @@ still planned.
 
 #### What ships per release (automated)
 
-Every tag-push build of `build_branch.yaml` uploads a
+Every version-branch push and every published `release-*` GitHub Release of `build_branch.yaml` uploads a
 `release-evidence-<version>` GitHub Actions artifact containing, for each
 of `clickhouse-operator` and `metrics-exporter`:
 
