@@ -173,6 +173,25 @@ func (s *ClusterSchemer) HostClusterDoesNotExistErrorCount(ctx context.Context, 
 	return s.QueryHostInt(ctx, host, s.sqlClusterDoesNotExistErrorCount())
 }
 
+// HostChangeableWithoutRestart reads system.server_settings.changeable_without_restart.
+// available is false when the column is absent. A query error is returned as-is so the caller
+// can fall back to configurationRestartPolicy without remembering the failure.
+func (s *ClusterSchemer) HostChangeableWithoutRestart(ctx context.Context, host *api.Host) (names []string, values []string, available bool, err error) {
+	count, err := s.QueryHostInt(ctx, host, s.sqlChangeableWithoutRestartColumn())
+	if err != nil || count == 0 {
+		return nil, nil, false, err
+	}
+	names, values, err = s.QueryUnzip2Columns(
+		ctx,
+		s.Names(interfaces.NameFQDNs, host, api.Host{}, false),
+		s.sqlChangeableWithoutRestart(),
+	)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	return names, values, true, nil
+}
+
 // HostClickHouseVersion returns ClickHouse version on the host
 func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *api.Host) (string, error) {
 	return s.QueryHostString(ctx, host, s.sqlVersion())

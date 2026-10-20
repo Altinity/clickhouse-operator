@@ -61,6 +61,11 @@ type worker struct {
 	queue   queue.PriorityQueue
 	schemer *schemer.ClusterSchemer
 
+	// serverSettingsRestartByVersion is system.server_settings.changeable_without_restart,
+	// remembered per ClickHouse version. A version whose column is absent is remembered
+	// too, so each version is asked once.
+	serverSettingsRestartByVersion map[string]model.ServerSettingsRestartAdvice
+
 	normalizer    *normalizer.Normalizer
 	task          *common.Task
 	stsReconciler *statefulset.Reconciler
@@ -186,7 +191,7 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
 		return true
 
-	case model.IsConfigurationChangeRequiresReboot(host):
+	case model.IsConfigurationChangeRequiresReboot(host, w.serverSettingsRestartAdvice(ctx, host)):
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 
@@ -209,6 +214,45 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("Host force restart is not required. Host: %s", host.GetName())
 		return false
 	}
+}
+
+// serverSettingsRestartAdvice asks the host whether system.server_settings has
+// changeable_without_restart and, when it does, what that column says. A query failure
+// leaves the restart decision to configurationRestartPolicy. A definite answer, including
+// "the column is absent", is remembered for that ClickHouse version.
+func (w *worker) serverSettingsRestartAdvice(ctx context.Context, host *api.Host) model.ServerSettingsRestartAdvice {
+	if util.IsContextDone(ctx) || host == nil {
+		return model.ServerSettingsRestartAdvice{}
+	}
+	version := ""
+	if host.Runtime.Version != nil && !host.Runtime.Version.IsUnknown() {
+		version = host.Runtime.Version.Render()
+	}
+	if version != "" {
+		if advice, ok := w.serverSettingsRestartByVersion[version]; ok {
+			return advice
+		}
+	}
+
+	names, values, available, err := w.ensureClusterSchemer(host).HostChangeableWithoutRestart(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("system.server_settings.changeable_without_restart is not usable, configurationRestartPolicy applies. Host: %s err: %v", host.GetName(), err)
+		return model.ServerSettingsRestartAdvice{}
+	}
+	advice := model.ServerSettingsRestartAdvice{}
+	if available {
+		advice = model.NewServerSettingsRestartAdvice(names, values)
+		w.a.V(1).M(host).F().Info("system.server_settings.changeable_without_restart lists %d settings. Host: %s", len(names), host.GetName())
+	} else {
+		w.a.V(1).M(host).F().Info("system.server_settings has no changeable_without_restart column, configurationRestartPolicy applies. Host: %s", host.GetName())
+	}
+	if version != "" {
+		if w.serverSettingsRestartByVersion == nil {
+			w.serverSettingsRestartByVersion = map[string]model.ServerSettingsRestartAdvice{}
+		}
+		w.serverSettingsRestartByVersion[version] = advice
+	}
+	return advice
 }
 
 // isImageChangeRequested reports whether the ClickHouse container image differs between

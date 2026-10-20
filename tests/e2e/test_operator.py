@@ -2370,6 +2370,46 @@ def test_010016(self):
             new_start_time = kubectl.get_clickhouse_start(chi)
             assert start_time == new_start_time
 
+    # test-016-settings-08.yaml
+    # configurationRestartPolicy says settings/* restarts. test_setting is not one of
+    # the "no" exceptions (only max_concurrent_queries is). Where system.server_settings lists it as
+    # changeable without a restart, that column wins and the pod stays up.
+    with When("Change a server setting that ClickHouse reloads without a restart"):
+        test_setting = "max_concurrent_select_queries"
+        has_column = clickhouse.query(
+            chi,
+            "SELECT count() FROM system.columns WHERE (database, table, name) = ('system','server_settings','changeable_without_restart')",
+        )
+        advice = ""
+        if has_column == "1":
+            advice = clickhouse.query(chi, f"SELECT changeable_without_restart FROM system.server_settings WHERE name = '{test_setting}'")
+        if has_column != "1" or advice != "Yes":
+            note(
+                f"{test_setting} is not marked changeable_without_restart = Yes "
+                f"(column={has_column}, advice={advice!r}); configurationRestartPolicy still decides"
+            )
+        else:
+            start_time = kubectl.get_clickhouse_start(chi)
+            kubectl.create_and_check(
+                manifest="manifests/chi/test-016-settings-08.yaml",
+                check={
+                    "do_not_delete": 1,
+                },
+            )
+            with Then("Confirm that the setting is loaded"):
+                out = ""
+                for i in range(1, 10):
+                    out = clickhouse.query(chi, f"SELECT value FROM system.server_settings WHERE name = '{test_setting}'")
+                    if out == "50":
+                        break
+                    retry_sleep(i, 5, f"{test_setting} is {out}, waiting for 50")
+                assert out == "50", error(f"expected {test_setting} = 50, got {out}")
+            with And("ClickHouse SHOULD NOT be restarted"):
+                new_start_time = kubectl.get_clickhouse_start(chi)
+                assert start_time == new_start_time, error(
+                    "changeable_without_restart = Yes must override configurationRestartPolicy settings/*"
+                )
+
     with Finally("I clean up"):
         delete_test_namespace()
 

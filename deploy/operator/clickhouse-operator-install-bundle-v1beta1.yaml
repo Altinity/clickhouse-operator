@@ -7213,7 +7213,9 @@ data:
           - version: "*"
             rules:
               # see https://kb.altinity.com/altinity-kb-setup-and-maintenance/altinity-kb-server-config-files/#server-config-configxml-sections-which-dont-require-restart
-              # to be replaced with "select * from system.server_settings where changeable_without_restart = 'No'"
+              # changeable_without_restart = Yes reloads that server setting even when a rule below says restart.
+              # No does not override a rule that says "no": ClickHouse reports No for every setting it did not
+              # register as live, including the exceptions listed here.
 
               - settings/*: "yes"
 
