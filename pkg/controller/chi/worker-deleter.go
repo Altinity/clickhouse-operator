@@ -459,6 +459,36 @@ func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 	return nil
 }
 
+// getHostToRunDropZKReplica determines which host should execute the SYSTEM DROP REPLICA statement.
+// When dropping a replica, running the statement on a peer replica in the same shard is preferred
+// because the host being dropped may be unavailable or newly created with an empty volume.
+// If the first host in the shard is the host being dropped, picking a peer host ensures the drop
+// statement finds the table definitions and cleans up ZooKeeper metadata.
+func (w *worker) getHostToRunDropZKReplica(hostToDrop *api.Host) *api.Host {
+	if hostToDrop == nil || !hostToDrop.HasCR() {
+		return nil
+	}
+
+	shard := hostToDrop.GetShard()
+	if shard == nil {
+		return nil
+	}
+
+	var hostToRunOn *api.Host
+	shard.WalkHosts(func(h *api.Host) error {
+		if hostToRunOn == nil && h != hostToDrop && h.GetName() != hostToDrop.GetName() {
+			hostToRunOn = h
+		}
+		return nil
+	})
+
+	if hostToRunOn == nil {
+		hostToRunOn = shard.FirstHost()
+	}
+
+	return hostToRunOn
+}
+
 // dropZKReplica drops replica's info from Zookeeper
 func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *dropReplicaOptions) error {
 	if hostToDrop == nil {
@@ -466,11 +496,7 @@ func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *
 		return nil
 	}
 
-	// Sometimes host to drop is already unavailable, so let's run SQL statement of the first replica in the shard
-	var hostToRunOn *api.Host
-	if shard := hostToDrop.GetShard(); shard != nil {
-		hostToRunOn = shard.FirstHost()
-	}
+	hostToRunOn := w.getHostToRunDropZKReplica(hostToDrop)
 
 	if hostToRunOn == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn: %s, hostToDrop: %s", hostToRunOn.GetName(), hostToDrop.GetName())
@@ -589,8 +615,8 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 	//
 	// Policy gating happens upstream in runHostHookActions, NOT here:
 	//   - hook succeeds                        → returns nil
-	//   - hook fails + failurePolicy=Ignore    → returns nil (warning logged inside)
 	//   - hook fails + failurePolicy=Fail      → returns the error
+	//   - hook fails + failurePolicy=Ignore    → returns nil (warning logged inside)
 	//   - host unreachable / no hooks defined  → returns nil
 	// So a non-nil err here means the user explicitly opted into "abort deletion on
 	// hook failure" via failurePolicy=Fail; just propagating it suffices.

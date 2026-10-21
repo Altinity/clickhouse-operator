@@ -212,3 +212,86 @@ func TestRemovedHostFQDNs(t *testing.T) {
 			"the FQDN of a host the plan drops must reach the event")
 	})
 }
+
+func TestGetHostToRunDropZKReplica(t *testing.T) {
+	w := &worker{}
+
+	t.Run("nil host returns nil", func(t *testing.T) {
+		require.Nil(t, w.getHostToRunDropZKReplica(nil))
+	})
+
+	t.Run("host without shard returns nil", func(t *testing.T) {
+		host := &api.Host{Name: "host-0"}
+		require.Nil(t, w.getHostToRunDropZKReplica(host))
+	})
+
+	t.Run("multi-replica shard selects peer replica when dropping first replica", func(t *testing.T) {
+		h0 := &api.Host{Name: "chi-cluster-0-0"}
+		h0.Runtime.Address.ClusterName = "cluster"
+		h0.Runtime.Address.ShardName = "shard-0"
+		h0.Runtime.Address.HostName = "chi-cluster-0-0"
+
+		h1 := &api.Host{Name: "chi-cluster-0-1"}
+		h1.Runtime.Address.ClusterName = "cluster"
+		h1.Runtime.Address.ShardName = "shard-0"
+		h1.Runtime.Address.HostName = "chi-cluster-0-1"
+
+		shard := &api.ChiShard{
+			Name:  "shard-0",
+			Hosts: []*api.Host{h0, h1},
+		}
+		cluster := &api.Cluster{
+			Name: "cluster",
+			Layout: &api.ChiClusterLayout{
+				Shards: []*api.ChiShard{shard},
+			},
+		}
+		cr := &api.ClickHouseInstallation{
+			Spec: api.ChiSpec{
+				Configuration: &api.Configuration{
+					Clusters: []*api.Cluster{cluster},
+				},
+			},
+		}
+		h0.Runtime.SetCR(cr)
+		h1.Runtime.SetCR(cr)
+
+		selected := w.getHostToRunDropZKReplica(h0)
+		require.NotNil(t, selected)
+		assert.Equal(t, "chi-cluster-0-1", selected.GetName())
+
+		selectedForH1 := w.getHostToRunDropZKReplica(h1)
+		require.NotNil(t, selectedForH1)
+		assert.Equal(t, "chi-cluster-0-0", selectedForH1.GetName())
+	})
+
+	t.Run("single-replica shard falls back to first host", func(t *testing.T) {
+		h0 := &api.Host{Name: "chi-cluster-0-0"}
+		h0.Runtime.Address.ClusterName = "cluster"
+		h0.Runtime.Address.ShardName = "shard-0"
+		h0.Runtime.Address.HostName = "chi-cluster-0-0"
+
+		shard := &api.ChiShard{
+			Name:  "shard-0",
+			Hosts: []*api.Host{h0},
+		}
+		cluster := &api.Cluster{
+			Name: "cluster",
+			Layout: &api.ChiClusterLayout{
+				Shards: []*api.ChiShard{shard},
+			},
+		}
+		cr := &api.ClickHouseInstallation{
+			Spec: api.ChiSpec{
+				Configuration: &api.Configuration{
+					Clusters: []*api.Cluster{cluster},
+				},
+			},
+		}
+		h0.Runtime.SetCR(cr)
+
+		selected := w.getHostToRunDropZKReplica(h0)
+		require.NotNil(t, selected)
+		assert.Equal(t, "chi-cluster-0-0", selected.GetName())
+	})
+}
