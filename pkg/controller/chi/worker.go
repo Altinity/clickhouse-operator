@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -62,6 +63,11 @@ type worker struct {
 	normalizer    *normalizer.Normalizer
 	task          *common.Task
 	stsReconciler *statefulset.Reconciler
+
+	// reloadability remembers, per host, which server settings ClickHouse applies
+	// without a restart. A reconcile replaces it. The restart policy is not cached:
+	// it is evaluated against the host's current version on every check.
+	reloadability *reconcileReloadability
 
 	start time.Time
 }
@@ -133,6 +139,8 @@ func (w *worker) buildCreator(cr *api.ClickHouseInstallation) *commonCreator.Cre
 }
 
 func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
+	// Host objects from the previous pass must not answer this one.
+	w.reloadability = &reconcileReloadability{}
 	w.task = common.NewTask(w.buildCreator(new), w.buildCreator(old))
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
@@ -146,7 +154,10 @@ func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
 	)
 }
 
-// shouldForceRestartHost checks whether cluster requires hosts restart
+// shouldForceRestartHost checks whether cluster requires hosts restart.
+// Which server settings are changeable without a restart is asked once per host
+// per reconcile. The restart policy is evaluated on every call, so a version that
+// becomes known later still selects its own rule.
 func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) bool {
 	switch {
 	case host.HasAncestor() && host.GetAncestor().IsStopped():
@@ -183,7 +194,7 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
 		return true
 
-	case w.configurationChangeRequiresReboot(ctx, host):
+	case w.configurationChangeRequiresReboot(ctx, host, w.reconcileReloadability()):
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 
@@ -208,14 +219,47 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 	}
 }
 
-// configurationChangeRequiresReboot reports whether a configuration change requires a restart.
-// ClickHouse is asked which server settings are changeable without a restart only when server settings differ.
-func (w *worker) configurationChangeRequiresReboot(ctx context.Context, host *api.Host) bool {
-	var changeableWithoutRestart model.SettingsChangeableWithoutRestart
-	if model.IsServerSettingsChanged(host) {
-		changeableWithoutRestart = w.settingsChangeableWithoutRestart(ctx, host)
+// hostReloadability is one host's answer for this reconcile.
+// once runs the ClickHouse query a single time. A failed query leaves settings
+// empty, and every later check in this reconcile uses that same fallback.
+type hostReloadability struct {
+	once     sync.Once
+	settings model.SettingsChangeableWithoutRestart
+}
+
+// reconcileReloadability keeps hostReloadability for the hosts of one reconcile.
+type reconcileReloadability struct {
+	hosts sync.Map // map[*api.Host]*hostReloadability
+}
+
+// get returns the server settings this host applies without a restart.
+// The query runs only when server settings changed, and only once.
+func (c *reconcileReloadability) get(ctx context.Context, w *worker, host *api.Host) model.SettingsChangeableWithoutRestart {
+	value, _ := c.hosts.LoadOrStore(host, &hostReloadability{})
+	entry := value.(*hostReloadability)
+
+	entry.once.Do(func() {
+		if model.IsServerSettingsChanged(host) {
+			entry.settings = w.settingsChangeableWithoutRestart(ctx, host)
+		}
+	})
+
+	return entry.settings
+}
+
+func (w *worker) reconcileReloadability() *reconcileReloadability {
+	if w.reloadability == nil {
+		w.reloadability = &reconcileReloadability{}
 	}
-	return model.IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart)
+	return w.reloadability
+}
+
+// configurationChangeRequiresReboot reports whether a configuration change requires a restart.
+// cache supplies the settings ClickHouse applies without a restart. The restart policy
+// is then applied to the host's current state.
+func (w *worker) configurationChangeRequiresReboot(ctx context.Context, host *api.Host, cache *reconcileReloadability) bool {
+	settings := cache.get(ctx, w, host)
+	return model.IsConfigurationChangeRequiresReboot(host, settings)
 }
 
 // settingsChangeableWithoutRestart asks this host which server settings it applies without a restart.
