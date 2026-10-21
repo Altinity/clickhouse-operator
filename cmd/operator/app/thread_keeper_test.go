@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
@@ -77,6 +78,64 @@ func Test_keeperPredicateUpdate(t *testing.T) {
 				ObjectNew: &api.ClickHouseKeeperInstallation{
 					Spec: api.ChkSpec{
 						Suspend: types.NewStringBool(true),
+					},
+				},
+			},
+		},
+		{
+			name: "drops update when generation, finalizers, and deletionTimestamp are unchanged (pure status update)",
+			want: false,
+			evt: event.UpdateEvent{
+				ObjectOld: &api.ClickHouseKeeperInstallation{
+					ObjectMeta: meta.ObjectMeta{
+						Generation: 1,
+						Finalizers: []string{"clickhousekeeperinstallations.clickhouse-keeper.altinity.com"},
+					},
+					Spec: api.ChkSpec{
+						Suspend: types.NewStringBool(false),
+					},
+				},
+				ObjectNew: &api.ClickHouseKeeperInstallation{
+					ObjectMeta: meta.ObjectMeta{
+						Generation: 1,
+						Finalizers: []string{"clickhousekeeperinstallations.clickhouse-keeper.altinity.com"},
+					},
+					Spec: api.ChkSpec{
+						Suspend: types.NewStringBool(false),
+					},
+				},
+			},
+		},
+		{
+			name: "queues update when generation changes",
+			want: true,
+			evt: event.UpdateEvent{
+				ObjectOld: &api.ClickHouseKeeperInstallation{
+					ObjectMeta: meta.ObjectMeta{
+						Generation: 1,
+					},
+				},
+				ObjectNew: &api.ClickHouseKeeperInstallation{
+					ObjectMeta: meta.ObjectMeta{
+						Generation: 2,
+					},
+				},
+			},
+		},
+		{
+			name: "queues update when finalizers change",
+			want: true,
+			evt: event.UpdateEvent{
+				ObjectOld: &api.ClickHouseKeeperInstallation{
+					ObjectMeta: meta.ObjectMeta{
+						Generation: 1,
+						Finalizers: []string{},
+					},
+				},
+				ObjectNew: &api.ClickHouseKeeperInstallation{
+					ObjectMeta: meta.ObjectMeta{
+						Generation: 1,
+						Finalizers: []string{"clickhousekeeperinstallations.clickhouse-keeper.altinity.com"},
 					},
 				},
 			},

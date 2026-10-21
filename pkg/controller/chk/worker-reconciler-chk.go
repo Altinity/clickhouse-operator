@@ -106,10 +106,14 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 			metrics.CRReconcilesCompleted(ctx, new)
 		}
 		return nil
-	case new.HasReconcileWork():
-		w.a.M(new).F().Info("CR has reconcile work - continue reconcile")
 	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
+	case w.isGenerationTheSame(new.GetAncestorT(), new):
+		w.a.M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
+		metrics.CRReconcilesCompleted(ctx, new)
+		return nil
+	case new.HasReconcileWork():
+		w.a.M(new).F().Info("CR has reconcile work - continue reconcile")
 	default:
 		w.a.M(new).F().Info("No reconcile work - abort reconcile")
 		metrics.CRReconcilesCompleted(ctx, new)
