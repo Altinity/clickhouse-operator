@@ -41,7 +41,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
@@ -58,8 +57,7 @@ type worker struct {
 	a a.Announcer
 
 	//queue workqueue.RateLimitingInterface
-	queue   queue.PriorityQueue
-	schemer *schemer.ClusterSchemer
+	queue queue.PriorityQueue
 
 	normalizer    *normalizer.Normalizer
 	task          *common.Task
@@ -87,8 +85,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		c: c,
 		a: announcer,
 
-		queue:   q,
-		schemer: nil,
+		queue: q,
 
 		normalizer: normalizer.New(func(namespace, name string) (*core.Secret, error) {
 			return c.kube.Secret().Get(context.TODO(), &core.Secret{
