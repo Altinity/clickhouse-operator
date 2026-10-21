@@ -343,7 +343,7 @@ func TestServerSettingsRestartAdviceHasPriorityOverPolicy(t *testing.T) {
 		host := settingChange("logger/level", "information", "trace")
 		advice := NewServerSettingsRestartAdvice(
 			[]string{"logger.level"},
-			[]string{"Y"},
+			[]string{"Yes"},
 		)
 		if IsConfigurationChangeRequiresReboot(host, advice) {
 			t.Fatal("settings/logger/level is server setting logger.level, and Yes means no restart")
