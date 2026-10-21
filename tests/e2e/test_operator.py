@@ -10453,7 +10453,7 @@ def test_020005(self):
                 "do_not_delete": 1,
             },
         )
-    
+
     # The more comprehensive re-scale logic checks are performed in test_020005_2
     # For the purpose of this test we only need to make sure Keeper is ready
     with Then("Confirm all CHK pods are ready"):
@@ -10521,14 +10521,17 @@ def test_020005_2(self):
         while time.time() < deadline:
             sts = kubectl.get_count("sts", chk=chk)
             ready = kubectl.get_ready_pods_count("chk", chk)
-            assert sts <= ready + 1, error(
-                f"fire-and-forget scale-up: {sts} StatefulSets while only {ready} Ready "
-                f"(expected sts <= ready + 1)"
-            )
+            with Then(f"{sts} sts and {ready} ready pods found"):
+                assert sts <= ready + 1, error(
+                    f"fire-and-forget scale-up: {sts} StatefulSets while only {ready} Ready "
+                    f"(expected sts <= ready + 1)"
+                )
             if sts >= 3:
                 saw_three_sts = True
             if ready >= 3:
-                break
+                finished_in = int(300 - (deadline - time.time()))
+                with Then(f"Finished in {finished_in}s"):
+                    break
             time.sleep(5)
         assert kubectl.get_ready_pods_count("chk", chk) >= 3, error(
             "timed out waiting for the 1→3 scale-up to become Ready"

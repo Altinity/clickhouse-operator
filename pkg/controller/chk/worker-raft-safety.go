@@ -89,8 +89,13 @@ func (f *chkStatefulSetFallback) OnStatefulSetUpdateFailed(
 // sizes defers every roll forever instead of preserving availability the user still has.
 const raftFaultTolerantMinMembers = 3
 
-// crHasEstablishedCluster is true when a previous generation already ran hosts.
-// Used to distinguish a join (1→3) from a fresh bootstrap (all servers new).
+// crHasEstablishedCluster is true when status.normalizedCompleted already lists hosts.
+// GetAncestor resolves from that status, and it is stamped only after a fully
+// successful pass. A CHK created with one replica whose first reconcile never
+// completed, then scaled to 3, has no ancestor and is treated as a fresh
+// bootstrap, so it is not staged. That fail-open is deliberate: a partial live
+// set with no completed generation is indistinguishable from an interrupted
+// bootstrap, and staging a bootstrap would publish a partial initial quorum.
 func crHasEstablishedCluster(cr api.ICustomResource) bool {
 	return cr != nil && cr.GetAncestor() != nil && cr.GetAncestor().HostsCount() > 0
 }
@@ -145,9 +150,11 @@ func (w *worker) stageUncommittedScaleUpHosts(ctx context.Context, cr *apiChk.Cl
 // small to protect quorum (1→N, 2→3). Identity is topological — established
 // ancestor without headroom, and this host is absent from that ancestor — not
 // ObjectStatusRequested. PrepareHostStatefulSetWithStatus overwrites Requested
-// to Same/Modified once the joiner STS exists, which is exactly the interrupted
-// Ready-wait retry this gate has to survive. Ready is not committed Raft
-// membership (see verifyHostEnsembleMembership). 3→N is not staged.
+// to Same/Modified once the joiner STS exists, so a retry must not treat that
+// host as still waiting to be admitted. deferUnreadyStagedAdmit uses this to
+// postpone the next not-yet-created joiner until this one's live ReadyReplicas
+// is positive. Ready is not committed Raft membership (see
+// verifyHostEnsembleMembership). 3→N is not staged.
 func hostIsStagedScaleUpJoin(host *api.Host) bool {
 	if host == nil || host.GetCR() == nil {
 		return false
@@ -159,6 +166,74 @@ func hostIsStagedScaleUpJoin(host *api.Host) bool {
 		return false
 	}
 	return !ensembleHasQuorumHeadroom(host.GetCR().GetAncestor().HostsCount())
+}
+
+// deferUnreadyStagedAdmit postpones a not-yet-created 1→N / 2→3 joiner while
+// another staged joiner already has a StatefulSet that is not Ready.
+//
+// The check is live ReadyReplicas, not ObjectStatus and not WaitUntilReady.
+// After an interrupted pass the previous joiner's StatefulSet exists, so
+// PrepareHostStatefulSetWithStatus marks it Same and ReconcileStatefulSet
+// returns without waiting. ErrCRUDDeferred is soft: the shard loop still
+// reconciles the other hosts, including the existing members that have to
+// reload or roll onto the published raft_configuration before the joiner can
+// become Ready. A Get error other than NotFound fails closed — membership is
+// not expanded while StatefulSet existence is unknown.
+func (w *worker) deferUnreadyStagedAdmit(ctx context.Context, host *api.Host) error {
+	if !hostIsStagedScaleUpJoin(host) || w.c == nil {
+		return nil
+	}
+	own, err := w.stagedJoinerStatefulSet(ctx, host)
+	if err != nil {
+		return err
+	}
+	if own != nil {
+		return nil
+	}
+
+	var blocker *api.Host
+	var getErr error
+	_ = host.GetCR().WalkHosts(func(peer *api.Host) error {
+		if getErr != nil || blocker != nil || peer == nil || peer == host || !hostIsStagedScaleUpJoin(peer) {
+			return nil
+		}
+		sts, peerErr := w.stagedJoinerStatefulSet(ctx, peer)
+		if peerErr != nil {
+			getErr = peerErr
+			return nil
+		}
+		if sts != nil && sts.Status.ReadyReplicas < 1 {
+			blocker = peer
+		}
+		return nil
+	})
+	if getErr != nil {
+		return getErr
+	}
+	if blocker == nil {
+		return nil
+	}
+	w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileInProgress).
+		WithAction(host.GetCR()).
+		M(host).F().
+		Info("Defer admitting %s into raft_configuration until %s is Ready", host.GetName(), blocker.GetName())
+	return common.ErrCRUDDeferred
+}
+
+// stagedJoinerStatefulSet returns the live StatefulSet, or nil when it is absent.
+// NotFound is not an error. Any other Get error is returned unchanged.
+func (w *worker) stagedJoinerStatefulSet(ctx context.Context, host *api.Host) (*apps.StatefulSet, error) {
+	sts, err := w.c.kube.STS().Get(ctx, host)
+	if apiErrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if sts != nil {
+		host.Runtime.CurStatefulSet = sts
+	}
+	return sts, nil
 }
 
 // ensembleHasQuorumHeadroom reports whether the gate can ever pass for this ensemble size.
@@ -433,9 +508,14 @@ func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) 
 // apply it when they reload or roll. Do not size quorum on the desired set as if
 // those servers were already voting.
 //
-// /ready on a newly created joiner is only a serialize-creates proxy for 1→N / 2→3
-// (hostIsStagedScaleUpJoin). It is not a committed-membership barrier;
-// verifyHostEnsembleMembership is the extension point for /keeper/config + mntr.
+// /ready on a newly created joiner is not a committed-membership barrier, and it
+// is not how 1→N / 2→3 serializes creates. A new peer cannot reach /ready until
+// existing members reload or roll onto the published file, and recovery-first
+// reconciles that peer before they do, so SetWaitUntilReady there expires into
+// ErrCRUDAbort. deferUnreadyStagedAdmit postpones the next missing joiner until
+// the previous joiner's live ReadyReplicas is positive, and that postponement
+// still lets this pass roll the existing members. verifyHostEnsembleMembership
+// is the extension point for /keeper/config + mntr.
 //
 // Sizing growth on the desired set inflates the denominator against a membership that does not
 // exist yet, and the damage is in the unsafe direction: a 3->5 with one member already down
@@ -447,7 +527,7 @@ func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) 
 // desired set there. That also keeps growth classified as bootstrap: a 1->3 sized at 1 would read
 // rolling (members<=1 is rolling unconditionally), putting a Ready wait on the one EXISTING host
 // while the ensemble it must reach quorum with is still being created. 3→N added hosts still
-// skip Ready (joinedEnsemble); 1→N / 2→3 wait Ready on each staged joiner.
+// skip Ready (joinedEnsemble). 1→N / 2→3 skip it too; the host loop defers the next admit.
 func quorumSizingEnsemble(cr api.ICustomResource) api.ICustomResource {
 	if cr == nil {
 		return nil
@@ -557,10 +637,12 @@ func (w *worker) prepareStsReconcileOptsWaitSection(
 	// no StatefulSet at all and so fails both terms. CurStatefulSet was refreshed moments ago by
 	// snapshotHostEnsemble.
 	joinedEnsemble := host.HasAncestor() || hostContributesReady(host)
-	// 1→N / 2→3: serialize STS create on the joiner's /ready. That is not
-	// committed membership — see verifyHostEnsembleMembership. 3→N still skips
-	// Ready so existing members can roll onto the config that admits the peer.
-	stagedJoin := hostIsStagedScaleUpJoin(host)
+	// 1→N / 2→3 does not force Ready here. The new peer is reconciled before
+	// existing members roll, and it cannot reach /ready until they reload or
+	// roll onto the published raft_configuration. Forcing the wait would burn
+	// the STS timeout and abort, including when readiness is "no". One-at-a-time
+	// admission is deferUnreadyStagedAdmit. 3→N still skips Ready so existing
+	// members can roll onto the config that admits the peer.
 
 	// A host outside the live ensemble still has to wait to START. The code before this gate spelled
 	// this `probes.GetStartup().IsTrue() || !host.HasAncestor()`; narrowing it to !rolling alone
@@ -572,11 +654,6 @@ func (w *worker) prepareStsReconcileOptsWaitSection(
 	}
 
 	switch {
-	case stagedJoin:
-		// Raft serialize-creates gate, not an optional pacing probe. readiness:false
-		// would otherwise admit the next STS while this joiner is only Started.
-		opts = opts.SetWaitUntilReady()
-		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (staged scale-up join)")
 	case rolling && joinedEnsemble && !probes.GetReadiness().IsFalse():
 		opts = opts.SetWaitUntilReady()
 		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilReady (Keeper must become Ready)")

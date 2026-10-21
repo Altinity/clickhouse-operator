@@ -69,6 +69,9 @@ type worker struct {
 	// reconciler and the whole kube surface behind it.
 	reconcileHostFn func(ctx context.Context, host *api.Host) error
 
+	// publishRaftFn overrides raft ConfigMap publication (tests only).
+	publishRaftFn func(ctx context.Context, host *api.Host) error
+
 	// quorumWaitSpent is the wait the Raft disrupt gate has already burned in THIS pass. The
 	// budget is per pass, not per host: a permanently unhealthy peer would otherwise cost the
 	// full timeout on every remaining host, and with ReconcileCHKsThreadsNumber defaulting to 1
