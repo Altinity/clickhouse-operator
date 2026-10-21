@@ -121,12 +121,13 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	}
 	w.prepareMonitoring(new)
 	w.setHostStatusesPreliminary(ctx, new)
-	if err := w.stageUncommittedScaleUpHosts(ctx, new); err != nil {
-		w.a.V(1).M(new).F().Warning("Unable to stage scale-up hosts: %v", err)
-		return err
+	// Staging and reconcile share one failure path. An early return here would
+	// leave the CHK InProgress after markReconcileStart.
+	err := w.stageUncommittedScaleUpHosts(ctx, new)
+	if err == nil {
+		err = w.reconcile(ctx, new)
 	}
-
-	if err := w.reconcile(ctx, new); err != nil {
+	if err != nil {
 		if errors.Is(err, common.ErrCRUDDeferred) {
 			w.a.V(1).M(new).F().Info("Reconcile deferred — waiting for Raft quorum headroom")
 			new.EnsureStatus().PushError(fmt.Sprintf(
