@@ -178,7 +178,7 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
 		return true
 
-	case model.IsConfigurationChangeRequiresReboot(host, model.ServerSettingsRestartAdvice{}):
+	case model.IsConfigurationChangeRequiresReboot(host, nil):
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 

@@ -269,16 +269,15 @@ func (s *ClusterSchemer) sqlVersion() string {
 	return `SELECT version()`
 }
 
-// sqlChangeableWithoutRestartColumn is 1 when system.server_settings has the column recent
-// ClickHouse versions use to say whether a server setting applies without a restart.
-func (s *ClusterSchemer) sqlChangeableWithoutRestartColumn() string {
+// sqlSettingsChangeableWithoutRestartColumn is 1 when system.server_settings has
+// changeable_without_restart. Asking system.columns avoids a failing query
+func (s *ClusterSchemer) sqlSettingsChangeableWithoutRestartColumn() string {
 	return `SELECT count() FROM system.columns WHERE database = 'system' AND table = 'server_settings' AND name = 'changeable_without_restart'`
 }
 
-// sqlChangeableWithoutRestart lists every server setting and whether it applies without a restart.
-// toString covers both the Enum ('Yes'/'No') and a numeric column.
-func (s *ClusterSchemer) sqlChangeableWithoutRestart() string {
-	return `SELECT name, toString(changeable_without_restart) FROM system.server_settings`
+// sqlSettingsChangeableWithoutRestart lists server settings ClickHouse applies without a restart.
+func (s *ClusterSchemer) sqlSettingsChangeableWithoutRestart() string {
+	return `SELECT name FROM system.server_settings WHERE changeable_without_restart = 'Yes'`
 }
 
 func (s *ClusterSchemer) sqlHostInCluster(cluster string) string {

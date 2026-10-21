@@ -24,58 +24,28 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
-// ServerSettingsRestartAdvice is what system.server_settings.changeable_without_restart says.
-// Available is false when the column is absent or the host could not be asked.
-// Yes means ClickHouse applies the setting without a restart, and that overrides a policy rule
-// that would restart. No is the value ClickHouse writes for every setting it did not register
-// as live, so a configurationRestartPolicy rule that says not to restart still wins.
-type ServerSettingsRestartAdvice struct {
-	available bool
-	// changeableWithoutRestart maps a server setting name to whether ClickHouse applies a
-	// change without a restart. Names match system.server_settings.name.
-	changeableWithoutRestart map[string]bool
-}
+// SettingsChangeableWithoutRestart is the set of system.server_settings names ClickHouse
+// applies without a restart. Names match system.server_settings.name. An empty set,
+// including a failed query, leaves the decision to configurationRestartPolicy.
+type SettingsChangeableWithoutRestart map[string]struct{}
 
-// NewServerSettingsRestartAdvice builds advice from the name and changeable_without_restart
-// columns. Values are the strings ClickHouse returns for the Enum ('Yes'/'No') or for a
-// numeric column ('1'/'0'). A value that is neither is left out, and the policy decides.
-func NewServerSettingsRestartAdvice(names, values []string) ServerSettingsRestartAdvice {
-	changeable := make(map[string]bool, len(names))
-	for i := range names {
-		if i >= len(values) || names[i] == "" {
+// NewSettingsChangeableWithoutRestart builds the set from system.server_settings.name.
+// An empty name is left out.
+func NewSettingsChangeableWithoutRestart(names []string) SettingsChangeableWithoutRestart {
+	changeableWithoutRestart := make(SettingsChangeableWithoutRestart, len(names))
+	for _, name := range names {
+		if name == "" {
 			continue
 		}
-		switch strings.ToLower(strings.TrimSpace(values[i])) {
-		case "yes", "1", "true":
-			changeable[names[i]] = true
-		case "no", "0", "false":
-			changeable[names[i]] = false
-		}
+		changeableWithoutRestart[name] = struct{}{}
 	}
-	return ServerSettingsRestartAdvice{
-		available:                true,
-		changeableWithoutRestart: changeable,
-	}
+	return changeableWithoutRestart
 }
 
-// RestartRequired reports whether path must restart the server according to
-// changeable_without_restart. known is false when the column is unavailable, the path is
-// not a server setting, or that setting is not listed. Yes (required == false) overrides
-// configurationRestartPolicy. No does not: ClickHouse reports No for every setting it did
-// not register as live, and a policy rule that says not to restart still applies.
-func (a ServerSettingsRestartAdvice) RestartRequired(path string) (required bool, known bool) {
-	if !a.available {
-		return false, false
-	}
-	name, ok := serverSettingName(path)
-	if !ok {
-		return false, false
-	}
-	changeable, found := a.changeableWithoutRestart[name]
-	if !found {
-		return false, false
-	}
-	return !changeable, true
+// Contains reports whether name is changeable without a restart.
+func (s SettingsChangeableWithoutRestart) Contains(name string) bool {
+	_, ok := s[name]
+	return ok
 }
 
 // serverSettingName maps a configurationRestartPolicy path onto system.server_settings.name.
@@ -100,7 +70,7 @@ func serverSettingName(path string) (string, bool) {
 // restart, subject to configurationRestartPolicy for zookeeper/*. Turning ZooKeeper on or off
 // always restarts, whatever the policy says; a change between two configs that both amount to
 // "no ZooKeeper" never does.
-func isZookeeperChangeRequiresReboot(host *api.Host, a, b *api.ZookeeperConfig, advice ServerSettingsRestartAdvice) bool {
+func isZookeeperChangeRequiresReboot(host *api.Host, a, b *api.ZookeeperConfig) bool {
 	if a.Equals(b) {
 		return false
 	}
@@ -122,17 +92,37 @@ func isZookeeperChangeRequiresReboot(host *api.Host, a, b *api.ZookeeperConfig, 
 	}
 	return isListedChangeRequiresReboot(host, []string{
 		configurationRestartPolicyRulesSectionZookeeper + "/*",
-	}, advice)
+	})
 }
 
 // isSettingsChangeRequiresReboot checks whether changes between two settings requires ClickHouse reboot
-func isSettingsChangeRequiresReboot(host *api.Host, configurationRestartPolicyRulesSection string, a, b *api.Settings, advice ServerSettingsRestartAdvice) bool {
+func isSettingsChangeRequiresReboot(host *api.Host, configurationRestartPolicyRulesSection string, a, b *api.Settings) bool {
 	diff, equal := messagediff.DeepDiff(a, b)
 	if equal {
 		return false
 	}
 	affectedPaths := api.ListAffectedSettingsPathsFromDiff(a, b, diff, configurationRestartPolicyRulesSection)
-	return isListedChangeRequiresReboot(host, affectedPaths, advice)
+	return isListedChangeRequiresReboot(host, affectedPaths)
+}
+
+// isServerSettingsChangeRequiresReboot checks server settings. A name ClickHouse lists as
+// changeable_without_restart = Yes skips configurationRestartPolicy. Profiles, quotas, files
+// and ZooKeeper are not server settings and are not consulted here.
+func isServerSettingsChangeRequiresReboot(host *api.Host, a, b *api.Settings, changeableWithoutRestart SettingsChangeableWithoutRestart) bool {
+	diff, equal := messagediff.DeepDiff(a, b)
+	if equal {
+		return false
+	}
+	affectedPaths := api.ListAffectedSettingsPathsFromDiff(a, b, diff, configurationRestartPolicyRulesSectionSettings)
+	paths := make([]string, 0, len(affectedPaths))
+	for _, path := range affectedPaths {
+		if name, ok := serverSettingName(path); ok && changeableWithoutRestart.Contains(name) {
+			log.Info("ChangeRequiresReboot server_settings path: %s restart: false", path)
+			continue
+		}
+		paths = append(paths, path)
+	}
+	return isListedChangeRequiresReboot(host, paths)
 }
 
 func versionMatches(target any, versionConstraint string) bool {
@@ -223,34 +213,12 @@ func GetConfigMatchSpecs(chi *api.ClickHouseInstallation) (specs []*api.ChiSpec)
 }
 
 // isListedChangeRequiresReboot checks whether any of the provided paths requires reboot to apply configuration.
-// changeable_without_restart = Yes reloads that server setting and the policy cannot put the restart
-// back. No does not override a policy rule that says not to restart: ClickHouse writes No for every
-// setting it did not register as live, including dictionaries_config and logger.level.
-func isListedChangeRequiresReboot(host *api.Host, paths []string, advice ServerSettingsRestartAdvice) bool {
+func isListedChangeRequiresReboot(host *api.Host, paths []string) bool {
 	for _, path := range paths {
-		if required, known := advice.RestartRequired(path); known && !required {
-			log.Info("ChangeRequiresReboot server_settings path: %s restart: false", path)
-			continue
-		}
-		// Check whether any path matches ClickHouse configuration restart policy rules requires reboot
-		if matches, value := getLatestConfigMatchValue(host, path); matches {
-			// This path matches configuration restart policy rule
-			if value {
-				// And this path not only matches, but requires reboot also - no need to find any other who requires reboot
-				return true
-			}
-			continue
-		}
-		// The column says this setting is not live, and no policy rule covers the path.
-		if required, known := advice.RestartRequired(path); known && required {
-			log.Info("ChangeRequiresReboot server_settings path: %s restart: true", path)
+		if matches, restart := getLatestConfigMatchValue(host, path); matches && restart {
 			return true
 		}
 	}
-	// Last matching path with value "yes" not found.
-	// This means either:
-	// 1. Last matching path has value "no"
-	// 2. No matching path found
 	return false
 }
 
@@ -319,9 +287,9 @@ func IsServerSettingsChanged(host *api.Host) bool {
 }
 
 // IsConfigurationChangeRequiresReboot checks whether configuration changes requires a reboot.
-// advice carries system.server_settings.changeable_without_restart when that column exists.
-// The zero advice leaves the decision to configurationRestartPolicy.
-func IsConfigurationChangeRequiresReboot(host *api.Host, advice ServerSettingsRestartAdvice) bool {
+// changeableWithoutRestart is the set of server settings ClickHouse applies without a restart.
+// An empty set leaves the decision to configurationRestartPolicy.
+func IsConfigurationChangeRequiresReboot(host *api.Host, changeableWithoutRestart SettingsChangeableWithoutRestart) bool {
 	// Zookeeper
 	{
 		var old, new *api.ZookeeperConfig
@@ -329,7 +297,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host, advice ServerSettingsRe
 			old = host.GetAncestor().GetZookeeper()
 		}
 		new = host.GetZookeeper()
-		if isZookeeperChangeRequiresReboot(host, old, new, advice) {
+		if isZookeeperChangeRequiresReboot(host, old, new) {
 			log.Info("ChangeRequiresReboot isZookeeperChangeRequiresReboot: true")
 			return true
 		}
@@ -343,7 +311,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host, advice ServerSettingsRe
 		if host.HasCR() {
 			new = host.GetCR().GetSpec().GetConfiguration().GetProfiles()
 		}
-		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionProfiles, old, new, advice) {
+		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionProfiles, old, new) {
 			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(profiles global): true")
 			return true
 		}
@@ -357,7 +325,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host, advice ServerSettingsRe
 		if host.HasCR() {
 			new = host.GetCR().GetSpec().GetConfiguration().GetQuotas()
 		}
-		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionQuotas, old, new, advice) {
+		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionQuotas, old, new) {
 			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(quotas global): true")
 			return true
 		}
@@ -371,8 +339,8 @@ func IsConfigurationChangeRequiresReboot(host *api.Host, advice ServerSettingsRe
 		if host.HasCR() {
 			new = host.GetCR().GetSpec().GetConfiguration().GetSettings()
 		}
-		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionSettings, old, new, advice) {
-			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(settings global): true")
+		if isServerSettingsChangeRequiresReboot(host, old, new, changeableWithoutRestart) {
+			log.Info("ChangeRequiresReboot isServerSettingsChangeRequiresReboot(settings global): true")
 			return true
 		}
 	}
@@ -383,8 +351,8 @@ func IsConfigurationChangeRequiresReboot(host *api.Host, advice ServerSettingsRe
 			old = host.GetAncestor().GetSettings()
 		}
 		new = host.Settings
-		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionSettings, old, new, advice) {
-			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(settings local): true")
+		if isServerSettingsChangeRequiresReboot(host, old, new, changeableWithoutRestart) {
+			log.Info("ChangeRequiresReboot isServerSettingsChangeRequiresReboot(settings local): true")
 			return true
 		}
 	}
@@ -405,7 +373,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host, advice ServerSettingsRe
 				true,
 			)
 		}
-		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionFiles, old, new, advice) {
+		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionFiles, old, new) {
 			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(files global): true")
 			return true
 		}
@@ -425,7 +393,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host, advice ServerSettingsRe
 			[]api.SettingsSection{api.SectionUsers},
 			true,
 		)
-		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionFiles, old, new, advice) {
+		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionFiles, old, new) {
 			log.Info("ChangeRequiresReboot isSettingsChangeRequiresReboot(files local): true")
 			return true
 		}

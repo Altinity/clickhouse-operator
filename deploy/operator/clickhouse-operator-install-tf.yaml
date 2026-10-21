@@ -6995,8 +6995,7 @@ data:
             rules:
               # see https://kb.altinity.com/altinity-kb-setup-and-maintenance/altinity-kb-server-config-files/#server-config-configxml-sections-which-dont-require-restart
               # changeable_without_restart = Yes reloads that server setting even when a rule below says restart.
-              # No does not override a rule that says "no": ClickHouse reports No for every setting it did not
-              # register as live, including the exceptions listed here.
+              # A server setting ClickHouse does not list as Yes follows the rules below.
     
               - settings/*: "yes"
     

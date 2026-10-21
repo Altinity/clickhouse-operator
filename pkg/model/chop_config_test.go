@@ -117,7 +117,7 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperEndpointsOnly(t *testing.T
 	if oldZK.Equals(newZK) {
 		t.Fatal("expected ZooKeeper configuration to change")
 	}
-	if got := IsConfigurationChangeRequiresReboot(host, ServerSettingsRestartAdvice{}); got {
+	if got := IsConfigurationChangeRequiresReboot(host, nil); got {
 		t.Fatalf("restart required = true, want false for ZooKeeper-only change")
 	}
 }
@@ -135,7 +135,7 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperAndRestartRequiredSetting(
 	})
 	host := hostWithZKAndSettings(oldZK, newZK, oldSettings, newSettings)
 
-	if got := IsConfigurationChangeRequiresReboot(host, ServerSettingsRestartAdvice{}); !got {
+	if got := IsConfigurationChangeRequiresReboot(host, nil); !got {
 		t.Fatalf("restart required = false, want true when ZooKeeper change is combined with a restart-required setting")
 	}
 }
@@ -150,7 +150,7 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperPolicyYesStillRestarts(t *
 		nil,
 	)
 
-	if got := IsConfigurationChangeRequiresReboot(host, ServerSettingsRestartAdvice{}); !got {
+	if got := IsConfigurationChangeRequiresReboot(host, nil); !got {
 		t.Fatalf("restart required = false, want true when operator policy zookeeper/* is yes")
 	}
 }
@@ -167,7 +167,7 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperUnchangedNeverRestarts(t *
 	applyRestartPolicy(t, true)
 
 	host := hostWithZKAndSettings(zkConfig("zk-0", "zk-1"), zkConfig("zk-0", "zk-1"), nil, nil)
-	if IsConfigurationChangeRequiresReboot(host, ServerSettingsRestartAdvice{}) {
+	if IsConfigurationChangeRequiresReboot(host, nil) {
 		t.Fatal("an unchanged ZooKeeper config is not a change and must never restart")
 	}
 }
@@ -204,7 +204,7 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperLastMatchingRuleWins(t *te
 	}
 
 	host := hostWithZKAndSettings(zkConfig("zk-0"), zkConfig("zk-1"), nil, nil)
-	if !IsConfigurationChangeRequiresReboot(host, ServerSettingsRestartAdvice{}) {
+	if !IsConfigurationChangeRequiresReboot(host, nil) {
 		t.Fatal("the later rule set says yes and must win over the earlier no")
 	}
 }
@@ -224,21 +224,21 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperEnableDisableAlwaysRestart
 
 	t.Run("enabling zookeeper restarts", func(t *testing.T) {
 		host := hostWithZKAndSettings(nil, zkConfig("zk-0"), nil, nil)
-		if !IsConfigurationChangeRequiresReboot(host, ServerSettingsRestartAdvice{}) {
+		if !IsConfigurationChangeRequiresReboot(host, nil) {
 			t.Fatal("adding zookeeper to a live cluster must restart: it introduces <distributed_ddl>")
 		}
 	})
 
 	t.Run("disabling zookeeper restarts", func(t *testing.T) {
 		host := hostWithZKAndSettings(zkConfig("zk-0"), nil, nil, nil)
-		if !IsConfigurationChangeRequiresReboot(host, ServerSettingsRestartAdvice{}) {
+		if !IsConfigurationChangeRequiresReboot(host, nil) {
 			t.Fatal("removing zookeeper must restart: it drops <distributed_ddl> and leaves a stale session")
 		}
 	})
 
 	t.Run("an empty-to-empty change is still no change", func(t *testing.T) {
 		host := hostWithZKAndSettings(nil, api.NewZookeeperConfig(), nil, nil)
-		if IsConfigurationChangeRequiresReboot(host, ServerSettingsRestartAdvice{}) {
+		if IsConfigurationChangeRequiresReboot(host, nil) {
 			t.Fatal("nil and a zero-value config are both empty - nothing changed, nothing to restart")
 		}
 	})
@@ -252,14 +252,14 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperEnableDisableAlwaysRestart
 		applyRestartPolicy(t, true)
 
 		host := hostWithZKAndSettings(nil, api.NewZookeeperConfig(), nil, nil)
-		if IsConfigurationChangeRequiresReboot(host, ServerSettingsRestartAdvice{}) {
+		if IsConfigurationChangeRequiresReboot(host, nil) {
 			t.Fatal("both sides describe no ZooKeeper: restarting would be a no-op restart")
 		}
 	})
 
 	t.Run("endpoint edit between two non-empty configs still honours the policy", func(t *testing.T) {
 		host := hostWithZKAndSettings(zkConfig("zk-0"), zkConfig("zk-1"), nil, nil)
-		if IsConfigurationChangeRequiresReboot(host, ServerSettingsRestartAdvice{}) {
+		if IsConfigurationChangeRequiresReboot(host, nil) {
 			t.Fatal("the transition guard must not swallow the policy for ordinary endpoint edits")
 		}
 	})
@@ -273,25 +273,21 @@ func settingChange(name, from, to string) *api.Host {
 	)
 }
 
-// TestServerSettingsRestartAdviceHasPriorityOverPolicy pins how
-// system.server_settings.changeable_without_restart meets configurationRestartPolicy.
-// Yes reloads even when the policy would restart. No does not override a rule that says
-// not to restart: ClickHouse reports No for every setting it did not register as live.
-func TestServerSettingsRestartAdviceHasPriorityOverPolicy(t *testing.T) {
-	t.Run("changeable without restart wins over a policy that restarts", func(t *testing.T) {
+// TestSettingsChangeableWithoutRestartSkipRestartPolicy pins that a setting ClickHouse lists as
+// changeable_without_restart = Yes skips configurationRestartPolicy. A setting that is not
+// listed uses the policy.
+func TestSettingsChangeableWithoutRestartSkipRestartPolicy(t *testing.T) {
+	t.Run("a setting changeable without restart does not restart when the policy would", func(t *testing.T) {
 		// applyRestartPolicy sets settings/*: yes, which would restart this edit on its own.
 		applyRestartPolicy(t, false)
 		host := settingChange("max_concurrent_queries", "10", "20")
-		advice := NewServerSettingsRestartAdvice(
-			[]string{"max_concurrent_queries"},
-			[]string{"Yes"},
-		)
-		if IsConfigurationChangeRequiresReboot(host, advice) {
-			t.Fatal("changeable_without_restart = Yes must not restart, whatever the policy says")
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries"})
+		if IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("a setting changeable without restart must not restart")
 		}
 	})
 
-	t.Run("No does not override a policy rule that skips the restart", func(t *testing.T) {
+	t.Run("a policy rule of no does not restart", func(t *testing.T) {
 		cfg := chop.Config()
 		prev := cfg.ClickHouse.ConfigRestartPolicy
 		t.Cleanup(func() { cfg.ClickHouse.ConfigRestartPolicy = prev })
@@ -305,35 +301,24 @@ func TestServerSettingsRestartAdviceHasPriorityOverPolicy(t *testing.T) {
 			}},
 		}
 		host := settingChange("dictionaries_config", "config.d/dict_*.xml", "config.d/dic*.xml")
-		advice := NewServerSettingsRestartAdvice(
-			[]string{"dictionaries_config"},
-			[]string{"No"},
-		)
-		if IsConfigurationChangeRequiresReboot(host, advice) {
-			t.Fatal("changeable_without_restart = No must not override a policy rule that says not to restart")
+		if IsConfigurationChangeRequiresReboot(host, nil) {
+			t.Fatal("a policy rule of no must not restart")
 		}
 	})
 
-	t.Run("No still restarts when the policy says restart", func(t *testing.T) {
+	t.Run("a setting that is not changeable without restart restarts when the policy says restart", func(t *testing.T) {
 		applyRestartPolicy(t, false)
 		host := settingChange("max_thread_pool_size", "10000", "20000")
-		advice := NewServerSettingsRestartAdvice(
-			[]string{"max_thread_pool_size"},
-			[]string{"No"},
-		)
-		if !IsConfigurationChangeRequiresReboot(host, advice) {
-			t.Fatal("changeable_without_restart = No restarts when the policy also says restart")
+		if !IsConfigurationChangeRequiresReboot(host, nil) {
+			t.Fatal("a setting that is not changeable without restart follows a policy rule of yes")
 		}
 	})
 
-	t.Run("a setting the column does not list follows the policy", func(t *testing.T) {
+	t.Run("a setting the query does not list follows the policy", func(t *testing.T) {
 		applyRestartPolicy(t, false)
 		host := settingChange("max_concurrent_queries", "10", "20")
-		advice := NewServerSettingsRestartAdvice(
-			[]string{"other_setting"},
-			[]string{"Yes"},
-		)
-		if !IsConfigurationChangeRequiresReboot(host, advice) {
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"other_setting"})
+		if !IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
 			t.Fatal("an unlisted setting falls through to configurationRestartPolicy")
 		}
 	})
@@ -341,12 +326,9 @@ func TestServerSettingsRestartAdviceHasPriorityOverPolicy(t *testing.T) {
 	t.Run("a nested server setting is matched by its dotted name", func(t *testing.T) {
 		applyRestartPolicy(t, false)
 		host := settingChange("logger/level", "information", "trace")
-		advice := NewServerSettingsRestartAdvice(
-			[]string{"logger.level"},
-			[]string{"Yes"},
-		)
-		if IsConfigurationChangeRequiresReboot(host, advice) {
-			t.Fatal("settings/logger/level is server setting logger.level, and Yes means no restart")
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"logger.level"})
+		if IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("settings/logger/level is server setting logger.level")
 		}
 	})
 }
@@ -383,27 +365,18 @@ func TestIsServerSettingsChanged(t *testing.T) {
 	})
 }
 
-func TestNewServerSettingsRestartAdvice(t *testing.T) {
-	advice := NewServerSettingsRestartAdvice(
-		[]string{"hot", "cold", "odd", ""},
-		[]string{"yes", "0", "maybe"},
-	)
-	if required, known := advice.RestartRequired("settings/hot"); !known || required {
-		t.Fatalf("hot: required=%t known=%t, want required=false known=true", required, known)
+func TestNewSettingsChangeableWithoutRestart(t *testing.T) {
+	changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries", ""})
+	if !changeableWithoutRestart.Contains("max_concurrent_queries") {
+		t.Fatal("a listed name is changeable without a restart")
 	}
-	if required, known := advice.RestartRequired("settings/cold"); !known || !required {
-		t.Fatalf("cold: required=%t known=%t, want required=true known=true", required, known)
+	if changeableWithoutRestart.Contains("") {
+		t.Fatal("an empty name is not a setting")
 	}
-	if _, known := advice.RestartRequired("settings/odd"); known {
-		t.Fatal("an unrecognised column value is not an answer")
+	if changeableWithoutRestart.Contains("other") {
+		t.Fatal("an unlisted name is not changeable without a restart")
 	}
-	if _, known := advice.RestartRequired("profiles/default/max_threads"); known {
-		t.Fatal("a profile path is not a server setting")
-	}
-	if _, known := advice.RestartRequired("settings/logger/*"); known {
-		t.Fatal("a wildcard path is not a server setting name")
-	}
-	if _, known := (ServerSettingsRestartAdvice{}).RestartRequired("settings/hot"); known {
-		t.Fatal("advice from a server without the column has no answer")
+	if (SettingsChangeableWithoutRestart(nil)).Contains("max_concurrent_queries") {
+		t.Fatal("an empty set leaves every setting to configurationRestartPolicy")
 	}
 }
