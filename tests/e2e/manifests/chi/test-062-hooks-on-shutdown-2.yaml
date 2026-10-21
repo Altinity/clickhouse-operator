@@ -23,8 +23,9 @@ spec:
     # triggers HostConfigRestart → HostShutdown → the events:[HostShutdown] hook fires.
     #
     # IMPORTANT: pick a setting that's NOT in the operator's hot-reload exception
-    # list (see pkg/model/chop_config.go's configurationRestartPolicy rules
-    # and not changeable_without_restart
+    # list (see the configurationRestartPolicy rules in config/config.yaml) and
+    # not changeable_without_restart = Yes in system.server_settings. test_062
+    # checks the latter before applying this manifest.
     settings:
       max_connections: 1024
     clusters:

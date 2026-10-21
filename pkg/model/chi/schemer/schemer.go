@@ -16,6 +16,7 @@ package schemer
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -174,26 +175,28 @@ func (s *ClusterSchemer) HostClusterDoesNotExistErrorCount(ctx context.Context, 
 }
 
 // HostSettingsChangeableWithoutRestart returns system.server_settings names ClickHouse applies
-// without a restart. A missing changeable_without_restart column returns no names and no error,
-// so the settings query is not sent. Any other query error is returned as-is so the caller can
+// without a restart. supported is false when system.server_settings has no changeable_without_restart
+// column; the settings query is not sent then. Any query error is returned as-is so the caller can
 // fall back to configurationRestartPolicy.
-func (s *ClusterSchemer) HostSettingsChangeableWithoutRestart(ctx context.Context, host *api.Host) ([]string, error) {
+func (s *ClusterSchemer) HostSettingsChangeableWithoutRestart(ctx context.Context, host *api.Host) (names []string, supported bool, err error) {
 	count, err := s.QueryHostInt(ctx, host, s.sqlSettingsChangeableWithoutRestartColumn())
 	if err != nil || count == 0 {
-		return nil, err
+		return nil, false, err
 	}
 	query, err := s.QueryHost(ctx, host, s.sqlSettingsChangeableWithoutRestart())
 	if query != nil {
 		defer query.Close()
 	}
-	if err != nil || query == nil {
-		return nil, err
+	if err != nil {
+		return nil, true, err
 	}
-	var names []string
+	if query == nil {
+		return nil, true, errors.New("no result")
+	}
 	if err := query.UnzipColumnsAsStrings(&names); err != nil {
-		return nil, err
+		return nil, true, err
 	}
-	return names, nil
+	return names, true, nil
 }
 
 // HostClickHouseVersion returns ClickHouse version on the host

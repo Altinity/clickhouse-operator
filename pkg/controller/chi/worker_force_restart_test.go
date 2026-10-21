@@ -78,6 +78,17 @@ func TestShouldForceRestartHostFollowsCurrentPolicy(t *testing.T) {
 	}
 }
 
+func hostReloadabilityDone(cache *reconcileReloadability, host *api.Host) bool {
+	value, ok := cache.hosts.Load(host)
+	if !ok {
+		return false
+	}
+	entry := value.(*hostReloadability)
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	return entry.done
+}
+
 func TestReconcileReloadabilityAsksOnce(t *testing.T) {
 	host := hostWithServerSettingChange()
 	if !model.IsServerSettingsChanged(host) {
@@ -86,24 +97,33 @@ func TestReconcileReloadabilityAsksOnce(t *testing.T) {
 	w := &worker{a: a.NewAnnouncer(nil, nil)}
 	cache := &reconcileReloadability{}
 
-	remembered := &hostReloadability{
+	cache.hosts.Store(host, &hostReloadability{
+		done:     true,
 		settings: model.NewSettingsChangeableWithoutRestart([]string{"logger.level"}),
-	}
-	remembered.once.Do(func() {})
-	cache.hosts.Store(host, remembered)
+	})
 	if !cache.get(context.Background(), w, host).Contains("logger.level") {
 		t.Fatal("a list already fetched for this host is reused")
 	}
 
-	// A cancelled query is remembered. A later live call must not dial ClickHouse.
+	// A cancelled query is not an answer. The next check asks again.
 	changed := hostWithServerSettingChange()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if cache.get(ctx, w, changed) != nil {
 		t.Fatal("a cancelled query leaves configurationRestartPolicy in charge")
 	}
-	if cache.get(context.Background(), w, changed) != nil {
-		t.Fatal("the failed query stays the answer for this reconcile")
+	if hostReloadabilityDone(cache, changed) {
+		t.Fatal("a failed query must not stay the answer for this reconcile")
+	}
+
+	// No server setting changed: nothing to ask, and that is an answer.
+	unchanged := hostWithAddress("r3")
+	unchanged.SetCR(&api.ClickHouseInstallation{})
+	if cache.get(context.Background(), w, unchanged) != nil {
+		t.Fatal("a host without server setting changes needs no list")
+	}
+	if !hostReloadabilityDone(cache, unchanged) {
+		t.Fatal("a host without server setting changes is answered without a query")
 	}
 
 	fresh := &reconcileReloadability{}
@@ -132,7 +152,17 @@ func TestReconcileReloadabilityConcurrentHosts(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	if cache.get(context.Background(), w, host) != nil {
-		t.Fatal("the failed query stays the answer for this reconcile")
+	if hostReloadabilityDone(cache, host) {
+		t.Fatal("a failed query must not stay the answer for this reconcile")
+	}
+}
+
+func TestReconcileReloadabilityWithoutTask(t *testing.T) {
+	w := &worker{}
+	if w.reconcileReloadability() == nil {
+		t.Fatal("a worker without a task still gets a cache")
+	}
+	if w.reloadability != nil {
+		t.Fatal("a worker without a task must not store a cache: shard goroutines would race on it")
 	}
 }

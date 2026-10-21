@@ -65,8 +65,7 @@ type worker struct {
 	stsReconciler *statefulset.Reconciler
 
 	// reloadability remembers, per host, which server settings ClickHouse applies
-	// without a restart. A reconcile replaces it. The restart policy is not cached:
-	// it is evaluated against the host's current version on every check.
+	// without a restart. A reconcile replaces it. The restart policy is not cached.
 	reloadability *reconcileReloadability
 
 	start time.Time
@@ -156,8 +155,7 @@ func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
 
 // shouldForceRestartHost checks whether cluster requires hosts restart.
 // Which server settings are changeable without a restart is asked once per host
-// per reconcile. The restart policy is evaluated on every call, so a version that
-// becomes known later still selects its own rule.
+// per reconcile; a failed query is asked again on the next call.
 func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) bool {
 	switch {
 	case host.HasAncestor() && host.GetAncestor().IsStopped():
@@ -219,11 +217,16 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 	}
 }
 
+// settingsChangeableWithoutRestartTimeout bounds one host's changeable_without_restart query.
+// A host that does not answer in time is left to configurationRestartPolicy.
+const settingsChangeableWithoutRestartTimeout = 10 * time.Second
+
 // hostReloadability is one host's answer for this reconcile.
-// once runs the ClickHouse query a single time. A failed query leaves settings
-// empty, and every later check in this reconcile uses that same fallback.
+// Only an answer is remembered. A failed query is retried on the next check,
+// so a pod that was briefly unreachable does not decide the whole reconcile.
 type hostReloadability struct {
-	once     sync.Once
+	mu       sync.Mutex
+	done     bool
 	settings model.SettingsChangeableWithoutRestart
 }
 
@@ -233,51 +236,72 @@ type reconcileReloadability struct {
 }
 
 // get returns the server settings this host applies without a restart.
-// The query runs only when server settings changed, and only once.
+// The query runs only when server settings changed, and only until it gets an answer.
 func (c *reconcileReloadability) get(ctx context.Context, w *worker, host *api.Host) model.SettingsChangeableWithoutRestart {
 	value, _ := c.hosts.LoadOrStore(host, &hostReloadability{})
 	entry := value.(*hostReloadability)
 
-	entry.once.Do(func() {
-		if model.IsServerSettingsChanged(host) {
-			entry.settings = w.settingsChangeableWithoutRestart(ctx, host)
-		}
-	})
-
-	return entry.settings
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	if entry.done {
+		return entry.settings
+	}
+	if !model.IsServerSettingsChanged(host) {
+		entry.done = true
+		return nil
+	}
+	settings, ok := w.settingsChangeableWithoutRestart(ctx, host)
+	if ok {
+		entry.settings = settings
+		entry.done = true
+	}
+	return settings
 }
 
+// reconcileReloadability returns this reconcile's cache. newTask sets it before any host is
+// reconciled. Without a task the answer is not cached, and w.reloadability is not written,
+// because shard goroutines call this concurrently.
 func (w *worker) reconcileReloadability() *reconcileReloadability {
 	if w.reloadability == nil {
-		w.reloadability = &reconcileReloadability{}
+		return &reconcileReloadability{}
 	}
 	return w.reloadability
 }
 
 // configurationChangeRequiresReboot reports whether a configuration change requires a restart.
 // cache supplies the settings ClickHouse applies without a restart. The restart policy
-// is then applied to the host's current state.
+// is then applied to the host.
 func (w *worker) configurationChangeRequiresReboot(ctx context.Context, host *api.Host, cache *reconcileReloadability) bool {
 	settings := cache.get(ctx, w, host)
 	return model.IsConfigurationChangeRequiresReboot(host, settings)
 }
 
 // settingsChangeableWithoutRestart asks this host which server settings it applies without a restart.
-// Older ClickHouse without changeable_without_restart, and any query failure, leaves the decision
-// to configurationRestartPolicy. The column is checked first, so that settings query is not sent
+// ok is false when there is no answer: a cancelled context or a failed query. Older ClickHouse without
+// changeable_without_restart is an answer: an empty set. Both leave the decision to
+// configurationRestartPolicy. The column is checked first, so that settings query is not sent
 // to a server that would reject it.
-func (w *worker) settingsChangeableWithoutRestart(ctx context.Context, host *api.Host) model.SettingsChangeableWithoutRestart {
+func (w *worker) settingsChangeableWithoutRestart(ctx context.Context, host *api.Host) (settings model.SettingsChangeableWithoutRestart, ok bool) {
 	if util.IsContextDone(ctx) || host == nil {
-		return nil
+		return nil, false
 	}
 
-	names, err := w.ensureClusterSchemer(host).HostSettingsChangeableWithoutRestart(ctx, host)
-	if err != nil {
-		w.a.V(1).M(host).F().Info("system.server_settings.changeable_without_restart is not usable, configurationRestartPolicy applies. Host: %s err: %v", host.GetName(), err)
-		return nil
+	ctx, cancel := context.WithTimeout(ctx, settingsChangeableWithoutRestartTimeout)
+	defer cancel()
+	names, supported, err := w.ensureClusterSchemer(host).HostSettingsChangeableWithoutRestart(ctx, host)
+	switch {
+	case err != nil:
+		w.a.V(1).M(host).F().Info("system.server_settings.changeable_without_restart query failed, configurationRestartPolicy applies. Host: %s err: %v", host.GetName(), err)
+		return nil, false
+	case util.IsContextDone(ctx):
+		w.a.V(1).M(host).F().Info("system.server_settings.changeable_without_restart query got no answer, configurationRestartPolicy applies. Host: %s", host.GetName())
+		return nil, false
+	case !supported:
+		w.a.V(1).M(host).F().Info("system.server_settings has no changeable_without_restart column, configurationRestartPolicy applies. Host: %s", host.GetName())
+		return nil, true
 	}
 	w.a.V(1).M(host).F().Info("system.server_settings.changeable_without_restart = Yes lists %d settings. Host: %s", len(names), host.GetName())
-	return model.NewSettingsChangeableWithoutRestart(names)
+	return model.NewSettingsChangeableWithoutRestart(names), true
 }
 
 // isImageChangeRequested reports whether the ClickHouse container image differs between

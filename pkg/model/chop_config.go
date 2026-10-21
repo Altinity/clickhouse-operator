@@ -106,8 +106,9 @@ func isSettingsChangeRequiresReboot(host *api.Host, configurationRestartPolicyRu
 }
 
 // isServerSettingsChangeRequiresReboot checks server settings. A name ClickHouse lists as
-// changeable_without_restart = Yes skips configurationRestartPolicy. Profiles, quotas, files
-// and ZooKeeper are not server settings and are not consulted here.
+// changeable_without_restart = Yes skips configurationRestartPolicy, unless the latest matching
+// rule names this exact path and says "yes". Profiles, quotas, files and ZooKeeper are not
+// server settings and are not consulted here.
 func isServerSettingsChangeRequiresReboot(host *api.Host, a, b *api.Settings, changeableWithoutRestart SettingsChangeableWithoutRestart) bool {
 	diff, equal := messagediff.DeepDiff(a, b)
 	if equal {
@@ -117,8 +118,10 @@ func isServerSettingsChangeRequiresReboot(host *api.Host, a, b *api.Settings, ch
 	paths := make([]string, 0, len(affectedPaths))
 	for _, path := range affectedPaths {
 		if name, ok := serverSettingName(path); ok && changeableWithoutRestart.Contains(name) {
-			log.Info("ChangeRequiresReboot server_settings path: %s restart: false", path)
-			continue
+			if _, restart, exact := getLatestConfigMatch(host, path); !(exact && restart) {
+				log.V(1).Info("ChangeRequiresReboot server_settings path: %s restart: false", path)
+				continue
+			}
 		}
 		paths = append(paths, path)
 	}
@@ -177,6 +180,13 @@ func ruleMatches(set api.OperatorConfigRestartPolicyRuleSet, path string) (match
 // getLatestConfigMatchValue returns value of the latest match of a specified `path` in ConfigRestartPolicy.Rules
 // in case match found in ConfigRestartPolicy.Rules or false
 func getLatestConfigMatchValue(host *api.Host, path string) (matches bool, value bool) {
+	matches, value, _ = getLatestConfigMatch(host, path)
+	return matches, value
+}
+
+// getLatestConfigMatch is getLatestConfigMatchValue that also reports whether the latest matching
+// rule names `path` exactly, without a wildcard.
+func getLatestConfigMatch(host *api.Host, path string) (matches bool, value bool, exact bool) {
 	// Check all rules
 	for _, r := range chop.Config().ClickHouse.ConfigRestartPolicy.Rules {
 		// Check ClickHouse version of a particular rule
@@ -188,11 +198,20 @@ func getLatestConfigMatchValue(host *api.Host, path string) (matches bool, value
 					// Yes, rule matches specified path.
 					matches = true
 					value = ruleValue
+					exact = ruleNamesPath(rule, path)
 				}
 			}
 		}
 	}
-	return matches, value
+	return matches, value, exact
+}
+
+// ruleNamesPath checks whether provided rule (rule set) names `path` literally
+func ruleNamesPath(set api.OperatorConfigRestartPolicyRuleSet, path string) bool {
+	for pattern := range set {
+		return string(pattern) == path
+	}
+	return false
 }
 
 func GetConfigMatchSpecs(chi *api.ClickHouseInstallation) (specs []*api.ChiSpec) {

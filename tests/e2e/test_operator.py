@@ -2372,8 +2372,8 @@ def test_010016(self):
 
     # test-016-settings-08.yaml
     # configurationRestartPolicy says settings/* restarts. test_setting is not one of
-    # the "no" exceptions (only max_concurrent_queries is). Where system.server_settings lists it as
-    # changeable without a restart, that column wins and the pod stays up.
+    # its "no" exceptions. Where system.server_settings lists it as changeable without
+    # a restart, that column wins and the pod stays up.
     with When("Change a server setting that ClickHouse reloads without a restart"):
         test_setting = "max_concurrent_select_queries"
         has_column = clickhouse.query(
@@ -2383,12 +2383,16 @@ def test_010016(self):
         advice = ""
         if has_column == "1":
             advice = clickhouse.query(chi, f"SELECT changeable_without_restart FROM system.server_settings WHERE name = '{test_setting}'")
-        if has_column != "1" or advice != "Yes":
+        if has_column != "1":
             note(
-                f"{test_setting} is not marked changeable_without_restart = Yes "
-                f"(column={has_column}, advice={advice!r}); configurationRestartPolicy still decides"
+                f"system.server_settings has no changeable_without_restart column; "
+                f"configurationRestartPolicy still decides"
             )
         else:
+            assert advice == "Yes", error(
+                f"{test_setting} must be changeable_without_restart = Yes on this ClickHouse, got {advice!r}; "
+                f"pick another setting for this step"
+            )
             start_time = kubectl.get_clickhouse_start(chi)
             kubectl.create_and_check(
                 manifest="manifests/chi/test-016-settings-08.yaml",
@@ -6563,6 +6567,19 @@ def test_010062(self):
         )
 
     with When("Apply CHI with a config change that forces software restart (HostConfigRestart → HostShutdown)"):
+        restart_setting = "max_connections"
+        has_column = clickhouse.query(
+            chi,
+            "SELECT count() FROM system.columns WHERE (database, table, name) = ('system','server_settings','changeable_without_restart')",
+        )
+        if has_column == "1":
+            advice = clickhouse.query(
+                chi, f"SELECT changeable_without_restart FROM system.server_settings WHERE name = '{restart_setting}'"
+            )
+            assert advice != "Yes", error(
+                f"{restart_setting} is changeable_without_restart = Yes on this ClickHouse, so it no longer restarts; "
+                f"pick another setting in test-062-hooks-on-shutdown-2.yaml"
+            )
         kubectl.create_and_check(
             manifest="manifests/chi/test-062-hooks-on-shutdown-2.yaml",
             check={

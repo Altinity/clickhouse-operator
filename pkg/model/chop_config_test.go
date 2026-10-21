@@ -323,6 +323,72 @@ func TestSettingsChangeableWithoutRestartSkipRestartPolicy(t *testing.T) {
 		}
 	})
 
+	t.Run("an exact policy rule of yes beats changeable without restart", func(t *testing.T) {
+		cfg := chop.Config()
+		prev := cfg.ClickHouse.ConfigRestartPolicy
+		t.Cleanup(func() { cfg.ClickHouse.ConfigRestartPolicy = prev })
+		cfg.ClickHouse.ConfigRestartPolicy = api.OperatorConfigRestartPolicy{
+			Rules: []api.OperatorConfigRestartPolicyRule{{
+				Version: "*",
+				Rules: []api.OperatorConfigRestartPolicyRuleSet{
+					{types.Matchable("settings/*"): yes()},
+					{types.Matchable("settings/max_concurrent_queries"): yes()},
+				},
+			}},
+		}
+		host := settingChange("max_concurrent_queries", "10", "20")
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries"})
+		if !IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("a rule naming this setting with yes is the user's explicit choice to restart")
+		}
+	})
+
+	t.Run("a later wildcard rule of yes does not beat changeable without restart", func(t *testing.T) {
+		cfg := chop.Config()
+		prev := cfg.ClickHouse.ConfigRestartPolicy
+		t.Cleanup(func() { cfg.ClickHouse.ConfigRestartPolicy = prev })
+		cfg.ClickHouse.ConfigRestartPolicy = api.OperatorConfigRestartPolicy{
+			Rules: []api.OperatorConfigRestartPolicyRule{{
+				Version: "*",
+				Rules: []api.OperatorConfigRestartPolicyRuleSet{
+					{types.Matchable("settings/max_concurrent_queries"): yes()},
+					{types.Matchable("settings/max_*"): yes()},
+				},
+			}},
+		}
+		host := settingChange("max_concurrent_queries", "10", "20")
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries"})
+		if IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("only the latest matching rule counts, and a wildcard does not name the setting")
+		}
+	})
+
+	t.Run("a mixed change restarts for the setting that is not changeable without restart", func(t *testing.T) {
+		applyRestartPolicy(t, false)
+		host := hostWithZKAndSettings(
+			nil, nil,
+			api.NewSettings().SetScalarsFromMap(map[string]string{"max_concurrent_queries": "10", "max_thread_pool_size": "10000"}),
+			api.NewSettings().SetScalarsFromMap(map[string]string{"max_concurrent_queries": "20", "max_thread_pool_size": "20000"}),
+		)
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries"})
+		if !IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("max_thread_pool_size is not changeable without restart and must still restart")
+		}
+	})
+
+	t.Run("a removed setting changeable without restart does not restart", func(t *testing.T) {
+		applyRestartPolicy(t, false)
+		host := hostWithZKAndSettings(
+			nil, nil,
+			api.NewSettings().SetScalarsFromMap(map[string]string{"max_concurrent_queries": "10"}),
+			api.NewSettings(),
+		)
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries"})
+		if IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("removing a setting changeable without restart reloads its default")
+		}
+	})
+
 	t.Run("a nested server setting is matched by its dotted name", func(t *testing.T) {
 		applyRestartPolicy(t, false)
 		host := settingChange("logger/level", "information", "trace")
