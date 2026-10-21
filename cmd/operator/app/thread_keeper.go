@@ -30,6 +30,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	controller "github.com/altinity/clickhouse-operator/pkg/controller/chk"
 	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 var (
@@ -244,6 +245,14 @@ func keeperPredicate() predicate.Funcs {
 
 			if !controller.ShouldEnqueue(new) {
 				return false
+			}
+
+			if old, ok := e.ObjectOld.(*api.ClickHouseKeeperInstallation); ok && old != nil {
+				if old.GetGeneration() == new.GetGeneration() &&
+					util.SlicesEqualAsSet(old.GetFinalizers(), new.GetFinalizers()) &&
+					old.GetDeletionTimestamp().Equal(new.GetDeletionTimestamp()) {
+					return false
+				}
 			}
 
 			return true
