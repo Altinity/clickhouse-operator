@@ -1649,26 +1649,38 @@ def check_operator_clickhouse_tls_logs(self, ns=None):
         )
 
 @TestStep(Then)
-def check_metrics_exporter_discovers_clickhouse_https(self, ns=None, since_time=None):
-    """Assert metrics-exporter discovers ClickHouse hosts using HTTPS :8443.
+def check_metrics_exporter_scrapes_clickhouse_https(self, chi, replica_count, ns=None):
+    """Assert metrics-exporter scrapes every ClickHouse host of `chi` through HTTPS.
 
-    since_time (RFC 3339) reads the log from that moment instead of the last 4000 lines.
-    The discovery line is written once, and failed scrapes that follow log their full SQL,
-    so a fixed tail can lose it.
+    chi_clickhouse_metric_VersionInteger is written only after a successful query, so it
+    proves the exporter passed TLS verification with the cluster's CA. A discovery line in
+    the exporter log does not: it is written before the first dial.
     """
 
     ns = ns or current().context.operator_namespace
     pod = kubectl.get_operator_pod(ns=ns)
-    window = f"--since-time={since_time}" if since_time else "--tail=4000"
-
-    logs = kubectl.launch(
-        f"logs {pod} -c metrics-exporter {window}",
-        ns=ns,
+    rx = re.compile(
+        r'^chi_clickhouse_metric_VersionInteger\{[^}]*hostname="(chi-' + re.escape(chi) + r'-[^".]+)',
+        re.MULTILINE,
     )
 
-    assert '"httpsPort":8443' in logs, error(
-        "metrics-exporter did not discover ClickHouse hosts with httpsPort=8443\n"
-        + "\n".join(logs.splitlines()[-200:])
+    hosts = set()
+    out = ""
+    for attempt in range(1, 13):
+        out = util.get_metrics(pod, ns)
+        hosts = set(rx.findall(out))
+        if len(hosts) >= replica_count:
+            break
+        with Then(f"metrics-exporter scrapes {len(hosts)}/{replica_count} hosts of {chi}. Wait for 10 seconds"):
+            time.sleep(10)
+
+    fetch_errors = [
+        line for line in out.splitlines()
+        if line.startswith("chi_clickhouse_metric_fetch_errors{") and f'hostname="chi-{chi}-' in line
+    ]
+    assert len(hosts) >= replica_count, error(
+        f"metrics-exporter scraped {sorted(hosts)} of {replica_count} hosts of {chi} over HTTPS\n"
+        + "\n".join(fetch_errors)
     )
 
 @TestStep(Then)

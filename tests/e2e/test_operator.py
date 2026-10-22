@@ -11171,11 +11171,6 @@ def test_030003(self):
     with Then("Keeper cluster passes essential FIPS checks"):
         chk_pods = run_chk_fips_checks(workload=chk, replica_count=1)
 
-    # The exporter logs the hosts once, when the operator registers the CHI. Read its log
-    # from here on instead of a fixed tail, which per-scrape errors can push the line out of.
-    # A minute of margin covers clock skew between the runner and the cluster.
-    exporter_log_since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 60))
-
     with When("FIPS ClickHouse is deployed with 1 replica and backup template"):
         chi_manifest_1 = fips_edit_manifest(
             source_manifest=chi_manifest,
@@ -11229,8 +11224,8 @@ def test_030003(self):
     with Check("operator uses TLS-compliant outbound paths after reconcile"):
         run_operator_reconcile_fips_checks()
 
-    with Check("metrics-exporter discovers ClickHouse through HTTPS"):
-        check_metrics_exporter_discovers_clickhouse_https(since_time=exporter_log_since)
+    with Check("metrics-exporter scrapes ClickHouse through HTTPS"):
+        check_metrics_exporter_scrapes_clickhouse_https(chi=chi, replica_count=2)
 
     with Check("ClickHouse replicas use Keeper secure client port"):
         check_clickhouse_uses_secure_keeper_port(chi=chi)

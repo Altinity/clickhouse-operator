@@ -83,17 +83,31 @@ func (p *ClusterConnectionParams) OverlayClusterSecurityTLS(tls *api.ClusterSecu
 	if (p == nil) || (tls == nil) {
 		return p
 	}
-	if v := tls.GetVerify(); v != "" {
-		p.TLSVerify = v
+	return p.OverlayTLS(tls.GetVerify(), tls.GetMinVersion(), tls.GetServerName(), tls.GetRootCA())
+}
+
+// OverlayTLS layers TLS knobs over the CHOP-config-derived defaults. Empty values leave
+// the existing value alone, same as OverlayClusterSecurityTLS.
+func (p *ClusterConnectionParams) OverlayTLS(
+	verify api.TLSVerify,
+	minVersion api.TLSMinVersion,
+	serverName string,
+	rootCA string,
+) *ClusterConnectionParams {
+	if p == nil {
+		return p
 	}
-	if mv := tls.GetMinVersion(); mv != "" {
-		p.TLSMinVersion = mv
+	if verify != "" {
+		p.TLSVerify = verify
 	}
-	if sn := tls.GetServerName(); sn != "" {
-		p.TLSServerName = sn
+	if minVersion != "" {
+		p.TLSMinVersion = minVersion
 	}
-	if ca := tls.GetRootCA(); ca != "" {
-		p.RootCA = ca
+	if serverName != "" {
+		p.TLSServerName = serverName
+	}
+	if rootCA != "" {
+		p.RootCA = rootCA
 	}
 	return p
 }
