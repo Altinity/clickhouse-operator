@@ -18,10 +18,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeTypes "k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
@@ -44,6 +47,18 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		log.V(1).Info("Reconcile is aborted. CR before start: %s ", new.GetName())
 		return nil
 	}
+	// A staged join that never started already aborted this generation. The
+	// status write requeues the CR; running it again pays the 30s membership
+	// settle and aborts once more. A spec edit bumps metadata.generation.
+	// A pod that later becomes Ready clears the annotation and re-enqueues,
+	// the same recovery CHI does for an Aborted installation.
+	if reconcileAbortedAtGeneration(new) {
+		w.a.V(1).M(new).F().Info(
+			"Reconcile already aborted at generation %d — waiting for a spec change",
+			new.GetGeneration(),
+		)
+		return nil
+	}
 
 	common.LogOldAndNew("non-normalized yet (native)", old, new)
 
@@ -61,6 +76,9 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	metrics.CRInitZeroValues(ctx, new)
 	metrics.CRReconcilesStarted(ctx, new)
 	startTime := time.Now()
+	// buildCR replaces new with a normalized copy. Keep the API identity for
+	// the abort-generation annotation, which is written on the live object.
+	apiNamespace, apiName := new.Namespace, new.Name
 
 	new = w.buildCR(ctx, new)
 
@@ -144,6 +162,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 			return err
 		}
 		// Something went wrong
+		stall := errors.Is(err, errStagedJoinPodNotStarted)
 		w.a.WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
 			WithError(new).
 			M(new).F().
@@ -152,6 +171,17 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 		if errors.Is(err, common.ErrCRUDAbort) {
 			metrics.CRReconcilesAborted(ctx, new)
+		}
+		if stall {
+			// Status is Aborted. Do not hand ErrCRUDAbort to controller-runtime:
+			// the error rate-limiter requeues in milliseconds, and the follow-up
+			// pass would wait out membershipSettleDelay before aborting again.
+			// The generation annotation makes that follow-up return above.
+			if noteErr := w.noteAbortGeneration(ctx, apiNamespace, apiName); noteErr != nil {
+				w.a.V(1).M(new).F().Warning("unable to record abort generation: %v", noteErr)
+				return noteErr
+			}
+			return nil
 		}
 		return err
 	}
@@ -174,6 +204,50 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	metrics.CRReconcilesTimings(ctx, new, time.Since(startTime).Seconds())
 
 	return nil
+}
+
+// abortGenerationAnnotation records the metadata.generation that a staged-join
+// start timeout aborted. Status updates do not bump generation, so the
+// follow-up reconcile sees the same value and stops. A spec edit bumps it.
+const abortGenerationAnnotation = "clickhouse-keeper.altinity.com/abort-generation"
+
+func reconcileAbortedAtGeneration(cr *apiChk.ClickHouseKeeperInstallation) bool {
+	// cr.Status, not GetStatus(): a nil *Status returned as IStatus is not a nil interface.
+	if cr == nil || cr.Status == nil || cr.Status.GetStatus() != api.StatusAborted {
+		return false
+	}
+	raw, ok := cr.GetAnnotations()[abortGenerationAnnotation]
+	if !ok || raw == "" {
+		return false
+	}
+	gen, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return false
+	}
+	return gen == cr.GetGeneration()
+}
+
+// noteAbortGeneration writes abortGenerationAnnotation on the live CR.
+// Generation is read from the API object: the normalized copy does not carry it.
+func (w *worker) noteAbortGeneration(ctx context.Context, namespace, name string) error {
+	if w == nil || w.c == nil || w.c.Client == nil || w.c.APIReader == nil {
+		return fmt.Errorf("abort generation was not recorded")
+	}
+	cur := &apiChk.ClickHouseKeeperInstallation{}
+	key := kubeTypes.NamespacedName{Namespace: namespace, Name: name}
+	if err := w.c.APIReader.Get(ctx, key, cur); err != nil {
+		return err
+	}
+	gen := strconv.FormatInt(cur.GetGeneration(), 10)
+	if cur.Annotations != nil && cur.Annotations[abortGenerationAnnotation] == gen {
+		return nil
+	}
+	base := cur.DeepCopy()
+	if cur.Annotations == nil {
+		cur.Annotations = map[string]string{}
+	}
+	cur.Annotations[abortGenerationAnnotation] = gen
+	return w.c.Client.Patch(ctx, cur, client.MergeFrom(base))
 }
 
 func (w *worker) buildCR(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {

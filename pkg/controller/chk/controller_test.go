@@ -78,6 +78,22 @@ func TestReconcileResult(t *testing.T) {
 		require.Equal(t, ctrl.Result{}, res)
 	})
 
+	t.Run("aborted generation sticks until the spec generation changes", func(t *testing.T) {
+		stuck := &apiChk.ClickHouseKeeperInstallation{}
+		stuck.Generation = 4
+		stuck.Annotations = map[string]string{abortGenerationAnnotation: "4"}
+		stuck.Status = &apiChk.Status{Status: apiChk.StatusAborted}
+		require.True(t, reconcileAbortedAtGeneration(stuck))
+
+		stuck.Generation = 5
+		require.False(t, reconcileAbortedAtGeneration(stuck), "a spec edit bumps generation and must reconcile again")
+
+		stuck.Generation = 4
+		stuck.Status.Status = apiChk.StatusInProgress
+		require.False(t, reconcileAbortedAtGeneration(stuck))
+		require.False(t, reconcileAbortedAtGeneration(nil))
+	})
+
 	t.Run("nil CR does not panic on the defer log path", func(t *testing.T) {
 		res, err := c.reconcileResult(nil, common.ErrCRUDDeferred)
 		require.NoError(t, err)

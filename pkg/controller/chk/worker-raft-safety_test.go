@@ -26,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -576,9 +577,10 @@ func hostAtOnCR(cr *apiChk.ClickHouseKeeperInstallation, i int) *api.Host {
 // The quorum gate only ever reads: Create/Update count the call and return an error so a
 // test can assert the gate deferred instead of mutating, and Delete panics outright.
 type raftFakeSTS struct {
-	mu    sync.Mutex
-	ready map[*api.Host]int32
-	err   error
+	mu      sync.Mutex
+	ready   map[*api.Host]int32
+	created map[*api.Host]time.Time
+	err     error
 	// mirrorDesired makes a Get for a *apps.StatefulSet hand back that very object, i.e. the
 	// cluster already holds exactly what the creator just built. That is the only way to make
 	// getStatefulSetStatus compare two equal object-version labels and answer ObjectStatusSame;
@@ -596,6 +598,16 @@ func (f *raftFakeSTS) setReady(host *api.Host, ready int32) *raftFakeSTS {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.ready[host] = ready
+	return f
+}
+
+func (f *raftFakeSTS) setCreated(host *api.Host, at time.Time) *raftFakeSTS {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.created == nil {
+		f.created = map[*api.Host]time.Time{}
+	}
+	f.created[host] = at
 	return f
 }
 
@@ -637,6 +649,9 @@ func (f *raftFakeSTS) Get(ctx context.Context, params ...any) (*apps.StatefulSet
 					schema.GroupResource{Group: "apps", Resource: "statefulsets"}, host.GetName())
 			}
 			sts.Status.ReadyReplicas = ready
+			if created, ok := f.created[host]; ok {
+				sts.CreationTimestamp = meta.NewTime(created)
+			}
 		}
 	}
 	return sts, nil
@@ -670,13 +685,42 @@ func (f *raftFakeSTS) List(ctx context.Context, namespace string, opts meta.List
 type raftFakeKube struct {
 	interfaces.IKube
 	sts interfaces.IKubeSTS
+	pod interfaces.IKubePod
 }
 
 func (k *raftFakeKube) STS() interfaces.IKubeSTS { return k.sts }
 
 // Pod and Storage are wired into the StatefulSet reconciler by newTask but never called on
-// the paths under test; nil is enough to let construction succeed.
-func (k *raftFakeKube) Pod() interfaces.IKubePod            { return nil }
+// the paths under test; nil is enough to let construction succeed. The staged-admit start
+// timeout reads Pod() when a StatefulSet is older than statefulSetUpdateTimeout.
+func (k *raftFakeKube) Pod() interfaces.IKubePod { return k.pod }
+
+// raftFakePod answers the staged-admit start check. One pod is enough: the check asks
+// about a single host, and an empty container status counts as not started.
+type raftFakePod struct {
+	interfaces.IKubePod
+	pod *core.Pod
+	err error
+}
+
+func (p *raftFakePod) Get(context.Context, ...any) (*core.Pod, error) {
+	if p.err != nil {
+		return nil, p.err
+	}
+	return p.pod, nil
+}
+
+func keeperPodStarted(started bool) *core.Pod {
+	value := started
+	return &core.Pod{
+		Status: core.PodStatus{
+			ContainerStatuses: []core.ContainerStatus{{
+				Name:    "clickhouse-keeper",
+				Started: &value,
+			}},
+		},
+	}
+}
 func (k *raftFakeKube) Storage() interfaces.IKubeStoragePVC { return nil }
 func (k *raftFakeKube) CR() interfaces.IKubeCR              { return raftFakeKubeCR{} }
 
@@ -1514,6 +1558,67 @@ func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
 		require.Equal(t, []string{"h0", "h1"}, visited,
 			"h2 must not be created while the CHK is stopped, and the pass must not stay deferred")
 		require.True(t, h2.GetReconcileAttributes().IsExclude())
+		require.Zero(t, fake.mutationCount())
+	})
+
+	t.Run("unstarted pod aborts once the StatefulSet update timeout has passed", func(t *testing.T) {
+		timeout := statefulSetUpdateTimeout()
+		require.Greater(t, timeout, time.Duration(0))
+		cr, fake, shard := newScaleUp(0)
+		h1 := hostAtOnCR(cr, 1)
+		h2 := hostAtOnCR(cr, 2)
+		fake.setCreated(h1, time.Now().Add(-timeout-time.Second))
+		var visited []string
+		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{
+			sts: fake,
+			pod: &raftFakePod{pod: keeperPodStarted(false)},
+		}}}
+		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
+			visited = append(visited, host.GetName())
+			return nil
+		}
+
+		require.ErrorIs(t, w.reconcileShardWithHosts(ctx, shard), common.ErrCRUDAbort)
+		require.Empty(t, visited, "an aborted start must not reconcile the next member")
+		require.True(t, h2.GetReconcileAttributes().IsExclude())
+		require.Zero(t, fake.mutationCount())
+	})
+
+	t.Run("a started pod that is not Ready is still deferred after the timeout", func(t *testing.T) {
+		timeout := statefulSetUpdateTimeout()
+		require.Greater(t, timeout, time.Duration(0))
+		cr, fake, shard := newScaleUp(0)
+		fake.setCreated(hostAtOnCR(cr, 1), time.Now().Add(-timeout-time.Second))
+		var visited []string
+		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{
+			sts: fake,
+			pod: &raftFakePod{pod: keeperPodStarted(true)},
+		}}}
+		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
+			visited = append(visited, host.GetName())
+			return nil
+		}
+
+		require.ErrorIs(t, w.reconcileShardWithHosts(ctx, shard), common.ErrCRUDDeferred)
+		require.Equal(t, []string{"h1", "h0"}, visited)
+		require.Zero(t, fake.mutationCount())
+	})
+
+	t.Run("an unstarted pod still inside the StatefulSet update timeout is deferred", func(t *testing.T) {
+		cr, fake, shard := newScaleUp(0)
+		fake.setCreated(hostAtOnCR(cr, 1), time.Now())
+		var visited []string
+		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{
+			sts: fake,
+			pod: &raftFakePod{pod: keeperPodStarted(false)},
+		}}}
+		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
+			visited = append(visited, host.GetName())
+			return nil
+		}
+
+		require.ErrorIs(t, w.reconcileShardWithHosts(ctx, shard), common.ErrCRUDDeferred)
+		require.Equal(t, []string{"h1", "h0"}, visited)
 		require.Zero(t, fake.mutationCount())
 	})
 }

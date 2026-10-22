@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -168,6 +169,12 @@ func initKeeper(ctx context.Context, extClient *apiextensions.Clientset) error {
 	maxConcurrentReconciles := chop.Config().Reconcile.Runtime.ReconcileCHKsThreadsNumber
 	logger.Info("init keeper - CHK controller concurrency", "maxConcurrentReconciles", maxConcurrentReconciles)
 
+	chkCtrl := controller.NewController(
+		manager.GetClient(),
+		manager.GetAPIReader(),
+		manager.GetScheme(),
+		extClient,
+	)
 	err = ctrlRuntime.
 		NewControllerManagedBy(manager).
 		For(
@@ -175,17 +182,17 @@ func initKeeper(ctx context.Context, extClient *apiextensions.Clientset) error {
 			builder.WithPredicates(keeperPredicate()),
 		).
 		Owns(&apps.StatefulSet{}).
+		// Same signal CHI uses: a NotReady → Ready pod of an Aborted CHK
+		// re-enqueues that CHK. The predicate drops every other pod event.
+		Watches(
+			&core.Pod{},
+			handler.EnqueueRequestsFromMapFunc(chkCtrl.RequestsForReadyPod),
+			builder.WithPredicates(controller.PodBecameReadyPredicate()),
+		).
 		WithOptions(ctrlController.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
-		Complete(
-			controller.NewController(
-				manager.GetClient(),
-				manager.GetAPIReader(),
-				manager.GetScheme(),
-				extClient,
-			),
-		)
+		Complete(chkCtrl)
 	if err != nil {
 		// Building the controller resolves the scheme and records watches; it issues no API calls,
 		// so like the scheme registration above this can only be a programming fault.

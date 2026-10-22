@@ -26,10 +26,12 @@ import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -180,6 +182,12 @@ func hostIsStagedScaleUpJoin(host *api.Host) bool {
 // reload or roll onto the published raft_configuration before the joiner can
 // become Ready. A Get error other than NotFound fails closed — membership is
 // not expanded while StatefulSet existence is unknown.
+//
+// That postponement is not open-ended for a pod that never starts. The create
+// path waits statefulSetUpdateTimeout once; a later pass sees ObjectStatusSame
+// and would otherwise defer the next member forever. Once that same timeout
+// has elapsed and the joiner's containers have not started, the pass aborts.
+// A pod that has started and is waiting to join Raft is still deferred.
 func (w *worker) deferUnreadyStagedAdmit(ctx context.Context, host *api.Host) error {
 	if !hostIsStagedScaleUpJoin(host) || w.c == nil {
 		return nil
@@ -189,6 +197,13 @@ func (w *worker) deferUnreadyStagedAdmit(ctx context.Context, host *api.Host) er
 		return err
 	}
 	if own != nil {
+		// Stopped: the pass has to reach clean(). An unstarted pod must not
+		// turn that into an abort.
+		if !host.IsStopped() {
+			if err := w.abortIfStagedJoinPodNotStarted(ctx, host); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 	// Stopped: do not defer (the pass must reach clean) and do not create the
@@ -223,6 +238,10 @@ func (w *worker) deferUnreadyStagedAdmit(ctx context.Context, host *api.Host) er
 	if blocker == nil {
 		return nil
 	}
+	// stagedJoinerStatefulSet stored this Get on the host before the walk recorded it.
+	if err := w.abortIfStagedJoinPodNotStarted(ctx, blocker); err != nil {
+		return err
+	}
 	w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileInProgress).
 		WithAction(host.GetCR()).
 		M(host).F().
@@ -230,9 +249,74 @@ func (w *worker) deferUnreadyStagedAdmit(ctx context.Context, host *api.Host) er
 	return common.ErrCRUDDeferred
 }
 
+// abortIfStagedJoinPodNotStarted aborts once a staged joiner's StatefulSet is
+// older than the operator StatefulSet update timeout and its pod has not
+// started. A zero CreationTimestamp has not been persisted yet, so it does not
+// count. A started pod is left for the Ready deferral: it may still be joining.
+func (w *worker) abortIfStagedJoinPodNotStarted(ctx context.Context, host *api.Host) error {
+	sts := host.Runtime.CurStatefulSet
+	timeout := statefulSetUpdateTimeout()
+	if sts == nil || sts.CreationTimestamp.IsZero() || timeout <= 0 {
+		return nil
+	}
+	if time.Since(sts.CreationTimestamp.Time) < timeout {
+		return nil
+	}
+	started, err := w.stagedJoinerPodStarted(ctx, host)
+	if err != nil {
+		return err
+	}
+	if started {
+		return nil
+	}
+	w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileFailed).
+		WithAction(host.GetCR()).
+		M(host).F().
+		Warning("Abort admitting %s: pod has not started within %s", host.GetName(), timeout)
+	return fmt.Errorf("staged keeper %s pod has not started within %s: %w", host.GetName(), timeout, errStagedJoinPodNotStarted)
+}
+
+// statefulSetUpdateTimeout is the same budget WaitHostPodStarted uses when a
+// StatefulSet is created. It comes from the operator configuration
+// (reconcile.statefulSet.update.timeout), default 300s.
+func statefulSetUpdateTimeout() time.Duration {
+	cfg := chop.Config()
+	if cfg == nil {
+		return 0
+	}
+	return time.Duration(cfg.Reconcile.StatefulSet.Update.Timeout) * time.Second
+}
+
+// stagedJoinerPodStarted reports whether the joiner pod's containers have
+// started. A missing pod, or a pod kubelet has not written container status
+// for, has not started. PodHasAllContainersStarted treats an empty status list
+// as started, which is the opposite of this check.
+func (w *worker) stagedJoinerPodStarted(ctx context.Context, host *api.Host) (bool, error) {
+	if w.c == nil || w.c.kube == nil || w.c.kube.Pod() == nil {
+		return false, fmt.Errorf("pod client is not configured")
+	}
+	pod, err := w.c.kube.Pod().Get(ctx, host)
+	if apiErrors.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if pod == nil || len(pod.Status.ContainerStatuses) == 0 {
+		return false, nil
+	}
+	return k8s.PodHasAllContainersStarted(pod), nil
+}
+
 // errSkipStagedAdmit tells reconcileHost to leave this not-yet-created member
 // alone and continue the pass. It is not a deferral and not a failure.
 var errSkipStagedAdmit = errors.New("skip staged keeper admit while stopped")
+
+// errStagedJoinPodNotStarted aborts the pass and must not be returned to
+// controller-runtime. An error result is requeued immediately, and the next
+// pass pays membershipSettleDelay before aborting again. Reconcile records the
+// CR generation and stays stopped until a spec change bumps that generation.
+var errStagedJoinPodNotStarted = fmt.Errorf("staged keeper pod has not started: %w", common.ErrCRUDAbort)
 
 // stagedJoinerStatefulSet returns the live StatefulSet, or nil when it is absent.
 // NotFound is not an error. Any other Get error is returned unchanged.
