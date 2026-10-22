@@ -1649,20 +1649,26 @@ def check_operator_clickhouse_tls_logs(self, ns=None):
         )
 
 @TestStep(Then)
-def check_metrics_exporter_discovers_clickhouse_https(self, ns=None):
-    """Assert metrics-exporter discovers ClickHouse hosts using HTTPS :8443."""
+def check_metrics_exporter_discovers_clickhouse_https(self, ns=None, since_time=None):
+    """Assert metrics-exporter discovers ClickHouse hosts using HTTPS :8443.
+
+    since_time (RFC 3339) reads the log from that moment instead of the last 4000 lines.
+    The discovery line is written once, and failed scrapes that follow log their full SQL,
+    so a fixed tail can lose it.
+    """
 
     ns = ns or current().context.operator_namespace
     pod = kubectl.get_operator_pod(ns=ns)
+    window = f"--since-time={since_time}" if since_time else "--tail=4000"
 
     logs = kubectl.launch(
-        f"logs {pod} -c metrics-exporter --tail=4000",
+        f"logs {pod} -c metrics-exporter {window}",
         ns=ns,
     )
 
     assert '"httpsPort":8443' in logs, error(
         "metrics-exporter did not discover ClickHouse hosts with httpsPort=8443\n"
-        f"{logs}"
+        + "\n".join(logs.splitlines()[-200:])
     )
 
 @TestStep(Then)
