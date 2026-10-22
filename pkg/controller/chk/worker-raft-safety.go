@@ -416,7 +416,11 @@ func (w *worker) ensureQuorumSafeToDisruptHost(
 	if snap == nil || !snap.rolling || !ensembleHasQuorumHeadroom(snap.members) {
 		return nil
 	}
-	if !w.hostDisruptionWouldBreakQuorum(ctx, host, opts, *snap) {
+	blocked, err := w.raftPlanDisruptionBlocked(ctx, host, opts, *snap)
+	if err != nil {
+		return err
+	}
+	if !blocked {
 		return nil
 	}
 
@@ -465,7 +469,11 @@ func (w *worker) ensureQuorumSafeToDisruptHost(
 		if err := w.refreshQuorumSnapshotCounts(ctx, host, snap); err != nil {
 			return err
 		}
-		if !w.hostDisruptionWouldBreakQuorum(ctx, host, opts, *snap) {
+		blocked, err = w.raftPlanDisruptionBlocked(ctx, host, opts, *snap)
+		if err != nil {
+			return err
+		}
+		if !blocked {
 			w.a.V(1).M(host).F().Info(
 				"Raft quorum headroom available — proceeding with host %s disruption (ready=%d)",
 				host.GetName(), snap.readyCount,
