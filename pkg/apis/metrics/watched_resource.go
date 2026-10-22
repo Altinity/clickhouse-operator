@@ -32,7 +32,76 @@ type WatchedCR struct {
 // WatchedCluster specifies watched cluster
 type WatchedCluster struct {
 	Name  string         `json:"name,omitempty"  yaml:"name,omitempty"`
+	TLS   *WatchedTLS    `json:"tls,omitempty"   yaml:"tls,omitempty"`
 	Hosts []*WatchedHost `json:"hosts,omitempty" yaml:"hosts,omitempty"`
+}
+
+// WatchedTLS carries the cluster's ClickHouse client TLS settings (security.clickhouse.tls),
+// so the metrics exporter dials hosts the way the operator does. RootCA is the CA certificate
+// the normalizer inlined from rootCASecretRef. No private key is carried.
+type WatchedTLS struct {
+	Verify     api.TLSVerify     `json:"verify,omitempty"     yaml:"verify,omitempty"`
+	MinVersion api.TLSMinVersion `json:"minVersion,omitempty" yaml:"minVersion,omitempty"`
+	ServerName string            `json:"serverName,omitempty" yaml:"serverName,omitempty"`
+	RootCA     string            `json:"rootCA,omitempty"     yaml:"rootCA,omitempty"`
+}
+
+// NewWatchedTLS copies the cluster's ClickHouse client TLS settings. Nil when the cluster sets none.
+func NewWatchedTLS(cluster api.ICluster) *WatchedTLS {
+	if cluster == nil {
+		return nil
+	}
+	tls := cluster.GetSecurity().GetClickHouse().GetTLS()
+	watched := &WatchedTLS{
+		Verify:     tls.GetVerify(),
+		MinVersion: tls.GetMinVersion(),
+		ServerName: tls.GetServerName(),
+		RootCA:     tls.GetRootCA(),
+	}
+	if *watched == (WatchedTLS{}) {
+		return nil
+	}
+	return watched
+}
+
+// GetVerify returns the TLS verify policy, nil-safe
+func (tls *WatchedTLS) GetVerify() api.TLSVerify {
+	if tls == nil {
+		return ""
+	}
+	return tls.Verify
+}
+
+// GetMinVersion returns the minimal TLS version, nil-safe
+func (tls *WatchedTLS) GetMinVersion() api.TLSMinVersion {
+	if tls == nil {
+		return ""
+	}
+	return tls.MinVersion
+}
+
+// GetServerName returns the TLS server name, nil-safe
+func (tls *WatchedTLS) GetServerName() string {
+	if tls == nil {
+		return ""
+	}
+	return tls.ServerName
+}
+
+// GetRootCA returns the root CA, nil-safe
+func (tls *WatchedTLS) GetRootCA() string {
+	if tls == nil {
+		return ""
+	}
+	return tls.RootCA
+}
+
+// GetTLS returns the cluster's TLS settings, nil-safe
+func (cluster *WatchedCluster) GetTLS() *WatchedTLS {
+	if cluster == nil {
+		return nil
+	}
+	return cluster.TLS
 }
 
 // WatchedHost specifies watched host
@@ -134,6 +203,7 @@ func (cluster *WatchedCluster) readFrom(c api.ICluster) {
 		return
 	}
 	cluster.Name = c.GetName()
+	cluster.TLS = NewWatchedTLS(c)
 
 	c.WalkHosts(func(h *api.Host) error {
 		host := &WatchedHost{}

@@ -11090,8 +11090,8 @@ def test_030003(self):
     with Check("operator uses TLS-compliant outbound paths after reconcile"):
         run_operator_reconcile_fips_checks()
 
-    with Check("metrics-exporter discovers ClickHouse through HTTPS"):
-        check_metrics_exporter_discovers_clickhouse_https()
+    with Check("metrics-exporter scrapes ClickHouse through HTTPS"):
+        check_metrics_exporter_scrapes_clickhouse_https(chi=chi, replica_count=2)
 
     with Check("ClickHouse replicas use Keeper secure client port"):
         check_clickhouse_uses_secure_keeper_port(chi=chi)
