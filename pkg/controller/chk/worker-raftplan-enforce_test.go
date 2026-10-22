@@ -88,7 +88,8 @@ func TestRaftPlanEnforcedAdmissionVerdicts(t *testing.T) {
 }
 
 func TestRaftPlanEnforcedDisruptionGate(t *testing.T) {
-	t.Setenv("CHOP_CHK_RAFTPLAN_ENFORCE", "1")
+	// Exercise the same no-environment default used by the e2e operator install.
+	t.Setenv("CHOP_CHK_RAFTPLAN_ENFORCE", "")
 	ctx := context.Background()
 	for _, tc := range []struct {
 		name string
