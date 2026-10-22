@@ -2370,6 +2370,50 @@ def test_010016(self):
             new_start_time = kubectl.get_clickhouse_start(chi)
             assert start_time == new_start_time
 
+    # test-016-settings-08.yaml
+    # configurationRestartPolicy says settings/* restarts. test_setting is not one of
+    # its "no" exceptions. Where system.server_settings lists it as changeable without
+    # a restart, that column wins and the pod stays up.
+    with When("Change a server setting that ClickHouse reloads without a restart"):
+        test_setting = "max_concurrent_select_queries"
+        has_column = clickhouse.query(
+            chi,
+            "SELECT count() FROM system.columns WHERE (database, table, name) = ('system','server_settings','changeable_without_restart')",
+        )
+        advice = ""
+        if has_column == "1":
+            advice = clickhouse.query(chi, f"SELECT changeable_without_restart FROM system.server_settings WHERE name = '{test_setting}'")
+        if has_column != "1":
+            note(
+                f"system.server_settings has no changeable_without_restart column; "
+                f"configurationRestartPolicy still decides"
+            )
+        else:
+            assert advice == "Yes", error(
+                f"{test_setting} must be changeable_without_restart = Yes on this ClickHouse, got {advice!r}; "
+                f"pick another setting for this step"
+            )
+            start_time = kubectl.get_clickhouse_start(chi)
+            kubectl.create_and_check(
+                manifest="manifests/chi/test-016-settings-08.yaml",
+                check={
+                    "do_not_delete": 1,
+                },
+            )
+            with Then("Confirm that the setting is loaded"):
+                out = ""
+                for i in range(1, 10):
+                    out = clickhouse.query(chi, f"SELECT value FROM system.server_settings WHERE name = '{test_setting}'")
+                    if out == "50":
+                        break
+                    retry_sleep(i, 5, f"{test_setting} is {out}, waiting for 50")
+                assert out == "50", error(f"expected {test_setting} = 50, got {out}")
+            with And("ClickHouse SHOULD NOT be restarted"):
+                new_start_time = kubectl.get_clickhouse_start(chi)
+                assert start_time == new_start_time, error(
+                    "changeable_without_restart = Yes must override configurationRestartPolicy settings/*"
+                )
+
     with Finally("I clean up"):
         delete_test_namespace()
 
@@ -6523,6 +6567,19 @@ def test_010062(self):
         )
 
     with When("Apply CHI with a config change that forces software restart (HostConfigRestart → HostShutdown)"):
+        restart_setting = "max_connections"
+        has_column = clickhouse.query(
+            chi,
+            "SELECT count() FROM system.columns WHERE (database, table, name) = ('system','server_settings','changeable_without_restart')",
+        )
+        if has_column == "1":
+            advice = clickhouse.query(
+                chi, f"SELECT changeable_without_restart FROM system.server_settings WHERE name = '{restart_setting}'"
+            )
+            assert advice != "Yes", error(
+                f"{restart_setting} is changeable_without_restart = Yes on this ClickHouse, so it no longer restarts; "
+                f"pick another setting in test-062-hooks-on-shutdown-2.yaml"
+            )
         kubectl.create_and_check(
             manifest="manifests/chi/test-062-hooks-on-shutdown-2.yaml",
             check={
@@ -11114,6 +11171,11 @@ def test_030003(self):
     with Then("Keeper cluster passes essential FIPS checks"):
         chk_pods = run_chk_fips_checks(workload=chk, replica_count=1)
 
+    # The exporter logs the hosts once, when the operator registers the CHI. Read its log
+    # from here on instead of a fixed tail, which per-scrape errors can push the line out of.
+    # A minute of margin covers clock skew between the runner and the cluster.
+    exporter_log_since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 60))
+
     with When("FIPS ClickHouse is deployed with 1 replica and backup template"):
         chi_manifest_1 = fips_edit_manifest(
             source_manifest=chi_manifest,
@@ -11168,7 +11230,7 @@ def test_030003(self):
         run_operator_reconcile_fips_checks()
 
     with Check("metrics-exporter discovers ClickHouse through HTTPS"):
-        check_metrics_exporter_discovers_clickhouse_https()
+        check_metrics_exporter_discovers_clickhouse_https(since_time=exporter_log_since)
 
     with Check("ClickHouse replicas use Keeper secure client port"):
         check_clickhouse_uses_secure_keeper_port(chi=chi)

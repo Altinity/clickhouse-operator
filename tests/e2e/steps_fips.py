@@ -1649,20 +1649,26 @@ def check_operator_clickhouse_tls_logs(self, ns=None):
         )
 
 @TestStep(Then)
-def check_metrics_exporter_discovers_clickhouse_https(self, ns=None):
-    """Assert metrics-exporter discovers ClickHouse hosts using HTTPS :8443."""
+def check_metrics_exporter_discovers_clickhouse_https(self, ns=None, since_time=None):
+    """Assert metrics-exporter discovers ClickHouse hosts using HTTPS :8443.
+
+    since_time (RFC 3339) reads the log from that moment instead of the last 4000 lines.
+    The discovery line is written once, and failed scrapes that follow log their full SQL,
+    so a fixed tail can lose it.
+    """
 
     ns = ns or current().context.operator_namespace
     pod = kubectl.get_operator_pod(ns=ns)
+    window = f"--since-time={since_time}" if since_time else "--tail=4000"
 
     logs = kubectl.launch(
-        f"logs {pod} -c metrics-exporter --tail=4000",
+        f"logs {pod} -c metrics-exporter {window}",
         ns=ns,
     )
 
     assert '"httpsPort":8443' in logs, error(
         "metrics-exporter did not discover ClickHouse hosts with httpsPort=8443\n"
-        f"{logs}"
+        + "\n".join(logs.splitlines()[-200:])
     )
 
 @TestStep(Then)
@@ -2486,6 +2492,35 @@ def check_clickhouse_backup_restore_roundtrip_https(
             ns=ns,
         ).strip()
 
+    def wait_command(operation, timeout=180):
+        # create and restore are asynchronous: the POST answers once the command is
+        # accepted. A second command while one runs is refused with 423 Locked.
+        # /backup/status lists commands as JSON lines with status "in progress",
+        # "success" or "error".
+        deadline = time.time() + timeout
+        commands = []
+        while True:
+            body = kubectl.launch(
+                f"exec {pod} -c clickhouse-backup -- "
+                "curl -sS --cacert /etc/clickhouse-backup/tls/ca.crt "
+                "https://127.0.0.1:7171/backup/status",
+                ns=ns,
+            )
+            commands = []
+            for line in body.splitlines():
+                line = line.strip()
+                if not line.startswith("{"):
+                    continue
+                entry = json.loads(line)
+                command = entry.get("command", "")
+                if command.startswith(operation) and backup_name in command:
+                    commands.append(entry)
+            if commands and all(c.get("status") != "in progress" for c in commands):
+                break
+            assert time.time() < deadline, error(f"{operation} {backup_name} did not finish: {commands}")
+            time.sleep(2)
+        assert commands[-1].get("status") == "success", error(f"{operation} {backup_name}: {commands[-1]}")
+
     with Given("test table exists with data"):
         fips_ch_external_secure_query(
             pod=pod,
@@ -2508,6 +2543,7 @@ def check_clickhouse_backup_restore_roundtrip_https(
             f"/backup/create?name={backup_name}&table=default.{table}",
         )
         assert out.startswith("HTTP:2"), error(out)
+        wait_command("create")
 
     with And("table is dropped"):
         fips_ch_external_secure_query(
@@ -2522,6 +2558,7 @@ def check_clickhouse_backup_restore_roundtrip_https(
             f"/backup/restore/{backup_name}?table=default.{table}",
         )
         assert out.startswith("HTTP:2"), error(out)
+        wait_command("restore")
 
     with Then("restored data is visible through strict TLS ClickHouse client"):
         fips_poll_secure_scalar(
