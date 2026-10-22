@@ -4,6 +4,7 @@ package chk
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	core "k8s.io/api/core/v1"
@@ -57,7 +58,7 @@ func (w *worker) observeRaftPlanHosts(
 		existing[id] = true
 	}
 
-	err := cr.WalkHosts(func(host *api.Host) error {
+	walkErrors := cr.WalkHosts(func(host *api.Host) error {
 		if host == nil {
 			return nil
 		}
@@ -90,7 +91,8 @@ func (w *worker) observeRaftPlanHosts(
 		snap.Hosts[id] = state
 		return nil
 	})
-	return snap, err
+	// WalkHosts aggregates callback errors as []error, not error.
+	return snap, errors.Join(walkErrors...)
 }
 
 // observeRaftPlanAdmission reads actual published membership from the common
