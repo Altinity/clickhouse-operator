@@ -15,11 +15,12 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 )
 
-// raftPlanEnforceEnabled opts into planner decisions. The legacy safety
-// policy stays the default until parity and e2e have been verified.
-// Existing preliminary staging, publication, waits, and rollback remain.
+// raftPlanEnforceEnabled runs the Raft planner by default in this test
+// branch, so the standard e2e operator install needs no environment changes.
+// Setting CHOP_CHK_RAFTPLAN_ENFORCE=0 is an optional emergency rollback;
+// the existing preliminary staging, publication, waits, and rollback remain.
 func raftPlanEnforceEnabled() bool {
-	return os.Getenv("CHOP_CHK_RAFTPLAN_ENFORCE") == "1"
+	return os.Getenv("CHOP_CHK_RAFTPLAN_ENFORCE") != "0"
 }
 
 // raftPlanAdmissionVerdict is the pure-to-worker boundary. An unknown
