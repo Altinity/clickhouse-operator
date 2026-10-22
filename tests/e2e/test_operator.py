@@ -2370,6 +2370,50 @@ def test_010016(self):
             new_start_time = kubectl.get_clickhouse_start(chi)
             assert start_time == new_start_time
 
+    # test-016-settings-08.yaml
+    # configurationRestartPolicy says settings/* restarts. test_setting is not one of
+    # its "no" exceptions. Where system.server_settings lists it as changeable without
+    # a restart, that column wins and the pod stays up.
+    with When("Change a server setting that ClickHouse reloads without a restart"):
+        test_setting = "max_concurrent_select_queries"
+        has_column = clickhouse.query(
+            chi,
+            "SELECT count() FROM system.columns WHERE (database, table, name) = ('system','server_settings','changeable_without_restart')",
+        )
+        advice = ""
+        if has_column == "1":
+            advice = clickhouse.query(chi, f"SELECT changeable_without_restart FROM system.server_settings WHERE name = '{test_setting}'")
+        if has_column != "1":
+            note(
+                f"system.server_settings has no changeable_without_restart column; "
+                f"configurationRestartPolicy still decides"
+            )
+        else:
+            assert advice == "Yes", error(
+                f"{test_setting} must be changeable_without_restart = Yes on this ClickHouse, got {advice!r}; "
+                f"pick another setting for this step"
+            )
+            start_time = kubectl.get_clickhouse_start(chi)
+            kubectl.create_and_check(
+                manifest="manifests/chi/test-016-settings-08.yaml",
+                check={
+                    "do_not_delete": 1,
+                },
+            )
+            with Then("Confirm that the setting is loaded"):
+                out = ""
+                for i in range(1, 10):
+                    out = clickhouse.query(chi, f"SELECT value FROM system.server_settings WHERE name = '{test_setting}'")
+                    if out == "50":
+                        break
+                    retry_sleep(i, 5, f"{test_setting} is {out}, waiting for 50")
+                assert out == "50", error(f"expected {test_setting} = 50, got {out}")
+            with And("ClickHouse SHOULD NOT be restarted"):
+                new_start_time = kubectl.get_clickhouse_start(chi)
+                assert start_time == new_start_time, error(
+                    "changeable_without_restart = Yes must override configurationRestartPolicy settings/*"
+                )
+
     with Finally("I clean up"):
         delete_test_namespace()
 
@@ -6523,6 +6567,19 @@ def test_010062(self):
         )
 
     with When("Apply CHI with a config change that forces software restart (HostConfigRestart → HostShutdown)"):
+        restart_setting = "max_connections"
+        has_column = clickhouse.query(
+            chi,
+            "SELECT count() FROM system.columns WHERE (database, table, name) = ('system','server_settings','changeable_without_restart')",
+        )
+        if has_column == "1":
+            advice = clickhouse.query(
+                chi, f"SELECT changeable_without_restart FROM system.server_settings WHERE name = '{restart_setting}'"
+            )
+            assert advice != "Yes", error(
+                f"{restart_setting} is changeable_without_restart = Yes on this ClickHouse, so it no longer restarts; "
+                f"pick another setting in test-062-hooks-on-shutdown-2.yaml"
+            )
         kubectl.create_and_check(
             manifest="manifests/chi/test-062-hooks-on-shutdown-2.yaml",
             check={
@@ -10454,6 +10511,8 @@ def test_020005(self):
             },
         )
 
+    # The more comprehensive re-scale logic checks are performed in test_020005_2
+    # For the purpose of this test we only need to make sure Keeper is ready
     with Then("Confirm all CHK pods are ready"):
         kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-0-0', '.status.containerStatuses[0].ready', 'true', retries=10)
         kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-1-0', '.status.containerStatuses[0].ready', 'true', retries=10)
@@ -10474,6 +10533,81 @@ def test_020005(self):
         kubectl.wait_field('pod', 'chk-test-052-chk-keeper-0-0-0', '.status.containerStatuses[0].ready', 'true', retries=10)
 
     check_replication(chi, {0, 1}, 5)
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_020005_2. CHK scale-up must not create all new Raft members at once")
+def test_020005_2(self):
+    """Fail-fast test for fire-and-forget CHK scale-up (#2041).
+
+    CHK only — no CHI. During 1→3, `sts_count <= ready_count + 1`,
+    and the scale-up must finish with three Ready Keepers. The original
+    member must become part of that Ready set without its container restarting:
+    it has to apply the published raft_configuration from the mounted ConfigMap.
+    """
+    create_shell_namespace_clickhouse_template()
+
+    chk_manifest_1 = "manifests/chk/test-052-chk-rescale-1.yaml"
+    chk_manifest_3 = "manifests/chk/test-052-chk-rescale-3.yaml"
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest_1))
+
+    with Given("CHK with 1 replica"):
+        kubectl.create_and_check(
+            manifest=chk_manifest_1,
+            kind="chk",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    keeper0 = "chk-test-052-chk-keeper-0-0-0"
+    keeper0_started = kubectl.get_field("pod", keeper0, ".status.containerStatuses[0].state.running.startedAt")
+
+    with When("Scale CHK to 3 replicas"):
+        kubectl.create_and_check(
+            manifest=chk_manifest_3,
+            kind="chk",
+            check={
+                "chk_status": "InProgress",
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Never create more than one extra STS beyond Ready members"):
+        deadline = time.time() + 300
+        saw_three_sts = False
+        while time.time() < deadline:
+            sts = kubectl.get_count("sts", chk=chk)
+            ready = kubectl.get_ready_pods_count("chk", chk)
+            with Then(f"{sts} sts and {ready} ready pods found"):
+                assert sts <= ready + 1, error(
+                    f"fire-and-forget scale-up: {sts} StatefulSets while only {ready} Ready "
+                    f"(expected sts <= ready + 1)"
+                )
+            if sts >= 3:
+                saw_three_sts = True
+            if ready >= 3:
+                finished_in = int(300 - (deadline - time.time()))
+                with Then(f"Finished in {finished_in}s"):
+                    break
+            time.sleep(5)
+        assert kubectl.get_ready_pods_count("chk", chk) >= 3, error(
+            "timed out waiting for the 1→3 scale-up to become Ready"
+        )
+        assert saw_three_sts or kubectl.get_count("sts", chk=chk) >= 3, error(
+            "1→3 completed Ready without three StatefulSets"
+        )
+        keeper0_started_after = kubectl.get_field(
+            "pod", keeper0, ".status.containerStatuses[0].state.running.startedAt",
+        )
+        with Then(f"{keeper0} should not be restarted"):
+            assert keeper0_started_after == keeper0_started, error(
+                f"original Keeper restarted during 1→3: startedAt {keeper0_started} -> {keeper0_started_after}"
+            )
 
     with Finally("I clean up"):
         delete_test_namespace()

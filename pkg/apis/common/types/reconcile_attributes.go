@@ -96,6 +96,9 @@ func (a *ReconcileAttributes) SetExclude() *ReconcileAttributes {
 	if a == nil {
 		return a
 	}
+	if a.tags == nil {
+		a.tags = NewTags()
+	}
 	a.tags.Set(TagExclude)
 	return a
 }
@@ -117,7 +120,10 @@ func (a *ReconcileAttributes) IsExclude() bool {
 	return a.tags.Has(TagExclude)
 }
 
-// SetLowPriority sets 'LowPriority' attribute
+// SetLowPriority sets 'LowPriority' attribute.
+// Nil tags stay a no-op: Tags.Set on a nil map does not store, and CHI
+// descendHostInClickHouseCluster calls this on every restart. Allocating
+// tags here would emit <priority>1000</priority> in remote_servers.
 func (a *ReconcileAttributes) SetLowPriority() *ReconcileAttributes {
 	if a == nil {
 		return a
