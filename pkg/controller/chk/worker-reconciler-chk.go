@@ -722,6 +722,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	// The next missing joiner has to be postponed here, while the loop continues
 	// so existing members can still roll.
 	if err := w.deferUnreadyStagedAdmit(ctx, host); err != nil {
+		if errors.Is(err, errSkipStagedAdmit) {
+			return nil
+		}
 		return err
 	}
 	// Below the ctx check on purpose: a cancelled reconcile must short-circuit identically
@@ -874,16 +877,13 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 	// Admit this host into raft_configuration before creating its StatefulSet,
 	// so the new pod starts with itself already in the published membership.
 	// Remaining staged hosts stay excluded.
-	admitted := false
-	if host.GetReconcileAttributes().IsExclude() {
-		if err := w.includeHostIntoRaftCluster(ctx, host); err != nil {
-			metrics.HostReconcilesErrors(ctx, host.GetCR())
-			w.a.V(1).
-				M(host).F().
-				Warning("Reconcile Host Main - unable to publish host into raft_configuration. Host: %s Err: %v", host.GetName(), err)
-			return err
-		}
-		admitted = true
+	admitted, admitErr := w.publishStagedAdmit(ctx, host)
+	if admitErr != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to publish host into raft_configuration. Host: %s Err: %v", host.GetName(), admitErr)
+		return admitErr
 	}
 
 	// Snapshot the ensemble and reconcile the StatefulSet against that same snapshot.

@@ -21,6 +21,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -125,17 +126,45 @@ func (w *worker) includeHostIntoRaftCluster(ctx context.Context, host *api.Host)
 
 // rollbackStagedRaftAdmit puts a host back out of raft_configuration after its
 // StatefulSet create failed, and republishes so the ConfigMap does not list a
-// server that has no Pod.
+// server that has no Pod. A live StatefulSet stays published: rolling it back
+// and letting the next pass's preliminary ConfigMap put it back flaps membership.
+// Absence is stagedJoinerStatefulSet returning nil, the same NotFound staging uses.
 func (w *worker) rollbackStagedRaftAdmit(ctx context.Context, host *api.Host) {
+	sts, err := w.stagedJoinerStatefulSet(ctx, host)
+	if err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to tell whether %s still has a StatefulSet after admit failed: %v", host.GetName(), err)
+		return
+	}
+	if sts != nil {
+		w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileInProgress).
+			WithAction(host.GetCR()).
+			M(host).F().
+			Info("Keep %s in raft_configuration; its StatefulSet exists", host.GetName())
+		return
+	}
 	host.GetCR().GetRuntime().LockCommonConfig()
 	host.GetReconcileAttributes().SetExclude()
-	err := w.publishRaftConfiguration(ctx, host)
+	err = w.publishRaftConfiguration(ctx, host)
 	host.GetCR().GetRuntime().UnlockCommonConfig()
 	if err != nil {
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host Main - unable to drop host from raft_configuration after StatefulSet create failed. Host: %s Err: %v", host.GetName(), err)
 	}
+}
+
+// publishStagedAdmit publishes a host that is still excluded. admitted is false
+// when the host was not excluded, so a later error must not roll membership back.
+func (w *worker) publishStagedAdmit(ctx context.Context, host *api.Host) (admitted bool, err error) {
+	if host == nil || !host.GetReconcileAttributes().IsExclude() {
+		return false, nil
+	}
+	if err := w.includeHostIntoRaftCluster(ctx, host); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // publishRaftConfiguration writes raft_configuration for the host's CR.

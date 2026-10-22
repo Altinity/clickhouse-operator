@@ -10487,7 +10487,9 @@ def test_020005_2(self):
     """Fail-fast test for fire-and-forget CHK scale-up (#2041).
 
     CHK only — no CHI. During 1→3, `sts_count <= ready_count + 1`,
-    and the scale-up must finish with three Ready Keepers.
+    and the scale-up must finish with three Ready Keepers. The original
+    member must become part of that Ready set without its container restarting:
+    it has to apply the published raft_configuration from the mounted ConfigMap.
     """
     create_shell_namespace_clickhouse_template()
 
@@ -10504,6 +10506,9 @@ def test_020005_2(self):
                 "do_not_delete": 1,
             },
         )
+
+    keeper0 = "chk-test-052-chk-keeper-0-0-0"
+    keeper0_started = kubectl.get_field("pod", keeper0, ".status.containerStatuses[0].state.running.startedAt")
 
     with When("Scale CHK to 3 replicas"):
         kubectl.create_and_check(
@@ -10539,6 +10544,13 @@ def test_020005_2(self):
         assert saw_three_sts or kubectl.get_count("sts", chk=chk) >= 3, error(
             "1→3 completed Ready without three StatefulSets"
         )
+        keeper0_started_after = kubectl.get_field(
+            "pod", keeper0, ".status.containerStatuses[0].state.running.startedAt",
+        )
+        with Then(f"{keeper0} should not be restarted"):
+            assert keeper0_started_after == keeper0_started, error(
+                f"original Keeper restarted during 1→3: startedAt {keeper0_started} -> {keeper0_started_after}"
+            )
 
     with Finally("I clean up"):
         delete_test_namespace()

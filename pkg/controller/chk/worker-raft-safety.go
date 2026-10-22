@@ -16,6 +16,7 @@ package chk
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -122,16 +123,16 @@ func (w *worker) stageUncommittedScaleUpHosts(ctx context.Context, cr *apiChk.Cl
 		if host == nil || !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 			return nil
 		}
-		_, err := w.c.kube.STS().Get(ctx, host)
-		if err == nil {
-			return nil
+		// Same predicate as rollbackStagedRaftAdmit: absent means NotFound.
+		sts, err := w.stagedJoinerStatefulSet(ctx, host)
+		if err != nil {
+			getErr = err
+			return err
 		}
-		if apiErrors.IsNotFound(err) {
+		if sts == nil {
 			toStage = append(toStage, host)
-			return nil
 		}
-		getErr = err
-		return err
+		return nil
 	})
 	if getErr != nil {
 		return getErr
@@ -190,6 +191,15 @@ func (w *worker) deferUnreadyStagedAdmit(ctx context.Context, host *api.Host) er
 	if own != nil {
 		return nil
 	}
+	// Stopped: do not defer (the pass must reach clean) and do not create the
+	// StatefulSet (resume would start every missing member at once).
+	if host.IsStopped() {
+		w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileInProgress).
+			WithAction(host.GetCR()).
+			M(host).F().
+			Info("Skip admitting %s while ClickHouseKeeper is stopped", host.GetName())
+		return errSkipStagedAdmit
+	}
 
 	var blocker *api.Host
 	var getErr error
@@ -219,6 +229,10 @@ func (w *worker) deferUnreadyStagedAdmit(ctx context.Context, host *api.Host) er
 		Info("Defer admitting %s into raft_configuration until %s is Ready", host.GetName(), blocker.GetName())
 	return common.ErrCRUDDeferred
 }
+
+// errSkipStagedAdmit tells reconcileHost to leave this not-yet-created member
+// alone and continue the pass. It is not a deferral and not a failure.
+var errSkipStagedAdmit = errors.New("skip staged keeper admit while stopped")
 
 // stagedJoinerStatefulSet returns the live StatefulSet, or nil when it is absent.
 // NotFound is not an error. Any other Get error is returned unchanged.

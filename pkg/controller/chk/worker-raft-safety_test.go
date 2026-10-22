@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -37,6 +38,8 @@ import (
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
+	chkNamer "github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
 )
 
 func TestRaftQuorumSize(t *testing.T) {
@@ -1495,6 +1498,24 @@ func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
 		require.False(t, errors.Is(err, common.ErrCRUDDeferred))
 		require.Empty(t, visited, "a Get failure must stop the loop before another joiner is admitted")
 	})
+
+	t.Run("stopped CHK skips the missing joiner and still completes the pass", func(t *testing.T) {
+		cr, fake, shard := newScaleUp(0)
+		cr.Spec.Stop = types.NewStringBool(true)
+		h2 := hostAtOnCR(cr, 2)
+		var visited []string
+		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
+			visited = append(visited, host.GetName())
+			return nil
+		}
+
+		require.NoError(t, w.reconcileShardWithHosts(ctx, shard))
+		require.Equal(t, []string{"h0", "h1"}, visited,
+			"h2 must not be created while the CHK is stopped, and the pass must not stay deferred")
+		require.True(t, h2.GetReconcileAttributes().IsExclude())
+		require.Zero(t, fake.mutationCount())
+	})
 }
 
 func TestIncludeHostIntoRaftClusterRestoresOnlyStagedExclude(t *testing.T) {
@@ -1533,19 +1554,135 @@ func TestIncludeHostIntoRaftClusterRestoresOnlyStagedExclude(t *testing.T) {
 
 func TestRollbackStagedRaftAdmitRepublishesExclude(t *testing.T) {
 	ctx := context.Background()
-	host := hostAtOnCR(chkWithHosts(2), 1)
-	var publishedExcluded bool
-	w := &worker{
-		a: a.NewAnnouncer(nil, nil),
-		publishRaftFn: func(_ context.Context, h *api.Host) error {
-			publishedExcluded = h.GetReconcileAttributes().IsExclude()
+
+	t.Run("missing StatefulSet drops the host from raft XML", func(t *testing.T) {
+		cr := chkWithHosts(2)
+		cr.Spec.Defaults = &api.Defaults{}
+		cr.SetAncestor(chkWithHosts(1))
+		hostAtOnCR(cr, 0)
+		host := hostAtOnCR(cr, 1)
+		fake := newRaftFakeSTS()
+		var published string
+		w := &worker{
+			a: a.NewAnnouncer(nil, nil),
+			c: &Controller{kube: &raftFakeKube{sts: fake}},
+		}
+		w.publishRaftFn = func(context.Context, *api.Host) error {
+			published = renderedRaft(t, w, cr)
 			return nil
-		},
+		}
+
+		w.rollbackStagedRaftAdmit(ctx, host)
+		require.True(t, host.GetReconcileAttributes().IsExclude())
+		require.NotContains(t, published, raftHostname(host),
+			"rollback must republish raft_configuration without the host that has no Pod")
+		require.Zero(t, fake.mutationCount())
+	})
+
+	t.Run("existing StatefulSet stays published", func(t *testing.T) {
+		cr := chkWithHosts(2)
+		cr.SetAncestor(chkWithHosts(1))
+		host := hostAtOnCR(cr, 1)
+		fake := newRaftFakeSTS()
+		fake.setReady(host, 0)
+		published := false
+		w := &worker{
+			a: a.NewAnnouncer(nil, nil),
+			c: &Controller{kube: &raftFakeKube{sts: fake}},
+			publishRaftFn: func(context.Context, *api.Host) error {
+				published = true
+				return nil
+			},
+		}
+
+		w.rollbackStagedRaftAdmit(ctx, host)
+		require.False(t, published, "a start-wait failure must not unpublish a StatefulSet that exists")
+		require.False(t, host.GetReconcileAttributes().IsExclude())
+		require.Zero(t, fake.mutationCount())
+	})
+}
+
+// TestStagedAdmitPublishesRaftWithoutTheHostSeam renders the raft XML the
+// ConfigMap would get. reconcileHostFn is not installed, so a publish has to
+// come from publishStagedAdmit, which is what reconcileHostMain calls.
+func TestStagedAdmitPublishesRaftWithoutTheHostSeam(t *testing.T) {
+	ctx := context.Background()
+	cr := chkWithHosts(5)
+	cr.Name = "scale"
+	cr.Spec.Defaults = &api.Defaults{}
+	cr.SetAncestor(chkWithHosts(1))
+	fake := newRaftFakeSTS()
+	for i := 0; i < 5; i++ {
+		host := hostAtOnCR(cr, i)
+		switch i {
+		case 0:
+			host.Runtime.CurStatefulSet = &apps.StatefulSet{}
+			host.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+			fake.setReady(host, 1)
+		case 1:
+			host.Runtime.CurStatefulSet = &apps.StatefulSet{}
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
+			fake.setReady(host, 0)
+		default:
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+			host.GetReconcileAttributes().SetExclude()
+		}
 	}
 
-	w.rollbackStagedRaftAdmit(ctx, host)
-	require.True(t, host.GetReconcileAttributes().IsExclude())
-	require.True(t, publishedExcluded, "the republish must observe the restored exclude tag")
+	var published []string
+	w := &worker{
+		a: a.NewAnnouncer(nil, nil),
+		c: &Controller{kube: &raftFakeKube{sts: fake}},
+	}
+	w.publishRaftFn = func(context.Context, *api.Host) error {
+		published = append(published, renderedRaft(t, w, cr))
+		return nil
+	}
+
+	deferred := false
+	for _, host := range shardHostsRecoveryFirst(cr.Spec.Configuration.Clusters[0].Layout.Shards[0], func(h *api.Host) bool {
+		return w.isHostHealthyForReconcile(ctx, h)
+	}) {
+		err := w.deferUnreadyStagedAdmit(ctx, host)
+		if errors.Is(err, errSkipStagedAdmit) {
+			continue
+		}
+		if errors.Is(err, common.ErrCRUDDeferred) {
+			deferred = true
+			continue
+		}
+		require.NoError(t, err)
+		_, err = w.publishStagedAdmit(ctx, host)
+		require.NoError(t, err)
+	}
+
+	require.True(t, deferred, "h2 must be postponed while h1 is not Ready")
+	require.Empty(t, published, "no raft_configuration publish may admit h2, h3, or h4")
+	xml := renderedRaft(t, w, cr)
+	require.Contains(t, xml, raftHostname(hostAtOnCR(cr, 0)))
+	require.Contains(t, xml, raftHostname(hostAtOnCR(cr, 1)))
+	for i := 2; i < 5; i++ {
+		require.NotContains(t, xml, raftHostname(hostAtOnCR(cr, i)),
+			"1→5 must keep every not-yet-created member out of raft_configuration")
+		require.True(t, hostAtOnCR(cr, i).GetReconcileAttributes().IsExclude())
+	}
+	require.Zero(t, fake.mutationCount(), "admitting into raft_configuration must not create or update a StatefulSet")
+}
+
+func renderedRaft(t *testing.T, w *worker, cr *apiChk.ClickHouseKeeperInstallation) string {
+	t.Helper()
+	sections := map[string]string{}
+	chkConfig.NewFilesGeneratorDomain(chkConfig.NewGenerator(cr, chkNamer.New(), nil)).
+		CreateConfigFilesGroupCommon(sections, w.options())
+	var b strings.Builder
+	for _, body := range sections {
+		b.WriteString(body)
+	}
+	return b.String()
+}
+
+func raftHostname(host *api.Host) string {
+	return chkNamer.New().Name(interfaces.NameInstanceHostname, host)
 }
 
 // TestReconcileShardWithHostsLoop pins the two host-loop invariants that no test reached before:
