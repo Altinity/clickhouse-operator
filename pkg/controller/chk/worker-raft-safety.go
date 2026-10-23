@@ -28,7 +28,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chk/raftplan"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -103,9 +105,9 @@ func crHasEstablishedCluster(cr api.ICustomResource) bool {
 
 // stageUncommittedScaleUpHosts keeps not-yet-created members out of
 // raft_configuration on 1→N / 2→3, so the published XML lists at most one
-// extra server while the previous join is still coming up. Only hosts whose
-// StatefulSet is confirmed absent are tagged: an interrupted pass must not
-// re-exclude a member that is already running. A Get error other than NotFound
+// extra server while the previous join is still coming up. Hosts without a
+// StatefulSet, or with a StatefulSet whose Pod has not Started, remain staged.
+// Previously published members are never re-excluded on an interrupted pass. A Get error other than NotFound
 // fails closed — nothing is staged and the caller must requeue rather than
 // publish an expanded membership. Fresh bootstrap and 3→N (ancestor already
 // has quorum headroom) are left alone.
@@ -117,19 +119,59 @@ func (w *worker) stageUncommittedScaleUpHosts(ctx context.Context, cr *apiChk.Cl
 		return nil
 	}
 
+	// Read the actual common ConfigMap before deciding whether an existing
+	// StatefulSet is still in the bootstrap phase. Never retract an already
+	// published voter, including a previously interrupted creation.
+	published := map[raftplan.HostID]bool{}
+	publishedKnown := false
+	if w.c.APIReader != nil && w.c.namer != nil && w.task != nil {
+		observed, err := w.observeRaftPlanAdmission(ctx, cr)
+		if err != nil {
+			return err
+		}
+		publishedKnown = observed.PublishedKnown
+		for _, id := range observed.PublishedHosts {
+			published[id] = true
+		}
+	}
+
 	var toStage []*api.Host
 	var getErr error
 	_ = cr.WalkHosts(func(host *api.Host) error {
 		if host == nil || !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 			return nil
 		}
-		// Same predicate as rollbackStagedRaftAdmit: absent means NotFound.
 		sts, err := w.stagedJoinerStatefulSet(ctx, host)
 		if err != nil {
 			getErr = err
 			return err
 		}
+		if publishedKnown && published[raftPlanHostID(host)] {
+			return nil
+		}
 		if sts == nil {
+			toStage = append(toStage, host)
+			return nil
+		}
+		// On spec repair, the failed joiner's STS already exists but its Pod
+		// may never have started. Preserve the bootstrap-only membership.
+		if !publishedKnown || w.c.kube.Pod() == nil {
+			return nil // test-only adapters without Pod/CM observations
+		}
+		pod, err := w.c.kube.Pod().Get(ctx, host)
+		if apiErrors.IsNotFound(err) {
+			toStage = append(toStage, host)
+			return nil
+		}
+		if err != nil {
+			getErr = err
+			return err
+		}
+		if pod == nil {
+			getErr = fmt.Errorf("nil staged Keeper Pod for %s", host.GetName())
+			return getErr
+		}
+		if !k8s.PodHasAllContainersStarted(pod) {
 			toStage = append(toStage, host)
 		}
 		return nil
@@ -152,10 +194,8 @@ func (w *worker) stageUncommittedScaleUpHosts(ctx context.Context, cr *apiChk.Cl
 // ancestor without headroom, and this host is absent from that ancestor — not
 // ObjectStatusRequested. PrepareHostStatefulSetWithStatus overwrites Requested
 // to Same/Modified once the joiner STS exists, so a retry must not treat that
-// host as still waiting to be admitted. deferUnreadyStagedAdmit uses this to
-// postpone the next not-yet-created joiner until this one's live ReadyReplicas
-// is positive. Ready is not committed Raft membership (see
-// verifyHostEnsembleMembership). 3→N is not staged.
+// host as absent. The admission gate defers the next joiner until this one
+// becomes Ready; the join verifier also checks Raft membership. 3→N is not staged.
 func hostIsStagedScaleUpJoin(host *api.Host) bool {
 	if host == nil || host.GetCR() == nil {
 		return false
@@ -169,8 +209,8 @@ func hostIsStagedScaleUpJoin(host *api.Host) bool {
 	return !ensembleHasQuorumHeadroom(host.GetCR().GetAncestor().HostsCount())
 }
 
-// deferUnreadyStagedAdmit postpones a not-yet-created 1→N / 2→3 joiner while
-// another staged joiner already has a StatefulSet that is not Ready.
+// deferUnreadyStagedAdmit is the optional legacy admission fallback for
+// 1→N / 2→3. The authoritative path uses raftplan.PlanAdmission.
 //
 // The check is live ReadyReplicas, not ObjectStatus and not WaitUntilReady.
 // After an interrupted pass the previous joiner's StatefulSet exists, so
@@ -416,7 +456,11 @@ func (w *worker) ensureQuorumSafeToDisruptHost(
 	if snap == nil || !snap.rolling || !ensembleHasQuorumHeadroom(snap.members) {
 		return nil
 	}
-	if !w.hostDisruptionWouldBreakQuorum(ctx, host, opts, *snap) {
+	blocked, err := w.raftPlanDisruptionBlocked(ctx, host, opts, *snap)
+	if err != nil {
+		return err
+	}
+	if !blocked {
 		return nil
 	}
 
@@ -465,7 +509,11 @@ func (w *worker) ensureQuorumSafeToDisruptHost(
 		if err := w.refreshQuorumSnapshotCounts(ctx, host, snap); err != nil {
 			return err
 		}
-		if !w.hostDisruptionWouldBreakQuorum(ctx, host, opts, *snap) {
+		blocked, err = w.raftPlanDisruptionBlocked(ctx, host, opts, *snap)
+		if err != nil {
+			return err
+		}
+		if !blocked {
 			w.a.V(1).M(host).F().Info(
 				"Raft quorum headroom available — proceeding with host %s disruption (ready=%d)",
 				host.GetName(), snap.readyCount,
@@ -524,12 +572,10 @@ func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) 
 //
 // /ready on a newly created joiner is not a committed-membership barrier, and it
 // is not how 1→N / 2→3 serializes creates. A new peer cannot reach /ready until
-// existing members reload or roll onto the published file, and recovery-first
-// reconciles that peer before they do, so SetWaitUntilReady there expires into
-// ErrCRUDAbort. deferUnreadyStagedAdmit postpones the next missing joiner until
-// the previous joiner's live ReadyReplicas is positive, and that postponement
-// still lets this pass roll the existing members. verifyHostEnsembleMembership
-// is the extension point for /keeper/config + mntr.
+// existing members reload the published file, and recovery-first reconciles
+// that peer before they do, so SetWaitUntilReady there expires into ErrCRUDAbort.
+// The admission gate postpones the next missing joiner until the previous one
+// is Ready; the post-publication gate checks live membership and Pod readiness.
 //
 // Sizing growth on the desired set inflates the denominator against a membership that does not
 // exist yet, and the damage is in the unsafe direction: a 3->5 with one member already down
@@ -609,13 +655,46 @@ func quorumDisruptDeferMessage(host *api.Host, snap hostEnsembleSnapshot) string
 	)
 }
 
-// verifyHostEnsembleMembership is the extension point for Raft membership
-// verification after a host joins in rolling mode. Currently a no-op: STS Ready
-// wait already ran. Implement committed-config / leader sync barriers here when
-// adopting a fuller rescale design.
+// verifyHostEnsembleMembership advances only after the joiner's live
+// StatefulSet AND Pod report Ready. Active Raft membership is a necessary
+// intermediate state, never proof that the new Pod has finished joining.
+// Each reconcile re-observes Kubernetes; no phase or readiness is cached.
 func (w *worker) verifyHostEnsembleMembership(ctx context.Context, host *api.Host) error {
-	_ = ctx
-	_ = host
+	if !hostIsStagedScaleUpJoin(host) || host.IsStopped() {
+		return nil
+	}
+	ready, err := w.readStagedJoinerReady(ctx, host)
+	if err != nil {
+		return err // unknown Kubernetes readiness fails closed
+	}
+
+	// Ready on this joiner implies a successful join and also works for
+	// TLS-only Keepers where this plaintext ZooKeeper probe is unavailable.
+	committed := ready
+	if !ready {
+		committed, err = w.readStagedJoinerMembership(ctx, host)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			w.a.V(1).M(host).F().Warning("Keeper Raft membership not observable for %s: %v", host.GetName(), err)
+			return common.ErrCRUDDeferred
+		}
+	}
+	decision := raftplan.PlanJoin(raftplan.JoinObservation{
+		StatefulSet: raftplan.PresencePresent,
+		StartedKnown: true, Started: true,
+		PublishedKnown: true, Published: true,
+		CommittedKnown: true, Committed: committed,
+		ReadyKnown: true, Ready: ready,
+	})
+	if decision.Action != raftplan.JoinAdmitNext {
+		w.a.V(1).M(host).F().Info(
+			"Keeper %s still joining: phase=%s action=%s raftCommitted=%t podReady=%t",
+			host.GetName(), decision.Phase, decision.Action, committed, ready,
+		)
+		return common.ErrCRUDDeferred
+	}
 	return nil
 }
 
@@ -665,6 +744,15 @@ func (w *worker) prepareStsReconcileOptsWaitSection(
 	if probes.GetStartup().IsTrue() || !rolling || !joinedEnsemble {
 		opts = opts.SetWaitUntilStarted()
 		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilStarted")
+	}
+
+	// A staged joiner's StatefulSet may already exist on a retry even though
+	// its image has never started. The standard Same shortcut otherwise skips
+	// the startup poll forever while admission defers the next joiner. Recheck
+	// Pod STARTED with the usual bounded timeout; do not require Pod READY,
+	// since readiness can depend on existing members adopting the new config.
+	if hostIsStagedScaleUpJoin(host) && !host.IsStopped() && !hostContributesReady(host) {
+		opts = opts.SetWaitUntilStartedOnSame()
 	}
 
 	switch {

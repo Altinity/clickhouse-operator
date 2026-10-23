@@ -150,6 +150,19 @@ func (r *Reconciler) ReconcileStatefulSet(
 	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet))
 
 	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) {
+		// An unchanged StatefulSet does not imply its Pod ever started.
+		// CHK serial admission can be interrupted after creating a joiner's
+		// StatefulSet but before kubelet starts its image. The next pass
+		// must still enforce the bounded startup wait (without waiting for
+		// Raft Ready, which may require the existing members to roll).
+		if opts.WaitUntilStartedOnSame() {
+			if err := r.hostObjectsPoller.WaitHostPodStarted(ctx, host); err != nil {
+				r.a.V(1).M(host).F().Warning(
+					"Existing StatefulSet pod did not start before timeout: %s, err: %v",
+					util.NamespaceNameString(newStatefulSet), err)
+				return r.fallback.OnStatefulSetCreateFailed(ctx, host)
+			}
+		}
 		r.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
 		if register {
 			host.GetCR().IEnsureStatus().HostUnchanged()

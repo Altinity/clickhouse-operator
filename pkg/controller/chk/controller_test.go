@@ -71,6 +71,15 @@ func TestReconcileResult(t *testing.T) {
 		require.Zero(t, res.RequeueAfter)
 	})
 
+	t.Run("terminal staged startup abort is not requeued", func(t *testing.T) {
+		err := fmt.Errorf("%w: %w",
+			common.ErrCRUDAbort, errRaftStagedJoinerStartupTimeout)
+		res, outErr := c.reconcileResult(cr, err)
+		require.NoError(t, outErr,
+			"terminal startup abort was already persisted as Aborted, so runtime must not retry it")
+		require.Equal(t, ctrl.Result{}, res)
+	})
+
 	t.Run("arbitrary error is returned verbatim", func(t *testing.T) {
 		boom := errors.New("boom")
 		res, err := c.reconcileResult(cr, boom)
@@ -82,5 +91,51 @@ func TestReconcileResult(t *testing.T) {
 		res, err := c.reconcileResult(nil, common.ErrCRUDDeferred)
 		require.NoError(t, err)
 		require.Equal(t, raftQuorumDeferredRequeueAfter, res.RequeueAfter)
+	})
+}
+
+// TestHoldRaftStagedStartupAbort ensures status and child-object watch events
+// cannot turn a persisted terminal abort back into InProgress. Only a spec
+// edit (new Kubernetes generation) should resume an aborted image pull.
+func TestHoldRaftStagedStartupAbort(t *testing.T) {
+	target := &apiChk.ClickHouseKeeperInstallation{
+		ObjectMeta: meta.ObjectMeta{Generation: 7},
+	}
+	cr := &apiChk.ClickHouseKeeperInstallation{
+		ObjectMeta: meta.ObjectMeta{Namespace: "test", Name: "keeper", Generation: 7},
+		Status: &apiChk.Status{
+			Status:       apiChk.StatusAborted,
+			NormalizedCR: target,
+			Errors:       []string{raftStagedJoinerStartupTimeoutStatusMarker + " failed to start"},
+		},
+	}
+
+	t.Run("same spec generation stays aborted after resync", func(t *testing.T) {
+		require.True(t, shouldHoldRaftStagedStartupAbort(cr))
+	})
+	t.Run("spec edit permits image recovery", func(t *testing.T) {
+		updated := cr.DeepCopy()
+		updated.Generation = 8
+		require.False(t, shouldHoldRaftStagedStartupAbort(updated))
+	})
+	t.Run("unrelated abort retains legacy behavior", func(t *testing.T) {
+		updated := cr.DeepCopy()
+		updated.Status.Errors = []string{"unrelated error"}
+		require.False(t, shouldHoldRaftStagedStartupAbort(updated))
+	})
+	t.Run("in progress is never held", func(t *testing.T) {
+		updated := cr.DeepCopy()
+		updated.Status.Status = apiChk.StatusInProgress
+		require.False(t, shouldHoldRaftStagedStartupAbort(updated))
+	})
+	t.Run("missing last-attempt generation is not a permanent lock", func(t *testing.T) {
+		updated := cr.DeepCopy()
+		updated.Status.NormalizedCR = nil
+		require.False(t, shouldHoldRaftStagedStartupAbort(updated))
+	})
+	t.Run("legacy zero generation is not a permanent lock", func(t *testing.T) {
+		updated := cr.DeepCopy()
+		updated.Status.NormalizedCR.Generation = 0
+		require.False(t, shouldHoldRaftStagedStartupAbort(updated))
 	})
 }
