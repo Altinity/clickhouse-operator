@@ -52,7 +52,10 @@ func PlanAdmission(s Snapshot) AdmissionPlan {
 	// hasn't yet caught up with the current live topology.
 	included = appendUnique(included, s.AncestorHosts...)
 	for _, id := range unique(s.DesiredHosts) {
-		if s.Hosts[id].StatefulSet == PresencePresent {
+		if s.Hosts[id].StatefulSet == PresencePresent &&
+			(!s.Established || len(unique(s.AncestorHosts)) >= 3 ||
+				(s.Hosts[id].PodStarted && s.Hosts[id].StartedKnown) ||
+				(s.Hosts[id].Ready && s.Hosts[id].ReadyKnown)) {
 			included = appendUnique(included, id)
 		}
 	}
@@ -109,7 +112,8 @@ func PlanAdmission(s Snapshot) AdmissionPlan {
 			continue
 		}
 		if s.Hosts[id].StatefulSet == PresenceAbsent {
-			included = appendUnique(included, id)
+			// Create with a host-scoped bootstrap config first; publishing
+			// now could exhaust Keeper's retries while the Pod is offline.
 			plan.MayCreate[id] = true
 			break
 		}

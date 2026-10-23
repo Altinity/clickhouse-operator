@@ -429,7 +429,10 @@ func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, cr api.ICust
 // reconcileConfigMapHost reconciles host's personal ConfigMap
 func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) error {
 	// ConfigMap for a host
-	configMap := w.task.Creator().CreateConfigMap(interfaces.ConfigMapHost, host)
+	opts := w.options().SetHost(host).SetBootstrapRaft(
+		hostIsStagedScaleUpJoin(host) && host.GetReconcileAttributes().IsExclude(),
+	)
+	configMap := w.task.Creator().CreateConfigMap(interfaces.ConfigMapHost, host, opts)
 	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterConfigMap(configMap.GetObjectMeta())
@@ -905,27 +908,21 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Warning("Reconcile Host Main - unable to reconcile Service. Host: %s Err: %v", host.GetName(), err)
 	}
 
-	// Admit this host into raft_configuration before creating its StatefulSet,
-	// so the new pod starts with itself already in the published membership.
-	// Remaining staged hosts stay excluded.
-	admitted, admitErr := w.publishStagedAdmit(ctx, host)
-	if admitErr != nil {
-		metrics.HostReconcilesErrors(ctx, host.GetCR())
-		w.a.V(1).
-			M(host).F().
-			Warning("Reconcile Host Main - unable to publish host into raft_configuration. Host: %s Err: %v", host.GetName(), admitErr)
-		return admitErr
-	}
-
+	// A new staged voter must start before its membership is published to
+	// existing Keepers. Its host ConfigMap carries a temporary bootstrap Raft
+	// overlay; the shared configuration still contains only live members.
 	// Snapshot the ensemble and reconcile the StatefulSet against that same snapshot.
 	snap, err := w.reconcileHostStatefulSetWithEnsembleSnapshot(ctx, host, stsReconcileOpts)
 	if err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
-		// Publication already cleared exclude. Put the host back and republish
-		// so a 1+1 scale-up does not keep a 2-of-2 quorum with no Pod.
-		if admitted {
-			w.rollbackStagedRaftAdmit(ctx, host)
-		}
+		return err
+	}
+
+	// WaitHostPodStarted runs inside the StatefulSet reconciler, including
+	// unchanged StatefulSets on a spec-repair retry. Only now may the new
+	// voter enter the established ensemble's shared Raft configuration.
+	if err := w.publishStartedStagedJoiner(ctx, host); err != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		return err
 	}
 
@@ -992,6 +989,11 @@ func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.
 }
 
 func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, snap hostEnsembleSnapshot) error {
+	// An existing staged joiner can be ObjectStatusSame on resume while
+	// still awaiting committed membership. Do not skip its live Raft check.
+	if hostIsStagedScaleUpJoin(host) && !host.IsStopped() {
+		return w.verifyHostEnsembleMembership(ctx, host)
+	}
 	if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		return nil
 	}

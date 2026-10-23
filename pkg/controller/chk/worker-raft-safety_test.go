@@ -2087,3 +2087,68 @@ func TestStagedJoinerRetryWaitsUntilPodStarted(t *testing.T) {
 	opts = w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
 	require.False(t, opts.WaitUntilStartedOnSame(), "stopped CHK must never block on pod startup")
 }
+
+// TestPublishStartedStagedJoiner pins the broken-image recovery transition:
+// an existing STS must not be published until kubelet reports Pod Started.
+// Publishing does not require Ready and never mutates the existing member.
+func TestPublishStartedStagedJoiner(t *testing.T) {
+	ctx := context.Background()
+	cr := chkWithHosts(3)
+	cr.SetAncestor(chkWithHosts(1))
+	host := hostAtOnCR(cr, 1)
+	host.GetReconcileAttributes().SetExclude()
+	host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+	fakeSTS := newRaftFakeSTS().setReady(host, 0)
+	pod := &core.Pod{Spec: core.PodSpec{
+		Containers: []core.Container{{Name: "clickhouse-keeper"}},
+	}}
+	fakePod := &raftFakeStartupPod{pod: pod}
+	w := &worker{
+		a: a.NewAnnouncer(nil, nil),
+		c: &Controller{kube: &raftFakeKube{sts: fakeSTS, pod: fakePod}},
+	}
+	published := 0
+	w.publishRaftFn = func(context.Context, *api.Host) error {
+		published++
+		return nil
+	}
+	require.ErrorIs(t, w.publishStartedStagedJoiner(ctx, host), common.ErrCRUDDeferred)
+	require.True(t, host.GetReconcileAttributes().IsExclude())
+	require.Zero(t, published)
+
+	started := true
+	fakePod.pod = &core.Pod{
+		Spec: core.PodSpec{Containers: []core.Container{{Name: "clickhouse-keeper"}}},
+		Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{
+			Name: "clickhouse-keeper", Started: &started,
+		}}},
+	}
+	require.NoError(t, w.publishStartedStagedJoiner(ctx, host))
+	require.False(t, host.GetReconcileAttributes().IsExclude())
+	require.Equal(t, 1, published)
+	require.Zero(t, fakeSTS.mutationCount(), "must not restart an existing Keeper")
+
+	// Operator restart / subsequent pass: no duplicate publication.
+	require.NoError(t, w.publishStartedStagedJoiner(ctx, host))
+	require.Equal(t, 1, published)
+}
+
+// A new Keeper starts with its own ID even though the shared Raft config
+// still excludes it. A second not-yet-created joiner is never in that overlay.
+func TestStagedJoinerBootstrapRaftConfig(t *testing.T) {
+	cr := chkWithHosts(3)
+	cr.SetAncestor(chkWithHosts(1))
+	h0, h1, h2 := hostAtOnCR(cr, 0), hostAtOnCR(cr, 1), hostAtOnCR(cr, 2)
+	h1.GetReconcileAttributes().SetExclude()
+	h2.GetReconcileAttributes().SetExclude()
+	w := &worker{a: a.NewAnnouncer(nil, nil)}
+	opts := w.options().SetHost(h1).SetBootstrapRaft(true)
+	sections := map[string]string{}
+	chkConfig.NewFilesGeneratorDomain(chkConfig.NewGenerator(cr, chkNamer.New(), nil)).
+		CreateConfigFilesGroupHost(sections, opts)
+	xml := sections["chop-generated-bootstrap-raft.xml"]
+	require.Contains(t, xml, `raft_configuration replace="replace"`)
+	require.Contains(t, xml, raftHostname(h0))
+	require.Contains(t, xml, raftHostname(h1))
+	require.NotContains(t, xml, raftHostname(h2))
+}

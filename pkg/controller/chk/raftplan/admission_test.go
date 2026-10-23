@@ -43,7 +43,7 @@ func TestPlanAdmission(t *testing.T) {
 		publish bool
 	}{
 		{"fresh bootstrap", func() Snapshot { return baseline(ids, nil) }, ids, []HostID{"h0", "h1", "h2"}, "", AdmissionAllowed, true},
-		{"1 to 3 start", func() Snapshot { return baseline(ids, ids[:1]) }, ids[:2], []HostID{"h1"}, "", AdmissionAllowed, true},
+		{"1 to 3 start", func() Snapshot { return baseline(ids, ids[:1]) }, ids[:1], []HostID{"h1"}, "", AdmissionAllowed, false},
 		{"1 to 3 pending", func() Snapshot {
 			s := baseline(ids, ids[:1])
 			s.PublishedHosts = ids[:2]
@@ -62,7 +62,7 @@ func TestPlanAdmission(t *testing.T) {
 			setHost(&s, "h1", PresencePresent, true, true)
 			return s
 		}, ids, []HostID{"h2"}, "", AdmissionAllowed, true},
-		{"2 to 3", func() Snapshot { return baseline(ids, ids[:2]) }, ids, []HostID{"h2"}, "", AdmissionAllowed, true},
+		{"2 to 3", func() Snapshot { return baseline(ids, ids[:2]) }, ids[:2], []HostID{"h2"}, "", AdmissionAllowed, false},
 		{"missing published joiner is repaired first", func() Snapshot {
 			s := baseline(ids, ids[:1])
 			s.PublishedHosts = ids[:2]
@@ -117,6 +117,22 @@ func TestPlanAdmission(t *testing.T) {
 				t.Fatal("planner output changed without new observations")
 			}
 		})
+	}
+}
+
+func TestPlanAdmissionDefersPublicationUntilPodStarted(t *testing.T) {
+	s := baseline([]HostID{"h0", "h1", "h2"}, []HostID{"h0"})
+	setHost(&s, "h1", PresencePresent, false, true)
+	notStarted := PlanAdmission(s)
+	if contains(notStarted.IncludedHosts, "h1") || notStarted.ShouldPublish || notStarted.MayCreate["h2"] {
+		t.Fatalf("existing but unstarted joiner admitted: %+v", notStarted)
+	}
+	h := s.Hosts["h1"]
+	h.StartedKnown, h.PodStarted = true, true
+	s.Hosts["h1"] = h
+	started := PlanAdmission(s)
+	if !contains(started.IncludedHosts, "h1") || !started.ShouldPublish || started.MayCreate["h2"] {
+		t.Fatalf("started joiner not published or next voter admitted early: %+v", started)
 	}
 }
 

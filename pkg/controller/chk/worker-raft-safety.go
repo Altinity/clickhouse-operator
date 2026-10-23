@@ -28,7 +28,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chk/raftplan"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -117,19 +119,59 @@ func (w *worker) stageUncommittedScaleUpHosts(ctx context.Context, cr *apiChk.Cl
 		return nil
 	}
 
+	// Read the actual common ConfigMap before deciding whether an existing
+	// StatefulSet is still in the bootstrap phase. Never retract an already
+	// published voter, including a previously interrupted creation.
+	published := map[raftplan.HostID]bool{}
+	publishedKnown := false
+	if w.c.APIReader != nil && w.c.namer != nil && w.task != nil {
+		observed, err := w.observeRaftPlanAdmission(ctx, cr)
+		if err != nil {
+			return err
+		}
+		publishedKnown = observed.PublishedKnown
+		for _, id := range observed.PublishedHosts {
+			published[id] = true
+		}
+	}
+
 	var toStage []*api.Host
 	var getErr error
 	_ = cr.WalkHosts(func(host *api.Host) error {
 		if host == nil || !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 			return nil
 		}
-		// Same predicate as rollbackStagedRaftAdmit: absent means NotFound.
 		sts, err := w.stagedJoinerStatefulSet(ctx, host)
 		if err != nil {
 			getErr = err
 			return err
 		}
+		if publishedKnown && published[raftPlanHostID(host)] {
+			return nil
+		}
 		if sts == nil {
+			toStage = append(toStage, host)
+			return nil
+		}
+		// On spec repair, the failed joiner's STS already exists but its Pod
+		// may never have started. Preserve the bootstrap-only membership.
+		if !publishedKnown || w.c.kube.Pod() == nil {
+			return nil // test-only adapters without Pod/CM observations
+		}
+		pod, err := w.c.kube.Pod().Get(ctx, host)
+		if apiErrors.IsNotFound(err) {
+			toStage = append(toStage, host)
+			return nil
+		}
+		if err != nil {
+			getErr = err
+			return err
+		}
+		if pod == nil {
+			getErr = fmt.Errorf("nil staged Keeper Pod for %s", host.GetName())
+			return getErr
+		}
+		if !k8s.PodHasAllContainersStarted(pod) {
 			toStage = append(toStage, host)
 		}
 		return nil
@@ -617,13 +659,34 @@ func quorumDisruptDeferMessage(host *api.Host, snap hostEnsembleSnapshot) string
 	)
 }
 
-// verifyHostEnsembleMembership is the extension point for Raft membership
-// verification after a host joins in rolling mode. Currently a no-op: STS Ready
-// wait already ran. Implement committed-config / leader sync barriers here when
-// adopting a fuller rescale design.
+// verifyHostEnsembleMembership checks the existing Keeper's active membership,
+// not merely the desired Raft XML. On retry it checks again; no phase is cached.
 func (w *worker) verifyHostEnsembleMembership(ctx context.Context, host *api.Host) error {
-	_ = ctx
-	_ = host
+	if !hostIsStagedScaleUpJoin(host) || host.IsStopped() {
+		return nil
+	}
+	// Ready implies the join has succeeded, including on TLS-only clusters
+	// whose client listener cannot be probed with plaintext ZooKeeper.
+	if hostContributesReady(host) {
+		return nil
+	}
+	committed, err := w.readStagedJoinerMembership(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Warning("Keeper Raft membership not observable for %s: %v", host.GetName(), err)
+		return common.ErrCRUDDeferred
+	}
+	decision := raftplan.PlanJoin(raftplan.JoinObservation{
+		StatefulSet: raftplan.PresencePresent,
+		StartedKnown: true, Started: true,
+		PublishedKnown: true, Published: true,
+		CommittedKnown: true, Committed: committed,
+		ReadyKnown: true, Ready: hostContributesReady(host),
+	})
+	if !committed {
+		w.a.V(1).M(host).F().Info("Keeper Raft membership for %s not committed: phase=%s action=%s",
+			host.GetName(), decision.Phase, decision.Action)
+		return common.ErrCRUDDeferred
+	}
 	return nil
 }
 

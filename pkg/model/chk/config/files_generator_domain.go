@@ -40,6 +40,10 @@ func (c *FilesGeneratorDomain) CreateConfigFilesGroupUsers(configSections map[st
 }
 
 func (c *FilesGeneratorDomain) CreateConfigFilesGroupHost(configSections map[string]string, options *FilesGeneratorOptions) {
+	if options != nil && options.BootstrapRaft {
+		util.IncludeNonEmpty(configSections, createConfigSectionFilename("bootstrap-raft"),
+			c.configGenerator.getBootstrapRaftConfig(options.GetHost(), options.GetRaftOptions()))
+	}
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configServerId), c.configGenerator.getHostServerId(options.GetHost()))
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configListeners), c.configGenerator.getHostListenersOverride(options.GetHost()))
 }
