@@ -284,14 +284,17 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *apiCh
 
 	// CR common ConfigMap without added hosts
 	cr.GetRuntime().LockCommonConfig()
-	if err := w.reconcileConfigMapCommon(ctx, cr, w.options()); err != nil {
-		w.a.F().Error("failed to reconcile config map common. err: %v", err)
-	}
+	err := w.reconcileConfigMapCommon(ctx, cr, w.options())
 	cr.GetRuntime().UnlockCommonConfig()
+	if err != nil {
+		w.a.F().Error("failed to reconcile config map common. err: %v", err)
+		return err
+	}
 
 	// CR users ConfigMap - common for all hosts
 	if err := w.reconcileConfigMapCommonUsers(ctx, cr); err != nil {
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
+		return err
 	}
 
 	return w.reconcileCRAuxObjectsPreliminaryDomain(ctx, cr)

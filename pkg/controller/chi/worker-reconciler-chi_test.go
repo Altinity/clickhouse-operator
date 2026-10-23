@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -220,4 +221,43 @@ func TestFinalRemoteServersOptions(t *testing.T) {
 		require.Len(t, got, 1)
 		require.Same(t, filtered, got[0])
 	})
+}
+
+// TestWalkTillErrorStopsOnPreliminaryFailure proves that when the preliminary phase
+// (e.g. reconcileCRAuxObjectsPreliminary) returns an error, WalkTillError halts immediately
+// and does not run cluster reconciliation or finalization, preventing pods from being created
+// without their requisite ConfigMaps.
+func TestWalkTillErrorStopsOnPreliminaryFailure(t *testing.T) {
+	cr := &api.ClickHouseInstallation{
+		Spec: api.ChiSpec{
+			Configuration: &api.Configuration{
+				Clusters: []*api.Cluster{
+					{Name: "c1"},
+				},
+			},
+		},
+	}
+
+	expectedErr := errors.New("forbidden: cannot set blockOwnerDeletion")
+	clusterRan := false
+	finalRan := false
+
+	err := cr.WalkTillError(
+		context.Background(),
+		func(ctx context.Context, chi *api.ClickHouseInstallation) error {
+			return expectedErr
+		},
+		func(ctx context.Context, cluster *api.Cluster) error {
+			clusterRan = true
+			return nil
+		},
+		func(ctx context.Context, chi *api.ClickHouseInstallation) error {
+			finalRan = true
+			return nil
+		},
+	)
+
+	require.ErrorIs(t, err, expectedErr)
+	require.False(t, clusterRan, "cluster reconcile must not run when preliminary aux objects fail")
+	require.False(t, finalRan, "final reconcile must not run when preliminary aux objects fail")
 }
