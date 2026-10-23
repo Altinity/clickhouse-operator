@@ -118,6 +118,19 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
+	// A staged joiner whose Pod never started has already exhausted the
+	// configured startup timeout and persisted Aborted. Child events and
+	// status updates must not restart the same failed generation. A spec
+	// edit (e.g. fixing the broken image) increments metadata.Generation
+	// and permits a new attempt.
+	if shouldHoldRaftStagedStartupAbort(new) {
+		log.V(1).M(new).F().Info(
+			"Keeper staged-joiner startup Aborted for generation %d; wait for CHK spec change",
+			new.GetGeneration(),
+		)
+		return ctrl.Result{}, nil
+	}
+
 	return c.reconcileResult(new, w.reconcileCR(ctx, nil, new))
 }
 
@@ -130,6 +143,12 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 func (c *Controller) reconcileResult(cr *apiChk.ClickHouseKeeperInstallation, err error) (ctrl.Result, error) {
 	switch {
 	case err == nil:
+		return ctrl.Result{}, nil
+	case errors.Is(err, errRaftStagedJoinerStartupTimeout):
+		// Status was persisted as Aborted by reconcileCR. Do not return an
+		// error (controller-runtime retries it), and do not explicitly requeue.
+		// The generation guard above also suppresses status/child-event retries.
+		log.V(1).M(cr).F().Info("Keeper staged-joiner startup timed out; wait for spec edit")
 		return ctrl.Result{}, nil
 	case errors.Is(err, common.ErrCRUDDeferred):
 		// Soft defer: quorum headroom not available yet. Status already
