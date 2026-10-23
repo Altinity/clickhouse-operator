@@ -120,6 +120,38 @@ else
     report "ch-metrics is gated on metrics.enabled" yes
 fi
 
+# The operator reads its configuration once at startup and has no file watcher, so a missed
+# restart strands stale confd/configd/templatesd/usersd config. These two assertions are the
+# contract: nothing version-derived may sit in the pod template, and a real data change must
+# still move the matching checksum. Chart version is not settable via --set, so the first one
+# renders a copy of the chart with Chart.yaml edited.
+pod_template() {
+    render "$@" | awk '/^  template:/{t=1} t{print} t&&/^      containers:/{exit}'
+}
+
+tmp_chart="$(mktemp -d)"
+cp -R "${CHART}" "${tmp_chart}/chart"
+pinned=(--set operator.image.tag=pinned --set metrics.image.tag=pinned)
+before="$(pod_template "${pinned[@]}")"
+yq e -i '.version = "99.99.99" | .appVersion = "99.99.99"' "${tmp_chart}/chart/Chart.yaml"
+after="$(helm template "${RELEASE}" "${tmp_chart}/chart" -n "${NS}" "${pinned[@]}" 2>&1 | awk '/^  template:/{t=1} t{print} t&&/^      containers:/{exit}')"
+rm -rf "${tmp_chart}"
+if [[ "${before}" == "${after}" ]]; then
+    report "pod template is unchanged by a version bump" yes
+else
+    report "pod template is unchanged by a version bump" no \
+        "$(diff <(printf '%s\n' "${before}") <(printf '%s\n' "${after}") | head -6 | tr '\n' ' ')"
+fi
+
+# ... but a real change to the mounted data must still roll the pods.
+base_files="$(render | grep -E '^\s+checksum/files:')"
+changed_files="$(render --set 'configs.files.config\.yaml=# changed' | grep -E '^\s+checksum/files:')"
+if [[ -n "${base_files}" && "${base_files}" != "${changed_files}" ]]; then
+    report "checksum/files tracks a data change" yes
+else
+    report "checksum/files tracks a data change" no "checksum/files did not move when the mounted data changed"
+fi
+
 echo
 echo "crd-install hook"
 # The hook runs at pre-install/pre-upgrade, so anything wrong here fails the whole release with

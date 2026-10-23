@@ -22,7 +22,7 @@ spec:
     matchLabels: {{ include "altinity-clickhouse-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}
+      labels: {{ include "altinity-clickhouse-operator.podTemplateLabels" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}
       annotations:
         {{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations | nindent 8 }}{{ end }}
         checksum/files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-files.yaml") }}

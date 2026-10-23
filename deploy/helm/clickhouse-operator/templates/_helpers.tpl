@@ -58,6 +58,24 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
 {{/*
+Pod template labels
+
+The common labels minus helm.sh/chart and app.kubernetes.io/version. Both of those
+change on a version bump, and anything inside the pod template feeds
+pod-template-hash, so leaving them there rolls the Deployment on a chart bump even
+when the image and the configuration are identical. They stay on the objects
+themselves. commonLabels and managed-by are kept, since a user who sets
+commonLabels reasonably expects them on the pods.
+*/}}
+{{- define "altinity-clickhouse-operator.podTemplateLabels" -}}
+{{ include "altinity-clickhouse-operator.selectorLabels" . }}
+{{- if .Values.commonLabels }}
+{{ toYaml .Values.commonLabels }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end -}}
+
+{{/*
 Selector labels
 */}}
 {{- define "altinity-clickhouse-operator.selectorLabels" -}}
@@ -153,6 +171,10 @@ Arguments (list): root context, configs.files, watchNamespaces list
 Compute a ConfigMap checksum from its data only, for the checksum/* pod annotations.
 Hashing the whole manifest includes the helm.sh/chart label, which changes on every chart version
 bump and would restart the operator when no configuration changed.
+
+fromYaml decodes only the first document of a multi-document file, without reporting an error.
+None of the generated ConfigMaps is multi-document, so this is latent rather than a live bug,
+but it is a difference from the raw-include form this replaced.
 */}}
 {{- define "altinity-clickhouse-operator.configMapContentHash" -}}
 {{ pick (include (print .ctx.Template.BasePath .name) .ctx | fromYaml) "data" "binaryData" | toYaml | sha256sum }}
