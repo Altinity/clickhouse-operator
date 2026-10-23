@@ -40,8 +40,9 @@ func NewConfigMap(kubeClient kube.Interface) *ConfigMap {
 }
 
 func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().ConfigMaps(cm.Namespace).Create(ctx, cm, controller.NewCreateOptions())
+	return commonKube.CreateWithRetry(ctx, func() (*core.ConfigMap, error) {
+		return c.kubeClient.CoreV1().ConfigMaps(cm.Namespace).Create(k8sCtx(ctx), cm, controller.NewCreateOptions())
+	})
 }
 
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
