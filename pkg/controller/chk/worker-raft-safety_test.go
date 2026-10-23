@@ -2137,6 +2137,8 @@ func TestPublishStartedStagedJoiner(t *testing.T) {
 // still excludes it. A second not-yet-created joiner is never in that overlay.
 func TestStagedJoinerBootstrapRaftConfig(t *testing.T) {
 	cr := chkWithHosts(3)
+	cr.Name = "scale"
+	cr.Spec.Defaults = &api.Defaults{}
 	cr.SetAncestor(chkWithHosts(1))
 	h0, h1, h2 := hostAtOnCR(cr, 0), hostAtOnCR(cr, 1), hostAtOnCR(cr, 2)
 	h1.GetReconcileAttributes().SetExclude()

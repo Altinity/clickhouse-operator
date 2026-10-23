@@ -61,7 +61,7 @@ func TestPlanAdmission(t *testing.T) {
 			s.PublishedHosts = ids[:2]
 			setHost(&s, "h1", PresencePresent, true, true)
 			return s
-		}, ids, []HostID{"h2"}, "", AdmissionAllowed, true},
+		}, ids[:2], []HostID{"h2"}, "", AdmissionAllowed, false},
 		{"2 to 3", func() Snapshot { return baseline(ids, ids[:2]) }, ids[:2], []HostID{"h2"}, "", AdmissionAllowed, false},
 		{"missing published joiner is repaired first", func() Snapshot {
 			s := baseline(ids, ids[:1])
