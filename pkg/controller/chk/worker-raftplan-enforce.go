@@ -4,8 +4,10 @@ package chk
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -21,6 +23,35 @@ import (
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 )
+
+// A startup timeout is terminal for the *current CHK specification*, unlike
+// ordinary Raft admission deferral. Keep this identity separate from
+// ErrCRUDAbort so controller-runtime does not retry a known-broken image.
+var errRaftStagedJoinerStartupTimeout = errors.New("staged Keeper joiner startup timed out")
+
+const raftStagedJoinerStartupTimeoutStatusMarker = "[RaftJoinerStartupTimeout]"
+
+// shouldHoldRaftStagedStartupAbort guards status/child-object resyncs after a
+// terminal startup timeout. Kubernetes metadata.Generation changes on a spec
+// edit (such as repairing an image), but not on a status update. NormalizedCR
+// is the last attempted spec stored in CHK status, so no new CRD field is needed.
+// Fail open for old/unmarked aborts and when recorded generation is unknown.
+func shouldHoldRaftStagedStartupAbort(cr *apiChk.ClickHouseKeeperInstallation) bool {
+	if cr == nil || cr.Status == nil || cr.Status.GetStatus() != apiChk.StatusAborted {
+		return false
+	}
+	target := cr.Status.GetNormalizedCR()
+	if target == nil || target.GetGeneration() <= 0 ||
+		target.GetGeneration() != cr.GetGeneration() {
+		return false
+	}
+	for _, message := range cr.Status.GetErrors() {
+		if strings.Contains(message, raftStagedJoinerStartupTimeoutStatusMarker) {
+			return true
+		}
+	}
+	return false
+}
 
 // raftPlanEnforceEnabled runs the Raft planner by default in this test
 // branch, so the standard e2e operator install needs no environment changes.
@@ -103,7 +134,8 @@ func (w *worker) enforceRaftPlanAdmission(ctx context.Context, host *api.Host) e
 					"Raft staged joiner %s never started within StatefulSet timeout; aborting rather than deferring %s",
 					plan.BlockedBy, id,
 				)
-				return common.ErrCRUDAbort
+				return fmt.Errorf("%w: %w (joiner %s blocked host %s)",
+					common.ErrCRUDAbort, errRaftStagedJoinerStartupTimeout, plan.BlockedBy, id)
 			}
 		}
 		w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileInProgress).
