@@ -47,3 +47,54 @@ func TestPodContainersRestartCountsGet(t *testing.T) {
 	require.Nil(t, PodContainersRestartCountsGet(nil, "clickhouse"))
 	require.Nil(t, PodContainersRestartCountsGet(&core.Pod{}))
 }
+
+func TestPodHasAllContainersStartedRequiresObservedStatuses(t *testing.T) {
+	started := true
+	notStarted := false
+	t.Run("nil pod", func(t *testing.T) {
+		require.False(t, PodHasAllContainersStarted(nil))
+	})
+	t.Run("status not yet reported for image pull", func(t *testing.T) {
+		pod := &core.Pod{Spec: core.PodSpec{
+			Containers: []core.Container{{Name: "keeper"}},
+		}}
+		require.False(t, PodHasAllContainersStarted(pod))
+		require.True(t, PodHasNotStartedContainers(pod))
+	})
+	t.Run("broken image reports waiting", func(t *testing.T) {
+		pod := &core.Pod{
+			Spec: core.PodSpec{Containers: []core.Container{{Name: "keeper"}}},
+			Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{
+				Name: "keeper", Started: &notStarted,
+				State: core.ContainerState{Waiting: &core.ContainerStateWaiting{Reason: "ImagePullBackOff"}},
+			}}},
+		}
+		require.False(t, PodHasAllContainersStarted(pod))
+	})
+	t.Run("one missing sidecar status", func(t *testing.T) {
+		pod := &core.Pod{
+			Spec: core.PodSpec{Containers: []core.Container{{Name: "keeper"}, {Name: "sidecar"}}},
+			Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{
+				{Name: "keeper", Started: &started},
+			}},
+		}
+		require.False(t, PodHasAllContainersStarted(pod))
+	})
+	t.Run("all containers started but not necessarily ready", func(t *testing.T) {
+		pod := &core.Pod{
+			Spec: core.PodSpec{Containers: []core.Container{{Name: "keeper"}, {Name: "sidecar"}}},
+			Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{
+				{Name: "sidecar", Started: &started},
+				{Name: "keeper", Started: &started},
+			}},
+		}
+		require.True(t, PodHasAllContainersStarted(pod))
+	})
+	t.Run("a nil Started status cannot count as started", func(t *testing.T) {
+		pod := &core.Pod{
+			Spec: core.PodSpec{Containers: []core.Container{{Name: "keeper"}}},
+			Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{Name: "keeper"}}},
+		}
+		require.False(t, PodHasAllContainersStarted(pod))
+	})
+}
