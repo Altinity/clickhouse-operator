@@ -722,8 +722,15 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	// for the previous joiner's Ready wait (ObjectStatusSame returns first).
 	// The next missing joiner has to be postponed here, while the loop continues
 	// so existing members can still roll.
-	admitErr := w.deferUnreadyStagedAdmit(ctx, host)
-	w.shadowRaftAdmission(ctx, host, admitErr)
+	var admitErr error
+	if raftPlanEnforceEnabled() {
+		// Opt-in: the pure planner decides serial joiner admission.
+		// Existing staging, publication, and rollback remain unchanged.
+		admitErr = w.enforceRaftPlanAdmission(ctx, host)
+	} else {
+		admitErr = w.deferUnreadyStagedAdmit(ctx, host)
+		w.shadowRaftAdmission(ctx, host, admitErr)
+	}
 	if err := admitErr; err != nil {
 		if errors.Is(err, errSkipStagedAdmit) {
 			return nil
