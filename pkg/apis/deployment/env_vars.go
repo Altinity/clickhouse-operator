@@ -14,6 +14,11 @@
 
 package deployment
 
+import (
+	"os"
+	"strconv"
+)
+
 const (
 	// OPERATOR_POD_NODE_NAME name from spec.nodeName Ex.: ip-172-20-52-62.ec2.internal
 	OPERATOR_POD_NODE_NAME = "OPERATOR_POD_NODE_NAME"
@@ -44,6 +49,12 @@ const (
 	// OPERATOR_K8S_CLIENT_BURST_LIMIT specifies an override for the default k8s client QPS burst limit.
 	OPERATOR_K8S_CLIENT_BURST_LIMIT = "OPERATOR_K8S_CLIENT_BURST_LIMIT"
 
+	// OPERATOR_METRICS_DISABLE_DEFAULT_COLLECTORS opts the operator and the
+	// metrics exporter out of the Prometheus client library's default Go
+	// runtime, process and promhttp collectors. Unset (the default) keeps them
+	// exposed; any value accepted by strconv.ParseBool enables the opt-out.
+	OPERATOR_METRICS_DISABLE_DEFAULT_COLLECTORS = "OPERATOR_METRICS_DISABLE_DEFAULT_COLLECTORS"
+
 	// WATCH_NAMESPACE and WATCH_NAMESPACES specifies what namespaces to watch
 	WATCH_NAMESPACE = "WATCH_NAMESPACE"
 	// WATCH_NAMESPACES and WATCH_NAMESPACE specifies what namespaces to watch
@@ -54,3 +65,16 @@ const (
 	// CHOP_CONFIG path to clickhouse operator configuration file
 	CHOP_CONFIG = "CHOP_CONFIG"
 )
+
+// DefaultCollectorsDisabled reports whether the metrics endpoints should stop
+// exposing the default Go runtime, process and promhttp collectors.
+func DefaultCollectorsDisabled() bool {
+	disabled, err := strconv.ParseBool(os.Getenv(OPERATOR_METRICS_DISABLE_DEFAULT_COLLECTORS))
+	if err != nil {
+		// Opt-out only: an unset or malformed value must leave the default
+		// (collectors exposed) in place, so a typo cannot silently drop
+		// runtime series that existing dashboards and alerts scrape.
+		return false
+	}
+	return disabled
+}
