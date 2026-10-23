@@ -229,7 +229,7 @@ func TestFinalRemoteServersOptions(t *testing.T) {
 // without their requisite ConfigMaps.
 func TestWalkTillErrorStopsOnPreliminaryFailure(t *testing.T) {
 	cr := &api.ClickHouseInstallation{
-		Spec: api.ClickHouseInstallationSpec{
+		Spec: api.ChiSpec{
 			Configuration: &api.Configuration{
 				Clusters: []*api.Cluster{
 					{Name: "c1"},
