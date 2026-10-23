@@ -22,9 +22,9 @@ func raftPlanShadowEnabled() bool {
 }
 
 // shadowRaftAdmission compares the *per-host* legacy gate with the new planner.
-// The legacy preliminary exclusion is intentionally not compared directly:
-// it stages every missing joiner, then publishes exactly one at its host gate,
-// while PlanAdmission describes the membership after that publish.
+// Preliminary exclusion is intentionally not compared directly: joiners
+// are staged before creation and published only after Pod Started. Shadow
+// admission compares only whether the next StatefulSet may be created.
 func (w *worker) shadowRaftAdmission(ctx context.Context, host *api.Host, legacyErr error) {
 	if !raftPlanShadowEnabled() || host == nil || host.GetCR() == nil || !hostIsStagedScaleUpJoin(host) {
 		return

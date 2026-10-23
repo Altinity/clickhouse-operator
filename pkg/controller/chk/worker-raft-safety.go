@@ -105,9 +105,9 @@ func crHasEstablishedCluster(cr api.ICustomResource) bool {
 
 // stageUncommittedScaleUpHosts keeps not-yet-created members out of
 // raft_configuration on 1→N / 2→3, so the published XML lists at most one
-// extra server while the previous join is still coming up. Only hosts whose
-// StatefulSet is confirmed absent are tagged: an interrupted pass must not
-// re-exclude a member that is already running. A Get error other than NotFound
+// extra server while the previous join is still coming up. Hosts without a
+// StatefulSet, or with a StatefulSet whose Pod has not Started, remain staged.
+// Previously published members are never re-excluded on an interrupted pass. A Get error other than NotFound
 // fails closed — nothing is staged and the caller must requeue rather than
 // publish an expanded membership. Fresh bootstrap and 3→N (ancestor already
 // has quorum headroom) are left alone.
@@ -194,10 +194,8 @@ func (w *worker) stageUncommittedScaleUpHosts(ctx context.Context, cr *apiChk.Cl
 // ancestor without headroom, and this host is absent from that ancestor — not
 // ObjectStatusRequested. PrepareHostStatefulSetWithStatus overwrites Requested
 // to Same/Modified once the joiner STS exists, so a retry must not treat that
-// host as still waiting to be admitted. deferUnreadyStagedAdmit uses this to
-// postpone the next not-yet-created joiner until this one's live ReadyReplicas
-// is positive. Ready is not committed Raft membership (see
-// verifyHostEnsembleMembership). 3→N is not staged.
+// host as absent. The admission gate defers the next joiner until this one
+// becomes Ready; the join verifier also checks Raft membership. 3→N is not staged.
 func hostIsStagedScaleUpJoin(host *api.Host) bool {
 	if host == nil || host.GetCR() == nil {
 		return false
@@ -211,8 +209,8 @@ func hostIsStagedScaleUpJoin(host *api.Host) bool {
 	return !ensembleHasQuorumHeadroom(host.GetCR().GetAncestor().HostsCount())
 }
 
-// deferUnreadyStagedAdmit postpones a not-yet-created 1→N / 2→3 joiner while
-// another staged joiner already has a StatefulSet that is not Ready.
+// deferUnreadyStagedAdmit is the optional legacy admission fallback for
+// 1→N / 2→3. The authoritative path uses raftplan.PlanAdmission.
 //
 // The check is live ReadyReplicas, not ObjectStatus and not WaitUntilReady.
 // After an interrupted pass the previous joiner's StatefulSet exists, so
@@ -574,12 +572,10 @@ func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) 
 //
 // /ready on a newly created joiner is not a committed-membership barrier, and it
 // is not how 1→N / 2→3 serializes creates. A new peer cannot reach /ready until
-// existing members reload or roll onto the published file, and recovery-first
-// reconciles that peer before they do, so SetWaitUntilReady there expires into
-// ErrCRUDAbort. deferUnreadyStagedAdmit postpones the next missing joiner until
-// the previous joiner's live ReadyReplicas is positive, and that postponement
-// still lets this pass roll the existing members. verifyHostEnsembleMembership
-// is the extension point for /keeper/config + mntr.
+// existing members reload the published file, and recovery-first reconciles
+// that peer before they do, so SetWaitUntilReady there expires into ErrCRUDAbort.
+// The admission gate postpones the next missing joiner until the previous one
+// is Ready; the post-publication gate checks live membership and Pod readiness.
 //
 // Sizing growth on the desired set inflates the denominator against a membership that does not
 // exist yet, and the damage is in the unsafe direction: a 3->5 with one member already down

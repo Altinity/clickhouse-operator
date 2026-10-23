@@ -1612,121 +1612,60 @@ func TestIncludeHostIntoRaftClusterRestoresOnlyStagedExclude(t *testing.T) {
 	})
 }
 
-func TestRollbackStagedRaftAdmitRepublishesExclude(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("missing StatefulSet drops the host from raft XML", func(t *testing.T) {
-		cr := chkWithHosts(2)
-		cr.Spec.Defaults = &api.Defaults{}
-		cr.SetAncestor(chkWithHosts(1))
-		hostAtOnCR(cr, 0)
-		host := hostAtOnCR(cr, 1)
-		fake := newRaftFakeSTS()
-		var published string
-		w := &worker{
-			a: a.NewAnnouncer(nil, nil),
-			c: &Controller{kube: &raftFakeKube{sts: fake}},
-		}
-		w.publishRaftFn = func(context.Context, *api.Host) error {
-			published = renderedRaft(t, w, cr)
-			return nil
-		}
-
-		w.rollbackStagedRaftAdmit(ctx, host)
-		require.True(t, host.GetReconcileAttributes().IsExclude())
-		require.NotContains(t, published, raftHostname(host),
-			"rollback must republish raft_configuration without the host that has no Pod")
-		require.Zero(t, fake.mutationCount())
-	})
-
-	t.Run("existing StatefulSet stays published", func(t *testing.T) {
-		cr := chkWithHosts(2)
-		cr.SetAncestor(chkWithHosts(1))
-		host := hostAtOnCR(cr, 1)
-		fake := newRaftFakeSTS()
-		fake.setReady(host, 0)
-		published := false
-		w := &worker{
-			a: a.NewAnnouncer(nil, nil),
-			c: &Controller{kube: &raftFakeKube{sts: fake}},
-			publishRaftFn: func(context.Context, *api.Host) error {
-				published = true
-				return nil
-			},
-		}
-
-		w.rollbackStagedRaftAdmit(ctx, host)
-		require.False(t, published, "a start-wait failure must not unpublish a StatefulSet that exists")
-		require.False(t, host.GetReconcileAttributes().IsExclude())
-		require.Zero(t, fake.mutationCount())
-	})
-}
-
-// TestStagedAdmitPublishesRaftWithoutTheHostSeam renders the raft XML the
-// ConfigMap would get. reconcileHostFn is not installed, so a publish has to
-// come from publishStagedAdmit, which is what reconcileHostMain calls.
-func TestStagedAdmitPublishesRaftWithoutTheHostSeam(t *testing.T) {
+// TestStagedRaftPublicationFollowsStartedPod checks the active 1->N
+// protocol with rendered Raft XML. No joiner is published before Pod Started,
+// and starting the first joiner does not admit the other missing joiners.
+func TestStagedRaftPublicationFollowsStartedPod(t *testing.T) {
 	ctx := context.Background()
 	cr := chkWithHosts(5)
 	cr.Name = "scale"
 	cr.Spec.Defaults = &api.Defaults{}
 	cr.SetAncestor(chkWithHosts(1))
-	fake := newRaftFakeSTS()
-	for i := 0; i < 5; i++ {
-		host := hostAtOnCR(cr, i)
-		switch i {
-		case 0:
-			host.Runtime.CurStatefulSet = &apps.StatefulSet{}
-			host.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
-			fake.setReady(host, 1)
-		case 1:
-			host.Runtime.CurStatefulSet = &apps.StatefulSet{}
-			host.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
-			fake.setReady(host, 0)
-		default:
-			host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
-			host.GetReconcileAttributes().SetExclude()
-		}
+	for i := 1; i < 5; i++ {
+		joiner := hostAtOnCR(cr, i)
+		joiner.GetReconcileAttributes().SetExclude()
+		joiner.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
 	}
-
+	first := hostAtOnCR(cr, 1)
+	fakeSTS := newRaftFakeSTS().setReady(first, 0)
+	fakePod := &raftFakeStartupPod{
+		pod: &core.Pod{Spec: core.PodSpec{
+			Containers: []core.Container{{Name: "clickhouse-keeper"}},
+		}},
+	}
 	var published []string
 	w := &worker{
 		a: a.NewAnnouncer(nil, nil),
-		c: &Controller{kube: &raftFakeKube{sts: fake}},
+		c: &Controller{kube: &raftFakeKube{sts: fakeSTS, pod: fakePod}},
 	}
 	w.publishRaftFn = func(context.Context, *api.Host) error {
 		published = append(published, renderedRaft(t, w, cr))
 		return nil
 	}
 
-	deferred := false
-	for _, host := range shardHostsRecoveryFirst(cr.Spec.Configuration.Clusters[0].Layout.Shards[0], func(h *api.Host) bool {
-		return w.isHostHealthyForReconcile(ctx, h)
-	}) {
-		err := w.deferUnreadyStagedAdmit(ctx, host)
-		if errors.Is(err, errSkipStagedAdmit) {
-			continue
-		}
-		if errors.Is(err, common.ErrCRUDDeferred) {
-			deferred = true
-			continue
-		}
-		require.NoError(t, err)
-		_, err = w.publishStagedAdmit(ctx, host)
-		require.NoError(t, err)
-	}
+	require.ErrorIs(t, w.publishStartedStagedJoiner(ctx, first), common.ErrCRUDDeferred,
+		"Pod not Started must not publish Raft membership")
+	require.Empty(t, published)
+	require.True(t, first.GetReconcileAttributes().IsExclude())
 
-	require.True(t, deferred, "h2 must be postponed while h1 is not Ready")
-	require.Empty(t, published, "no raft_configuration publish may admit h2, h3, or h4")
-	xml := renderedRaft(t, w, cr)
-	require.Contains(t, xml, raftHostname(hostAtOnCR(cr, 0)))
-	require.Contains(t, xml, raftHostname(hostAtOnCR(cr, 1)))
+	started := true
+	fakePod.pod = &core.Pod{
+		Spec: core.PodSpec{Containers: []core.Container{{Name: "clickhouse-keeper"}}},
+		Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{
+			Name: "clickhouse-keeper", Started: &started,
+		}}},
+	}
+	require.NoError(t, w.publishStartedStagedJoiner(ctx, first))
+	require.Len(t, published, 1)
+	require.Contains(t, published[0], raftHostname(hostAtOnCR(cr, 0)))
+	require.Contains(t, published[0], raftHostname(first))
+	require.False(t, first.GetReconcileAttributes().IsExclude())
 	for i := 2; i < 5; i++ {
-		require.NotContains(t, xml, raftHostname(hostAtOnCR(cr, i)),
-			"1→5 must keep every not-yet-created member out of raft_configuration")
+		require.NotContains(t, published[0], raftHostname(hostAtOnCR(cr, i)),
+			"only the started joiner may enter shared Raft configuration")
 		require.True(t, hostAtOnCR(cr, i).GetReconcileAttributes().IsExclude())
 	}
-	require.Zero(t, fake.mutationCount(), "admitting into raft_configuration must not create or update a StatefulSet")
+	require.Zero(t, fakeSTS.mutationCount(), "publication must not mutate a StatefulSet")
 }
 
 func renderedRaft(t *testing.T, w *worker, cr *apiChk.ClickHouseKeeperInstallation) string {

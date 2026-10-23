@@ -56,8 +56,7 @@ func (w *worker) publishStartedStagedJoiner(ctx context.Context, host *api.Host)
 	if decision.Action != raftplan.JoinPublish {
 		return common.ErrCRUDDeferred
 	}
-	_, err = w.publishStagedAdmit(ctx, host)
-	return err
+	return w.publishStagedAdmit(ctx, host)
 }
 
 // readStagedJoinerReady checks both live Kubernetes readiness indicators.
