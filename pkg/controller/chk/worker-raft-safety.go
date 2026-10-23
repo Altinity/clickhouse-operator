@@ -659,32 +659,44 @@ func quorumDisruptDeferMessage(host *api.Host, snap hostEnsembleSnapshot) string
 	)
 }
 
-// verifyHostEnsembleMembership checks the existing Keeper's active membership,
-// not merely the desired Raft XML. On retry it checks again; no phase is cached.
+// verifyHostEnsembleMembership advances only after the joiner's live
+// StatefulSet AND Pod report Ready. Active Raft membership is a necessary
+// intermediate state, never proof that the new Pod has finished joining.
+// Each reconcile re-observes Kubernetes; no phase or readiness is cached.
 func (w *worker) verifyHostEnsembleMembership(ctx context.Context, host *api.Host) error {
 	if !hostIsStagedScaleUpJoin(host) || host.IsStopped() {
 		return nil
 	}
-	// Ready implies the join has succeeded, including on TLS-only clusters
-	// whose client listener cannot be probed with plaintext ZooKeeper.
-	if hostContributesReady(host) {
-		return nil
-	}
-	committed, err := w.readStagedJoinerMembership(ctx, host)
+	ready, err := w.readStagedJoinerReady(ctx, host)
 	if err != nil {
-		w.a.V(1).M(host).F().Warning("Keeper Raft membership not observable for %s: %v", host.GetName(), err)
-		return common.ErrCRUDDeferred
+		return err // unknown Kubernetes readiness fails closed
+	}
+
+	// Ready on this joiner implies a successful join and also works for
+	// TLS-only Keepers where this plaintext ZooKeeper probe is unavailable.
+	committed := ready
+	if !ready {
+		committed, err = w.readStagedJoinerMembership(ctx, host)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			w.a.V(1).M(host).F().Warning("Keeper Raft membership not observable for %s: %v", host.GetName(), err)
+			return common.ErrCRUDDeferred
+		}
 	}
 	decision := raftplan.PlanJoin(raftplan.JoinObservation{
 		StatefulSet: raftplan.PresencePresent,
 		StartedKnown: true, Started: true,
 		PublishedKnown: true, Published: true,
 		CommittedKnown: true, Committed: committed,
-		ReadyKnown: true, Ready: hostContributesReady(host),
+		ReadyKnown: true, Ready: ready,
 	})
-	if !committed {
-		w.a.V(1).M(host).F().Info("Keeper Raft membership for %s not committed: phase=%s action=%s",
-			host.GetName(), decision.Phase, decision.Action)
+	if decision.Action != raftplan.JoinAdmitNext {
+		w.a.V(1).M(host).F().Info(
+			"Keeper %s still joining: phase=%s action=%s raftCommitted=%t podReady=%t",
+			host.GetName(), decision.Phase, decision.Action, committed, ready,
+		)
 		return common.ErrCRUDDeferred
 	}
 	return nil
