@@ -25,6 +25,7 @@ import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chk/raftplan"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
@@ -71,6 +72,13 @@ type worker struct {
 
 	// publishRaftFn overrides raft ConfigMap publication (tests only).
 	publishRaftFn func(ctx context.Context, host *api.Host) error
+
+	// readPublishedRaftMembersFn replaces ONLY the common-ConfigMap membership
+	// read in tests. Live StatefulSet observation and the admission planner
+	// still execute normally; production always reads the actual ConfigMap.
+	readPublishedRaftMembersFn func(
+		ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation,
+	) (published []raftplan.HostID, known bool, err error)
 
 	// quorumWaitSpent is the wait the Raft disrupt gate has already burned in THIS pass. The
 	// budget is per pass, not per host: a permanently unhealthy peer would otherwise cost the
