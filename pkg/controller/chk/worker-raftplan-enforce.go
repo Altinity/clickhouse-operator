@@ -6,6 +6,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
+
+	core "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -80,6 +87,25 @@ func (w *worker) enforceRaftPlanAdmission(ctx context.Context, host *api.Host) e
 	}
 	plan, err := raftPlanAdmissionVerdict(observed, id)
 	if err == common.ErrCRUDDeferred {
+		// "Not Ready" covers two very different situations: a Pod that has
+		// started but is waiting for Raft quorum (keep deferring), and one
+		// that has never started (e.g. ImagePullBackOff). In the latter case
+		// a repeated soft deferral can mask the StatefulSet startup timeout.
+		// The deadline is based on live Kubernetes creation timestamps so
+		// it survives controller restarts and repeated reconcile passes.
+		if plan.Reason == raftplan.WaitingForJoiner && plan.BlockedBy != "" {
+			expired, checkErr := w.stagedJoinerStartupExpired(ctx, cr, plan.BlockedBy)
+			if checkErr != nil {
+				return checkErr
+			}
+			if expired {
+				w.a.M(host).F().Warning(
+					"Raft staged joiner %s never started within StatefulSet timeout; aborting rather than deferring %s",
+					plan.BlockedBy, id,
+				)
+				return common.ErrCRUDAbort
+			}
+		}
 		w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileInProgress).
 			WithAction(host.GetCR()).M(host).F().Info(
 				"Raft planner defers admitting %s: reason=%s blockedBy=%s",
@@ -112,4 +138,72 @@ func (w *worker) raftPlanDisruptionBlocked(
 		)
 	}
 	return !decision.Allowed, nil
+}
+
+// stagedJoinerStartupDeadlineExceeded is an executor-side timeout, not Raft
+// policy. A started-but-unready Keeper can legitimately need its existing
+// peers to load the new membership, so only an unstarted Pod can time out.
+// Use the Pod's creation time (not a per-reconcile timer) to avoid resetting
+// the deadline on every soft deferral. For a missing Pod, use the StatefulSet
+// creation time if it is available.
+func stagedJoinerStartupDeadlineExceeded(
+	pod *core.Pod, stsCreated, now time.Time, timeout time.Duration,
+) bool {
+	if timeout <= 0 {
+		return false
+	}
+	var startedAt time.Time
+	if pod != nil {
+		if k8s.PodHasAllContainersStarted(pod) {
+			return false
+		}
+		startedAt = pod.CreationTimestamp.Time
+	} else {
+		startedAt = stsCreated
+	}
+	return !startedAt.IsZero() && now.Sub(startedAt) >= timeout
+}
+
+// stagedJoinerStartupExpired checks only a joiner that the pure planner
+// identified as blocking an absent member. The existing StatefulSet create
+// wait remains the first timeout path. This is a cross-reconcile backstop
+// when the joiner's STS already exists and repeated admission deferrals would
+// otherwise leave the CHK indefinitely InProgress.
+func (w *worker) stagedJoinerStartupExpired(
+	ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, id raftplan.HostID,
+) (bool, error) {
+	// Legacy lightweight host-loop tests don't construct Pod clients; the
+	// planner and real StatefulSet observation are still exercised there.
+	if w == nil || w.c == nil || w.c.kube == nil || w.c.kube.Pod() == nil {
+		return false, nil
+	}
+	var blocker *api.Host
+	_ = cr.WalkHosts(func(peer *api.Host) error {
+		if peer != nil && raftPlanHostID(peer) == id {
+			blocker = peer
+		}
+		return nil
+	})
+	if blocker == nil {
+		return false, fmt.Errorf("Raft planner blocked by unknown joiner %s", id)
+	}
+	sts, err := w.stagedJoinerStatefulSet(ctx, blocker)
+	if err != nil {
+		return false, fmt.Errorf("read blocked joiner StatefulSet %s: %w", id, err)
+	}
+	if sts == nil {
+		return false, nil // lost STS: admission observation must be repeated
+	}
+	pod, err := w.c.kube.Pod().Get(ctx, blocker)
+	if apiErrors.IsNotFound(err) {
+		pod = nil
+	} else if err != nil {
+		return false, fmt.Errorf("read blocked joiner Pod %s: %w", id, err)
+	} else if pod == nil {
+		return false, fmt.Errorf("nil Pod with successful Get for blocked joiner %s", id)
+	}
+	timeout := poller.NewOptionsFromConfig().Timeout
+	return stagedJoinerStartupDeadlineExceeded(
+		pod, sts.CreationTimestamp.Time, time.Now(), timeout,
+	), nil
 }
