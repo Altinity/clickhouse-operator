@@ -2017,3 +2017,30 @@ func TestQuorumWaitReturnsContextErrorOnCancellation(t *testing.T) {
 			"a cancelled reconcile must report cancellation, not a downstream API error")
 	}
 }
+
+func TestStagedJoinerRetryWaitsUntilPodStarted(t *testing.T) {
+	cr := chkWithHosts(3)
+	cr.SetAncestor(chkWithHosts(1))
+	joiner := hostAtOnCR(cr, 1)
+	joiner.Runtime.CurStatefulSet = &apps.StatefulSet{}
+	joiner.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
+	w := &worker{a: a.NewAnnouncer(nil, nil)}
+
+	opts := w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
+	require.True(t, opts.WaitUntilStarted(), "new joiner must wait to start")
+	require.True(t, opts.WaitUntilStartedOnSame(), "a matching STS may still have an unstarted Pod")
+	require.False(t, opts.WaitUntilReady(), "joiner Ready can depend on existing members updating Raft config")
+
+	joiner.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+	opts = w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
+	require.False(t, opts.WaitUntilStartedOnSame(), "already Ready joiners do not need a redundant startup check")
+
+	existing := hostAtOnCR(cr, 0)
+	opts = w.prepareStsReconcileOptsWaitSection(existing, nil, false)
+	require.False(t, opts.WaitUntilStartedOnSame(), "do not apply retry startup wait to established voters")
+
+	joiner.Runtime.CurStatefulSet.Status.ReadyReplicas = 0
+	cr.Spec.Stop = types.NewStringBool(true)
+	opts = w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
+	require.False(t, opts.WaitUntilStartedOnSame(), "stopped CHK must never block on pod startup")
+}
