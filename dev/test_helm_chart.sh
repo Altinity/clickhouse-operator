@@ -144,9 +144,14 @@ else
 fi
 
 # ... but a real change to the mounted data must still roll the pods.
-base_files="$(render | grep -E '^\s+checksum/files:')"
-changed_files="$(render --set 'configs.files.config\.yaml=# changed' | grep -E '^\s+checksum/files:')"
-if [[ -n "${base_files}" && "${base_files}" != "${changed_files}" ]]; then
+# watchNamespaces is rendered into config.yaml, so it must move checksum/files. Both renders must
+# succeed and carry the annotation: a failed render yields an empty value, which differs from any hash.
+base_files="$(render | grep -E '^[[:space:]]+checksum/files:')"
+changed_out="$(render --set 'watchNamespaces={ns1,ns2}')"
+changed_files="$(grep -E '^[[:space:]]+checksum/files:' <<<"${changed_out}")"
+if grep -qE '^Error:' <<<"${changed_out}"; then
+    report "checksum/files tracks a data change" no "$(grep -E '^Error:' <<<"${changed_out}" | head -1)"
+elif [[ -n "${base_files}" && -n "${changed_files}" && "${base_files}" != "${changed_files}" ]]; then
     report "checksum/files tracks a data change" yes
 else
     report "checksum/files tracks a data change" no "checksum/files did not move when the mounted data changed"
