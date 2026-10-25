@@ -158,6 +158,13 @@ func CreateWithRetry[T any](ctx context.Context, create func() (T, error)) (T, e
 	return retryOn(ctx, "owner-ref admission pending", createRetryBackoff, IsOwnerRefAdmissionPending, create)
 }
 
+// UpdateWithRetry is CreateWithRetry for an Update that newly adds a blockOwnerDeletion owner
+// reference, which admission checks the same way. The rejected request stores nothing, so the
+// object's resourceVersion is unchanged and the retry cannot hit a Conflict of its own making.
+func UpdateWithRetry[T any](ctx context.Context, update func() (T, error)) (T, error) {
+	return retryOn(ctx, "owner-ref admission pending", createRetryBackoff, IsOwnerRefAdmissionPending, update)
+}
+
 // retryOn runs f, retrying it while retryable(err) on the given back-off. backoff.Steps is the
 // number of retries, so f runs at most backoff.Steps+1 times. what names the retried condition in logs.
 func retryOn[T any](ctx context.Context, what string, backoff wait.Backoff, retryable func(error) bool, f func() (T, error)) (T, error) {

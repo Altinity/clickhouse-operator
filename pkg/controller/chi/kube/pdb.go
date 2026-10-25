@@ -52,8 +52,9 @@ func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisru
 }
 
 func (c *PDB) Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Update(ctx, pdb, controller.NewUpdateOptions())
+	return commonKube.UpdateWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
+		return c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Update(k8sCtx(ctx), pdb, controller.NewUpdateOptions())
+	})
 }
 
 func (c *PDB) Remove(ctx context.Context, namespace, name string) error {

@@ -111,8 +111,9 @@ func (c *STS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.Stateful
 
 func (c *STS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	log.V(3).M(sts).Info("Going to update STS: %s", util.NamespaceNameString(sts))
-	err := c.kubeClient.Update(ctx, sts)
-	return sts, err
+	return commonKube.UpdateWithRetry(ctx, func() (*apps.StatefulSet, error) {
+		return sts, c.kubeClient.Update(ctx, sts)
+	})
 }
 
 // Remove issues a fire-and-forget delete against the API server. It returns immediately after

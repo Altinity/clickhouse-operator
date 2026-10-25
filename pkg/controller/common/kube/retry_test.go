@@ -262,3 +262,34 @@ func TestCreateRetryBackoffBudget(t *testing.T) {
 		t.Fatalf("create retry budget = %s, want >= 60s", total)
 	}
 }
+
+func TestUpdateWithRetry(t *testing.T) {
+	orig := createRetryBackoff
+	createRetryBackoff = wait.Backoff{Duration: time.Millisecond, Factor: 2.0, Cap: 4 * time.Millisecond, Steps: 3}
+	defer func() { createRetryBackoff = orig }()
+
+	t.Run("owner-ref admission pending, then accepted", func(t *testing.T) {
+		calls := 0
+		_, err := UpdateWithRetry(context.Background(), func() (int, error) {
+			calls++
+			if calls < 3 {
+				return 0, ownerRefPending()
+			}
+			return 1, nil
+		})
+		if err != nil || calls != 3 {
+			t.Fatalf("err=%v calls=%d, want nil/3", err, calls)
+		}
+	})
+
+	t.Run("conflict is not retried", func(t *testing.T) {
+		calls := 0
+		_, err := UpdateWithRetry(context.Background(), func() (int, error) {
+			calls++
+			return 0, apiErrors.NewConflict(schema.GroupResource{Resource: "statefulsets"}, "y", errors.New("x"))
+		})
+		if !apiErrors.IsConflict(err) || calls != 1 {
+			t.Fatalf("err=%v calls=%d, want Conflict/1", err, calls)
+		}
+	})
+}

@@ -59,8 +59,9 @@ func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisru
 }
 
 func (c *PDB) Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	err := c.kubeClient.Update(ctx, pdb)
-	return pdb, err
+	return commonKube.UpdateWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
+		return pdb, c.kubeClient.Update(ctx, pdb)
+	})
 }
 
 func (c *PDB) Delete(ctx context.Context, namespace, name string) error {

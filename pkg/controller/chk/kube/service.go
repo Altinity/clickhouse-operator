@@ -85,8 +85,9 @@ func (c *Service) Create(ctx context.Context, svc *core.Service) (*core.Service,
 }
 
 func (c *Service) Update(ctx context.Context, svc *core.Service) (*core.Service, error) {
-	err := c.kubeClient.Update(ctx, svc)
-	return svc, err
+	return commonKube.UpdateWithRetry(ctx, func() (*core.Service, error) {
+		return svc, c.kubeClient.Update(ctx, svc)
+	})
 }
 
 func (c *Service) Delete(ctx context.Context, namespace, name string) error {

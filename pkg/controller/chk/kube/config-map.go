@@ -59,8 +59,9 @@ func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.Conf
 }
 
 func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
-	err := c.kubeClient.Update(ctx, cm)
-	return cm, err
+	return commonKube.UpdateWithRetry(ctx, func() (*core.ConfigMap, error) {
+		return cm, c.kubeClient.Update(ctx, cm)
+	})
 }
 
 func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
