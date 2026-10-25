@@ -40,7 +40,7 @@ const transientGetRetryMaxAttempts = 5
 // 5s, with 10% jitter so a fleet of hosts hitting the same apiserver blip does not
 // retry in lockstep (thundering herd). Steps = attempts-1 because the first attempt
 // is not preceded by a back-off. It is a var (not a const) so tests can shrink it;
-// treat it as read-only at runtime — GetWithRetry copies it before calling Step().
+// treat it as read-only at runtime — retryOn takes it by value before calling Step().
 var transientGetRetryBackoff = wait.Backoff{
 	Duration: 500 * time.Millisecond,
 	Factor:   2.0,
@@ -122,7 +122,7 @@ func IsTransientAPIError(err error) bool {
 // full request URL, e.g. `Get "https://.../namespaces/x/configmaps/y": ...`), so the
 // logged error already identifies the verb, kind, namespace and name.
 func GetWithRetry[T any](ctx context.Context, get func() (T, error)) (T, error) {
-	return retryOn(ctx, transientGetRetryBackoff, IsTransientAPIError, get)
+	return retryOn(ctx, "transient API error", transientGetRetryBackoff, IsTransientAPIError, get)
 }
 
 // createRetryBackoff covers OwnerReferencesPermissionEnforcement's window after a CRD is
@@ -140,26 +140,27 @@ var createRetryBackoff = wait.Backoff{
 // IsOwnerRefAdmissionPending reports whether err is the OwnerReferencesPermissionEnforcement
 // admission plugin rejecting a blockOwnerDeletion owner reference because its cached RESTMapper
 // does not know the owner kind yet. That happens for a short while after the owner's CRD is
-// created and clears by itself, unlike every other Forbidden.
+// created and clears by itself, unlike every other Forbidden. Both phrases of the plugin's
+// message are required so a webhook deny that happens to mention one is not retried.
 func IsOwnerRefAdmissionPending(err error) bool {
-	return apiErrors.IsForbidden(err) && strings.Contains(err.Error(), "cannot find RESTMapping")
+	if !apiErrors.IsForbidden(err) {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "cannot set blockOwnerDeletion") && strings.Contains(msg, "cannot find RESTMapping")
 }
 
-func isRetryableCreateError(err error) bool {
-	return IsTransientAPIError(err) || IsOwnerRefAdmissionPending(err)
-}
-
-// CreateWithRetry runs create and retries it on a transient API/network error or a pending
-// owner-reference admission (IsOwnerRefAdmissionPending), with the same contract as GetWithRetry.
-// A create that landed server-side before a dropped connection surfaces as AlreadyExists on the
-// retry, which is terminal and returned as is.
+// CreateWithRetry runs create and retries it only on a pending owner-reference admission
+// (IsOwnerRefAdmissionPending), with the same contract as GetWithRetry. Any other error,
+// transient ones included, is returned as is, as before. Admission rejects the request before
+// anything is stored, so a retry never meets an AlreadyExists left by its own earlier attempt.
 func CreateWithRetry[T any](ctx context.Context, create func() (T, error)) (T, error) {
-	return retryOn(ctx, createRetryBackoff, isRetryableCreateError, create)
+	return retryOn(ctx, "owner-ref admission pending", createRetryBackoff, IsOwnerRefAdmissionPending, create)
 }
 
 // retryOn runs f, retrying it while retryable(err) on the given back-off. backoff.Steps is the
-// number of retries, so f runs at most backoff.Steps+1 times.
-func retryOn[T any](ctx context.Context, backoff wait.Backoff, retryable func(error) bool, f func() (T, error)) (T, error) {
+// number of retries, so f runs at most backoff.Steps+1 times. what names the retried condition in logs.
+func retryOn[T any](ctx context.Context, what string, backoff wait.Backoff, retryable func(error) bool, f func() (T, error)) (T, error) {
 	var (
 		result T
 		err    error
@@ -167,15 +168,23 @@ func retryOn[T any](ctx context.Context, backoff wait.Backoff, retryable func(er
 	maxAttempts := backoff.Steps + 1
 	for attempt := 1; ; attempt++ {
 		result, err = f()
+		if err == nil && attempt > 1 {
+			log.V(1).F().Info("%s: succeeded after %d attempts", what, attempt)
+		}
 		if err == nil || !retryable(err) {
 			return result, err
 		}
 		if attempt >= maxAttempts {
-			log.V(1).F().Warning("transient API error: giving up after %d attempt(s), err: %v", attempt, err)
+			log.V(1).F().Warning("%s: giving up after %d attempt(s), err: %v", what, attempt, err)
 			return result, err
 		}
 		delay := backoff.Step() // backoff is a copy - Step() mutates the receiver
-		log.V(2).F().Warning("transient API error: retrying (attempt %d/%d) in %s, err: %v", attempt, maxAttempts, delay, err)
+		// The first retry is logged at default verbosity so a long pause is visible.
+		if attempt == 1 {
+			log.V(1).F().Warning("%s: retrying (attempt %d/%d) in %s, err: %v", what, attempt, maxAttempts, delay, err)
+		} else {
+			log.V(2).F().Warning("%s: retrying (attempt %d/%d) in %s, err: %v", what, attempt, maxAttempts, delay, err)
+		}
 		if util.WaitContextDoneOrTimeout(ctx, delay) {
 			// ctx cancelled/expired during back-off — stop retrying and surface the
 			// last error (matches pre-retry behavior: the caller always gets a real error).

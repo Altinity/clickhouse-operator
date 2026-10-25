@@ -289,7 +289,9 @@ func (c *CR) statusUpdateCM(ctx context.Context, cm *core.ConfigMap) error {
 	cmm := NewConfigMap(c.kubeClient)
 	_, err := cmm.Update(ctx, cm)
 	if apiErrors.IsNotFound(err) {
-		_, err = cmm.Create(ctx, cm)
+		// The only create inside statusUpdateRetry's loop. It is best effort and rewritten on
+		// every status update, so create once: ConfigMap.Create's retry would repeat per attempt.
+		_, err = c.kubeClient.CoreV1().ConfigMaps(cm.Namespace).Create(k8sCtx(ctx), cm, controller.NewCreateOptions())
 	}
 	return err
 }
