@@ -85,6 +85,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Host template `settings` set in the installation, or in a later template, were dropped** whenever an earlier template's same-named host template had settings of its own; they now merge per key.
   by [@sunsingerus](https://github.com/sunsingerus)
 
+* **A Helm chart upgrade with unchanged configuration no longer restarts the operator.**
+  The `checksum/*` pod annotations hashed the whole rendered ConfigMap, `helm.sh/chart` label included, and the pod template carried `helm.sh/chart` and `app.kubernetes.io/version`, so every chart version bump rolled the operator Deployment even with `image.tag` pinned.
+  The checksums now hash only the ConfigMap `data`, and the operator pod no longer carries those two labels; they stay on the Deployment and the other objects, and `commonLabels`, `podLabels` and `app.kubernetes.io/managed-by` still reach the pod.
+  The upgrade that lands this restarts the operator once, as all nine checksums are recomputed; ClickHouse clusters are unaffected.
+  by [@DrFaust92](https://github.com/DrFaust92) in [#2079](https://github.com/Altinity/clickhouse-operator/pull/2079)
+
 ### Security
 * **Bumped `golang.org/x/net` `v0.56.0` → `v0.60.0` and `golang.org/x/text` `v0.39.0` → `v0.42.0`** to address CVEs in the operator and metrics-exporter images (`CVE-2026-78663`, `CVE-2026-78659`, `CVE-2026-78669`, `CVE-2026-78660`, `CVE-2026-97032`, `CVE-2026-56851`).
   No API or behavior changes.
