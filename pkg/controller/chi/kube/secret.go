@@ -71,13 +71,15 @@ func (c *Secret) Get(ctx context.Context, params ...any) (*core.Secret, error) {
 }
 
 func (c *Secret) Create(ctx context.Context, svc *core.Secret) (*core.Secret, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().Secrets(svc.Namespace).Create(ctx, svc, controller.NewCreateOptions())
+	return commonKube.CreateWithRetry(ctx, func() (*core.Secret, error) {
+		return c.kubeClient.CoreV1().Secrets(svc.Namespace).Create(k8sCtx(ctx), svc, controller.NewCreateOptions())
+	})
 }
 
 func (c *Secret) Update(ctx context.Context, svc *core.Secret) (*core.Secret, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().Secrets(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
+	return commonKube.UpdateWithRetry(ctx, func() (*core.Secret, error) {
+		return c.kubeClient.CoreV1().Secrets(svc.Namespace).Update(k8sCtx(ctx), svc, controller.NewUpdateOptions())
+	})
 }
 
 func (c *Secret) Remove(ctx context.Context, namespace, name string) error {
