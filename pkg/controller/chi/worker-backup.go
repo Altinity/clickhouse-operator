@@ -16,15 +16,17 @@ package chi
 
 import (
 	"context"
+	"errors"
+	"maps"
+	"slices"
 	"strings"
 
-	core "k8s.io/api/core/v1"
-	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
 	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -49,35 +51,50 @@ func (w *worker) warnBackupWithoutStorage(cr *api.ClickHouseInstallation) {
 			strings.Join(clusters, ", "), api.BackupStorageHint)
 }
 
-// warnMissingStorageSecrets warns about the storage Secrets of backup-enabled clusters that do not
-// exist. The sidecars take such a Secret as optional, so the hosts start without a storage to upload to, and
-// every backup and restore of the cluster fails - with nothing else telling why.
-func (w *worker) warnMissingStorageSecrets(ctx context.Context, cr *api.ClickHouseInstallation) {
-	checked := make(map[string]bool)
-	cr.WalkClusters(func(cluster api.ICluster) error {
-		backup := cluster.GetBackup()
-		name := backup.GetStorageSecretName()
-		if !backup.IsEnabled() || (name == "") || checked[name] {
-			return nil
-		}
-		checked[name] = true
-
-		secret := &core.Secret{ObjectMeta: meta.ObjectMeta{Namespace: cr.GetNamespace(), Name: name}}
-		_, err := w.c.getSecret(ctx, secret)
+// reconcileBackupConfigSecrets reconciles the configuration file Secret of the sidecars of every backup-enabled
+// cluster, registering each so that it is not purged as an unknown object, and warns about the storage Secrets the
+// files name no storage by, or cannot be built from. A missing storage Secret leaves the hosts without a storage to
+// upload to, and every backup and restore of the cluster fails - with nothing else telling why.
+func (w *worker) reconcileBackupConfigSecrets(ctx context.Context, cr *api.ClickHouseInstallation) error {
+	outcomes, err := w.c.reconcileBackupConfigSecrets(ctx, cr, cr)
+	if err != nil {
+		w.a.V(1).M(cr).F().
+			WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			Warning("Unable to reconcile backup configuration Secrets err: %v", err)
+		return err
+	}
+	var errs []error
+	for _, cluster := range slices.Sorted(maps.Keys(outcomes)) {
+		outcome := outcomes[cluster]
+		storageSecret := util.NamespaceNameString(&meta.ObjectMeta{Namespace: cr.GetNamespace(), Name: outcome.storageSecret})
 		switch {
-		case apiErrors.IsNotFound(err):
+		case errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig):
+			w.a.V(1).M(cr).F().
+				WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageConfigInvalid).
+				Warning("Secret %s of the backup storage of cluster %s holds a %s that cannot be read - the sidecars "+
+					"keep their configuration until it is fixed: %v", storageSecret, cluster, backupconfig.FileName, outcome.err)
+		case outcome.err != nil:
+			w.a.V(1).M(cr).F().
+				WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+				Warning("Unable to reconcile backup configuration Secret of cluster %s err: %v", cluster, outcome.err)
+			errs = append(errs, outcome.err)
+		case outcome.noStorage != nil:
 			w.a.V(1).M(cr).F().
 				WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageSecretMissing).
-				Warning("Secret %s of backup storage %s of cluster %s does not exist - its backups fail until it is "+
-					"created, and the sidecars restart to pick it up a few minutes after",
-					util.NamespaceNameString(secret), backup.GetStorageName(), cluster.GetName())
-		case err != nil:
-			w.a.V(1).M(cr).F().
-				Warning("Unable to check Secret %s of backup storage %s of cluster %s err: %v",
-					util.NamespaceNameString(secret), backup.GetStorageName(), cluster.GetName(), err)
+				Warning("Secret %s of the backup storage of cluster %s %v - its backups fail until the Secret holds the "+
+					"clickhouse-backup configuration of the storage in key %s, which the sidecars pick up within a few minutes",
+					storageSecret, cluster, outcome.noStorage, backupconfig.FileName)
 		}
-		return nil
-	})
+		if outcome.secret == nil {
+			continue
+		}
+		if outcome.err != nil {
+			w.task.RegistryFailed().RegisterSecret(outcome.secret.GetObjectMeta())
+		} else {
+			w.task.RegistryReconciled().RegisterSecret(outcome.secret.GetObjectMeta())
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // warnUnpublishedBackupAPI warns about the hosts of backup-enabled clusters whose Service does not publish the

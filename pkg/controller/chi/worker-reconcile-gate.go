@@ -28,8 +28,8 @@ const (
 	// networks/host_regexp must be refreshed.
 	gateOperatorIPChanged reconcileGateDecision = "OperatorIPChanged"
 	// gateBackupSecretChanged: this pass created the backup Secret or filled in its missing keys,
-	// with new random values. The sidecars restart with them, so the backup user's password in the
-	// users config must follow, or the sidecars are locked out of ClickHouse.
+	// with new random values. The configuration files of the sidecars take them, so the backup user's password in
+	// the users config must follow, or the sidecars are locked out of ClickHouse.
 	gateBackupSecretChanged reconcileGateDecision = "BackupSecretChanged"
 	// gateStuckHostRecovery: a host has been sustained-NotReady past its threshold.
 	gateStuckHostRecovery reconcileGateDecision = "StuckHostRecovery"

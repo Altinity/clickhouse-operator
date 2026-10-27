@@ -47,7 +47,6 @@ PATH_CHECK_KEYS=(
 	COS_URL COS_PATH COS_OBJECT_DISK_PATH
 	FTP_ADDRESS FTP_PATH FTP_OBJECT_DISK_PATH
 	SFTP_ADDRESS SFTP_PORT SFTP_PATH SFTP_OBJECT_DISK_PATH
-	CLICKHOUSE_BACKUP_CONFIG
 )
 REQUEST_TIMEOUT=600
 DELETE_TIMEOUT=3600
@@ -964,7 +963,8 @@ path_check_inconclusive() {
 # and prune it. A backup of the first replica of each shard has to be at a path without {replica}, as every replica of
 # the shard restores its schema from its own path; one of every replica needs {replica}, which gives each a path of its
 # own. Another cluster whose storage or path macros the check does not know - a configuration file of its
-# sidecar in place of its environment, say - is left out of it with a warning: only a path proven shared is refused.
+# sidecar other than the one the operator generates, say - is left out of it with a warning: only a path proven shared
+# is refused.
 # The target cluster's own unknown paths fail the Job, unless it is the only backup-enabled cluster.
 check_storage_paths() {
 	local index storage prefix identity key template object shard name what value self=${PATH_SELF:-} self_name=
@@ -999,14 +999,9 @@ check_storage_paths() {
 		if [[ ${index} == "${self}" ]]; then
 			self_name=${name}
 		fi
-		# The operator tells when the settings it gives do not have to be those of the sidecar. A configuration file the
-		# storage Secret names, which the operator does not read, may set any of them.
+		# The operator tells when the settings it gives do not have to be those of the sidecar
 		path_setting "${index}" UNVERIFIABLE
 		what=${REPLY//[[:cntrl:]]/ }
-		path_setting "${index}" CLICKHOUSE_BACKUP_CONFIG
-		if [[ -z ${what} && -n ${REPLY} ]]; then
-			what="its storage Secret names a configuration file in CLICKHOUSE_BACKUP_CONFIG"
-		fi
 		if [[ -n ${what} ]]; then
 			what="the operator cannot tell the sidecar settings of cluster ${name}: ${what}"
 			if [[ ${index} == "${self}" ]]; then
@@ -1022,7 +1017,7 @@ check_storage_paths() {
 		prefix=${REPLY}
 		if [[ -z ${prefix} ]]; then
 			if [[ -z ${storage} ]]; then
-				what="its environment does not set REMOTE_STORAGE, as with a configuration file of the sidecar"
+				what="its configuration does not set remote_storage"
 			else
 				what="it keeps its backups in ${storage} storage, where the check cannot tell their paths"
 			fi

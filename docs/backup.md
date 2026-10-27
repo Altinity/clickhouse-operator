@@ -172,7 +172,7 @@ spec:
 |--------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `enabled`                | `"yes"` turns operator-managed backup on. Accepts the usual yes/no forms (`"yes"`, `"no"`, `true`, `false`, ...). Off by default. Takes effect only with a storage that has a `secretRef`, or with `podTemplate`, see below.                               |
 | `podTemplate`            | Pod template whose `clickhouse-backup` container the sidecar is built on, see [Customizing the sidecar](#customizing-the-sidecar). `""` on a cluster: the operator's own.                                                                                  |
-| `storages`               | Storages for the backups, one per level for now: a `name`, a DNS label of at most 45 characters, and a `secretRef` naming a Secret in the CHI namespace whose keys become environment variables of the sidecar. See [Storages](#storages).                 |
+| `storages`               | Storages for the backups, one per level for now: a `name`, a DNS label of at most 45 characters, and a `secretRef` naming a Secret in the CHI namespace whose key `config.yml` holds the `clickhouse-backup` configuration of the storage. See [Storages](#storages). |
 | `storage`                | The storage of `storages` the sidecar keeps the backups in. Left out, the only one the same level declares, or else the one the level a cluster inherits from uses. `""` on a cluster: no storage.                                                         |
 | `recovery`               | `backupName`: the backup a new CHI starts from, see [Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup). `""` on a cluster: nothing to recover there. `sourceInstallation`, `sourceNamespace`: the CHI that made the backup, when another; `""` on a cluster: this CHI. |
 
@@ -203,9 +203,10 @@ schedule of it is held, one of every cluster leaves it out with a warning (see
 [Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup)). Declaring a storage with a
 `secretRef`, or setting `podTemplate`, turns backup on with the next reconcile, which rolls the
 cluster's Pods once. Setting `enabled: "no"` on a cluster that inherited backup unasked settles it as
-well, and changes no Pod. The operator looks at these fields only: a configuration file the hosts'
-pod template mounts at `/etc/clickhouse-backup`, or settings a mutating admission webhook injects, do
-not count. To use those, name the sidecar's pod template in `podTemplate`, even one whose
+well, and changes no Pod. The operator looks at these fields only: settings a mutating admission
+webhook injects do not count, and a configuration file a pod template mounts at
+`/etc/clickhouse-backup` gives way to the one the operator generates there. To configure the storage
+in the sidecar's container instead, name its pod template in `podTemplate`, even one whose
 `clickhouse-backup` container sets nothing.
 
 **Enabling or disabling backup rolls that cluster's Pods only.** Adding or removing the sidecar
@@ -213,8 +214,8 @@ changes the cluster's Pod template, so the operator performs its usual rolling u
 Changing `podTemplate`, which Secret the cluster's storage names - in its `secretRef`, or by
 switching to another storage - or the sidecar's container in its pod template rolls the Pods the same
 way; `recovery` is no sidecar setting, and changing it restarts nothing. Changing the contents of the
-storage Secret does not roll the Pods either: it restarts the sidecars alone, see
-[Secret changes](#secret-changes). The other clusters of the CHI are not restarted: they only
+storage Secret restarts nothing at all: the operator regenerates the configuration file of the
+sidecars, which they read anew for every operation, see [Secret changes](#secret-changes). The other clusters of the CHI are not restarted: they only
 reload their users configuration live when the operator adds or removes the `clickhouse_backup`
 user (see below).
 
@@ -236,9 +237,19 @@ For every Pod of a cluster with backup enabled, the operator adds a container na
   random values and the CHI as owner, so it is deleted with the CHI. It holds the REST API basic-auth
   credentials (`API_USERNAME`, `API_PASSWORD`) and the ClickHouse credentials of the sidecar
   (`CLICKHOUSE_USERNAME`, `CLICKHOUSE_PASSWORD`), the same for every cluster of the CHI. Nothing in
-  it needs to be configured; the Jobs read it directly. A sidecar that starts while this Secret is
-  missing does not serve its REST API, which would let in anybody without credentials, but waits
-  for the Secret, leaving its Pod Ready (see [Secret changes](#secret-changes)).
+  it needs to be configured; the Jobs read it directly, and the sidecars through their configuration
+  file, see below.
+* **Configuration file Secret `<chi-name>-<cluster-name>-backup-config`.** The operator generates
+  one per backup-enabled cluster, owned by the CHI, from the [storage Secret](#backup-storage) of the
+  cluster and the credentials above, and mounts its `config.yml` read-only into the sidecar alone, at
+  `/etc/clickhouse-backup/config.yml`, where `clickhouse-backup` reads its configuration by default.
+  `clickhouse-backup` reads the file anew for every operation, and Kubernetes keeps a mounted Secret up
+  to date, so a changed storage Secret reaches a running sidecar without a restart, see
+  [Secret changes](#secret-changes). Besides `config.yml`, the Secret holds the settings of the file
+  that locate the storage, under the names of their environment variables, for the
+  [storage path check](#storage-paths) of the Jobs. A sidecar that starts before the Secret exists
+  does not serve its REST API, which would let in anybody without credentials, but waits for the
+  file, leaving its Pod Ready.
 * **ClickHouse user `clickhouse_backup`.** The operator adds this user to the CHI, with the password
   from the Secret above and access restricted to localhost (`127.0.0.1`, `::1`): it logs in only from
   inside its own Pod, the sidecar's. ClickHouse counts every address of the Pod as local, so a client
@@ -266,11 +277,11 @@ For every Pod of a cluster with backup enabled, the operator adds a container na
   sidecar. See [Access entities](#access-entities).
 * **One operation at a time.** `API_ALLOW_PARALLEL` is set to `false`, so a sidecar runs one
   backup or restore command at a time and refuses another meanwhile, which the Jobs wait out.
-* **Default storage paths.** When the path of the storage in use is not set, the sidecar uses
+* **Default storage paths.** Where the storage settings set no path, the configuration file takes
   `backup/{namespace}/{installation}/{cluster}/{shard}`, and
-  `object_disks/{namespace}/{installation}/{cluster}/{shard}` as the object disk path, or the paths the operator configuration sets, see
-  [Storage paths](#storage-paths). A path set in the Secret or in the container's `env` is used as it
-  is, and with a configuration file mounted into the sidecar no default is applied.
+  `object_disks/{namespace}/{installation}/{cluster}/{shard}` as the object disk path, or the paths the
+  operator configuration sets, for every storage type, see [Storage paths](#storage-paths). A path set
+  in the storage Secret or in the container's `env` is used as it is.
 * **Same volumes as ClickHouse.** The sidecar mounts every volume the `clickhouse` container mounts,
   so it sees all data disks. See [Data volume](#data-volume).
 * **Security context.** The sidecar runs with the `securityContext` of its container in its pod
@@ -291,18 +302,21 @@ For every Pod of a cluster with backup enabled, the operator adds a container na
 * **Local copies removed after upload.** `BACKUPS_TO_KEEP_LOCAL` is set to `-1`, so a backup's local
   copy is deleted from the data disk once it has been uploaded. Local copies are hard links that pin
   old data parts and would otherwise grow without bound.
-* **Secret changes followed.** Both Secrets the sidecar takes its environment from are mounted into
-  the sidecar as well, read-only under `/var/run/secrets/clickhouse-backup/`, and a liveness probe
-  restarts the sidecar alone once they change, see [Secret changes](#secret-changes).
-
-The sidecar environment is assembled, from lowest to highest precedence, from: the keys of the
-storage Secret, the operator's own settings listed above, and the `env` of the sidecar's
-container in its pod template. A Secret key that collides with an operator setting is
-therefore ignored. Nine settings are the exception: the operator always sets `API_LISTEN`
-(`0.0.0.0:7171`), `API_SECURE` (`false`), `API_USERNAME` and `API_PASSWORD` (from the credentials
-Secret), `RESTORE_SCHEMA_ON_CLUSTER`, `RESTORE_DATABASE_MAPPING`, `RESTORE_TABLE_MAPPING`,
-`API_ALLOW_PARALLEL` and `CLICKHOUSE_RESTART_COMMAND` as above, over the container's own, as the
-Jobs rely on them - they reach every sidecar on port 7171 over plain HTTP with those credentials, a
+The sidecar's configuration is assembled, from lowest to highest precedence, from: the
+configuration file - the storage settings of the storage Secret, with the default paths filled in
+and the credentials above over whatever the storage settings say of `api.username`,
+`api.password`, `clickhouse.username` and `clickhouse.password` - then the environment of the
+sidecar: the operator's own settings listed above, and the `env` of the sidecar's container in its
+pod template. `clickhouse-backup` takes an environment variable over the setting of the file it
+stands for, and the operator sets `general.disable_environment_override` to `false` in the file, so
+that the storage settings cannot turn that off. A storage setting that collides with an operator
+setting is therefore ignored. Seven settings are pinned: the operator always sets `API_LISTEN`
+(`0.0.0.0:7171`), `API_SECURE` (`false`), `RESTORE_SCHEMA_ON_CLUSTER`, `RESTORE_DATABASE_MAPPING`,
+`RESTORE_TABLE_MAPPING`, `API_ALLOW_PARALLEL` and `CLICKHOUSE_RESTART_COMMAND` as above, over the
+container's own, and drops the container's `API_USERNAME`, `API_PASSWORD`, `CLICKHOUSE_USERNAME`,
+`CLICKHOUSE_PASSWORD` and `CLICKHOUSE_BACKUP_CONFIG`, which would override the credentials of the
+file or make `clickhouse-backup` read another file. The Jobs rely on all of them - they reach every
+sidecar on port 7171 over plain HTTP with the credentials of `<chi-name>-auto-backup-secret`, a
 restore `ON CLUSTER` would re-point `Distributed` tables, a mapped restore would replace tables the
 overwrite guard never checked, two commands at once on one sidecar would share its environment,
 and restored access entities would not load. The default storage paths are no such setting: they
@@ -311,8 +325,8 @@ fill in a path left unset only.
 A Kubernetes Service in the namespace sets `<SERVICE>_PORT=tcp://<ip>:<port>` in every container,
 so a Service named `sftp` sets `SFTP_PORT`, which `clickhouse-backup` fails to parse, refusing its
 whole configuration. The sidecar sets `CLICKHOUSE_PORT` itself, and starts the server without any
-`*_PORT` variable that holds such a link; a port set in the Secret or in the container's `env` is
-kept.
+`*_PORT` variable that holds such a link; a port set in the storage settings or in the container's
+`env` is kept.
 
 ### Customizing the sidecar
 
@@ -350,13 +364,18 @@ A `ClickHouseInstallationTemplate` may carry both `spec.backup.podTemplate` and 
 names, to give every installation that uses it the same sidecar.
 
 * **Yours:** `image` (over the bundled default, `altinity/clickhouse-backup:2.8.1`), `env` (over the
-  storage Secret and the operator's defaults), `envFrom`, `resources`, `securityContext`,
-  `volumeMounts` (of volumes the Pods have), `command`, `args`, `livenessProbe`. An `envFrom` of the
-  container's own sets only what neither the storage Secret, added after it, nor any `env`
-  entry sets. Without a `securityContext` the sidecar copies the ClickHouse container's; without
+  configuration file and the operator's defaults), `envFrom`, `resources`, `securityContext`,
+  `volumeMounts` (of volumes the Pods have), `command`, `args`, `livenessProbe`.
+  An `envFrom` of the container's own sets what no `env` entry sets, over the configuration file.
+  Without a `securityContext` the sidecar copies the ClickHouse container's; without
   `resources` it has none, which makes a `Guaranteed` Pod `Burstable`, see
   [What the operator runs](#what-the-operator-runs).
-* **Pinned:** the nine settings above are set over the container's own.
+* **Pinned:** the seven settings above are set over the container's own.
+* **Dropped:** the container's `env` entries `API_USERNAME`, `API_PASSWORD`, `CLICKHOUSE_USERNAME`,
+  `CLICKHOUSE_PASSWORD` and `CLICKHOUSE_BACKUP_CONFIG`, and its mounts at `/etc/clickhouse-backup`,
+  below or above it - as are such mounts of the ClickHouse container, which the sidecar otherwise
+  shares: the operator's configuration file takes their place. A pod template volume named
+  `clickhouse-backup-config` is replaced by the operator's.
 * **Rejected:** a literal `API_SECURE` that turns TLS on: the Jobs speak plain HTTP, so the CHI is
   aborted with `InvalidPodTemplate` before anything changes, rather than having TLS turned off
   unasked. So is a `podTemplate` naming a pod template that does not exist, that has none or two
@@ -375,10 +394,11 @@ image and pull policy, and the user, group, `runAsNonRoot` and seccomp profile o
 `securityContext`, besides the `imagePullSecrets` and `serviceAccountName` of the pod template the
 host runs. Changing the container rolls the cluster's Pods.
 
-A `command` or `args` of the sidecar's container needs the credentials Secret to start, keeps the
-service links and gets no default storage paths; its own `livenessProbe` stops it following Secret
-changes; an `envFrom` of its own other than the storage Secret, unprefixed, hides its storage
-paths from the Jobs, see [Storage paths](#storage-paths).
+A `command` or `args` of the sidecar's container needs the configuration file Secret to start - the
+operator mounts it as mandatory then, as another command might serve the REST API without
+credentials - and keeps the service links. It still reads the operator's configuration file, unless
+it names another one with `-c` or `--config`, which hides the storage paths from the Jobs, as does an
+`envFrom` of the container's own, see [Storage paths](#storage-paths).
 
 A `clickhouse-backup` container in a pod template a cluster with backup off runs is that cluster's
 own, run as written.
@@ -404,10 +424,12 @@ one downloaded copy of a backup.
 Where a cluster keeps its backups - the storage type, the bucket or container, the path - and the
 credentials to reach them are configured by a Secret in the CHI namespace, the storage Secret, named
 in the `secretRef` of the [storage](#storages) the cluster uses.
-Each key becomes an environment variable of the sidecar and is read by `clickhouse-backup` as its
-configuration - see the
+Its key `config.yml` holds the storage settings: a YAML mapping of the sections of the
+`clickhouse-backup` configuration file - `general`, `s3`, `gcs`, `azblob`, ... - see the
 [clickhouse-backup configuration reference](https://github.com/Altinity/clickhouse-backup#default-config)
-for every option. A minimal S3 or MinIO Secret:
+for every option. The operator generates the configuration file of the sidecars from it, see
+[What the operator runs](#what-the-operator-runs); other keys of the Secret are not read. A minimal S3
+or MinIO Secret:
 
 ```yaml
 apiVersion: v1
@@ -416,45 +438,55 @@ metadata:
   name: backup-demo-storage
 type: Opaque
 stringData:
-  REMOTE_STORAGE: "s3"
-  # With MinIO, http://minio-hl.minio:9000
-  S3_ENDPOINT: "https://s3.us-east-1.amazonaws.com"
-  S3_REGION: "us-east-1"
-  S3_BUCKET: "clickhouse-backups"
-  # The default, see Storage paths
-  S3_PATH: "backup/{namespace}/{installation}/{cluster}/{shard}"
-  S3_ACCESS_KEY: "..."
-  S3_SECRET_KEY: "..."
-  # Needed by MinIO and most S3-compatible stores
-  # S3_FORCE_PATH_STYLE: "true"
+  config.yml: |
+    general:
+      remote_storage: s3
+    s3:
+      # With MinIO, http://minio-hl.minio:9000
+      endpoint: https://s3.us-east-1.amazonaws.com
+      region: us-east-1
+      bucket: clickhouse-backups
+      # The default, see Storage paths
+      path: backup/{namespace}/{installation}/{cluster}/{shard}
+      access_key: "..."
+      secret_key: "..."
+      # Needed by MinIO and most S3-compatible stores
+      # force_path_style: true
 ```
 
-Other storage types use the same scheme, for example `REMOTE_STORAGE: "gcs"` with `GCS_BUCKET`,
-`GCS_PATH`, `GCS_CREDENTIALS_JSON`, or `REMOTE_STORAGE: "azblob"` with `AZBLOB_ACCOUNT_NAME`,
-`AZBLOB_ACCOUNT_KEY`, `AZBLOB_CONTAINER`, `AZBLOB_PATH`. Each cluster takes the Secret of the
+Other storage types use the same scheme, for example `remote_storage: gcs` with a `gcs` section
+holding `bucket`, `path` and `credentials_json`, or `remote_storage: azblob` with an `azblob` section
+holding `account_name`, `account_key`, `container` and `path`. Each cluster takes the Secret of the
 storage it uses, so clusters may keep their backups in different buckets, or with different
-providers.
+providers. Settings `clickhouse-backup` does not know are passed on as they are: a newer image may
+take settings the operator knows nothing of.
 
-Useful `clickhouse-backup` settings to consider in the Secret:
+Useful `clickhouse-backup` settings to consider in the storage settings:
 
-* Leave `BACKUPS_TO_KEEP_REMOTE` unset (`0`). It prunes every backup regardless of who made
+* Leave `general.backups_to_keep_remote` unset (`0`). It prunes every backup regardless of who made
   it; use the schedule's [`retention.keepLast`](#retention) instead, which only touches that
   schedule's backups.
-* Compression, per storage: `S3_COMPRESSION_FORMAT` (`tar`, `zstd`, `gzip`, ...),
-  `GCS_COMPRESSION_FORMAT`, `AZBLOB_COMPRESSION_FORMAT`. Not `lz4`: ClickHouse data is
-  lz4-compressed already, so `clickhouse-backup` refuses that configuration, its sidecar never
-  serves its API, and every backup and restore of the cluster fails.
-* Server-side encryption: `S3_SSE` (e.g. `AES256` or `aws:kms`) with `S3_SSE_KMS_KEY_ID`; see the
+* Compression, per storage: `s3.compression_format` (`tar`, `zstd`, `gzip`, ...),
+  `gcs.compression_format`, `azblob.compression_format`. Not `lz4`: ClickHouse data is
+  lz4-compressed already, so `clickhouse-backup` refuses that configuration, and every backup and
+  restore of the cluster fails.
+* Server-side encryption: `s3.sse` (e.g. `AES256` or `aws:kms`) with `s3.sse_kms_key_id`; see the
   clickhouse-backup reference for GCS and Azure.
 
-`BACKUPS_TO_KEEP_LOCAL` is set by the operator (see above), so a value in this Secret is ignored;
-set it in the `env` of the sidecar's container in its pod template to keep local copies.
+`BACKUPS_TO_KEEP_LOCAL` is set by the operator as an environment variable (see above), so
+`general.backups_to_keep_local` in the storage settings is ignored; set the variable in the `env` of
+the sidecar's container in its pod template to keep local copies.
 
 The Pods start without the Secret. When it does not exist - not created yet, or misspelled in
-`secretRef` - the sidecar starts without a storage configuration, ClickHouse is unaffected,
-the operator emits a `BackupStorageSecretMissing` warning event on the CHI on every reconcile,
-naming the Secret, its storage and the cluster, and backups and restores fail until the Secret is in
-place. Once it is created, the sidecars pick it up by themselves, as they do any later change of it.
+`secretRef` - or holds no key `config.yml`, as a Secret of environment-variable keys does, the
+configuration file of the sidecars names no storage, ClickHouse is unaffected, the operator emits a
+`BackupStorageSecretMissing` warning event on the CHI on every reconcile, naming the Secret, its
+storage and the cluster, and backups and restores fail until the Secret holds the storage settings.
+Storage settings that are no YAML mapping of sections - not YAML at all, a section that is no
+mapping, a setting the operator reads that is a list - leave the configuration file as it is, with a
+`BackupStorageConfigInvalid` warning event on every reconcile, until they are fixed. Once the Secret
+is right, the sidecars pick it up by themselves, as they do any later change of it, see
+[Secret changes](#secret-changes).
 
 ### Storages
 
@@ -517,11 +549,12 @@ name), `{shard}` (the shard name, by default its index in the cluster), `{replic
 names that the CHI's own configuration defines takes precedence on the hosts, while the Jobs check
 the paths with the operator's values: do not redefine them.
 
-**Default.** Without a path for the storage in use - `S3_PATH`, `GCS_PATH`, `AZBLOB_PATH`, ... -
-the sidecar uses `backup/{namespace}/{installation}/{cluster}/{shard}`, and, for tables on object
-disks, `object_disks/{namespace}/{installation}/{cluster}/{shard}` as the object disk path
-(`S3_OBJECT_DISK_PATH`, `GCS_OBJECT_DISK_PATH`, `AZBLOB_OBJECT_DISK_PATH`). A path you set always
-wins. The namespace and the CHI name keep apart the backups of every CHI of one Kubernetes cluster
+**Default.** Without a path for the storage in use - `s3.path`, `gcs.path`, `azblob.path`, ... -
+the configuration file takes `backup/{namespace}/{installation}/{cluster}/{shard}`, and, for tables
+on object disks, `object_disks/{namespace}/{installation}/{cluster}/{shard}` as the object disk path
+(`s3.object_disk_path`, `gcs.object_disk_path`, `azblob.object_disk_path`). A path you set, in the
+storage settings or as an environment variable such as `S3_PATH` in the container's `env`, always
+wins; one set empty is the root of the storage, one set null is unset. The namespace and the CHI name keep apart the backups of every CHI of one Kubernetes cluster
 on a shared storage: with paths that expand alike for two CHIs, each lists, restores and deletes the
 backups of the other by name, and two backups of one name would merge into one.
 
@@ -534,8 +567,9 @@ backup:
 ```
 
 A fixed prefix of your own, as `eu1/` here, keeps apart the installations of several Kubernetes
-clusters on one storage, CHIs of one name in one namespace among them. The sidecar takes the defaults on its command line: changing
-them rolls the Pods of every backup-enabled cluster, and leaves the backups made under the old paths
+clusters on one storage, CHIs of one name in one namespace among them. The operator writes the
+defaults into the configuration files: changing them changes the paths of every backup-enabled
+cluster within minutes, with no Pod restarted, and leaves the backups made under the old paths
 where they are, where restores, retention and incremental backups no longer find them. Set both,
 each with `{shard}`, and neither a prefix of the other.
 
@@ -544,7 +578,7 @@ backup-enabled clusters of the CHI, not only of its own cluster, and fails witho
 anything unless:
 
 * **every shard of its cluster has a storage path of its own**, which no other shard uses, of its
-  cluster or of another one on the same storage (the same `REMOTE_STORAGE` and bucket, container,
+  cluster or of another one on the same storage (the same storage type and bucket, container,
   endpoint or address). Without `{shard}` the shards of a cluster would write over each other's part
   of a backup, and without `{cluster}` two clusters on one bucket would mix theirs: as they share the
   backup name, a restore of one cluster could restore the other's data. One cluster with one shard
@@ -568,38 +602,37 @@ only warns.
 
 Settings left unset count as the defaults `clickhouse-backup` gives them, and paths are compared as
 it cleans them, so `backup//{shard}/` and `backup/{shard}` are one path. To check, the Job's Pod
-takes from the `env` of each cluster's sidecar, as its pod template sets it, and from
-its storage Secret only the keys that locate the storage (storage type, bucket,
-container, endpoint, address, port and paths) and, from the Secret alone,
-`CLICKHOUSE_BACKUP_CONFIG` - never its credentials. Kubernetes passes the Secret's keys to the Pod:
-the operator itself only checks that the Secret exists.
+takes the settings that locate the storage (storage type, bucket, container, endpoint, address,
+port and paths) of each cluster as its sidecars do: from the `env` of the sidecar's container, as its
+pod template sets it, over the configuration file Secret of the cluster, which holds those settings of
+the file under the names of their environment variables - `REMOTE_STORAGE`, `S3_BUCKET`, `S3_PATH`,
+... - and never its credentials. Kubernetes passes the Secret's keys to the Pod.
 
 **When the check cannot tell.** The paths of a cluster are unknown to the check when:
 
 * a path holds a macro other than the five above, which the Job cannot expand;
-* neither the container's `env` nor the storage Secret sets `REMOTE_STORAGE`, as with a
-  configuration file of the sidecar, or it names a storage type whose paths the check does not know,
-  such as `custom`;
-* the sidecar may take settings the operator cannot see: from a configuration file, on a volume
-  mounted at `/etc/clickhouse-backup`, named by `CLICKHOUSE_BACKUP_CONFIG` in the container's `env`
-  or the storage Secret, or named on the command line of the sidecar's container in its pod
-  template - a `command` or `args` with `-c` or `--config`, or any argument
-  holding `--config`, as a shell wrapper passes it on; from an `envFrom` of that container; or
-  from a setting that locates the storage but is taken from anything but a Secret or ConfigMap key,
-  such as a `fieldRef`, or refers to another variable with `$(...)`.
+* neither the container's `env` nor the storage settings set the storage type
+  (`general.remote_storage`), or they name a storage type whose paths the check does not know, such
+  as `custom`;
+* the sidecar may take settings the operator cannot see: from a configuration file named on the
+  command line of the sidecar's container in its pod template - a `command` or `args` with `-c` or
+  `--config`, or any argument holding `--config`, as a shell wrapper passes it on; from an `envFrom`
+  of that container; or from a setting that locates the storage but is taken from anything but a
+  Secret or ConfigMap key, such as a `fieldRef`, or refers to another variable with `$(...)`. A mount
+  at `/etc/clickhouse-backup` or `CLICKHOUSE_BACKUP_CONFIG` in the container's `env` no longer hides
+  anything: the operator replaces the one and drops the other.
 
 In a CHI with one backup-enabled cluster, the Job then logs a warning and goes on. With several, the
 Jobs of their clusters run at the same time, and two of them writing one backup to one path would
 leave a mix of both, listed as complete: a Job that cannot tell the paths of its own cluster fails
 without changing anything, and one that cannot tell those of another cluster leaves it out of the
 check, with a warning - that cluster's own Jobs fail. Configure the sidecars of a CHI with several
-backup-enabled clusters through the storage Secret and `env` only, without a configuration
-file named anywhere.
+backup-enabled clusters through the storage Secret and `env` only, without an `envFrom` or a
+configuration file named on the command line.
 
-A configuration file built into a custom `clickhouse-backup` image is invisible to the operator. The
-sidecar then takes from the file what its environment leaves unset, and applies no default path,
-while the check takes the defaults: with such an image, set every setting that locates the storage,
-paths included, in the storage Secret or `env`.
+A configuration file built into a custom `clickhouse-backup` image at
+`/etc/clickhouse-backup/config.yml` is hidden by the operator's; one elsewhere is read only when the
+command names it, see above.
 
 **Restoring into another CHI.** The target CHI finds a backup by expanding its paths with its own
 macros, so it needs the same cluster names and shard layout. A backup of a CHI of another name, or
@@ -608,8 +641,8 @@ of another namespace where the paths hold `{namespace}`, lies under the paths of
 [ClickHouseRestore](#clickhouserestore), or of `spec.backup.recovery` for a
 [recovery](#recover-a-new-chi-from-a-backup). The restore then reads the backup from the paths those
 macros give there, through clickhouse-backup commands that override both paths for that command
-alone. The paths of the target must be known to the Job (see above): a configuration file of the
-sidecar fails such a restore before it changes anything, and paths that hold neither macro are read
+alone. The paths of the target must be known to the Job (see above): a configuration file named on
+the command line of the sidecar fails such a restore before it changes anything, and paths that hold neither macro are read
 as they are, with a warning. With `validateTopology: false` the restore does not check first that
 every host finds the backup there. An `AllReplicas` backup cannot be restored into a CHI of another
 name, as `{replica}` - the host name - differs there.
@@ -667,55 +700,40 @@ as a warning event and in its `Validated` condition (reason `CHIRecovered`).
 
 ### Secret changes
 
-The sidecar takes its environment from two Secrets: the storage Secret and
-`<chi-name>-auto-backup-secret`. Kubernetes resolves the environment of a container only when it
-starts the container, and `spec.restart: "RollingUpdate"` restarts ClickHouse in its Pod, not the
-sidecar. The operator therefore mounts both Secrets into the sidecar too, which Kubernetes keeps up
-to date, and gives the sidecar a liveness probe that compares them with the environment it started
-with. Once they differ, the probe fails, and Kubernetes restarts the sidecar alone, resolving its
-environment anew; ClickHouse keeps running. Creating the storage Secret after the Pods,
-editing it, or deleting and recreating it with other contents therefore takes effect by itself:
+The sidecar reads its configuration file anew for every operation, from the configuration file
+Secret the operator generates for its cluster out of the storage Secret and
+`<chi-name>-auto-backup-secret`. The operator regenerates it on every reconcile of the CHI and, for
+a CHI that has completed a reconcile and is not suspended, once a minute in between, as it does not
+watch Secrets it did not create; Kubernetes then updates the mounted file, which takes about a minute
+more. Creating the storage Secret after the Pods, editing it, or deleting and recreating it with
+other contents therefore takes effect by itself:
 
-* **Within a few minutes.** Kubernetes updates a mounted Secret about once a minute, and the probe
-  fails for 90 seconds before the restart, so that a sidecar that started just before such an update
-  is not restarted for nothing.
-* **Not during an operation of the sidecar.** The probe asks the sidecar's REST API first and waits
-  while the sidecar runs an operation, and for a minute after it finished one, so that a restart
-  does not interrupt its backup or restore - a restore is not resumed - nor a Job between two of its
-  steps on that host. A sidecar whose API does not answer is restarted anyway: no Job can be driving
-  it. The probe knows of its own sidecar only, while a Job drives the hosts of its cluster one after
-  another: the sidecar of a host the Job has not reached yet, or left more than a minute ago, may
-  restart meanwhile. A backup Job waits for it, but goes on with the new values on that host and the
-  old ones on the hosts before - and fails on new credentials; a restore Job that finds a sidecar
-  restarted between two of its steps fails as partially applied. Change these Secrets only while no
-  backup or restore runs.
-* **The Pod is briefly not Ready.** For the second or two the sidecar takes to restart, the CHI's
-  Service sends no new connections to the Pod. The host Services, which replication, distributed
-  queries and the backup Jobs use, publish Pods that are not Ready and are unaffected. The restart
-  counts in the Pod's `RESTARTS`, and a `Liveness probe failed` event names the changed key. A
-  second change within ten minutes or so delays that restart by Kubernetes' restart back-off,
-  keeping the Pod not Ready for that long.
-* **A changed or added key counts, a removed one does not.** A key removed from the Secret, with
-  nothing else changed, stays in the sidecar's environment until the sidecar restarts for another
-  reason; set it to its default value instead - for a path, the one the sidecar defaults to
-  (see [Storage paths](#storage-paths)), as an empty one names the root of
-  the storage, and for `CLICKHOUSE_BACKUP_CONFIG` an empty one, which names no file - not even one
-  a custom image ships. A deleted Secret leaves the sidecars running with the configuration they
-  have.
-* **Only these two Secrets are followed.** A key the sidecar sets otherwise - an operator setting or
-  the container's own `env` - is not compared, as the Secret does not set it, and an `env` entry
-  taken from another Secret or a ConfigMap changes at the next restart of the sidecar only.
+* **Within a few minutes, without a restart.** Neither ClickHouse nor the sidecar restarts, and the
+  Pod stays Ready. The generated Secret is updated only when its contents change.
+* **Operation by operation.** An operation that runs keeps the settings it started with; the next
+  one takes the new ones. A Job drives the hosts of its cluster one after another, so a change while
+  a backup or restore runs leaves it with the old settings on some hosts and the new ones on others:
+  change the storage Secret only while no backup or restore runs.
+* **A removed setting counts.** The file is generated from the Secret as it is, so a setting removed
+  from it is gone from the file too. A deleted storage Secret, or one without `config.yml`, leaves a
+  file that names no storage, with a `BackupStorageSecretMissing` event; storage settings that
+  cannot be read leave the file as it was, see [Backup storage](#backup-storage).
+* **Only the storage Secret and the credentials are followed.** An `env` entry of the sidecar's
+  container, taken from another Secret or a ConfigMap, and the operator's own settings, are
+  environment variables, which Kubernetes resolves when it starts the container: they change at the
+  next restart of the sidecar only.
 
 When `<chi-name>-auto-backup-secret` is deleted, the running sidecars keep their credentials, which
-ClickHouse still accepts, and the probe restarts nothing while the Secret is missing, as a sidecar
-restarted without it would lack them. The operator notices the deletion and reconciles the CHI,
-which creates the Secret anew, with new random values; so does any reconcile that finds the Secret
-missing or lacking a key, whatever started it, except for a suspended CHI, whose Secret is left as
-it is until the CHI is resumed. ClickHouse reloads the new password live, and the sidecars of every
-cluster restart with the new credentials as above - backups and restores fail until they have.
-Backup and restore Jobs need the Secret too and do not start while it is missing. A sidecar that
-starts while the Secret is missing serves no REST API, as an API without credentials would let in
-anybody, but waits until the Secret is back, leaving its Pod Ready.
+ClickHouse still accepts. The operator notices the deletion and reconciles the CHI, which creates the
+Secret anew, with new random values; so does any reconcile that finds the Secret missing or lacking a
+key, whatever started it, except for a suspended CHI, whose Secret is left as it is until the CHI is
+resumed. ClickHouse reloads the new password live, and the configuration files take the new
+credentials as above. The sidecars do not, however, let the Jobs in with them: `clickhouse-backup`
+checks the REST API credentials against the configuration it last loaded, which only an operation
+called with the old credentials loads anew. Restart the sidecars by hand after such a deletion -
+deleting the Pods one at a time, for example - and backups and restores fail with
+`401 Unauthorized` until they have. Backup and restore Jobs need the Secret too and
+do not start while it is missing.
 
 ## ClickHouseBackup
 
@@ -1392,10 +1410,9 @@ empty CHI and switching clients over once it is verified.
 Do not change the target CHI while a restore runs. A change that rolls its Pods restarts the
 sidecars, which interrupts the restore on the restarted host and leaves the cluster partly restored;
 the restore then has to be repeated, with `overwrite: true` since some tables already exist. Do not
-change the Secrets the sidecars take their environment from either: a sidecar restarts for such a
-change once it is idle, also while the restore works on other hosts, which leaves the restore
-applied with the old values on some hosts and the new ones on others, or fails it as partially
-applied (see [Secret changes](#secret-changes)).
+change the storage Secret either: the sidecars take a change with their next operation, also while
+the restore works on other hosts, which leaves the restore applied with the old settings on some
+hosts and the new ones on others (see [Secret changes](#secret-changes)).
 
 ## One operation at a time per cluster
 
@@ -1754,14 +1771,17 @@ storage keeps them, as its spec still asks for backups: an alert on their age fi
   older ClickHouse the restore completes, but ClickHouse loads them only at its next restart, see
   [Access entities](#access-entities).
 * **Several backup-enabled clusters need settings the operator can see.** In such a CHI, a Job
-  refuses to run when the storage paths of its cluster cannot be checked - a configuration file of the
-  sidecar, an `envFrom` of the sidecar's container, a macro the check does not know - and a configuration
-  file built into the image goes unseen, see [Storage paths](#storage-paths).
+  refuses to run when the storage paths of its cluster cannot be checked - a configuration file named
+  on the sidecar's command line, an `envFrom` of the sidecar's container, a macro the check does not
+  know, see [Storage paths](#storage-paths).
 * **Do not change a CHI while it is being restored.** A rolling update restarts the sidecars and
   leaves a partly applied restore, see [Restore safety](#restore-safety).
-* **A Secret change restarts the sidecars.** Each sidecar restarts once it is idle, also while a
-  backup or restore works on other hosts, which takes its Pod out of the CHI's Service for a moment;
-  a key removed from a Secret is not noticed, see [Secret changes](#secret-changes).
+* **A storage Secret change reaches the sidecars operation by operation.** It takes a few minutes,
+  and an operation running on other hosts meanwhile is left with the old settings on some hosts and
+  the new ones on others, see [Secret changes](#secret-changes).
+* **New REST API credentials need a sidecar restart.** After `<chi-name>-auto-backup-secret` is
+  deleted and recreated, the sidecars keep accepting only the old credentials until they are
+  restarted by hand, see [Secret changes](#secret-changes).
 * **Targets and a schedule's prefix are immutable on Kubernetes 1.25 and newer only.** Older
   versions, and the `v1beta1` bundle, accept an edit of `clickHouseInstallation` or `cluster`, and a
   change of a schedule's `backupNamePrefix`, which leaves the backups of the former series unpruned,

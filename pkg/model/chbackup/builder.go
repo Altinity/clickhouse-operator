@@ -705,16 +705,13 @@ func backupOptionsEnv(options *api.BackupOptions, topology *Topology) []core.Env
 // of the hosts it drives are their own, for the replica selection of a backup, none for a restore:
 // every backup-enabled cluster of the installation by index, with its shards and every setting that
 // tells where its sidecars keep their backups, taken from where the sidecars take it, see
-// sidecarSettingSources. The operator never reads a Secret: kubelet resolves it for the Job, and a key
-// the Secret lacks stays unset, as for the sidecars. The paths a sidecar running the operator's command
-// defaults an unset path to are passed once, and set empty for a cluster whose sidecars run a command
-// of their own, which defaults none. A cluster whose settings the Job cannot know is passed with why,
-// and without settings; a configuration file its storage Secret names reaches the Job as its
-// CLICKHOUSE_BACKUP_CONFIG setting, which leaves the cluster out just as well when set.
+// sidecarSettingSources. kubelet resolves the keys of the configuration file Secret of a cluster for the Job, and
+// a key the Secret lacks stays unset, as the setting is in the file. The paths the configuration files default an
+// unset path to are passed once. A cluster whose settings the Job cannot know is passed with why, and without
+// settings.
 func pathCheckEnv(topology *Topology, selection api.ReplicaSelection) []core.EnvVar {
 	var indexes []string
 	self := 0
-	defaults := false
 	var clusterEnv []core.EnvVar
 	for index, cluster := range topology.enabled {
 		indexes = append(indexes, strconv.Itoa(index))
@@ -733,13 +730,6 @@ func pathCheckEnv(topology *Topology, selection api.ReplicaSelection) []core.Env
 			clusterEnv = append(clusterEnv, envVar(pathClusterEnv(index, pathEnvUnverifiable), cluster.sidecar.unverifiable))
 			continue
 		}
-		defaults = defaults || cluster.sidecar.defaultsPaths
-		if !cluster.sidecar.defaultsPaths {
-			clusterEnv = append(clusterEnv,
-				envVar(pathClusterEnv(index, envDefaultPath), ""),
-				envVar(pathClusterEnv(index, envDefaultObjectDiskPath), ""),
-			)
-		}
 		for _, key := range PathCheckKeys {
 			for _, source := range cluster.sidecar.sources[key] {
 				source.Name = pathClusterEnv(index, key)
@@ -752,15 +742,11 @@ func pathCheckEnv(topology *Topology, selection api.ReplicaSelection) []core.Env
 		envVar(envPathSelf, strconv.Itoa(self)),
 		envVar(envPathInstallation, topology.installation),
 		envVar(envPathNamespace, topology.namespace),
+		envVar(envDefaultPath, chop.Config().Backup.StoragePath),
+		envVar(envDefaultObjectDiskPath, chop.Config().Backup.StorageObjectDiskPath),
 	}
 	if selection != "" {
 		env = append(env, envVar(envPathReplicaSelection, string(selection)))
-	}
-	if defaults {
-		env = append(env,
-			envVar(envDefaultPath, chop.Config().Backup.StoragePath),
-			envVar(envDefaultObjectDiskPath, chop.Config().Backup.StorageObjectDiskPath),
-		)
 	}
 	return append(env, clusterEnv...)
 }

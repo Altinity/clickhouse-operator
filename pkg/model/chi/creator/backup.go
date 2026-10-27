@@ -18,7 +18,6 @@ import (
 	_ "embed"
 	"net"
 	"path"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,27 +29,11 @@ import (
 
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-)
-
-// Timing of the sidecar's liveness probe. kubelet resolves the env vars of a container when it starts the container,
-// and updates the files of a mounted Secret when it syncs the pod, which it does every minute or so. A sidecar
-// started between a change of a Secret and that sync runs with env vars newer than the files meanwhile, so the probe
-// fails for longer than that before kubelet restarts the sidecar.
-const (
-	backupLivenessPeriodSeconds    = 30
-	backupLivenessFailureThreshold = 4
-	// backupLivenessAPITimeoutSeconds bounds the probe's call of the REST API, which the probe's own timeout leaves
-	// room for
-	backupLivenessAPITimeoutSeconds = 5
-	backupLivenessTimeoutSeconds    = 2 * backupLivenessAPITimeoutSeconds
-	// backupLivenessQuietSeconds is how long after an operation the probe restarts no sidecar, so that a backup Job,
-	// polling every few seconds, sees how its step ended and starts its next one first
-	backupLivenessQuietSeconds = 60
 )
 
 // backupSidecarScriptSource starts the clickhouse-backup server of the sidecar, as its command
@@ -58,18 +41,9 @@ const (
 //go:embed scripts/backup-sidecar.sh
 var backupSidecarScriptSource string
 
-// backupSidecarLivenessScriptSource is the liveness probe that restarts the sidecar once a Secret it takes env vars
-// from changes
-//
-//go:embed scripts/backup-sidecar-liveness.sh
-var backupSidecarLivenessScriptSource string
-
-// The scripts as the pod template carries them. Their comments are left out: a changed pod template rolls the pods,
-// restarting ClickHouse, which a reworded comment must not.
-var (
-	backupSidecarScript         = stripScriptComments(backupSidecarScriptSource)
-	backupSidecarLivenessScript = stripScriptComments(backupSidecarLivenessScriptSource)
-)
+// backupSidecarScript is the script as the pod template carries it. Its comments are left out: a changed pod
+// template rolls the pods, restarting ClickHouse, which a reworded comment must not.
+var backupSidecarScript = stripScriptComments(backupSidecarScriptSource)
 
 // stripScriptComments drops the lines of the shell script that hold nothing but a comment or blanks, keeping a
 // shebang. A '#' within a line of code stays. The scripts hold no heredoc and no string spanning lines, whose lines
@@ -88,15 +62,13 @@ func stripScriptComments(script string) string {
 }
 
 // backupPinnedEnvVarNames are the env vars of the sidecar the backup Jobs rely on. The operator sets them over what
-// the base container sets: the Jobs call the REST API over plain HTTP on its port with the operator's
-// credentials, a restore that ran ON CLUSTER on every replica would rewrite Distributed tables, restored access
-// entities left unloaded would be missing, operations running alongside in one sidecar would see each other's
+// the base container sets, and they take precedence over the configuration file: the Jobs call the REST API over
+// plain HTTP on its port, a restore that ran ON CLUSTER on every replica would rewrite Distributed tables, restored
+// access entities left unloaded would be missing, operations running alongside in one sidecar would see each other's
 // settings, and a restore mapped to other databases or tables would drop what the guard of its Job never checked.
 var backupPinnedEnvVarNames = []string{
 	config.ClickHouseBackupEnvAPIListen,
 	config.ClickHouseBackupEnvAPISecure,
-	config.ClickHouseBackupSecretKeyAPIUsername,
-	config.ClickHouseBackupSecretKeyAPIPassword,
 	config.ClickHouseBackupEnvAPIAllowParallel,
 	config.ClickHouseBackupEnvRestoreSchemaOnCluster,
 	config.ClickHouseBackupEnvClickHouseRestartCommand,
@@ -104,8 +76,19 @@ var backupPinnedEnvVarNames = []string{
 	config.ClickHouseBackupEnvRestoreTableMapping,
 }
 
-// IsBackupSidecarCommand reports whether the sidecar runs the operator's command, which defaults the storage paths
-// its environment leaves unset, nil-safe
+// backupConfigFileEnvVarNames are the env vars the base container must not set: the credentials, which the
+// configuration file the operator generates holds and an env var would override, and the variable that would make
+// clickhouse-backup read another configuration file instead.
+var backupConfigFileEnvVarNames = []string{
+	config.ClickHouseBackupSecretKeyAPIUsername,
+	config.ClickHouseBackupSecretKeyAPIPassword,
+	config.ClickHouseBackupSecretKeyClickHouseUsername,
+	config.ClickHouseBackupSecretKeyClickHousePassword,
+	config.ClickHouseBackupEnvConfig,
+}
+
+// IsBackupSidecarCommand reports whether the sidecar runs the operator's command, which waits for its configuration
+// file before it starts the server, nil-safe
 func IsBackupSidecarCommand(container *core.Container) bool {
 	return (container != nil) && (len(container.Args) == 0) && slices.Equal(container.Command, newBackupSidecarCommand())
 }
@@ -113,11 +96,15 @@ func IsBackupSidecarCommand(container *core.Container) bool {
 // newBackupSidecarCommand is the operator's command of the sidecar, for a base container that runs none of its own
 func newBackupSidecarCommand() []string {
 	return k8s.EscapeVariableReferencesAll(newBackupScriptCommand(backupSidecarScript,
-		append(newBackupSidecarArgs(), config.ClickHouseBackupCommand, config.ClickHouseBackupCommandServer)...))
+		path.Join(config.DirPathClickHouseBackupConfig, backupconfig.FileName),
+		config.ClickHouseBackupCommand, config.ClickHouseBackupCommandServer))
 }
 
-// envVarIdentifierRE matches the env var names the liveness probe compares, as IDENTIFIER_RE of its script does
-var envVarIdentifierRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+// newBackupScriptCommand runs the script with bash, which the backup image has for the backup Jobs as well. The
+// arguments become the script's positional parameters, with the container name as its $0.
+func newBackupScriptCommand(script string, args ...string) []string {
+	return append([]string{"bash", "-c", script, config.ClickHouseBackupContainerName}, args...)
+}
 
 // getContainerClickHouseBackup
 func (cm *ContainerManager) getContainerClickHouseBackup(statefulSet *apps.StatefulSet) (*core.Container, bool) {
@@ -130,9 +117,10 @@ func (cm *ContainerManager) getContainerClickHouseBackup(statefulSet *apps.State
 // lacks is filled in, the settings the Jobs rely on last. Hosts of other clusters get none, whatever their pod
 // template holds.
 //
-// The operator's command serves the REST API only with its credentials, so these may be missing: a sidecar started
-// while the backup Secret is missing idles, leaving its pod ready, rather than failing to start. Any other command
-// might serve the API to everybody without them, so it gets them as mandatory.
+// The sidecar reads its configuration file, which holds the credentials and the storage settings, from the Secret
+// the operator generates for the cluster, mounted where clickhouse-backup looks for it. The operator's command
+// waits for the file, so a sidecar started before the Secret exists serves nothing until then. Any other command
+// might serve the REST API to everybody without the file, so it gets the Secret as mandatory.
 func (cm *ContainerManager) NewBackupContainer(host *chi.Host) (core.Container, bool) {
 	backup := host.GetCluster().GetBackup()
 	if !backup.IsEnabled() {
@@ -153,18 +141,18 @@ func (cm *ContainerManager) NewBackupContainer(host *chi.Host) (core.Container, 
 	if container.Image == "" {
 		container.Image = config.DefaultClickHouseBackupDockerImage
 	}
-	ownCommand := (len(container.Command) == 0) && (len(container.Args) == 0)
-	if ownCommand {
+	if (len(container.Command) == 0) && (len(container.Args) == 0) {
 		container.Command = newBackupSidecarCommand()
 	}
-	envVars := cm.newBackupEnvVars(host, ownCommand)
+	container.Env = slices.DeleteFunc(container.Env, func(envVar core.EnvVar) bool {
+		return slices.Contains(backupConfigFileEnvVarNames, envVar.Name)
+	})
+	envVars := newBackupEnvVars(host)
 	container.Env = util.MergeEnvVars(container.Env, envVars...)
-	if secret := backup.GetStorageSecretName(); secret != "" {
-		containerEnsureEnvFromSecret(&container, secret)
-	}
 	container.Env = util.OverwriteEnvVars(container.Env, slices.DeleteFunc(envVars, func(envVar core.EnvVar) bool {
 		return !slices.Contains(backupPinnedEnvVarNames, envVar.Name)
 	})...)
+	containerEnsureBackupConfigMount(&container)
 	// A sidecar without a securityContext gets the pod rejected wherever a policy demands one of every container.
 	// It runs as ClickHouse does then, which also gives it the same access to the server's files. The copy is
 	// taken as is: a user it leaves open is the platform's to assign, as an OpenShift SCC does from a range that
@@ -176,8 +164,27 @@ func (cm *ContainerManager) NewBackupContainer(host *chi.Host) (core.Container, 
 	return container, true
 }
 
+// containerEnsureBackupConfigMount mounts the configuration file Secret where clickhouse-backup reads its
+// configuration file from, in place of whatever the base container mounts there or below. The whole directory is
+// mounted, never the file by subPath, as kubelet keeps a file mounted by subPath as it was when the container started.
+func containerEnsureBackupConfigMount(container *core.Container) {
+	container.VolumeMounts = slices.DeleteFunc(container.VolumeMounts, func(mount core.VolumeMount) bool {
+		return isBackupConfigPath(mount.MountPath)
+	})
+	mount := k8s.CreateVolumeMount(config.ClickHouseBackupConfigVolumeName, config.DirPathClickHouseBackupConfig)
+	mount.ReadOnly = true
+	container.VolumeMounts = append(container.VolumeMounts, mount)
+}
+
+// isBackupConfigPath reports whether a mount at the path would hide the configuration file of the sidecar, or put
+// files of its own beside it: the path is the directory of the file, lies within it, or holds it
+func isBackupConfigPath(mountPath string) bool {
+	return isPathWithin(mountPath, config.DirPathClickHouseBackupConfig) || isPathWithin(config.DirPathClickHouseBackupConfig, mountPath)
+}
+
 // ensureContainerSpecifiedClickHouseBackup puts the clickhouse-backup sidecar NewBackupContainer builds into pods
-// of a backup-enabled cluster, in place of the pod template's container of that name, if it has one
+// of a backup-enabled cluster, in place of the pod template's container of that name, if it has one, along with the
+// volume of its configuration file
 func (cm *ContainerManager) ensureContainerSpecifiedClickHouseBackup(statefulSet *apps.StatefulSet, host *chi.Host) {
 	sidecar, ok := cm.NewBackupContainer(host)
 	if !ok {
@@ -188,145 +195,29 @@ func (cm *ContainerManager) ensureContainerSpecifiedClickHouseBackup(statefulSet
 	} else {
 		k8s.PodSpecAddContainer(&statefulSet.Spec.Template.Spec, sidecar)
 	}
-	container, _ := cm.getContainerClickHouseBackup(statefulSet)
-	cm.ensureContainerSecretsFollowedClickHouseBackup(statefulSet, container, host)
+	cm.statefulSetEnsureBackupConfigVolume(statefulSet, host, IsBackupSidecarCommand(&sidecar))
 }
 
-// ensureContainerSecretsFollowedClickHouseBackup makes the sidecar follow the Secrets it takes env vars from - the
-// backup Secret and the storage Secret - without restarting ClickHouse. kubelet resolves env vars only when
-// it starts a container, but keeps the files of a mounted Secret up to date: the sidecar gets both Secrets mounted,
-// and a liveness probe that fails once their files hold values the sidecar did not start with, so that kubelet
-// restarts the sidecar alone. The volumes are optional, as the env vars are, and a missing Secret leaves its
-// directory empty. A liveness probe the base container has is kept, and nothing is mounted for it then.
-func (cm *ContainerManager) ensureContainerSecretsFollowedClickHouseBackup(
-	statefulSet *apps.StatefulSet,
-	container *core.Container,
-	host *chi.Host,
-) {
-	if container.LivenessProbe != nil {
-		return
-	}
-
-	credentials := ""
-	backupSecret := cm.namer.Name(interfaces.NameBackupAutoSecret, host.GetCR())
-	if items := containerSecretEnvVarItems(container, backupSecret); len(items) > 0 {
-		source := &core.SecretVolumeSource{SecretName: backupSecret, Items: items, Optional: ptr.To(true)}
-		if statefulSetMountSecret(statefulSet, container, config.ClickHouseBackupCredentialsVolumeName, config.DirPathClickHouseBackupCredentials, source) {
-			credentials = config.DirPathClickHouseBackupCredentials
-		}
-	}
-
-	storage := ""
-	var explicit []string
-	if secret := host.GetCluster().GetBackup().GetStorageSecretName(); (secret != "") && containerTakesSecretLast(container, secret) {
-		source := &core.SecretVolumeSource{SecretName: secret, Optional: ptr.To(true)}
-		if statefulSetMountSecret(statefulSet, container, config.ClickHouseBackupStorageVolumeName, config.DirPathClickHouseBackupStorage, source) {
-			storage = config.DirPathClickHouseBackupStorage
-			// The container's own env vars take precedence over every key of the Secret
-			for i := range container.Env {
-				explicit = append(explicit, container.Env[i].Name)
-			}
-		}
-	}
-
-	if (credentials == "") && (storage == "") {
-		return
-	}
-	container.LivenessProbe = &core.Probe{
-		ProbeHandler: core.ProbeHandler{
-			Exec: &core.ExecAction{
-				Command: k8s.EscapeVariableReferencesAll(newBackupScriptCommand(backupSidecarLivenessScript, append(newBackupLivenessArgs(credentials, storage), explicit...)...)),
+// statefulSetEnsureBackupConfigVolume gives the pod the volume of the configuration file Secret of the host's
+// cluster, in place of a volume of that name the pod template has. Only the file is projected: the Secret holds
+// the settings the storage path check reads as well, which the backup Jobs take as env vars.
+func (cm *ContainerManager) statefulSetEnsureBackupConfigVolume(statefulSet *apps.StatefulSet, host *chi.Host, optional bool) {
+	volume := core.Volume{
+		Name: config.ClickHouseBackupConfigVolumeName,
+		VolumeSource: core.VolumeSource{
+			Secret: &core.SecretVolumeSource{
+				SecretName: cm.namer.Name(interfaces.NameBackupConfigSecret, host.GetCR(), host.GetCluster().GetName()),
+				Items:      []core.KeyToPath{{Key: backupconfig.FileName, Path: backupconfig.FileName}},
+				Optional:   ptr.To(optional),
 			},
 		},
-		TimeoutSeconds:   backupLivenessTimeoutSeconds,
-		PeriodSeconds:    backupLivenessPeriodSeconds,
-		FailureThreshold: backupLivenessFailureThreshold,
 	}
-}
-
-// newBackupLivenessArgs are the arguments of the liveness probe ahead of the env vars the sidecar sets itself: its
-// timing, and the mounts of the two Secrets, "" for one that is not followed
-func newBackupLivenessArgs(credentials, storage string) []string {
-	return []string{
-		strconv.Itoa(backupLivenessAPITimeoutSeconds),
-		strconv.Itoa(backupLivenessQuietSeconds),
-		credentials,
-		storage,
+	volumes := statefulSet.Spec.Template.Spec.Volumes
+	if index := slices.IndexFunc(volumes, func(v core.Volume) bool { return v.Name == volume.Name }); index >= 0 {
+		volumes[index] = volume
+		return
 	}
-}
-
-// newBackupSidecarArgs are the arguments of the sidecar's command ahead of the command it starts: the paths on the
-// storage it defaults to. They are no env vars of the container, which would take precedence over the
-// paths the storage Secret sets, and hide a change of these from the liveness probe.
-func newBackupSidecarArgs() []string {
-	return []string{
-		chop.Config().Backup.StoragePath,
-		chop.Config().Backup.StorageObjectDiskPath,
-	}
-}
-
-// newBackupScriptCommand runs the script with bash, which the backup image has for the backup Jobs as well. The
-// arguments become the script's positional parameters, with the container name as its $0.
-func newBackupScriptCommand(script string, args ...string) []string {
-	return append([]string{"bash", "-c", script, config.ClickHouseBackupContainerName}, args...)
-}
-
-// containerSecretEnvVarItems maps every env var of the container that takes its value from a key of the Secret
-// to a file named after the env var, which is how the liveness probe tells the env var a file feeds. Of an env var
-// named twice the last entry counts, as for kubelet. A name that is no shell identifier is left out: the probe
-// does not compare it, and it might be no valid file name either.
-func containerSecretEnvVarItems(container *core.Container, secretName string) []core.KeyToPath {
-	var items []core.KeyToPath
-	for i := range container.Env {
-		envVar := &container.Env[i]
-		items = slices.DeleteFunc(items, func(item core.KeyToPath) bool {
-			return item.Path == envVar.Name
-		})
-		if (envVar.ValueFrom == nil) || (envVar.ValueFrom.SecretKeyRef == nil) {
-			continue
-		}
-		if (envVar.ValueFrom.SecretKeyRef.Name != secretName) || !envVarIdentifierRE.MatchString(envVar.Name) {
-			continue
-		}
-		items = append(items, core.KeyToPath{Key: envVar.ValueFrom.SecretKeyRef.Key, Path: envVar.Name})
-	}
-	return items
-}
-
-// containerTakesSecretLast reports whether every key of the Secret becomes an env var of the container named after
-// the key: the Secret is the container's last envFrom source, which wins over the others, and adds no prefix
-func containerTakesSecretLast(container *core.Container, secretName string) bool {
-	if len(container.EnvFrom) == 0 {
-		return false
-	}
-	last := container.EnvFrom[len(container.EnvFrom)-1]
-	return (last.SecretRef != nil) && (last.SecretRef.Name == secretName) && (last.Prefix == "")
-}
-
-// statefulSetMountSecret mounts the Secret read-only into the container alone, reporting whether it did. Where the
-// pod has a volume of that name already, or the container a mount at that path, the files there are not the
-// Secret's, and nothing is mounted.
-func statefulSetMountSecret(
-	statefulSet *apps.StatefulSet,
-	container *core.Container,
-	volumeName string,
-	mountPath string,
-	source *core.SecretVolumeSource,
-) bool {
-	taken := slices.ContainsFunc(container.VolumeMounts, func(mount core.VolumeMount) bool {
-		return mount.MountPath == mountPath
-	})
-	if taken || k8s.StatefulSetHasVolumeByName(statefulSet, volumeName) {
-		return false
-	}
-	k8s.StatefulSetAppendVolumes(statefulSet, core.Volume{
-		Name:         volumeName,
-		VolumeSource: core.VolumeSource{Secret: source},
-	})
-	mount := k8s.CreateVolumeMount(volumeName, mountPath)
-	mount.ReadOnly = true
-	container.VolumeMounts = append(container.VolumeMounts, mount)
-	return true
+	k8s.StatefulSetAppendVolumes(statefulSet, volume)
 }
 
 // ensureContainerVolumeMountsClickHouseBackup mounts every volume of the ClickHouse container into the
@@ -349,14 +240,15 @@ func (cm *ContainerManager) ensureContainerVolumeMountsClickHouseBackup(stateful
 
 // containerCopyVolumeMounts gives the container every mount of the source container exactly as it is. One volume
 // may be mounted several times - at different paths or of different subPaths - and each such mount counts. A path
-// the container mounts something at already keeps that mount, as two mounts at one path make the pod invalid.
+// the container mounts something at already keeps that mount, as two mounts at one path make the pod invalid, and
+// nothing is mounted where it would touch the configuration file of the sidecar.
 func containerCopyVolumeMounts(container, source *core.Container) {
 	for i := range source.VolumeMounts {
 		mount := source.VolumeMounts[i]
 		taken := slices.ContainsFunc(container.VolumeMounts, func(existing core.VolumeMount) bool {
 			return existing.MountPath == mount.MountPath
 		})
-		if !k8s.VolumeMountIsValid(mount) || taken {
+		if !k8s.VolumeMountIsValid(mount) || taken || isBackupConfigPath(mount.MountPath) {
 			continue
 		}
 		container.VolumeMounts = append(container.VolumeMounts, *mount.DeepCopy())
@@ -390,18 +282,10 @@ func isPathWithin(target, dir string) bool {
 	return (dir == "/") || (target == dir) || strings.HasPrefix(target, dir+"/")
 }
 
-// newBackupEnvVars builds the environment the operator provides to the clickhouse-backup sidecar. The sidecar's
-// ClickHouse password comes from the same Secret the normalizer derives the backup user's password from. The
-// credentials are optional only where the sidecar runs the operator's command, see NewBackupContainer.
-func (cm *ContainerManager) newBackupEnvVars(host *chi.Host, optionalCredentials bool) []core.EnvVar {
-	secretName := cm.namer.Name(interfaces.NameBackupAutoSecret, host.GetCR())
-	credential := func(key string) core.EnvVar {
-		envVar := k8s.NewEnvVarFromSecret(key, secretName, key)
-		if optionalCredentials {
-			envVar.ValueFrom.SecretKeyRef.Optional = ptr.To(true)
-		}
-		return envVar
-	}
+// newBackupEnvVars builds the environment the operator provides to the clickhouse-backup sidecar: what is the same
+// for as long as the pod runs, as kubelet resolves env vars only when it starts a container. The credentials and the
+// storage settings, which may change meanwhile, are in the configuration file instead.
+func newBackupEnvVars(host *chi.Host) []core.EnvVar {
 	envVars := []core.EnvVar{
 		{
 			Name:  config.ClickHouseBackupEnvAPIListen,
@@ -416,10 +300,6 @@ func (cm *ContainerManager) newBackupEnvVars(host *chi.Host, optionalCredentials
 			Name:  config.ClickHouseBackupEnvAPIAllowParallel,
 			Value: strconv.FormatBool(false),
 		},
-		credential(config.ClickHouseBackupSecretKeyAPIUsername),
-		credential(config.ClickHouseBackupSecretKeyAPIPassword),
-		credential(config.ClickHouseBackupSecretKeyClickHouseUsername),
-		credential(config.ClickHouseBackupSecretKeyClickHousePassword),
 		{
 			Name:  config.ClickHouseBackupEnvClickHouseHost,
 			Value: config.ClickHouseBackupClickHouseHost,
@@ -479,25 +359,6 @@ func (cm *ContainerManager) newBackupEnvVars(host *chi.Host, optionalCredentials
 	}
 
 	return envVars
-}
-
-// containerEnsureEnvFromSecret ensures the container takes all keys of the Secret as env vars, unprefixed and over
-// every other envFrom source: the Secret is its last one. A source of the container's own that names the Secret
-// elsewhere, or with a prefix, stays as it is - kubelet takes repeated sources alike. The Secret is optional: a
-// missing one would keep the container from being created, and a pod that never gets ready stalls the reconcile of
-// the whole CR - an optional sidecar must not take ClickHouse down with it.
-func containerEnsureEnvFromSecret(container *core.Container, secretName string) {
-	if containerTakesSecretLast(container, secretName) {
-		return
-	}
-	container.EnvFrom = append(container.EnvFrom, core.EnvFromSource{
-		SecretRef: &core.SecretEnvSource{
-			LocalObjectReference: core.LocalObjectReference{
-				Name: secretName,
-			},
-			Optional: ptr.To(true),
-		},
-	})
 }
 
 // ServiceHasBackupPort reports whether the host Service publishes the clickhouse-backup REST API the backup

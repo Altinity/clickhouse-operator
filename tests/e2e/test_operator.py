@@ -8528,7 +8528,7 @@ backup_api_port = 7171
 backup_api_port_name = "backup-api"
 backup_user = "clickhouse_backup"
 backup_auto_secret_keys = ("API_USERNAME", "API_PASSWORD", "CLICKHOUSE_USERNAME", "CLICKHOUSE_PASSWORD")
-# Sidecar settings the operator pins whatever the storage Secret or the sidecar's base container says,
+# Sidecar settings the operator pins whatever the storage settings or the sidecar's base container say,
 # mirrored from newBackupEnvVars of pkg/model/chi/creator/backup.go: the REST API on port 7171 over plain HTTP, as
 # the Jobs call it, no schema restore ON CLUSTER but where a Job asks for it, one operation at a time, access objects
 # loaded once restored, and no restore into databases or tables other than the backup's, which the guard of a Job
@@ -8542,8 +8542,12 @@ backup_pinned_env = {
     "RESTORE_DATABASE_MAPPING": "",
     "RESTORE_TABLE_MAPPING": "",
 }
-# REST API credentials the operator pins to its own Secret, which the Jobs read
-backup_pinned_secret_env = ("API_USERNAME", "API_PASSWORD")
+# Settings the configuration file of the sidecar holds, which no env var of the sidecar may override
+backup_config_file_env = ("API_USERNAME", "API_PASSWORD", "CLICKHOUSE_USERNAME", "CLICKHOUSE_PASSWORD", "CLICKHOUSE_BACKUP_CONFIG")
+# The volume of the configuration file of the sidecar, ClickHouseBackupConfigVolumeName of
+# pkg/model/chi/config/const.go, and where it is mounted
+backup_config_volume = "clickhouse-backup-config"
+backup_config_dir = "/etc/clickhouse-backup"
 # The exit code of a Job that failed before it changed anything, UnchangedExitCode of pkg/model/chbackup/script.go.
 backup_unchanged_exit_code = 3
 # The engine of the replicated tables of the scenarios: one replication group per installation, cluster and shard.
@@ -8559,6 +8563,31 @@ def backup_unset(value):
 def backup_auto_secret(chi):
     """The Secret the operator keeps the sidecar credentials of an installation in."""
     return f"{chi}-auto-backup-secret"
+
+
+def backup_config_secret(chi, cluster):
+    """The Secret the operator generates the configuration file of the sidecars of a cluster in."""
+    return f"{chi}-{cluster}-backup-config"
+
+
+def backup_secret_data(name):
+    secret = kubectl.get("secret", name, ok_to_fail=True) or {}
+    return {key: base64.b64decode(value).decode() for key, value in (secret.get("data") or {}).items()}
+
+
+def wait_backup_config_setting(chi, clusters, name, expected, timeout=300):
+    """Waits for the configuration file Secret of every cluster to hold the setting the storage Secret changed to,
+    which the operator follows within a minute."""
+    with Then(f"The configuration files of clusters {clusters} set {name} to {expected!r}"):
+        for cluster in clusters:
+            value = None
+            deadline = time.time() + timeout
+            while time.time() < deadline:
+                value = backup_secret_data(backup_config_secret(chi, cluster)).get(name)
+                if value == expected:
+                    break
+                time.sleep(10)
+            assert value == expected, error(f"{backup_config_secret(chi, cluster)}: {name} is {value!r}, expected {expected!r}")
 
 
 def backup_auto_secret_data(chi):
@@ -8605,8 +8634,8 @@ def backup_remote_names(pod_name, auth):
 
 
 def backup_check_pinned_env(chi, pod_name):
-    """Checks that the sidecar of pod_name runs with the settings the operator pins. Each is set, so that no
-    Secret the sidecar takes its environment from can set it; kubelet takes the last of two of one name."""
+    """Checks that the sidecar of pod_name runs with the settings the operator pins. Each is set, as an env var
+    takes precedence over the configuration file, and none of the settings the file holds is."""
     containers = {c["name"]: c for c in kubectl.get_pod_spec(chi, pod_name)["containers"]}
     env = {item["name"]: item for item in containers[backup_sidecar].get("env") or []}
     for name, value in backup_pinned_env.items():
@@ -8614,11 +8643,8 @@ def backup_check_pinned_env(chi, pod_name):
         assert (item is not None) and ("valueFrom" not in item) and ((item.get("value") or "") == value), error(
             f"{pod_name}: sidecar env {name} is {item}, expected the value {value!r}"
         )
-    for name in backup_pinned_secret_env:
-        ref = ((env.get(name) or {}).get("valueFrom") or {}).get("secretKeyRef") or {}
-        assert (ref.get("name") == backup_auto_secret(chi)) and (ref.get("key") == name), error(
-            f"{pod_name}: sidecar env {name} is {env.get(name)}, expected key {name} of Secret {backup_auto_secret(chi)}"
-        )
+    for name in backup_config_file_env:
+        assert name not in env, error(f"{pod_name}: sidecar env {name} is {env.get(name)}, over the configuration file")
 
 
 def backup_status(kind, name):
@@ -8773,7 +8799,7 @@ def test_010087(self):
     Secret says, and the Jobs reach every sidecar.
 
     The backup-enabled clusters differ in shape - hot has two shards of one replica holding different row
-    counts, cold one shard of two replicas - and share one storage Secret whose S3_PATH carries the
+    counts, cold one shard of two replicas - and share one storage Secret whose s3.path carries the
     {cluster} and {shard} macros, so every shard of every cluster writes to a path of its own. A verified
     backup of the whole installation runs one backup Job and one verify Job per cluster, under one backup
     name, and reports every cluster.
@@ -8861,7 +8887,7 @@ def test_010087(self):
     assert (
         (hot_spec["cluster"] == hot) and (hot_spec.get("overwrite") is True) and (hot_spec.get("tables") == restored_tables)
     ), error(f"{restore_hot_manifest} must restore cluster {hot} with overwrite, the tables matching {restored_tables}")
-    # S3_PATH of the storage Secret without its {cluster} macro: shard 0 of both clusters would share it.
+    # s3.path of the storage Secret without its {cluster} macro: shard 0 of both clusters would share it.
     shared_path = "backup/{shard}"
 
     # Rows per (cluster, shard), different everywhere, so a restore that swaps or merges shards cannot match.
@@ -9005,7 +9031,7 @@ def test_010087(self):
         create_shell_namespace_clickhouse_template()
 
         with Given("The storage Secret and an S3 store in the test namespace"):
-            # Applied before the CHI, so the sidecars start with it rather than restart for it minutes later.
+            # Applied before the CHI, so that the first configuration files of the sidecars name the storage.
             kubectl.apply(util.get_full_path(storage_manifest))
             kubectl.apply(util.get_full_path(minio_manifest))
 
@@ -9034,8 +9060,15 @@ def test_010087(self):
                 assert backup_sidecar in containers, error(f"{name} has no {backup_sidecar} sidecar: {sorted(containers)}")
                 ports = {p.get("name"): p.get("containerPort") for p in containers[backup_sidecar].get("ports") or []}
                 assert ports.get(backup_api_port_name) == backup_api_port, error(f"{name}: sidecar ports {ports}")
-                env_from = [(e.get("secretRef") or {}).get("name") for e in containers[backup_sidecar].get("envFrom") or []]
-                assert storage_secret in env_from, error(f"{name}: sidecar envFrom {env_from} lacks {storage_secret}")
+                assert not containers[backup_sidecar].get("envFrom"), error(f"{name}: sidecar takes env vars from envFrom")
+                volumes = {v["name"]: v for v in kubectl.get_pod_spec(chi, name).get("volumes") or []}
+                config_secret = ((volumes.get(backup_config_volume) or {}).get("secret") or {}).get("secretName")
+                assert config_secret == backup_config_secret(chi, cluster), error(
+                    f"{name}: the configuration file volume is {volumes.get(backup_config_volume)}"
+                )
+                mounts = {m["mountPath"]: m["name"] for m in containers[backup_sidecar].get("volumeMounts") or []}
+                assert mounts.get(backup_config_dir) == backup_config_volume, error(f"{name}: sidecar mounts {mounts}")
+                assert not containers[backup_sidecar].get("livenessProbe"), error(f"{name}: the sidecar has a liveness probe")
             name = pod(disabled_cluster, 0, 0)
             containers = [c["name"] for c in kubectl.get_pod_spec(chi, name)["containers"]]
             assert backup_sidecar not in containers, error(f"{name} runs {backup_sidecar} although its cluster opted out: {containers}")
@@ -9064,6 +9097,23 @@ def test_010087(self):
             owners = [(o.get("kind"), o.get("name")) for o in secret["metadata"].get("ownerReferences") or []]
             assert ("ClickHouseInstallation", chi) in owners, error(f"{backup_auto_secret(chi)} owners: {owners}")
             api_auth = (data["API_USERNAME"], data["API_PASSWORD"])
+
+        with And("The operator generates the configuration file of the sidecars of every backup-enabled cluster, owned by the CHI"):
+            for cluster in backup_clusters:
+                name = backup_config_secret(chi, cluster)
+                secret = kubectl.get("secret", name)
+                owners = [(o.get("kind"), o.get("name")) for o in secret["metadata"].get("ownerReferences") or []]
+                assert ("ClickHouseInstallation", chi) in owners, error(f"{name} owners: {owners}")
+                config_data = backup_secret_data(name)
+                config_file = yaml.safe_load(config_data["config.yml"])
+                assert config_file["api"]["password"] == data["API_PASSWORD"], error(f"{name}: not the API credentials")
+                assert config_file["clickhouse"]["password"] == data["CLICKHOUSE_PASSWORD"], error(
+                    f"{name}: not the ClickHouse credentials"
+                )
+                assert config_file["general"]["disable_environment_override"] is False, error(
+                    f"{name}: the env vars the operator pins would not take precedence"
+                )
+                assert config_data.get("REMOTE_STORAGE") == "s3", error(f"{name}: settings {sorted(config_data)}")
 
         with And(f"ClickHouse user {backup_user} logs in from its own pod only, not from another pod"):
             name = pod(hot, 0, 0)
@@ -9517,9 +9567,15 @@ def test_010087(self):
                     )
 
         with When("The storage path loses its {cluster} macro, and the whole installation is backed up"):
-            # Only the Jobs read the Secret anew here. The sidecars restart for the change once their liveness
-            # probe has seen it for minutes, long after the Jobs refused the backup.
-            backup_patch("secret", storage_secret, {"stringData": {"S3_PATH": shared_path}})
+            # The operator regenerates the configuration files of the sidecars within a minute, without restarting
+            # them; the Jobs take the path from the configuration file Secret of each cluster.
+            storage_config = backup_secret_data(storage_secret)["config.yml"]
+            shared_config = storage_config.replace(
+                'path: "backup/{namespace}/{installation}/{cluster}/{shard}"', f'path: "{shared_path}"'
+            )
+            assert shared_config != storage_config, error(f"{storage_secret}: no path to replace")
+            backup_patch("secret", storage_secret, {"stringData": {"config.yml": shared_config}})
+            wait_backup_config_setting(chi, backup_clusters, "S3_PATH", shared_path)
             kubectl.apply(util.get_full_path(shared_path_backup_manifest))
 
         wait_backup_phase(backup_kind, shared_path_backup, "Failed")

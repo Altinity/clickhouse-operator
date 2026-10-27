@@ -85,10 +85,11 @@ type ClusterBackup struct {
 type BackupStorage struct {
 	// Name identifies the storage: backup.storage names it.
 	Name string `json:"name" yaml:"name"`
-	// SecretRef names a Secret in the installation's namespace whose keys are passed to the sidecar as environment
-	// variables, e.g. REMOTE_STORAGE, S3_BUCKET, S3_ACCESS_KEY. Without one, of its own or of the storage of the
-	// same name it pairs with, the storage is configured by the clickhouse-backup container of the pod template
-	// backup.podTemplate names.
+	// SecretRef names a Secret in the installation's namespace whose key config.yml holds the clickhouse-backup
+	// configuration of the storage, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket,
+	// s3.access_key. The operator generates the configuration file of the sidecar from it, which follows a change of
+	// the Secret without a restart. Without one, of its own or of the storage of the same name it pairs with, the
+	// storage is configured by the clickhouse-backup container of the pod template backup.podTemplate names.
 	SecretRef *core.LocalObjectReference `json:"secretRef,omitempty" yaml:"secretRef,omitempty"`
 }
 

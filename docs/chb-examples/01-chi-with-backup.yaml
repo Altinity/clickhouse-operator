@@ -22,25 +22,31 @@ metadata:
   name: backup-demo-storage
 type: Opaque
 stringData:
-  # Every key becomes an environment variable of the clickhouse-backup sidecar. Keep the whole
-  # configuration here and in the env of the sidecar's container in its pod template, where
-  # backup and restore Jobs can check the storage paths: with several backup-enabled clusters, they
-  # refuse to run when the sidecar reads a configuration file.
-  REMOTE_STORAGE: "s3"
-  # MinIO installed with deploy/minio
-  S3_ENDPOINT: "http://minio-hl.minio:9000"
-  S3_BUCKET: "clickhouse-backup"
-  # Left unset, the path is the default of the operator configuration (backup.storagePath, and
-  # backup.storageObjectDiskPath for S3_OBJECT_DISK_PATH), by default this one: {namespace},
-  # {installation}, {cluster} and {shard} are ClickHouse macros expanded on every host, so each
-  # shard of each cluster of each installation keeps its part of a backup in its own location.
-  # Every backup and restore refuses paths two shards would share.
-  # S3_PATH: "backup/{namespace}/{installation}/{cluster}/{shard}"
-  S3_FORCE_PATH_STYLE: "true"
-  S3_ACCESS_KEY: "minio-access-key"
-  S3_SECRET_KEY: "minio-secret-key"
-  # S3_COMPRESSION_FORMAT: "zstd"
-  # S3_SSE: "AES256"
+  # The clickhouse-backup configuration of the storage, a YAML mapping of the sections of its
+  # configuration file. The operator generates the configuration file of the sidecars from it,
+  # with the credentials of the sidecar and the default paths filled in, and the sidecars follow
+  # a change of it within minutes, without a restart. Keep the whole configuration here and in the
+  # env of the sidecar's container in its pod template, where backup and restore Jobs can check the
+  # storage paths: with several backup-enabled clusters, they refuse to run when the sidecar takes
+  # settings from envFrom or from a configuration file its command names.
+  config.yml: |
+    general:
+      remote_storage: s3
+    s3:
+      # MinIO installed with deploy/minio
+      endpoint: http://minio-hl.minio:9000
+      bucket: clickhouse-backup
+      # Left unset, the path is the default of the operator configuration (backup.storagePath, and
+      # backup.storageObjectDiskPath for object_disk_path), by default this one: {namespace},
+      # {installation}, {cluster} and {shard} are ClickHouse macros expanded on every host, so each
+      # shard of each cluster of each installation keeps its part of a backup in its own location.
+      # Every backup and restore refuses paths two shards would share.
+      # path: backup/{namespace}/{installation}/{cluster}/{shard}
+      force_path_style: true
+      access_key: minio-access-key
+      secret_key: minio-secret-key
+      # compression_format: zstd
+      # sse: AES256
 ---
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
