@@ -24,7 +24,7 @@ function download_file() {
     fi
 
     # Download file
-    if ! curl --silent "${FILE_URL}" --output "${LOCAL_FILE}"; then
+    if ! curl --silent --fail "${FILE_URL}" --output "${LOCAL_FILE}"; then
         echo "curl call to download ${FILE_URL} failed, can not continue"
         exit 1
     fi
