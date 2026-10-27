@@ -1,0 +1,5 @@
+<yandex>
+    <asynchronous_metric_log>
+        <ttl>event_date + INTERVAL 30 DAY DELETE</ttl>
+    </asynchronous_metric_log>
+</yandex>

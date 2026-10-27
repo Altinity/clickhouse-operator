@@ -1,0 +1,5 @@
+<yandex>
+    <text_log>
+        <ttl>event_date + INTERVAL 30 DAY DELETE</ttl>
+    </text_log>
+</yandex>

@@ -42,6 +42,15 @@
                         },
                         "01-clickhouse-05-trace_log.xml": {
                             "type": "string"
+                        },
+                        "01-clickhouse-06-text_log.xml": {
+                            "type": "string"
+                        },
+                        "01-clickhouse-07-metric_log.xml": {
+                            "type": "string"
+                        },
+                        "01-clickhouse-08-asynchronous_metric_log.xml": {
+                            "type": "string"
                         }
                     }
                 },
