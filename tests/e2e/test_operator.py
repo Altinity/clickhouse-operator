@@ -9569,12 +9569,13 @@ def test_010087(self):
         with When("The storage path loses its {cluster} macro, and the whole installation is backed up"):
             # The operator regenerates the configuration files of the sidecars within a minute, without restarting
             # them; the Jobs take the path from the configuration file Secret of each cluster.
-            storage_config = backup_secret_data(storage_secret)["config.yml"]
-            shared_config = storage_config.replace(
-                'path: "backup/{namespace}/{installation}/{cluster}/{shard}"', f'path: "{shared_path}"'
-            )
-            assert shared_config != storage_config, error(f"{storage_secret}: no path to replace")
-            backup_patch("secret", storage_secret, {"stringData": {"config.yml": shared_config}})
+            # Applied from a file: the whole configuration on a command line is longer than the shell takes.
+            def share_path(data):
+                storage_config = yaml.safe_load(data["stringData"]["config.yml"])
+                storage_config["s3"]["path"] = shared_path
+                data["stringData"]["config.yml"] = yaml.safe_dump(storage_config, default_flow_style=False)
+
+            backup_apply_edited(storage_manifest, share_path)
             wait_backup_config_setting(chi, backup_clusters, "S3_PATH", shared_path)
             kubectl.apply(util.get_full_path(shared_path_backup_manifest))
 
