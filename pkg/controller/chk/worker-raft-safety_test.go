@@ -26,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -671,13 +672,14 @@ func (f *raftFakeSTS) List(ctx context.Context, namespace string, opts meta.List
 type raftFakeKube struct {
 	interfaces.IKube
 	sts interfaces.IKubeSTS
+	pod interfaces.IKubePod
 }
 
 func (k *raftFakeKube) STS() interfaces.IKubeSTS { return k.sts }
 
-// Pod and Storage are wired into the StatefulSet reconciler by newTask but never called on
-// the paths under test; nil is enough to let construction succeed.
-func (k *raftFakeKube) Pod() interfaces.IKubePod            { return nil }
+// Most raftFakeKube users do not need a Pod reader; tests for an expired
+// staged admission supply one to exercise the real executor deadline path.
+func (k *raftFakeKube) Pod() interfaces.IKubePod            { return k.pod }
 func (k *raftFakeKube) Storage() interfaces.IKubeStoragePVC { return nil }
 func (k *raftFakeKube) CR() interfaces.IKubeCR              { return raftFakeKubeCR{} }
 
@@ -689,6 +691,18 @@ type raftFakeKubeCR struct{ interfaces.IKubeCR }
 
 func (raftFakeKubeCR) StatusUpdate(ctx context.Context, cr api.ICustomResource, opts types.UpdateStatusOptions) error {
 	return nil
+}
+
+// raftFakeStartupPod exposes an actual Pod startup state to the planner's
+// post-admission executor without requiring a Kubernetes cluster.
+type raftFakeStartupPod struct {
+	interfaces.IKubePod
+	pod *core.Pod
+	err error
+}
+
+func (f *raftFakeStartupPod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
+	return f.pod, f.err
 }
 
 func raftWorkerWithSTS(sts interfaces.IKubeSTS) *worker {
@@ -1485,6 +1499,35 @@ func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
 			"h2 must not be published or created while h1 is not Ready; h0 must still be reconciled")
 		require.True(t, h2.GetReconcileAttributes().IsExclude(), "h2 stays out of raft_configuration")
 		require.Zero(t, fake.mutationCount())
+	})
+
+	t.Run("expired image pull aborts instead of deferring forever", func(t *testing.T) {
+		cr, fake, shard := newScaleUp(0)
+		var visited []string
+		broken := &core.Pod{
+			ObjectMeta: meta.ObjectMeta{
+				CreationTimestamp: meta.NewTime(time.Now().Add(-72 * time.Hour)),
+			},
+			Spec: core.PodSpec{Containers: []core.Container{{Name: "keeper"}}},
+			Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{
+				Name: "keeper",
+				State: core.ContainerState{
+					Waiting: &core.ContainerStateWaiting{Reason: "ImagePullBackOff"},
+				},
+			}}},
+		}
+		w := newStagedAdmitWorker(fake)
+		w.c.kube = &raftFakeKube{sts: fake, pod: &raftFakeStartupPod{pod: broken}}
+		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
+			visited = append(visited, host.GetName())
+			return nil
+		}
+		err := w.reconcileShardWithHosts(ctx, shard)
+		require.ErrorIs(t, err, common.ErrCRUDAbort,
+			"a never-started published joiner must abort instead of softly deferring its successor")
+		require.Equal(t, []string{"h1"}, visited, "h2 and the other hosts must not be touched after abort")
+		require.Zero(t, fake.mutationCount())
+		require.True(t, hostAtOnCR(cr, 2).GetReconcileAttributes().IsExclude())
 	})
 
 	t.Run("ready previous joiner admits the next host", func(t *testing.T) {
