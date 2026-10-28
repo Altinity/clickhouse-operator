@@ -66,24 +66,10 @@ func (w *worker) reconcileBackupConfigSecrets(ctx context.Context, cr *api.Click
 	var errs []error
 	for _, cluster := range slices.Sorted(maps.Keys(outcomes)) {
 		outcome := outcomes[cluster]
-		storageSecret := util.NamespaceNameString(&meta.ObjectMeta{Namespace: cr.GetNamespace(), Name: outcome.storageSecret})
-		switch {
-		case errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig):
-			w.a.V(1).M(cr).F().
-				WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageConfigInvalid).
-				Warning("Secret %s of the backup storage of cluster %s holds a %s that cannot be read - the sidecars "+
-					"keep their configuration until it is fixed: %v", storageSecret, cluster, backupconfig.FileName, outcome.err)
-		case outcome.err != nil:
-			w.a.V(1).M(cr).F().
-				WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
-				Warning("Unable to reconcile backup configuration Secret of cluster %s err: %v", cluster, outcome.err)
+		w.c.backupConfigProblems.reported(cr, cluster, outcome)
+		warnBackupConfigOutcome(w.a, cr, cluster, outcome)
+		if (outcome.err != nil) && !errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig) {
 			errs = append(errs, outcome.err)
-		case outcome.noStorage != nil:
-			w.a.V(1).M(cr).F().
-				WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageSecretMissing).
-				Warning("Secret %s of the backup storage of cluster %s %v - its backups fail until the Secret holds the "+
-					"clickhouse-backup configuration of the storage in key %s, which the sidecars pick up within a few minutes",
-					storageSecret, cluster, outcome.noStorage, backupconfig.FileName)
 		}
 		if outcome.secret == nil {
 			continue
@@ -95,6 +81,29 @@ func (w *worker) reconcileBackupConfigSecrets(ctx context.Context, cr *api.Click
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// warnBackupConfigOutcome warns about the configuration file Secret of the cluster when it names no storage although
+// the cluster has a storage Secret, or could not be reconciled
+func warnBackupConfigOutcome(announcer a.Announcer, cr *api.ClickHouseInstallation, cluster string, outcome backupConfigOutcome) {
+	storageSecret := util.NamespaceNameString(&meta.ObjectMeta{Namespace: cr.GetNamespace(), Name: outcome.storageSecret})
+	switch {
+	case errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig):
+		announcer.V(1).M(cr).F().
+			WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageConfigInvalid).
+			Warning("Secret %s of the backup storage of cluster %s holds a %s that cannot be read - the sidecars "+
+				"keep their configuration until it is fixed: %v", storageSecret, cluster, backupconfig.FileName, outcome.err)
+	case outcome.err != nil:
+		announcer.V(1).M(cr).F().
+			WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			Warning("Unable to reconcile backup configuration Secret of cluster %s err: %v", cluster, outcome.err)
+	case outcome.noStorage != nil:
+		announcer.V(1).M(cr).F().
+			WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageSecretMissing).
+			Warning("Secret %s of the backup storage of cluster %s %v - its backups fail until the Secret holds the "+
+				"clickhouse-backup configuration of the storage in key %s, which the sidecars pick up within a few minutes",
+				storageSecret, cluster, outcome.noStorage, backupconfig.FileName)
+	}
 }
 
 // warnUnpublishedBackupAPI warns about the hosts of backup-enabled clusters whose Service does not publish the

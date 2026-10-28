@@ -253,11 +253,12 @@ func receivedArgs(container *core.Container, args []string) []string {
 }
 
 // sidecarCommand is the command the operator gives the sidecar: clickhouse-backup server, started by its script,
-// which gets the configuration file it waits for ahead of it
+// which gets the configuration file it waits for and the fingerprint file it watches ahead of it
 func sidecarCommand() []string {
 	return []string{
 		"bash", "-c", chiCreator.BackupSidecarScript, config.ClickHouseBackupContainerName,
 		path.Join(config.DirPathClickHouseBackupConfig, backupconfig.FileName),
+		path.Join(config.DirPathClickHouseBackupConfig, backupconfig.APIFingerprintFileName),
 		config.ClickHouseBackupCommand, config.ClickHouseBackupCommandServer,
 	}
 }
@@ -281,8 +282,11 @@ func requireConfigVolume(t *testing.T, sts *apps.StatefulSet, cluster string, op
 		Name: config.ClickHouseBackupConfigVolumeName,
 		VolumeSource: core.VolumeSource{Secret: &core.SecretVolumeSource{
 			SecretName: configSecretName(cluster),
-			Items:      []core.KeyToPath{{Key: backupconfig.FileName, Path: backupconfig.FileName}},
-			Optional:   ptr.To(optional),
+			Items: []core.KeyToPath{
+				{Key: backupconfig.FileName, Path: backupconfig.FileName},
+				{Key: backupconfig.APIFingerprintFileName, Path: backupconfig.APIFingerprintFileName},
+			},
+			Optional: ptr.To(optional),
 		}},
 	}}, volumes)
 	for _, container := range sts.Spec.Template.Spec.Containers {

@@ -83,6 +83,9 @@ type Controller struct {
 	namer       interfaces.INameManager
 	ctrlLabeler *ctrlLabeler.Labeler
 	pvcDeleter  *volume.PVCDeleter
+
+	// backupConfigProblems is what is wrong with the backup configuration Secrets as last warned about
+	backupConfigProblems backupConfigProblems
 }
 
 // NewController creates instance of Controller

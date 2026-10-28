@@ -20,6 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
+	"strings"
+	"sync"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -30,6 +33,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
@@ -196,17 +200,80 @@ func (c *Controller) applyBackupConfigSecret(ctx context.Context, secret *core.S
 	return nil
 }
 
+// backupConfigProblems keeps what is wrong with the configuration file Secret of every backup-enabled cluster as last
+// warned about, so that the sync, which runs every minute, warns only when it changes
+type backupConfigProblems struct {
+	mu       sync.Mutex
+	problems map[string]string
+}
+
+// backupConfigProblem tells what the outcome warns about: "" when nothing, or a failure to read or write a Secret,
+// which may well be gone by the next pass and is logged instead
+func backupConfigProblem(outcome backupConfigOutcome) string {
+	switch {
+	case errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig):
+		return outcome.err.Error()
+	case outcome.err != nil:
+		return ""
+	case outcome.noStorage != nil:
+		return outcome.noStorage.Error()
+	}
+	return ""
+}
+
+// backupConfigProblemKey names the cluster of the installation
+func backupConfigProblemKey(cr *api.ClickHouseInstallation, cluster string) string {
+	return cr.GetNamespace() + "/" + cr.GetName() + "/" + cluster
+}
+
+// reported keeps what the outcome warns about as warned about, telling whether that differs from what was before
+func (p *backupConfigProblems) reported(cr *api.ClickHouseInstallation, cluster string, outcome backupConfigOutcome) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	key := backupConfigProblemKey(cr, cluster)
+	problem := backupConfigProblem(outcome)
+	if p.problems[key] == problem {
+		return false
+	}
+	if p.problems == nil {
+		p.problems = make(map[string]string)
+	}
+	if problem == "" {
+		delete(p.problems, key)
+	} else {
+		p.problems[key] = problem
+	}
+	return true
+}
+
+// retain forgets the clusters of the installations other than those given
+func (p *backupConfigProblems) retain(crs []api.ClickHouseInstallation) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	kept := make(map[string]bool, len(crs))
+	for i := range crs {
+		kept[crs[i].GetNamespace()+"/"+crs[i].GetName()] = true
+	}
+	for key := range p.problems {
+		if namespace, rest, _ := strings.Cut(key, "/"); !kept[namespace+"/"+strings.SplitN(rest, "/", 2)[0]] {
+			delete(p.problems, key)
+		}
+	}
+}
+
 // StartBackupConfigSync keeps the configuration files of the clickhouse-backup sidecars of every installation in
 // step with their storage Secrets, until ctx is done
 func (c *Controller) StartBackupConfigSync(ctx context.Context) {
-	go wait.UntilWithContext(ctx, c.syncBackupConfigs, backupConfigSyncPeriod)
+	announcer := a.NewAnnouncer(a.NewEventEmitter(c.kube.Event(), "ClickHouseInstallation", "chop-chi-", componentName), c.kube.CR())
+	go wait.UntilWithContext(ctx, func(ctx context.Context) { c.syncBackupConfigs(ctx, announcer) }, backupConfigSyncPeriod)
 }
 
 // syncBackupConfigs reconciles the configuration file Secrets of every installation of the watched namespaces as
 // its last completed reconcile normalized it. An installation that has completed none, is being reconciled or
 // deleted, or is suspended is left alone: its reconcile creates its Secrets, one in progress has written them from a
-// newer spec than the last completed one, and a suspended one is not to change.
-func (c *Controller) syncBackupConfigs(ctx context.Context) {
+// newer spec than the last completed one, and a suspended one is not to change. A storage Secret gone or holding
+// settings that cannot be read is warned about as the reconcile does, once, when it turns so.
+func (c *Controller) syncBackupConfigs(ctx context.Context, announcer a.Announcer) {
 	ctx, cancel := context.WithTimeout(ctx, backupConfigSyncTimeout)
 	defer cancel()
 
@@ -215,6 +282,7 @@ func (c *Controller) syncBackupConfigs(ctx context.Context) {
 		log.V(1).Warning("Unable to list installations to sync backup configuration Secrets err: %v", err)
 		return
 	}
+	c.backupConfigProblems.retain(list.Items)
 	for i := range list.Items {
 		item := &list.Items[i]
 		if !chop.Config().IsNamespaceWatched(item.GetNamespace()) || !item.GetDeletionTimestamp().IsZero() || item.Spec.Suspend.Value() {
@@ -234,8 +302,12 @@ func (c *Controller) syncBackupConfigs(ctx context.Context) {
 			log.V(1).M(cr).F().Warning("Unable to sync backup configuration Secrets err: %v", err)
 			continue
 		}
-		for cluster, outcome := range outcomes {
-			if outcome.err != nil {
+		for _, cluster := range slices.Sorted(maps.Keys(outcomes)) {
+			outcome := outcomes[cluster]
+			switch {
+			case c.backupConfigProblems.reported(cr, cluster, outcome) && (backupConfigProblem(outcome) != ""):
+				warnBackupConfigOutcome(announcer, cr, cluster, outcome)
+			case (outcome.err != nil) && (backupConfigProblem(outcome) == ""):
 				log.V(1).M(cr).F().Warning("Unable to sync backup configuration Secret of cluster %s err: %v", cluster, outcome.err)
 			}
 		}

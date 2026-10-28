@@ -177,3 +177,34 @@ func TestBuildRefusesInvalidStorageSettings(t *testing.T) {
 		})
 	}
 }
+
+// The fingerprint of the credentials of the REST API changes with them alone, and gives none of them away
+func TestBuildAPIFingerprint(t *testing.T) {
+	first, err := Build([]byte("s3:\n  bucket: a\n"), testCredentials, testDefaults)
+	require.NoError(t, err)
+	require.Len(t, first.APIFingerprint, 64)
+	require.NotContains(t, first.APIFingerprint, testCredentials.APIPassword)
+
+	otherStorage, err := Build([]byte("s3:\n  bucket: b\n"), testCredentials, testDefaults)
+	require.NoError(t, err)
+	require.Equal(t, first.APIFingerprint, otherStorage.APIFingerprint, "storage settings are reloaded without a restart")
+
+	otherClickHouse := testCredentials
+	otherClickHouse.ClickHousePassword = "other"
+	built, err := Build(nil, otherClickHouse, testDefaults)
+	require.NoError(t, err)
+	require.Equal(t, first.APIFingerprint, built.APIFingerprint, "the ClickHouse credentials are reloaded without a restart")
+
+	for name, mutate := range map[string]func(*Credentials){
+		"username": func(c *Credentials) { c.APIUsername = "other" },
+		"password": func(c *Credentials) { c.APIPassword = "other" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			credentials := testCredentials
+			mutate(&credentials)
+			built, err := Build(nil, credentials, testDefaults)
+			require.NoError(t, err)
+			require.NotEqual(t, first.APIFingerprint, built.APIFingerprint)
+		})
+	}
+}

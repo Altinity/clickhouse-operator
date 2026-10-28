@@ -54,12 +54,13 @@ func writeConfigFile(t *testing.T) string {
 	return file
 }
 
-// The sidecar's command names the configuration file clickhouse-backup reads by default, in the directory the
-// configuration file Secret is mounted at
+// The sidecar's command names the configuration file clickhouse-backup reads by default and the fingerprint file of
+// the credentials of its REST API, in the directory the configuration file Secret is mounted at
 func TestBackupSidecarCommandNamesTheConfigFile(t *testing.T) {
 	command := newBackupSidecarCommand()
 	require.Equal(t, []string{
 		path.Join(config.DirPathClickHouseBackupConfig, backupconfig.FileName),
+		path.Join(config.DirPathClickHouseBackupConfig, backupconfig.APIFingerprintFileName),
 		config.ClickHouseBackupCommand,
 		config.ClickHouseBackupCommandServer,
 	}, command[4:])
@@ -107,10 +108,11 @@ type sidecarScript struct {
 }
 
 // startSidecarScript starts the sidecar's command script with the environment and the configuration file, running
-// the command after it
+// the command after it. The fingerprint file is the one next to the configuration file.
 func startSidecarScript(t *testing.T, env map[string]string, configFile string, command ...string) *sidecarScript {
 	t.Helper()
-	args := append([]string{"-c", backupSidecarScript, config.ClickHouseBackupContainerName, configFile}, command...)
+	fingerprintFile := filepath.Join(filepath.Dir(configFile), backupconfig.APIFingerprintFileName)
+	args := append([]string{"-c", backupSidecarScript, config.ClickHouseBackupContainerName, configFile, fingerprintFile}, command...)
 	s := &sidecarScript{cmd: exec.Command("bash", args...), out: &lockedOutput{}, done: make(chan error, 1)}
 	s.cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
 	for name, value := range env {
@@ -232,15 +234,19 @@ func TestBackupSidecarScriptWaitsForTheConfigFile(t *testing.T) {
 	})
 }
 
-// The sidecar's command takes the configuration file and the command of the server as arguments from the operator;
-// anything else is the operator's own fault and fails the sidecar loudly.
+// The sidecar's command takes the configuration file, the fingerprint file and the command of the server as
+// arguments from the operator; anything else is the operator's own fault and fails the sidecar loudly.
 func TestBackupSidecarScriptArguments(t *testing.T) {
 	requireScriptTools(t)
 
+	configFile := path.Join(config.DirPathClickHouseBackupConfig, backupconfig.FileName)
+	fingerprintFile := path.Join(config.DirPathClickHouseBackupConfig, backupconfig.APIFingerprintFileName)
 	for name, args := range map[string][]string{
 		"no arguments":             {},
-		"no command":               {path.Join(config.DirPathClickHouseBackupConfig, backupconfig.FileName)},
-		"configuration file empty": {"", "env"},
+		"no fingerprint file":      {configFile},
+		"no command":               {configFile, fingerprintFile},
+		"configuration file empty": {"", fingerprintFile, "env"},
+		"fingerprint file empty":   {configFile, "", "env"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			cmd := exec.Command("bash", append([]string{"-c", backupSidecarScript, config.ClickHouseBackupContainerName}, args...)...)
@@ -249,9 +255,55 @@ func TestBackupSidecarScriptArguments(t *testing.T) {
 			var exitErr *exec.ExitError
 			require.ErrorAs(t, err, &exitErr, string(out))
 			require.Equal(t, 1, exitErr.ExitCode(), string(out))
-			require.Contains(t, string(out), "the configuration file and the command of the server must be given")
+			require.Contains(t, string(out), "the configuration file, the fingerprint file and the command of the server must be given")
 		})
 	}
+}
+
+// fakeServer stands for clickhouse-backup server: it reports every SIGHUP and exits on SIGTERM
+var fakeServer = []string{"bash", "-c", `trap 'echo reloaded' HUP; trap 'echo stopped; exit 0' TERM; while :; do sleep 0.1; done`}
+
+// clickhouse-backup checks the credentials of a request against the configuration it last loaded, which only a
+// request it lets in loads anew: the sidecar's command restarts the server by SIGHUP when the fingerprint of the
+// credentials changes, and only then, and passes SIGTERM on to it.
+func TestBackupSidecarScriptRestartsServerOnNewCredentials(t *testing.T) {
+	requireScriptTools(t)
+
+	configFile := writeConfigFile(t)
+	fingerprintFile := filepath.Join(filepath.Dir(configFile), backupconfig.APIFingerprintFileName)
+	require.NoError(t, os.WriteFile(fingerprintFile, []byte("first"), 0o644))
+	script := startSidecarScript(t, nil, configFile, fakeServer...)
+
+	exited, _ := script.wait(7 * time.Second)
+	require.False(t, exited, script.out.String())
+	require.NotContains(t, script.out.String(), "reloaded", "unchanged credentials do not restart the server")
+
+	require.NoError(t, os.WriteFile(fingerprintFile, []byte("second"), 0o644))
+	require.Eventually(t, func() bool { return strings.Contains(script.out.String(), "reloaded") }, 15*time.Second, 100*time.Millisecond)
+	require.Equal(t, 1, strings.Count(script.out.String(), "reloaded"), script.out.String())
+
+	require.NoError(t, os.Remove(fingerprintFile))
+	exited, _ = script.wait(7 * time.Second)
+	require.False(t, exited, script.out.String())
+	require.Equal(t, 1, strings.Count(script.out.String(), "reloaded"), "a fingerprint file gone restarts nothing")
+
+	require.NoError(t, script.cmd.Process.Signal(syscall.SIGTERM))
+	exited, err := script.wait(10 * time.Second)
+	require.True(t, exited, "the sidecar must stop when kubelet stops it")
+	require.NoError(t, err, script.out.String())
+	require.Contains(t, script.out.String(), "stopped", "SIGTERM reaches the server")
+}
+
+// The sidecar exits as the server does
+func TestBackupSidecarScriptExitsAsTheServer(t *testing.T) {
+	requireScriptTools(t)
+
+	script := startSidecarScript(t, nil, writeConfigFile(t), "bash", "-c", "exit 3")
+	exited, err := script.wait(10 * time.Second)
+	require.True(t, exited)
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr, script.out.String())
+	require.Equal(t, 3, exitErr.ExitCode())
 }
 
 // The sidecar runs the script in the image of clickhouse-backup, an Alpine one, whose regex library refuses a

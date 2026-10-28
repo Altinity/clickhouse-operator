@@ -97,6 +97,7 @@ func IsBackupSidecarCommand(container *core.Container) bool {
 func newBackupSidecarCommand() []string {
 	return k8s.EscapeVariableReferencesAll(newBackupScriptCommand(backupSidecarScript,
 		path.Join(config.DirPathClickHouseBackupConfig, backupconfig.FileName),
+		path.Join(config.DirPathClickHouseBackupConfig, backupconfig.APIFingerprintFileName),
 		config.ClickHouseBackupCommand, config.ClickHouseBackupCommandServer))
 }
 
@@ -199,16 +200,20 @@ func (cm *ContainerManager) ensureContainerSpecifiedClickHouseBackup(statefulSet
 }
 
 // statefulSetEnsureBackupConfigVolume gives the pod the volume of the configuration file Secret of the host's
-// cluster, in place of a volume of that name the pod template has. Only the file is projected: the Secret holds
-// the settings the storage path check reads as well, which the backup Jobs take as env vars.
+// cluster, in place of a volume of that name the pod template has. Only the file and the fingerprint of the
+// credentials of the REST API are projected: the Secret holds the settings the storage path check reads as well,
+// which the backup Jobs take as env vars.
 func (cm *ContainerManager) statefulSetEnsureBackupConfigVolume(statefulSet *apps.StatefulSet, host *chi.Host, optional bool) {
 	volume := core.Volume{
 		Name: config.ClickHouseBackupConfigVolumeName,
 		VolumeSource: core.VolumeSource{
 			Secret: &core.SecretVolumeSource{
 				SecretName: cm.namer.Name(interfaces.NameBackupConfigSecret, host.GetCR(), host.GetCluster().GetName()),
-				Items:      []core.KeyToPath{{Key: backupconfig.FileName, Path: backupconfig.FileName}},
-				Optional:   ptr.To(optional),
+				Items: []core.KeyToPath{
+					{Key: backupconfig.FileName, Path: backupconfig.FileName},
+					{Key: backupconfig.APIFingerprintFileName, Path: backupconfig.APIFingerprintFileName},
+				},
+				Optional: ptr.To(optional),
 			},
 		},
 	}

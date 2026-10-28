@@ -9234,6 +9234,31 @@ def test_010087(self):
                 names = backup_remote_names(pod(cluster, shard, replica), api_auth)
                 assert backup_name in names, error(f"{cluster} shard {shard} replica {replica}: remote backups {names}")
 
+        with When(f"The REST API password is changed in place in {backup_auto_secret(chi)}"):
+            rotated = (api_auth[0], f"rotated-{os.urandom(8).hex()}")
+            kubectl.launch(
+                f"patch secret {backup_auto_secret(chi)} --type merge "
+                f"-p '{{\"stringData\":{{\"API_PASSWORD\":\"{rotated[1]}\"}}}}'"
+            )
+
+        with Then("Every sidecar restarts its server with the new password, without a restart of the pod, and refuses the old one"):
+            restarts = {}
+            for cluster, shard, replica in enabled_hosts:
+                name = pod(cluster, shard, replica)
+                restarts[name] = kubectl.get("pod", name)["status"]["containerStatuses"]
+            for cluster, shard, replica in enabled_hosts:
+                name = pod(cluster, shard, replica)
+                for attempt in retries(timeout=300, delay=10):
+                    with attempt:
+                        code, body = backup_api_get(name, "/backup/status", rotated)
+                        assert code == "200", error(f"{name}: /backup/status with the new password answered {code}: {body}")
+                code, body = backup_api_get(name, "/backup/status", api_auth)
+                assert code == "401", error(f"{name}: /backup/status with the old password answered {code}: {body}")
+                counts = {c["name"]: c.get("restartCount") for c in kubectl.get("pod", name)["status"]["containerStatuses"]}
+                before = {c["name"]: c.get("restartCount") for c in restarts[name]}
+                assert counts == before, error(f"{name}: containers restarted {before} -> {counts}")
+            api_auth = rotated
+
         with When(f"A schedule of the whole installation, running every minute and keeping {keep_last} backup, is created"):
             kubectl.apply(util.get_full_path(schedule_manifest))
 

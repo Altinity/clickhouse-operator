@@ -80,6 +80,9 @@ func TestReconcileBackupConfigSecret(t *testing.T) {
 	require.Equal(t, "s3", string(secret.Data["REMOTE_STORAGE"]))
 	require.Equal(t, "backups", string(secret.Data["S3_BUCKET"]))
 	require.NotContains(t, secret.Data, "S3_SECRET_KEY", "no credential is a setting of the path check")
+	fingerprint := string(secret.Data[backupconfig.APIFingerprintFileName])
+	require.Len(t, fingerprint, 64, "the sidecar restarts its server when the credentials of its REST API change")
+	require.NotContains(t, fingerprint, string(credentials[config.ClickHouseBackupSecretKeyAPIPassword]))
 }
 
 // A changed storage Secret changes the configuration file, and nothing else does: an unchanged one leaves the Secret
@@ -128,6 +131,39 @@ func (k *backupConfigSyncFakeKube) CR() interfaces.IKubeCR {
 	return &backupSecretOwnerFakeCR{crs: k.crs}
 }
 
+// newBackupConfigSyncController reconciles an installation with storage Secret bucket "first", which then becomes
+// "second", and returns a controller that serves the installation as the operator stores it after mutate
+func newBackupConfigSyncController(t *testing.T, mutate func(cr *api.ClickHouseInstallation)) (*Controller, *backupSecretFakeSecret) {
+	t.Helper()
+	normalized := newBackupSecretCR(t, enabledBackup())
+	fake := &backupSecretFakeSecret{secrets: map[string]*core.Secret{
+		testStorageSecret: storageSecretWith("s3:\n  bucket: first\n"),
+	}}
+	w := newBackupSecretWorker(fake, normalized)
+	require.NoError(t, w.reconcileCRAuxObjectsPreliminaryDomain(context.Background(), normalized))
+	fake.secrets[testStorageSecret] = storageSecretWith("s3:\n  bucket: second\n")
+
+	stored := &api.ClickHouseInstallation{ObjectMeta: *normalized.ObjectMeta.DeepCopy()}
+	stored.Spec.Backup = enabledBackup()
+	// As the operator reads it back from where it keeps it, without the runtime of the reconcile
+	data, err := json.Marshal(&api.ClickHouseInstallation{ObjectMeta: normalized.ObjectMeta, Spec: normalized.Spec})
+	require.NoError(t, err)
+	ancestor := &api.ClickHouseInstallation{}
+	require.NoError(t, json.Unmarshal(data, ancestor))
+	stored.EnsureStatus().NormalizedCRCompleted = ancestor
+	if mutate != nil {
+		mutate(stored)
+	}
+	return &Controller{
+		chopClient: chopFake.NewSimpleClientset(stored),
+		kube: &backupConfigSyncFakeKube{
+			backupSecretFakeKube: backupSecretFakeKube{secret: fake},
+			crs:                  map[string]*api.ClickHouseInstallation{stored.GetName(): stored},
+		},
+		namer: managers.NewNameManager(managers.NameManagerTypeClickHouse),
+	}, fake
+}
+
 // Between the reconciles of an installation, the configuration files follow its storage Secrets as its last completed
 // reconcile normalized it. An installation that has completed none, is being reconciled, or is suspended is left
 // alone.
@@ -149,35 +185,39 @@ func TestSyncBackupConfigs(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			normalized := newBackupSecretCR(t, enabledBackup())
-			fake := &backupSecretFakeSecret{secrets: map[string]*core.Secret{
-				testStorageSecret: storageSecretWith("s3:\n  bucket: first\n"),
-			}}
-			w := newBackupSecretWorker(fake, normalized)
-			require.NoError(t, w.reconcileCRAuxObjectsPreliminaryDomain(context.Background(), normalized))
-			fake.secrets[testStorageSecret] = storageSecretWith("s3:\n  bucket: second\n")
-
-			stored := &api.ClickHouseInstallation{ObjectMeta: *normalized.ObjectMeta.DeepCopy()}
-			stored.Spec.Backup = enabledBackup()
-			// As the operator reads it back from where it keeps it, without the runtime of the reconcile
-			data, err := json.Marshal(&api.ClickHouseInstallation{ObjectMeta: normalized.ObjectMeta, Spec: normalized.Spec})
-			require.NoError(t, err)
-			ancestor := &api.ClickHouseInstallation{}
-			require.NoError(t, json.Unmarshal(data, ancestor))
-			stored.EnsureStatus().NormalizedCRCompleted = ancestor
-			if tc.mutate != nil {
-				tc.mutate(stored)
-			}
-			c := &Controller{
-				chopClient: chopFake.NewSimpleClientset(stored),
-				kube: &backupConfigSyncFakeKube{
-					backupSecretFakeKube: backupSecretFakeKube{secret: fake},
-					crs:                  map[string]*api.ClickHouseInstallation{stored.GetName(): stored},
-				},
-				namer: managers.NewNameManager(managers.NameManagerTypeClickHouse),
-			}
-			c.syncBackupConfigs(context.Background())
+			c, fake := newBackupConfigSyncController(t, tc.mutate)
+			c.syncBackupConfigs(context.Background(), a.NewAnnouncer(&recordingEventEmitter{}, nil))
 			require.Equal(t, tc.want, configFile(t, fake.secrets[configSecretName])["s3"]["bucket"])
 		})
 	}
+}
+
+// The sync warns about a storage Secret gone, or holding settings that cannot be read, as the reconcile does - once
+// when it turns so, not on every pass
+func TestSyncBackupConfigsWarnsOnChange(t *testing.T) {
+	c, fake := newBackupConfigSyncController(t, nil)
+	events := &recordingEventEmitter{}
+	sync := func() []string {
+		t.Helper()
+		events.events = nil
+		c.syncBackupConfigs(context.Background(), a.NewAnnouncer(events, nil))
+		var reasons []string
+		for _, event := range events.events {
+			reasons = append(reasons, event.reason)
+		}
+		return reasons
+	}
+
+	require.Empty(t, sync())
+	delete(fake.secrets, testStorageSecret)
+	require.Equal(t, []string{a.EventReasonBackupStorageSecretMissing}, sync())
+	require.Empty(t, sync(), "a storage Secret still gone is warned about once")
+	fake.secrets[testStorageSecret] = storageSecretWith("s3: [")
+	require.Equal(t, []string{a.EventReasonBackupStorageConfigInvalid}, sync())
+	require.Empty(t, sync())
+	fake.secrets[testStorageSecret] = storageSecretWith("s3:\n  bucket: third\n")
+	require.Empty(t, sync())
+	require.Equal(t, "third", configFile(t, fake.secrets[configSecretName])["s3"]["bucket"])
+	delete(fake.secrets, testStorageSecret)
+	require.Equal(t, []string{a.EventReasonBackupStorageSecretMissing}, sync(), "a storage Secret gone again is warned about again")
 }

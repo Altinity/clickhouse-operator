@@ -70,7 +70,8 @@ func (c *Creator) CreateBackupSecret() *core.Secret {
 // under the name of the env var clickhouse-backup knows it by
 func (c *Creator) CreateBackupConfigSecret(cluster string, backupConfig *backupconfig.Config) *core.Secret {
 	data := map[string][]byte{
-		backupconfig.FileName: backupConfig.File,
+		backupconfig.FileName:               backupConfig.File,
+		backupconfig.APIFingerprintFileName: []byte(backupConfig.APIFingerprint),
 	}
 	for name, value := range backupConfig.Settings {
 		data[name] = []byte(value)

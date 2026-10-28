@@ -18,6 +18,8 @@
 package backupconfig
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -28,6 +30,11 @@ import (
 // FileName is the name of the configuration file: the key of the storage Secret that holds the storage settings,
 // the key of the generated Secret that holds the whole file, and the file the sidecar reads.
 const FileName = "config.yml"
+
+// APIFingerprintFileName is the name of the file that holds the fingerprint of the credentials of the REST API the
+// configuration file sets. The sidecar restarts its server when it changes: clickhouse-backup checks the credentials
+// of a request against the configuration it last loaded, which it loads anew only for a request it lets in.
+const APIFingerprintFileName = "api-credentials.sha256"
 
 // ErrInvalidStorageConfig is returned when the storage settings are no YAML mapping of the sections of the
 // configuration file of clickhouse-backup.
@@ -106,6 +113,8 @@ type Config struct {
 	File []byte
 	// Settings holds, by env var name, the value of every setting of Settings the file sets
 	Settings map[string]string
+	// APIFingerprint is the fingerprint of the credentials of the REST API the file sets, never the credentials
+	APIFingerprint string
 }
 
 // Build builds the configuration file of the sidecar from the storage settings, a YAML mapping of the sections of
@@ -167,7 +176,13 @@ func Build(storageConfig []byte, credentials Credentials, defaults Defaults) (*C
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidStorageConfig, err)
 	}
-	return &Config{File: out, Settings: settings}, nil
+	return &Config{File: out, Settings: settings, APIFingerprint: apiFingerprint(credentials)}, nil
+}
+
+// apiFingerprint is the SHA-256 of the credentials of the REST API, which tells whether they changed
+func apiFingerprint(credentials Credentials) string {
+	sum := sha256.Sum256([]byte(credentials.APIUsername + "\x00" + credentials.APIPassword))
+	return hex.EncodeToString(sum[:])
 }
 
 // sectionOf returns the section of the file, adding it when the file has none. A section the file sets null

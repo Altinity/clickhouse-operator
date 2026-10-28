@@ -717,7 +717,9 @@ other contents therefore takes effect by itself:
 * **A removed setting counts.** The file is generated from the Secret as it is, so a setting removed
   from it is gone from the file too. A deleted storage Secret, or one without `config.yml`, leaves a
   file that names no storage, with a `BackupStorageSecretMissing` event; storage settings that
-  cannot be read leave the file as it was, see [Backup storage](#backup-storage).
+  cannot be read leave the file as it was, with a `BackupStorageConfigInvalid` event, see
+  [Backup storage](#backup-storage). The reconcile of the CHI warns every time; the check once a
+  minute in between warns once, when the storage Secret turns so.
 * **Only the storage Secret and the credentials are followed.** An `env` entry of the sidecar's
   container, taken from another Secret or a ConfigMap, and the operator's own settings, are
   environment variables, which Kubernetes resolves when it starts the container: they change at the
@@ -728,12 +730,18 @@ ClickHouse still accepts. The operator notices the deletion and reconciles the C
 Secret anew, with new random values; so does any reconcile that finds the Secret missing or lacking a
 key, whatever started it, except for a suspended CHI, whose Secret is left as it is until the CHI is
 resumed. ClickHouse reloads the new password live, and the configuration files take the new
-credentials as above. The sidecars do not, however, let the Jobs in with them: `clickhouse-backup`
-checks the REST API credentials against the configuration it last loaded, which only an operation
-called with the old credentials loads anew. Restart the sidecars by hand after such a deletion -
-deleting the Pods one at a time, for example - and backups and restores fail with
-`401 Unauthorized` until they have. Backup and restore Jobs need the Secret too and
-do not start while it is missing.
+credentials as above. Editing the credentials in the Secret in place works the same way.
+
+`clickhouse-backup` checks the REST API credentials of a request against the configuration it last
+loaded, so on its own it would refuse every request made with new ones. The sidecar therefore
+restarts its server - the process, not the container - when the REST API credentials of its
+configuration file change: the operator puts their fingerprint next to the file, and the sidecar
+sends the server `SIGHUP` when it changes. The restart cancels the operations the sidecar runs at
+that moment, which their Jobs, started with the old credentials, could not follow anyway: change the
+credentials only while no backup or restore runs. Until the sidecars have the new file, within a few
+minutes, Jobs started with the new credentials fail with `401 Unauthorized`. A sidecar started with a
+command of its own is not restarted. Backup and restore Jobs need the Secret too and do not start
+while it is missing.
 
 ## ClickHouseBackup
 
