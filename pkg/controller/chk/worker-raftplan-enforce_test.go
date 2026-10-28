@@ -19,12 +19,14 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 )
 
-func TestRaftPlanEnforcementOptIn(t *testing.T) {
+func TestRaftPlanEnforcementDefaultForE2E(t *testing.T) {
+	// E2E deploys the operator without configuring this environment variable.
 	t.Setenv("CHOP_CHK_RAFTPLAN_ENFORCE", "")
-	require.False(t, raftPlanEnforceEnabled())
+	require.True(t, raftPlanEnforceEnabled(), "planner must be active without e2e installation changes")
 	t.Setenv("CHOP_CHK_RAFTPLAN_ENFORCE", "1")
 	require.True(t, raftPlanEnforceEnabled())
-	t.Setenv("CHOP_CHK_RAFTPLAN_ENFORCE", "false")
+	// Preserve an explicit rollback for manual test deployments.
+	t.Setenv("CHOP_CHK_RAFTPLAN_ENFORCE", "0")
 	require.False(t, raftPlanEnforceEnabled())
 }
 
