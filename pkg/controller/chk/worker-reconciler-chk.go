@@ -442,6 +442,7 @@ func (w *worker) reconcileHostStatefulSet(
 
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
 	opts = w.prepareStsReconcileOptsWaitSection(host, opts, snap.rolling)
+	w.shadowRaftDisruption(ctx, host, opts, snap)
 	if err := w.ensureQuorumSafeToDisruptHost(ctx, host, opts, &snap); err != nil {
 		return err
 	}
@@ -721,7 +722,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	// for the previous joiner's Ready wait (ObjectStatusSame returns first).
 	// The next missing joiner has to be postponed here, while the loop continues
 	// so existing members can still roll.
-	if err := w.deferUnreadyStagedAdmit(ctx, host); err != nil {
+	admitErr := w.deferUnreadyStagedAdmit(ctx, host)
+	w.shadowRaftAdmission(ctx, host, admitErr)
+	if err := admitErr; err != nil {
 		if errors.Is(err, errSkipStagedAdmit) {
 			return nil
 		}
