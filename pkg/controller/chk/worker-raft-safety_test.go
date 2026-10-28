@@ -34,6 +34,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chk/raftplan"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
@@ -1453,11 +1454,27 @@ func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
 		return cr, fake, cr.Spec.Configuration.Clusters[0].Layout.Shards[0]
 	}
 
+	// The host-loop fixture has no ConfigMap/task machinery. Supply only the
+	// membership that pass 1 published (h0 and h1), then let the real
+	// observeRaftPlanHosts read the fake live StatefulSets and run the planner.
+	newStagedAdmitWorker := func(fake *raftFakeSTS) *worker {
+		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w.readPublishedRaftMembersFn = func(
+			_ context.Context, cr *apiChk.ClickHouseKeeperInstallation,
+		) ([]raftplan.HostID, bool, error) {
+			return []raftplan.HostID{
+				raftPlanHostID(hostAtOnCR(cr, 0)),
+				raftPlanHostID(hostAtOnCR(cr, 1)),
+			}, true, nil
+		}
+		return w
+	}
+
 	t.Run("unready previous joiner blocks the next admit and still reconciles the existing member", func(t *testing.T) {
 		cr, fake, shard := newScaleUp(0)
 		h2 := hostAtOnCR(cr, 2)
 		var visited []string
-		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w := newStagedAdmitWorker(fake)
 		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
 			visited = append(visited, host.GetName())
 			return nil
@@ -1473,7 +1490,7 @@ func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
 	t.Run("ready previous joiner admits the next host", func(t *testing.T) {
 		_, fake, shard := newScaleUp(1)
 		var visited []string
-		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w := newStagedAdmitWorker(fake)
 		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
 			visited = append(visited, host.GetName())
 			return nil
@@ -1487,7 +1504,7 @@ func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
 		_, fake, shard := newScaleUp(0)
 		fake.err = errors.New("apiserver unavailable")
 		var visited []string
-		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w := newStagedAdmitWorker(fake)
 		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
 			visited = append(visited, host.GetName())
 			return nil
@@ -1504,7 +1521,7 @@ func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
 		cr.Spec.Stop = types.NewStringBool(true)
 		h2 := hostAtOnCR(cr, 2)
 		var visited []string
-		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w := newStagedAdmitWorker(fake)
 		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
 			visited = append(visited, host.GetName())
 			return nil
