@@ -70,24 +70,30 @@ func PodHasNotReadyContainers(pod *core.Pod) bool {
 }
 
 func PodHasAllContainersStarted(pod *core.Pod) bool {
-	allContainersStarted := true
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		// Started indicates whether the container has finished its postStart lifecycle hook
-		// and passed its startup probe.
-		// Initialized as false, becomes true after startupProbe is considered
-		// successful. Resets to false when the container is restarted, or if kubelet
-		// loses state temporarily. In both cases, startup probes will run again.
-		// Is always true when no startupProbe is defined and container is running and
-		// has passed the postStart lifecycle hook. The null value must be treated the
-		// same as false.
-		if (containerStatus.Started != nil) && (*containerStatus.Started) {
-			// Current container is started. no changes in all status
-		} else {
-			// Current container is NOT started
-			allContainersStarted = false
+	// Kubelet may not have populated containerStatuses yet. In particular, an
+	// ImagePullBackOff pod briefly has no statuses after StatefulSet creation.
+	// Treating an empty slice as vacuously true lets the startup waiter succeed
+	// without a single container ever starting.
+	if pod == nil || len(pod.Spec.Containers) == 0 ||
+		len(pod.Status.ContainerStatuses) != len(pod.Spec.Containers) {
+		return false
+	}
+	for _, container := range pod.Spec.Containers {
+		started := false
+		for _, status := range pod.Status.ContainerStatuses {
+			// Started is only true after the postStart hook / startup probe.
+			// Nil means unknown, not started. Match by name so a missing
+			// sidecar cannot be masked by an unrelated status entry.
+			if status.Name == container.Name && status.Started != nil && *status.Started {
+				started = true
+				break
+			}
+		}
+		if !started {
+			return false
 		}
 	}
-	return allContainersStarted
+	return true
 }
 
 func PodHasNotStartedContainers(pod *core.Pod) bool {
