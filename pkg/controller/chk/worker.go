@@ -189,7 +189,7 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
 		return true
 
-	case model.IsConfigurationChangeRequiresReboot(host):
+	case model.IsConfigurationChangeRequiresReboot(host, nil):
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 
@@ -348,10 +348,10 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 	return nil
 }
 
-func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, err error) {
+func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, err error) error {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
-		return
+		return ctx.Err()
 	}
 
 	switch {
@@ -360,13 +360,15 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *a
 	case errors.Is(err, common.ErrCRUDAbort):
 		cr.EnsureStatus().ReconcileAbort()
 	}
-	w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
+	if statusErr := w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
 				FieldGroupMain: true,
 			},
 		},
-	})
+	}); statusErr != nil {
+		return statusErr
+	}
 
 	w.a.V(1).
 		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
@@ -374,6 +376,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *a
 		WithActions(cr).
 		M(cr).F().
 		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", cr.GetSpecT().GetTaskID())
+	return nil
 }
 
 func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
