@@ -101,6 +101,15 @@ func (w *worker) observeRaftPlanHosts(
 func (w *worker) observeRaftPlanAdmission(
 	ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation,
 ) (raftplan.Snapshot, error) {
+	// Test-only seam for published membership. This does not bypass the
+	// actual live StatefulSet observer or the planner's safety decisions.
+	if w != nil && w.readPublishedRaftMembersFn != nil {
+		published, known, err := w.readPublishedRaftMembersFn(ctx, cr)
+		if err != nil {
+			return raftplan.Snapshot{}, fmt.Errorf("read published Raft membership: %w", err)
+		}
+		return w.observeRaftPlanHosts(ctx, cr, published, known)
+	}
 	if w == nil || w.c == nil || w.c.APIReader == nil || w.c.namer == nil || w.task == nil || cr == nil {
 		return raftplan.Snapshot{}, fmt.Errorf("raftplan admission observation is unavailable")
 	}
