@@ -16,6 +16,7 @@ var raftBlock = regexp.MustCompile(`(?s)<raft_configuration(?:\s[^>]*)?\s*>.*?</
 
 type raftSection struct {
 	Servers []struct {
+		ID       string `xml:"id"`
 		Hostname string `xml:"hostname"`
 	} `xml:"server"`
 }
@@ -40,6 +41,24 @@ func PublishedHostnames(data map[string]string) (hostnames []string, known bool,
 			var section raftSection
 			if err := xml.Unmarshal([]byte(block), &section); err != nil {
 				return nil, false, fmt.Errorf("ConfigMap %s Raft XML: %w", key, err)
+			}
+			// User settings can render a partial raft_configuration, e.g.
+			// keeper_server/raft_configuration/server/port. That produces
+			// <server><port>9444</port></server> in chop-generated-settings.xml;
+			// it is not a published member and must not be parsed as one.
+			// Still inspect settings sections with member identifiers so a
+			// conflicting or malformed membership cannot be silently ignored.
+			if key == "chop-generated-settings.xml" {
+				hasMemberIdentifier := false
+				for _, server := range section.Servers {
+					if strings.TrimSpace(server.ID) != "" || strings.TrimSpace(server.Hostname) != "" {
+						hasMemberIdentifier = true
+						break
+					}
+				}
+				if !hasMemberIdentifier {
+					continue
+				}
 			}
 			names := make([]string, 0, len(section.Servers))
 			seen := map[string]bool{}
