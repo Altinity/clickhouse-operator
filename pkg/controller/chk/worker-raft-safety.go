@@ -675,6 +675,15 @@ func (w *worker) prepareStsReconcileOptsWaitSection(
 		w.a.V(1).M(host).F().Warning("Setting option SetWaitUntilStarted")
 	}
 
+	// A staged joiner's StatefulSet may already exist on a retry even though
+	// its image has never started. The standard Same shortcut otherwise skips
+	// the startup poll forever while admission defers the next joiner. Recheck
+	// Pod STARTED with the usual bounded timeout; do not require Pod READY,
+	// since readiness can depend on existing members adopting the new config.
+	if hostIsStagedScaleUpJoin(host) && !host.IsStopped() && !hostContributesReady(host) {
+		opts = opts.SetWaitUntilStartedOnSame()
+	}
+
 	switch {
 	case rolling && joinedEnsemble && !probes.GetReadiness().IsFalse():
 		opts = opts.SetWaitUntilReady()
