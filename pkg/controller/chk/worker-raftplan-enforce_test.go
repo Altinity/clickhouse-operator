@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -143,5 +145,56 @@ func TestRaftPlanEnforcedDisruptionGate(t *testing.T) {
 		snap := hostEnsembleSnapshot{rolling: true, members: 3, readyCount: 2}
 		err := w.ensureQuorumSafeToDisruptHost(ctx, host, nil, &snap)
 		require.ErrorIs(t, err, common.ErrCRUDDeferred)
+	})
+}
+
+func TestStagedJoinerStartupDeadlineExceeded(t *testing.T) {
+	now := time.Date(2026, time.October, 23, 9, 0, 0, 0, time.UTC)
+	timeout := time.Minute
+	started := true
+	neverStarted := false
+	old := meta.NewTime(now.Add(-2 * timeout))
+	recent := meta.NewTime(now.Add(-timeout / 2))
+	pendingPod := func(creation meta.Time, started *bool) *core.Pod {
+		return &core.Pod{
+			ObjectMeta: meta.ObjectMeta{CreationTimestamp: creation},
+			Spec: core.PodSpec{Containers: []core.Container{{Name: "keeper"}}},
+			Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{
+				Name: "keeper", Started: started,
+			}}},
+		}
+	}
+	t.Run("broken image after timeout", func(t *testing.T) {
+		require.True(t, stagedJoinerStartupDeadlineExceeded(
+			pendingPod(old, &neverStarted), old.Time, now, timeout,
+		))
+	})
+	t.Run("pod without container status after timeout", func(t *testing.T) {
+		pod := pendingPod(old, nil)
+		pod.Status.ContainerStatuses = nil
+		require.True(t, stagedJoinerStartupDeadlineExceeded(pod, old.Time, now, timeout))
+	})
+	t.Run("unstarted pod inside timeout", func(t *testing.T) {
+		require.False(t, stagedJoinerStartupDeadlineExceeded(
+			pendingPod(recent, &neverStarted), old.Time, now, timeout,
+		))
+	})
+	t.Run("started but unready must defer, not abort", func(t *testing.T) {
+		require.False(t, stagedJoinerStartupDeadlineExceeded(
+			pendingPod(old, &started), old.Time, now, timeout,
+		))
+	})
+	t.Run("no pod but old StatefulSet", func(t *testing.T) {
+		require.True(t, stagedJoinerStartupDeadlineExceeded(nil, old.Time, now, timeout))
+	})
+	t.Run("unknown creation age is not a timeout", func(t *testing.T) {
+		require.False(t, stagedJoinerStartupDeadlineExceeded(
+			pendingPod(meta.Time{}, &neverStarted), old.Time, now, timeout,
+		))
+	})
+	t.Run("zero timeout disables deadline", func(t *testing.T) {
+		require.False(t, stagedJoinerStartupDeadlineExceeded(
+			pendingPod(old, &neverStarted), old.Time, now, 0,
+		))
 	})
 }
