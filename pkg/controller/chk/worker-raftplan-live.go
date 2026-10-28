@@ -15,6 +15,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/go-zookeeper/zk"
+	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -59,12 +60,51 @@ func (w *worker) publishStartedStagedJoiner(ctx context.Context, host *api.Host)
 	return err
 }
 
+// readStagedJoinerReady checks both live Kubernetes readiness indicators.
+// A cached CurStatefulSet (captured before the join) or Raft membership alone
+// cannot authorize completion. Checking the Pod as well avoids using an STS
+// ready count from a previous Pod during a replacement/restart.
+func (w *worker) readStagedJoinerReady(ctx context.Context, host *api.Host) (bool, error) {
+	sts, err := w.stagedJoinerStatefulSet(ctx, host)
+	if err != nil {
+		return false, fmt.Errorf("read staged Keeper StatefulSet %s: %w", host.GetName(), err)
+	}
+	if sts == nil || sts.Status.ReadyReplicas < 1 {
+		return false, nil
+	}
+	if w.c == nil || w.c.kube == nil || w.c.kube.Pod() == nil {
+		return false, fmt.Errorf("Keeper Pod observation unavailable for %s", host.GetName())
+	}
+	pod, err := w.c.kube.Pod().Get(ctx, host)
+	if apiErrors.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read staged Keeper Pod %s: %w", host.GetName(), err)
+	}
+	if pod == nil {
+		return false, fmt.Errorf("nil staged Keeper Pod %s on successful Get", host.GetName())
+	}
+	if pod.DeletionTimestamp != nil || pod.Status.Phase != core.PodRunning {
+		return false, nil
+	}
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == core.PodReady {
+			return condition.Status == core.ConditionTrue, nil
+		}
+	}
+	return false, nil
+}
+
 // readStagedJoinerMembership probes an established member, not the joiner:
 // /keeper/config on a new candidate is unavailable before it joins quorum.
 // The probe is read-only and its failure never permits the next voter.
 func (w *worker) readStagedJoinerMembership(ctx context.Context, host *api.Host) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
+	}
+	if w.readStagedJoinerMembershipFn != nil {
+		return w.readStagedJoinerMembershipFn(ctx, host)
 	}
 	var peer *api.Host
 	_ = host.GetCR().WalkHosts(func(h *api.Host) error {

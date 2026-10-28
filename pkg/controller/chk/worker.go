@@ -80,6 +80,10 @@ type worker struct {
 		ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation,
 	) (published []raftplan.HostID, known bool, err error)
 
+	// readStagedJoinerMembershipFn overrides the live /keeper/config probe
+	// in unit tests only; production uses the real Keeper connection.
+	readStagedJoinerMembershipFn func(ctx context.Context, host *api.Host) (bool, error)
+
 	// quorumWaitSpent is the wait the Raft disrupt gate has already burned in THIS pass. The
 	// budget is per pass, not per host: a permanently unhealthy peer would otherwise cost the
 	// full timeout on every remaining host, and with ReconcileCHKsThreadsNumber defaulting to 1

@@ -2154,3 +2154,75 @@ func TestStagedJoinerBootstrapRaftConfig(t *testing.T) {
 	require.Contains(t, xml, raftHostname(h1))
 	require.NotContains(t, xml, raftHostname(h2))
 }
+
+
+// TestStagedJoinerReadyBarrier verifies the final JoinJoining -> JoinReady
+// transition. Published/committed membership must not complete a CHK while
+// Kubernetes still reports the last joining Pod as unready. Every observation
+// is re-read after a retry; old CurStatefulSet snapshots are not trusted.
+func TestStagedJoinerReadyBarrier(t *testing.T) {
+	ctx := context.Background()
+	cr := chkWithHosts(3)
+	cr.SetAncestor(chkWithHosts(1))
+	host := hostAtOnCR(cr, 2)
+	sts := newRaftFakeSTS().setReady(host, 0)
+
+	readyPod := func(status core.ConditionStatus) *core.Pod {
+		return &core.Pod{
+			Status: core.PodStatus{
+				Phase: core.PodRunning,
+				Conditions: []core.PodCondition{{
+					Type: core.PodReady, Status: status,
+				}},
+			},
+		}
+	}
+	pods := &raftFakeStartupPod{pod: readyPod(core.ConditionFalse)}
+	committed := true
+	membershipChecks := 0
+	w := &worker{
+		a: a.NewAnnouncer(nil, nil),
+		c: &Controller{kube: &raftFakeKube{sts: sts, pod: pods}},
+		readStagedJoinerMembershipFn: func(context.Context, *api.Host) (bool, error) {
+			membershipChecks++
+			return committed, nil
+		},
+	}
+
+	// The reconcile-time cache can contain an earlier ready result. The
+	// source of truth must be a new API read, not this stale snapshot.
+	host.Runtime.CurStatefulSet = &apps.StatefulSet{
+		Status: apps.StatefulSetStatus{ReadyReplicas: 1},
+	}
+	require.ErrorIs(t, w.verifyHostEnsembleMembership(ctx, host), common.ErrCRUDDeferred,
+		"committed membership cannot complete while live STS has 0 ReadyReplicas")
+	require.Equal(t, 1, membershipChecks)
+	require.Positive(t, sts.calls())
+
+	// A ready STS count alone can be stale during a Pod replacement; the
+	// actual Pod must also have Ready=True.
+	sts.setReady(host, 1)
+	require.ErrorIs(t, w.verifyHostEnsembleMembership(ctx, host), common.ErrCRUDDeferred,
+		"live Pod Ready=False must hold the final transition")
+	require.Equal(t, 2, membershipChecks)
+	pods.pod = nil
+	pods.err = apiErrors.NewNotFound(schema.GroupResource{Resource: "pods"}, host.GetName())
+	require.ErrorIs(t, w.verifyHostEnsembleMembership(ctx, host), common.ErrCRUDDeferred,
+		"disappearing Pod must never be considered ready")
+	pods.err = nil
+	pods.pod = readyPod(core.ConditionTrue)
+
+	// As soon as both the StatefulSet and Pod are Ready, the next observed
+	// pass can complete. No wait before membership publication is involved.
+	require.NoError(t, w.verifyHostEnsembleMembership(ctx, host))
+	require.Zero(t, sts.mutationCount(), "readiness checking must not restart Keepers")
+	require.Equal(t, 3, membershipChecks,
+		"Ready on the joiner is sufficient, including for TLS-only Keepers")
+
+	// Subsequent flapping is never masked by the prior successful probe.
+	sts.setReady(host, 0)
+	require.ErrorIs(t, w.verifyHostEnsembleMembership(ctx, host), common.ErrCRUDDeferred)
+	committed = false
+	require.ErrorIs(t, w.verifyHostEnsembleMembership(ctx, host), common.ErrCRUDDeferred,
+		"an uncommitted/unready joiner is not admitted")
+}
