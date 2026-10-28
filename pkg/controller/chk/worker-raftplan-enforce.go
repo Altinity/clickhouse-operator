@@ -55,8 +55,8 @@ func shouldHoldRaftStagedStartupAbort(cr *apiChk.ClickHouseKeeperInstallation) b
 
 // raftPlanEnforceEnabled runs the Raft planner by default in this test
 // branch, so the standard e2e operator install needs no environment changes.
-// Setting CHOP_CHK_RAFTPLAN_ENFORCE=0 is an optional emergency rollback;
-// the existing preliminary staging, publication, waits, and rollback remain.
+// CHOP_CHK_RAFTPLAN_ENFORCE=0 restores the legacy admission decision only;
+// the safe publish-after-Pod-Started sequence remains active in both modes.
 func raftPlanEnforceEnabled() bool {
 	return os.Getenv("CHOP_CHK_RAFTPLAN_ENFORCE") != "0"
 }
@@ -83,8 +83,8 @@ func (w *worker) enforceRaftPlanAdmission(ctx context.Context, host *api.Host) e
 	if !hostIsStagedScaleUpJoin(host) || w.c == nil {
 		return nil
 	}
-	// Keep an already created STS published, including after an interrupted
-	// Create. Never re-admit it or roll its membership back.
+	// An existing STS is handled by the Started -> publish -> Ready path
+	// in host reconciliation. Never create it again after an interruption.
 	own, err := w.stagedJoinerStatefulSet(ctx, host)
 	if err != nil {
 		return err

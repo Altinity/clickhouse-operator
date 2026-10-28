@@ -380,12 +380,7 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *apiChk.Clic
 	err = w.reconcileConfigMapCommon(ctx, cr)
 	cr.GetRuntime().UnlockCommonConfig()
 
-	w.includeAllHostsIntoCluster(ctx, cr)
 	return err
-}
-
-func (w *worker) includeAllHostsIntoCluster(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
-	// Not applicable
 }
 
 // reconcileConfigMapCommon reconciles common ConfigMap
@@ -826,9 +821,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 // reconcileHostPrepare reconciles specified ClickHouse host
 func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error {
 	if host.GetReconcileAttributes().IsExclude() {
-		// Stay out of raft_configuration until immediately before STS create.
-		// Publishing here would leave the server in XML if ConfigMapHost / PVC
-		// abort before the StatefulSet exists.
+		// Keep staged joiners out of shared raft_configuration until their Pod
+		// has Started. The host-specific bootstrap config lets them start
+		// without first changing the established members' Raft configuration.
 		w.a.V(1).
 			M(host).F().
 			Info("Skip raft include in prepare; host is staged. Host/shard/cluster: %d/%d/%s",
@@ -989,18 +984,13 @@ func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.
 }
 
 func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, snap hostEnsembleSnapshot) error {
-	// An existing staged joiner can be ObjectStatusSame on resume while
-	// still awaiting committed membership. Do not skip its live Raft check.
-	if hostIsStagedScaleUpJoin(host) && !host.IsStopped() {
+	// Even ObjectStatusSame on resume must pass the live Raft/Ready barrier.
+	// Stopped staged joiners return immediately from the verifier.
+	if hostIsStagedScaleUpJoin(host) {
 		return w.verifyHostEnsembleMembership(ctx, host)
 	}
 	if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
 		return nil
-	}
-
-	// Staged 1→N joins are serialized by deferUnreadyStagedAdmit, not by this sleep.
-	if hostIsStagedScaleUpJoin(host) {
-		return w.verifyHostEnsembleMembership(ctx, host)
 	}
 
 	if !snap.rolling {

@@ -27,7 +27,8 @@ func raftPlanHostID(host *api.Host) raftplan.HostID {
 // observeRaftPlanHosts returns values captured from live StatefulSet Gets.
 // Unlike a cached CurStatefulSet, an API error is explicitly Unknown; callers
 // cannot interpret an unreadable member as absent or unready.
-// This adapter is only used in shadow mode for now; no mutations are performed.
+// The authoritative admission gate, preliminary staging, and optional shadow
+// diagnostics all use this read-only adapter. No resources are mutated.
 func (w *worker) observeRaftPlanHosts(
 	ctx context.Context,
 	cr *apiChk.ClickHouseKeeperInstallation,
