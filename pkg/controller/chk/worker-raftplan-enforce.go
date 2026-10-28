@@ -71,14 +71,9 @@ func raftPlanAdmissionVerdict(snapshot raftplan.Snapshot, id raftplan.HostID) (r
 	if !plan.MayCreate[id] {
 		return plan, common.ErrCRUDDeferred
 	}
-	// The existing publisher still writes membership immediately before
-	// StatefulSet creation. Ensure the planner includes the admitted host.
-	for _, included := range plan.IncludedHosts {
-		if included == id {
-			return plan, nil
-		}
-	}
-	return plan, fmt.Errorf("Raft planner allowed creating %s without publishing its membership", id)
+	// The admission planner authorizes a bootstrap StatefulSet here, but
+	// deliberately does not publish its voter until Pod Started.
+	return plan, nil
 }
 
 // enforceRaftPlanAdmission replaces deferUnreadyStagedAdmit for staged

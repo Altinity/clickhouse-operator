@@ -17,6 +17,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/chk/raftplan"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
 func raftPlanHostID(host *api.Host) raftplan.HostID {
@@ -87,6 +88,26 @@ func (w *worker) observeRaftPlanHosts(
 			state.StatefulSet = raftplan.PresencePresent
 			state.ReadyKnown = true
 			state.Ready = sts.Status.ReadyReplicas > 0
+			if state.Ready {
+				state.PodStarted, state.StartedKnown = true, true
+			} else if w.c.kube.Pod() != nil && hostIsStagedScaleUpJoin(host) {
+				// A StatefulSet exists before Keeper starts. Observation must
+				// distinguish it from a joiner eligible for publication.
+				pod, podErr := w.c.kube.Pod().Get(ctx, host)
+				switch {
+				case apiErrors.IsNotFound(podErr):
+					state.StartedKnown = true
+				case podErr != nil:
+					snap.Hosts[id] = state
+					return fmt.Errorf("read Keeper joiner Pod %s: %w", id, podErr)
+				case pod == nil:
+					snap.Hosts[id] = state
+					return fmt.Errorf("nil Keeper Pod %s on successful Get", id)
+				default:
+					state.StartedKnown = true
+					state.PodStarted = k8s.PodHasAllContainersStarted(pod)
+				}
+			}
 		}
 		snap.Hosts[id] = state
 		return nil

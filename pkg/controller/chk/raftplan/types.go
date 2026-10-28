@@ -25,9 +25,11 @@ type HostState struct {
 	// InAncestor means present in the last successfully completed topology.
 	InAncestor bool
 
-	StatefulSet Presence
-	Ready       bool
-	ReadyKnown  bool
+	StatefulSet  Presence
+	Ready        bool
+	ReadyKnown   bool
+	PodStarted   bool
+	StartedKnown bool
 
 	// WouldDisrupt is computed by the adapter from the actual proposed STS
 	// mutation, including force-recreate and force-restart options.
