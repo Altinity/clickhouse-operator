@@ -148,12 +148,25 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 			WithError(new).
 			M(new).F().
 			Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
-		err = common.ErrCRUDAbort
-		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
-		if errors.Is(err, common.ErrCRUDAbort) {
-			metrics.CRReconcilesAborted(ctx, new)
+		// Only an expired staged-joiner startup is terminal for this spec
+		// generation. Other hard errors keep their historical retry behavior.
+		startupTimedOut := errors.Is(err, errRaftStagedJoinerStartupTimeout)
+		if startupTimedOut {
+			new.EnsureStatus().PushError(
+				raftStagedJoinerStartupTimeoutStatusMarker +
+					" Keeper joiner failed to start; edit CHK spec to retry",
+			)
 		}
-		return err
+		abortErr := common.ErrCRUDAbort
+		if startupTimedOut {
+			abortErr = fmt.Errorf("%w: %w", common.ErrCRUDAbort, err)
+		}
+		if persistErr := w.markReconcileCompletedUnsuccessfully(ctx, new, abortErr); persistErr != nil {
+			// Do not acknowledge a terminal error before Aborted is durable.
+			return fmt.Errorf("persist CHK Aborted status: %w", persistErr)
+		}
+		metrics.CRReconcilesAborted(ctx, new)
+		return abortErr
 	}
 
 	// Reconcile successful
@@ -469,6 +482,14 @@ func (w *worker) reconcileHostStatefulSet(
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. Reconcile StatefulSet", host.GetName())
 	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, true, opts)
+	// An unchanged staged joiner's *startup* timeout is terminal for this
+	// CHK spec, not another reason for controller-runtime to re-run the same
+	// broken-image reconcile. The Same+opt-in path only waits for Pod Started.
+	if errors.Is(err, common.ErrCRUDAbort) &&
+		hostIsStagedScaleUpJoin(host) && opts.WaitUntilStartedOnSame() &&
+		host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) {
+		err = fmt.Errorf("%w: %w", errRaftStagedJoinerStartupTimeout, err)
+	}
 	if err == nil {
 		w.task.RegistryReconciled().RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
 	} else {
