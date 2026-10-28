@@ -22,6 +22,21 @@ func TestPublishedHostnames(t *testing.T) {
 		{name: "empty valid section", data: map[string]string{"raft.xml": "<raft_configuration></raft_configuration>"}, want: []string{}, known: true},
 		{name: "duplicate hostname", data: map[string]string{"raft.xml": "<raft_configuration><server><hostname>h0</hostname></server><server><hostname>h0</hostname></server></raft_configuration>"}, fails: true},
 		{name: "empty hostname", data: map[string]string{"raft.xml": "<raft_configuration><server><id>2</id></server></raft_configuration>"}, fails: true},
+		{name: "settings port-only overlay before actual published membership", data: map[string]string{
+			"chop-generated-settings.xml": "<clickhouse><keeper_server><raft_configuration><server><port>9444</port></server></raft_configuration></keeper_server></clickhouse>",
+			"chop-generated-raft.xml": "<clickhouse><keeper_server><raft_configuration><server><id>0</id><hostname>h0.ns.svc</hostname><port>9444</port></server></raft_configuration></keeper_server></clickhouse>",
+		}, want: []string{"h0.ns.svc"}, known: true},
+		{name: "settings port-only overlay without published membership is unknown", data: map[string]string{
+			"chop-generated-settings.xml": "<raft_configuration><server><port>9444</port></server></raft_configuration>",
+		}},
+		{name: "settings overlay does not hide invalid generated membership", data: map[string]string{
+			"chop-generated-settings.xml": "<raft_configuration><server><port>9444</port></server></raft_configuration>",
+			"chop-generated-raft.xml": "<raft_configuration><server><id>0</id></server></raft_configuration>",
+		}, fails: true},
+		{name: "settings overlay with a hostname still checks conflicting membership", data: map[string]string{
+			"chop-generated-settings.xml": "<raft_configuration><server><hostname>unexpected</hostname></server></raft_configuration>",
+			"chop-generated-raft.xml": "<raft_configuration><server><hostname>h0.ns.svc</hostname></server></raft_configuration>",
+		}, fails: true},
 		{name: "malformed XML", data: map[string]string{"raft.xml": "<raft_configuration><server></raft_configuration>"}, fails: true},
 		{name: "conflicting blocks", data: map[string]string{
 			"a.xml": "<raft_configuration><server><hostname>h0</hostname></server></raft_configuration>",
