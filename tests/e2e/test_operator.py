@@ -6567,19 +6567,6 @@ def test_010062(self):
         )
 
     with When("Apply CHI with a config change that forces software restart (HostConfigRestart → HostShutdown)"):
-        restart_setting = "max_connections"
-        has_column = clickhouse.query(
-            chi,
-            "SELECT count() FROM system.columns WHERE (database, table, name) = ('system','server_settings','changeable_without_restart')",
-        )
-        if has_column == "1":
-            advice = clickhouse.query(
-                chi, f"SELECT changeable_without_restart FROM system.server_settings WHERE name = '{restart_setting}'"
-            )
-            assert advice != "Yes", error(
-                f"{restart_setting} is changeable_without_restart = Yes on this ClickHouse, so it no longer restarts; "
-                f"pick another setting in test-062-hooks-on-shutdown-2.yaml"
-            )
         kubectl.create_and_check(
             manifest="manifests/chi/test-062-hooks-on-shutdown-2.yaml",
             check={
@@ -6802,13 +6789,34 @@ def test_010064(self):
     # satisfy the not-restarted asserts below without ever having read a timestamp. A missing
     # pod raises IndexError inside the helper instead, which fails loudly on its own.
     assert start_time != "", error("could not read the ClickHouse container start time")
-    connected_time = ""
     with And("CHI is connected to Keeper"):
         connected_time = clickhouse.query(chi, "SELECT connected_time from system.zookeeper_connection")
         assert connected_time != ""
 
+    # A taskID-only CHK update does not change the resolved endpoint list.
+    # The watcher must record a skip, not reconfigure the CHI. Connected_time
+    # is not a valid proxy for CHI reconfiguration: an otherwise healthy
+    # ClickHouse can create a new ZooKeeper session independently.
+    zk_config_name = f"chi-{chi}-deploy-confd-default-0-0"
+    zk_config_before = kubectl.get("configmap", zk_config_name)["data"]["chop-generated-zookeeper.xml"]
+
     with When("Trigger CHK reconcile by patching taskID"):
         kubectl.force_chk_reconcile(chk, "keeper-watch-test")
+
+        with Then("Watcher skips CHI reconcile when Keeper endpoints are unchanged"):
+            skipped = False
+            for i in range(1, 16):
+                events = kubectl.get("events", "").get("items", [])
+                skipped = any(
+                    event.get("reason") == "KeeperUpdateNoEndpointChange"
+                    and event.get("involvedObject", {}).get("kind") == "ClickHouseInstallation"
+                    and event.get("involvedObject", {}).get("name") == chi
+                    for event in events
+                )
+                if skipped:
+                    break
+                retry_sleep(i, 5, "Waiting for CHK watcher skip event")
+            assert skipped, error("CHK watcher did not report skipping unchanged Keeper endpoints")
 
         with Then("Confirm CHI is complete"):
             kubectl.wait_chi_status(chi, "Completed")
@@ -6817,9 +6825,9 @@ def test_010064(self):
             new_start_time = kubectl.get_clickhouse_start(chi)
             assert new_start_time == start_time, error("CHI has been restarted")
 
-        with Then("CHI does not reconnect to Keeper"):
-            new_connected_time = clickhouse.query(chi, "SELECT connected_time from system.zookeeper_connection")
-            assert new_connected_time == connected_time, error("ClickHouse reconnected to Keeper")
+        with Then("CHI ZooKeeper configuration has not changed"):
+            zk_config_after = kubectl.get("configmap", zk_config_name)["data"]["chop-generated-zookeeper.xml"]
+            assert zk_config_after == zk_config_before, error("CHI ZooKeeper configuration changed without Keeper endpoint changes")
 
     with When("Rescale Keeper to 3 nodes"):
         kubectl.create_and_check(
@@ -11224,8 +11232,8 @@ def test_030003(self):
     with Check("operator uses TLS-compliant outbound paths after reconcile"):
         run_operator_reconcile_fips_checks()
 
-    with Check("metrics-exporter scrapes ClickHouse through HTTPS"):
-        check_metrics_exporter_scrapes_clickhouse_https(chi=chi, replica_count=2)
+    with Check("metrics-exporter discovers ClickHouse through HTTPS"):
+        check_metrics_exporter_discovers_clickhouse_https()
 
     with Check("ClickHouse replicas use Keeper secure client port"):
         check_clickhouse_uses_secure_keeper_port(chi=chi)

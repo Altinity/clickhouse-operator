@@ -44,13 +44,23 @@ def _dump_failed_test_namespace(test, ns, shell):
     operator_ns = getattr(test.context, "operator_namespace", None) or ns
     print(f"\n=== DEBUG DUMP (test failed) namespace={ns} ===")
 
-    for kind in ("pods", "chi", "chk"):
+    for kind in ("pods", "statefulsets", "chi", "chk"):
         try:
             print(f"\n--- {kind.upper()} ---")
             items = kubectl.launch(f"get {kind}", ns=ns, ok_to_fail=True, shell=shell)
             print(items or f"(no {kind})")
         except Exception as exc:
             print(f"failed to list {kind}: {exc}")
+
+    try:
+        print("\n--- Kubernetes events (last 30 lines) ---")
+        events = kubectl.launch(
+            "get events --sort-by=.lastTimestamp",
+            ns=ns, ok_to_fail=True, timeout=15, shell=shell,
+        )
+        print("\n".join((events or "").splitlines()[-30:]) or "(no events)")
+    except Exception as exc:
+        print(f"failed to list events: {exc}")
 
     try:
         print(f"\n--- ClickHouse log (last {_dump_log_lines} lines) ---")

@@ -1621,6 +1621,9 @@ func TestStagedRaftPublicationFollowsStartedPod(t *testing.T) {
 	cr.Name = "scale"
 	cr.Spec.Defaults = &api.Defaults{}
 	cr.SetAncestor(chkWithHosts(1))
+	// Every host visited by the Raft renderer needs a CR back-reference;
+	// the first voter is not part of the staged-joiner loop below.
+	hostAtOnCR(cr, 0)
 	for i := 1; i < 5; i++ {
 		joiner := hostAtOnCR(cr, i)
 		joiner.GetReconcileAttributes().SetExclude()
