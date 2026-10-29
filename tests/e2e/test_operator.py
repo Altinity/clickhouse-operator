@@ -6567,6 +6567,19 @@ def test_010062(self):
         )
 
     with When("Apply CHI with a config change that forces software restart (HostConfigRestart → HostShutdown)"):
+        restart_setting = "max_connections"
+        has_column = clickhouse.query(
+            chi,
+            "SELECT count() FROM system.columns WHERE (database, table, name) = ('system','server_settings','changeable_without_restart')",
+        )
+        if has_column == "1":
+            advice = clickhouse.query(
+                chi, f"SELECT changeable_without_restart FROM system.server_settings WHERE name = '{restart_setting}'"
+            )
+            assert advice != "Yes", error(
+                f"{restart_setting} is changeable_without_restart = Yes on this ClickHouse, so it no longer restarts; "
+                f"pick another setting in test-062-hooks-on-shutdown-2.yaml"
+            )
         kubectl.create_and_check(
             manifest="manifests/chi/test-062-hooks-on-shutdown-2.yaml",
             check={
@@ -11232,8 +11245,8 @@ def test_030003(self):
     with Check("operator uses TLS-compliant outbound paths after reconcile"):
         run_operator_reconcile_fips_checks()
 
-    with Check("metrics-exporter discovers ClickHouse through HTTPS"):
-        check_metrics_exporter_discovers_clickhouse_https()
+    with Check("metrics-exporter scrapes ClickHouse through HTTPS"):
+        check_metrics_exporter_scrapes_clickhouse_https(chi=chi, replica_count=2)
 
     with Check("ClickHouse replicas use Keeper secure client port"):
         check_clickhouse_uses_secure_keeper_port(chi=chi)
