@@ -19,6 +19,7 @@ import (
 	"errors"
 	"time"
 
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 
@@ -101,7 +102,13 @@ func initWithRetry(ctx context.Context, component string, init func(context.Cont
 // DNS labels, enabling per-namespace cache scoping. It falls back to NamespaceAll when the include
 // list is unset or any watch namespace is a regexp pattern (the controllers' Reconcile guard
 // handles filtering in that case). ByObject entries that leave Namespaces nil inherit this scoping.
+//
+// NamespaceAll alone yields nil, so the cache is a single cluster-wide one. A lone "" key would make
+// controller-runtime build a multi-namespace cache whose List rejects every concrete namespace.
 func newCacheNamespaces(cacheNamespaces []string) map[string]cache.Config {
+	if len(cacheNamespaces) == 1 && cacheNamespaces[0] == meta.NamespaceAll {
+		return nil
+	}
 	defaultNamespaces := make(map[string]cache.Config)
 	for _, ns := range cacheNamespaces {
 		defaultNamespaces[ns] = cache.Config{}
