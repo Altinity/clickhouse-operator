@@ -127,3 +127,16 @@ func TestKeeperCacheOptionsNarrowsEveryServedType(t *testing.T) {
 	}
 
 }
+
+// TestCacheOptionsWatchAllNamespacesBuildsClusterWideCache covers watch.namespaces unset, where
+// GetCacheNamespaces returns only NamespaceAll. controller-runtime builds a multi-namespace cache
+// whenever DefaultNamespaces has an entry, and in v0.18 its List refuses any namespace that is not
+// a key, so a lone "" key made every namespaced list in CHK discovery fail.
+func TestCacheOptionsWatchAllNamespacesBuildsClusterWideCache(t *testing.T) {
+	log := funcr.New(func(prefix, args string) {}, funcr.Options{})
+	all := []string{meta.NamespaceAll}
+
+	require.Empty(t, newKeeperCacheOptions(log, all).DefaultNamespaces, "keeper cache must be cluster-wide when watching all namespaces")
+	require.Empty(t, newBackupCacheOptions(log, all).DefaultNamespaces, "backup cache must be cluster-wide when watching all namespaces")
+	require.Len(t, newKeeperCacheOptions(log, []string{"ns1"}).DefaultNamespaces, 1, "a named namespace must stay scoped")
+}
