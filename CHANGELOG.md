@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **EXPERIMENTAL: Operator-managed backup and restore.** Added `ClickHouseBackup`, `ClickHouseBackupSchedule`, and `ClickHouseRestore` resources using `clickhouse-backup`. Supports per-cluster backups and restores, scheduled backups, retention, configurable storage paths, and cross-installation restores. Enable with `spec.backup.enabled: "yes"`. See [backup documentation](docs/backup.md). by [@discostur](https://github.com/discostur) and [@sunsingerus](https://github.com/sunsingerus) in [#2015](https://github.com/Altinity/clickhouse-operator/pull/2015). Related [#1795](https://github.com/Altinity/clickhouse-operator/issues/1795), [#862](https://github.com/Altinity/clickhouse-operator/issues/862)
 
+### Added
+* **The Helm chart now aggregates the operator's CRDs into the builtin `view`, `edit` and `admin` ClusterRoles.** `ClickHouseInstallationTemplate`, `ClickHouseOperatorConfiguration` and `ClickHouseKeeperInstallation` are readable by `view`; `edit` and `admin` can read and write all four operator kinds. `ClickHouseInstallation` is deliberately not readable by `view`, because the operator writes the normalized CR, including derived `password_sha256_hex` user hashes, into its status. Enabled by default, disable with `rbac.aggregate.enabled=false` (requires `rbac.create`).
+
 ### Changed
 
 * **BACKWARD INCOMPATIBLE: Revised template precedence.** `ClickHouseInstallation` settings now override templates and operator defaults; later templates override earlier ones. Kubernetes resource lists merge by name or appropriate key. Existing installations may restart or recreate StatefulSets when effective configuration changes. See [upgrade notes](docs/operator_configuration.md#upgrading-from-027). by [@sunsingerus](https://github.com/sunsingerus)
