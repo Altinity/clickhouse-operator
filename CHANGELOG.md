@@ -4,91 +4,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.28.0](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.4...release-0.28.0)
+## [0.28.0](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.4...0.28.0)
 
 ### Added
-* **EXPERIMENTAL.** **Operator-managed backup and restore with `clickhouse-backup`.**
-  Set `spec.backup.enabled: "yes"` on a `ClickHouseInstallation`, or per cluster, and declare the storage in `storages`.
-  The operator runs a `clickhouse-backup` sidecar and the new `ClickHouseBackup`, `ClickHouseBackupSchedule` and `ClickHouseRestore` resources.
-  See [docs/backup.md](docs/backup.md). by [@discostur](https://github.com/discostur) in [#2015](https://github.com/Altinity/clickhouse-operator/pull/2015)
 
-* **EXPERIMENTAL.** **Backup paths by installation, namespace and operator configuration.**
-  Hosts gain a `{namespace}` macro, and the default backup paths come from `backup.storagePath` and `backup.storageObjectDiskPath`.
-  A restore of another installation sets `sourceInstallation` and `sourceNamespace`.
-  See [docs/backup.md](docs/backup.md#storage-paths). by [@sunsingerus](https://github.com/sunsingerus)
-
-* **EXPERIMENTAL.** **Backups run a schedule now, or at a later time, and schedules keep their retention apart.**
-  `scheduleRef` runs a schedule's backup once, `scheduledTime` defers one, and `retention.keepLast` prunes only that schedule's series.
-  See [docs/backup.md](docs/backup.md#run-a-schedule-now). by [@sunsingerus](https://github.com/sunsingerus)
-
-* **EXPERIMENTAL.** **Backups and restores run per cluster.**
-  Each backup-enabled cluster gets its own Job under one backup name, reported in `status.clusters`, and a failing cluster no longer stops the others.
-  See [docs/backup.md](docs/backup.md#installations-and-clusters). by [@sunsingerus](https://github.com/sunsingerus)
+* **EXPERIMENTAL: Operator-managed backup and restore.** Added `ClickHouseBackup`, `ClickHouseBackupSchedule`, and `ClickHouseRestore` resources using `clickhouse-backup`. Supports per-cluster backups and restores, scheduled backups, retention, configurable storage paths, and cross-installation restores. Enable with `spec.backup.enabled: "yes"`. See [backup documentation](docs/backup.md). by [@discostur](https://github.com/discostur) and [@sunsingerus](https://github.com/sunsingerus) in [#2015](https://github.com/Altinity/clickhouse-operator/pull/2015). Related [#1795](https://github.com/Altinity/clickhouse-operator/issues/1795), [#862](https://github.com/Altinity/clickhouse-operator/issues/862)
 
 ### Changed
-* **BACKWARD INCOMPATIBLE.** **`system.server_settings.changeable_without_restart = Yes` reloads that server setting without a restart, ahead of `configurationRestartPolicy`.** With the default `settings/*: "yes"`, an edit of such a setting no longer restarts the pod. When server settings changed, the operator asks the host for the names ClickHouse applies without a restart and skips wildcard restart-policy rules for those; a rule that names the setting exactly, such as `settings/max_concurrent_queries: "yes"`, still restarts. Hooks, the shard-disruption check and the restart share the answer for the reconcile; a failed or timed-out query is asked again on the next check. Every other change, a host whose ClickHouse has no such column, and a host whose query fails, keeps using `configurationRestartPolicy`. The column is looked up in `system.columns` first, so an older server is not sent a query it would reject. `ClickHouseKeeperInstallation` is not covered. Turning ZooKeeper on or off still restarts. by [@alex-zaitsev](https://github.com/alex-zaitsev)
-* **A Keeper scale-up from one or two members admits one new replica at a time.**
-  On 1→N, a member that does not exist yet stays out of `raft_configuration` until the previous join is Ready, so the operator does not create every new StatefulSet in one pass.
-  A fresh ensemble is unchanged, and 3→N still adds replicas without that wait so the existing members can roll first.
-  by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2087](https://github.com/Altinity/clickhouse-operator/pull/2087).
-  Partially addresses [#2041](https://github.com/Altinity/clickhouse-operator/pull/2041)
 
-* **BACKWARD INCOMPATIBLE.** **The operator and the metrics exporter refuse to start when `security.fips.enforced` is not a boolean.**
-  A mistyped value (`"ture"`) used to read as off, so the binaries ran without FIPS enforcement unnoticed; the startup log now names the value.
-  Set it to `true` or `false`.
-  by [@sunsingerus](https://github.com/sunsingerus)
+* **BACKWARD INCOMPATIBLE: Revised template precedence.** `ClickHouseInstallation` settings now override templates and operator defaults; later templates override earlier ones. Kubernetes resource lists merge by name or appropriate key. Existing installations may restart or recreate StatefulSets when effective configuration changes. See [upgrade notes](docs/operator_configuration.md#upgrading-from-027). by [@sunsingerus](https://github.com/sunsingerus)
 
-* **BACKWARD INCOMPATIBLE.** **A `ClickHouseInstallation` now wins over the templates it uses.**
-  Where a template used to beat it silently - same-named pod, host and volume-claim templates, `configuration.users`, `profiles`, `quotas`, `settings` and `files`, `suspend`, `restart`, `taskID`, `namespaceDomainPattern`, `reconcile.statefulSet` and `reconcile.host` among them - the installation now wins, templates fill what it leaves unset, and a later template beats an earlier one.
-  The operator's configuration rules (`clickhouse.addons.rules`) now yield the same way to a template or the installation setting the same key, such as `display_secrets_in_show_and_select`, though a grant spelled with the operator user's name still loses to the rules', which use the `{clickhouseOperatorUser}` placeholder.
-  Containers, volumes and env now pair by name, mounts by mount path and ports by number and protocol, so differently named containers at the same position are now two.
-  [docs/operator_configuration.md](docs/operator_configuration.md#template-precedence) lists the fields and what an upgrade changes.
-  by [@sunsingerus](https://github.com/sunsingerus)
+* **BACKWARD INCOMPATIBLE: Invalid pod templates are rejected.** Reconciliation now fails with `InvalidPodTemplate` for duplicate containers, missing names or images, and conflicting ClickHouse containers. by [@sunsingerus](https://github.com/sunsingerus)
 
-* **Upgrading reconciles every installation that conflicts with a template or the operator's configuration rules, all at once.**
-  A rolling restart follows an image or resource change and a StatefulSet recreate a storage change; installations that set an env name their template also sets restart too, since that name used to be listed twice.
-  Existing volumes keep their storage class.
-  To avoid the rest, before upgrading make each conflicting installation, and each template that sets a key the rules also set, keep the value in effect today - drop its value or set that one; for a key two templates both set, set today's value on each installation using them instead - see [docs/operator_configuration.md](docs/operator_configuration.md#upgrading-from-027).
-  by [@sunsingerus](https://github.com/sunsingerus)
+* **BACKWARD INCOMPATIBLE: Invalid `security.fips.enforced` values now prevent startup.** The operator and metrics exporter require a valid boolean value. by [@sunsingerus](https://github.com/sunsingerus)
 
-* **BACKWARD INCOMPATIBLE.** **A pod template that cannot run now aborts the reconcile with `InvalidPodTemplate`**, before anything is changed: a container without a name or an image, two containers of one name, or - in a pod template merged from several layers - a duplicate ClickHouse server started in another container, which pairing by name makes of a template's `clickhouse-pod` next to the installation's `clickhouse`.
-  Naming the installation's container like the template's clears it, and keeps the pods' container as it is when the installation's sets nothing the template's also sets; a fixed template reaches an installation only on its next reconcile, such as a new `spec.taskID` - or, under `template.chi.policy: ReadOnStart`, after an operator restart.
-  See [docs/operator_configuration.md](docs/operator_configuration.md#upgrading-from-027).
-  by [@sunsingerus](https://github.com/sunsingerus)
+* **ClickHouse settings supporting live reload no longer require a restart** when matched by wildcard `configurationRestartPolicy` rules. Explicit restart rules still take precedence. by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2109](https://github.com/Altinity/clickhouse-operator/pull/2109)
 
-* **BACKWARD INCOMPATIBLE.** **Bumped the Go toolchain `1.26.8` → `1.27.2`.**
-  The FIPS module (`GOFIPS140=v1.0.0`) is unchanged.
-  The operator and the metrics exporter now refuse to start when the Pod's `GODEBUG` sets a setting Go 1.27 removed back to its old value, such as `tlsrsakex=1`, `tls10server=1` or `x509sha1=1` - drop such settings before upgrading, see [docs/security_hardening_fips.md](docs/security_hardening_fips.md).
-  A ClickHouse or Keeper certificate with an IPv4-mapped IPv6 address (`::ffff:a.b.c.d`) in its SAN is now rejected even with verification off.
-  by [@sunsingerus](https://github.com/sunsingerus)
+* **Keeper scale-up from one or two replicas is now staged.** New members join one at a time to avoid Raft initialization issues. by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2087](https://github.com/Altinity/clickhouse-operator/pull/2087). Partially addresses [#2041](https://github.com/Altinity/clickhouse-operator/issues/2041)
+
+* **Removed deprecated `OnePerHost` pod distribution configuration.** Use `podDistribution` with `ClickHouseAntiAffinity` instead. by [@Tyagiquamar](https://github.com/Tyagiquamar) in [#2083](https://github.com/Altinity/clickhouse-operator/pull/2083). Fixes [#1978](https://github.com/Altinity/clickhouse-operator/issues/1978)
 
 ### Fixed
-* **The metrics exporter now dials ClickHouse with the cluster's `security.clickhouse.tls`.** It used only the operator configuration, so a cluster with its own CA (`rootCA` or `rootCASecretRef`), `serverName`, `verify` or `minVersion` was dialed without them: under `verify: Strict` every scrape of such a cluster failed with `certificate signed by unknown authority` and the cluster had no metrics. The operator now sends these settings, with the CA resolved from its Secret, to the exporter along with the hosts, and the exporter discovers them the same way on startup. by [@Slach](https://github.com/Slach)
-* **One malformed on/off value no longer stops the reconcile of every resource of its kind.**
-  A `ClickHouseInstallation`, `ClickHouseInstallationTemplate` or `ClickHouseKeeperInstallation` whose on/off field (`stop`, `suspend`, `troubleshoot`, ...) held a number with a fraction, a list or an object failed the decode of the whole list the operator watches, so no resource of that kind was reconciled any more, and such a value in a `ClickHouseOperatorConfiguration` made the operator ignore every `ClickHouseOperatorConfiguration` resource.
-  The resource is now reconciled, the field read as one holding a mistyped word already was - mostly as its default.
-  by [@sunsingerus](https://github.com/sunsingerus)
 
-* **The operator's sidecars are no longer taken for a pod template's ClickHouse container.**
-  A pod template that names no container `clickhouse` runs ClickHouse in its first container that is neither `clickhouse-log` nor `clickhouse-backup`; the operator used to take its first container, whatever it was.
-  An installation whose template lists such a sidecar first rolls once on upgrade, as ClickHouse's probes, ports and env move to the server, and the `FIPSRequired` image check now reads that container instead of refusing one not named `clickhouse`.
-  by [@sunsingerus](https://github.com/sunsingerus)
+* **Metrics exporter now respects cluster-specific ClickHouse TLS settings**, including custom CAs and certificate verification. by [@Slach](https://github.com/Slach) in [#2113](https://github.com/Altinity/clickhouse-operator/pull/2113)
 
-* **Installations that take their clusters from a template no longer share them.**
-  Every installation using such a template worked on the template's own cluster objects, so cluster settings - `defaults.templates`, `reconcile`, `security`, `backup` - leaked from whichever installation the operator normalized first into the others, and an installation taking its clusters from an auto template rendered, on its first reconcile, objects named without its name and namespace, such as StatefulSet `chi--<cluster>-0-0`.
-  Each installation now normalizes clusters of its own; one that was rendered with leaked values rolls once on upgrade.
-  by [@sunsingerus](https://github.com/sunsingerus)
+* **Kubernetes resource creation and updates now retry transient owner-reference admission failures**, fixing installation failures immediately after CRD creation, particularly on OpenShift. by [@matthewhudsonedb](https://github.com/matthewhudsonedb) in [#2103](https://github.com/Altinity/clickhouse-operator/pull/2103). Addresses [#2094](https://github.com/Altinity/clickhouse-operator/issues/2094)
 
-* **Service template ports and other lists set in the installation, or in a later template, were dropped** whenever an earlier template defined a service template of the same name; they now merge, ports paired by number and protocol.
-  by [@sunsingerus](https://github.com/sunsingerus)
+* **Malformed boolean-like configuration values no longer interrupt reconciliation** of other resources. by [@sunsingerus](https://github.com/sunsingerus)
 
-* **Host template `settings` set in the installation, or in a later template, were dropped** whenever an earlier template's same-named host template had settings of its own; they now merge per key.
-  by [@sunsingerus](https://github.com/sunsingerus)
+* **Corrected ClickHouse container detection** when logging or backup sidecars appear first in a pod template. by [@sunsingerus](https://github.com/sunsingerus)
+
+* **Fixed configuration inheritance and merging:** installations no longer share mutable clusters from templates, and service ports and host settings merge correctly. by [@sunsingerus](https://github.com/sunsingerus)
 
 ### Security
-* **Bumped `golang.org/x/net` `v0.56.0` → `v0.60.0` and `golang.org/x/text` `v0.39.0` → `v0.42.0`** to address CVEs in the operator and metrics-exporter images (`CVE-2026-78663`, `CVE-2026-78659`, `CVE-2026-78669`, `CVE-2026-78660`, `CVE-2026-97032`, `CVE-2026-56851`).
-  No API or behavior changes.
-  The FIPS module is unchanged.
+
+* **Updated Go from `1.26.8` to `1.27.3`**, including the fix for `CVE-2026-111943`. Go 1.27 also removes support for certain legacy `GODEBUG` settings. Review [upgrade compatibility](docs/security_hardening_fips.md). by [@sunsingerus](https://github.com/sunsingerus) and [@lucas-alpaca](https://github.com/lucas-alpaca) in [#2120](https://github.com/Altinity/clickhouse-operator/pull/2120)
+
+* **Updated `golang.org/x/net` to `v0.60.0` and `golang.org/x/text` to `v0.42.0`** to address security vulnerabilities. by [@sunsingerus](https://github.com/sunsingerus)
 
 ## [0.27.4](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.3...release-0.27.4)
 
