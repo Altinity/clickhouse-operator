@@ -2090,7 +2090,7 @@ func TestStagedJoinerBootstrapRaftConfig(t *testing.T) {
 	sections := map[string]string{}
 	chkConfig.NewFilesGeneratorDomain(chkConfig.NewGenerator(cr, chkNamer.New(), nil)).
 		CreateConfigFilesGroupHost(sections, opts)
-	xml := sections["chop-generated-bootstrap-raft.xml"]
+	xml := sections[chkConfig.BootstrapRaftHostConfigKey]
 	require.Contains(t, xml, `raft_configuration replace="replace"`)
 	require.Contains(t, xml, raftHostname(h0))
 	require.Contains(t, xml, raftHostname(h1))
