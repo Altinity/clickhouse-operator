@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* **Fixed incorrect function names in logs from Go generic functions.** by [@matthewhudsonedb](https://github.com/matthewhudsonedb) in [#2102](https://github.com/Altinity/clickhouse-operator/pull/2102). Fixes [#2101](https://github.com/Altinity/clickhouse-operator/issues/2101)
+
 * **Metrics exporter now respects cluster-specific ClickHouse TLS settings**, including custom CAs and certificate verification. by [@Slach](https://github.com/Slach) in [#2113](https://github.com/Altinity/clickhouse-operator/pull/2113)
 
 * **Kubernetes resource creation and updates now retry transient owner-reference admission failures**, fixing installation failures immediately after CRD creation, particularly on OpenShift. by [@matthewhudsonedb](https://github.com/matthewhudsonedb) in [#2103](https://github.com/Altinity/clickhouse-operator/pull/2103). Addresses [#2094](https://github.com/Altinity/clickhouse-operator/issues/2094)
