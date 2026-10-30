@@ -394,9 +394,12 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 
 func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr *api.ClickHouseInstallation) error {
 	w.warnBackupWithoutStorage(cr)
-	w.warnMissingStorageSecrets(ctx, cr)
 	w.warnUnpublishedBackupAPI(cr)
-	return w.reconcileBackupSecret(ctx, cr)
+	if err := w.reconcileBackupSecret(ctx, cr); err != nil {
+		return err
+	}
+	// The configuration files take the credentials of the backup Secret
+	return w.reconcileBackupConfigSecrets(ctx, cr)
 }
 
 // reconcileCRServicePreliminary runs first stage of CR reconcile process

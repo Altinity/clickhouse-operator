@@ -26,6 +26,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
 	chiNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 )
@@ -74,6 +75,14 @@ func (r *recordingEventEmitter) warnings() (warnings []recordedEvent) {
 	return warnings
 }
 
+// testStorageSecrets holds the storage Secret enabledBackup names, with storage settings
+func testStorageSecrets() map[string]*core.Secret {
+	return map[string]*core.Secret{testStorageSecret: {
+		ObjectMeta: meta.ObjectMeta{Name: testStorageSecret},
+		Data:       map[string][]byte{backupconfig.FileName: []byte("general:\n  remote_storage: s3\n")},
+	}}
+}
+
 // reconcileBackupAuxObjects runs the backup part of the preliminary reconcile of the CR, recording its events
 func reconcileBackupAuxObjects(t *testing.T, cr *api.ClickHouseInstallation, secrets map[string]*core.Secret) *recordingEventEmitter {
 	t.Helper()
@@ -84,25 +93,55 @@ func reconcileBackupAuxObjects(t *testing.T, cr *api.ClickHouseInstallation, sec
 	return events
 }
 
-// The sidecar takes the storage Secret as optional, so a host starts without it - and every backup Job of
-// the cluster fails. A Warning event on the installation is what tells the user why. It repeats on every
-// reconcile, so it has a reason of its own: one alerting can tell from a failed reconcile.
+// A storage Secret that is missing, or holds no configuration file, leaves the configuration file of the sidecars
+// without a storage - and every backup Job of the cluster fails. A Warning event on the installation is what tells
+// the user why. It repeats on every reconcile, so it has a reason of its own: one alerting can tell from a failed
+// reconcile. Storage settings that cannot be read leave the configuration file as it is, with a reason of their own.
 func TestBackupStorageSecretMissing(t *testing.T) {
 	newCR := func(backup *api.ClusterBackup) *api.ClickHouseInstallation {
 		cr := newBackupSecretCR(t, enabledBackup())
 		cr.FindCluster("c").(*api.Cluster).Backup = backup.MergeFrom(cr.Spec.Backup, api.MergeTypeFillEmptyValues)
 		return cr
 	}
+	storage := func(data map[string]string) map[string]*core.Secret {
+		secret := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: testStorageSecret}, Data: map[string][]byte{}}
+		for key, value := range data {
+			secret.Data[key] = []byte(value)
+		}
+		return map[string]*core.Secret{testStorageSecret: secret}
+	}
 
-	t.Run("missing", func(t *testing.T) {
-		warnings := reconcileBackupAuxObjects(t, newCR(nil), map[string]*core.Secret{}).warnings()
-		require.Len(t, warnings, 1)
-		require.Equal(t, a.EventReasonBackupStorageSecretMissing, warnings[0].reason)
-		require.Contains(t, warnings[0].message, testStorageSecret)
-	})
+	for name, tc := range map[string]struct {
+		secrets map[string]*core.Secret
+		reason  string
+		message string
+	}{
+		"missing": {
+			secrets: map[string]*core.Secret{},
+			reason:  a.EventReasonBackupStorageSecretMissing,
+			message: "does not exist",
+		},
+		"without a configuration file": {
+			secrets: storage(map[string]string{"REMOTE_STORAGE": "s3"}),
+			reason:  a.EventReasonBackupStorageSecretMissing,
+			message: "has no key " + backupconfig.FileName,
+		},
+		"with a configuration file that cannot be read": {
+			secrets: storage(map[string]string{backupconfig.FileName: "s3: ["}),
+			reason:  a.EventReasonBackupStorageConfigInvalid,
+			message: "cannot be read",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			warnings := reconcileBackupAuxObjects(t, newCR(nil), tc.secrets).warnings()
+			require.Len(t, warnings, 1)
+			require.Equal(t, tc.reason, warnings[0].reason)
+			require.Contains(t, warnings[0].message, testStorageSecret)
+			require.Contains(t, warnings[0].message, tc.message)
+		})
+	}
 	t.Run("present", func(t *testing.T) {
-		secrets := map[string]*core.Secret{testStorageSecret: {ObjectMeta: meta.ObjectMeta{Name: testStorageSecret}}}
-		require.Empty(t, reconcileBackupAuxObjects(t, newCR(nil), secrets).warnings())
+		require.Empty(t, reconcileBackupAuxObjects(t, newCR(nil), testStorageSecrets()).warnings())
 	})
 	t.Run("cluster opts out of backup", func(t *testing.T) {
 		require.Empty(t, reconcileBackupAuxObjects(t, newCR(&api.ClusterBackup{Enabled: types.NewStringBool(false)}), map[string]*core.Secret{}).warnings())
@@ -128,7 +167,7 @@ func TestBackupWithoutStorageWarning(t *testing.T) {
 	lacking := func() *api.ClusterBackup {
 		return &api.ClusterBackup{Enabled: types.NewStringBool(true)}
 	}
-	secrets := map[string]*core.Secret{testStorageSecret: {ObjectMeta: meta.ObjectMeta{Name: testStorageSecret}}}
+	secrets := testStorageSecrets()
 
 	for name, tc := range map[string]struct {
 		backups []*api.ClusterBackup
@@ -179,7 +218,7 @@ func TestBackupAPIUnpublishedWarning(t *testing.T) {
 	}
 	warnings := func(t *testing.T, cr *api.ClickHouseInstallation) []recordedEvent {
 		t.Helper()
-		secrets := map[string]*core.Secret{testStorageSecret: {ObjectMeta: meta.ObjectMeta{Name: testStorageSecret}}}
+		secrets := testStorageSecrets()
 		return reconcileBackupAuxObjects(t, cr, secrets).warnings()
 	}
 

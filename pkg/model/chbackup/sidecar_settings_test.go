@@ -15,12 +15,10 @@
 package chbackup
 
 import (
-	"os"
-	"os/exec"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,7 +27,9 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
@@ -118,15 +118,39 @@ func (k kubeObjects) resolve(t *testing.T, container *core.Container, podName st
 	return env
 }
 
-// sidecarOfHost is what the clickhouse-backup sidecar of a host starts the server with.
+// sidecarOfHost is what the clickhouse-backup sidecar of a host runs with.
 type sidecarOfHost struct {
 	cluster, service string
-	env              map[string]string
+	// settings are the settings the path check reads, as clickhouse-backup takes them: from its env, else from its
+	// configuration file
+	settings map[string]string
+}
+
+// withConfigSecrets adds the configuration file Secret the operator generates of every backup-enabled cluster, built
+// from the storage Secret of the cluster as kube holds it.
+func (k kubeObjects) withConfigSecrets(t *testing.T, inMemory *api.ClickHouseInstallation) kubeObjects {
+	t.Helper()
+	names := managers.NewNameManager(managers.NameManagerTypeClickHouse)
+	for _, cluster := range inMemory.GetSpecT().GetConfiguration().GetClusters() {
+		if !cluster.GetBackup().IsEnabled() {
+			continue
+		}
+		storageConfig := k.secrets[cluster.GetBackup().GetStorageSecretName()][backupconfig.FileName]
+		built, err := backupconfig.Build([]byte(storageConfig), backupconfig.Credentials{}, backupconfig.Defaults{
+			Path:           chop.Config().Backup.StoragePath,
+			ObjectDiskPath: chop.Config().Backup.StorageObjectDiskPath,
+		})
+		require.NoError(t, err)
+		data := maps.Clone(built.Settings)
+		data[backupconfig.FileName] = string(built.File)
+		k.secrets[names.Name(interfaces.NameBackupConfigSecret, inMemory, cluster.GetName())] = data
+	}
+	return k
 }
 
 // runSidecars builds the StatefulSet of every backup-enabled host as the operator does, resolves the
-// env of its sidecar as kubelet does, and runs the sidecar's command with the server replaced by
-// `env -0`: what the server would start with, the paths the operator's command defaults included.
+// env of its sidecar as kubelet does, and reads the settings the path check reads as clickhouse-backup does: an env
+// var over the configuration file mounted from the Secret its volume names.
 func runSidecars(t *testing.T, inMemory *api.ClickHouseInstallation, kube kubeObjects) []sidecarOfHost {
 	t.Helper()
 	creator := productionCreator(inMemory)
@@ -140,26 +164,25 @@ func runSidecars(t *testing.T, inMemory *api.ClickHouseInstallation, kube kubeOb
 		container, ok := k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseBackupContainerName)
 		require.True(t, ok)
 		env := kube.resolve(t, container, names.Name(interfaces.NameStatefulSet, host)+"-0")
-		command := []string{"env", "-0"}
-		if received := receivedCommand(container.Command, env); slices.Equal(received[len(received)-2:], []string{config.ClickHouseBackupCommand, config.ClickHouseBackupCommandServer}) {
-			command = append(slices.Clone(received[:len(received)-2]), command...)
+		var file map[string]string
+		for _, volume := range statefulSet.Spec.Template.Spec.Volumes {
+			if volume.Name == config.ClickHouseBackupConfigVolumeName {
+				file = kube.secrets[volume.Secret.SecretName]
+			}
 		}
-		run := exec.Command(command[0], command[1:]...)
-		run.Env = []string{"PATH=" + os.Getenv("PATH")}
-		for name, value := range env {
-			run.Env = append(run.Env, name+"="+value)
-		}
-		out, err := run.Output()
-		require.NoError(t, err, string(out))
-		started := map[string]string{}
-		for _, entry := range strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00") {
-			name, value, _ := strings.Cut(entry, "=")
-			started[name] = value
+		require.NotNil(t, file, "the sidecar has no configuration file")
+		settings := map[string]string{}
+		for _, key := range PathCheckKeys {
+			if value, set := env[key]; set {
+				settings[key] = value
+			} else if value, set := file[key]; set {
+				settings[key] = value
+			}
 		}
 		sidecars = append(sidecars, sidecarOfHost{
-			cluster: host.Runtime.Address.ClusterName,
-			service: names.Name(interfaces.NameStatefulSetService, host),
-			env:     started,
+			cluster:  host.Runtime.Address.ClusterName,
+			service:  names.Name(interfaces.NameStatefulSetService, host),
+			settings: settings,
 		})
 		return nil
 	})
@@ -190,9 +213,9 @@ func jobSetting(env map[string]string, index int, key string) (string, bool) {
 }
 
 // sidecarSettingsInstallation has a cluster whose sidecars take their settings from its pod template's
-// clickhouse-backup container, a value and a Secret key, over the installation's storage Secret; one without backup; one whose
-// sidecars run a command of their own from a pod template, with a Secret of its own; and warm, which
-// inherits everything, and which the cases change.
+// clickhouse-backup container, a value and a Secret key, over the configuration file of the installation's storage
+// Secret; one without backup; one whose sidecars run a command of their own from a pod template, with a Secret of its
+// own; and warm, which inherits everything, and which the cases change.
 func sidecarSettingsInstallation(t *testing.T, mutate func(chi *api.ClickHouseInstallation, warm *api.Cluster)) (inMemory, stored *api.ClickHouseInstallation) {
 	t.Helper()
 	hot := layoutCluster("hot", 2, 2, &api.ClusterBackup{Enabled: types.NewStringBool(true)})
@@ -300,16 +323,16 @@ func pathTemplateEnv(values ...string) []core.EnvVar {
 }
 
 // The path check of a Job sees every setting it reads of every backup-enabled cluster as the sidecars of
-// the cluster start with it, wherever they take it from - the storage Secret, the pod template's
-// own clickhouse-backup container, the defaults of the operator's command - as kubelet
-// resolves both. Where it cannot, the cluster is passed as unverifiable, with why: the Job must never
-// check paths the sidecars do not use.
+// the cluster run with it, wherever they take it from - the configuration file the operator generates from the storage
+// Secret, with its default paths, or the pod template's own clickhouse-backup container - as kubelet resolves both.
+// Where it cannot, the cluster is passed as unverifiable, with why: the Job must never check paths the sidecars do
+// not use. What would have the sidecar read another configuration file the operator overrides.
 func TestJobSeesTheSettingsTheSidecarsRunWith(t *testing.T) {
 	for name, tc := range map[string]struct {
 		mutate       func(chi *api.ClickHouseInstallation, warm *api.Cluster)
 		unverifiable string
 	}{
-		"settings of the Secret, the pod template's container and the operator's defaults": {},
+		"settings of the configuration file, the pod template's container and the operator's defaults": {},
 		"a path of the pod template's container": {mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
 			sidecarTemplate(chi, "shared", core.Container{Env: pathTemplateEnv("shared/{shard}")})
 			useTemplate(chi, warm, "shared")
@@ -380,29 +403,26 @@ func TestJobSeesTheSettingsTheSidecarsRunWith(t *testing.T) {
 			},
 			unverifiable: "the clickhouse-backup container of pod template env-from takes environment variables from envFrom",
 		},
-		"the storage Secret in the pod template's container": {mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
-			sidecarTemplate(chi, "env-from", core.Container{EnvFrom: []core.EnvFromSource{{SecretRef: &core.SecretEnvSource{
-				LocalObjectReference: core.LocalObjectReference{Name: "s3-main"},
-			}}}})
-			useTemplate(chi, warm, "env-from")
+		"the storage Secret in the pod template's container": {
+			mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
+				sidecarTemplate(chi, "env-from", core.Container{EnvFrom: []core.EnvFromSource{{SecretRef: &core.SecretEnvSource{
+					LocalObjectReference: core.LocalObjectReference{Name: "s3-main"},
+				}}}})
+				useTemplate(chi, warm, "env-from")
+			},
+			unverifiable: "the clickhouse-backup container of pod template env-from takes environment variables from envFrom",
+		},
+		"a configuration file the pod template's container names": {mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
+			sidecarTemplate(chi, "config", core.Container{Env: []core.EnvVar{{Name: config.ClickHouseBackupEnvConfig, Value: "/config/backup.yml"}}})
+			useTemplate(chi, warm, "config")
 		}},
-		"a configuration file the pod template's container names": {
-			mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
-				sidecarTemplate(chi, "config", core.Container{Env: []core.EnvVar{{Name: config.ClickHouseBackupEnvConfig, Value: "/config/backup.yml"}}})
-				useTemplate(chi, warm, "config")
-			},
-			unverifiable: "the clickhouse-backup sidecar reads a configuration file CLICKHOUSE_BACKUP_CONFIG names",
-		},
-		"a volume where the configuration file is read from": {
-			mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
-				sidecarTemplate(chi, "mounted", core.Container{VolumeMounts: []core.VolumeMount{{Name: "config", MountPath: "/etc/clickhouse-backup/"}}})
-				chi.Spec.Templates.PodTemplates[len(chi.Spec.Templates.PodTemplates)-1].Spec.Volumes = []core.Volume{{
-					Name: "config", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
-				}}
-				useTemplate(chi, warm, "mounted")
-			},
-			unverifiable: "the clickhouse-backup sidecar mounts a volume at /etc/clickhouse-backup/, where its configuration file may be",
-		},
+		"a volume where the configuration file is read from": {mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
+			sidecarTemplate(chi, "mounted", core.Container{VolumeMounts: []core.VolumeMount{{Name: "config", MountPath: "/etc/clickhouse-backup/"}}})
+			chi.Spec.Templates.PodTemplates[len(chi.Spec.Templates.PodTemplates)-1].Spec.Volumes = []core.Volume{{
+				Name: "config", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+			}}
+			useTemplate(chi, warm, "mounted")
+		}},
 		"a path from a field of the pod": {
 			mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
 				sidecarEnv(chi, warm, []core.EnvVar{{Name: "S3_PATH", ValueFrom: &core.EnvVarSource{
@@ -435,37 +455,22 @@ func TestJobSeesTheSettingsTheSidecarsRunWith(t *testing.T) {
 			},
 			unverifiable: "the clickhouse-backup container of pod template sidecar-only takes environment variables from envFrom",
 		},
-		"a host after the first whose ClickHouse container mounts a configuration file": {
-			mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
-				clickHouseTemplate(chi, "config-file", core.VolumeMount{
-					Name: "config", MountPath: "/etc/clickhouse-backup/config.yml", SubPath: "config.yml",
-				})
-				warm.Layout = &api.ChiClusterLayout{Shards: []*api.ChiShard{
-					{Name: "0", ReplicasCount: 1},
-					{Name: "1", ReplicasCount: 1, Templates: &api.TemplatesList{PodTemplate: "config-file"}},
-				}}
-			},
-			unverifiable: "the clickhouse-backup sidecar mounts a volume at /etc/clickhouse-backup/config.yml, where its configuration file may be",
-		},
-		"a configuration file mounted on the ClickHouse container": {
-			mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
-				clickHouseTemplate(chi, "config-file", core.VolumeMount{
-					Name: "config", MountPath: "/etc/clickhouse-backup/config.yml", SubPath: "config.yml",
-				})
-				useTemplate(chi, warm, "config-file")
-			},
-			unverifiable: "the clickhouse-backup sidecar mounts a volume at /etc/clickhouse-backup/config.yml, where its configuration file may be",
-		},
-		"a volume mounted above where the configuration file is read from": {
-			mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
-				sidecarTemplate(chi, "etc", core.Container{VolumeMounts: []core.VolumeMount{{Name: "etc", MountPath: "/etc"}}})
-				chi.Spec.Templates.PodTemplates[len(chi.Spec.Templates.PodTemplates)-1].Spec.Volumes = []core.Volume{{
-					Name: "etc", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
-				}}
-				useTemplate(chi, warm, "etc")
-			},
-			unverifiable: "the clickhouse-backup sidecar mounts a volume at /etc, where its configuration file may be",
-		},
+		"a host after the first whose ClickHouse container mounts a configuration file": {mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
+			clickHouseTemplate(chi, "config-file", core.VolumeMount{
+				Name: "config", MountPath: "/etc/clickhouse-backup/config.yml", SubPath: "config.yml",
+			})
+			warm.Layout = &api.ChiClusterLayout{Shards: []*api.ChiShard{
+				{Name: "0", ReplicasCount: 1},
+				{Name: "1", ReplicasCount: 1, Templates: &api.TemplatesList{PodTemplate: "config-file"}},
+			}}
+		}},
+		"a volume mounted above where the configuration file is read from": {mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
+			sidecarTemplate(chi, "etc", core.Container{VolumeMounts: []core.VolumeMount{{Name: "etc", MountPath: "/etc"}}})
+			chi.Spec.Templates.PodTemplates[len(chi.Spec.Templates.PodTemplates)-1].Spec.Volumes = []core.Volume{{
+				Name: "etc", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+			}}
+			useTemplate(chi, warm, "etc")
+		}},
 		"a configuration file the command names by the flag and the next argument": {
 			mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
 				commandTemplate(chi, "config-flag", []string{"clickhouse-backup", "server", "--config", "/config/backup.yml"}, nil)
@@ -518,14 +523,14 @@ func TestJobSeesTheSettingsTheSidecarsRunWith(t *testing.T) {
 					config.ClickHouseBackupSecretKeyClickHouseUsername: config.ClickHouseBackupUsername,
 					config.ClickHouseBackupSecretKeyClickHousePassword: "secret",
 				},
-				"s3-main":   {"REMOTE_STORAGE": "s3", "S3_BUCKET": "main", "S3_PATH": "main/{cluster}/{shard}", "S3_ACCESS_KEY": "key"},
-				"s3-cold":   {"REMOTE_STORAGE": "s3", "S3_BUCKET": "cold", "S3_ENDPOINT": "", "S3_ACCESS_KEY": "key"},
+				"s3-main":   {backupconfig.FileName: "general:\n  remote_storage: s3\ns3:\n  bucket: main\n  path: main/{cluster}/{shard}\n  access_key: key\n"},
+				"s3-cold":   {backupconfig.FileName: "general:\n  remote_storage: s3\ns3:\n  bucket: cold\n  endpoint: \"\"\n  access_key: key\n"},
 				"bucket":    {"name": "hot"},
 				"paths":     {"S3_PATH": "from-env-from/{shard}"},
 				"own-paths": {"path": "own/{cluster}/{shard}"},
 			}, configMaps: map[string]map[string]string{
 				"paths": {"path": "config-map/{cluster}/{shard}"},
-			}}
+			}}.withConfigSecrets(t, inMemory)
 			topology, err := NewTopology(stored, "")
 			require.NoError(t, err)
 			require.Equal(t, []string{"hot", "cold", "warm"}, topology.ClusterNames())
@@ -549,7 +554,7 @@ func TestJobSeesTheSettingsTheSidecarsRunWith(t *testing.T) {
 				require.False(t, marked, "%s: %s", sidecar.service, unverifiable)
 				for _, key := range PathCheckKeys {
 					jobValue, jobSet := jobSetting(jobEnv, index, key)
-					sidecarValue, sidecarSet := sidecar.env[key]
+					sidecarValue, sidecarSet := sidecar.settings[key]
 					require.Equal(t, sidecarSet, jobSet, "%s: %s set", sidecar.service, key)
 					require.Equal(t, sidecarValue, jobValue, "%s: %s", sidecar.service, key)
 				}
@@ -636,4 +641,10 @@ func TestRestoreJobKnowsWhatDropsOnTheClusterNeed(t *testing.T) {
 			require.Equal(t, strconv.FormatUint(tc.limit, 10), values[envMaxTableSizeToDrop])
 		})
 	}
+}
+
+// The configuration file Secret holds every setting the path check reads under its env var name, and nothing the
+// path check does not read
+func TestPathCheckKeysAreTheSettingsOfTheConfigFile(t *testing.T) {
+	require.ElementsMatch(t, PathCheckKeys, slices.Collect(maps.Keys(backupconfig.Settings)))
 }

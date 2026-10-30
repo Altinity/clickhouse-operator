@@ -64,6 +64,10 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	case interfaces.NameBackupAutoSecret:
 		cr := params[0].(api.ICustomResource)
 		return createBackupAutoSecretName(cr)
+	case interfaces.NameBackupConfigSecret:
+		cr := params[0].(api.ICustomResource)
+		cluster := params[1].(string)
+		return createBackupConfigSecretName(cr, cluster)
 	}
 
 	panic("unknown name type")

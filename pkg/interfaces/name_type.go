@@ -42,5 +42,6 @@ const (
 	NamePVCNameByVolumeClaimTemplate NameType = "NamePVCNameByVolumeClaimTemplate"
 	NameClusterAutoSecret            NameType = "NameClusterAutoSecret"
 	NameBackupAutoSecret             NameType = "NameBackupAutoSecret"
+	NameBackupConfigSecret           NameType = "NameBackupConfigSecret"
 	NameClusterPDB                   NameType = "NameClusterPDB"
 )

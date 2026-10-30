@@ -17,6 +17,7 @@
 package creator_test
 
 import (
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
@@ -251,12 +253,59 @@ func receivedArgs(container *core.Container, args []string) []string {
 }
 
 // sidecarCommand is the command the operator gives the sidecar: clickhouse-backup server, started by its script,
-// which gets the storage paths it defaults to ahead of it
+// which gets the configuration file it waits for and the fingerprint file it watches ahead of it
 func sidecarCommand() []string {
 	return []string{
 		"bash", "-c", chiCreator.BackupSidecarScript, config.ClickHouseBackupContainerName,
-		chop.Config().Backup.StoragePath, chop.Config().Backup.StorageObjectDiskPath,
+		path.Join(config.DirPathClickHouseBackupConfig, backupconfig.FileName),
+		path.Join(config.DirPathClickHouseBackupConfig, backupconfig.APIFingerprintFileName),
 		config.ClickHouseBackupCommand, config.ClickHouseBackupCommandServer,
+	}
+}
+
+// configSecretName is the name of the configuration file Secret of the cluster
+func configSecretName(cluster string) string {
+	return crName + "-" + cluster + "-backup-config"
+}
+
+// requireConfigVolume requires the pod to mount the configuration file Secret of the cluster into the sidecar alone,
+// read-only at the directory clickhouse-backup reads its configuration file from, optional as given
+func requireConfigVolume(t *testing.T, sts *apps.StatefulSet, cluster string, optional bool) {
+	t.Helper()
+	var volumes []core.Volume
+	for _, volume := range sts.Spec.Template.Spec.Volumes {
+		if volume.Name == config.ClickHouseBackupConfigVolumeName {
+			volumes = append(volumes, volume)
+		}
+	}
+	require.Equal(t, []core.Volume{{
+		Name: config.ClickHouseBackupConfigVolumeName,
+		VolumeSource: core.VolumeSource{Secret: &core.SecretVolumeSource{
+			SecretName: configSecretName(cluster),
+			Items: []core.KeyToPath{
+				{Key: backupconfig.FileName, Path: backupconfig.FileName},
+				{Key: backupconfig.APIFingerprintFileName, Path: backupconfig.APIFingerprintFileName},
+			},
+			Optional: ptr.To(optional),
+		}},
+	}}, volumes)
+	for _, container := range sts.Spec.Template.Spec.Containers {
+		var mounts []core.VolumeMount
+		for _, mount := range container.VolumeMounts {
+			sidecarAt := (container.Name == config.ClickHouseBackupContainerName) && strings.HasPrefix(mount.MountPath, config.DirPathClickHouseBackupConfig)
+			if (mount.Name == config.ClickHouseBackupConfigVolumeName) || sidecarAt {
+				mounts = append(mounts, mount)
+			}
+		}
+		if container.Name != config.ClickHouseBackupContainerName {
+			require.Empty(t, mounts, "container %s mounts the configuration file", container.Name)
+			continue
+		}
+		require.Equal(t, []core.VolumeMount{{
+			Name:      config.ClickHouseBackupConfigVolumeName,
+			MountPath: config.DirPathClickHouseBackupConfig,
+			ReadOnly:  true,
+		}}, mounts)
 	}
 }
 
@@ -270,8 +319,10 @@ func requireMountedAt(t *testing.T, container *core.Container, path string) {
 	require.Failf(t, "mount missing", "container %s mounts nothing at %s", container.Name, path)
 }
 
-// The sidecar is added to hosts of backup-enabled clusters only, wired to the backup Secret, the host's
-// ClickHouse, the storage Secret, and every volume the ClickHouse container mounts.
+// The sidecar is added to hosts of backup-enabled clusters only, wired to the host's ClickHouse, the configuration
+// file Secret of its cluster, and every volume the ClickHouse container mounts. The credentials and the storage
+// settings are in the configuration file, which clickhouse-backup reads anew for every operation, never in env vars,
+// which would keep a change from the sidecar until it restarts.
 func TestBackupSidecar(t *testing.T) {
 	resources := &core.ResourceRequirements{
 		Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("1")},
@@ -305,26 +356,15 @@ func TestBackupSidecar(t *testing.T) {
 		config.ClickHouseBackupSecretKeyAPIPassword,
 		config.ClickHouseBackupSecretKeyClickHouseUsername,
 		config.ClickHouseBackupSecretKeyClickHousePassword,
+		config.ClickHouseBackupEnvConfig,
 	} {
-		e, ok := envVar(t, sidecar, key)
-		require.True(t, ok, "env var %s missing", key)
-		require.Empty(t, e.Value, "credential %s must not be inlined", key)
-		require.NotNil(t, e.ValueFrom)
-		// Optional: the sidecar's own command idles without them, rather than keep the pod from getting ready
-		require.Equal(t, &core.SecretKeySelector{
-			LocalObjectReference: core.LocalObjectReference{Name: backupSecretName},
-			Key:                  key,
-			Optional:             ptr.To(true),
-		}, e.ValueFrom.SecretKeyRef)
+		_, ok := envVar(t, sidecar, key)
+		require.False(t, ok, "env var %s would override the configuration file", key)
 	}
-
-	// Optional: a missing storage Secret must not keep the sidecar, and thus the host, from starting
-	require.Contains(t, sidecar.EnvFrom, core.EnvFromSource{
-		SecretRef: &core.SecretEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: storageSecret},
-			Optional:             ptr.To(true),
-		},
-	})
+	require.Empty(t, sidecar.EnvFrom, "the storage settings are in the configuration file")
+	require.Nil(t, sidecar.LivenessProbe, "nothing restarts the sidecar to apply a changed Secret")
+	// Optional: the sidecar's own command waits for the file, rather than keep the pod from getting ready
+	requireConfigVolume(t, sts, backedUpCluster, true)
 	require.Contains(t, sidecar.Ports, core.ContainerPort{
 		Name:          config.ClickHouseBackupAPIPortName,
 		ContainerPort: config.ClickHouseBackupAPIPortNumber,
@@ -613,10 +653,9 @@ func TestBackupSidecarSettingsForJobs(t *testing.T) {
 	}
 }
 
-// The sidecar defaults the paths of a storage that names none to a path of their own for every shard of every
-// cluster, holding the macros clickhouse-backup expands on each host. It gets them as arguments of its command: an env
-// var of the container would take precedence over the path the storage Secret sets, and the liveness probe,
-// which compares no env var the container sets itself, would no longer restart the sidecar once that path changes.
+// The configuration file defaults the paths of a storage that names none to a path of their own for every shard of
+// every cluster, holding the macros clickhouse-backup expands on each host, see backupconfig. No env var of the
+// sidecar sets a path: it would take precedence over the path the storage settings set.
 func TestBackupSidecarDefaultPaths(t *testing.T) {
 	cr := newCR(newCluster(backedUpCluster, enabled()))
 	cr.Spec.Backup = &chi.ClusterBackup{Storages: []chi.BackupStorage{{Name: "main", SecretRef: &core.LocalObjectReference{Name: storageSecret}}}}
@@ -624,12 +663,8 @@ func TestBackupSidecarDefaultPaths(t *testing.T) {
 	sidecar := requireBackupContainer(t, sts)
 
 	require.Equal(t, sidecarCommand(), receivedCommand(sidecar))
-	require.NotNil(t, sidecar.LivenessProbe, "fixture must give the sidecar its liveness probe")
 	for _, e := range sidecar.Env {
-		require.False(t, strings.HasSuffix(e.Name, "_PATH"), "the sidecar sets %s itself, over the storage Secret", e.Name)
-	}
-	for _, arg := range sidecar.LivenessProbe.Exec.Command {
-		require.False(t, strings.HasSuffix(arg, "_PATH"), "the liveness probe does not compare %s", arg)
+		require.False(t, strings.HasSuffix(e.Name, "_PATH"), "the sidecar sets %s itself, over the storage settings", e.Name)
 	}
 
 	// Installations that share a storage keep their backups apart by default, those of one name in different
@@ -643,22 +678,6 @@ func TestBackupSidecarDefaultPaths(t *testing.T) {
 	// clickhouse-backup refuses a storage path that starts with the object disk path
 	require.False(t, strings.HasPrefix(chop.Config().Backup.StoragePath, chop.Config().Backup.StorageObjectDiskPath))
 	require.False(t, strings.HasPrefix(chop.Config().Backup.StorageObjectDiskPath, chop.Config().Backup.StoragePath))
-}
-
-// The operator configuration sets the paths the sidecar defaults to, macros and all.
-func TestBackupSidecarTakesTheConfiguredPaths(t *testing.T) {
-	defaults := chop.Config().Backup
-	t.Cleanup(func() { chop.Config().Backup = defaults })
-	chop.Config().Backup = chi.OperatorConfigBackup{
-		StoragePath:           "eu1/backup/{namespace}/{installation}/{cluster}/{shard}",
-		StorageObjectDiskPath: "eu1/object_disks/{namespace}/{installation}/{cluster}/{shard}",
-	}
-	cr := newCR(newCluster(backedUpCluster, enabled()))
-	cr.Spec.Backup = &chi.ClusterBackup{Storages: []chi.BackupStorage{{Name: "main", SecretRef: &core.LocalObjectReference{Name: storageSecret}}}}
-	sts, _ := createStatefulSet(t, normalize(t, cr), backedUpCluster)
-	command := receivedCommand(requireBackupContainer(t, sts))
-	require.Equal(t, sidecarCommand(), command)
-	require.Contains(t, command, chop.Config().Backup.StoragePath)
 }
 
 // Every host defines the macros clickhouse-backup expands in a storage path, the namespace of its installation among
@@ -698,7 +717,8 @@ func TestBackupSidecarEnvOverride(t *testing.T) {
 	require.Equal(t, "3", envValue(t, sidecar, config.ClickHouseBackupEnvBackupsToKeepLocal))
 }
 
-// What the backup Jobs rely on is set by the operator over the pod template's own container, each once: ON CLUSTER schema restores on every replica would rewrite Distributed tables,
+// What the backup Jobs rely on is set by the operator over the pod template's own container, each once, and over the
+// configuration file, which env vars take precedence over: ON CLUSTER schema restores on every replica would rewrite Distributed tables,
 // restored access entities left unloaded would be missing, parallel operations would see each other's
 // settings, and a restore mapped to other databases or tables would drop what the guard of its Job never
 // checked. The other settings stay the user's.
@@ -745,8 +765,8 @@ func TestBackupSidecarPinsWhatTheJobsRelyOn(t *testing.T) {
 				require.Equal(t, want, envValue(t, sidecar, name), name)
 			}
 			for _, key := range []string{config.ClickHouseBackupSecretKeyAPIUsername, config.ClickHouseBackupSecretKeyAPIPassword} {
-				e, _ := envVar(t, sidecar, key)
-				require.Equal(t, backupSecretName, e.ValueFrom.SecretKeyRef.Name, "the Jobs call the API with the credentials of the backup Secret")
+				_, ok := envVar(t, sidecar, key)
+				require.False(t, ok, "%s would override the credentials of the configuration file, which the Jobs call the API with", key)
 			}
 		})
 	}
@@ -797,7 +817,8 @@ func TestBackupSidecarFromUserContainer(t *testing.T) {
 	require.Equal(t, userPort, envValue(t, sidecar, config.ClickHouseBackupEnvClickHousePort), "the user's env var is kept")
 	require.Equal(t, config.ClickHouseBackupClickHouseHost, envValue(t, sidecar, config.ClickHouseBackupEnvClickHouseHost), "a missing env var is filled in")
 	_, ok := envVar(t, sidecar, config.ClickHouseBackupSecretKeyAPIPassword)
-	require.True(t, ok)
+	require.False(t, ok, "the credentials are in the configuration file")
+	requireConfigVolume(t, sts, backedUpCluster, true)
 	require.Contains(t, sidecar.Ports, core.ContainerPort{Name: config.ClickHouseBackupAPIPortName, ContainerPort: config.ClickHouseBackupAPIPortNumber})
 	requireMountedAt(t, sidecar, userMountPath)
 	requireMountedAt(t, sidecar, diskMountPath)
@@ -820,315 +841,99 @@ func findVolume(sts *apps.StatefulSet, name string) (core.Volume, bool) {
 	return core.Volume{}, false
 }
 
-// findSecretVolume finds the volume of the name that mounts the Secret
-func findSecretVolume(sts *apps.StatefulSet, name, secretName string) (*core.SecretVolumeSource, bool) {
-	volume, ok := findVolume(sts, name)
-	if !ok || (volume.Secret == nil) || (volume.Secret.SecretName != secretName) {
-		return nil, false
-	}
-	return volume.Secret, true
-}
-
-// operatorEnvVarNames are the env vars the operator gives the sidecar of a host serving plain TCP, in their order
-func operatorEnvVarNames() []string {
-	return []string{
-		config.ClickHouseBackupEnvAPIListen,
-		config.ClickHouseBackupEnvAPISecure,
-		config.ClickHouseBackupEnvAPIAllowParallel,
-		config.ClickHouseBackupSecretKeyAPIUsername,
-		config.ClickHouseBackupSecretKeyAPIPassword,
-		config.ClickHouseBackupSecretKeyClickHouseUsername,
-		config.ClickHouseBackupSecretKeyClickHousePassword,
-		config.ClickHouseBackupEnvClickHouseHost,
-		config.ClickHouseBackupEnvRestoreSchemaOnCluster,
-		config.ClickHouseBackupEnvClickHouseRestartCommand,
-		config.ClickHouseBackupEnvRestoreDatabaseMapping,
-		config.ClickHouseBackupEnvRestoreTableMapping,
-		config.ClickHouseBackupEnvBackupsToKeepLocal,
-		config.ClickHouseBackupEnvAllowEmptyBackups,
-		config.ClickHouseBackupEnvClickHousePort,
-	}
-}
-
-// livenessCommand is the command of the sidecar's liveness probe: its timing, the mounts of the two Secrets, "" for
-// one that is not followed, and the env vars the sidecar sets itself
-func livenessCommand(credentials, storage string, explicit ...string) []string {
-	return append([]string{
-		"bash", "-c", chiCreator.BackupSidecarLivenessScript, config.ClickHouseBackupContainerName,
-		strconv.Itoa(chiCreator.BackupLivenessAPITimeoutSeconds), strconv.Itoa(chiCreator.BackupLivenessQuietSeconds),
-		credentials, storage,
-	}, explicit...)
-}
-
-func backupCredentialItems() []core.KeyToPath {
-	return credentialItems(
-		config.ClickHouseBackupSecretKeyAPIUsername,
-		config.ClickHouseBackupSecretKeyAPIPassword,
-		config.ClickHouseBackupSecretKeyClickHouseUsername,
-		config.ClickHouseBackupSecretKeyClickHousePassword,
-	)
-}
-
-// apiPasswordFirstCredentialItems are the backup Secret's files of a sidecar whose container sets API_PASSWORD first
-func apiPasswordFirstCredentialItems() []core.KeyToPath {
-	return credentialItems(
-		config.ClickHouseBackupSecretKeyAPIPassword,
-		config.ClickHouseBackupSecretKeyAPIUsername,
-		config.ClickHouseBackupSecretKeyClickHouseUsername,
-		config.ClickHouseBackupSecretKeyClickHousePassword,
-	)
-}
-
-func credentialItems(keys ...string) []core.KeyToPath {
-	var items []core.KeyToPath
-	for _, key := range keys {
-		items = append(items, core.KeyToPath{Key: key, Path: key})
-	}
-	return items
-}
-
-// kubelet resolves env vars only when it starts a container, so the sidecar mounts the two Secrets it takes env vars
-// from as well, optional as the env vars are, and gets a liveness probe that compares their files with the env vars
-// it started with: a changed Secret restarts the sidecar alone. The backup Secret is mounted with one file per env var
-// it feeds; the storage Secret with every key, which the env vars the sidecar sets itself take precedence over.
-func TestBackupSidecarFollowsSecrets(t *testing.T) {
-	cr := newCR(newCluster(backedUpCluster, enabled()), newCluster(plainCluster, nil))
-	cr.Spec.Backup = &chi.ClusterBackup{
-		Storages: []chi.BackupStorage{{Name: "main", SecretRef: &core.LocalObjectReference{Name: storageSecret}}},
-	}
-	sidecarOn(cr, cr.Spec.Configuration.Clusters[0], core.Container{Env: []core.EnvVar{{Name: "LOG_LEVEL", Value: "debug"}}})
-	cr = normalize(t, cr)
-
-	sts, _ := createStatefulSet(t, cr, backedUpCluster)
-	sidecar := requireBackupContainer(t, sts)
-
-	credentials, ok := findVolume(sts, config.ClickHouseBackupCredentialsVolumeName)
-	require.True(t, ok, "the backup Secret is not mounted")
-	require.Equal(t, &core.SecretVolumeSource{
-		SecretName: backupSecretName,
-		Items:      backupCredentialItems(),
-		Optional:   ptr.To(true),
-	}, credentials.Secret)
-	storage, ok := findVolume(sts, config.ClickHouseBackupStorageVolumeName)
-	require.True(t, ok, "the storage Secret is not mounted")
-	require.Equal(t, &core.SecretVolumeSource{SecretName: storageSecret, Optional: ptr.To(true)}, storage.Secret)
-
-	require.Contains(t, sidecar.VolumeMounts, core.VolumeMount{
-		Name: config.ClickHouseBackupCredentialsVolumeName, MountPath: config.DirPathClickHouseBackupCredentials, ReadOnly: true,
-	})
-	require.Contains(t, sidecar.VolumeMounts, core.VolumeMount{
-		Name: config.ClickHouseBackupStorageVolumeName, MountPath: config.DirPathClickHouseBackupStorage, ReadOnly: true,
-	})
-	clickHouse, _ := k8s.StatefulSetContainerGet(sts, config.ClickHouseContainerName)
-	for _, mount := range clickHouse.VolumeMounts {
-		require.NotContains(t, []string{config.ClickHouseBackupCredentialsVolumeName, config.ClickHouseBackupStorageVolumeName},
-			mount.Name, "ClickHouse must not mount the sidecar's Secrets")
-	}
-
-	require.NotNil(t, sidecar.LivenessProbe)
-	require.NotNil(t, sidecar.LivenessProbe.Exec)
-	// Env vars of the pod template's container win over the Secret's keys, and keep their place ahead of the operator's
-	require.Equal(t,
-		livenessCommand(config.DirPathClickHouseBackupCredentials, config.DirPathClickHouseBackupStorage, append([]string{"LOG_LEVEL"}, operatorEnvVarNames()...)...),
-		receivedArgs(sidecar, sidecar.LivenessProbe.Exec.Command))
-	// kubelet updates mounted Secrets about once a minute: the probe must fail longer than that before a restart,
-	// or a sidecar that started with a newer Secret than its files would be restarted needlessly
-	probe := sidecar.LivenessProbe
-	require.Greater(t, probe.PeriodSeconds*(probe.FailureThreshold-1), int32(60))
-	require.Greater(t, probe.TimeoutSeconds, int32(chiCreator.BackupLivenessAPITimeoutSeconds),
-		"a probe killed during its REST API call would restart a sidecar that runs an operation")
-
-	plain, _ := createStatefulSet(t, cr, plainCluster)
-	for _, name := range []string{config.ClickHouseBackupCredentialsVolumeName, config.ClickHouseBackupStorageVolumeName} {
-		_, ok := findVolume(plain, name)
-		require.False(t, ok, "a host without backup got volume %s", name)
-	}
-}
-
-// The probe compares a mounted Secret only where the files there are the ones the sidecar's env vars come from: of an
-// env var named twice the last entry counts, as for kubelet, and a Secret is not mounted where the pod has a volume
-// of its volume's name or the container a mount at its path. A base container's own liveness probe and its own
-// command are kept; the credentials are mandatory then, as another command might serve the REST API to everybody
-// without them.
-func TestBackupSidecarFollowsSecretsAsTaken(t *testing.T) {
-	const (
-		otherConfigMap = "other"
-		ownVolume      = "own"
-	)
-	ownProbe := &core.Probe{ProbeHandler: core.ProbeHandler{TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(config.ClickHouseBackupAPIPortNumber)}}}
-	apiPasswordFromSecret := k8s.NewEnvVarFromSecret(config.ClickHouseBackupSecretKeyAPIPassword, backupSecretName, config.ClickHouseBackupSecretKeyAPIPassword)
-	apiPasswordFromSecret.ValueFrom.SecretKeyRef.Optional = ptr.To(true)
-	apiPasswordLiteral := core.EnvVar{Name: config.ClickHouseBackupSecretKeyAPIPassword, Value: "secret"}
+// The sidecar reads its configuration file from the Secret of its cluster, mounted at the directory clickhouse-backup
+// reads it from, whatever the pod template's own container mounts or sets: a mount there or below or above, a volume
+// of the name of the operator's, and env vars that would override the file, credentials or the file itself, give way.
+// A base container's own command or args make the Secret mandatory, as another command might serve the REST API to
+// everybody without the credentials the file holds, and the operator's command waits for the file.
+func TestBackupSidecarConfigFile(t *testing.T) {
+	const ownVolume = "own"
 	emptyDir := core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}
-
 	for name, tc := range map[string]struct {
-		storage bool
-		env     []core.EnvVar
-		base    *core.Container
+		base *core.Container
 		// volumes are the pod template's own
 		volumes []core.Volume
-		// wantCredentials are the files of the backup Secret's mount, nil when it is not mounted
-		wantCredentials []core.KeyToPath
-		wantFollowed    bool
-		// wantExplicit are the env vars the probe takes the sidecar to set itself
-		wantExplicit []string
-		// wantProbe is the probe, when not the operator's
-		wantProbe *core.Probe
-		// wantMandatory tells whether the credentials are mandatory
-		wantMandatory bool
+		// clickHouseMounts are the ClickHouse container's own
+		clickHouseMounts []core.VolumeMount
+		wantMandatory    bool
 	}{
-		"no storage Secret": {
-			wantCredentials: backupCredentialItems(),
+		"nothing of its own": {},
+		"mount at the directory": {
+			base:    &core.Container{VolumeMounts: []core.VolumeMount{{Name: ownVolume, MountPath: config.DirPathClickHouseBackupConfig}}},
+			volumes: []core.Volume{{Name: ownVolume, VolumeSource: emptyDir}},
 		},
-		"API credentials of the pod template's container are pinned": {
-			storage: true,
-			env: []core.EnvVar{
-				{Name: config.ClickHouseBackupSecretKeyAPIUsername, Value: "admin"},
-				{Name: config.ClickHouseBackupSecretKeyAPIPassword, Value: "secret"},
-			},
-			wantCredentials: backupCredentialItems(),
-			wantFollowed:    true,
-			wantExplicit: append(
-				[]string{config.ClickHouseBackupSecretKeyAPIUsername, config.ClickHouseBackupSecretKeyAPIPassword},
-				slices.DeleteFunc(operatorEnvVarNames(), func(name string) bool {
-					return (name == config.ClickHouseBackupSecretKeyAPIUsername) || (name == config.ClickHouseBackupSecretKeyAPIPassword)
-				})...,
-			),
+		"mount of the file": {
+			base: &core.Container{VolumeMounts: []core.VolumeMount{{
+				Name: ownVolume, MountPath: path.Join(config.DirPathClickHouseBackupConfig, backupconfig.FileName), SubPath: backupconfig.FileName,
+			}}},
+			volumes: []core.Volume{{Name: ownVolume, VolumeSource: emptyDir}},
 		},
-		// A pinned credential takes the place of the container's first entry of its name, and drops the others
-		"credential taken from the Secret, then set": {
-			base:            &core.Container{Env: []core.EnvVar{apiPasswordFromSecret, apiPasswordLiteral}},
-			wantCredentials: apiPasswordFirstCredentialItems(),
+		"mount above the directory": {
+			base:    &core.Container{VolumeMounts: []core.VolumeMount{{Name: ownVolume, MountPath: path.Dir(config.DirPathClickHouseBackupConfig)}}},
+			volumes: []core.Volume{{Name: ownVolume, VolumeSource: emptyDir}},
 		},
-		"credential set, then taken from the Secret": {
-			base:            &core.Container{Env: []core.EnvVar{apiPasswordLiteral, apiPasswordFromSecret}},
-			wantCredentials: apiPasswordFirstCredentialItems(),
+		"ClickHouse mounts the directory": {
+			clickHouseMounts: []core.VolumeMount{{Name: ownVolume, MountPath: config.DirPathClickHouseBackupConfig}},
+			volumes:          []core.Volume{{Name: ownVolume, VolumeSource: emptyDir}},
 		},
-		"mount path of the backup Secret taken": {
-			storage:      true,
-			base:         &core.Container{VolumeMounts: []core.VolumeMount{{Name: ownVolume, MountPath: config.DirPathClickHouseBackupCredentials}}},
-			volumes:      []core.Volume{{Name: ownVolume, VolumeSource: emptyDir}},
-			wantFollowed: true,
-			wantExplicit: operatorEnvVarNames(),
+		"volume of the operator's name": {
+			volumes: []core.Volume{{Name: config.ClickHouseBackupConfigVolumeName, VolumeSource: emptyDir}},
 		},
-		"volume name of the storage Secret taken": {
-			storage:         true,
-			volumes:         []core.Volume{{Name: config.ClickHouseBackupStorageVolumeName, VolumeSource: emptyDir}},
-			wantCredentials: backupCredentialItems(),
-		},
-		"every credential set by the pod template's container": {
-			env: []core.EnvVar{
+		"env vars over the file": {
+			base: &core.Container{Env: []core.EnvVar{
 				{Name: config.ClickHouseBackupSecretKeyAPIUsername, Value: "admin"},
 				{Name: config.ClickHouseBackupSecretKeyAPIPassword, Value: "secret"},
 				{Name: config.ClickHouseBackupSecretKeyClickHouseUsername, Value: "default"},
-				{Name: config.ClickHouseBackupSecretKeyClickHousePassword, Value: ""},
-			},
-			wantCredentials: backupCredentialItems()[:2],
-		},
-		"another env var from the backup Secret": {
-			env: []core.EnvVar{
-				k8s.NewEnvVarFromSecret("COPY_OF_PASSWORD", backupSecretName, config.ClickHouseBackupSecretKeyAPIPassword),
-				k8s.NewEnvVarFromSecret("not.an.identifier", backupSecretName, config.ClickHouseBackupSecretKeyAPIPassword),
-			},
-			wantCredentials: append([]core.KeyToPath{{Key: config.ClickHouseBackupSecretKeyAPIPassword, Path: "COPY_OF_PASSWORD"}}, backupCredentialItems()...),
-		},
-		// The operator takes the storage Secret last and unprefixed whatever the container's own envFrom holds
-		"storage Secret ahead of another envFrom source of the container": {
-			storage: true,
-			base: &core.Container{EnvFrom: []core.EnvFromSource{
-				{SecretRef: &core.SecretEnvSource{LocalObjectReference: core.LocalObjectReference{Name: storageSecret}}},
-				{ConfigMapRef: &core.ConfigMapEnvSource{LocalObjectReference: core.LocalObjectReference{Name: otherConfigMap}}},
+				k8s.NewEnvVarFromSecret(config.ClickHouseBackupSecretKeyClickHousePassword, backupSecretName, config.ClickHouseBackupSecretKeyClickHousePassword),
+				{Name: config.ClickHouseBackupEnvConfig, Value: "/etc/elsewhere/config.yml"},
 			}},
-			wantCredentials: backupCredentialItems(),
-			wantFollowed:    true,
-			wantExplicit:    operatorEnvVarNames(),
-		},
-		"storage Secret with a prefix in the container": {
-			storage: true,
-			base: &core.Container{EnvFrom: []core.EnvFromSource{
-				{Prefix: "BACKUP_", SecretRef: &core.SecretEnvSource{LocalObjectReference: core.LocalObjectReference{Name: storageSecret}}},
-			}},
-			wantCredentials: backupCredentialItems(),
-			wantFollowed:    true,
-			wantExplicit:    operatorEnvVarNames(),
-		},
-		"own liveness probe": {
-			storage:   true,
-			base:      &core.Container{LivenessProbe: ownProbe},
-			wantProbe: ownProbe,
 		},
 		"own command": {
-			storage:         true,
-			base:            &core.Container{Command: []string{config.ClickHouseBackupCommand, config.ClickHouseBackupCommandServer, "--watch"}},
-			wantCredentials: backupCredentialItems(),
-			wantFollowed:    true,
-			wantExplicit:    operatorEnvVarNames(),
-			wantMandatory:   true,
+			base:          &core.Container{Command: []string{config.ClickHouseBackupCommand, config.ClickHouseBackupCommandServer, "--watch"}},
+			wantMandatory: true,
 		},
 		"own args": {
-			base:            &core.Container{Args: []string{config.ClickHouseBackupCommandServer}},
-			wantCredentials: backupCredentialItems(),
-			wantMandatory:   true,
+			base:          &core.Container{Args: []string{config.ClickHouseBackupCommandServer}},
+			wantMandatory: true,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			backup := enabled()
-			if !tc.storage {
-				backup.Storages = nil
-			}
+			backup := enabledOn(podTemplateName)
 			cr := newCR(newCluster(backedUpCluster, backup))
 			podSpec := &cr.Spec.Templates.PodTemplates[0].Spec
-			// Without the storage Secret, naming the pod template of the sidecar is what turns backup on
-			if (tc.base != nil) || (tc.env != nil) || !tc.storage {
-				base := tc.base.DeepCopy()
-				if base == nil {
-					base = &core.Container{}
-				}
-				base.Name = config.ClickHouseBackupContainerName
-				base.Env = append(base.Env, tc.env...)
-				podSpec.Containers = append(podSpec.Containers, *base)
-				backup.PodTemplate = types.NewString(podTemplateName)
+			base := tc.base.DeepCopy()
+			if base == nil {
+				base = &core.Container{}
 			}
+			base.Name = config.ClickHouseBackupContainerName
+			podSpec.Containers = append(podSpec.Containers, *base)
+			podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, tc.clickHouseMounts...)
 			podSpec.Volumes = append(podSpec.Volumes, tc.volumes...)
 			sts, _ := createStatefulSet(t, normalize(t, cr), backedUpCluster)
 			sidecar := requireBackupContainer(t, sts)
 
-			credentials, mounted := findSecretVolume(sts, config.ClickHouseBackupCredentialsVolumeName, backupSecretName)
-			require.Equal(t, tc.wantCredentials != nil, mounted, "backup Secret mounted")
-			wantCredentialsDir := ""
-			if mounted {
-				require.Equal(t, tc.wantCredentials, credentials.Items)
-				wantCredentialsDir = config.DirPathClickHouseBackupCredentials
-			}
-			_, followed := findSecretVolume(sts, config.ClickHouseBackupStorageVolumeName, storageSecret)
-			require.Equal(t, tc.wantFollowed, followed, "storage Secret mounted")
-			wantStorageDir := ""
-			if followed {
-				wantStorageDir = config.DirPathClickHouseBackupStorage
-			}
+			requireConfigVolume(t, sts, backedUpCluster, !tc.wantMandatory)
 			paths := map[string]bool{}
 			for _, mount := range sidecar.VolumeMounts {
 				require.False(t, paths[mount.MountPath], "two mounts at %s", mount.MountPath)
 				paths[mount.MountPath] = true
-			}
-
-			switch {
-			case tc.wantProbe != nil:
-				require.Equal(t, tc.wantProbe, sidecar.LivenessProbe, "the base container's probe is kept")
-			case mounted || followed:
-				require.NotNil(t, sidecar.LivenessProbe)
-				require.Equal(t, livenessCommand(wantCredentialsDir, wantStorageDir, tc.wantExplicit...), receivedArgs(sidecar, sidecar.LivenessProbe.Exec.Command))
-			default:
-				require.Nil(t, sidecar.LivenessProbe, "nothing to follow, no probe")
-			}
-
-			for _, e := range sidecar.Env {
-				credential := (e.Name == config.ClickHouseBackupSecretKeyAPIUsername) || (e.Name == config.ClickHouseBackupSecretKeyAPIPassword)
-				if !credential || (e.ValueFrom == nil) || (e.ValueFrom.SecretKeyRef == nil) {
-					continue
+				if mount.Name != config.ClickHouseBackupConfigVolumeName {
+					require.False(t, strings.HasPrefix(config.DirPathClickHouseBackupConfig, mount.MountPath) ||
+						strings.HasPrefix(mount.MountPath, config.DirPathClickHouseBackupConfig),
+						"the sidecar mounts %s at %s, over its configuration file", mount.Name, mount.MountPath)
 				}
-				require.Equal(t, !tc.wantMandatory, ptr.Deref(e.ValueFrom.SecretKeyRef.Optional, false), "%s optional", e.Name)
 			}
+			for _, key := range []string{
+				config.ClickHouseBackupSecretKeyAPIUsername,
+				config.ClickHouseBackupSecretKeyAPIPassword,
+				config.ClickHouseBackupSecretKeyClickHouseUsername,
+				config.ClickHouseBackupSecretKeyClickHousePassword,
+				config.ClickHouseBackupEnvConfig,
+			} {
+				_, ok := envVar(t, sidecar, key)
+				require.False(t, ok, "env var %s would override the configuration file", key)
+			}
+			require.Nil(t, sidecar.LivenessProbe)
 		})
 	}
 }
@@ -1148,19 +953,15 @@ func rewordComments(t *testing.T, script string) string {
 	return reworded
 }
 
-// The pod template carries the sidecar's scripts without their comments: a changed pod template rolls the pods,
+// The pod template carries the sidecar's script without its comments: a changed pod template rolls the pods,
 // restarting ClickHouse, which an operator upgrade that merely rewords a comment of a script must not.
 func TestBackupSidecarScriptCommentsLeavePodTemplateAlone(t *testing.T) {
 	cr := newCR(newCluster(backedUpCluster, enabled()))
 	cr.Spec.Backup = &chi.ClusterBackup{Storages: []chi.BackupStorage{{Name: "main", SecretRef: &core.LocalObjectReference{Name: storageSecret}}}}
 	cr = normalize(t, cr)
 	shipped, _ := createStatefulSet(t, cr, backedUpCluster)
-	require.NotNil(t, requireBackupContainer(t, shipped).LivenessProbe, "fixture must give the sidecar its liveness probe")
 
-	restore := chiCreator.ShipBackupScripts(
-		rewordComments(t, chiCreator.BackupSidecarScriptSource),
-		rewordComments(t, chiCreator.BackupSidecarLivenessScriptSource),
-	)
+	restore := chiCreator.ShipBackupScript(rewordComments(t, chiCreator.BackupSidecarScriptSource))
 	defer restore()
 	reworded, _ := createStatefulSet(t, cr, backedUpCluster)
 	require.Equal(t, shipped.Spec.Template, reworded.Spec.Template)
@@ -1274,9 +1075,8 @@ func TestBackupAnnotationsNotPropagated(t *testing.T) {
 	}
 }
 
-// Kubelet expands the command of a container and of its exec probe, reducing "$$" to "$": the sidecar script and
-// the liveness script, which both read the environment from /proc/$$/environ, reach the container as written only
-// escaped.
+// Kubelet expands the command of a container, reducing "$$" to "$": the sidecar script, which reads the environment
+// from /proc/$$/environ, reaches the container as written only escaped.
 func TestBackupSidecarScriptSurvivesKubeletExpansion(t *testing.T) {
 	require.Contains(t, chiCreator.BackupSidecarScript, "$$", "the script relies on $$")
 	cr := newCR(newCluster(backedUpCluster, enabled()))
@@ -1285,11 +1085,6 @@ func TestBackupSidecarScriptSurvivesKubeletExpansion(t *testing.T) {
 	sidecar := requireBackupContainer(t, sts)
 	require.Equal(t, sidecarCommand(), receivedCommand(sidecar))
 	require.NotEqual(t, sidecarCommand(), sidecar.Command, "an unescaped script would lose its $$")
-	require.NotNil(t, sidecar.LivenessProbe)
-	require.Contains(t, chiCreator.BackupSidecarLivenessScript, "$$", "the liveness script relies on $$")
-	probe := sidecar.LivenessProbe.Exec.Command
-	require.Contains(t, receivedArgs(sidecar, probe), chiCreator.BackupSidecarLivenessScript)
-	require.NotContains(t, probe, chiCreator.BackupSidecarLivenessScript, "an unescaped liveness script would lose its $$")
 }
 
 // The sidecar may be built on a pod template of its own, apart from the one the pods run: only its clickhouse-backup
@@ -1357,45 +1152,21 @@ func TestBackupSidecarIsNeverClickHouse(t *testing.T) {
 	})
 }
 
-// The storage Secret is the sidecar's last envFrom source, unprefixed, so that every key of it is an env var of
-// its name over what the container's own sources set. A container that takes it so already gets no second entry, which
-// leaves its StatefulSet as it is; its own sources stay as they are.
-func TestBackupSidecarTakesTheStorageSecretLast(t *testing.T) {
-	const otherConfigMap = "other"
-	secretRef := func(prefix string, optional *bool) core.EnvFromSource {
-		return core.EnvFromSource{Prefix: prefix, SecretRef: &core.SecretEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: storageSecret},
-			Optional:             optional,
-		}}
-	}
-	operators := secretRef("", ptr.To(true))
-	configMap := core.EnvFromSource{ConfigMapRef: &core.ConfigMapEnvSource{LocalObjectReference: core.LocalObjectReference{Name: otherConfigMap}}}
-	for name, tc := range map[string]struct {
-		own, want []core.EnvFromSource
-	}{
-		"none of the container's own": {want: []core.EnvFromSource{operators}},
-		"the Secret last already": {
-			own:  []core.EnvFromSource{configMap, secretRef("", nil)},
-			want: []core.EnvFromSource{configMap, secretRef("", nil)},
-		},
-		"the Secret ahead of another source": {
-			own:  []core.EnvFromSource{secretRef("", nil), configMap},
-			want: []core.EnvFromSource{secretRef("", nil), configMap, operators},
-		},
-		"the Secret with a prefix": {
-			own:  []core.EnvFromSource{secretRef("BACKUP_", nil)},
-			want: []core.EnvFromSource{secretRef("BACKUP_", nil), operators},
-		},
+// The operator gives the sidecar no envFrom source: the storage settings are in the configuration file. The
+// container's own sources stay as they are.
+func TestBackupSidecarTakesNoEnvFrom(t *testing.T) {
+	configMap := core.EnvFromSource{ConfigMapRef: &core.ConfigMapEnvSource{LocalObjectReference: core.LocalObjectReference{Name: "other"}}}
+	for name, own := range map[string][]core.EnvFromSource{
+		"none of the container's own": nil,
+		"the container's own":         {configMap},
 	} {
 		t.Run(name, func(t *testing.T) {
-			backup := enabled()
-			backup.Storages = []chi.BackupStorage{{Name: "main", SecretRef: &core.LocalObjectReference{Name: storageSecret}}}
-			cr := newCR(newCluster(backedUpCluster, backup))
-			if tc.own != nil {
-				sidecarOn(cr, cr.Spec.Configuration.Clusters[0], core.Container{EnvFrom: tc.own})
+			cr := newCR(newCluster(backedUpCluster, enabled()))
+			if own != nil {
+				sidecarOn(cr, cr.Spec.Configuration.Clusters[0], core.Container{EnvFrom: own})
 			}
 			sts, _ := createStatefulSet(t, normalize(t, cr), backedUpCluster)
-			require.Equal(t, tc.want, requireBackupContainer(t, sts).EnvFrom)
+			require.Equal(t, own, requireBackupContainer(t, sts).EnvFrom)
 		})
 	}
 }

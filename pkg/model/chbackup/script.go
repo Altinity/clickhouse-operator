@@ -126,10 +126,9 @@ const (
 	// envPathReplicaSelection is the api.ReplicaSelection of a backup. A backup of every replica needs
 	// the {replica} macro in the path, one of the first replica of each shard must not have it
 	envPathReplicaSelection = "PATH_REPLICA_SELECTION"
-	// envDefaultPath and envDefaultObjectDiskPath are the paths the sidecar sets when the storage
-	// settings leave them unset; when absent, an unset path is the root of the storage. The
-	// pathClusterEnv of either, when set, takes its place for that cluster: set empty for a cluster
-	// whose sidecar sets no default
+	// envDefaultPath and envDefaultObjectDiskPath are the paths the configuration file of a sidecar takes when
+	// the storage settings leave them unset; when absent, an unset path is the root of the storage. The
+	// pathClusterEnv of either, when set, takes its place for that cluster
 	envDefaultPath           = "DEFAULT_PATH"
 	envDefaultObjectDiskPath = "DEFAULT_OBJECT_DISK_PATH"
 
@@ -141,8 +140,7 @@ const (
 	// pathEnvUnverifiable is the pathClusterEnv of why the settings the operator gives of the cluster do not
 	// have to be those its sidecar takes, a single line, empty when they have to as far as the operator can
 	// tell. The check leaves such a cluster out, and a Job that targets it fails unless it is the only
-	// backup-enabled cluster; a configuration file the storage Secret names, which only the Job sees
-	// as the cluster's CLICKHOUSE_BACKUP_CONFIG setting, does the same.
+	// backup-enabled cluster.
 	pathEnvUnverifiable = "UNVERIFIABLE"
 )
 
@@ -158,13 +156,12 @@ func pathClusterEnv(index int, name string) string {
 
 // PathCheckKeys are the clickhouse-backup settings the storage path check reads of every cluster, as
 // pathClusterEnv(index, key): which type of storage it is, what tells one storage of its type from
-// another, its backup and object disk paths, and the configuration file that may set any of them, which
-// the check cannot read: only the storage Secret can name one here, as one named otherwise makes
-// the settings unverifiable to begin with. None of them is a credential. A cluster takes each
-// as its sidecar does: from an optional key of its storage Secret, which kubelet leaves unset
-// when the Secret lacks it, overridden by the env of the sidecar container of its pod template;
-// pathEnvUnverifiable tells when its sidecar may take them otherwise. An unset one
-// counts with the default clickhouse-backup gives it, an unset path with the one the sidecar sets.
+// another, and its backup and object disk paths, each by the name of the env var clickhouse-backup knows it by,
+// see backupconfig.Settings. None of them is a credential. A cluster takes each as its sidecar does: from an
+// optional key of the configuration file Secret of the cluster, which holds the setting of the file, and which
+// kubelet leaves unset when the file does not set it, overridden by the env of the sidecar container of its pod
+// template; pathEnvUnverifiable tells when its sidecar may take them otherwise. An unset one counts with the
+// default clickhouse-backup gives it, an unset path with the one the configuration file takes.
 // The region of an S3 storage is none of them: a bucket name is global, the region only tells where
 // the requests to it go and what they are signed for, and the AWS SDK of the sidecar takes it from its
 // own environment when the setting is empty. A bucket of one name in another AWS partition then counts
@@ -177,7 +174,6 @@ var PathCheckKeys = []string{
 	"COS_URL", "COS_PATH", "COS_OBJECT_DISK_PATH",
 	"FTP_ADDRESS", "FTP_PATH", "FTP_OBJECT_DISK_PATH",
 	"SFTP_ADDRESS", "SFTP_PORT", "SFTP_PATH", "SFTP_OBJECT_DISK_PATH",
-	config.ClickHouseBackupEnvConfig,
 }
 
 // UnchangedExitCode is the value of envUnchangedExitCode: the Job container exits with it when the

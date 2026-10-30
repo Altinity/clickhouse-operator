@@ -50,7 +50,6 @@ func testTopology() *Topology {
 			{name: "0", hosts: []string{"chi-demo-main-0-0", "chi-demo-main-0-1"}},
 			{name: "1", hosts: []string{"chi-demo-main-1-0", "chi-demo-main-1-1"}},
 		},
-		sidecar: sidecarSettings{defaultsPaths: true},
 	}
 	return &Topology{installation: "demo", namespace: testNamespace, clusters: []topologyCluster{main}, enabled: []topologyCluster{main}}
 }
@@ -1192,8 +1191,8 @@ func TestJobsCarryTheConfiguredDefaultPaths(t *testing.T) {
 // Before it changes anything a Job checks that the storage paths of the hosts it drives are their own,
 // across every backup-enabled cluster of the installation, which it therefore knows all of: by index,
 // with their shards and every setting that tells where their sidecars keep their backups, taken from
-// where the sidecars take it. The operator never reads the storage Secret: kubelet resolves
-// it for the Job, optionally, so that a check never keeps the Job from starting.
+// where the sidecars take it: the configuration file Secret of the cluster, which kubelet resolves for the Job,
+// optionally, so that a check never keeps the Job from starting, under the env of the pod template's container.
 func TestJobsCarryWhatThePathCheckNeeds(t *testing.T) {
 	stored := pathCheckInstallation(t)
 	topology, err := NewTopology(stored, "")
@@ -1231,7 +1230,7 @@ func TestJobsCarryWhatThePathCheckNeeds(t *testing.T) {
 
 			require.Equal(t, "hot", values["PATH_0_CLUSTER"])
 			require.Equal(t, "0 1", values["PATH_0_SHARDS"], "the {shard} macro values of the shards")
-			require.NotContains(t, values, "PATH_0_DEFAULT_PATH", "a cluster whose sidecars default the paths takes the defaults")
+			require.NotContains(t, values, "PATH_0_DEFAULT_PATH", "every cluster takes the defaults of its configuration file")
 			require.NotContains(t, values, "PATH_0_DEFAULT_OBJECT_DISK_PATH")
 			require.Equal(t, "backup/{cluster}/{shard}", values["PATH_0_S3_PATH"], "a value of the pod template's container, the last one as for the sidecar")
 			bucket := envVarNamed(t, c, "PATH_0_S3_BUCKET").ValueFrom.SecretKeyRef
@@ -1244,23 +1243,19 @@ func TestJobsCarryWhatThePathCheckNeeds(t *testing.T) {
 					continue
 				}
 				fromSecret := envVarNamed(t, c, name).ValueFrom.SecretKeyRef
-				require.Equal(t, "s3", fromSecret.Name, name)
+				require.Equal(t, "demo-hot-backup-config", fromSecret.Name, name)
 				require.Equal(t, key, fromSecret.Key, name)
 				require.True(t, ptr.Deref(fromSecret.Optional, false), name)
 			}
 
 			require.Equal(t, "cold", values["PATH_1_CLUSTER"])
 			require.Equal(t, "0", values["PATH_1_SHARDS"])
-			require.Equal(t, "", values["PATH_1_DEFAULT_PATH"], "a sidecar running a command of its own defaults no path")
-			require.Contains(t, values, "PATH_1_DEFAULT_PATH")
-			require.Equal(t, "", values["PATH_1_DEFAULT_OBJECT_DISK_PATH"])
-			require.Contains(t, values, "PATH_1_DEFAULT_OBJECT_DISK_PATH")
-			require.Equal(t, "s3-cold", envVarNamed(t, c, "PATH_1_REMOTE_STORAGE").ValueFrom.SecretKeyRef.Name)
+			require.NotContains(t, values, "PATH_1_DEFAULT_PATH", "a sidecar running a command of its own reads the configuration file too")
+			require.Equal(t, "demo-cold-backup-config", envVarNamed(t, c, "PATH_1_REMOTE_STORAGE").ValueFrom.SecretKeyRef.Name)
 
 			require.Equal(t, "bare", values["PATH_2_CLUSTER"])
-			for _, key := range PathCheckKeys {
-				require.NotContains(t, values, "PATH_2_"+key, "a cluster without storage settings gives none")
-			}
+			require.Equal(t, "demo-bare-backup-config", envVarNamed(t, c, "PATH_2_S3_PATH").ValueFrom.SecretKeyRef.Name,
+				"a cluster without a storage Secret has the configuration file all the same")
 			require.NotContains(t, values, "PATH_3_CLUSTER")
 			for _, e := range c.Env {
 				require.NotContains(t, e.Name, "plain")
@@ -1268,18 +1263,6 @@ func TestJobsCarryWhatThePathCheckNeeds(t *testing.T) {
 			}
 		})
 	}
-}
-
-// An installation none of whose sidecars runs the operator's command defaults no path: the Job gets no
-// default to apply.
-func TestJobsCarryNoDefaultPathsNoSidecarApplies(t *testing.T) {
-	topology := testTopology()
-	topology.clusters[0].sidecar.defaultsPaths = false
-	topology.enabled = topology.clusters
-	values := env(container(t, BuildBackupJob(testBackup("b1"), testInstallation(), topology).Spec.Template.Spec))
-	require.NotContains(t, values, "DEFAULT_PATH")
-	require.NotContains(t, values, "DEFAULT_OBJECT_DISK_PATH")
-	require.Equal(t, "", values["PATH_0_DEFAULT_PATH"])
 }
 
 // A Job drives the hosts of one cluster only, with the image and the pod settings of that cluster.

@@ -3446,21 +3446,21 @@ func TestJobScriptChecksTheStoragePaths(t *testing.T) {
 				{name: "b", shards: "0", settings: storageSettings("sftp", "SFTP_ADDRESS", "sftp", "SFTP_PORT", "2222", "SFTP_PATH", "x")},
 			},
 		},
-		"another cluster configured by a file": {
+		"another cluster that sets no storage": {
 			clusters: []pathCluster{{name: "a", shards: "0", settings: s3("S3_PATH", "x")}, {name: "b", shards: "0", settings: map[string]string{"S3_PATH": "x"}}},
-			warned:   "cluster b is left out of the storage path check: its environment does not set REMOTE_STORAGE",
+			warned:   "cluster b is left out of the storage path check: its configuration does not set remote_storage",
 		},
-		"the target cluster configured by a file": {
+		"the target cluster that sets no storage": {
 			clusters: []pathCluster{{name: "a", shards: "0 1", settings: map[string]string{"S3_PATH": "x"}}},
-			warned:   "the storage path check is skipped: its environment does not set REMOTE_STORAGE",
+			warned:   "the storage path check is skipped: its configuration does not set remote_storage",
 		},
 		"custom storage": {
 			clusters: []pathCluster{{name: "a", shards: "0 1", settings: storageSettings("custom")}},
 			warned:   "the storage path check is skipped: it keeps its backups in custom storage",
 		},
-		"the target cluster configured by a file, beside another cluster": {
+		"the target cluster that sets no storage, beside another cluster": {
 			clusters: []pathCluster{{name: "a", shards: "0", settings: map[string]string{"S3_PATH": "x"}}, {name: "b", shards: "0", settings: s3()}},
-			refused:  "the storage path check cannot tell whether cluster a shares a storage path with another of the 2 backup-enabled clusters of the installation, which would mix their backups and restore one with the data of the other: its environment does not set REMOTE_STORAGE",
+			refused:  "the storage path check cannot tell whether cluster a shares a storage path with another of the 2 backup-enabled clusters of the installation, which would mix their backups and restore one with the data of the other: its configuration does not set remote_storage",
 		},
 		"custom storage, beside another cluster": {
 			clusters: []pathCluster{{name: "a", shards: "0", settings: storageSettings("custom")}, {name: "b", shards: "0", settings: s3()}},
@@ -3470,7 +3470,7 @@ func TestJobScriptChecksTheStoragePaths(t *testing.T) {
 			clusters: []pathCluster{{name: "a", shards: "0", settings: s3("S3_PATH", "x/{layer}")}, {name: "b", shards: "0", settings: s3()}},
 			refused:  "the storage path check cannot tell whether cluster a shares a storage path with another of the 2 backup-enabled clusters of the installation, which would mix their backups and restore one with the data of the other: the path 'x/{layer}' of cluster a holds {layer}",
 		},
-		"a restore of the target cluster configured by a file, beside another cluster": {
+		"a restore of the target cluster that sets no storage, beside another cluster": {
 			operation: operationRestore,
 			clusters:  []pathCluster{{name: "a", shards: "0", settings: map[string]string{}}, {name: "b", shards: "0", settings: s3()}},
 			refused:   "the storage path check cannot tell whether cluster a shares a storage path with another of the 2 backup-enabled clusters of the installation",
@@ -3492,27 +3492,6 @@ func TestJobScriptChecksTheStoragePaths(t *testing.T) {
 				{name: "b", shards: "0", settings: s3("S3_PATH", "x", pathEnvUnverifiable, "its hosts disagree on the default paths")},
 			},
 			warned: "cluster b is left out of the storage path check: the operator cannot tell the sidecar settings of cluster b: its hosts disagree on the default paths",
-		},
-		"a configuration file the target cluster's storage Secret names, beside another cluster": {
-			clusters: []pathCluster{
-				{name: "a", shards: "0", settings: s3("S3_PATH", "x", config.ClickHouseBackupEnvConfig, "/cfg/backup.yml")},
-				{name: "b", shards: "0", settings: s3("S3_PATH", "y")},
-			},
-			refused: "the storage path check cannot tell whether cluster a shares a storage path with another of the 2 backup-enabled clusters of the installation, which would mix their backups and restore one with the data of the other: the operator cannot tell the sidecar settings of cluster a: its storage Secret names a configuration file in CLICKHOUSE_BACKUP_CONFIG",
-		},
-		"a configuration file another cluster's storage Secret names": {
-			clusters: []pathCluster{
-				{name: "a", shards: "0", settings: s3("S3_PATH", "x")},
-				{name: "b", shards: "0", settings: s3("S3_PATH", "x", config.ClickHouseBackupEnvConfig, "/cfg/backup.yml")},
-			},
-			warned: "cluster b is left out of the storage path check: the operator cannot tell the sidecar settings of cluster b: its storage Secret names a configuration file in CLICKHOUSE_BACKUP_CONFIG",
-		},
-		"a configuration file set empty in the storage Secret": {
-			clusters: []pathCluster{
-				{name: "a", shards: "0", settings: s3("S3_PATH", "x")},
-				{name: "b", shards: "0", settings: s3("S3_PATH", "x", config.ClickHouseBackupEnvConfig, "")},
-			},
-			refused: "the storage path 'x' of shard 0 of cluster b is that of shard 0 of cluster a too",
 		},
 		"a macro of unknown value in the target cluster's path": {
 			clusters: []pathCluster{{name: "a", shards: "0 1", settings: s3("S3_PATH", "x/{all-sharded-shard}")}},
@@ -3910,10 +3889,6 @@ func TestJobScriptRefusesARestoreFromAnotherInstallationBeforeItChangesAnything(
 		"no storage path check": {
 			env:     map[string]string{envPathClusters: ""},
 			refused: unknown + "PATH_CLUSTERS names no cluster",
-		},
-		"a configuration file of the sidecar": {
-			env:     cluster(s3("S3_PATH", testOwnPath, config.ClickHouseBackupEnvConfig, "/cfg/backup.yml")),
-			refused: unknown + "the operator cannot tell the sidecar settings of cluster main: its storage Secret names a configuration file in CLICKHOUSE_BACKUP_CONFIG",
 		},
 		"a storage of unknown paths": {
 			env:     cluster(storageSettings("custom")),

@@ -35,6 +35,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	chiNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
 // backupSecretFakeSecret keeps Secrets the way the API server does - StringData lands in Data - and panics
@@ -63,7 +64,9 @@ func (f *backupSecretFakeSecret) Get(ctx context.Context, params ...any) (*core.
 func (f *backupSecretFakeSecret) Create(ctx context.Context, secret *core.Secret) (*core.Secret, error) {
 	f.creates++
 	stored := secret.DeepCopy()
-	stored.Data = make(map[string][]byte)
+	if stored.Data == nil {
+		stored.Data = make(map[string][]byte)
+	}
 	for key, value := range stored.StringData {
 		stored.Data[key] = []byte(value)
 	}
@@ -122,7 +125,7 @@ func newBackupSecretCR(t *testing.T, backup *api.ClusterBackup) *api.ClickHouseI
 // generating fresh random values, on every call.
 func newBackupSecretWorker(fake *backupSecretFakeSecret, cr *api.ClickHouseInstallation) *worker {
 	w := &worker{
-		c: &Controller{kube: &backupSecretFakeKube{secret: fake}},
+		c: &Controller{kube: &backupSecretFakeKube{secret: fake}, namer: managers.NewNameManager(managers.NameManagerTypeClickHouse)},
 		a: a.NewAnnouncer(nil, nil),
 	}
 	w.task = common.NewTask(w.buildCreator(cr), w.buildCreator(nil))
