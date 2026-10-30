@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Fixed configuration inheritance and merging:** installations no longer share mutable clusters from templates, and service ports and host settings merge correctly. by [@sunsingerus](https://github.com/sunsingerus)
 
+* **A Helm chart upgrade with unchanged configuration no longer restarts the operator.**
+  The `checksum/*` pod annotations hashed the whole rendered ConfigMap, `helm.sh/chart` label included, and the pod template carried `helm.sh/chart` and `app.kubernetes.io/version`, so every chart version bump rolled the operator Deployment even with `image.tag` pinned.
+  The checksums now hash only the ConfigMap `data`, and the operator pod no longer carries those two labels; they stay on the Deployment and the other objects, and `commonLabels`, `podLabels` and `app.kubernetes.io/managed-by` still reach the pod.
+  The upgrade that lands this restarts the operator once, as all nine checksums are recomputed; ClickHouse clusters are unaffected.
+  by [@DrFaust92](https://github.com/DrFaust92) in [#2079](https://github.com/Altinity/clickhouse-operator/pull/2079)
+
 ### Security
 
 * **Updated Go from `1.26.8` to `1.27.3`**, including the fix for `CVE-2026-111943`. Go 1.27 also removes support for certain legacy `GODEBUG` settings. Review [upgrade compatibility](docs/security_hardening_fips.md). by [@sunsingerus](https://github.com/sunsingerus) and [@lucas-alpaca](https://github.com/lucas-alpaca) in [#2120](https://github.com/Altinity/clickhouse-operator/pull/2120)
