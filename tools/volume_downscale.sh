@@ -21,9 +21,12 @@ Phases:
 Required inputs:
   NS           Kubernetes namespace
   TARGET_STS   Target StatefulSet name, for example chi-otel-logs-otel-logs-0-0
-  NEW_SIZE     Desired smaller PVC size, for example 1500Gi
+  NEW_SIZE     Desired PVC size, for example 1500Gi (use the current size for a pure storage-class change)
 
 Optional:
+  NEW_STORAGE_CLASS
+                         Default: current StorageClass. Set to migrate the volume to another class,
+                         for example pd-ssd -> hyperdisk-extreme. Must already exist in the cluster.
   --auto-confirm
                          Auto-confirm single-token gates except ACM_READY.
                          Does not answer DELETE_OLD_DATA/SKIP.
@@ -47,6 +50,9 @@ Optional:
   WARM_COPY_RSYNC_BYTES_PER_HOUR
                          Default: 500000000000. Used for auto warm-copy timeout.
   WARM_COPY_POLL_SECONDS  Default: 60. Poll interval while waiting for warm-copy convergence.
+  VOLUME_ERROR_EVENT_THRESHOLD
+                         Default: 3. Stop warm-copy/final-copy (exit 31) when the target pod has this many
+                         FailedAttachVolume/FailedMount events, for example a disk type the node cannot attach.
   AUTO_CONFIRM           Default: no. Env equivalent of --auto-confirm.
 EOF
 }
@@ -217,6 +223,47 @@ wait_for_pvc_volume() {
     exit 10
 }
 
+abort_on_pod_volume_errors() {
+    local threshold="${VOLUME_ERROR_EVENT_THRESHOLD:-3}"
+    local uid pod_state events warnings errors
+    uid=$(k get pod -n "$NS" "$TARGET_POD" -o jsonpath='{.metadata.uid}' 2>/dev/null || true)
+    [[ -n "$uid" ]] || return 0
+
+    pod_state=$(k get pod -n "$NS" "$TARGET_POD" -o json 2>/dev/null | jq -r '
+        "phase=\(.status.phase // "?") init=" + ([.status.initContainerStatuses[]? | .name + ":" + (
+          if .state.running then "running"
+          elif .state.terminated then "terminated(" + (.state.terminated.reason // "") + ")"
+          else "waiting(" + (.state.waiting.reason // "?") + ")" end)] | join(","))
+    ' || true)
+    events=$(k get events -n "$NS" --field-selector "involvedObject.name=$TARGET_POD" -o json 2>/dev/null || true)
+
+    warnings=$(jq -r --arg uid "$uid" '
+        [.items[]? | select(.involvedObject.uid == $uid and .type == "Warning")]
+        | sort_by(.lastTimestamp // .eventTime // "") | .[-3:][]
+        | "  \(.reason) x\(.count // 1): \(.message | .[0:240])"
+    ' <<<"$events" 2>/dev/null || true)
+    if [[ -n "$warnings" ]]; then
+        echo "Pod $TARGET_POD ${pod_state:-state unknown}; recent warnings:"
+        echo "$warnings"
+    fi
+
+    errors=$(jq -r --arg uid "$uid" --argjson n "$threshold" '
+        .items[]?
+        | select(.involvedObject.uid == $uid
+                 and .type == "Warning"
+                 and (.reason | test("^(FailedAttachVolume|FailedMount)$"))
+                 and ((.count // 1) >= $n))
+        | "\(.reason) x\(.count // 1): \(.message)"
+    ' <<<"$events" 2>/dev/null | head -3 || true)
+
+    if [[ -n "$errors" ]]; then
+        echo "ERROR: pod $TARGET_POD cannot start (${pod_state:-state unknown}); repeated volume errors:" >&2
+        echo "$errors" >&2
+        echo "Stopping. Original PVC $OLD_PVC is untouched. Run the cleanup phase to remove the migration CHIT, then delete the unused temp PVC $NEW_TEMP_PVC." >&2
+        exit 31
+    fi
+}
+
 wait_for_final_copy_and_ready() {
     local timeout="${1:-3600}"
     local interval=10
@@ -261,6 +308,7 @@ wait_for_final_copy_and_ready() {
             echo "Waiting for pod $TARGET_POD to be recreated waited=${waited}s"
         fi
 
+        abort_on_pod_volume_errors
         sleep "$interval"
         waited=$((waited + interval))
     done
@@ -468,6 +516,7 @@ wait_for_warm_copy_convergence() {
             echo "Waiting for next completed rsync pass: seen=$seen_passes stable=$stable_passes/$WARM_COPY_STABLE_PASSES waited=${waited}s"
         fi
 
+        abort_on_pod_volume_errors
         sleep "$WARM_COPY_POLL_SECONDS"
         waited=$((waited + WARM_COPY_POLL_SECONDS))
     done
@@ -520,6 +569,11 @@ derive() {
     OLD_PV=$(k get pvc -n "$NS" "$OLD_PVC" -o jsonpath='{.spec.volumeName}')
     OLD_SIZE=$(k get pvc -n "$NS" "$OLD_PVC" -o jsonpath='{.spec.resources.requests.storage}')
     STORAGE_CLASS=$(k get pvc -n "$NS" "$OLD_PVC" -o jsonpath='{.spec.storageClassName}')
+    NEW_STORAGE_CLASS="${NEW_STORAGE_CLASS:-$STORAGE_CLASS}"
+    if [[ "$NEW_STORAGE_CLASS" != "$STORAGE_CLASS" ]] && ! k get storageclass "$NEW_STORAGE_CLASS" >/dev/null 2>&1; then
+        echo "StorageClass $NEW_STORAGE_CLASS not found" >&2
+        exit 29
+    fi
 
     NEW_SIZE_SUFFIX=$(echo "$NEW_SIZE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]//g')
     NEW_TEMP_PVC="${OLD_PVC}-new-${NEW_SIZE_SUFFIX}"
@@ -572,6 +626,7 @@ NEW_SIZE=$NEW_SIZE
 NEW_TEMP_PVC=$NEW_TEMP_PVC
 OLD_AS_TEMP_PVC=$OLD_AS_TEMP_PVC
 STORAGE_CLASS=$STORAGE_CLASS
+NEW_STORAGE_CLASS=$NEW_STORAGE_CLASS
 MIGRATION_CHIT=$MIGRATION_CHIT
 ORIGINAL_POD_TEMPLATE_NAME=$ORIGINAL_POD_TEMPLATE_NAME
 ORIGINAL_VCT_NAME=$ORIGINAL_VCT_NAME
@@ -631,7 +686,7 @@ phase_prepare() {
     k get sts -n "$NS" "$TARGET_STS" -o json | jq '.spec.template.spec.volumes' > "$WORKDIR/base-volumes.json"
     echo "Backups written under $WORKDIR"
 
-    confirm "Prepare will patch PV $OLD_PV reclaimPolicy to Retain and create temp PVC $NEW_TEMP_PVC with size $NEW_SIZE in namespace $NS." "PREPARE"
+    confirm "Prepare will patch PV $OLD_PV reclaimPolicy to Retain and create temp PVC $NEW_TEMP_PVC with size $NEW_SIZE and StorageClass $NEW_STORAGE_CLASS in namespace $NS." "PREPARE"
 
     section "Patch old PV reclaim policy"
     k patch pv "$OLD_PV" -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
@@ -640,6 +695,7 @@ phase_prepare() {
     k get pvc -n "$NS" "$OLD_PVC" -o json | jq \
         --arg name "$NEW_TEMP_PVC" \
         --arg size "$NEW_SIZE" \
+        --arg storageClass "$NEW_STORAGE_CLASS" \
         '{
           apiVersion: "v1",
           kind: "PersistentVolumeClaim",
@@ -651,7 +707,7 @@ phase_prepare() {
           },
           spec: {
             accessModes: .spec.accessModes,
-            storageClassName: .spec.storageClassName,
+            storageClassName: $storageClass,
             resources: {requests: {storage: $size}}
           }
         }' > "$WORKDIR/01-new-temp-pvc.json"
@@ -783,25 +839,40 @@ patch_chi_requested_size_for_swap() {
     echo "Old requested size: $OLD_SIZE"
     echo "New requested size: $NEW_SIZE"
 
+    local class_op=""
+    if [[ "$NEW_STORAGE_CLASS" != "$STORAGE_CLASS" ]]; then
+        echo "Old StorageClass: $STORAGE_CLASS"
+        echo "New StorageClass: $NEW_STORAGE_CLASS"
+        class_op=',{"op":"add","path":"/spec/templates/volumeClaimTemplates/'"$vct_index"'/spec/storageClassName","value":"'"$NEW_STORAGE_CLASS"'"}'
+    fi
+
     k patch chi -n "$NS" "$CHI" --type=json -p='[
-      {"op":"replace","path":"/spec/templates/volumeClaimTemplates/'"$vct_index"'/spec/resources/requests/storage","value":"'"$NEW_SIZE"'"}
+      {"op":"replace","path":"/spec/templates/volumeClaimTemplates/'"$vct_index"'/spec/resources/requests/storage","value":"'"$NEW_SIZE"'"}'"$class_op"'
     ]'
 
     section "Kubernetes desired size"
     k get chi -n "$NS" "$CHI" -o json | jq \
         --arg name "$ORIGINAL_VCT_NAME" \
-        '.spec.templates.volumeClaimTemplates[] | select(.name == $name) | .spec.resources.requests.storage'
-    k get pvc -n "$NS" "$NEW_TEMP_PVC" -o jsonpath='{.spec.resources.requests.storage}{" "}{.status.capacity.storage}{"\n"}'
+        '.spec.templates.volumeClaimTemplates[] | select(.name == $name) | .spec.resources.requests.storage, .spec.storageClassName'
+    k get pvc -n "$NS" "$NEW_TEMP_PVC" -o jsonpath='{.spec.resources.requests.storage}{" "}{.status.capacity.storage}{" "}{.spec.storageClassName}{"\n"}'
 
-    confirm "Confirm ACM, CHI VolumeClaimTemplate, and temp PVC all show $NEW_SIZE before the PVC swap." "ACM_READY"
+    confirm "Confirm ACM, CHI VolumeClaimTemplate, and temp PVC all show $NEW_SIZE and StorageClass $NEW_STORAGE_CLASS before the PVC swap." "ACM_READY"
 }
 
 phase_swap() {
     phase_section "swap"
     derive
+
+    local temp_pvc_class
+    temp_pvc_class=$(k get pvc -n "$NS" "$NEW_TEMP_PVC" -o jsonpath='{.spec.storageClassName}' 2>/dev/null || true)
+    if [[ "$temp_pvc_class" != "$NEW_STORAGE_CLASS" ]]; then
+        echo "temp PVC $NEW_TEMP_PVC has StorageClass '${temp_pvc_class:-<not found>}' but NEW_STORAGE_CLASS is '$NEW_STORAGE_CLASS'; pass the same NEW_STORAGE_CLASS and NEW_SIZE used for prepare" >&2
+        exit 30
+    fi
+
     patch_chi_requested_size_for_swap
 
-    section "Pre-swap PVC binding checkpoint"
+    section "PVC binding checkpoint"
     NEW_PV=$(wait_for_pvc_volume "$NEW_TEMP_PVC")
     echo "Using new PV $NEW_PV from temp PVC $NEW_TEMP_PVC"
 
@@ -811,8 +882,8 @@ phase_swap() {
     echo "StatefulSet scaled to zero: $TARGET_STS"
     echo "Pod that must disappear: $TARGET_POD"
     echo "Delete PVCs: $OLD_PVC and $NEW_TEMP_PVC"
-    echo "Recreate $OLD_PVC bound to new PV: $NEW_PV at $NEW_SIZE"
-    echo "Recreate $OLD_AS_TEMP_PVC bound to old PV: $OLD_PV at $OLD_SIZE"
+    echo "Recreate $OLD_PVC bound to new PV: $NEW_PV at $NEW_SIZE ($NEW_STORAGE_CLASS)"
+    echo "Recreate $OLD_AS_TEMP_PVC bound to old PV: $OLD_PV at $OLD_SIZE ($STORAGE_CLASS)"
     if k get pvc -n "$NS" "$OLD_AS_TEMP_PVC" >/dev/null 2>&1; then
         echo "retained old-data PVC $OLD_AS_TEMP_PVC already exists; aborting before scale-down/PVC deletion" >&2
         k get pvc -n "$NS" "$OLD_AS_TEMP_PVC" -o wide >&2
@@ -871,6 +942,7 @@ phase_swap() {
         --arg oldPVC "$OLD_PVC" \
         --arg oldAsTempPVC "$OLD_AS_TEMP_PVC" \
         --arg storageClass "$STORAGE_CLASS" \
+        --arg newStorageClass "$NEW_STORAGE_CLASS" \
         --arg newPV "$NEW_PV" \
         --arg oldPV "$OLD_PV" \
         --arg newSize "$NEW_SIZE" \
@@ -891,7 +963,7 @@ phase_swap() {
               },
               spec: {
                 accessModes: $oldPVCJson[0].spec.accessModes,
-                storageClassName: $storageClass,
+                storageClassName: $newStorageClass,
                 volumeName: $newPV,
                 resources: {requests: {storage: $newSize}}
               }
@@ -1100,7 +1172,7 @@ phase_verify() {
     NEW_PV=$(k get pvc -n "$NS" "$OLD_PVC" -o jsonpath='{.spec.volumeName}')
     section "Kubernetes verification"
     k get pvc -n "$NS" "$OLD_PVC"
-    k get pv "$NEW_PV" -o jsonpath='{.spec.capacity.storage}{"\n"}'
+    k get pv "$NEW_PV" -o jsonpath='{.spec.capacity.storage}{" "}{.spec.storageClassName}{"\n"}'
     k exec -n "$NS" "$TARGET_POD" -c "$CLICKHOUSE_CONTAINER" -- df -hT "$CLICKHOUSE_DATA_PATH"
 }
 
