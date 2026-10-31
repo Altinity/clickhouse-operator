@@ -110,7 +110,8 @@ func normalizePodTemplateZone(template *api.PodTemplate) {
 }
 
 func normalizePodTemplateDistribution(replicasCount int, template *api.PodTemplate) {
-	for i := range template.PodDistribution {
+	// Expanded shortcuts are appended to the list and have to be normalized as well, so check the length on each step
+	for i := 0; i < len(template.PodDistribution); i++ {
 		if additionalPodDistributions := normalizePodDistribution(replicasCount, &template.PodDistribution[i]); additionalPodDistributions != nil {
 			template.PodDistribution = append(template.PodDistribution, additionalPodDistributions...)
 		}
@@ -176,33 +177,43 @@ func normalizePodDistribution(replicasCount int, podDistribution *api.PodDistrib
 		}
 
 		// Expand shortcut
+		// Expanded distributions are not shortcuts, so no further expansion is possible.
+		// Topology key is inherited, otherwise it would be lost
+		topologyKey := podDistribution.TopologyKey
 		return []api.PodDistribution{
 			{
-				Type:  deployment.PodDistributionShardAntiAffinity,
-				Scope: podDistribution.Scope,
+				Type:        deployment.PodDistributionShardAntiAffinity,
+				Scope:       podDistribution.Scope,
+				TopologyKey: topologyKey,
 			},
 			{
-				Type:  deployment.PodDistributionReplicaAntiAffinity,
-				Scope: podDistribution.Scope,
+				Type:        deployment.PodDistributionReplicaAntiAffinity,
+				Scope:       podDistribution.Scope,
+				TopologyKey: topologyKey,
 			},
 			{
-				Type:   deployment.PodDistributionMaxNumberPerNode,
-				Scope:  podDistribution.Scope,
-				Number: replicasCount,
+				Type:        deployment.PodDistributionMaxNumberPerNode,
+				Scope:       podDistribution.Scope,
+				Number:      replicasCount,
+				TopologyKey: topologyKey,
 			},
 
 			{
-				Type: deployment.PodDistributionPreviousTailAffinity,
+				Type:        deployment.PodDistributionPreviousTailAffinity,
+				TopologyKey: topologyKey,
 			},
 
 			{
-				Type: deployment.PodDistributionNamespaceAffinity,
+				Type:        deployment.PodDistributionNamespaceAffinity,
+				TopologyKey: topologyKey,
 			},
 			{
-				Type: deployment.PodDistributionClickHouseInstallationAffinity,
+				Type:        deployment.PodDistributionClickHouseInstallationAffinity,
+				TopologyKey: topologyKey,
 			},
 			{
-				Type: deployment.PodDistributionClusterAffinity,
+				Type:        deployment.PodDistributionClusterAffinity,
+				TopologyKey: topologyKey,
 			},
 		}
 	}

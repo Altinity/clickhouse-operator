@@ -334,7 +334,12 @@ func (cr *ClickHouseInstallation) GetPodTemplate(name string) (*PodTemplate, boo
 
 // WalkPodTemplates walks over all PodTemplates
 func (cr *ClickHouseInstallation) WalkPodTemplates(f func(template *PodTemplate)) {
-	cr.GetSpecT().GetTemplates().GetPodTemplatesIndex().Walk(f)
+	// Walk the list rather than the index: the index is built when the templates are normalized,
+	// while this is needed earlier, when host addresses are calculated
+	podTemplates := cr.GetSpecT().GetTemplates().GetPodTemplates()
+	for i := range podTemplates {
+		f(&podTemplates[i])
+	}
 }
 
 // GetVolumeClaimTemplate gets VolumeClaimTemplate by name
