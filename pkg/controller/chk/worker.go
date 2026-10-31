@@ -25,6 +25,7 @@ import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chk/raftplan"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
@@ -71,6 +72,17 @@ type worker struct {
 
 	// publishRaftFn overrides raft ConfigMap publication (tests only).
 	publishRaftFn func(ctx context.Context, host *api.Host) error
+
+	// readPublishedRaftMembersFn replaces ONLY the common-ConfigMap membership
+	// read in tests. Live StatefulSet observation and the admission planner
+	// still execute normally; production always reads the actual ConfigMap.
+	readPublishedRaftMembersFn func(
+		ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation,
+	) (published []raftplan.HostID, known bool, err error)
+
+	// readStagedJoinerMembershipFn overrides the live /keeper/config probe
+	// in unit tests only; production uses the real Keeper connection.
+	readStagedJoinerMembershipFn func(ctx context.Context, host *api.Host) (bool, error)
 
 	// quorumWaitSpent is the wait the Raft disrupt gate has already burned in THIS pass. The
 	// budget is per pass, not per host: a permanently unhealthy peer would otherwise cost the
@@ -340,10 +352,10 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 	return nil
 }
 
-func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, err error) {
+func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, err error) error {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
-		return
+		return ctx.Err()
 	}
 
 	switch {
@@ -352,13 +364,15 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *a
 	case errors.Is(err, common.ErrCRUDAbort):
 		cr.EnsureStatus().ReconcileAbort()
 	}
-	w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
+	if statusErr := w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
 				FieldGroupMain: true,
 			},
 		},
-	})
+	}); statusErr != nil {
+		return statusErr
+	}
 
 	w.a.V(1).
 		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
@@ -366,6 +380,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *a
 		WithActions(cr).
 		M(cr).F().
 		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", cr.GetSpecT().GetTaskID())
+	return nil
 }
 
 func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {

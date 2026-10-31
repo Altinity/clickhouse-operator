@@ -44,13 +44,23 @@ def _dump_failed_test_namespace(test, ns, shell):
     operator_ns = getattr(test.context, "operator_namespace", None) or ns
     print(f"\n=== DEBUG DUMP (test failed) namespace={ns} ===")
 
-    for kind in ("pods", "chi", "chk"):
+    for kind in ("pods", "statefulsets", "chi", "chk"):
         try:
             print(f"\n--- {kind.upper()} ---")
             items = kubectl.launch(f"get {kind}", ns=ns, ok_to_fail=True, shell=shell)
             print(items or f"(no {kind})")
         except Exception as exc:
             print(f"failed to list {kind}: {exc}")
+
+    try:
+        print("\n--- Kubernetes events (last 30 lines) ---")
+        events = kubectl.launch(
+            "get events --sort-by=.lastTimestamp",
+            ns=ns, ok_to_fail=True, timeout=15, shell=shell,
+        )
+        print("\n".join((events or "").splitlines()[-30:]) or "(no events)")
+    except Exception as exc:
+        print(f"failed to list events: {exc}")
 
     try:
         print(f"\n--- ClickHouse log (last {_dump_log_lines} lines) ---")
@@ -75,6 +85,35 @@ def _dump_failed_test_namespace(test, ns, shell):
             print(plan or "(empty action plan)")
     except Exception as exc:
         print(f"failed to fetch CHI action plan: {exc}")
+
+    # Keeper-specific failure context: published vs live Raft membership.
+    try:
+        chks = kubectl.get_obj_names("", obj_type="chk", kind="", ns=ns, shell=shell)
+        for chk in chks:
+            print(f"\n--- Keeper Raft ({chk}) ---")
+            published = kubectl.launch(
+                f"get cm chk-{chk}-common-configd "
+                "-o go-template='{{index .data \"chop-generated-raft.xml\"}}'",
+                ns=ns, ok_to_fail=True, timeout=15, shell=shell,
+            )
+            print(f"Published raft_configuration:\n{published or '(unavailable)'}")
+            for pod in sorted(kubectl.get_chk_pod_names(chk, ns=ns, shell=shell))[:2]:
+                print(f"\n# {pod}: live /keeper/config")
+                live = kubectl.launch(
+                    f"exec {pod} -c clickhouse-keeper -- "
+                    'clickhouse-keeper-client --history-file=/dev/null '
+                    '-h 127.0.0.1 -p 2181 -q "get \'/keeper/config\'"',
+                    ns=ns, ok_to_fail=True, timeout=15, shell=shell,
+                )
+                print(live or "(unavailable)")
+                print(f"# {pod}: Keeper log (last {_dump_log_lines} lines)")
+                logs = kubectl.launch(
+                    f"logs {pod} -c clickhouse-keeper --tail={_dump_log_lines}",
+                    ns=ns, ok_to_fail=True, timeout=15, shell=shell,
+                )
+                print(logs or "(unavailable)")
+    except Exception as exc:
+        print(f"failed to fetch Keeper Raft diagnostics: {exc}")
 
     try:
         print(f"\n--- Operator log (last {_dump_log_lines} lines) ---")

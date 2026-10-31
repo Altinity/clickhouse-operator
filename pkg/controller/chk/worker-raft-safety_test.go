@@ -26,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,6 +35,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chk/raftplan"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
@@ -670,13 +672,14 @@ func (f *raftFakeSTS) List(ctx context.Context, namespace string, opts meta.List
 type raftFakeKube struct {
 	interfaces.IKube
 	sts interfaces.IKubeSTS
+	pod interfaces.IKubePod
 }
 
 func (k *raftFakeKube) STS() interfaces.IKubeSTS { return k.sts }
 
-// Pod and Storage are wired into the StatefulSet reconciler by newTask but never called on
-// the paths under test; nil is enough to let construction succeed.
-func (k *raftFakeKube) Pod() interfaces.IKubePod            { return nil }
+// Most raftFakeKube users do not need a Pod reader; tests for an expired
+// staged admission supply one to exercise the real executor deadline path.
+func (k *raftFakeKube) Pod() interfaces.IKubePod            { return k.pod }
 func (k *raftFakeKube) Storage() interfaces.IKubeStoragePVC { return nil }
 func (k *raftFakeKube) CR() interfaces.IKubeCR              { return raftFakeKubeCR{} }
 
@@ -688,6 +691,18 @@ type raftFakeKubeCR struct{ interfaces.IKubeCR }
 
 func (raftFakeKubeCR) StatusUpdate(ctx context.Context, cr api.ICustomResource, opts types.UpdateStatusOptions) error {
 	return nil
+}
+
+// raftFakeStartupPod exposes an actual Pod startup state to the planner's
+// post-admission executor without requiring a Kubernetes cluster.
+type raftFakeStartupPod struct {
+	interfaces.IKubePod
+	pod *core.Pod
+	err error
+}
+
+func (f *raftFakeStartupPod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
+	return f.pod, f.err
 }
 
 func raftWorkerWithSTS(sts interfaces.IKubeSTS) *worker {
@@ -1453,11 +1468,27 @@ func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
 		return cr, fake, cr.Spec.Configuration.Clusters[0].Layout.Shards[0]
 	}
 
+	// The host-loop fixture has no ConfigMap/task machinery. Supply only the
+	// membership that pass 1 published (h0 and h1), then let the real
+	// observeRaftPlanHosts read the fake live StatefulSets and run the planner.
+	newStagedAdmitWorker := func(fake *raftFakeSTS) *worker {
+		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w.readPublishedRaftMembersFn = func(
+			_ context.Context, cr *apiChk.ClickHouseKeeperInstallation,
+		) ([]raftplan.HostID, bool, error) {
+			return []raftplan.HostID{
+				raftPlanHostID(hostAtOnCR(cr, 0)),
+				raftPlanHostID(hostAtOnCR(cr, 1)),
+			}, true, nil
+		}
+		return w
+	}
+
 	t.Run("unready previous joiner blocks the next admit and still reconciles the existing member", func(t *testing.T) {
 		cr, fake, shard := newScaleUp(0)
 		h2 := hostAtOnCR(cr, 2)
 		var visited []string
-		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w := newStagedAdmitWorker(fake)
 		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
 			visited = append(visited, host.GetName())
 			return nil
@@ -1470,10 +1501,39 @@ func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
 		require.Zero(t, fake.mutationCount())
 	})
 
+	t.Run("expired image pull aborts instead of deferring forever", func(t *testing.T) {
+		cr, fake, shard := newScaleUp(0)
+		var visited []string
+		broken := &core.Pod{
+			ObjectMeta: meta.ObjectMeta{
+				CreationTimestamp: meta.NewTime(time.Now().Add(-72 * time.Hour)),
+			},
+			Spec: core.PodSpec{Containers: []core.Container{{Name: "keeper"}}},
+			Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{
+				Name: "keeper",
+				State: core.ContainerState{
+					Waiting: &core.ContainerStateWaiting{Reason: "ImagePullBackOff"},
+				},
+			}}},
+		}
+		w := newStagedAdmitWorker(fake)
+		w.c.kube = &raftFakeKube{sts: fake, pod: &raftFakeStartupPod{pod: broken}}
+		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
+			visited = append(visited, host.GetName())
+			return nil
+		}
+		err := w.reconcileShardWithHosts(ctx, shard)
+		require.ErrorIs(t, err, common.ErrCRUDAbort,
+			"a never-started published joiner must abort instead of softly deferring its successor")
+		require.Equal(t, []string{"h1"}, visited, "h2 and the other hosts must not be touched after abort")
+		require.Zero(t, fake.mutationCount())
+		require.True(t, hostAtOnCR(cr, 2).GetReconcileAttributes().IsExclude())
+	})
+
 	t.Run("ready previous joiner admits the next host", func(t *testing.T) {
 		_, fake, shard := newScaleUp(1)
 		var visited []string
-		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w := newStagedAdmitWorker(fake)
 		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
 			visited = append(visited, host.GetName())
 			return nil
@@ -1487,7 +1547,7 @@ func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
 		_, fake, shard := newScaleUp(0)
 		fake.err = errors.New("apiserver unavailable")
 		var visited []string
-		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w := newStagedAdmitWorker(fake)
 		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
 			visited = append(visited, host.GetName())
 			return nil
@@ -1504,7 +1564,7 @@ func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
 		cr.Spec.Stop = types.NewStringBool(true)
 		h2 := hostAtOnCR(cr, 2)
 		var visited []string
-		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w := newStagedAdmitWorker(fake)
 		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
 			visited = append(visited, host.GetName())
 			return nil
@@ -1552,121 +1612,63 @@ func TestIncludeHostIntoRaftClusterRestoresOnlyStagedExclude(t *testing.T) {
 	})
 }
 
-func TestRollbackStagedRaftAdmitRepublishesExclude(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("missing StatefulSet drops the host from raft XML", func(t *testing.T) {
-		cr := chkWithHosts(2)
-		cr.Spec.Defaults = &api.Defaults{}
-		cr.SetAncestor(chkWithHosts(1))
-		hostAtOnCR(cr, 0)
-		host := hostAtOnCR(cr, 1)
-		fake := newRaftFakeSTS()
-		var published string
-		w := &worker{
-			a: a.NewAnnouncer(nil, nil),
-			c: &Controller{kube: &raftFakeKube{sts: fake}},
-		}
-		w.publishRaftFn = func(context.Context, *api.Host) error {
-			published = renderedRaft(t, w, cr)
-			return nil
-		}
-
-		w.rollbackStagedRaftAdmit(ctx, host)
-		require.True(t, host.GetReconcileAttributes().IsExclude())
-		require.NotContains(t, published, raftHostname(host),
-			"rollback must republish raft_configuration without the host that has no Pod")
-		require.Zero(t, fake.mutationCount())
-	})
-
-	t.Run("existing StatefulSet stays published", func(t *testing.T) {
-		cr := chkWithHosts(2)
-		cr.SetAncestor(chkWithHosts(1))
-		host := hostAtOnCR(cr, 1)
-		fake := newRaftFakeSTS()
-		fake.setReady(host, 0)
-		published := false
-		w := &worker{
-			a: a.NewAnnouncer(nil, nil),
-			c: &Controller{kube: &raftFakeKube{sts: fake}},
-			publishRaftFn: func(context.Context, *api.Host) error {
-				published = true
-				return nil
-			},
-		}
-
-		w.rollbackStagedRaftAdmit(ctx, host)
-		require.False(t, published, "a start-wait failure must not unpublish a StatefulSet that exists")
-		require.False(t, host.GetReconcileAttributes().IsExclude())
-		require.Zero(t, fake.mutationCount())
-	})
-}
-
-// TestStagedAdmitPublishesRaftWithoutTheHostSeam renders the raft XML the
-// ConfigMap would get. reconcileHostFn is not installed, so a publish has to
-// come from publishStagedAdmit, which is what reconcileHostMain calls.
-func TestStagedAdmitPublishesRaftWithoutTheHostSeam(t *testing.T) {
+// TestStagedRaftPublicationFollowsStartedPod checks the active 1->N
+// protocol with rendered Raft XML. No joiner is published before Pod Started,
+// and starting the first joiner does not admit the other missing joiners.
+func TestStagedRaftPublicationFollowsStartedPod(t *testing.T) {
 	ctx := context.Background()
 	cr := chkWithHosts(5)
 	cr.Name = "scale"
 	cr.Spec.Defaults = &api.Defaults{}
 	cr.SetAncestor(chkWithHosts(1))
-	fake := newRaftFakeSTS()
-	for i := 0; i < 5; i++ {
-		host := hostAtOnCR(cr, i)
-		switch i {
-		case 0:
-			host.Runtime.CurStatefulSet = &apps.StatefulSet{}
-			host.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
-			fake.setReady(host, 1)
-		case 1:
-			host.Runtime.CurStatefulSet = &apps.StatefulSet{}
-			host.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
-			fake.setReady(host, 0)
-		default:
-			host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
-			host.GetReconcileAttributes().SetExclude()
-		}
+	// Every host visited by the Raft renderer needs a CR back-reference;
+	// the first voter is not part of the staged-joiner loop below.
+	hostAtOnCR(cr, 0)
+	for i := 1; i < 5; i++ {
+		joiner := hostAtOnCR(cr, i)
+		joiner.GetReconcileAttributes().SetExclude()
+		joiner.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
 	}
-
+	first := hostAtOnCR(cr, 1)
+	fakeSTS := newRaftFakeSTS().setReady(first, 0)
+	fakePod := &raftFakeStartupPod{
+		pod: &core.Pod{Spec: core.PodSpec{
+			Containers: []core.Container{{Name: "clickhouse-keeper"}},
+		}},
+	}
 	var published []string
 	w := &worker{
 		a: a.NewAnnouncer(nil, nil),
-		c: &Controller{kube: &raftFakeKube{sts: fake}},
+		c: &Controller{kube: &raftFakeKube{sts: fakeSTS, pod: fakePod}},
 	}
 	w.publishRaftFn = func(context.Context, *api.Host) error {
 		published = append(published, renderedRaft(t, w, cr))
 		return nil
 	}
 
-	deferred := false
-	for _, host := range shardHostsRecoveryFirst(cr.Spec.Configuration.Clusters[0].Layout.Shards[0], func(h *api.Host) bool {
-		return w.isHostHealthyForReconcile(ctx, h)
-	}) {
-		err := w.deferUnreadyStagedAdmit(ctx, host)
-		if errors.Is(err, errSkipStagedAdmit) {
-			continue
-		}
-		if errors.Is(err, common.ErrCRUDDeferred) {
-			deferred = true
-			continue
-		}
-		require.NoError(t, err)
-		_, err = w.publishStagedAdmit(ctx, host)
-		require.NoError(t, err)
-	}
+	require.ErrorIs(t, w.publishStartedStagedJoiner(ctx, first), common.ErrCRUDDeferred,
+		"Pod not Started must not publish Raft membership")
+	require.Empty(t, published)
+	require.True(t, first.GetReconcileAttributes().IsExclude())
 
-	require.True(t, deferred, "h2 must be postponed while h1 is not Ready")
-	require.Empty(t, published, "no raft_configuration publish may admit h2, h3, or h4")
-	xml := renderedRaft(t, w, cr)
-	require.Contains(t, xml, raftHostname(hostAtOnCR(cr, 0)))
-	require.Contains(t, xml, raftHostname(hostAtOnCR(cr, 1)))
+	started := true
+	fakePod.pod = &core.Pod{
+		Spec: core.PodSpec{Containers: []core.Container{{Name: "clickhouse-keeper"}}},
+		Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{
+			Name: "clickhouse-keeper", Started: &started,
+		}}},
+	}
+	require.NoError(t, w.publishStartedStagedJoiner(ctx, first))
+	require.Len(t, published, 1)
+	require.Contains(t, published[0], raftHostname(hostAtOnCR(cr, 0)))
+	require.Contains(t, published[0], raftHostname(first))
+	require.False(t, first.GetReconcileAttributes().IsExclude())
 	for i := 2; i < 5; i++ {
-		require.NotContains(t, xml, raftHostname(hostAtOnCR(cr, i)),
-			"1→5 must keep every not-yet-created member out of raft_configuration")
+		require.NotContains(t, published[0], raftHostname(hostAtOnCR(cr, i)),
+			"only the started joiner may enter shared Raft configuration")
 		require.True(t, hostAtOnCR(cr, i).GetReconcileAttributes().IsExclude())
 	}
-	require.Zero(t, fake.mutationCount(), "admitting into raft_configuration must not create or update a StatefulSet")
+	require.Zero(t, fakeSTS.mutationCount(), "publication must not mutate a StatefulSet")
 }
 
 func renderedRaft(t *testing.T, w *worker, cr *apiChk.ClickHouseKeeperInstallation) string {
@@ -1999,4 +2001,170 @@ func TestQuorumWaitReturnsContextErrorOnCancellation(t *testing.T) {
 		require.ErrorIs(t, w.ensureQuorumSafeToDisruptHost(ctx, host, nil, &snap), context.Canceled,
 			"a cancelled reconcile must report cancellation, not a downstream API error")
 	}
+}
+
+func TestStagedJoinerRetryWaitsUntilPodStarted(t *testing.T) {
+	cr := chkWithHosts(3)
+	cr.SetAncestor(chkWithHosts(1))
+	joiner := hostAtOnCR(cr, 1)
+	joiner.Runtime.CurStatefulSet = &apps.StatefulSet{}
+	joiner.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
+	w := &worker{a: a.NewAnnouncer(nil, nil)}
+
+	opts := w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
+	require.True(t, opts.WaitUntilStarted(), "new joiner must wait to start")
+	require.True(t, opts.WaitUntilStartedOnSame(), "a matching STS may still have an unstarted Pod")
+	require.False(t, opts.WaitUntilReady(), "joiner Ready can depend on existing members updating Raft config")
+
+	joiner.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+	opts = w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
+	require.False(t, opts.WaitUntilStartedOnSame(), "already Ready joiners do not need a redundant startup check")
+
+	existing := hostAtOnCR(cr, 0)
+	opts = w.prepareStsReconcileOptsWaitSection(existing, nil, false)
+	require.False(t, opts.WaitUntilStartedOnSame(), "do not apply retry startup wait to established voters")
+
+	joiner.Runtime.CurStatefulSet.Status.ReadyReplicas = 0
+	cr.Spec.Stop = types.NewStringBool(true)
+	opts = w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
+	require.False(t, opts.WaitUntilStartedOnSame(), "stopped CHK must never block on pod startup")
+}
+
+// TestPublishStartedStagedJoiner pins the broken-image recovery transition:
+// an existing STS must not be published until kubelet reports Pod Started.
+// Publishing does not require Ready and never mutates the existing member.
+func TestPublishStartedStagedJoiner(t *testing.T) {
+	ctx := context.Background()
+	cr := chkWithHosts(3)
+	cr.SetAncestor(chkWithHosts(1))
+	host := hostAtOnCR(cr, 1)
+	host.GetReconcileAttributes().SetExclude()
+	host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+	fakeSTS := newRaftFakeSTS().setReady(host, 0)
+	pod := &core.Pod{Spec: core.PodSpec{
+		Containers: []core.Container{{Name: "clickhouse-keeper"}},
+	}}
+	fakePod := &raftFakeStartupPod{pod: pod}
+	w := &worker{
+		a: a.NewAnnouncer(nil, nil),
+		c: &Controller{kube: &raftFakeKube{sts: fakeSTS, pod: fakePod}},
+	}
+	published := 0
+	w.publishRaftFn = func(context.Context, *api.Host) error {
+		published++
+		return nil
+	}
+	require.ErrorIs(t, w.publishStartedStagedJoiner(ctx, host), common.ErrCRUDDeferred)
+	require.True(t, host.GetReconcileAttributes().IsExclude())
+	require.Zero(t, published)
+
+	started := true
+	fakePod.pod = &core.Pod{
+		Spec: core.PodSpec{Containers: []core.Container{{Name: "clickhouse-keeper"}}},
+		Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{
+			Name: "clickhouse-keeper", Started: &started,
+		}}},
+	}
+	require.NoError(t, w.publishStartedStagedJoiner(ctx, host))
+	require.False(t, host.GetReconcileAttributes().IsExclude())
+	require.Equal(t, 1, published)
+	require.Zero(t, fakeSTS.mutationCount(), "must not restart an existing Keeper")
+
+	// Operator restart / subsequent pass: no duplicate publication.
+	require.NoError(t, w.publishStartedStagedJoiner(ctx, host))
+	require.Equal(t, 1, published)
+}
+
+// A new Keeper starts with its own ID even though the shared Raft config
+// still excludes it. A second not-yet-created joiner is never in that overlay.
+func TestStagedJoinerBootstrapRaftConfig(t *testing.T) {
+	cr := chkWithHosts(3)
+	cr.Name = "scale"
+	cr.Spec.Defaults = &api.Defaults{}
+	cr.SetAncestor(chkWithHosts(1))
+	h0, h1, h2 := hostAtOnCR(cr, 0), hostAtOnCR(cr, 1), hostAtOnCR(cr, 2)
+	h1.GetReconcileAttributes().SetExclude()
+	h2.GetReconcileAttributes().SetExclude()
+	w := &worker{a: a.NewAnnouncer(nil, nil)}
+	opts := w.options().SetHost(h1).SetBootstrapRaft(true)
+	sections := map[string]string{}
+	chkConfig.NewFilesGeneratorDomain(chkConfig.NewGenerator(cr, chkNamer.New(), nil)).
+		CreateConfigFilesGroupHost(sections, opts)
+	xml := sections[chkConfig.BootstrapRaftHostConfigKey]
+	require.Contains(t, xml, `raft_configuration replace="replace"`)
+	require.Contains(t, xml, raftHostname(h0))
+	require.Contains(t, xml, raftHostname(h1))
+	require.NotContains(t, xml, raftHostname(h2))
+}
+
+
+// TestStagedJoinerReadyBarrier verifies the final JoinJoining -> JoinReady
+// transition. Published/committed membership must not complete a CHK while
+// Kubernetes still reports the last joining Pod as unready. Every observation
+// is re-read after a retry; old CurStatefulSet snapshots are not trusted.
+func TestStagedJoinerReadyBarrier(t *testing.T) {
+	ctx := context.Background()
+	cr := chkWithHosts(3)
+	cr.SetAncestor(chkWithHosts(1))
+	host := hostAtOnCR(cr, 2)
+	sts := newRaftFakeSTS().setReady(host, 0)
+
+	readyPod := func(status core.ConditionStatus) *core.Pod {
+		return &core.Pod{
+			Status: core.PodStatus{
+				Phase: core.PodRunning,
+				Conditions: []core.PodCondition{{
+					Type: core.PodReady, Status: status,
+				}},
+			},
+		}
+	}
+	pods := &raftFakeStartupPod{pod: readyPod(core.ConditionFalse)}
+	committed := true
+	membershipChecks := 0
+	w := &worker{
+		a: a.NewAnnouncer(nil, nil),
+		c: &Controller{kube: &raftFakeKube{sts: sts, pod: pods}},
+		readStagedJoinerMembershipFn: func(context.Context, *api.Host) (bool, error) {
+			membershipChecks++
+			return committed, nil
+		},
+	}
+
+	// The reconcile-time cache can contain an earlier ready result. The
+	// source of truth must be a new API read, not this stale snapshot.
+	host.Runtime.CurStatefulSet = &apps.StatefulSet{
+		Status: apps.StatefulSetStatus{ReadyReplicas: 1},
+	}
+	require.ErrorIs(t, w.verifyHostEnsembleMembership(ctx, host), common.ErrCRUDDeferred,
+		"committed membership cannot complete while live STS has 0 ReadyReplicas")
+	require.Equal(t, 1, membershipChecks)
+	require.Positive(t, sts.calls())
+
+	// A ready STS count alone can be stale during a Pod replacement; the
+	// actual Pod must also have Ready=True.
+	sts.setReady(host, 1)
+	require.ErrorIs(t, w.verifyHostEnsembleMembership(ctx, host), common.ErrCRUDDeferred,
+		"live Pod Ready=False must hold the final transition")
+	require.Equal(t, 2, membershipChecks)
+	pods.pod = nil
+	pods.err = apiErrors.NewNotFound(schema.GroupResource{Resource: "pods"}, host.GetName())
+	require.ErrorIs(t, w.verifyHostEnsembleMembership(ctx, host), common.ErrCRUDDeferred,
+		"disappearing Pod must never be considered ready")
+	pods.err = nil
+	pods.pod = readyPod(core.ConditionTrue)
+
+	// As soon as both the StatefulSet and Pod are Ready, the next observed
+	// pass can complete. No wait before membership publication is involved.
+	require.NoError(t, w.verifyHostEnsembleMembership(ctx, host))
+	require.Zero(t, sts.mutationCount(), "readiness checking must not restart Keepers")
+	require.Equal(t, 3, membershipChecks,
+		"Ready on the joiner is sufficient, including for TLS-only Keepers")
+
+	// Subsequent flapping is never masked by the prior successful probe.
+	sts.setReady(host, 0)
+	require.ErrorIs(t, w.verifyHostEnsembleMembership(ctx, host), common.ErrCRUDDeferred)
+	committed = false
+	require.ErrorIs(t, w.verifyHostEnsembleMembership(ctx, host), common.ErrCRUDDeferred,
+		"an uncommitted/unready joiner is not admitted")
 }

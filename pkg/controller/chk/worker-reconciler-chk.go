@@ -148,12 +148,25 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 			WithError(new).
 			M(new).F().
 			Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
-		err = common.ErrCRUDAbort
-		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
-		if errors.Is(err, common.ErrCRUDAbort) {
-			metrics.CRReconcilesAborted(ctx, new)
+		// Only an expired staged-joiner startup is terminal for this spec
+		// generation. Other hard errors keep their historical retry behavior.
+		startupTimedOut := errors.Is(err, errRaftStagedJoinerStartupTimeout)
+		if startupTimedOut {
+			new.EnsureStatus().PushError(
+				raftStagedJoinerStartupTimeoutStatusMarker +
+					" Keeper joiner failed to start; edit CHK spec to retry",
+			)
 		}
-		return err
+		abortErr := common.ErrCRUDAbort
+		if startupTimedOut {
+			abortErr = fmt.Errorf("%w: %w", common.ErrCRUDAbort, err)
+		}
+		if persistErr := w.markReconcileCompletedUnsuccessfully(ctx, new, abortErr); persistErr != nil {
+			// Do not acknowledge a terminal error before Aborted is durable.
+			return fmt.Errorf("persist CHK Aborted status: %w", persistErr)
+		}
+		metrics.CRReconcilesAborted(ctx, new)
+		return abortErr
 	}
 
 	// Reconcile successful
@@ -367,12 +380,7 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *apiChk.Clic
 	err = w.reconcileConfigMapCommon(ctx, cr)
 	cr.GetRuntime().UnlockCommonConfig()
 
-	w.includeAllHostsIntoCluster(ctx, cr)
 	return err
-}
-
-func (w *worker) includeAllHostsIntoCluster(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
-	// Not applicable
 }
 
 // reconcileConfigMapCommon reconciles common ConfigMap
@@ -416,7 +424,10 @@ func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, cr api.ICust
 // reconcileConfigMapHost reconciles host's personal ConfigMap
 func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) error {
 	// ConfigMap for a host
-	configMap := w.task.Creator().CreateConfigMap(interfaces.ConfigMapHost, host)
+	opts := w.options().SetHost(host).SetBootstrapRaft(
+		hostIsStagedScaleUpJoin(host) && host.GetReconcileAttributes().IsExclude(),
+	)
+	configMap := w.task.Creator().CreateConfigMap(interfaces.ConfigMapHost, host, opts)
 	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterConfigMap(configMap.GetObjectMeta())
@@ -442,6 +453,7 @@ func (w *worker) reconcileHostStatefulSet(
 
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
 	opts = w.prepareStsReconcileOptsWaitSection(host, opts, snap.rolling)
+	w.shadowRaftDisruption(ctx, host, opts, snap)
 	if err := w.ensureQuorumSafeToDisruptHost(ctx, host, opts, &snap); err != nil {
 		return err
 	}
@@ -468,6 +480,14 @@ func (w *worker) reconcileHostStatefulSet(
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. Reconcile StatefulSet", host.GetName())
 	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, true, opts)
+	// An unchanged staged joiner's *startup* timeout is terminal for this
+	// CHK spec, not another reason for controller-runtime to re-run the same
+	// broken-image reconcile. The Same+opt-in path only waits for Pod Started.
+	if errors.Is(err, common.ErrCRUDAbort) &&
+		hostIsStagedScaleUpJoin(host) && opts.WaitUntilStartedOnSame() &&
+		host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) {
+		err = fmt.Errorf("%w: %w", errRaftStagedJoinerStartupTimeout, err)
+	}
 	if err == nil {
 		w.task.RegistryReconciled().RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
 	} else {
@@ -721,7 +741,16 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	// for the previous joiner's Ready wait (ObjectStatusSame returns first).
 	// The next missing joiner has to be postponed here, while the loop continues
 	// so existing members can still roll.
-	if err := w.deferUnreadyStagedAdmit(ctx, host); err != nil {
+	var admitErr error
+	if raftPlanEnforceEnabled() {
+		// Opt-in: the pure planner decides serial joiner admission.
+		// Existing staging, publication, and rollback remain unchanged.
+		admitErr = w.enforceRaftPlanAdmission(ctx, host)
+	} else {
+		admitErr = w.deferUnreadyStagedAdmit(ctx, host)
+		w.shadowRaftAdmission(ctx, host, admitErr)
+	}
+	if err := admitErr; err != nil {
 		if errors.Is(err, errSkipStagedAdmit) {
 			return nil
 		}
@@ -792,9 +821,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 // reconcileHostPrepare reconciles specified ClickHouse host
 func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error {
 	if host.GetReconcileAttributes().IsExclude() {
-		// Stay out of raft_configuration until immediately before STS create.
-		// Publishing here would leave the server in XML if ConfigMapHost / PVC
-		// abort before the StatefulSet exists.
+		// Keep staged joiners out of shared raft_configuration until their Pod
+		// has Started. The host-specific bootstrap config lets them start
+		// without first changing the established members' Raft configuration.
 		w.a.V(1).
 			M(host).F().
 			Info("Skip raft include in prepare; host is staged. Host/shard/cluster: %d/%d/%s",
@@ -874,27 +903,21 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Warning("Reconcile Host Main - unable to reconcile Service. Host: %s Err: %v", host.GetName(), err)
 	}
 
-	// Admit this host into raft_configuration before creating its StatefulSet,
-	// so the new pod starts with itself already in the published membership.
-	// Remaining staged hosts stay excluded.
-	admitted, admitErr := w.publishStagedAdmit(ctx, host)
-	if admitErr != nil {
-		metrics.HostReconcilesErrors(ctx, host.GetCR())
-		w.a.V(1).
-			M(host).F().
-			Warning("Reconcile Host Main - unable to publish host into raft_configuration. Host: %s Err: %v", host.GetName(), admitErr)
-		return admitErr
-	}
-
+	// A new staged voter must start before its membership is published to
+	// existing Keepers. Its host ConfigMap carries a temporary bootstrap Raft
+	// overlay; the shared configuration still contains only live members.
 	// Snapshot the ensemble and reconcile the StatefulSet against that same snapshot.
 	snap, err := w.reconcileHostStatefulSetWithEnsembleSnapshot(ctx, host, stsReconcileOpts)
 	if err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
-		// Publication already cleared exclude. Put the host back and republish
-		// so a 1+1 scale-up does not keep a 2-of-2 quorum with no Pod.
-		if admitted {
-			w.rollbackStagedRaftAdmit(ctx, host)
-		}
+		return err
+	}
+
+	// WaitHostPodStarted runs inside the StatefulSet reconciler, including
+	// unchanged StatefulSets on a spec-repair retry. Only now may the new
+	// voter enter the established ensemble's shared Raft configuration.
+	if err := w.publishStartedStagedJoiner(ctx, host); err != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		return err
 	}
 
@@ -961,13 +984,13 @@ func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.
 }
 
 func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, snap hostEnsembleSnapshot) error {
-	if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
-		return nil
-	}
-
-	// Staged 1→N joins are serialized by deferUnreadyStagedAdmit, not by this sleep.
+	// Even ObjectStatusSame on resume must pass the live Raft/Ready barrier.
+	// Stopped staged joiners return immediately from the verifier.
 	if hostIsStagedScaleUpJoin(host) {
 		return w.verifyHostEnsembleMembership(ctx, host)
+	}
+	if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
+		return nil
 	}
 
 	if !snap.rolling {

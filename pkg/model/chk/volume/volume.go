@@ -16,6 +16,7 @@ package volume
 
 import (
 	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -57,10 +58,10 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 	configMapCommonUsersName := m.namer.Name(interfaces.NameConfigMapCommonUsers, m.cr)
 	configMapHostName := m.namer.Name(interfaces.NameConfigMapHost, host)
 
-	// Add all ConfigMap objects as Volume objects of type ConfigMap
+	// Mount shared and host configuration, projecting the late bootstrap overlay
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
-		k8s.CreateVolumeForConfigMap(configMapCommonName),
+		createProjectedCommonConfigVolume(configMapCommonName, configMapHostName),
 		k8s.CreateVolumeForConfigMap(configMapCommonUsersName),
 		k8s.CreateVolumeForConfigMap(configMapHostName),
 	)
@@ -73,6 +74,39 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 		k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathConfigUsers),
 		k8s.CreateVolumeMount(configMapHostName, config.DirPathConfigHost),
 	)
+}
+
+// createProjectedCommonConfigVolume combines the shared Raft configuration
+// with an optional, host-specific bootstrap replacement in keeper_config.d.
+// Keeper loads conf.d first, so the replacement must sort *after* the shared
+// chop-generated-raft.xml in keeper_config.d.
+//
+// A projected volume (not subPath) keeps ConfigMap changes live: when the host
+// no longer needs bootstrap Raft, the overlay file is removed automatically.
+func createProjectedCommonConfigVolume(commonName, hostName string) core.Volume {
+	var defaultMode int32 = 0644
+	optional := true
+	return core.Volume{
+		Name: commonName,
+		VolumeSource: core.VolumeSource{
+			Projected: &core.ProjectedVolumeSource{
+				DefaultMode: &defaultMode,
+				Sources: []core.VolumeProjection{
+					{ConfigMap: &core.ConfigMapProjection{
+						LocalObjectReference: core.LocalObjectReference{Name: commonName},
+					}},
+					{ConfigMap: &core.ConfigMapProjection{
+						LocalObjectReference: core.LocalObjectReference{Name: hostName},
+						Items: []core.KeyToPath{{
+							Key:  config.BootstrapRaftHostConfigKey,
+							Path: config.BootstrapRaftProjectedFile,
+						}},
+						Optional: &optional,
+					}},
+				},
+			},
+		},
+	}
 }
 
 // stsSetupVolumesUserDataWithFixedPaths

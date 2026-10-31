@@ -6802,13 +6802,34 @@ def test_010064(self):
     # satisfy the not-restarted asserts below without ever having read a timestamp. A missing
     # pod raises IndexError inside the helper instead, which fails loudly on its own.
     assert start_time != "", error("could not read the ClickHouse container start time")
-    connected_time = ""
     with And("CHI is connected to Keeper"):
         connected_time = clickhouse.query(chi, "SELECT connected_time from system.zookeeper_connection")
         assert connected_time != ""
 
+    # A taskID-only CHK update does not change the resolved endpoint list.
+    # The watcher must record a skip, not reconfigure the CHI. Connected_time
+    # is not a valid proxy for CHI reconfiguration: an otherwise healthy
+    # ClickHouse can create a new ZooKeeper session independently.
+    zk_config_name = f"chi-{chi}-deploy-confd-default-0-0"
+    zk_config_before = kubectl.get("configmap", zk_config_name)["data"]["chop-generated-zookeeper.xml"]
+
     with When("Trigger CHK reconcile by patching taskID"):
         kubectl.force_chk_reconcile(chk, "keeper-watch-test")
+
+        with Then("Watcher skips CHI reconcile when Keeper endpoints are unchanged"):
+            skipped = False
+            for i in range(1, 16):
+                events = kubectl.get("events", "").get("items", [])
+                skipped = any(
+                    event.get("reason") == "KeeperUpdateNoEndpointChange"
+                    and event.get("involvedObject", {}).get("kind") == "ClickHouseInstallation"
+                    and event.get("involvedObject", {}).get("name") == chi
+                    for event in events
+                )
+                if skipped:
+                    break
+                retry_sleep(i, 5, "Waiting for CHK watcher skip event")
+            assert skipped, error("CHK watcher did not report skipping unchanged Keeper endpoints")
 
         with Then("Confirm CHI is complete"):
             kubectl.wait_chi_status(chi, "Completed")
@@ -6817,9 +6838,9 @@ def test_010064(self):
             new_start_time = kubectl.get_clickhouse_start(chi)
             assert new_start_time == start_time, error("CHI has been restarted")
 
-        with Then("CHI does not reconnect to Keeper"):
-            new_connected_time = clickhouse.query(chi, "SELECT connected_time from system.zookeeper_connection")
-            assert new_connected_time == connected_time, error("ClickHouse reconnected to Keeper")
+        with Then("CHI ZooKeeper configuration has not changed"):
+            zk_config_after = kubectl.get("configmap", zk_config_name)["data"]["chop-generated-zookeeper.xml"]
+            assert zk_config_after == zk_config_before, error("CHI ZooKeeper configuration changed without Keeper endpoint changes")
 
     with When("Rescale Keeper to 3 nodes"):
         kubectl.create_and_check(

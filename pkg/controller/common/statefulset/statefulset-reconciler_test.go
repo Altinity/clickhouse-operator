@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	announcer "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
@@ -120,8 +121,10 @@ func (n *fakeNamer) Names(what interfaces.NameType, params ...any) []string {
 // fakePoller is an IHostObjectsPoller test double. The default zero value is a
 // successful wait; tests that need a scale-to-0 timeout set waitReadyErr.
 type fakePoller struct {
-	waitReadyCalls int
-	waitReadyErr   error
+	waitReadyCalls   int
+	waitReadyErr     error
+	waitStartedCalls int
+	waitStartedErr   error
 }
 
 func (p *fakePoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error {
@@ -129,7 +132,8 @@ func (p *fakePoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Hos
 	return p.waitReadyErr
 }
 func (p *fakePoller) WaitHostPodStarted(ctx context.Context, host *api.Host) error {
-	return nil
+	p.waitStartedCalls++
+	return p.waitStartedErr
 }
 
 // fakePod is a minimal IKubePod test double. Only Delete is exercised by the
@@ -608,4 +612,44 @@ func (f *cancelOnGetSTS) Get(_ context.Context, _ ...any) (*apps.StatefulSet, er
 	f.getCalls++
 	f.cancel()
 	return nil, context.Canceled
+}
+
+type testAbortStartupFallback struct{}
+
+func (*testAbortStartupFallback) OnStatefulSetCreateFailed(context.Context, *api.Host) common.ErrorCRUD {
+	return common.ErrCRUDAbort
+}
+func (*testAbortStartupFallback) OnStatefulSetUpdateFailed(
+	context.Context, *apps.StatefulSet, *api.Host, interfaces.IKubeSTS,
+) common.ErrorCRUD {
+	return common.ErrCRUDAbort
+}
+
+// An interrupted Keeper scale-up can leave an unchanged StatefulSet whose
+// image never started. Opted-in reconciliation must still time out and abort
+// rather than treating the matching desired STS as a successful launch.
+func TestReconcileStatefulSetSameWaitsForStagedStartup(t *testing.T) {
+	ctx := context.Background()
+	p := &fakePoller{waitStartedErr: poller.ErrTimeout}
+	r := newReconciler(&fakeSTS{}, "keeper-0")
+	r.hostObjectsPoller = p
+	r.fallback = &testAbortStartupFallback{}
+	h := hostWithCR("ns", "keeper")
+	h.Runtime.DesiredStatefulSet = &apps.StatefulSet{
+		ObjectMeta: meta.ObjectMeta{Namespace: "ns", Name: "keeper-0"},
+	}
+	h.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
+
+	require.NoError(t, r.ReconcileStatefulSet(ctx, h, false, NewReconcileStatefulSetOptions()))
+	require.Zero(t, p.waitStartedCalls, "ordinary unchanged StatefulSets should retain the fast path")
+
+	opts := NewReconcileStatefulSetOptions().SetWaitUntilStartedOnSame()
+	require.ErrorIs(t, r.ReconcileStatefulSet(ctx, h, false, opts), common.ErrCRUDAbort,
+		"a failed startup wait must escalate to the configured Keeper create fallback")
+	require.Equal(t, 1, p.waitStartedCalls)
+
+	p.waitStartedErr = nil
+	require.NoError(t, r.ReconcileStatefulSet(ctx, h, false, opts),
+		"a Pod that has started may continue even if Keeper is not Ready")
+	require.Equal(t, 2, p.waitStartedCalls)
 }

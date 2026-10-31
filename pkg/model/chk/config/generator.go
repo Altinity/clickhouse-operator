@@ -17,6 +17,7 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -99,6 +100,24 @@ func (c *Generator) getRaftConfig(selector *config.HostSelector) string {
 	})
 
 	return chi.NewSettings().Set("keeper_server/raft_configuration", chi.MustNewSettingScalarFromAny(raft).SetEmbed()).ClickHouseConfig()
+}
+
+// getBootstrapRaftConfig gives a staged joiner its own server ID while the
+// established ensemble's shared configuration still excludes that joiner.
+// The host-specific overlay replaces the shared raft_configuration.
+func (c *Generator) getBootstrapRaftConfig(host *chi.Host, selector *config.HostSelector) string {
+	if host == nil {
+		return ""
+	}
+	bootstrap := config.NewHostSelector()
+	_ = c.cr.WalkHosts(func(peer *chi.Host) error {
+		if peer != host && selector != nil && selector.Exclude(peer) {
+			bootstrap.ExcludeHost(peer)
+		}
+		return nil
+	})
+	xml := c.getRaftConfig(bootstrap)
+	return strings.Replace(xml, "<raft_configuration>", "<raft_configuration replace=\"replace\">", 1)
 }
 
 // getHostServerId builds server id config for the host
