@@ -177,7 +177,7 @@ func TestDeleteHostStatefulSetGetErrorClassification(t *testing.T) {
 // against the API with nothing to aggregate them, so an ungated call mints a new Event object
 // on every deferred pass forever.
 //
-// WalkRemoved dispatches on the diff entry's TYPE: a dropped shard arrives as one IShard entry,
+// WalkRemoved reports the most specific removed item: a dropped shard arrives as one IShard entry,
 // never as its hosts, which is why the walk expands clusters and shards back into hosts.
 func TestRemovedHostFQDNs(t *testing.T) {
 	nameFQDN := func(host *api.Host) string { return "fqdn-" + host.GetName() }
@@ -210,5 +210,36 @@ func TestRemovedHostFQDNs(t *testing.T) {
 		cr.EnsureRuntime().ActionPlan = api.MakeActionPlan(crWith("h0", "h1"), cr)
 		require.Contains(t, removedHostFQDNs(cr, nameFQDN), "fqdn-h1",
 			"the FQDN of a host the plan drops must reach the event")
+	})
+}
+
+// DROP REPLICA for a removed host must run on a host which survives in the new CR. The removed
+// host's own shard comes from the old CR and may hold only removed - already purged - hosts:
+// https://github.com/Altinity/clickhouse-operator/issues/1545
+func TestSurvivingShardHost(t *testing.T) {
+	host := func(cluster, shard, name string) *api.Host {
+		h := &api.Host{Name: name}
+		h.Runtime.Address.ClusterName = cluster
+		h.Runtime.Address.ShardName = shard
+		return h
+	}
+	crWith := func(hosts ...*api.Host) *api.ClickHouseInstallation {
+		cr := &api.ClickHouseInstallation{}
+		cr.Spec.Configuration = &api.Configuration{
+			Clusters: []*api.Cluster{{Layout: &api.ChiClusterLayout{Shards: []*api.ChiShard{{Hosts: hosts}}}}},
+		}
+		return cr
+	}
+
+	t.Run("runs on a host of the same shard in the new CR", func(t *testing.T) {
+		cr := crWith(host("c", "1", "1-0-dedicated"), host("c", "0", "0-0-dedicated"))
+		got := survivingShardHost(cr, host("c", "0", "0-0"))
+		require.NotNil(t, got)
+		require.Equal(t, "0-0-dedicated", got.GetName())
+	})
+
+	t.Run("no surviving host in the shard", func(t *testing.T) {
+		cr := crWith(host("c", "1", "1-0"), host("other", "0", "0-1"))
+		require.Nil(t, survivingShardHost(cr, host("c", "0", "0-0")))
 	})
 }

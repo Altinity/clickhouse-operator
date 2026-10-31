@@ -78,11 +78,28 @@ func (w *worker) dropZKReplicas(ctx context.Context, cr *api.ClickHouseInstallat
 		func(shard api.IShard) {
 		},
 		func(host *api.Host) {
-			_ = w.dropZKReplica(ctx, host, NewDropReplicaOptions().SetRegularDrop())
+			_ = w.dropZKReplicaOn(ctx, survivingShardHost(cr, host), host, NewDropReplicaOptions().SetRegularDrop())
 			cnt++
 		},
 	)
 	w.a.V(1).M(cr).F().E().Info("processed replicas: %d", cnt)
+}
+
+// survivingShardHost finds a host to run DROP REPLICA for the removed hostToDrop on.
+// Removed hosts come from the old CR, so their own shard may consist of removed hosts only,
+// which are already purged at this point. Look for the shard in the new CR instead and pick
+// its first host, which is alive. Returns nil when the shard has no hosts left in the new CR.
+func survivingShardHost(cr *api.ClickHouseInstallation, hostToDrop *api.Host) (res *api.Host) {
+	cr.WalkHosts(func(host *api.Host) error {
+		if (res == nil) &&
+			(host.Runtime.Address.ClusterName == hostToDrop.Runtime.Address.ClusterName) &&
+			(host.Runtime.Address.ShardName == hostToDrop.Runtime.Address.ShardName) &&
+			(host.GetName() != hostToDrop.GetName()) {
+			res = host
+		}
+		return nil
+	})
+	return res
 }
 
 // purge
@@ -475,6 +492,16 @@ func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *
 		hostToRunOn = shard.FirstHost()
 	}
 
+	return w.dropZKReplicaOn(ctx, hostToRunOn, hostToDrop, opts)
+}
+
+// dropZKReplicaOn drops replica hostToDrop running SQL statement on hostToRunOn
+func (w *worker) dropZKReplicaOn(ctx context.Context, hostToRunOn, hostToDrop *api.Host, opts *dropReplicaOptions) error {
+	if hostToDrop == nil {
+		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop: %s", hostToDrop.GetName())
+		return nil
+	}
+
 	if hostToRunOn == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn: %s, hostToDrop: %s", hostToRunOn.GetName(), hostToDrop.GetName())
 		return nil
@@ -801,7 +828,7 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 
 // removedHostFQDNs enumerates the FQDNs of the hosts this pass planned to remove.
 //
-// WalkRemoved dispatches on the diff entry's type, so a removed cluster or shard arrives as ONE
+// WalkRemoved reports the most specific removed item, so a removed cluster or shard arrives as ONE
 // entry rather than as its constituent hosts - both are expanded back into hosts here, the same
 // way runHostPreDeleteHooksOnRemovedHosts does. nameFQDN is injected so the walk is reachable
 // from a test without a live name manager.
