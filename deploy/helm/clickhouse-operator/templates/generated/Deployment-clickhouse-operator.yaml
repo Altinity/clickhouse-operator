@@ -240,6 +240,7 @@ spec:
                   containerName: {{ .Chart.Name }}
                   resource: limits.memory
                   divisor: "1Mi"
+            {{ include "altinity-clickhouse-operator.metrics.loggerEnv" . | nindent 12 }}
             {{ with .Values.metrics.env }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 8888

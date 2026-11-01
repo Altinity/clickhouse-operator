@@ -128,6 +128,10 @@ metrics:
   # metrics.env -- additional environment variables for the deployment of metrics-exporter containers
   # possible format value `[{"name": "SAMPLE", "value": "text"}]`
   env: []
+  # metrics.logVerbosity -- log verbosity level (glog `-v`) of the metrics-exporter container, e.g. `0` to reduce log noise.
+  # Rendered as `CHOP_LOGGER_V` env var, which overrides `logger.v` of the operator configuration for the metrics-exporter only.
+  # Empty value keeps `logger.v` from the operator configuration.
+  logVerbosity: ""
   # metrics.livenessProbe -- optional liveness probe for the metrics-exporter container
   # check `kubectl explain pod.spec.containers.livenessProbe` for details
   # example:

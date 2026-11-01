@@ -112,6 +112,7 @@ crdHook:
 | metrics.image.repository | string | `"altinity/metrics-exporter"` | image repository |
 | metrics.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
 | metrics.livenessProbe | string | `nil` | optional liveness probe for the metrics-exporter container check `kubectl explain pod.spec.containers.livenessProbe` for details example:   httpGet:     path: /metrics     port: ch-metrics   initialDelaySeconds: 10   periodSeconds: 10 |
+| metrics.logVerbosity | string | `""` | log verbosity level (glog `-v`) of the metrics-exporter container, e.g. `0` to reduce log noise. Rendered as `CHOP_LOGGER_V` env var, which overrides `logger.v` of the operator configuration for the metrics-exporter only. Empty value keeps `logger.v` from the operator configuration. |
 | metrics.readinessProbe | string | `nil` | optional readiness probe for the metrics-exporter container check `kubectl explain pod.spec.containers.readinessProbe` for details example:   httpGet:     path: /metrics     port: ch-metrics   initialDelaySeconds: 5   periodSeconds: 5 |
 | metrics.resources | object | `{}` | custom resource configuration |
 | nameOverride | string | `""` | override name of the chart |

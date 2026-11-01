@@ -116,6 +116,18 @@ Create the tag for the docker image to use
 {{- end -}}
 
 {{/*
+Env vars overriding logger options of the metrics-exporter container.
+metrics.logVerbosity is checked as a string, so 0 is a valid value.
+*/}}
+{{- define "altinity-clickhouse-operator.metrics.loggerEnv" -}}
+{{- $v := .Values.metrics.logVerbosity -}}
+{{- if and (not (kindIs "invalid" $v)) (ne (toString $v) "") -}}
+- name: CHOP_LOGGER_V
+  value: {{ toString $v | quote }}
+{{- end -}}
+{{- end -}}
+
+{{/*
 altinity-clickhouse-operator.rawResource will create a resource template that can be
 merged with each item in `.Values.additionalResources`.
 */}}
