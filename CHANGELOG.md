@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* **A ClickHouse username or password with URL-reserved characters no longer breaks the operator's and the metrics exporter's connections.** Credentials went into the connection URL unescaped, so a password such as `cs#...` failed with `invalid port ... after host`, and `@`, `/`, `?` or `%` cut or altered it. They are now percent-encoded. by [@mraj602](https://github.com/mraj602)
+
+* **The metrics exporter now dials ClickHouse with the cluster's `security.clickhouse.tls`.** It used only the operator configuration, so a cluster with its own CA (`rootCA` or `rootCASecretRef`), `serverName`, `verify` or `minVersion` was dialed without them: under `verify: Strict` every scrape of such a cluster failed with `certificate signed by unknown authority` and the cluster had no metrics. The operator now sends these settings, with the CA resolved from its Secret, to the exporter along with the hosts, and the exporter discovers them the same way on startup. by [@Slach](https://github.com/Slach)
+
+* **One malformed on/off value no longer stops the reconcile of every resource of its kind.**
+  A `ClickHouseInstallation`, `ClickHouseInstallationTemplate` or `ClickHouseKeeperInstallation` whose on/off field (`stop`, `suspend`, `troubleshoot`, ...) held a number with a fraction, a list or an object failed the decode of the whole list the operator watches, so no resource of that kind was reconciled any more, and such a value in a `ClickHouseOperatorConfiguration` made the operator ignore every `ClickHouseOperatorConfiguration` resource.
+  The resource is now reconciled, the field read as one holding a mistyped word already was - mostly as its default.
+  by [@sunsingerus](https://github.com/sunsingerus)
+
 * **Fixed incorrect function names in logs from Go generic functions.** by [@matthewhudsonedb](https://github.com/matthewhudsonedb) in [#2102](https://github.com/Altinity/clickhouse-operator/pull/2102). Fixes [#2101](https://github.com/Altinity/clickhouse-operator/issues/2101)
 
 * **Metrics exporter now respects cluster-specific ClickHouse TLS settings**, including custom CAs and certificate verification. by [@Slach](https://github.com/Slach) in [#2113](https://github.com/Altinity/clickhouse-operator/pull/2113)
