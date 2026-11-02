@@ -10202,7 +10202,6 @@ def test_020002(self):
 
 @TestScenario
 @Name("test_020003. Clickhouse-keeper upgrade")
-@Tags("HEAVY")
 def test_020003(self):
     """Check that clickhouse-operator support upgrading clickhouse-keeper version
      when clickhouse-keeper defined with ClickHouseKeeperInstallation."""
@@ -10322,7 +10321,6 @@ def test_020003_2(self):
 
 
 @TestScenario
-@Tags("HEAVY")
 @Name("test_020003_3. Interrupted Keeper roll must preserve Raft quorum")
 def test_020003_3(self):
     """Companion to test_010083 for ClickHouse Keeper.
@@ -10488,7 +10486,136 @@ def test_020003_3(self):
 
 
 @TestScenario
-@Tags("HEAVY")
+@Name("test_020003_4. Stuck Keeper scale-up aborts, then completes once the image is fixed")
+def test_020003_4(self):
+    """A 1→3 scale-up whose new replicas cannot start, then a fix.
+
+    Replica 0 keeps a good pod template. Replicas 1 and 2 use a per-replica
+    template whose image does not exist, so the first new Keeper gets a
+    StatefulSet and its containers never start. The operator must abort once
+    reconcile.statefulSet.update.timeout has elapsed, and must not create the
+    next member. manifests/chopconf/low-timeout.yaml sets that timeout to 60s.
+    Switching those replicas to the image replica 0 already runs must clear
+    the abort and finish with three Ready Keepers, without restarting replica 0.
+    """
+    create_shell_namespace_clickhouse_template()
+
+    chk = "test-020003-4-chk"
+    cluster = "keeper"
+    keeper0 = f"chk-{chk}-{cluster}-0-0-0"
+    keeper1 = f"chk-{chk}-{cluster}-0-1-0"
+    keeper2 = f"chk-{chk}-{cluster}-0-2-0"
+    good_version = "clickhouse/clickhouse-keeper:25.8"
+    broken_version = "clickhouse/clickhouse-keeper:25.8-broken"
+    chopconf = "manifests/chopconf/low-timeout.yaml"
+    operator_namespace = current().context.operator_namespace
+
+    with Given("StatefulSet update timeout is short enough to observe the abort"):
+        util.apply_operator_config(chopconf)
+
+    with And("CHK with 1 replica on a good image"):
+        kubectl.create_and_check(
+            manifest="manifests/chk/test-020003-4-chk-1.yaml",
+            kind="chk",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    keeper0_started = kubectl.get_field(
+        "pod", keeper0, ".status.containerStatuses[0].state.running.startedAt",
+    )
+
+    with When("Scale to 3 replicas, leaving the new ones on a broken image"):
+        kubectl.create_and_check(
+            manifest="manifests/chk/test-020003-4-chk-2.yaml",
+            kind="chk",
+            check={
+                "chk_status": "InProgress",
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("The first new Keeper cannot pull its image"):
+        kubectl.wait_field(
+            "pod",
+            keeper1,
+            ".status.containerStatuses[0].state.waiting.reason",
+            ["ErrImagePull", "ImagePullBackOff"],
+            retries=40,
+        )
+        keeper1_image = kubectl.get_field("pod", keeper1, ".spec.containers[0].image")
+        assert broken_version in keeper1_image, error(
+            f"{keeper1} must use {broken_version}, got {keeper1_image}"
+        )
+
+    with Then("The original Keeper stays Ready and is not restarted"):
+        assert kubectl.get_condition_status(keeper0, "Ready") == "True", error(
+            f"{keeper0} must stay Ready while the new replica cannot pull its image"
+        )
+        keeper0_started_after = kubectl.get_field(
+            "pod", keeper0, ".status.containerStatuses[0].state.running.startedAt",
+        )
+        assert keeper0_started_after == keeper0_started, error(
+            f"{keeper0} restarted during the stuck scale-up: "
+            f"startedAt {keeper0_started} -> {keeper0_started_after}"
+        )
+
+    # Scale-up pays a 30s membership settle, then the create wait runs for the
+    # 60s timeout from low-timeout.yaml. Abort lands after that.
+    with And("The reconcile aborts and does not create the third Keeper"):
+        kubectl.wait_chk_status(chk, "Aborted", retries=10)
+        assert kubectl.get_count("sts", chk=chk) == 2, error(
+            "the third member must stay uncreated when the new pod does not start"
+        )
+        assert kubectl.get_condition_status(keeper0, "Ready") == "True", error(
+            f"{keeper0} must stay Ready after the stuck scale-up aborts"
+        )
+        # A deferral would park the CHK at InProgress and requeue every 5s.
+        # An abort comes back to Aborted on the next pass.
+        time.sleep(15)
+        kubectl.wait_chk_status(chk, "Aborted", retries=10)
+        assert kubectl.get_count("sts", chk=chk) == 2, error(
+            "a later pass must not create the third member after the start timeout"
+        )
+
+    with When("The new replicas are switched to the image replica 0 already runs"):
+        kubectl.create_and_check(
+            manifest="manifests/chk/test-020003-4-chk-3.yaml",
+            kind="chk",
+            check={
+                "pod_count": 3,
+                "chk_status": "Completed",
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("The scale-up finishes and the original Keeper is not restarted"):
+        with Then("all three Keepers must be Ready after the image is fixed"):
+            assert kubectl.get_ready_pods_count("chk", chk) == 3, error(
+                "all three Keepers must be Ready after the image is fixed"
+                )
+        with And("All pods running good image"):
+            for pod in (keeper1, keeper2):
+                image = kubectl.get_field("pod", pod, ".spec.containers[0].image")
+                assert good_version in image, error(
+                    f"{pod} must run {good_version} after the image is fixed, got {image}"
+                )
+        with And(f"{keeper0} was not restarted"):
+            keeper0_started_recovered = kubectl.get_field(
+                "pod", keeper0, ".status.containerStatuses[0].state.running.startedAt",
+                )
+            assert keeper0_started_recovered == keeper0_started, error(
+                f"{keeper0} restarted after the image was fixed: "
+                f"startedAt {keeper0_started} -> {keeper0_started_recovered}"
+            )
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
 @Name("test_020005. Clickhouse-keeper scale-up/scale-down")
 def test_020005(self):
     """Check that clickhouse-operator support scale-up/scale-down without service interruption"""
@@ -10691,7 +10818,6 @@ def test_020007(self):
 
 @TestScenario
 @Name("test_020011. CHK cluster.secure=yes wires zk-secure Service port and Raft <secure>1</secure>")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
 def test_020011(self):
     """Positive-path declarative-TLS assertion: a CHK with cluster.secure=yes
     (and no FIPS chopconf) must normalize and reconcile to status=Completed.
@@ -10748,7 +10874,6 @@ def test_020011(self):
 
 @TestScenario
 @Name("test_020014. CHK cluster.insecure=no + secure=yes wires TLS-only listener and pgrep liveness fallback")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
 def test_020014(self):
     """TLS-only CHK happy path. With cluster.insecure=no AND
     cluster.secure=yes the operator must
@@ -10853,7 +10978,6 @@ def test_020014(self):
 
 @TestScenario
 @Name("test_020015. NoKeeperListener: CHK with insecure=no and secure unset is aborted on reconcile")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
 def test_020015(self):
     """Admission gate. A CHK whose cluster declares insecure=no
     without an offsetting secure=yes would emit a Service with no
@@ -10890,7 +11014,6 @@ def test_020015(self):
 
 @TestScenario
 @Name("test_020016. Legacy CHK with neither secure nor insecure preserves pre-knob byte-identity")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
 def test_020016(self):
     """Back-compat sentinel. A CHK that declares NEITHER
     cluster.secure NOR cluster.insecure (the legacy default shape) must
@@ -10979,7 +11102,6 @@ def test_020016(self):
 
 @TestScenario
 @Name("test_020017. CHK emits two per-host Services (peer + client) with split readiness")
-@Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
 def test_020017(self):
     """A CHK with no replicaServiceTemplate must emit TWO
     per-host headless Services:

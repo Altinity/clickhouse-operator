@@ -92,12 +92,11 @@ def _dump_failed_test_namespace(test, ns, shell):
         for chk in chks:
             print(f"\n--- Keeper Raft ({chk}) ---")
             published = kubectl.launch(
-                f"get cm chk-{chk}-common-configd "
-                "-o go-template='{{index .data \"chop-generated-raft.xml\"}}'",
+                f"get cm chk-{chk}-common-configd -o go-template='{{index .data \"chop-generated-raft.xml\"}}'",
                 ns=ns, ok_to_fail=True, timeout=15, shell=shell,
             )
             print(f"Published raft_configuration:\n{published or '(unavailable)'}")
-            for pod in sorted(kubectl.get_chk_pod_names(chk, ns=ns, shell=shell))[:2]:
+            for pod in sorted(kubectl.get_chk_pod_names(chk, ns=ns, shell=shell)):
                 print(f"\n# {pod}: live /keeper/config")
                 live = kubectl.launch(
                     f"exec {pod} -c clickhouse-keeper -- "
