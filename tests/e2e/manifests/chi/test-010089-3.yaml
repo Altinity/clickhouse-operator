@@ -1,0 +1,23 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-010089
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+      session_timeout_ms: 5000
+      operation_timeout_ms: 5000
+    clusters:
+      - name: default
+        layout:
+          shards:
+            - name: "0"
+              replicas:
+                - name: "0-1"
+                - name: "0-3"
+                - name: "0-2"
