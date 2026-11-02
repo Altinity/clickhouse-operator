@@ -24,8 +24,10 @@ import (
 	"syscall"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/util/fips"
+	"github.com/altinity/clickhouse-operator/pkg/util/profiling"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
@@ -51,6 +53,9 @@ var (
 
 	// masterURL defines URL of kubernetes master to be used
 	masterURL string
+
+	// pprofAddress defines pprof listen address. Empty means pprof is disabled
+	pprofAddress string
 )
 
 func init() {
@@ -59,6 +64,7 @@ func init() {
 	flag.BoolVar(&debugRequest, "debug", false, "Debug run")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
 	flag.StringVar(&masterURL, "master", "", "The address of custom Kubernetes API server. Makes sense if runs outside of the cluster and not being specified in kube config file only.")
+	flag.StringVar(&pprofAddress, profiling.FlagName, "", profiling.FlagUsage)
 }
 
 // Run is an entry point of the application
@@ -94,6 +100,10 @@ func Run() {
 
 	// Setup notification signals with cancel
 	setupSignalsNotification(cancelFunc)
+
+	// Opt-in pprof on its own listener, once per process, see pkg/util/profiling.
+	// controller-runtime managers keep their own PprofBindAddress unset (disabled).
+	profiling.Start(ctx, profiling.ResolveAddress(pprofAddress, deployment.OPERATOR_PPROF_ADDRESS), "clickhouse-operator")
 
 	var wg sync.WaitGroup
 

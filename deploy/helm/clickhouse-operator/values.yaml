@@ -86,6 +86,13 @@ operator:
   # operator.env -- additional environment variables for the clickhouse-operator container in deployment
   # possible format value `[{"name": "SAMPLE", "value": "text"}]`
   env: []
+  pprof:
+    # operator.pprof.enabled -- serve Go pprof from the clickhouse-operator container on a separate listener (sets `OPERATOR_PPROF_ADDRESS`).
+    # Never served on the metrics port. Access with `kubectl port-forward`
+    enabled: false
+    # operator.pprof.address -- pprof listen address; keep it on loopback, a non-loopback address logs a warning.
+    # Must differ from `metrics.pprof.address`, both containers share the pod network
+    address: "127.0.0.1:6060"
   # operator.livenessProbe -- optional liveness probe for the clickhouse-operator container
   # check `kubectl explain pod.spec.containers.livenessProbe` for details
   # example:
@@ -128,6 +135,13 @@ metrics:
   # metrics.env -- additional environment variables for the deployment of metrics-exporter containers
   # possible format value `[{"name": "SAMPLE", "value": "text"}]`
   env: []
+  pprof:
+    # metrics.pprof.enabled -- serve Go pprof from the metrics-exporter container on a separate listener (sets `METRICS_EXPORTER_PPROF_ADDRESS`).
+    # Never served on the metrics port. Access with `kubectl port-forward`
+    enabled: false
+    # metrics.pprof.address -- pprof listen address; keep it on loopback, a non-loopback address logs a warning.
+    # Must differ from `operator.pprof.address`, both containers share the pod network
+    address: "127.0.0.1:6061"
   # metrics.livenessProbe -- optional liveness probe for the metrics-exporter container
   # check `kubectl explain pod.spec.containers.livenessProbe` for details
   # example:

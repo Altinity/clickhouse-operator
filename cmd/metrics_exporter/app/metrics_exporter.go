@@ -28,11 +28,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util/fips"
+	"github.com/altinity/clickhouse-operator/pkg/util/profiling"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
@@ -70,6 +72,9 @@ var (
 	metricsEP string
 
 	chiListEP string
+
+	// pprofAddress defines pprof listen address. Empty means pprof is disabled
+	pprofAddress string
 )
 
 func init() {
@@ -80,6 +85,7 @@ func init() {
 	flag.StringVar(&masterURL, "master", "", "The address of custom Kubernetes API server. Makes sense if runs outside of the cluster and not being specified in kube config file only.")
 	flag.StringVar(&metricsEP, "metrics-endpoint", defaultMetricsEndpoint, "The Prometheus exporter endpoint.")
 	flag.StringVar(&chiListEP, "chi-list-endpoint", defaultChiListEndPoint, "The CHI list endpoint.")
+	flag.StringVar(&pprofAddress, profiling.FlagName, "", profiling.FlagUsage)
 	flag.Parse()
 }
 
@@ -122,6 +128,9 @@ func Run() {
 	}()
 
 	log.Infof("Starting metrics exporter. Version:%s GitSHA:%s BuiltAt:%s\n", version.Version, version.GitSHA, version.BuiltAt)
+
+	// Opt-in pprof on its own listener, see pkg/util/profiling
+	profiling.Start(ctx, profiling.ResolveAddress(pprofAddress, deployment.METRICS_EXPORTER_PPROF_ADDRESS), "metrics-exporter")
 
 	// Initialize k8s API clients
 	kubeClient, _, chopClient, _ := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)

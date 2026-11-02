@@ -112,6 +112,8 @@ crdHook:
 | metrics.image.repository | string | `"altinity/metrics-exporter"` | image repository |
 | metrics.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
 | metrics.livenessProbe | string | `nil` | optional liveness probe for the metrics-exporter container check `kubectl explain pod.spec.containers.livenessProbe` for details example:   httpGet:     path: /metrics     port: ch-metrics   initialDelaySeconds: 10   periodSeconds: 10 |
+| metrics.pprof.address | string | `"127.0.0.1:6061"` | pprof listen address; keep it on loopback, a non-loopback address logs a warning. Must differ from `operator.pprof.address`, both containers share the pod network |
+| metrics.pprof.enabled | bool | `false` | serve Go pprof from the metrics-exporter container on a separate listener (sets `METRICS_EXPORTER_PPROF_ADDRESS`). Never served on the metrics port. Access with `kubectl port-forward` |
 | metrics.readinessProbe | string | `nil` | optional readiness probe for the metrics-exporter container check `kubectl explain pod.spec.containers.readinessProbe` for details example:   httpGet:     path: /metrics     port: ch-metrics   initialDelaySeconds: 5   periodSeconds: 5 |
 | metrics.resources | object | `{}` | custom resource configuration |
 | nameOverride | string | `""` | override name of the chart |
@@ -124,6 +126,8 @@ crdHook:
 | operator.image.repository | string | `"altinity/clickhouse-operator"` | image repository |
 | operator.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
 | operator.livenessProbe | string | `nil` | optional liveness probe for the clickhouse-operator container check `kubectl explain pod.spec.containers.livenessProbe` for details example:   httpGet:     path: /metrics     port: op-metrics   initialDelaySeconds: 10   periodSeconds: 10 |
+| operator.pprof.address | string | `"127.0.0.1:6060"` | pprof listen address; keep it on loopback, a non-loopback address logs a warning. Must differ from `metrics.pprof.address`, both containers share the pod network |
+| operator.pprof.enabled | bool | `false` | serve Go pprof from the clickhouse-operator container on a separate listener (sets `OPERATOR_PPROF_ADDRESS`). Never served on the metrics port. Access with `kubectl port-forward` |
 | operator.priorityClassName | string | "" | priority class name for the clickhouse-operator deployment, check `kubectl explain pod.spec.priorityClassName` for details |
 | operator.readinessProbe | string | `nil` | optional readiness probe for the clickhouse-operator container check `kubectl explain pod.spec.containers.readinessProbe` for details example:   httpGet:     path: /metrics     port: op-metrics   initialDelaySeconds: 5   periodSeconds: 5 |
 | operator.resources | object | `{}` | custom resource configuration, check `kubectl explain pod.spec.containers.resources` for details |
