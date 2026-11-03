@@ -4,6 +4,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.0](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.4...0.28.0)
+
+### Added
+
+* **EXPERIMENTAL: Operator-managed backup and restore.** Added `ClickHouseBackup`, `ClickHouseBackupSchedule`, and `ClickHouseRestore` resources using `clickhouse-backup`. Supports per-cluster backups and restores, scheduled backups, retention, configurable storage paths, and cross-installation restores. Enable with `spec.backup.enabled: "yes"`. See [backup documentation](docs/backup.md). by [@discostur](https://github.com/discostur) and [@sunsingerus](https://github.com/sunsingerus) in [#2015](https://github.com/Altinity/clickhouse-operator/pull/2015). Related [#1795](https://github.com/Altinity/clickhouse-operator/issues/1795), [#862](https://github.com/Altinity/clickhouse-operator/issues/862)
+
+### Changed
+
+* **BACKWARD INCOMPATIBLE: Revised template precedence.** `ClickHouseInstallation` settings now override templates and operator defaults; later templates override earlier ones. Kubernetes resource lists merge by name or appropriate key. Existing installations may restart or recreate StatefulSets when effective configuration changes. See [upgrade notes](docs/operator_configuration.md#upgrading-from-027). by [@sunsingerus](https://github.com/sunsingerus)
+
+* **BACKWARD INCOMPATIBLE: Invalid pod templates are rejected.** Reconciliation now fails with `InvalidPodTemplate` for duplicate containers, missing names or images, and conflicting ClickHouse containers. by [@sunsingerus](https://github.com/sunsingerus)
+
+* **BACKWARD INCOMPATIBLE: Invalid `security.fips.enforced` values now prevent startup.** The operator and metrics exporter require a valid boolean value. by [@sunsingerus](https://github.com/sunsingerus)
+
+* **ClickHouse settings supporting live reload no longer require a restart** when matched by wildcard `configurationRestartPolicy` rules. Explicit restart rules still take precedence. by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2109](https://github.com/Altinity/clickhouse-operator/pull/2109)
+
+* **Keeper scale-up from one or two replicas is now staged.** New members join one at a time to avoid Raft initialization issues. by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2087](https://github.com/Altinity/clickhouse-operator/pull/2087). Partially addresses [#2041](https://github.com/Altinity/clickhouse-operator/issues/2041)
+
+* **Removed deprecated `OnePerHost` pod distribution configuration.** Use `podDistribution` with `ClickHouseAntiAffinity` instead. by [@Tyagiquamar](https://github.com/Tyagiquamar) in [#2083](https://github.com/Altinity/clickhouse-operator/pull/2083). Fixes [#1978](https://github.com/Altinity/clickhouse-operator/issues/1978)
+
+### Fixed
+
+* **ClickHouse credentials containing URL-reserved characters no longer break operator or metrics-exporter connections.** Usernames and passwords are now percent-encoded in connection URLs. by [@mraj602](https://github.com/mraj602) in [#2123](https://github.com/Altinity/clickhouse-operator/pull/2123). Addresses [#1822](https://github.com/Altinity/clickhouse-operator/issues/1822)
+
+* **Fixed incorrect function names in logs from Go generic functions.** by [@matthewhudsonedb](https://github.com/matthewhudsonedb) in [#2102](https://github.com/Altinity/clickhouse-operator/pull/2102). Fixes [#2101](https://github.com/Altinity/clickhouse-operator/issues/2101)
+
+* **Metrics exporter now respects cluster-specific ClickHouse TLS settings**, including custom CAs and certificate verification. by [@Slach](https://github.com/Slach) in [#2113](https://github.com/Altinity/clickhouse-operator/pull/2113)
+
+* **Kubernetes resource creation and updates now retry transient owner-reference admission failures**, fixing installation failures immediately after CRD creation, particularly on OpenShift. by [@matthewhudsonedb](https://github.com/matthewhudsonedb) in [#2103](https://github.com/Altinity/clickhouse-operator/pull/2103). Addresses [#2094](https://github.com/Altinity/clickhouse-operator/issues/2094)
+
+* **Malformed boolean-like configuration values no longer interrupt reconciliation** of other resources. by [@sunsingerus](https://github.com/sunsingerus)
+
+* **Corrected ClickHouse container detection** when logging or backup sidecars appear first in a pod template. by [@sunsingerus](https://github.com/sunsingerus)
+
+* **Fixed configuration inheritance and merging:** installations no longer share mutable clusters from templates, and service ports and host settings merge correctly. by [@sunsingerus](https://github.com/sunsingerus)
+
+* **Helm chart upgrades with unchanged configuration no longer restart the operator.** ConfigMap checksums now exclude chart metadata, and version labels no longer trigger pod recreation. The first upgrade to this version still restarts the operator once; ClickHouse clusters are unaffected. by [@DrFaust92](https://github.com/DrFaust92) in [#2079](https://github.com/Altinity/clickhouse-operator/pull/2079)
+
+### Security
+
+* **Updated Go from `1.26.8` to `1.27.3`**, including the fix for `CVE-2026-111943`. Go 1.27 also removes support for certain legacy `GODEBUG` settings. Review [upgrade compatibility](docs/security_hardening_fips.md). by [@sunsingerus](https://github.com/sunsingerus) and [@lucas-alpaca](https://github.com/lucas-alpaca) in [#2120](https://github.com/Altinity/clickhouse-operator/pull/2120)
+
+* **Updated `golang.org/x/net` to `v0.60.0` and `golang.org/x/text` to `v0.42.0`** to address security vulnerabilities. by [@sunsingerus](https://github.com/sunsingerus)
+
 ## [0.27.4](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.3...release-0.27.4)
 
 ### Security

@@ -101,7 +101,8 @@ clickhouse:
       - version: "*"
         rules:
           # see https://kb.altinity.com/altinity-kb-setup-and-maintenance/altinity-kb-server-config-files/#server-config-configxml-sections-which-dont-require-restart
-          # to be replaced with "select * from system.server_settings where changeable_without_restart = 'No'"
+          # changeable_without_restart = Yes reloads that server setting even when a wildcard rule below says restart.
+          # An exact rule such as settings/<name>: "yes" still restarts. Other server settings follow the rules below.
 
           - settings/*: "yes"
 
@@ -667,6 +668,21 @@ pod:
   # SIGTERM and SIGKILL during Pod termination process.
   # Increase this number is case of slow shutdown.
   terminationGracePeriod: 30
+
+################################################
+##
+## Backup section
+##
+################################################
+backup:
+  # EXPERIMENTAL. Where in its storage the clickhouse-backup sidecar of a host keeps its backups,
+  # and their object disk data, when the settings of that storage set no path of their own.
+  # Templates clickhouse-backup expands with the macros of the host: {namespace},
+  # {installation}, {cluster}, {shard}, {replica}. Changing them rolls the pods of every
+  # backup-enabled cluster and leaves the backups made under the old paths where they are.
+  # See docs/backup.md#storage-paths.
+  storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
+  storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
 
 ################################################
 ##

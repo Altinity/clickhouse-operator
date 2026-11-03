@@ -21,6 +21,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -90,19 +91,87 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 		return nil
 	}
 
+	// After the StatefulSet exists, including steady state. A transient ConfigMap
+	// conflict must not abort the pass; the next reconcile republishes. Staged
+	// admission calls includeHostIntoRaftCluster itself and keeps the error.
+	if err := w.includeHostIntoRaftCluster(ctx, host); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Include host - unable to publish raft_configuration, continuing. Host: %s Err: %v", host.GetName(), err)
+	}
 	return nil
 }
 
-// includeHostIntoRaftCluster includes host into raft configuration
-func (w *worker) includeHostIntoRaftCluster(ctx context.Context, host *api.Host) {
+// includeHostIntoRaftCluster publishes the host into raft_configuration.
+// On ConfigMap failure a host that was excluded is excluded again, so the next
+// pass retries publication instead of creating a StatefulSet against stale XML.
+// A host that was not excluded stays that way: SetExclude here would drop an
+// existing voter from raft_configuration after a conflict.
+func (w *worker) includeHostIntoRaftCluster(ctx context.Context, host *api.Host) error {
 	w.a.V(1).
 		M(host).F().
 		Info("going to include host. Host/shard/cluster: %d/%d/%s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	// Specify in options to add this host into ClickHouse config file
+	wasExcluded := host.GetReconcileAttributes().IsExclude()
 	host.GetCR().GetRuntime().LockCommonConfig()
 	host.GetReconcileAttributes().UnsetExclude()
-	_ = w.reconcileConfigMapCommon(ctx, host.GetCR(), w.options())
+	err := w.publishRaftConfiguration(ctx, host)
+	if err != nil && wasExcluded {
+		host.GetReconcileAttributes().SetExclude()
+	}
 	host.GetCR().GetRuntime().UnlockCommonConfig()
+	return err
+}
+
+// rollbackStagedRaftAdmit puts a host back out of raft_configuration after its
+// StatefulSet create failed, and republishes so the ConfigMap does not list a
+// server that has no Pod. A live StatefulSet stays published: rolling it back
+// and letting the next pass's preliminary ConfigMap put it back flaps membership.
+// Absence is stagedJoinerStatefulSet returning nil, the same NotFound staging uses.
+func (w *worker) rollbackStagedRaftAdmit(ctx context.Context, host *api.Host) {
+	sts, err := w.stagedJoinerStatefulSet(ctx, host)
+	if err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to tell whether %s still has a StatefulSet after admit failed: %v", host.GetName(), err)
+		return
+	}
+	if sts != nil {
+		w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileInProgress).
+			WithAction(host.GetCR()).
+			M(host).F().
+			Info("Keep %s in raft_configuration; its StatefulSet exists", host.GetName())
+		return
+	}
+	host.GetCR().GetRuntime().LockCommonConfig()
+	host.GetReconcileAttributes().SetExclude()
+	err = w.publishRaftConfiguration(ctx, host)
+	host.GetCR().GetRuntime().UnlockCommonConfig()
+	if err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to drop host from raft_configuration after StatefulSet create failed. Host: %s Err: %v", host.GetName(), err)
+	}
+}
+
+// publishStagedAdmit publishes a host that is still excluded. admitted is false
+// when the host was not excluded, so a later error must not roll membership back.
+func (w *worker) publishStagedAdmit(ctx context.Context, host *api.Host) (admitted bool, err error) {
+	if host == nil || !host.GetReconcileAttributes().IsExclude() {
+		return false, nil
+	}
+	if err := w.includeHostIntoRaftCluster(ctx, host); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// publishRaftConfiguration writes raft_configuration for the host's CR.
+// publishRaftFn replaces the ConfigMap write in tests.
+func (w *worker) publishRaftConfiguration(ctx context.Context, host *api.Host) error {
+	if w.publishRaftFn != nil {
+		return w.publishRaftFn(ctx, host)
+	}
+	return w.reconcileConfigMapCommon(ctx, host.GetCR(), w.options())
 }

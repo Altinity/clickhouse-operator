@@ -44,6 +44,8 @@ func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]str
 		return l.labelConfigMapCRStorage()
 	case interfaces.LabelConfigMapHost:
 		return l.labelConfigMapHost(params...)
+	case interfaces.LabelSecretBackup:
+		return l.GetCRScope()
 
 	default:
 		// Delegate any type not handled above to the base labeler, whose Label()

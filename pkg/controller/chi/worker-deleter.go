@@ -331,6 +331,9 @@ func (w *worker) deleteCRProtocol(ctx context.Context, chi *api.ClickHouseInstal
 	// Delete ConfigMap(s)
 	_ = w.c.deleteConfigMapsCHI(ctx, chi)
 
+	// Delete backup Secret
+	_ = w.c.deleteSecretBackup(ctx, chi)
+
 	w.a.V(1).
 		WithEvent(chi, a.EventActionDelete, a.EventReasonDeleteCompleted).
 		WithAction(chi).

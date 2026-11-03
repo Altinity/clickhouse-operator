@@ -91,4 +91,10 @@ spec:
               name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-3
           - configMap:
               name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-4
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-5
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-6
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-7
 {{- end }}

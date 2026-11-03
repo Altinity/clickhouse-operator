@@ -21,16 +21,19 @@ import (
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
 type ContainerManager struct {
 	probe interfaces.IProbeManager
+	namer interfaces.INameManager
 }
 
 func NewContainerManager(probe interfaces.IProbeManager) interfaces.IContainerManager {
 	return &ContainerManager{
 		probe: probe,
+		namer: namer.New(),
 	}
 }
 
@@ -54,6 +57,14 @@ func (cm *ContainerManager) EnsureLogContainer(statefulSet *apps.StatefulSet) {
 	cm.ensureContainerSpecifiedClickHouseLog(statefulSet)
 }
 
+func (cm *ContainerManager) EnsureBackupContainer(statefulSet *apps.StatefulSet, host *chi.Host) {
+	cm.ensureContainerSpecifiedClickHouseBackup(statefulSet, host)
+}
+
+func (cm *ContainerManager) EnsureBackupContainerVolumeMounts(statefulSet *apps.StatefulSet, host *chi.Host) {
+	cm.ensureContainerVolumeMountsClickHouseBackup(statefulSet, host)
+}
+
 func (cm *ContainerManager) SetupAdditionalEnvVars(host *chi.Host, appContainer *core.Container) {
 	// Setup additional ENV VAR in case no command provided
 	if len(appContainer.Command) == 0 {
@@ -64,9 +75,20 @@ func (cm *ContainerManager) SetupAdditionalEnvVars(host *chi.Host, appContainer 
 	}
 }
 
+// PodSpecContainerGetClickHouse returns the ClickHouse container of the pod spec: the one named so, else the first
+// container that is none of the operator's sidecars, as a pod template may name its ClickHouse container otherwise
+func PodSpecContainerGetClickHouse(podSpec *core.PodSpec) (*core.Container, bool) {
+	return k8s.PodSpecContainerGetOrFirstOther(podSpec, config.ClickHouseContainerName, config.ClickHouseSidecarContainerNames...)
+}
+
+// StatefulSetContainerGetClickHouse returns the ClickHouse container of the StatefulSet, see PodSpecContainerGetClickHouse
+func StatefulSetContainerGetClickHouse(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+	return PodSpecContainerGetClickHouse(&statefulSet.Spec.Template.Spec)
+}
+
 // getContainerClickHouse
 func (cm *ContainerManager) getContainerClickHouse(statefulSet *apps.StatefulSet) (*core.Container, bool) {
-	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseContainerName, 0)
+	return StatefulSetContainerGetClickHouse(statefulSet)
 }
 
 // getContainerClickHouseLog

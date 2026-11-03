@@ -14,7 +14,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
-GO_IMAGE="${GO_IMAGE:-golang:$(grep '^go ' "${REPO_ROOT}/go.mod" | awk '{print $2}')-alpine}"
+# GO_VERSION (the go.mod directive) and GOFIPS140 (the FIPS module the images ship) come from the
+# build config the image builds use, so the harness validates the shipped module rather than the
+# toolchain's in-tree one, which is a newer, different module.
+source "${REPO_ROOT}/dev/go_build_config.sh"
+
+GO_IMAGE="${GO_IMAGE:-golang:${GO_VERSION}-alpine}"
 BORINGSSL_DIR="${BORINGSSL_DIR:-/tmp/boringssl}"
 ACVP_TESTDATA_DIR="${ACVP_TESTDATA_DIR:-/tmp/acvp-testdata}"
 BORINGSSL_COMMIT="${BORINGSSL_COMMIT:-baaf868e6e8f}"
@@ -38,6 +43,7 @@ esac
 
 echo "[1/4] Build ${BINARY} (with -tags acvp_wrapper) and ACVP symlink"
 docker run --rm \
+  -e GOFIPS140="${GOFIPS140}" \
   -v "${REPO_ROOT}:/work" \
   -w /work \
   "${GO_IMAGE}" \
