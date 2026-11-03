@@ -34,12 +34,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
 )
 
-// TestKubeInformerFactoryFiltersToCHOPGeneratedObjects pins the CHI wiring, not the helper that
-// builds the selector.
-//
-// A selector that is correct but never handed to the factory is indistinguishable, in any test
-// that only inspects the selector, from one that is. This drives the real constructor and asserts
-// on what the informer ends up holding, so deleting the WithTweakListOptions line fails here.
 // The password watcher must use PartialObjectMetadata, never full Secret values.
 // This tests the factory used by initClickHouse and the cache it actually builds.
 func TestPasswordSecretInformerCachesOnlyMetadata(t *testing.T) {
@@ -64,8 +58,8 @@ func TestPasswordSecretInformerCachesOnlyMetadata(t *testing.T) {
 	)
 	factory, informer := newPasswordSecretMetadataInformerFactory(client, "ns")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	defer factory.Shutdown()
+	defer cancel()
 
 	factory.Start(ctx.Done())
 	require.True(t, cache.WaitForCacheSync(ctx.Done(), informer.HasSynced))
@@ -78,6 +72,12 @@ func TestPasswordSecretInformerCachesOnlyMetadata(t *testing.T) {
 	require.Equal(t, "passwords", secret.Name)
 }
 
+// TestKubeInformerFactoryFiltersToCHOPGeneratedObjects pins the CHI wiring, not the helper that
+// builds the selector.
+//
+// A selector that is correct but never handed to the factory is indistinguishable, in any test
+// that only inspects the selector, from one that is. This drives the real constructor and asserts
+// on what the informer ends up holding, so deleting the WithTweakListOptions line fails here.
 func TestKubeInformerFactoryFiltersToCHOPGeneratedObjects(t *testing.T) {
 	ours := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
