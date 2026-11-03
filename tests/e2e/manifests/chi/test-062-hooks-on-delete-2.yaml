@@ -1,0 +1,29 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-062-hooks
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  useTemplates:
+    - name: clickhouse-version
+  reconcile:
+    host:
+      hooks:
+        pre:
+          - sql:
+              queries:
+                - "SELECT 'host_ondelete_hook_marker'"
+            events:
+              - HostDelete
+            failurePolicy: Ignore
+  configuration:
+    clusters:
+      - name: default
+        # Scaled down to 1 shard. The reconcile to this manifest deletes shard 1
+        # (host chi-test-062-hooks-default-1-0-0); its pre-delete hook should fire
+        # against that host before it is torn down.
+        layout:
+          shardsCount: 1
+          replicasCount: 1

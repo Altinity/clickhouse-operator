@@ -190,6 +190,115 @@ spec:
           onLostVolume: yes
           # Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
           active: no
+      # Optional, hooks to execute before/after each host reconcile.
+      # Hooks defined at CHI level are inherited by all clusters.
+      # Hooks are skipped on first CHI creation (no live hosts yet).
+      hooks:
+        pre:
+          - sql:
+              queries:
+                - "SYSTEM STOP REPLICATION QUEUES"
+            # `events:` is REQUIRED and non-empty. It lists the reconcile lifecycle events
+            # at which this hook fires; the hook is skipped on any reconcile whose
+            # classifier does not emit at least one of the listed events.
+            #
+            # Events are grouped into TWO SCOPES that match the YAML hook nesting:
+            # host-scope events for host-level hooks (this block, under
+            # spec.reconcile.host.hooks) and cluster-scope events for cluster-level
+            # hooks (under spec.configuration.clusters[N].reconcile.hooks). The two
+            # scopes are independent — a cluster hook listing a Host* event is
+            # rejected at apply time. `Always` is the only value valid in both scopes.
+            #
+            # Host-scope events (THIS hook is host-level, so these apply):
+            #
+            #   Always            - fires on every hook-evaluation point, including
+            #                       the pre-delete sweep on the dying host
+            #   HostCreate        - first reconcile that creates a host (no ancestor);
+            #                       best paired with POST hooks (PRE on first creation
+            #                       is silently inert because the pod is not up yet)
+            #   HostUpdate        - reconcile that has prior state for the host (i.e.
+            #                       neither create nor delete); the catch-all for
+            #                       ongoing reconciles
+            #   HostStart         - host transitions from stopped to running
+            #   HostStop          - host is being stopped (current spec marks it stopped)
+            #   HostConfigRestart - operator decided this host needs an in-place
+            #                       software restart for a config change to take effect
+            #   HostRollout       - pod-template change forces a StatefulSet rollout
+            #                       (new env var, new image, new volume, ...)
+            #   HostShutdown      - aggregate: fires whenever the pod is going to be
+            #                       brought down for any reason (Stop, ConfigRestart,
+            #                       Rollout, or Delete)
+            #   HostDelete        - host is being removed from the cluster (downsize);
+            #                       fires on the dying host before tear-down. Always
+            #                       emitted alongside HostShutdown.
+            #
+            # Cluster-scope events (used by cluster-level hooks under
+            # configuration.clusters[].reconcile.hooks — see further below):
+            #
+            #   Always           - every cluster reconcile (incl. cluster delete sweep)
+            #   ClusterCreate    - cluster's first-time reconcile (ALL hosts new — no
+            #                      ancestor on any of them)
+            #   ClusterReconcile - ongoing reconcile pass over an existing cluster (at
+            #                      least one host has prior state). Fires on every
+            #                      operator reconcile cycle, including taskID-only
+            #                      force-reconciles. NOT a "spec changed" signal.
+            #   ClusterDelete    - cluster being removed (delete sweep — wiring follow-up)
+            #
+            # HostShutdown below is the right choice for "graceful drain before any
+            # restart-class event" patterns (Alex's swarm-leave use case).
+            events:
+              - HostShutdown
+        post:
+          - sql:
+              queries:
+                - "SYSTEM START REPLICATION QUEUES"
+            events:
+              - HostUpdate
+    # Optional, CHI-level CLUSTER hooks. Inherited by every cluster's
+    # spec.configuration.clusters[N].reconcile.hooks and merged with any per-cluster
+    # additions via dedup'd MergeFrom (so defining a hook here PLUS the same hook
+    # per cluster does not double-fire).
+    #
+    # Cluster scope is independent of host scope above:
+    #   - host hooks fire per host, around each host reconcile
+    #   - cluster hooks fire once per cluster reconcile, around the host iteration
+    # Cluster hooks accept ONLY cluster-scope events (Always, ClusterCreate,
+    # ClusterReconcile, ClusterDelete) — Host* events are rejected at apply time.
+    #
+    # Use this top-level form when the same cluster-scope hook should apply to
+    # every cluster of the CHI. Override per cluster only when you genuinely need
+    # cluster-specific behavior (those hooks append to the inherited set).
+    #
+    # `target` (optional, default: FirstHost) controls which host(s) execute the SQL:
+    #   FirstHost — one host only; correct when the SQL itself fans out via
+    #               `ON CLUSTER '{cluster}'` (ClickHouse propagates the DDL).
+    #   AllHosts  — every host individually; required for SQL that does NOT
+    #               support ON CLUSTER (e.g. SYSTEM FLUSH LOGS).
+    #   AllShards — first replica of each shard.
+    # Both patterns are demonstrated below.
+    cluster:
+      hooks:
+        pre:
+          # ON CLUSTER DDL → target defaults to FirstHost (omitted)
+          - sql:
+              queries:
+                - "DETACH TABLE IF EXISTS db.kafka_table ON CLUSTER '{cluster}' PERMANENTLY"
+            events:
+              - ClusterReconcile
+        post:
+          # ON CLUSTER DDL → target defaults to FirstHost (omitted)
+          - sql:
+              queries:
+                - "ATTACH TABLE db.kafka_table ON CLUSTER '{cluster}'"
+            events:
+              - ClusterReconcile
+          # SYSTEM FLUSH LOGS does NOT support ON CLUSTER — fan out via target: AllHosts
+          - sql:
+              queries:
+                - "SYSTEM FLUSH LOGS"
+            target: AllHosts
+            events:
+              - ClusterReconcile
 
     macros:
       sections:
@@ -212,6 +321,64 @@ spec:
       useType: merge
     - name: template2
       # No namespace specified - use CHI namespace
+
+  # CHI-level security defaults. Inherited by every cluster that does not override.
+  # Operator-wide defaults live in ClickHouseOperatorConfiguration (chopconf) and
+  # cascade chopconf → CHI spec → cluster spec; lower level wins.
+  # All fields default to nil/empty so an upgrade preserves identical behavior.
+  security:
+    clickhouse:
+      # Outbound TLS knobs for the operator's ClickHouse client.
+      tls:
+        # Strict | None | "" (unset: legacy InsecureSkipVerify=true preserved).
+        verify: ""
+        # "1.2" | "1.3" | "" (Go stdlib default).
+        minVersion: ""
+        # SNI / cert-verify name override. Empty derives from dial host.
+        serverName: ""
+        # Inline PEM CA bundle. Mutually exclusive with rootCASecretRef below.
+        rootCA: ""
+        # Alternate source: read PEM CA from a Kubernetes Secret in this CHI's
+        # namespace. When Key is empty, the operator tries "ca.crt" then "tls.crt".
+        rootCASecretRef:
+          name: ""
+          key: ""
+    zookeeper:
+      # Outbound TLS knobs for the operator's ZooKeeper / Keeper client.
+      tls:
+        verify: ""
+        minVersion: ""
+    # Note: Kubernetes-API-client TLS is operator-process-scoped — there is no
+    # per-CHI override. Configure it in ClickHouseOperatorConfiguration only.
+
+  # EXPERIMENTAL. Operator-managed backup defaults, inherited by every cluster that does not
+  # override them (spec.configuration.clusters[].backup). When enabled, the operator injects a
+  # clickhouse-backup sidecar into every Pod of the cluster. See docs/backup.md.
+  backup:
+    # "yes" | "no" (default). Takes effect only where the storage in use has a secretRef, or with
+    # podTemplate set: without either the sidecar would have no backup storage, so backup stays off.
+    enabled: "no"
+    # Pod template whose container named clickhouse-backup the sidecar is built on - image, env,
+    # resources, securityContext; only that container is taken, and the backup/restore Jobs run its
+    # image under its identity. Empty, the operator builds the sidecar on its own.
+    # See docs/backup.md#customizing-the-sidecar.
+    podTemplate: ""
+    # Storages the backups may be kept in, one per level for now. name: a DNS label of at
+    # most 45 characters. secretRef: Secret in this CHI's namespace with the storage
+    # configuration of clickhouse-backup, one environment variable per key: REMOTE_STORAGE,
+    # S3_BUCKET, S3_PATH, S3_ACCESS_KEY, ...; without it, the clickhouse-backup container of the
+    # pod template podTemplate names configures the storage. A cluster takes these along with its
+    # own, pairing them by name: its own storage of a name declared here takes what it leaves out,
+    # such as secretRef, from this one.
+    storages:
+      - name: main
+        secretRef:
+          name: clickhouse-backup-storage
+    # Storage of storages the sidecar keeps the backups in. Left out, the only storage this level
+    # declares, or else the one the level a cluster inherits from uses. "" on a cluster: no storage.
+    # On a cluster that turns backup on, a name no level declares aborts the reconcile
+    # (InvalidBackupStorage).
+    storage: main
 
   defaults:
     replicasUseFQDN: "no"
@@ -241,6 +408,14 @@ spec:
 
   configuration:
     zookeeper:
+      # Option 1: Reference a ClickHouseKeeperInstallation (CHK) by name.
+      # The operator resolves this to ZooKeeper node addresses automatically.
+      # keeper:
+      #   name: my-keeper
+      #   namespace: my-namespace    # optional, defaults to CHI namespace
+      #   serviceType: replicas      # "replicas" (default) or "service"
+
+      # Option 2: Specify ZooKeeper nodes explicitly.
       nodes:
         - host: zookeeper-0.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
@@ -326,6 +501,35 @@ spec:
         layout:
           shardsCount: 3
           replicasCount: 2
+
+        # Cluster-level security knobs. Same shape as spec.security above; values
+        # here win over CHI-level and chopconf-level defaults (fill-empty merge).
+        security:
+          clickhouse:
+            tls:
+              # Strict | None | "" (inherit / legacy InsecureSkipVerify=true).
+              verify: ""
+              # "1.2" | "1.3" | "" (Go stdlib default).
+              minVersion: ""
+              # SNI / cert-verify name override. Empty derives from dial host.
+              serverName: ""
+              # Inline PEM CA bundle. Mutually exclusive with rootCASecretRef below.
+              rootCA: ""
+              # Alternate source: read PEM CA from a Kubernetes Secret in the CHI's
+              # namespace. When Key is empty, the operator tries "ca.crt" then "tls.crt".
+              rootCASecretRef:
+                name: ""
+                key: ""
+          zookeeper:
+            tls:
+              verify: ""
+              minVersion: ""
+          # Kubernetes-API-client TLS is operator-process-scoped — no per-cluster
+          # override exists. Configure it in ClickHouseOperatorConfiguration only.
+        # EXPERIMENTAL. Cluster-level backup settings. Same shape as spec.backup above;
+        # fields left empty are inherited from it, so "no" here opts the cluster out.
+        backup:
+          enabled: "no"
         reconcile:
           # Optional, overwrites reconcile.runtime from the operator's config
           runtime:
@@ -333,6 +537,43 @@ spec:
             reconcileShardsThreadsNumber: 5
             # Max percentage of concurrent shard reconciles within one cluster in progress
             reconcileShardsMaxConcurrencyPercent: 50
+
+          # Optional, cluster-level hooks to execute before/after cluster reconcile.
+          # Cluster hooks run ONCE per cluster (not per host).
+          # For cluster hooks, `target` controls where SQL executes:
+          #   - FirstHost (default): one host, suitable for ON CLUSTER queries
+          #   - AllHosts:            every host in the cluster
+          #   - AllShards:           first replica of each shard
+          # Hooks are skipped on first cluster creation (no live hosts yet).
+          hooks:
+            # Cluster-level hooks listen to CLUSTER scope events only:
+            #   Always           - every cluster reconcile (incl. cluster delete sweep)
+            #   ClusterCreate    - cluster's first-time reconcile (ALL hosts new)
+            #   ClusterReconcile - ongoing reconcile pass; fires on every operator
+            #                      reconcile cycle, NOT only on spec changes
+            #   ClusterDelete    - cluster being removed (delete sweep)
+            # Host* events are NOT valid here — they belong to host-level hooks
+            # (spec.reconcile.host.hooks above), which are evaluated per host.
+            pre:
+              - sql:
+                  queries:
+                    - "DETACH TABLE IF EXISTS db.kafka_table ON CLUSTER '{cluster}' PERMANENTLY"
+                events:
+                  - ClusterReconcile
+            post:
+              - sql:
+                  queries:
+                    - "ATTACH TABLE db.kafka_table ON CLUSTER '{cluster}'"
+                events:
+                  - ClusterReconcile
+              - sql:
+                  queries:
+                    - "SYSTEM FLUSH LOGS"
+                # target and events are HookAction fields (siblings of sql:), not SQLHookAction
+                # fields — they must be at the same indent level as `sql:` above.
+                target: AllHosts
+                events:
+                  - ClusterReconcile
 
           host:
             # Whether the operator during reconcile procedure should wait for a ClickHouse host:
@@ -370,6 +611,13 @@ spec:
           podTemplate: clickhouse-v23.8
           dataVolumeClaimTemplate: default-volume-claim
           logVolumeClaimTemplate: default-volume-claim
+        # Cluster-level keeper reference overrides top-level zookeeper config for this cluster.
+        # If a cluster has its own zookeeper config, the top-level config is ignored for this cluster.
+        zookeeper:
+          keeper:
+            name: cluster-specific-keeper
+            namespace: keeper-namespace
+            serviceType: service
         layout:
           shardsCount: 3
           # replicasCount not specified, assumed = 1, by default

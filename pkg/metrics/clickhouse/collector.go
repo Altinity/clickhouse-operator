@@ -59,10 +59,10 @@ func (c *Collector) collectSystemMetrics(ctx context.Context, host *metrics.Watc
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d system metrics for host %s", elapsed, len(metrics), host.Hostname)
 		c.writer.WriteMetrics(metrics)
-		c.writer.WriteOKFetch("system.metrics")
+		c.writer.WriteOKFetch("system_metrics")
 	} else {
 		log.Warningf("Error [%s] querying system.metrics for host %s err: %s", elapsed, host.Hostname, err)
-		c.writer.WriteErrorFetch("system.metrics")
+		c.writer.WriteErrorFetch("system_metrics")
 	}
 }
 
@@ -74,13 +74,13 @@ func (c *Collector) collectSystemParts(ctx context.Context, host *metrics.Watche
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d table sizes for host %s", elapsed, len(systemPartsData), host.Hostname)
 		c.writer.WriteTableSizes(systemPartsData)
-		c.writer.WriteOKFetch("table sizes")
+		c.writer.WriteOKFetch("table_sizes")
 		c.writer.WriteSystemParts(systemPartsData)
-		c.writer.WriteOKFetch("system parts")
+		c.writer.WriteOKFetch("system_parts")
 	} else {
 		log.Warningf("Error [%s] querying system.parts for host %s err: %s", elapsed, host.Hostname, err)
-		c.writer.WriteErrorFetch("table sizes")
-		c.writer.WriteErrorFetch("system parts")
+		c.writer.WriteErrorFetch("table_sizes")
+		c.writer.WriteErrorFetch("system_parts")
 	}
 }
 
@@ -92,10 +92,10 @@ func (c *Collector) collectSystemReplicas(ctx context.Context, host *metrics.Wat
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d system replicas for host %s", elapsed, len(systemReplicas), host.Hostname)
 		c.writer.WriteSystemReplicas(systemReplicas)
-		c.writer.WriteOKFetch("system.replicas")
+		c.writer.WriteOKFetch("system_replicas")
 	} else {
 		log.Warningf("Error [%s] querying system.replicas for host %s err: %s", elapsed, host.Hostname, err)
-		c.writer.WriteErrorFetch("system.replicas")
+		c.writer.WriteErrorFetch("system_replicas")
 	}
 }
 
@@ -107,10 +107,10 @@ func (c *Collector) collectMutations(ctx context.Context, host *metrics.WatchedH
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d mutations for %s", elapsed, len(mutations), host.Hostname)
 		c.writer.WriteMutations(mutations)
-		c.writer.WriteOKFetch("system.mutations")
+		c.writer.WriteOKFetch("system_mutations")
 	} else {
 		log.Warningf("Error [%s] querying system.mutations for host %s err: %s", elapsed, host.Hostname, err)
-		c.writer.WriteErrorFetch("system.mutations")
+		c.writer.WriteErrorFetch("system_mutations")
 	}
 }
 
@@ -122,10 +122,10 @@ func (c *Collector) collectSystemDisks(ctx context.Context, host *metrics.Watche
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d disks for host %s", elapsed, len(disks), host.Hostname)
 		c.writer.WriteSystemDisks(disks)
-		c.writer.WriteOKFetch("system.disks")
+		c.writer.WriteOKFetch("system_disks")
 	} else {
 		log.Warningf("Error [%s] querying system.disks for host %s err: %s", elapsed, host.Hostname, err)
-		c.writer.WriteErrorFetch("system.disks")
+		c.writer.WriteErrorFetch("system_disks")
 	}
 }
 
@@ -137,9 +137,9 @@ func (c *Collector) collectDetachedParts(ctx context.Context, host *metrics.Watc
 	if err == nil {
 		log.V(1).Infof("Extracted [%s] %d detached parts info for host %s", elapsed, len(detachedParts), host.Hostname)
 		c.writer.WriteDetachedParts(detachedParts)
-		c.writer.WriteOKFetch("system.detached_parts")
+		c.writer.WriteOKFetch("system_detached_parts")
 	} else {
 		log.Warningf("Error [%s] querying system.detached_parts for host %s err: %s", elapsed, host.Hostname, err)
-		c.writer.WriteErrorFetch("system.detached_parts")
+		c.writer.WriteErrorFetch("system_detached_parts")
 	}
 }

@@ -142,16 +142,20 @@ const (
 type MetricsFetcher struct {
 	connectionParams *clickhouse.EndpointConnectionParams
 	tablesRegexp     string
+	// Used to filter system-metric names while fetching metrics. Nil means keep all.
+	metricsFilter MetricsFilter
 }
 
 // NewMetricsFetcher creates new clickhouse fetcher object
 func NewMetricsFetcher(
 	endpointConnectionParams *clickhouse.EndpointConnectionParams,
 	tablesRegexp string,
+	metricsFilter MetricsFilter,
 ) *MetricsFetcher {
 	return &MetricsFetcher{
 		connectionParams: endpointConnectionParams,
 		tablesRegexp:     tablesRegexp,
+		metricsFilter:    metricsFilter,
 	}
 }
 
@@ -160,8 +164,10 @@ func (f *MetricsFetcher) connection() *clickhouse.Connection {
 	return clickhouse.GetPooledDBConnection(f.connectionParams)
 }
 
-// buildMetricsTableSource returns the FROM clause for the metrics query.
-// If tablesRegexp is set, it uses merge() to query tables matching the regexp.
+// buildMetricsTableSource returns the FROM clause for the metrics query —
+// the WHICH-tables half of the SQL build (cf. buildMetricsSQL which assembles
+// the full query). If tablesRegexp is set it uses merge() to query tables
+// matching the regexp; otherwise it falls back to the bundled default.
 func (f *MetricsFetcher) buildMetricsTableSource() string {
 	if f.tablesRegexp == "" {
 		return "merge('system','^(metrics|custom_metrics)$')"
@@ -169,20 +175,43 @@ func (f *MetricsFetcher) buildMetricsTableSource() string {
 	return fmt.Sprintf("merge('system','%s')", f.tablesRegexp)
 }
 
-// getClickHouseQueryMetrics requests metrics data from ClickHouse
+// buildMetricsSQL renders the metrics-fetch SQL by substituting the table-source
+// clause into queryMetricsSQLTemplate. Symmetric with buildMetricsTableSource:
+// one helper picks WHICH tables to read, this one assembles the full query.
+func (f *MetricsFetcher) buildMetricsSQL() string {
+	return fmt.Sprintf(queryMetricsSQLTemplate, f.buildMetricsTableSource())
+}
+
+// getClickHouseQueryMetrics requests metrics data from ClickHouse.
+// Excluded names are dropped during row scan so they never enter the in-memory buffer.
+// SQL-side filtering was tried and abandoned: wrapping the UNION-ALL in
+// `FROM (...) WHERE NOT (...)` caused zero rows on restart-then-scrape windows.
 func (f *MetricsFetcher) getClickHouseQueryMetrics(ctx context.Context) (Table, error) {
-	metricsSQL := fmt.Sprintf(queryMetricsSQLTemplate, f.buildMetricsTableSource())
 	return f.clickHouseQueryScanRows(
 		ctx,
-		metricsSQL,
+		f.buildMetricsSQL(),
 		func(rows *sql.Rows, data *Table) error {
 			var metric, value, description, _type string
 			if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
-				*data = append(*data, []string{metric, value, description, _type})
+				f.appendMetricRow(data, metric, value, description, _type)
 			}
 			return nil
 		},
 	)
+}
+
+// appendMetricRow adds a scanned system-metrics row to the buffer, dropping excluded
+// names first. This is a memory pre-filter on the highest-cardinality fetch path (the
+// system.metrics/asynchronous_metrics UNION, whose per-CPU OS series scale with core
+// count) so excluded rows never enter the in-memory Table. Names synthesized by the
+// other query paths (parts, mutations, disks, replicas) never reach this scan, so the
+// writer-side filter stays authoritative for those; where both paths see a name the
+// filter is identical, so re-checking writer-side is idempotent.
+func (f *MetricsFetcher) appendMetricRow(data *Table, metric, value, description, _type string) {
+	if IsExcluded(f.metricsFilter, metric) {
+		return
+	}
+	*data = append(*data, []string{metric, value, description, _type})
 }
 
 // getClickHouseSystemParts requests data sizes from ClickHouse

@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 
@@ -36,6 +37,18 @@ const (
 	StatusCompleted   = "Completed"
 	StatusAborted     = "Aborted"
 	StatusTerminating = "Terminating"
+)
+
+// Status reasons distinguish flavors of StatusAborted. The reason is pushed
+// into the error stream so operators can grep / dashboards can branch on it
+// (existing CR status schema has no first-class Reason field — preserving
+// the schema is the back-compat trade-off). Aliased to the CHI value so
+// operator dashboards can pattern-match a single tag across both kinds.
+const (
+	StatusReasonFIPSValidationFailed     = chi.StatusReasonFIPSValidationFailed
+	StatusReasonFIPSImagePolicyViolation = chi.StatusReasonFIPSImagePolicyViolation
+	StatusReasonNoKeeperListener         = chi.StatusReasonNoKeeperListener
+	StatusReasonRaftQuorumUnsafe         = chi.StatusReasonRaftQuorumUnsafe
 )
 
 // Status defines status section of the custom resource.
@@ -330,6 +343,28 @@ func (s *Status) ReconcileAbort() {
 	})
 }
 
+// ReconcileAbortWithReason marks reconcile abortion AND records a reason-tagged
+// error so callers can distinguish flavors of Aborted (e.g. FIPSValidationFailed)
+// from the generic case. The reason is prepended to the message in `[reason] msg`
+// form — operators and dashboards grep the error stream for the bracketed tag.
+func (s *Status) ReconcileAbortWithReason(reason, msg string) {
+	doWithWriteLock(s, func(s *Status) {
+		if s == nil {
+			return
+		}
+		s.Status = StatusAborted
+		s.Action = ""
+		pushTaskIDCompletedNoSync(s)
+		if (reason != "") || (msg != "") {
+			tagged := fmt.Sprintf("[%s] %s", reason, msg)
+			s.Errors = append([]string{tagged}, s.Errors...)
+			if len(s.Errors) > maxErrors {
+				s.Errors = s.Errors[:maxErrors]
+			}
+		}
+	})
+}
+
 // DeleteStart marks deletion start
 func (s *Status) DeleteStart() {
 	doWithWriteLock(s, func(s *Status) {
@@ -360,7 +395,6 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.TaskIDsCompleted = true
 		opts.Copy.Actions = true
 		opts.Copy.Errors = true
-		opts.Copy.UsedTemplates = true
 	}
 
 	if opts.FieldGroupActions {
@@ -561,8 +595,8 @@ func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 				}
 			}
 			if opts.Copy.UsedTemplates {
-				if len(from.UsedTemplates) > len(s.UsedTemplates) {
-					s.UsedTemplates = nil
+				s.UsedTemplates = nil
+				if len(from.UsedTemplates) > 0 {
 					s.UsedTemplates = append(s.UsedTemplates, from.UsedTemplates...)
 				}
 			}
@@ -864,7 +898,16 @@ func getStringArrWithReadLock(s *Status, f func(*Status) []string) []string {
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return f(s)
+	// Return a COPY so callers may iterate the snapshot after the read lock is
+	// released without racing concurrent writers (PushError/SetAndPushError/
+	// ReconcileAbortWithReason mutate the underlying slice).
+	src := f(s)
+	if src == nil {
+		return emptyArr
+	}
+	cp := make([]string, len(src))
+	copy(cp, src)
+	return cp
 }
 
 // mergeActionsNoSync merges the actions of from into those of s (without synchronization, because synchronized

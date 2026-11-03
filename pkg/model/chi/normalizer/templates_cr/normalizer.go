@@ -16,6 +16,7 @@ package templates_cr
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // NormalizeTemplateRefList normalizes list of templates use specifications
@@ -38,10 +39,11 @@ func normalizeTemplateRef(templateRef *api.TemplateRef) *api.TemplateRef {
 		// So far do nothing with empty namespace
 	}
 
-	// Ensure UseType
-	switch templateRef.UseType {
+	// Ensure UseType — fold any accepted casing to the canonical const; unknown values
+	// fall back to the default. Kept as a switch so future use types are just new cases.
+	switch util.FoldEnum(templateRef.UseType, UseTypeMerge) {
 	case UseTypeMerge:
-		// Known use type, all is fine, do nothing
+		templateRef.UseType = UseTypeMerge
 	default:
 		// Unknown use type - overwrite with default value
 		templateRef.UseType = UseTypeMerge

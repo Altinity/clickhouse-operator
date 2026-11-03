@@ -19,13 +19,19 @@
 ##
 ################################################
 watch:
-  # List of namespaces where clickhouse-operator watches for events.
+  # Namespaces where clickhouse-operator watches for events.
   # Concurrently running operators should watch on different namespaces.
-  # IMPORTANT
-  # Regexp is applicable.
+  # `include` and `exclude` accept literal namespace names or regexp patterns.
+  # Empty `include` watches the operator's own namespace (or all namespaces when
+  # the operator runs in `kube-system`); use [".*"] to force watch-all elsewhere.
+  # Empty `exclude` matches none. `exclude` is applied after `include`.
   namespaces:
     include: [dev, test]
     exclude: []
+
+  # Behavior when ClickHouseOperatorConfiguration changes: none | restart
+  configuration:
+    onChange: restart
 
 clickhouse:
   configuration:
@@ -113,7 +119,8 @@ clickhouse:
       - version: "*"
         rules:
           # see https://kb.altinity.com/altinity-kb-setup-and-maintenance/altinity-kb-server-config-files/#server-config-configxml-sections-which-dont-require-restart
-          # to be replaced with "select * from system.server_settings where changeable_without_restart = 'No'"
+          # changeable_without_restart = Yes reloads that server setting even when a wildcard rule below says restart.
+          # An exact rule such as settings/<name>: "yes" still restarts. Other server settings follow the rules below.
 
           - settings/*: "yes"
 
@@ -158,8 +165,8 @@ clickhouse:
     # Possible values for 'scheme' are:
     #   1. http - force http to be used to connect to ClickHouse instances
     #   2. https - force https to be used to connect to ClickHouse instances
-    #   3. auto - either http or https is selected based on open ports
-    scheme: "auto"
+    #   3. Auto - either http or https is selected based on open ports
+    scheme: "Auto"
     # ClickHouse credentials (username, password and port) to be used by the operator to connect to ClickHouse instances.
     # These credentials are used for:
     #   1. Metrics requests
@@ -230,7 +237,6 @@ clickhouse:
             quotas:
             settings:
             files:
-
       - version: ">= 23.5"
         spec:
           configuration:
@@ -323,6 +329,8 @@ reconcile:
   runtime:
     # Max number of concurrent CHI reconciles in progress
     reconcileCHIsThreadsNumber: 1
+    # Max number of concurrent CHK reconciles in progress
+    reconcileCHKsThreadsNumber: 1
 
     # The operator reconciles shards concurrently in each CHI with the following limitations:
     #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
@@ -422,6 +430,65 @@ reconcile:
         onLostVolume: yes
         # Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
         active: no
+
+  ################################################
+  ##
+  ## Coordination with external systems during reconcile
+  ##
+  ################################################
+  coordination:
+    keeper:
+      # How long the operator waits for a referenced ClickHouseKeeper to become ready
+      # before aborting CHI reconcile. In seconds.
+      readyTimeout: 120
+      # Reaction when a referenced CHK resource changes:
+      #   none      — do nothing (default, backward-compatible)
+      #   reconcile — trigger CHI reconcile
+      # onKeeperResourceUpdate: none
+
+  ################################################
+  ##
+  ## Auto-recovery from aborted reconcile
+  ##
+  ################################################
+  recovery:
+    # Recovery scopes keyed by the CHI .status.status they apply to.
+    # Each scope contains on<Event>: <action> mappings that apply while the CHI
+    # is in that status. Multi-scope design anticipates future states beyond Aborted
+    # (e.g. Failed, Broken).
+    onStatus:
+      # Recovery while Status=Aborted
+      aborted:
+        # Action when a pod belonging to an Aborted CHI transitions to Ready:
+        #   retry (default) — re-enqueue the CHI for reconcile
+        #   none            — do nothing, CHI stays Aborted
+        onPodReady: retry
+        # Future events (not yet implemented):
+        #   onKeeperReady: retry       — retry when a referenced CHK becomes ready
+        #   onOperatorRestart: retry   — sweep Aborted CHIs on operator startup
+      # Future scopes (not yet implemented):
+      # failed:
+      #   onPodReady: retry
+      # broken:
+      #   onPodReady: retry
+
+    # Future global policy knobs (not yet implemented) — flat peers of `onStatus`,
+    # apply across all recovery scopes:
+    #
+    # Global kill-switch for auto-recovery:
+    # enabled: true
+    #
+    # Cap on consecutive auto-recovery attempts before giving up:
+    # retries: 5
+    #
+    # Minimum time between auto-recovery attempts for the same CHI:
+    # cooldown: 30s
+    #
+    # Exponential backoff for auto-recovery attempts:
+    # backoff:
+    #   duration: 5s
+    #   factor: 2
+    #   maxDuration: 2m
 
 ################################################
 ##

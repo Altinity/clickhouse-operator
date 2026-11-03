@@ -1,0 +1,24 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-078-verify-none
+spec:
+  configuration:
+    # External ZooKeeper with secure: true — passes the ZK strict gate so the
+    # verify:None bypass on the cluster is the gate under test.
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2281
+          secure: "true"
+    clusters:
+      - name: c1
+        # Cluster-level security explicitly relaxes verify; under FIPS Enforced
+        # policy this is a bypass attempt that rejectFIPSBypass must catch.
+        security:
+          clickhouse:
+            tls:
+              verify: None
+        layout:
+          shardsCount: 1
+          replicasCount: 1

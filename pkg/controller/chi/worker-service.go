@@ -181,7 +181,7 @@ func (w *worker) updateService(
 			M(cr).F().
 			Info("Update Service success: %s", util.NamespaceNameString(newService))
 	} else {
-		w.a.M(cr).F().Error("Update Service fail: %s failed with error: %v", util.NamespaceNameString(newService))
+		w.a.M(cr).F().Error("Update Service fail: %s failed with error: %v", util.NamespaceNameString(newService), err)
 	}
 
 	return err

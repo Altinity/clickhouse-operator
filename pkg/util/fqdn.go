@@ -30,3 +30,12 @@ func NormalizeFQDNs(fqdns []string) []string {
 	}
 	return result
 }
+
+// TrimHostListToFQDNs keeps only entries from hosts that appear in fqdns (after FQDN normalization).
+// If fqdns is nil, hosts is returned unchanged — callers that refresh status FQDNs later may sync explicitly.
+func TrimHostListToFQDNs(hosts []string, fqdns []string) []string {
+	if fqdns == nil {
+		return hosts
+	}
+	return IntersectStringArrays(NormalizeFQDNs(hosts), NormalizeFQDNs(fqdns))
+}

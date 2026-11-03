@@ -15,6 +15,8 @@
 package util
 
 import (
+	"slices"
+
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -68,6 +70,25 @@ func MergeEnvVars(to []core.EnvVar, from ...core.EnvVar) []core.EnvVar {
 		if !HasEnvVar(to, candidate) {
 			to = append(to, candidate)
 		}
+	}
+	return to
+}
+
+// OverwriteEnvVars sets in `to` every element of `from`, replacing the first element of the same name in place and
+// dropping any later one, which kubelet would apply over it
+func OverwriteEnvVars(to []core.EnvVar, from ...core.EnvVar) []core.EnvVar {
+	for _, candidate := range from {
+		i := slices.IndexFunc(to, func(envVar core.EnvVar) bool {
+			return envVar.Name == candidate.Name
+		})
+		if i < 0 {
+			to = append(to, candidate)
+			continue
+		}
+		to[i] = candidate
+		to = append(to[:i+1], slices.DeleteFunc(to[i+1:], func(envVar core.EnvVar) bool {
+			return envVar.Name == candidate.Name
+		})...)
 	}
 	return to
 }

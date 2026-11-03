@@ -1,0 +1,29 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-062-hooks
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  useTemplates:
+    - name: clickhouse-version
+  reconcile:
+    host:
+      hooks:
+        # Pre hook scoped to HostShutdown — the aggregate event covering Stop, Rollout,
+        # and ConfigRestart. Should NOT fire on a no-op force-reconcile (taskID-only
+        # change with no diff). SHOULD fire when a config change forces a software
+        # restart (HostConfigRestart → triggers HostShutdown).
+        pre:
+          - sql:
+              queries:
+                - "SELECT 'host_onshutdown_hook_marker'"
+            events:
+              - HostShutdown
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1

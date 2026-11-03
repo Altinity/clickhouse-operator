@@ -870,10 +870,22 @@ spec:
   configuration:
     users:
       default/password: default
-      # reference to namespace/name/field in the secret containing passwords
-      user1/k8s_secret_password: test/test-011-secret/pwduser1
-      user2/k8s_secret_password_sha256_hex: test/test-011-secret/pwduser2
-      user3/k8s_secret_password_double_sha1_hex: test/test-011-secret/pwduser3
+      # reference a secret in the CHI's own namespace containing passwords
+      user1/password:
+        valueFrom:
+          secretKeyRef:
+            name: test-011-secret
+            key: pwduser1
+      user2/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: test-011-secret
+            key: pwduser2
+      user3/password_double_sha1_hex:
+        valueFrom:
+          secretKeyRef:
+            name: test-011-secret
+            key: pwduser3
     clusters:
     - name: default
       layout:
@@ -1006,14 +1018,14 @@ version: 1.0
 
 [ClickHouse Operator] SHALL support customized [Pod] templates for cluster, shard, replica and [CHI] level.
 [Pod] templates SHALL correspond to [Kubernetes] `PodTemplate` standard specification with
-two additional properties `distribution` and `zones` to simplify affinity and anti-affinity rules.
+two additional properties `podDistribution` and `zones` to simplify affinity and anti-affinity rules.
 
 Pod templates SHALL support defining the following:
 
 * image reference for particular [ClickHouse] version
 * CPU/memory requests
 * affinity and anti-affinity rules that are also available as separate shortcuts:
-  * `distribution`’ property streamlines OnePerHost semantics
+  * `podDistribution` property streamlines pod anti-affinity semantics
   * `zones` property streamlines multi-AZ deployment (tested with AWS)
 
 ### Custom Service Templates

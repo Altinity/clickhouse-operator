@@ -1,0 +1,13 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-070-no-security
+spec:
+  # No security: block anywhere. Exercises the zero-regression upgrade path —
+  # operator must behave identically to pre-0.27.1.
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1

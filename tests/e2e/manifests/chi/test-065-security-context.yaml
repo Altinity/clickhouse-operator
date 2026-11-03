@@ -1,0 +1,31 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-065-security-context
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    clusters:
+      - name: default
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-pod
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  add:
+                    - CHOWN
+                    - SETUID
+                    - SETGID
+                  drop:
+                    - ALL
+                    - NET_RAW
+                seccompProfile:
+                  type: RuntimeDefault

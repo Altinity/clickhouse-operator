@@ -1,0 +1,28 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-062-hooks
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  useTemplates:
+    - name: clickhouse-version
+  reconcile:
+    host:
+      hooks:
+        # Post hook scoped to HostCreate. Should run exactly once on initial host
+        # creation (when the host first becomes available, after pod is up). Should
+        # NOT run on subsequent reconciles where the host already has an ancestor.
+        post:
+          - sql:
+              queries:
+                - "SELECT 'host_oncreate_hook_marker'"
+            events:
+              - HostCreate
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1

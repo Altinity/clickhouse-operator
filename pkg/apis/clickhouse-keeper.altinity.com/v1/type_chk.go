@@ -201,14 +201,8 @@ func (cr *ClickHouseKeeperInstallation) MergeFrom(from *ClickHouseKeeperInstalla
 	}
 
 	// Merge Meta
-	switch _type {
-	case apiChi.MergeTypeFillEmptyValues:
-		_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta)
-		_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta)
-	case apiChi.MergeTypeOverrideByNonEmptyValues:
-		_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta, mergo.WithOverride)
-		_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta, mergo.WithOverride)
-	}
+	_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta, apiChi.MergoOptions(_type)...)
+	_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta, apiChi.MergoOptions(_type)...)
 	// Exclude skipped annotations
 	cr.SetAnnotations(
 		util.CopyMapFilter(
@@ -305,6 +299,12 @@ func (cr *ClickHouseKeeperInstallation) HostsWithAttributesCount(a *types.Reconc
 	return count
 }
 
+// HasReconcileWork reports whether the CR has any work to reconcile:
+// either the ActionPlan has spec/label/finalizer changes, or child resources have drifted.
+func (cr *ClickHouseKeeperInstallation) HasReconcileWork() bool {
+	return cr.EnsureRuntime().ActionPlan.HasActionsToDo() || cr.GetHostsAttributesCounters().HasDrift()
+}
+
 // GetHostsAttributesCounters
 func (cr *ClickHouseKeeperInstallation) GetHostsAttributesCounters() *types.ReconcileAttributesCounters {
 	counters := types.NewReconcileAttributesCounters()
@@ -379,6 +379,9 @@ func (cr *ClickHouseKeeperInstallation) GetServiceTemplates(names ...string) ([]
 
 // GetRootServiceTemplates gets service templates of a CR
 func (cr *ClickHouseKeeperInstallation) GetRootServiceTemplates() ([]*apiChi.ServiceTemplate, bool) {
+	if cr == nil {
+		return nil, false
+	}
 	if !cr.GetSpecT().GetDefaults().Templates.HasAnyServiceTemplate() {
 		return nil, false
 	}

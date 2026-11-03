@@ -22,8 +22,3 @@ const (
 	componentName   = "clickhouse-operator"
 	runWorkerPeriod = time.Second
 )
-
-const (
-	messageUnableToDecode = "unable to decode object (invalid type)"
-	messageUnableToSync   = "unable to sync caches for %s controller"
-)

@@ -24,6 +24,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 )
 
@@ -45,6 +46,7 @@ type HostRequest struct {
 	CRNamespace string               `json:"crNamespace"`
 	CRName      string               `json:"crName"`
 	ClusterName string               `json:"clusterName"`
+	ClusterTLS  *metrics.WatchedTLS  `json:"clusterTLS,omitempty"`
 	Host        *metrics.WatchedHost `json:"host"`
 }
 
@@ -174,14 +176,38 @@ func StartMetricsREST(
 	// Create REST server
 	restServer := NewRESTServer(registry)
 
+	// Resolve operator↔exporter IPC mode. In Plain mode (default) preserves
+	// today's behavior: server binds the supplied addresses on all interfaces,
+	// no auth. In Secure mode: server binds the loopback BindHost, /chi handler
+	// is wrapped in a token-check middleware reading the shared-volume token.
+	ipc := resolveIPC()
+	chiHandler := http.Handler(restServer)
+	if ipc.Mode == api.IPCModeSecure {
+		// Wait for the operator to provision the token in the shared volume.
+		// Container startup order is not guaranteed; tolerate a brief race.
+		token, err := ipc.waitForToken()
+		if err != nil {
+			log.Fatalf("IPC Secure mode requested but token cannot be loaded: %v", err)
+		}
+		chiHandler = ipcAuthMiddleware(restServer, token)
+		log.Infof("IPC: Secure mode — binding /chi to %s, requiring %s header", ipc.BindHost, api.IPCHeaderToken)
+	}
+
 	// Setup HTTP handlers
 	http.Handle(metricsPath, promhttp.Handler())
-	http.Handle(chiListPath, restServer)
+	http.Handle(chiListPath, chiHandler)
 
-	// Start HTTP servers
+	// Start HTTP servers. Prometheus /metrics ALWAYS binds the original address
+	// (typically all-interfaces) so ServiceMonitor scrapes from outside the Pod
+	// keep working. In Secure mode the /chi handler is protected by the loopback
+	// + token middleware (see chiHandler above); since /metrics and /chi commonly
+	// share a port, we cannot bind /chi to a different interface on the same
+	// listener — instead the middleware enforces remoteAddr=loopback at request
+	// time. If a custom config splits the two addresses, the /chi listener is
+	// bound to BindHost in Secure mode.
 	go http.ListenAndServe(metricsAddress, nil)
 	if metricsAddress != chiListAddress {
-		go http.ListenAndServe(chiListAddress, nil)
+		go http.ListenAndServe(ipc.secureBindAddress(chiListAddress), nil)
 	}
 
 	return exporter

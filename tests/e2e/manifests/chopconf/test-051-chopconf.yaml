@@ -1,0 +1,11 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-051-chopconf"
+spec:
+  clickhouse:
+    metrics:
+      excludeRegexp:
+        - "^table_parts$"
+        - "^table_parts_bytes_uncompressed$"
+        - "^table_parts_rows$"

@@ -328,6 +328,11 @@ func (in *ChkSpec) DeepCopyInto(out *ChkSpec) {
 		*out = new(clickhousealtinitycomv1.Templates)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Security != nil {
+		in, out := &in.Security, &out.Security
+		*out = new(clickhousealtinitycomv1.ClusterSecurity)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -430,6 +435,9 @@ func (in *ClickHouseKeeperInstallationRuntime) DeepCopyInto(out *ClickHouseKeepe
 		in, out := &in.MaxVersion, &out.MaxVersion
 		*out = (*in).DeepCopy()
 	}
+	if in.ActionPlan != nil {
+		out.ActionPlan = in.ActionPlan.DeepCopyIActionPlan()
+	}
 	return
 }
 
@@ -461,11 +469,6 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 		*out = new(clickhousealtinitycomv1.TemplatesList)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Layout != nil {
-		in, out := &in.Layout, &out.Layout
-		*out = new(ChkClusterLayout)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.PDBManaged != nil {
 		in, out := &in.PDBManaged, &out.PDBManaged
 		*out = new(types.StringBool)
@@ -479,6 +482,26 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 	if in.Reconcile != nil {
 		in, out := &in.Reconcile, &out.Reconcile
 		*out = new(clickhousealtinitycomv1.ClusterReconcile)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Security != nil {
+		in, out := &in.Security, &out.Security
+		*out = new(clickhousealtinitycomv1.ClusterSecurity)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Insecure != nil {
+		in, out := &in.Insecure, &out.Insecure
+		*out = new(types.StringBool)
+		**out = **in
+	}
+	if in.Secure != nil {
+		in, out := &in.Secure, &out.Secure
+		*out = new(types.StringBool)
+		**out = **in
+	}
+	if in.Layout != nil {
+		in, out := &in.Layout, &out.Layout
+		*out = new(ChkClusterLayout)
 		(*in).DeepCopyInto(*out)
 	}
 	in.Runtime.DeepCopyInto(&out.Runtime)
@@ -623,8 +646,7 @@ func (in *Status) DeepCopyInto(out *Status) {
 	}
 	if in.ActionPlan != nil {
 		in, out := &in.ActionPlan, &out.ActionPlan
-		*out = new(clickhousealtinitycomv1.ActionPlan)
-		(*in).DeepCopyInto(*out)
+		*out = (*in).DeepCopy()
 	}
 	if in.HostsWithTablesCreated != nil {
 		in, out := &in.HostsWithTablesCreated, &out.HostsWithTablesCreated

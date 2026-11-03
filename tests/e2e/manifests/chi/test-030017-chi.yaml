@@ -1,0 +1,33 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-030017-chi
+spec:
+  # chi-...-0-0.<ns>.127.0.0.1.nip.io → 127.0.0.1 on the host; operator Ping(:8443)
+  # hits local openssl s_server, not a real ClickHouse HTTPS listener.
+  namespaceDomainPattern: "%s.127.0.0.1.nip.io"
+  reconcile:
+    host:
+      wait:
+        exclude: "no"
+        queries: "no"
+        probes:
+          startup: "no"
+          readiness: "no"
+  templates:
+    podTemplates:
+      - name: clickhouse
+        spec:
+          containers:
+            - name: clickhouse
+              image: altinity/clickhouse-server:25.3.8.30001.altinityfips
+  configuration:
+    clusters:
+      - name: default
+        secure: "yes"
+        insecure: "no"
+        templates:
+          podTemplate: clickhouse
+        layout:
+          shardsCount: 1
+          replicasCount: 1

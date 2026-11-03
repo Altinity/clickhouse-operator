@@ -82,3 +82,13 @@ Date:   Mon Jan 24 12:34:56 2020 +0200
 ```
 
 Notice the `Author` and `Signed-off-by` lines **must match**.
+
+## License
+
+Contributions are licensed under the Apache License, Version 2.0 (see [LICENSE](./LICENSE) and [NOTICE](./NOTICE)).
+
+For new Go files, use the existing Apache header style (copyright line without "All rights reserved", plus the standard Apache-2.0 boilerplate). Optionally add:
+
+```go
+// SPDX-License-Identifier: Apache-2.0
+```

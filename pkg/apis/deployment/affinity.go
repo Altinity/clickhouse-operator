@@ -14,6 +14,8 @@
 
 package deployment
 
+import "github.com/altinity/clickhouse-operator/pkg/util"
+
 // Possible pod distributions
 const (
 	PodDistributionUnspecified = "Unspecified"
@@ -50,9 +52,6 @@ const (
 	PodDistributionScopeNamespace = "Namespace"
 	// No Pods can co-exist on one node
 	PodDistributionScopeGlobal = "Global"
-
-	// Deprecated value
-	PodDistributionOnePerHost = "OnePerHost"
 )
 
 // Possible port distributions
@@ -60,3 +59,54 @@ const (
 	PortDistributionUnspecified       = "Unspecified"
 	PortDistributionClusterScopeIndex = "ClusterScopeIndex"
 )
+
+// podDistributionTypes enumerates every recognized PodDistribution.Type value in canonical (humped) form.
+var podDistributionTypes = []string{
+	PodDistributionUnspecified,
+	PodDistributionClickHouseAntiAffinity,
+	PodDistributionShardAntiAffinity,
+	PodDistributionReplicaAntiAffinity,
+	PodDistributionAnotherNamespaceAntiAffinity,
+	PodDistributionAnotherClickHouseInstallationAntiAffinity,
+	PodDistributionAnotherClusterAntiAffinity,
+	PodDistributionNamespaceAffinity,
+	PodDistributionClickHouseInstallationAffinity,
+	PodDistributionClusterAffinity,
+	PodDistributionShardAffinity,
+	PodDistributionReplicaAffinity,
+	PodDistributionPreviousTailAffinity,
+	PodDistributionMaxNumberPerNode,
+	PodDistributionCircularReplication,
+}
+
+// podDistributionScopes enumerates every recognized PodDistribution.Scope value in canonical (humped) form.
+var podDistributionScopes = []string{
+	PodDistributionScopeUnspecified,
+	PodDistributionScopeShard,
+	PodDistributionScopeReplica,
+	PodDistributionScopeCluster,
+	PodDistributionScopeClickHouseInstallation,
+	PodDistributionScopeNamespace,
+	PodDistributionScopeGlobal,
+}
+
+// portDistributionTypes enumerates every recognized PortDistribution.Type value in canonical (humped) form.
+var portDistributionTypes = []string{
+	PortDistributionUnspecified,
+	PortDistributionClusterScopeIndex,
+}
+
+// NormalizePodDistributionType folds any accepted casing of a PodDistribution type to its canonical const.
+func NormalizePodDistributionType(value string) string {
+	return util.FoldEnum(value, podDistributionTypes...)
+}
+
+// NormalizePodDistributionScope folds any accepted casing of a PodDistribution scope to its canonical const.
+func NormalizePodDistributionScope(value string) string {
+	return util.FoldEnum(value, podDistributionScopes...)
+}
+
+// NormalizePortDistributionType folds any accepted casing of a PortDistribution type to its canonical const.
+func NormalizePortDistributionType(value string) string {
+	return util.FoldEnum(value, portDistributionTypes...)
+}

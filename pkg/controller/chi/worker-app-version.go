@@ -16,9 +16,14 @@ package chi
 
 import (
 	"context"
+	"fmt"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
+	utilfips "github.com/altinity/clickhouse-operator/pkg/util/fips"
 )
 
 func (w *worker) getTagBasedVersion(host *api.Host) *swversion.SoftWareVersion {
@@ -56,4 +61,36 @@ func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Hos
 		},
 	)
 	return
+}
+
+// enforceFIPSImagePolicyRuntime checks the running binary's `SELECT version()`
+// reply against security.images.policy. Called after the host is alive
+// and `version()` has been fetched. Returns common.ErrCRUDAbort when the CR
+// is aborted, so the error propagates to reconcile() which routes it through
+// markReconcileCompletedUnsuccessfully (the established abort persistence
+// path). Returning nil for success or fail-open avoids the bug where the
+// in-memory abort gets overwritten by the success-path finalizer that
+// re-fetches the CR from the API server.
+//
+// Fail-open semantics: nil version (transient query failure) does NOT abort —
+// admission already rejected images known to be non-FIPS; a SQL hiccup against
+// a running CR should not flip it to Aborted. The next reconcile re-evaluates.
+//
+// No-op (returns nil) when policy is Permissive or unset.
+func (w *worker) enforceFIPSImagePolicyRuntime(host *api.Host, version *swversion.SoftWareVersion) error {
+	if !chop.Config().Security.GetImages().IsRequired() {
+		return nil
+	}
+	if version == nil {
+		return nil
+	}
+	if utilfips.VersionHasFIPSMarker(version.GetOriginal()) {
+		return nil
+	}
+	host.GetCR().IEnsureStatus().ReconcileAbortWithReason(
+		api.StatusReasonFIPSImagePolicyViolation,
+		fmt.Sprintf("host %s SELECT version()=%q lacks 'fips' substring (security.images.policy=Required)",
+			host.GetName(), version.GetOriginal()),
+	)
+	return common.ErrCRUDAbort
 }

@@ -1,0 +1,24 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-068-idempotence
+spec:
+  security:
+    clickhouse:
+      tls:
+        verify: Strict
+        minVersion: "1.3"
+        serverName: idem.example
+    zookeeper:
+      tls:
+        minVersion: "1.3"
+  configuration:
+    clusters:
+      - name: default
+        security:
+          clickhouse:
+            tls:
+              verify: None
+        layout:
+          shardsCount: 1
+          replicasCount: 1

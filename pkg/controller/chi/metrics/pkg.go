@@ -34,6 +34,12 @@ func CRReconcilesCompleted(ctx context.Context, src labelsSource) {
 func CRReconcilesAborted(ctx context.Context, src labelsSource) {
 	chiReconcilesAborted(ctx, src)
 }
+func CRAutoRecoveriesTriggered(ctx context.Context, src labelsSource) {
+	chiAutoRecoveriesTriggered(ctx, src)
+}
+func CRKeeperUpdatesSkipped(ctx context.Context, src labelsSource) {
+	chiKeeperUpdatesSkipped(ctx, src)
+}
 func CRReconcilesTimings(ctx context.Context, src labelsSource, seconds float64) {
 	chiReconcilesTimings(ctx, src, seconds)
 }

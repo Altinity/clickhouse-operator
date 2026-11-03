@@ -49,6 +49,7 @@ type HostPorts struct {
 	HTTPSPort           *types.Int32 `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
 	InterserverHTTPPort *types.Int32 `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
 	ZKPort              *types.Int32 `json:"zkPort,omitempty"              yaml:"zkPort,omitempty"`
+	ZKPortSecure        *types.Int32 `json:"zkPortSecure,omitempty"        yaml:"zkPortSecure,omitempty"`
 	RaftPort            *types.Int32 `json:"raftPort,omitempty"            yaml:"raftPort,omitempty"`
 }
 
@@ -57,6 +58,7 @@ type HostSettings struct {
 	Files    *Settings `json:"files,omitempty"               yaml:"files,omitempty"`
 }
 
+// +k8s:deepcopy-gen=false
 type HostRuntime struct {
 	// Internal data
 	Address             HostAddress                `json:"-" yaml:"-"`
@@ -71,6 +73,46 @@ type HostRuntime struct {
 	DesiredStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 
 	cr ICustomResource `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+// DeepCopyInto clones HostRuntime by value, deep-copying the heap fields that have
+// their own DeepCopy methods. The unexported `cr ICustomResource` back-pointer is
+// intentionally aliased: it's a pointer back to the owning CR, and the caller is
+// expected to re-bind it via FillCR/SetCR after copying the surrounding tree.
+func (r *HostRuntime) DeepCopyInto(out *HostRuntime) {
+	*out = *r
+	if r.Version != nil {
+		in, out := &r.Version, &out.Version
+		*out = (*in).DeepCopy()
+	}
+	if r.reconcileAttributes != nil {
+		in, out := &r.reconcileAttributes, &out.reconcileAttributes
+		*out = (*in).DeepCopy()
+	}
+	if r.replicas != nil {
+		in, out := &r.replicas, &out.replicas
+		*out = new(types.Int32)
+		**out = **in
+	}
+	if r.CurStatefulSet != nil {
+		in, out := &r.CurStatefulSet, &out.CurStatefulSet
+		*out = new(apps.StatefulSet)
+		(*in).DeepCopyInto(*out)
+	}
+	if r.DesiredStatefulSet != nil {
+		in, out := &r.DesiredStatefulSet, &out.DesiredStatefulSet
+		*out = new(apps.StatefulSet)
+		(*in).DeepCopyInto(*out)
+	}
+}
+
+func (r *HostRuntime) DeepCopy() *HostRuntime {
+	if r == nil {
+		return nil
+	}
+	out := new(HostRuntime)
+	r.DeepCopyInto(out)
+	return out
 }
 
 func (r *HostRuntime) GetAddress() IHostAddress {
@@ -136,12 +178,12 @@ func (host *Host) InheritSettingsFrom(sources ...any) {
 		case IShard:
 			shard := typed
 			if shard.HasSettings() {
-				host.Settings = host.Settings.MergeFrom(shard.GetSettings())
+				host.Settings = host.Settings.MergeFrom(shard.GetSettings(), MergeTypeFillEmptyValues)
 			}
 		case IReplica:
 			replica := typed
 			if replica.HasSettings() {
-				host.Settings = host.Settings.MergeFrom(replica.GetSettings())
+				host.Settings = host.Settings.MergeFrom(replica.GetSettings(), MergeTypeFillEmptyValues)
 			}
 		}
 	}
@@ -157,12 +199,12 @@ func (host *Host) InheritFilesFrom(sources ...any) {
 		case IShard:
 			shard := typed
 			if shard.HasFiles() {
-				host.Files = host.Files.MergeFrom(shard.GetFiles())
+				host.Files = host.Files.MergeFrom(shard.GetFiles(), MergeTypeFillEmptyValues)
 			}
 		case IReplica:
 			replica := typed
 			if replica.HasFiles() {
-				host.Files = host.Files.MergeFrom(replica.GetFiles())
+				host.Files = host.Files.MergeFrom(replica.GetFiles(), MergeTypeFillEmptyValues)
 			}
 		}
 	}
@@ -223,6 +265,9 @@ func (host *Host) MergeFrom(from *Host) {
 	if !host.ZKPort.HasValue() {
 		host.ZKPort.MergeFrom(from.ZKPort)
 	}
+	if !host.ZKPortSecure.HasValue() {
+		host.ZKPortSecure.MergeFrom(from.ZKPortSecure)
+	}
 	if !host.RaftPort.HasValue() {
 		host.RaftPort.MergeFrom(from.RaftPort)
 	}
@@ -246,6 +291,16 @@ func (host *Host) GetPodTemplate() (*PodTemplate, bool) {
 		return nil, false
 	}
 	name := host.GetTemplates().GetPodTemplate()
+	return host.GetCR().GetPodTemplate(name)
+}
+
+// GetBackupPodTemplate gets the pod template the clickhouse-backup sidecar of the host is built on, which the backup
+// of its cluster names
+func (host *Host) GetBackupPodTemplate() (*PodTemplate, bool) {
+	name := host.GetCluster().GetBackup().GetPodTemplate().Value()
+	if name == "" {
+		return nil, false
+	}
 	return host.GetCR().GetPodTemplate(name)
 }
 
@@ -552,11 +607,52 @@ const (
 	ChDefaultInterserverHTTPPortNumber = int32(9009)
 
 	// Keeper open ports names and values
-	KpDefaultZKPortName     = "zk"
-	KpDefaultZKPortNumber   = int32(2181)
-	KpDefaultRaftPortName   = "raft"
-	KpDefaultRaftPortNumber = int32(9444)
+	KpDefaultZKPortName         = "zk"
+	KpDefaultZKPortNumber       = int32(2181)
+	KpDefaultZKSecurePortName   = "zk-secure"
+	KpDefaultZKSecurePortNumber = int32(2281)
+	KpDefaultRaftPortName       = "raft"
+	KpDefaultRaftPortNumber     = int32(9444)
 )
+
+// ZKPortInfo holds the extracted ZooKeeper port and whether it's a secure (TLS) port.
+type ZKPortInfo struct {
+	Port   int32
+	Secure bool
+}
+
+// ExtractZKPort extracts the ZooKeeper client port from a Kubernetes service port list.
+// Matches by port name (KpDefaultZKPortName) or port number (KpDefaultZKPortNumber).
+// Returns KpDefaultZKPortNumber if no matching port is found.
+func ExtractZKPort(ports []core.ServicePort) int32 {
+	return ExtractZKPortInfo(ports).Port
+}
+
+// ExtractZKPortInfo extracts the ZooKeeper client port and TLS flag from a service port list.
+// Prefers the secure port if available; falls back to insecure port.
+func ExtractZKPortInfo(ports []core.ServicePort) ZKPortInfo {
+	// Prefer secure port if available
+	for _, p := range ports {
+		if p.Name == KpDefaultZKSecurePortName || p.Port == KpDefaultZKSecurePortNumber {
+			return ZKPortInfo{
+				Port:   p.Port,
+				Secure: true,
+			}
+		}
+	}
+	for _, p := range ports {
+		if p.Name == KpDefaultZKPortName || p.Port == KpDefaultZKPortNumber {
+			return ZKPortInfo{
+				Port:   p.Port,
+				Secure: false,
+			}
+		}
+	}
+	return ZKPortInfo{
+		Port:   KpDefaultZKPortNumber,
+		Secure: false,
+	}
+}
 
 func (host *Host) WalkPorts(f func(name string, port *types.Int32, protocol core.Protocol) bool) {
 	if host == nil {
@@ -581,6 +677,9 @@ func (host *Host) WalkPorts(f func(name string, port *types.Int32, protocol core
 		return
 	}
 	if f(KpDefaultZKPortName, host.ZKPort, core.ProtocolTCP) {
+		return
+	}
+	if f(KpDefaultZKSecurePortName, host.ZKPortSecure, core.ProtocolTCP) {
 		return
 	}
 	if f(KpDefaultRaftPortName, host.RaftPort, core.ProtocolTCP) {
@@ -659,7 +758,7 @@ func (host *Host) ShouldIncludeIntoCluster() bool {
 	switch {
 	case host.IsStopped():
 		return false
-	case host.GetCluster().HostsCount() < 2:
+	case host.GetCluster().IsSingleNode():
 		return false
 	default:
 		return true

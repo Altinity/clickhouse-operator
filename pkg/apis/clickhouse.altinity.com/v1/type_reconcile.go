@@ -35,8 +35,32 @@ type ChiReconcile struct {
 	Runtime ReconcileRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
 	// StatefulSet specifies StatefulSet reconcile settings
 	StatefulSet ReconcileStatefulSet `json:"statefulSet,omitempty" yaml:"statefulSet,omitempty"`
-	// Host specifies host-lever reconcile settings
+	// Host specifies host-level reconcile settings inherited by every cluster's
+	// reconcile.host (each cluster can append/override per-host).
 	Host ReconcileHost `json:"host" yaml:"host"`
+	// Cluster specifies cluster-level reconcile settings inherited by every
+	// cluster's reconcile (each cluster can append/override its own pre/post hooks
+	// via the existing dedup'd merge). Provides a single CHI-level place to define
+	// "every cluster of this CHI does X on reconcile" patterns.
+	// +optional
+	Cluster *ReconcileCluster `json:"cluster,omitempty" yaml:"cluster,omitempty"`
+}
+
+// ReconcileCluster defines CHI-level cluster reconcile defaults that are inherited
+// by every cluster's reconcile section. Currently carries cluster-scope hooks; future
+// cluster-wide reconcile knobs can be added here.
+type ReconcileCluster struct {
+	// Hooks specifies cluster-level pre/post hooks inherited by every cluster.
+	// +optional
+	Hooks *ReconcileHooks `json:"hooks,omitempty" yaml:"hooks,omitempty"`
+}
+
+// GetHooks returns CHI-level cluster hooks, nil-safe when ReconcileCluster itself is nil.
+func (rc *ReconcileCluster) GetHooks() *ReconcileHooks {
+	if rc == nil {
+		return nil
+	}
+	return rc.Hooks
 }
 
 type ClusterReconcile struct {
@@ -46,6 +70,8 @@ type ClusterReconcile struct {
 	StatefulSet ReconcileStatefulSet `json:"statefulSet,omitempty" yaml:"statefulSet,omitempty"`
 	// Host specifies host-lever reconcile settings
 	Host ReconcileHost `json:"host" yaml:"host"`
+	// Hooks specifies pre/post actions for cluster-level reconcile
+	Hooks *ReconcileHooks `json:"hooks,omitempty" yaml:"hooks,omitempty"`
 }
 
 // ReconcileStatefulSet defines StatefulSet reconcile settings
@@ -74,25 +100,13 @@ type ReconcileStatefulSetRecreate struct {
 }
 
 // MergeFrom merges from specified ReconcileStatefulSet
-func (s ReconcileStatefulSet) MergeFrom(from ReconcileStatefulSet) ReconcileStatefulSet {
-	if s.Create.OnFailure == "" {
-		s.Create.OnFailure = from.Create.OnFailure
-	}
-	if s.Update.Timeout == 0 {
-		s.Update.Timeout = from.Update.Timeout
-	}
-	if s.Update.PollInterval == 0 {
-		s.Update.PollInterval = from.Update.PollInterval
-	}
-	if s.Update.OnFailure == "" {
-		s.Update.OnFailure = from.Update.OnFailure
-	}
-	if s.Recreate.OnDataLoss == "" {
-		s.Recreate.OnDataLoss = from.Recreate.OnDataLoss
-	}
-	if s.Recreate.OnUpdateFailure == "" {
-		s.Recreate.OnUpdateFailure = from.Recreate.OnUpdateFailure
-	}
+func (s ReconcileStatefulSet) MergeFrom(from ReconcileStatefulSet, _type MergeType) ReconcileStatefulSet {
+	s.Create.OnFailure = MergeValue(s.Create.OnFailure, from.Create.OnFailure, _type)
+	s.Update.Timeout = MergeValue(s.Update.Timeout, from.Update.Timeout, _type)
+	s.Update.PollInterval = MergeValue(s.Update.PollInterval, from.Update.PollInterval, _type)
+	s.Update.OnFailure = MergeValue(s.Update.OnFailure, from.Update.OnFailure, _type)
+	s.Recreate.OnDataLoss = MergeValue(s.Recreate.OnDataLoss, from.Recreate.OnDataLoss, _type)
+	s.Recreate.OnUpdateFailure = MergeValue(s.Recreate.OnUpdateFailure, from.Recreate.OnUpdateFailure, _type)
 	return s
 }
 
@@ -101,6 +115,14 @@ func (reconcile *ClusterReconcile) Ensure() *ClusterReconcile {
 		reconcile = &ClusterReconcile{}
 	}
 	return reconcile
+}
+
+// GetHooks returns cluster-level hooks or nil.
+func (reconcile *ClusterReconcile) GetHooks() *ReconcileHooks {
+	if reconcile == nil {
+		return nil
+	}
+	return reconcile.Hooks
 }
 
 // NewChiReconcile creates new reconcile
@@ -118,30 +140,14 @@ func (r *ChiReconcile) MergeFrom(from *ChiReconcile, _type MergeType) *ChiReconc
 		r = NewChiReconcile()
 	}
 
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		if r.Policy == "" {
-			r.Policy = from.Policy
-		}
-		if r.ConfigMapPropagationTimeout == 0 {
-			r.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
-		}
-	case MergeTypeOverrideByNonEmptyValues:
-		if from.Policy != "" {
-			// Override by non-empty values only
-			r.Policy = from.Policy
-		}
-		if from.ConfigMapPropagationTimeout != 0 {
-			// Override by non-empty values only
-			r.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
-		}
-	}
+	r.Policy = MergeValue(r.Policy, from.Policy, _type)
+	r.ConfigMapPropagationTimeout = MergeValue(r.ConfigMapPropagationTimeout, from.ConfigMapPropagationTimeout, _type)
 
 	r.Cleanup = r.Cleanup.MergeFrom(from.Cleanup, _type)
 	r.Macros = r.Macros.MergeFrom(from.Macros, _type)
 	r.Runtime = r.Runtime.MergeFrom(from.Runtime, _type)
-	r.StatefulSet = r.StatefulSet.MergeFrom(from.StatefulSet)
-	r.Host = r.Host.MergeFrom(from.Host)
+	r.StatefulSet = r.StatefulSet.MergeFrom(from.StatefulSet, _type)
+	r.Host = r.Host.MergeFrom(from.Host, _type)
 
 	return r
 }
@@ -201,21 +207,23 @@ func (r *ChiReconcile) GetConfigMapPropagationTimeoutDuration() time.Duration {
 	return time.Duration(r.GetConfigMapPropagationTimeout()) * time.Second
 }
 
-// Possible reconcile policy values
+// Possible reconcile policy values (canonical humped form; CRD also accepts all-lowercase)
 const (
-	ReconcilingPolicyUnspecified = "unspecified"
-	ReconcilingPolicyWait        = "wait"
-	ReconcilingPolicyNoWait      = "nowait"
+	ReconcilingPolicyUnspecified = "Unspecified"
+	ReconcilingPolicyWait        = "Wait"
+	ReconcilingPolicyNoWait      = "NoWait"
 )
 
-// IsReconcilingPolicyWait checks whether reconcile policy is "wait"
+// IsReconcilingPolicyWait checks whether reconcile policy is "Wait".
+// EqualFold so both humped and all-lowercase inputs match regardless of normalization order.
 func (r *ChiReconcile) IsReconcilingPolicyWait() bool {
-	return strings.ToLower(r.GetPolicy()) == ReconcilingPolicyWait
+	return strings.EqualFold(r.GetPolicy(), ReconcilingPolicyWait)
 }
 
-// IsReconcilingPolicyNoWait checks whether reconcile policy is "no wait"
+// IsReconcilingPolicyNoWait checks whether reconcile policy is "NoWait".
+// EqualFold so both humped and all-lowercase inputs match regardless of normalization order.
 func (r *ChiReconcile) IsReconcilingPolicyNoWait() bool {
-	return strings.ToLower(r.GetPolicy()) == ReconcilingPolicyNoWait
+	return strings.EqualFold(r.GetPolicy(), ReconcilingPolicyNoWait)
 }
 
 // GetCleanup gets cleanup
@@ -273,5 +281,5 @@ func (r *ChiReconcile) InheritStatefulSetFrom(from OperatorConfigReconcile) {
 }
 
 func (r *ChiReconcile) InheritHostFrom(from ReconcileHost) {
-	r.Host = r.Host.MergeFrom(from)
+	r.Host = r.Host.MergeFrom(from, MergeTypeFillEmptyValues)
 }

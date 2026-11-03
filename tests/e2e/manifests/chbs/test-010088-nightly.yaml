@@ -1,0 +1,12 @@
+# test_010088
+# No backupNamePrefix: the default prefix is that of the backup the installation is recovered
+# from, so the operator holds the schedule until it is given its prefix explicitly. Due once a
+# year, so it never runs during the scenario.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackupSchedule"
+metadata:
+  name: nightly
+spec:
+  clickHouseInstallation: test-088-dr
+  schedule: "0 0 1 1 *"
+  concurrencyPolicy: Forbid

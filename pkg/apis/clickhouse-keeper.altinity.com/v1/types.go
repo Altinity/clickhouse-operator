@@ -23,6 +23,14 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 )
 
+// NewClickHouseKeeperInstallation creates a ClickHouseKeeperInstallation with the given name and namespace.
+func NewClickHouseKeeperInstallation(name, namespace string) *ClickHouseKeeperInstallation {
+	chk := &ClickHouseKeeperInstallation{}
+	chk.SetName(name)
+	chk.SetNamespace(namespace)
+	return chk
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClickHouseKeeperInstallation defines a ClickHouse Keeper ChkCluster

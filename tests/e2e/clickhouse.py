@@ -1,3 +1,5 @@
+import time
+
 import e2e.kubectl as kubectl
 import e2e.settings as settings
 from testflows.core import *
@@ -17,12 +19,16 @@ def query(
     pod="",
     container="clickhouse-pod",
 ):
-    pod_names = kubectl.get_pod_names(chi_name, ns)
-    pod_name = pod_names[0]
-    for p in pod_names:
-        if host in p or p == pod:
-            pod_name = p
-            break
+    # An explicit pod wins: a host name is a prefix of its own pod's name, so matching by host first
+    # would run a client meant for another pod inside the host's pod
+    pod_name = pod
+    if not pod_name:
+        pod_names = kubectl.get_pod_names(chi_name, ns)
+        pod_name = pod_names[0]
+        for p in pod_names:
+            if host in p:
+                pod_name = p
+                break
 
     pwd_str = "" if pwd == "" else f"--password={pwd}"
     user_str = "" if user == "" else f"--user={user}"
@@ -82,6 +88,39 @@ def query_with_error(
         pod=pod,
         container=container,
     )
+
+
+def wait_config_applied(chi_name, user, retries=30, delay=5, pwd="", host="127.0.0.1"):
+    """Poll ClickHouse until a config change takes effect (user becomes available/unavailable)."""
+    for i in range(retries):
+        out = query_with_error(chi_name, "SELECT 'OK'", user=user, pwd=pwd, host=host)
+        if out == "OK":
+            return True
+        time.sleep(delay)
+    return False
+
+
+def wait_config_denied(chi_name, user, retries=30, delay=5, pwd="", host="127.0.0.1"):
+    """Poll ClickHouse until a user becomes unavailable after config change."""
+    for i in range(retries):
+        out = query_with_error(chi_name, "SELECT 'OK'", user=user, pwd=pwd, host=host)
+        if out != "OK":
+            return True
+        time.sleep(delay)
+    return False
+
+
+def wait_replication_sync(chi_name, table, expected_count, host="127.0.0.1", retries=20, delay=3):
+    """Poll until replicated table reaches expected row count on given host."""
+    for i in range(retries):
+        out = query_with_error(chi_name, f"SELECT count() FROM {table}", host=host)
+        try:
+            if int(out.strip()) >= expected_count:
+                return True
+        except (ValueError, TypeError):
+            pass
+        time.sleep(delay)
+    return False
 
 
 def drop_table_on_cluster(chi, cluster_name="all-sharded", table="default.test"):

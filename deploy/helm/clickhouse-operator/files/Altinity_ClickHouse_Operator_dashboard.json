@@ -262,7 +262,7 @@
           "datasource": {
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(chi_clickhouse_metric_fetch_errors{chi=~\"$chi\",hostname=~\"$hostname\",fetch_type=\"system.metrics\"})",
+          "expr": "sum(chi_clickhouse_metric_fetch_errors{chi=~\"$chi\",hostname=~\"$hostname\",fetch_type=\"system_metrics\"})",
           "intervalFactor": 2,
           "legendFormat": "",
           "refId": "A",

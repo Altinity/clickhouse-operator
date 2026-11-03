@@ -1,6 +1,6 @@
 # altinity-clickhouse-operator
 
-![Version: 0.26.1](https://img.shields.io/badge/Version-0.26.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.26.1](https://img.shields.io/badge/AppVersion-0.26.1-informational?style=flat-square)
+![Version: 0.28.0](https://img.shields.io/badge/Version-0.28.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.28.0](https://img.shields.io/badge/AppVersion-0.28.0-informational?style=flat-square)
 
 Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
 
@@ -16,6 +16,9 @@ To disable automatic CRD updates, set `crdHook.enabled: false` in values.yaml. W
   kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallationtemplates.clickhouse.altinity.com.yaml
   kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseoperatorconfigurations.clickhouse.altinity.com.yaml
   kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousekeeperinstallations.clickhouse-keeper.altinity.com.yaml
+  kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousebackups.clickhouse.altinity.com.yaml
+  kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousebackupschedules.clickhouse.altinity.com.yaml
+  kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouserestores.clickhouse.altinity.com.yaml
 ```
 
 **Homepage:** <https://github.com/Altinity/clickhouse-operator>
@@ -25,6 +28,10 @@ To disable automatic CRD updates, set `crdHook.enabled: false` in values.yaml. W
 | Name | Email | Url |
 | ---- | ------ | --- |
 | altinity | <support@altinity.com> |  |
+
+## Source Code
+
+* <https://github.com/Altinity/clickhouse-operator>
 
 ## CRD Management
 
@@ -46,6 +53,9 @@ kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/depl
 kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallationtemplates.clickhouse.altinity.com.yaml
 kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseoperatorconfigurations.clickhouse.altinity.com.yaml
 kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousekeeperinstallations.clickhouse-keeper.altinity.com.yaml
+kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousebackups.clickhouse.altinity.com.yaml
+kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousebackupschedules.clickhouse.altinity.com.yaml
+kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouserestores.clickhouse.altinity.com.yaml
 ```
 
 ### Troubleshooting
@@ -76,12 +86,15 @@ crdHook:
 | configs | object | check the `values.yaml` file for the config content (auto-generated from latest operator release) | clickhouse operator configs |
 | crdHook.affinity | object | `{}` | affinity for CRD installation job |
 | crdHook.annotations | object | `{}` | additional annotations for CRD installation job |
+| crdHook.containerSecurityContext | object | `{}` | container security context for CRD installation job check `kubectl explain pod.spec.containers.securityContext` for details |
 | crdHook.enabled | bool | `true` | enable automatic CRD installation/update via pre-install/pre-upgrade hooks when disabled, CRDs must be installed manually using kubectl apply |
 | crdHook.image.pullPolicy | string | `"IfNotPresent"` | image pull policy for CRD installation job |
-| crdHook.image.repository | string | `"bitnami/kubectl"` | image repository for CRD installation job |
-| crdHook.image.tag | string | `"latest"` | image tag for CRD installation job |
+| crdHook.image.repository | string | `"registry.k8s.io/kubectl"` | image repository for CRD installation job |
+| crdHook.image.tag | string | `"v1.36.3"` | image tag for CRD installation job. registry.k8s.io/kubectl publishes no `latest` tag, so this must name an explicit version |
 | crdHook.imagePullSecrets | list | `[]` | image pull secrets for CRD installation job possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |
 | crdHook.nodeSelector | object | `{}` | node selector for CRD installation job |
+| crdHook.podAnnotations | object | `{}` | additional annotations for CRD installation job pod template useful to opt out of service mesh injection, e.g. `sidecar.istio.io/inject: "false"` |
+| crdHook.podSecurityContext | object | `{}` | pod-level security context for CRD installation job required by some admission policies (e.g. Kyverno `restrict-seccomp-strict`) check `kubectl explain pod.spec.securityContext` for details |
 | crdHook.resources | object | `{}` | resource limits and requests for CRD installation job |
 | crdHook.tolerations | list | `[]` | tolerations for CRD installation job |
 | dashboards.additionalLabels | object | `{"grafana_dashboard":""}` | labels to add to a secret with dashboards |
@@ -98,6 +111,8 @@ crdHook:
 | metrics.image.registry | string | `""` | optional image registry prefix (e.g. 1234567890.dkr.ecr.us-east-1.amazonaws.com) |
 | metrics.image.repository | string | `"altinity/metrics-exporter"` | image repository |
 | metrics.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
+| metrics.livenessProbe | string | `nil` | optional liveness probe for the metrics-exporter container check `kubectl explain pod.spec.containers.livenessProbe` for details example:   httpGet:     path: /metrics     port: ch-metrics   initialDelaySeconds: 10   periodSeconds: 10 |
+| metrics.readinessProbe | string | `nil` | optional readiness probe for the metrics-exporter container check `kubectl explain pod.spec.containers.readinessProbe` for details example:   httpGet:     path: /metrics     port: ch-metrics   initialDelaySeconds: 5   periodSeconds: 5 |
 | metrics.resources | object | `{}` | custom resource configuration |
 | nameOverride | string | `""` | override name of the chart |
 | namespaceOverride | string | `""` |  |
@@ -108,7 +123,9 @@ crdHook:
 | operator.image.registry | string | `""` | optional image registry prefix (e.g. 1234567890.dkr.ecr.us-east-1.amazonaws.com) |
 | operator.image.repository | string | `"altinity/clickhouse-operator"` | image repository |
 | operator.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
+| operator.livenessProbe | string | `nil` | optional liveness probe for the clickhouse-operator container check `kubectl explain pod.spec.containers.livenessProbe` for details example:   httpGet:     path: /metrics     port: op-metrics   initialDelaySeconds: 10   periodSeconds: 10 |
 | operator.priorityClassName | string | "" | priority class name for the clickhouse-operator deployment, check `kubectl explain pod.spec.priorityClassName` for details |
+| operator.readinessProbe | string | `nil` | optional readiness probe for the clickhouse-operator container check `kubectl explain pod.spec.containers.readinessProbe` for details example:   httpGet:     path: /metrics     port: op-metrics   initialDelaySeconds: 5   periodSeconds: 5 |
 | operator.resources | object | `{}` | custom resource configuration, check `kubectl explain pod.spec.containers.resources` for details |
 | podAnnotations | object | check the `values.yaml` file | annotations to add to the clickhouse-operator pod, check `kubectl explain pod.spec.annotations` for details |
 | podLabels | object | `{}` | labels to add to the clickhouse-operator pod |
@@ -126,11 +143,20 @@ crdHook:
 | serviceMonitor.clickhouseMetrics.metricRelabelings | list | `[]` |  |
 | serviceMonitor.clickhouseMetrics.relabelings | list | `[]` |  |
 | serviceMonitor.clickhouseMetrics.scrapeTimeout | string | `""` |  |
-| serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) In serviceMonitor will be created two endpoints ch-metrics on port 8888 and op-metrics # 9999. Ypu can specify interval, scrapeTimeout, relabelings, metricRelabelings for each endpoint below |
+| serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) In serviceMonitor will be created two endpoints ch-metrics on port 8888 and op-metrics # 9999, plus a separate keeper-metrics ServiceMonitor when `serviceMonitor.keeperMetrics.enabled` is also set. You can specify interval, scrapeTimeout, relabelings, metricRelabelings for each endpoint below |
+| serviceMonitor.keeperMetrics.enabled | bool | `false` | create a separate ServiceMonitor scraping the native ClickHouse Keeper prometheus endpoint on the Keeper Services the operator manages. Unlike ClickHouse server metrics, Keeper metrics do not go through the operator's metrics-exporter - Keeper serves Prometheus itself. Off by default because it needs the CHK to opt in first: operator-generated Keeper Services publish only the `zk`/`zk-secure`/`raft` ports, so the CHK must both enable the endpoint via `prometheus/*` settings and name the port in `spec.templates.serviceTemplates` (a serviceTemplate REPLACES the default port list, so re-declare `zk` and `raft` there). Without that the ServiceMonitor matches no targets and reports nothing. |
+| serviceMonitor.keeperMetrics.interval | string | `"30s"` | Prometheus scrape interval for the keeper-metrics endpoint |
+| serviceMonitor.keeperMetrics.metricRelabelings | list | `[]` | Prometheus [MetricRelabelConfigs] to apply to samples before ingestion |
+| serviceMonitor.keeperMetrics.namespaceSelector | object | `{"any":true}` | namespaces where prometheus-operator will discover keeper services, `any: true` means all namespaces. Entries under `matchNames` must be literal namespace names, not the regexps `watchNamespaces` accepts. Cluster-wide discovery also requires the Prometheus service account to hold cluster-scoped RBAC on services/endpoints, and Prometheus to select this ServiceMonitor (see `serviceMonitor.additionalLabels`) |
+| serviceMonitor.keeperMetrics.port | string | `"prometheus"` | name of the Keeper Service port exposing the native prometheus endpoint. Must match the port name in the CHK serviceTemplate. `prometheus` follows this repo's own Keeper examples (port 7000); charts that name it `metrics` need this overridden |
+| serviceMonitor.keeperMetrics.relabelings | list | `[]` | Prometheus [RelabelConfigs] to apply to samples before scraping |
+| serviceMonitor.keeperMetrics.scrapeTimeout | string | `""` | Prometheus ServiceMonitor scrapeTimeout. If empty, Prometheus uses the global scrape timeout unless it is less than the target's scrape interval value in which the latter is used. |
+| serviceMonitor.keeperMetrics.selector | object | check the `values.yaml` file | matchLabels selecting the Keeper Services to scrape. The default matches every Keeper Service the operator manages. Note the operator creates several Services per CHK (CR-scope plus per-host peer and client), all carrying this label, so if more than one of them names the metrics port the same pod is scraped more than once - narrow with `clickhouse-keeper.altinity.com/Service: chk` (CR-scope) or `: host` (per-host) to pick a single tier |
 | serviceMonitor.operatorMetrics.interval | string | `"30s"` |  |
 | serviceMonitor.operatorMetrics.metricRelabelings | list | `[]` |  |
 | serviceMonitor.operatorMetrics.relabelings | list | `[]` |  |
 | serviceMonitor.operatorMetrics.scrapeTimeout | string | `""` |  |
 | tolerations | list | `[]` | tolerations for scheduler pod assignment, check `kubectl explain pod.spec.tolerations` for details |
 | topologySpreadConstraints | list | `[]` |  |
+| watchNamespaces | list | `[]` | namespaces where the operator watches for ClickHouseInstallation resources. Sets config.yaml watch.namespaces.include (the exclude list is not exposed here). If empty, the operator watches only its own namespace (or all namespaces when running in kube-system). Use [".*"] to watch all namespaces. Entries are regexps and are Helm-templated, so avoid a literal "{{" in a namespace/regexp. Example: watchNamespaces: ["clickhouse", "my-other-namespace"] |
 
