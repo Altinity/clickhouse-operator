@@ -1,0 +1,15 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-030007-invalid-minversion
+spec:
+  security:
+    clickhouse:
+      tls:
+        minVersion: "9.9"
+  configuration:
+    clusters:
+      - name: c1
+        layout:
+          shardsCount: 1
+          replicasCount: 1

@@ -27,7 +27,7 @@ func ServiceSpecVerifyPorts(spec *core.ServiceSpec) error {
 	for i := range spec.Ports {
 		servicePort := &spec.Ports[i]
 		if types.IsPortInvalid(servicePort.Port) {
-			return fmt.Errorf(fmt.Sprintf("incorrect port :%d", servicePort.Port))
+			return fmt.Errorf("incorrect port :%d", servicePort.Port)
 		}
 	}
 	return nil

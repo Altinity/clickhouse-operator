@@ -46,6 +46,7 @@ var list = types.List{
 	labeler.LabelServiceValueCluster:         "cluster",
 	labeler.LabelServiceValueShard:           "shard",
 	labeler.LabelServiceValueHost:            "host",
+	labeler.LabelServiceValueHostClient:      "host-client",
 	labeler.LabelPVCReclaimPolicyName:        clickhouse_keeper_altinity_com.APIGroupName + "/" + "reclaimPolicy",
 
 	// Supplementary service labels - used to cooperate with k8s

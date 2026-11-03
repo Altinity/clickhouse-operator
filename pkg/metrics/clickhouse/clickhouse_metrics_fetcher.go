@@ -17,6 +17,8 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
+	"fmt"
+
 	"github.com/MakeNowJust/heredoc"
 
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
@@ -28,17 +30,18 @@ const (
 		SELECT
 			database,
 			table,
-			toString(is_session_expired) AS is_session_expired
+			'1' AS session_expired
 		FROM system.replicas
+		WHERE is_session_expired
 	`
 
-	queryMetricsSQL = `
+	queryMetricsSQLTemplate = `
     	SELECT
         	concat('metric.', metric) AS metric,
         	toString(value)           AS value,
         	''                        AS description,
         	'gauge'                   AS type
-    	FROM merge('system','^(metrics|custom_metrics)$')
+    	FROM %s
 	    UNION ALL
     	SELECT
         	concat('metric.', metric) AS metric,
@@ -116,7 +119,7 @@ const (
             toString(free_space)  AS free_space,
 			toString(total_space) AS total_space
         FROM system.disks
-       WHERE type IN ('local','Local')
+        WHERE type IN ('local','Local')
 	`
 
 	queryDetachedPartsSQL = `
@@ -135,39 +138,84 @@ const (
     `
 )
 
-// ClickHouseMetricsFetcher specifies clickhouse fetcher object
-type ClickHouseMetricsFetcher struct {
+// MetricsFetcher specifies clickhouse fetcher object
+type MetricsFetcher struct {
 	connectionParams *clickhouse.EndpointConnectionParams
+	tablesRegexp     string
+	// Used to filter system-metric names while fetching metrics. Nil means keep all.
+	metricsFilter MetricsFilter
 }
 
-// NewClickHouseFetcher creates new clickhouse fetcher object
-func NewClickHouseFetcher(endpointConnectionParams *clickhouse.EndpointConnectionParams) *ClickHouseMetricsFetcher {
-	return &ClickHouseMetricsFetcher{
+// NewMetricsFetcher creates new clickhouse fetcher object
+func NewMetricsFetcher(
+	endpointConnectionParams *clickhouse.EndpointConnectionParams,
+	tablesRegexp string,
+	metricsFilter MetricsFilter,
+) *MetricsFetcher {
+	return &MetricsFetcher{
 		connectionParams: endpointConnectionParams,
+		tablesRegexp:     tablesRegexp,
+		metricsFilter:    metricsFilter,
 	}
 }
 
-func (f *ClickHouseMetricsFetcher) connection() *clickhouse.Connection {
+// connection is a connection getter
+func (f *MetricsFetcher) connection() *clickhouse.Connection {
 	return clickhouse.GetPooledDBConnection(f.connectionParams)
 }
 
-// getClickHouseQueryMetrics requests metrics data from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseQueryMetrics(ctx context.Context) (Table, error) {
+// buildMetricsTableSource returns the FROM clause for the metrics query —
+// the WHICH-tables half of the SQL build (cf. buildMetricsSQL which assembles
+// the full query). If tablesRegexp is set it uses merge() to query tables
+// matching the regexp; otherwise it falls back to the bundled default.
+func (f *MetricsFetcher) buildMetricsTableSource() string {
+	if f.tablesRegexp == "" {
+		return "merge('system','^(metrics|custom_metrics)$')"
+	}
+	return fmt.Sprintf("merge('system','%s')", f.tablesRegexp)
+}
+
+// buildMetricsSQL renders the metrics-fetch SQL by substituting the table-source
+// clause into queryMetricsSQLTemplate. Symmetric with buildMetricsTableSource:
+// one helper picks WHICH tables to read, this one assembles the full query.
+func (f *MetricsFetcher) buildMetricsSQL() string {
+	return fmt.Sprintf(queryMetricsSQLTemplate, f.buildMetricsTableSource())
+}
+
+// getClickHouseQueryMetrics requests metrics data from ClickHouse.
+// Excluded names are dropped during row scan so they never enter the in-memory buffer.
+// SQL-side filtering was tried and abandoned: wrapping the UNION-ALL in
+// `FROM (...) WHERE NOT (...)` caused zero rows on restart-then-scrape windows.
+func (f *MetricsFetcher) getClickHouseQueryMetrics(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
 		ctx,
-		queryMetricsSQL,
+		f.buildMetricsSQL(),
 		func(rows *sql.Rows, data *Table) error {
 			var metric, value, description, _type string
 			if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
-				*data = append(*data, []string{metric, value, description, _type})
+				f.appendMetricRow(data, metric, value, description, _type)
 			}
 			return nil
 		},
 	)
 }
 
+// appendMetricRow adds a scanned system-metrics row to the buffer, dropping excluded
+// names first. This is a memory pre-filter on the highest-cardinality fetch path (the
+// system.metrics/asynchronous_metrics UNION, whose per-CPU OS series scale with core
+// count) so excluded rows never enter the in-memory Table. Names synthesized by the
+// other query paths (parts, mutations, disks, replicas) never reach this scan, so the
+// writer-side filter stays authoritative for those; where both paths see a name the
+// filter is identical, so re-checking writer-side is idempotent.
+func (f *MetricsFetcher) appendMetricRow(data *Table, metric, value, description, _type string) {
+	if IsExcluded(f.metricsFilter, metric) {
+		return
+	}
+	*data = append(*data, []string{metric, value, description, _type})
+}
+
 // getClickHouseSystemParts requests data sizes from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseSystemParts(ctx context.Context) (Table, error) {
+func (f *MetricsFetcher) getClickHouseSystemParts(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
 		ctx,
 		querySystemPartsSQL,
@@ -189,7 +237,7 @@ func (f *ClickHouseMetricsFetcher) getClickHouseSystemParts(ctx context.Context)
 }
 
 // getClickHouseQuerySystemReplicas requests replica information from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemReplicas(ctx context.Context) (Table, error) {
+func (f *MetricsFetcher) getClickHouseQuerySystemReplicas(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
 		ctx,
 		querySystemReplicasSQL,
@@ -204,7 +252,7 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemReplicas(ctx context.
 }
 
 // getClickHouseQueryMutations requests mutations information from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseQueryMutations(ctx context.Context) (Table, error) {
+func (f *MetricsFetcher) getClickHouseQueryMutations(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
 		ctx,
 		queryMutationsSQL,
@@ -219,7 +267,7 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQueryMutations(ctx context.Conte
 }
 
 // getClickHouseQuerySystemDisks requests used disks information from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemDisks(ctx context.Context) (Table, error) {
+func (f *MetricsFetcher) getClickHouseQuerySystemDisks(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
 		ctx,
 		querySystemDisksSQL,
@@ -234,7 +282,7 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemDisks(ctx context.Con
 }
 
 // getClickHouseQueryDetachedParts requests detached parts reasons from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseQueryDetachedParts(ctx context.Context) (Table, error) {
+func (f *MetricsFetcher) getClickHouseQueryDetachedParts(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
 		ctx,
 		queryDetachedPartsSQL,
@@ -249,7 +297,7 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQueryDetachedParts(ctx context.C
 }
 
 // clickHouseQueryScanRows scan all rows by external scan function
-func (f *ClickHouseMetricsFetcher) clickHouseQueryScanRows(
+func (f *MetricsFetcher) clickHouseQueryScanRows(
 	ctx context.Context,
 	sql string,
 	scanner ScanFunction,

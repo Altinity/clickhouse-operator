@@ -52,6 +52,6 @@ type MacrosSection struct {
 
 // MergeFrom merges from specified macros
 func (t MacrosSection) MergeFrom(from MacrosSection, _type MergeType) MacrosSection {
-	t.Enabled = t.Enabled.MergeFrom(from.Enabled)
+	t.Enabled = MergeScalar(t.Enabled, from.Enabled, _type)
 	return t
 }

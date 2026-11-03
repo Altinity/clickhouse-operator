@@ -1,0 +1,10 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+metadata:
+  name: test-069-security-template
+spec:
+  security:
+    clickhouse:
+      tls:
+        verify: Strict
+        minVersion: "1.3"

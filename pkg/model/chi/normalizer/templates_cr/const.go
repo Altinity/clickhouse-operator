@@ -15,6 +15,6 @@
 package templates_cr
 
 const (
-	// .spec.useTemplate.useType
-	UseTypeMerge = "merge"
+	// .spec.useTemplate.useType (canonical humped form; CRD also accepts all-lowercase)
+	UseTypeMerge = "Merge"
 )

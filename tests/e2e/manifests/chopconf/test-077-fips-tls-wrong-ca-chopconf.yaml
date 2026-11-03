@@ -1,0 +1,45 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-077-fips-tls-wrong-ca-chopconf"
+spec:
+  clickhouse:
+    access:
+      scheme: https
+  security:
+    clickhouse:
+      tls:
+        # Strict verification activates the FIPS-built TLS stack and refuses
+        # any cert that does not chain to the configured rootCA. Combined
+        # with the deliberately-wrong CA below, every operator -> ClickHouse
+        # connection attempt must fail with a verification error — proving
+        # the FIPS-built crypto path is actually executing on the wire
+        # rather than silently downgrading to InsecureSkipVerify=true.
+        verify: Strict
+        # Self-signed CA generated specifically for this test
+        # (CN=test-077-unrelated-ca.example). It is NOT the issuer of the
+        # ClickHouse server cert provisioned by test-058-secret.yaml, so the
+        # operator's TLS handshake fails at chain verification — proving the
+        # FIPS-built crypto path actually validates the chain rather than
+        # silently downgrading to InsecureSkipVerify=true.
+        rootCA: |-
+          -----BEGIN CERTIFICATE-----
+          MIIDMTCCAhmgAwIBAgIUW3Bc7vzCdyEauj+8RIRKaAPhx4IwDQYJKoZIhvcNAQEL
+          BQAwKDEmMCQGA1UEAwwddGVzdC0wNzctdW5yZWxhdGVkLWNhLmV4YW1wbGUwHhcN
+          MjYwNTIwMDg0NzI0WhcNMzYwNTE3MDg0NzI0WjAoMSYwJAYDVQQDDB10ZXN0LTA3
+          Ny11bnJlbGF0ZWQtY2EuZXhhbXBsZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCC
+          AQoCggEBANluYJRN5a+2jRSEPKTYbh9zw0Q+F9iSNPFUZ9Wbn8AwAYoerc7I2t5g
+          9V6FvN893YKtJ1JitbPYH7Yd7e4j+8kmJS1h0u9d6HEzO0RaB6bOn2jqY92MLPIi
+          g1u/Pda7hp9hj/5VJSrwF/CehA24TXIdFEObQaoYYDTkqJkjfCTtau9ukvF5p8BI
+          6hMHMnP8dymka+jhwF18xv46JGJMpOiJ+joQu79QLbPlEsOItPEV+WLC54iw7Cmb
+          wnXnvX4DMszB/ZrEcMFk+RAkH5KiU/s3jN1fg8KUmAqzxOs880zsCSvJGpemYYkp
+          2B2TlJlJ+fl7QJWcreuUMqnvtCiRUCcCAwEAAaNTMFEwHQYDVR0OBBYEFH6TciYq
+          /FLps7gEpqnl8oX8yX/3MB8GA1UdIwQYMBaAFH6TciYq/FLps7gEpqnl8oX8yX/3
+          MA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAEywSmeyPprRvTk4
+          +M6HN8oWwMcCCAso3eaCtb41fWsqYrA8wLln0FlNpV/tW7JhzMLUXgPfVcehYLK+
+          K/Xt/Qm7gmPAIUlUkS/MSFJ5s3WwK5FV+HJjqVtB+WNpUZEvIhHNfiS/EkRFFoWJ
+          LnHEYH0ltFM1xnvYfDVFSyQ9B/TBoM+1RRBREWwOsbNLiJI34adcNz9pHImaPmPD
+          aOPja7/pR9FDJ/9amjcDdUCJ2W5ZkVdqde/Z7LA/cAhitIB2BamHXYslC04Xz2nc
+          8QqTsoPhJ8e7f1JaCUvInvqF8brbYXeKS0Zurr8j8m3ddHRhJ40w9dZKCvPFR7m8
+          +8l7sxo=
+          -----END CERTIFICATE-----

@@ -45,6 +45,21 @@ func NewClusterConnectionParamsFromCHOpConfig(config *api.OperatorConfig) *Clust
 	params.SetConnectTimeout(config.ClickHouse.Access.Timeouts.Connect)
 	params.SetQueryTimeout(config.ClickHouse.Access.Timeouts.Query)
 
+	// Inject CHOP-config-level TLS hardening as defaults. Per-cluster overrides
+	// from CHI spec land in the EndpointCredentials when the connection is built
+	// for a specific host (see Cluster.Security via the schemer/exporter wiring).
+	if tls := config.Security.GetClickHouse().GetTLS(); tls != nil {
+		params.ClusterCredentials.SetTLSSecurity(
+			tls.GetVerify(),
+			tls.GetMinVersion(),
+			tls.GetServerName(),
+		)
+		// If chopconf provides a RootCA via Security and Access didn't, lift it.
+		if (params.RootCA == "") && (tls.GetRootCA() != "") {
+			params.RootCA = tls.GetRootCA()
+		}
+	}
+
 	return params
 }
 
@@ -57,12 +72,52 @@ func (p *ClusterConnectionParams) SetTimeouts(timeouts *Timeouts) *ClusterConnec
 	return p
 }
 
+// OverlayClusterSecurityTLS layers the per-cluster TLS knobs over the
+// CHOP-config-derived defaults. Empty fields in tls leave the existing value
+// alone (per-cluster fill-empty, matching the normalize-time semantics). Called
+// at schemer construction time, after the base ClusterConnectionParams is built
+// from chopconf — without this step the 3-level inheritance from
+// InheritClusterSecurityFrom + normalizeClusterSecurity would never reach the
+// dial.
+func (p *ClusterConnectionParams) OverlayClusterSecurityTLS(tls *api.ClusterSecurityClickHouseTLS) *ClusterConnectionParams {
+	if (p == nil) || (tls == nil) {
+		return p
+	}
+	return p.OverlayTLS(tls.GetVerify(), tls.GetMinVersion(), tls.GetServerName(), tls.GetRootCA())
+}
+
+// OverlayTLS layers TLS knobs over the CHOP-config-derived defaults. Empty values leave
+// the existing value alone, same as OverlayClusterSecurityTLS.
+func (p *ClusterConnectionParams) OverlayTLS(
+	verify api.TLSVerify,
+	minVersion api.TLSMinVersion,
+	serverName string,
+	rootCA string,
+) *ClusterConnectionParams {
+	if p == nil {
+		return p
+	}
+	if verify != "" {
+		p.TLSVerify = verify
+	}
+	if minVersion != "" {
+		p.TLSMinVersion = minVersion
+	}
+	if serverName != "" {
+		p.TLSServerName = serverName
+	}
+	if rootCA != "" {
+		p.RootCA = rootCA
+	}
+	return p
+}
+
 // NewEndpointConnectionParams creates endpoint connection params for a specified host in the cluster
 func (p *ClusterConnectionParams) NewEndpointConnectionParams(host string) *EndpointConnectionParams {
 	if p == nil {
 		return nil
 	}
-	return NewEndpointConnectionParams(
+	endpoint := NewEndpointConnectionParams(
 		p.Scheme,
 		host,
 		p.Username,
@@ -70,4 +125,6 @@ func (p *ClusterConnectionParams) NewEndpointConnectionParams(host string) *Endp
 		p.RootCA,
 		p.Port,
 	).SetTimeouts(p.Timeouts)
+	endpoint.EndpointCredentials.SetTLSSecurity(p.TLSVerify, p.TLSMinVersion, p.TLSServerName)
+	return endpoint
 }

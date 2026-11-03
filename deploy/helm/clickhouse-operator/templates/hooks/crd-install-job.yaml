@@ -1,0 +1,100 @@
+{{- if .Values.crdHook.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "altinity-clickhouse-operator.fullname" . }}-crd-install
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
+  labels:
+    {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crd-install-hook
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    {{- with .Values.crdHook.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  template:
+    metadata:
+      name: {{ include "altinity-clickhouse-operator.fullname" . }}-crd-install
+      labels:
+        {{- include "altinity-clickhouse-operator.labels" . | nindent 8 }}
+        app.kubernetes.io/component: crd-install-hook
+      {{- with .Values.crdHook.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "altinity-clickhouse-operator.fullname" . }}-crd-install
+      restartPolicy: OnFailure
+      {{- with .Values.crdHook.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.crdHook.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.crdHook.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.crdHook.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.crdHook.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: crd-install
+        image: "{{ .Values.crdHook.image.repository }}:{{ .Values.crdHook.image.tag }}"
+        imagePullPolicy: {{ .Values.crdHook.image.pullPolicy | default "IfNotPresent" }}
+        # Invoked without a shell: the default image (registry.k8s.io/kubectl) is distroless
+        # and ships no /bin/sh. `apply -f <dir>` is not recursive and only reads
+        # *.json/*.yaml/*.yml, so it picks up the projected CRDs and skips the `..data`
+        # symlink and `..<timestamp>` directories kubelet maintains alongside them.
+        # Never add -R: it would descend into those and apply stale duplicates.
+        command:
+        - kubectl
+        args:
+        - apply
+        - --server-side=true
+        - --force-conflicts
+        - -f
+        - /crds
+        volumeMounts:
+        - name: crds
+          mountPath: /crds
+          readOnly: true
+        {{- with .Values.crdHook.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.crdHook.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      volumes:
+      # Projected into one directory so the apply above stays a fixed argument list as
+      # per-CRD ConfigMaps are added.
+      - name: crds
+        projected:
+          sources:
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-1
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-2
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-3
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-4
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-5
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-6
+          - configMap:
+              name: {{ include "altinity-clickhouse-operator.fullname" . }}-crds-7
+{{- end }}

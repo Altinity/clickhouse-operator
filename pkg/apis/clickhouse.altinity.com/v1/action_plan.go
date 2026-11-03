@@ -16,6 +16,7 @@ package v1
 
 import (
 	"fmt"
+	"sync"
 
 	"gopkg.in/d4l3k/messagediff.v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,13 +24,16 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// +k8s:deepcopy-gen=false
+
 // ActionPlan is an action plan with list of differences between two CHIs
 type ActionPlan struct {
 	old ICustomResource
 	new ICustomResource
 
-	specDiff  *messagediff.Diff
-	specEqual bool
+	specDiff        *messagediff.Diff
+	specDiffReverse *messagediff.Diff
+	specEqual       bool
 
 	labelsDiff  *messagediff.Diff
 	labelsEqual bool
@@ -44,6 +48,22 @@ type ActionPlan struct {
 	attributesEqual bool
 
 	skipTaskID bool
+
+	// str caches the rendering. render() reflection-dumps every diffed object and the
+	// status path calls String() once per update attempt, so re-rendering dominated
+	// operator CPU on a large scale-up. Rendered on first use, not at construction:
+	// most plans are built only to test HasActionsToDo() and are discarded unread.
+	//
+	// mu guards that first render, because String() is genuinely called from several
+	// goroutines at once: a shard fan-out gives every shard worker a status update, and
+	// each one pointer-copies this same plan into the status it builds. Today the race is
+	// masked - the reconciler renders the plan for a log line before the fan-out starts -
+	// but that is an accident of statement order, not a guarantee, and it would vanish the
+	// moment that log line became level-gated. A pointer keeps DeepCopyInto's *out = *ap
+	// free of the copylocks vet error.
+	str      string
+	rendered bool
+	mu       *sync.Mutex
 }
 
 func NewActionPlan() *ActionPlan {
@@ -55,13 +75,15 @@ func MakeActionPlan(old, new ICustomResource) IActionPlan {
 	ap := &ActionPlan{
 		old: old,
 		new: new,
+		mu:  &sync.Mutex{},
 	}
 
 	if (old != nil) && (new != nil) {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.GetSpecA(), ap.new.GetSpecA())
+		ap.specDiffReverse, _ = messagediff.DeepDiff(ap.new.GetSpecA(), ap.old.GetSpecA())
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.GetLabels(), ap.new.GetLabels())
-		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.GetDeletionTimestamp(), ap.new.GetDeletionTimestamp())
 		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.GetDeletionTimestamp(), ap.new.GetDeletionTimestamp())
+		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.GetDeletionTimestamp(), ap.new.GetDeletionTimestamp())
 		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.GetFinalizers(), ap.new.GetFinalizers())
 		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.GetRuntime().GetAttributes(), ap.new.GetRuntime().GetAttributes())
 	} else if old == nil {
@@ -108,52 +130,69 @@ func MakeActionPlan(old, new ICustomResource) IActionPlan {
 func (ap *ActionPlan) timestampEqual(old, new *meta.Time) bool {
 	switch {
 	case (old == nil) && (new == nil):
-		// Both are useless
+		// Both are useless - consider equal
 		return true
 	case (old == nil) && (new != nil):
-		// Timestamp assigned
+		// Timestamp is assigned - unequal
 		return false
 	case (old != nil) && (new == nil):
-		// Timestamp unassigned
+		// Timestamp unassigned - unequal
+		return false
+	case (old != nil) && (new != nil):
+		// Both have value - need to compare
+		return old.Equal(new)
+	default:
+		// WTF?
 		return false
 	}
-	return old.Equal(new)
 }
 
-// excludePaths - sanitize diff - do not pay attention to changes in some paths, such as
-// ObjectMeta.ResourceVersion
+// excludePaths - sanitize diff - do not pay attention to changes in some paths, such as ObjectMeta.ResourceVersion
 func (ap *ActionPlan) excludePaths() {
+	// Sanity check
 	if ap.specDiff == nil {
 		return
 	}
 
-	excludePaths := make([]*messagediff.Path, 0)
-	// Walk over all .diff.Modified paths and find .ObjectMeta.ResourceVersion path
-	for ptrPath := range ap.specDiff.Modified {
-		for i := range *ptrPath {
-			pathNodeCurr := (*ptrPath)[i]
-			pathNodePrev := (*ptrPath)[i]
-			if i > 0 {
-				// We have prev node
-				pathNodePrev = (*ptrPath)[i-1]
-			}
+	// List of paths to be excluded
+	var excludePaths []*messagediff.Path
 
-			if ap.isExcludedPath(pathNodePrev.String(), pathNodeCurr.String()) {
-				// This path should be excluded from Modified
-				excludePaths = append(excludePaths, ptrPath)
-				break
-			}
+	// Walk over all .diff.Modified paths and find all paths that are to be excluded from modified
+	for path := range ap.specDiff.Modified {
+		if ap.isExcludedPath(path) {
+			// This path should be excluded from Modified
+			excludePaths = append(excludePaths, path)
 		}
 	}
 
-	// Exclude paths from diff.Modified
-	for _, ptrPath := range excludePaths {
-		delete(ap.specDiff.Modified, ptrPath)
+	// Exclude paths from diff.Modified according to the list of paths to be excluded
+	for _, path := range excludePaths {
+		delete(ap.specDiff.Modified, path)
 	}
 }
 
 // isExcludedPath checks whether path is excluded
-func (ap *ActionPlan) isExcludedPath(prev, cur string) bool {
+func (ap *ActionPlan) isExcludedPath(path *messagediff.Path) bool {
+	// Walk over all path's segments and check whether any segment is excluded
+	for i := range *path {
+		pathNodeCurr := (*path)[i]
+		pathNodePrev := (*path)[i]
+		if i > 0 {
+			// We have prev node
+			pathNodePrev = (*path)[i-1]
+		}
+
+		if ap.isExcludedPathSegment(pathNodePrev.String(), pathNodeCurr.String()) {
+			// Path has segment which specifies to exclude this path
+			return true
+		}
+	}
+
+	return false
+}
+
+// isExcludedPathSegment checks whether path segment is excluded
+func (ap *ActionPlan) isExcludedPathSegment(prev, cur string) bool {
 	if ((prev == "ObjectMeta") && (cur == ".ResourceVersion")) ||
 		((prev == ".ObjectMeta") && (cur == ".ResourceVersion")) {
 		return true
@@ -205,16 +244,37 @@ func (ap *ActionPlan) HasActionsToDo() bool {
 
 func (ap *ActionPlan) Log(tag string) string {
 	return fmt.Sprintf(
-		"ActionPlan start %s ---------------------------------------------:\n%s\nActionPlan end %s ---------------------------------------------",
+		"\nActionPlan start %s ---------------------------------------------:\n%s\nActionPlan end %s ---------------------------------------------",
 		tag,
 		ap,
 		tag,
 	)
 }
 
-// String stringifies ActionPlan
+// String stringifies ActionPlan, rendering at most once per plan.
 func (ap *ActionPlan) String() string {
+	if ap.mu == nil {
+		// Not built by MakeActionPlan, so there is no shared plan to protect and no diffs
+		// to cache. Render straight through rather than write unguarded fields.
+		return ap.render()
+	}
+	ap.mu.Lock()
+	defer ap.mu.Unlock()
+	if !ap.rendered {
+		ap.str = ap.render()
+		ap.rendered = true
+	}
+	return ap.str
+}
+
+// render stringifies the ActionPlan. Call it through String(), which memoizes.
+func (ap *ActionPlan) render() string {
 	if !ap.HasActionsToDo() {
+		return ""
+	}
+	if ap.specDiff == nil {
+		// A plan that was never diffed reports actions-to-do (every *Equal flag is false)
+		// but has nothing to render, so say so rather than dereference a nil diff.
 		return ""
 	}
 
@@ -233,6 +293,14 @@ func (ap *ActionPlan) String() string {
 	if len(ap.specDiff.Modified) > 0 {
 		// Something modified
 		str += util.MessageDiffItemString("modified spec items", "none", "", ap.specDiff.Modified)
+	}
+
+	// Only the both-non-nil construction branch assigns specDiffReverse, so a plan
+	// built from a nil old has none. render() used to be reached rarely enough to
+	// hide that; it must not panic now that String() is on the status path.
+	if (ap.specDiffReverse != nil) && (len(ap.specDiffReverse.Modified) > 0) {
+		// Something modified
+		str += util.MessageDiffItemString("prev spec items", "none", "", ap.specDiffReverse.Modified)
 	}
 
 	if len(ap.labelsDiff.Added) > 0 {
@@ -398,4 +466,37 @@ func (ap *ActionPlan) WalkModified(
 			hostFunc(host)
 		}
 	}
+}
+
+// DeepCopyInto is deliberately shallow: the diffs are fixed once MakeActionPlan returns,
+// and its messagediff.Diff pointers are not safe to deep-copy. Sharing pointers between
+// source and copy is acceptable because nobody mutates the diffs.
+//
+// The plan is not strictly immutable, though: String() memoizes on first call, so it
+// mutates str/rendered under mu - and this copies those two fields, so it has to take the
+// same lock. Without it a copy can land with rendered=true beside a torn str header and
+// then serve that text forever. The copy shares mu with the source, which is harmless:
+// each guards its own first render.
+func (ap *ActionPlan) DeepCopyInto(out *ActionPlan) {
+	if ap.mu != nil {
+		ap.mu.Lock()
+		defer ap.mu.Unlock()
+	}
+	*out = *ap
+}
+
+func (ap *ActionPlan) DeepCopy() *ActionPlan {
+	if ap == nil {
+		return nil
+	}
+	out := new(ActionPlan)
+	ap.DeepCopyInto(out)
+	return out
+}
+
+func (ap *ActionPlan) DeepCopyIActionPlan() IActionPlan {
+	if ap == nil {
+		return nil
+	}
+	return ap.DeepCopy()
 }

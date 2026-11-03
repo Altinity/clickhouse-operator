@@ -1,0 +1,16 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-035-1-auto-recovery-disabled"
+spec:
+  reconcile:
+    statefulSet:
+      create:
+        onFailure: abort
+      update:
+        timeout: 30
+    recovery:
+      onStatus:
+        aborted:
+          # Opt-out: CHI should STAY Aborted even when pod becomes Ready
+          onPodReady: none

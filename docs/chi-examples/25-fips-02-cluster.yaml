@@ -1,0 +1,86 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: clickhouse-fips
+spec:
+  defaults:
+    templates:
+      podTemplate: fips
+  templates:
+    podTemplates:
+      - name: fips
+        spec:
+          containers:
+            - name: clickhouse
+              image: altinity/clickhouse-server:25.3.8.30001.altinityfips
+              imagePullPolicy: IfNotPresent
+  security:
+    clickhouse:
+      tls:
+        rootCASecretRef:
+          name: clickhouse-certs
+          key: ca.crt
+  configuration:
+    clusters:
+      - name: default
+        secure: "yes"
+        insecure: "no"
+        layout:
+          shardsCount: 1
+          replicasCount: 2
+    zookeeper:
+      nodes:
+        - host: chk-clickhouse-keeper-fips-keeper-0-0
+          port: 2281
+          secure: "yes"
+    settings:
+      http_port: _removed_
+      tcp_port: _removed_
+      interserver_http_port: _removed_
+      mysql_port: _removed_
+      postgresql_port: _removed_
+      https_port: 8443
+      tcp_port_secure: 9440
+      interserver_https_port: 9010
+    files:
+      openssl.xml: |
+        <yandex>
+          <openSSL>
+            <server>
+              <certificateFile>/etc/clickhouse-server/secrets.d/server.crt/clickhouse-certs/server.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/secrets.d/server.key/clickhouse-certs/server.key</privateKeyFile>
+              <dhParamsFile>/etc/clickhouse-server/secrets.d/dhparam.pem/clickhouse-certs/dhparam.pem</dhParamsFile>
+              <!-- Server-auth TLS only: clients validate this certificate; the server does not require client certificates (not mTLS). -->
+              <verificationMode>none</verificationMode>
+              <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1</disableProtocols>
+              <cipherSuites>TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384</cipherSuites>
+            </server>
+            <client>
+              <caConfig>/etc/clickhouse-server/secrets.d/ca.crt/clickhouse-certs/ca.crt</caConfig>
+              <loadDefaultCAFile>false</loadDefaultCAFile>
+              <verificationMode>strict</verificationMode>
+              <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1</disableProtocols>
+              <cipherSuites>TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384</cipherSuites>
+            </client>
+          </openSSL>
+        </yandex>
+      server.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.crt
+      server.key:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.key
+      dhparam.pem:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: dhparam.pem
+      ca.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: ca.crt

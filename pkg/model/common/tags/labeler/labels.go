@@ -87,6 +87,27 @@ func (l *Labeler) _labelServiceHost(host *api.Host) map[string]string {
 		})
 }
 
+// labelServiceHostClient
+func (l *Labeler) labelServiceHostClient(params ...any) map[string]string {
+	var host *api.Host
+	if len(params) > 0 {
+		host = params[0].(*api.Host)
+		return l._labelServiceHostClient(host)
+	}
+	panic("not enough params for labeler")
+}
+
+// _labelServiceHostClient labels the client-facing per-host Service (publishNotReadyAddresses=false).
+// Mirrors _labelServiceHost but carries the host-client Service value so the keeper-ref resolver
+// can select the ready-only client tier distinctly from the Raft/peer tier.
+func (l *Labeler) _labelServiceHostClient(host *api.Host) map[string]string {
+	return util.MergeStringMapsOverwrite(
+		l.GetHostScope(host, false),
+		map[string]string{
+			l.Get(LabelService): l.Get(LabelServiceValueHostClient),
+		})
+}
+
 func (l *Labeler) labelExistingPV(params ...any) map[string]string {
 	var pv *core.PersistentVolume
 	var host *api.Host

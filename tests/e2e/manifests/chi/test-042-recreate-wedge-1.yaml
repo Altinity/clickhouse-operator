@@ -1,0 +1,40 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-010042-3
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  reconcile:
+    statefulSet:
+      recreate:
+        onUpdateFailure: recreate
+  defaults:
+    storageManagement:
+      provisioner: StatefulSet
+    templates:
+      podTemplate: default
+      dataVolumeClaimTemplate: data-volume-claim
+  templates:
+    podTemplates:
+    - name: default
+      spec:
+        # preStop outlasts the scale-to-0 wait so Recreate must force-delete (#2080).
+        terminationGracePeriodSeconds: 600
+        containers:
+        - name: clickhouse-pod
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 600"]
+    volumeClaimTemplates:
+    - name: data-volume-claim
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 100Mi
+  configuration:
+    clusters:
+    - name: default

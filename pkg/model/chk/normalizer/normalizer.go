@@ -15,6 +15,7 @@
 package normalizer
 
 import (
+	"fmt"
 	"strings"
 
 	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
@@ -24,14 +25,17 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	crTemplatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates_cr"
+	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
+	commonfips "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/fips"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Normalizer specifies structures normalizer
@@ -135,6 +139,7 @@ func (n *Normalizer) ensureSubject(subj *chk.ClickHouseKeeperInstallation) *chk.
 func (n *Normalizer) normalizeTarget() (*chk.ClickHouseKeeperInstallation, error) {
 	n.normalizeSpec()
 	n.finalize()
+	n.enforceFIPSImagePolicy()
 	n.fillStatus()
 
 	return n.req.GetTarget(), nil
@@ -143,6 +148,8 @@ func (n *Normalizer) normalizeTarget() (*chk.ClickHouseKeeperInstallation, error
 func (n *Normalizer) normalizeSpec() {
 	// Walk over Spec datatype fields
 	n.req.GetTarget().GetSpecT().TaskID = n.normalizeTaskID(n.req.GetTarget().GetSpecT().TaskID)
+	n.req.GetTarget().GetSpecT().Stop = n.normalizeStop(n.req.GetTarget().GetSpecT().Stop)
+	n.req.GetTarget().GetSpecT().Suspend = n.normalizeSuspend(n.req.GetTarget().GetSpecT().Suspend)
 	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
 	n.normalizeReconciling()
 	n.req.GetTarget().GetSpecT().Reconcile = n.normalizeReconcile(n.req.GetTarget().GetSpecT().Reconcile)
@@ -208,6 +215,28 @@ func (n *Normalizer) normalizeTaskID(taskID *types.Id) *types.Id {
 	return types.NewAutoId()
 }
 
+// normalizeStop normalizes .spec.stop
+func (n *Normalizer) normalizeStop(stop *types.StringBool) *types.StringBool {
+	if stop.IsValid() {
+		// It is bool, use as it is
+		return stop
+	}
+
+	// In case it is unknown value - just use set it to false
+	return types.NewStringBool(false)
+}
+
+// normalizeSuspend normalizes .spec.suspend
+func (n *Normalizer) normalizeSuspend(suspend *types.StringBool) *types.StringBool {
+	if suspend.IsValid() {
+		// It is bool, use as it is
+		return suspend
+	}
+
+	// In case it is unknown value - just use set it to false
+	return types.NewStringBool(false)
+}
+
 func isNamespaceDomainPatternValid(namespaceDomainPattern *types.String) bool {
 	if strings.Count(namespaceDomainPattern.Value(), "%s") > 1 {
 		return false
@@ -240,6 +269,9 @@ func (n *Normalizer) normalizeDefaults(defaults *chi.Defaults) *chi.Defaults {
 	if defaults.StorageManagement == nil {
 		defaults.StorageManagement = chi.NewStorageManagement()
 	}
+	// Fold casing + validate the default StorageManagement (provisioner/reclaimPolicy),
+	// matching the CHI normalizer — previously left un-normalized at the defaults level.
+	templates.NormalizeStorageManagement(defaults.StorageManagement)
 	// Ensure field
 	if defaults.Templates == nil {
 		//defaults.Templates = api.NewChiTemplateNames()
@@ -314,16 +346,13 @@ func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiRec
 		reconcile = chi.NewChiReconcile().SetDefaults()
 	}
 
-	// Policy
-	switch strings.ToLower(reconcile.GetPolicy()) {
-	case strings.ToLower(chi.ReconcilingPolicyWait):
-		// Known value, overwrite it to ensure case-ness
+	// Policy — fold any accepted casing to the canonical const; unknown values fall back to default.
+	switch util.FoldEnum(reconcile.GetPolicy(), chi.ReconcilingPolicyWait, chi.ReconcilingPolicyNoWait) {
+	case chi.ReconcilingPolicyWait:
 		reconcile.SetPolicy(chi.ReconcilingPolicyWait)
-	case strings.ToLower(chi.ReconcilingPolicyNoWait):
-		// Known value, overwrite it to ensure case-ness
+	case chi.ReconcilingPolicyNoWait:
 		reconcile.SetPolicy(chi.ReconcilingPolicyNoWait)
 	default:
-		// Unknown value, fallback to default
 		reconcile.SetPolicy(chi.ReconcilingPolicyUnspecified)
 	}
 
@@ -337,11 +366,76 @@ func (n *Normalizer) normalizeReconcile(reconcile *chi.ChiReconcile) *chi.ChiRec
 	// No normalization yet
 
 	// Runtime
-	// No normalization yet
+	// Inherit from chop Config
+	reconcile.InheritRuntimeFrom(chop.Config().Reconcile.Runtime)
+	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
+
+	// StatefulSet
+	// Inherit from chop Config
+	reconcile.InheritStatefulSetFrom(chop.Config().Reconcile)
+	reconcile.StatefulSet = n.normalizeReconcileStatefulSet(reconcile.StatefulSet)
 
 	// Host
-	// No normalization yet
+	// Inherit from chop Config
+	reconcile.InheritHostFrom(chop.Config().Reconcile.Host)
+	reconcile.Host = n.normalizeReconcileHost(reconcile.Host)
+
 	return reconcile
+}
+
+func (n *Normalizer) normalizeReconcileRuntime(runtime chi.ReconcileRuntime) chi.ReconcileRuntime {
+	if runtime.ReconcileShardsThreadsNumber == 0 {
+		runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
+	}
+	if runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
+	}
+	return runtime
+}
+
+func (n *Normalizer) normalizeReconcileStatefulSet(sts chi.ReconcileStatefulSet) chi.ReconcileStatefulSet {
+	// Create — fold casing to canonical const, then default if empty.
+	sts.Create.OnFailure = chi.NormalizeOnStatefulSetCreateFailureAction(sts.Create.OnFailure)
+	if sts.Create.OnFailure == "" {
+		sts.Create.OnFailure = chi.OnStatefulSetCreateFailureActionDelete
+	}
+	// Update
+	if sts.Update.Timeout == 0 {
+		sts.Update.Timeout = defaultStatefulSetUpdateTimeout
+	}
+	if sts.Update.PollInterval == 0 {
+		sts.Update.PollInterval = defaultStatefulSetUpdatePollInterval
+	}
+	sts.Update.OnFailure = chi.NormalizeOnStatefulSetUpdateFailureAction(sts.Update.OnFailure)
+	if sts.Update.OnFailure == "" {
+		sts.Update.OnFailure = chi.OnStatefulSetUpdateFailureActionRollback
+	}
+	// Recreate
+	sts.Recreate.OnDataLoss = chi.NormalizeOnStatefulSetRecreateAction(sts.Recreate.OnDataLoss)
+	if sts.Recreate.OnDataLoss == "" {
+		sts.Recreate.OnDataLoss = chi.OnStatefulSetRecreateOnDataLossActionRecreate
+	}
+	sts.Recreate.OnUpdateFailure = chi.NormalizeOnStatefulSetRecreateAction(sts.Recreate.OnUpdateFailure)
+	if sts.Recreate.OnUpdateFailure == "" {
+		sts.Recreate.OnUpdateFailure = chi.OnStatefulSetRecreateOnUpdateFailureActionRecreate
+	}
+	return sts
+}
+
+func (n *Normalizer) normalizeReconcileHost(rh chi.ReconcileHost) chi.ReconcileHost {
+	rh = rh.Normalize()
+	if rh.Wait.Probes == nil {
+		rh.Wait.Probes = &chi.ReconcileHostWaitProbes{}
+	}
+	// Wait between CHK hosts during reconcile until the new pod's startup probe passes.
+	// Without this, the operator may bump multiple replica StatefulSets back-to-back —
+	// all keeper pods can be down simultaneously, losing Raft quorum during the rollout
+	// window. Each replica is its own STS, so K8s STS RollingUpdate provides no
+	// cross-replica gate; the operator is the only place we can enforce sequencing.
+	if rh.Wait.Probes.Startup == nil {
+		rh.Wait.Probes.Startup = types.NewStringBool(true)
+	}
+	return rh
 }
 
 func (n *Normalizer) normalizeReconcileCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
@@ -371,15 +465,13 @@ func (n *Normalizer) normalizeCleanup(str *string, value string) {
 	if str == nil {
 		return
 	}
-	switch strings.ToLower(*str) {
-	case strings.ToLower(chi.ObjectsCleanupRetain):
-		// Known value, overwrite it to ensure case-ness
+	// Fold any accepted casing to the canonical const; unknown values fall back to the supplied default.
+	switch util.FoldEnum(*str, chi.ObjectsCleanupRetain, chi.ObjectsCleanupDelete) {
+	case chi.ObjectsCleanupRetain:
 		*str = chi.ObjectsCleanupRetain
-	case strings.ToLower(chi.ObjectsCleanupDelete):
-		// Known value, overwrite it to ensure case-ness
+	case chi.ObjectsCleanupDelete:
 		*str = chi.ObjectsCleanupDelete
 	default:
-		// Unknown value, fallback to default
 		*str = value
 	}
 }
@@ -492,7 +584,7 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings) *chi
 	settings.Normalize()
 
 	settings.WalkSafe(func(name string, setting *chi.Setting) {
-		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings, false)
+		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings)
 	})
 	return settings
 }
@@ -545,6 +637,10 @@ func (n *Normalizer) normalizeClusterStage1(cluster *chk.Cluster) *chk.Cluster {
 func (n *Normalizer) normalizeClusterStage2(cluster *chk.Cluster) *chk.Cluster {
 	// Inherit from .spec.configuration.files
 	cluster.InheritFilesFrom(n.req.GetTarget())
+	// Inherit from .spec.reconciling
+	cluster.InheritClusterReconcileFrom(n.req.GetTarget())
+	// Inherit from .spec.security
+	cluster.InheritClusterSecurityFrom(n.req.GetTarget())
 	// Inherit from .spec.defaults
 	cluster.InheritTemplatesFrom(n.req.GetTarget())
 
@@ -553,6 +649,10 @@ func (n *Normalizer) normalizeClusterStage2(cluster *chk.Cluster) *chk.Cluster {
 
 	cluster.PDBManaged = n.normalizePDBManaged(cluster.PDBManaged)
 	cluster.PDBMaxUnavailable = n.normalizePDBMaxUnavailable(cluster.PDBMaxUnavailable)
+	cluster.Reconcile = n.normalizeClusterReconcile(cluster.Reconcile)
+	cluster.Security = n.normalizeClusterSecurity(cluster.Security)
+	n.rejectFIPSInsecureKeeperCluster(cluster)
+	n.rejectNoKeeperListener(cluster)
 
 	n.appendClusterSecretEnvVar(cluster)
 
@@ -668,6 +768,15 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 	return clusterLayout
 }
 
+func (n *Normalizer) normalizeClusterReconcile(reconcile *chi.ClusterReconcile) *chi.ClusterReconcile {
+	reconcile = reconcile.Ensure()
+
+	reconcile.Runtime = n.normalizeReconcileRuntime(reconcile.Runtime)
+	reconcile.StatefulSet = n.normalizeReconcileStatefulSet(reconcile.StatefulSet)
+	reconcile.Host = n.normalizeReconcileHost(reconcile.Host)
+	return reconcile
+}
+
 // ensureClusterLayoutShards ensures slice layout.Shards is in place
 func (n *Normalizer) ensureClusterLayoutShards(layout *chk.ChkClusterLayout) {
 	// Disposition of shards in slice would be
@@ -709,7 +818,7 @@ func (n *Normalizer) normalizeShardStage2(shard *chk.ChkShard, cluster *chk.Clus
 	shard.Files = n.normalizeConfigurationFiles(shard.Files)
 	shard.InheritTemplatesFrom(cluster)
 	// Internal replication uses ReplicasCount thus it has to be normalized after shard ReplicaCount normalized
-	//n.normalizeShardInternalReplication(shard)
+	n.normalizeShardInternalReplication(shard)
 }
 
 // normalizeReplicaStage1 normalizes a replica - walks over all fields
@@ -824,4 +933,149 @@ func (n *Normalizer) normalizeReplicaHosts(replica *chk.ChkReplica, cluster *chk
 		host := cluster.GetOrCreateHost(shardIndex, replicaIndex)
 		replica.Hosts = append(replica.Hosts, host)
 	}
+}
+
+// normalizeShardInternalReplication ensures reasonable values in
+// .spec.configuration.clusters.layout.shards.internalReplication
+func (n *Normalizer) normalizeShardInternalReplication(shard *chk.ChkShard) {
+	// Shards with replicas are expected to have internal replication on by default
+	//defaultInternalReplication := false
+	//if shard.ReplicasCount > 1 {
+	//	defaultInternalReplication = true
+	//}
+	//shard.InternalReplication = shard.InternalReplication.Normalize(defaultInternalReplication)
+}
+
+// normalizeClusterSecurity fills the cluster's Security from CHOP-config defaults
+// (CHK-spec merge already ran in InheritClusterSecurityFrom). Pattern mirrors
+// normalizeClusterReconcile. 3-level inheritance: CHOP-config → CHK spec → cluster.
+//
+// When chopconf has security.policy=Enforced, this also enforces FIPS posture
+// at the cluster level — cluster-level explicit Verify=None or MinVersion=1.2
+// would otherwise bypass the chopconf-level coercion. Bypass attempts trigger
+// the same ReconcileAbort path as the CHI normalizer's gate.
+func (n *Normalizer) normalizeClusterSecurity(security *chi.ClusterSecurity) *chi.ClusterSecurity {
+	if security == nil {
+		security = &chi.ClusterSecurity{}
+	}
+	// Inherit from CHOP-config-level security defaults (fill empty values only).
+	// chop.Config().Security is a value-typed field; always present.
+	chopSecurity := &chop.Config().Security
+	security.ClickHouse = security.ClickHouse.MergeFrom(chopSecurity.GetClickHouse(), chi.MergeTypeFillEmptyValues)
+	security.Zookeeper = security.Zookeeper.MergeFrom(chopSecurity.GetZookeeper(), chi.MergeTypeFillEmptyValues)
+	if chopSecurity.RequiresHardening() {
+		n.rejectFIPSBypass(security)
+	}
+	return security
+}
+
+// rejectFIPSInsecureKeeperCluster aborts the CHK when chopconf hardening is
+// active and the cluster does not opt into the secure (TLS) Keeper port via
+// cluster.secure=yes. The predicate `!IsTrue()` catches both unset (nil) and
+// explicit-false. Companion to rejectFIPSBypass which polices the resolved
+// Security knobs; this gate polices the cluster-level secure opt-in.
+//
+// Scope note: this gate only refuses the spec at admission. It does not auto-
+// close the plain-text Keeper client port (host.ZKPort=2181 still emits onto
+// the Service even when this gate accepts a `secure: yes` cluster). Closing
+// the plain-text listener requires server-side Keeper TLS XML + cert mounts
+// which are user-supplied today; auto-closing is a follow-up.
+func (n *Normalizer) rejectFIPSInsecureKeeperCluster(cluster *chk.Cluster) {
+	if cluster == nil {
+		return
+	}
+	if !chop.Config().Security.RequiresHardening() {
+		return
+	}
+	if cluster.GetSecure().IsTrue() {
+		return
+	}
+	target := n.req.GetTarget()
+	if target == nil {
+		return
+	}
+	msg := fmt.Sprintf("cluster %q must declare secure=yes under FIPS hardening", cluster.GetName())
+	target.EnsureStatus().ReconcileAbortWithReason(chk.StatusReasonFIPSValidationFailed, msg)
+}
+
+// rejectNoKeeperListener aborts the CHK when the cluster opts out of BOTH the
+// insecure plaintext port (cluster.insecure=no) AND the secure TLS port
+// (cluster.secure unset or =no). Such a cluster would produce a Service with
+// no client-facing Keeper port — ClickHouse clients could not reach it. This
+// is a misconfiguration regardless of FIPS posture, so the gate is unconditional.
+func (n *Normalizer) rejectNoKeeperListener(cluster *chk.Cluster) {
+	if cluster == nil {
+		return
+	}
+	if cluster.GetSecure().IsTrue() {
+		return
+	}
+	// cluster.Insecure defaults to "yes" (legacy), so the only way to land here
+	// with no listener is an explicit `insecure: no` + no `secure: yes`.
+	if !cluster.GetInsecure().IsFalse() {
+		return
+	}
+	target := n.req.GetTarget()
+	if target == nil {
+		return
+	}
+	msg := fmt.Sprintf("cluster %q has both insecure=no and secure unset: no Keeper client port would be emitted", cluster.GetName())
+	target.EnsureStatus().ReconcileAbortWithReason(chk.StatusReasonNoKeeperListener, msg)
+}
+
+// rejectFIPSBypass aborts the CHK if the cluster's resolved Security
+// explicitly relaxes any of the FIPS-coerced knobs. CHK mirror of the CHI
+// gate: CHOP-level applyFIPSStrict coerces operator-wide defaults; cluster-
+// level values can still set Verify=None / MinVersion<1.2 / kubernetes.tls.
+// verify=None, and under FIPS that's a bypass attempt. Delegates to the
+// shared CHI/CHK helper so behavior cannot drift between the two normalizers.
+func (n *Normalizer) rejectFIPSBypass(security *chi.ClusterSecurity) {
+	target := n.req.GetTarget()
+	if target == nil {
+		return
+	}
+	commonfips.RejectFIPSBypass(security, func(reason, msg string) {
+		target.EnsureStatus().ReconcileAbortWithReason(reason, msg)
+	}, chk.StatusReasonFIPSValidationFailed)
+}
+
+// enforceFIPSImagePolicy aborts the CHK at admission when chopconf has
+// security.images.policy=Required and any host's resolved Keeper
+// container image lacks the "fips" tag substring. CHK mirror of the CHI
+// gate — Altinity ships Keeper FIPS variants under the same `.altinityfips`
+// suffix convention as ClickHouse.
+func (n *Normalizer) enforceFIPSImagePolicy() {
+	if !chop.Config().Security.GetImages().IsRequired() {
+		return
+	}
+	target := n.req.GetTarget()
+	if target == nil {
+		return
+	}
+	commonfips.EnforceFIPSImagePolicy(
+		target,
+		resolveKeeperImage,
+		chkConfig.KeeperContainerName,
+		chk.StatusReasonFIPSImagePolicyViolation,
+		func(reason, msg string) {
+			target.EnsureStatus().ReconcileAbortWithReason(reason, msg)
+		},
+	)
+}
+
+// resolveKeeperImage returns the image string the operator would deploy for
+// this host's Keeper container — the resolved PodTemplate's container
+// override, or the operator default when no PodTemplate is set.
+func resolveKeeperImage(host *chi.Host) string {
+	pt, ok := host.GetPodTemplate()
+	if !ok || (pt == nil) {
+		return chkConfig.DefaultKeeperDockerImage
+	}
+	for i := range pt.Spec.Containers {
+		c := &pt.Spec.Containers[i]
+		if c.Name == chkConfig.KeeperContainerName {
+			return c.Image
+		}
+	}
+	return chkConfig.DefaultKeeperDockerImage
 }

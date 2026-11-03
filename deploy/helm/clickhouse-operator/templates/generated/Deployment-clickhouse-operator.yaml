@@ -2,9 +2,9 @@
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.25.5
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.28.0
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.25.5
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.28.0
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -22,18 +22,18 @@ spec:
     matchLabels: {{ include "altinity-clickhouse-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}
+      labels: {{ include "altinity-clickhouse-operator.podTemplateLabels" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}
       annotations:
         {{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations | nindent 8 }}{{ end }}
-        checksum/files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-files.yaml") . | sha256sum }}
-        checksum/confd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-confd-files.yaml") . | sha256sum }}
-        checksum/configd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-configd-files.yaml") . | sha256sum }}
-        checksum/templatesd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-templatesd-files.yaml") . | sha256sum }}
-        checksum/usersd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-usersd-files.yaml") . | sha256sum }}
-        checksum/keeper-confd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-confd-files.yaml") . | sha256sum }}
-        checksum/keeper-configd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-configd-files.yaml") . | sha256sum }}
-        checksum/keeper-templatesd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-templatesd-files.yaml") . | sha256sum }}
-        checksum/keeper-usersd-files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-keeper-operator-usersd-files.yaml") . | sha256sum }}
+        checksum/files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-files.yaml") }}
+        checksum/confd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-confd-files.yaml") }}
+        checksum/configd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-configd-files.yaml") }}
+        checksum/templatesd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-templatesd-files.yaml") }}
+        checksum/usersd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-usersd-files.yaml") }}
+        checksum/keeper-confd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-keeper-operator-confd-files.yaml") }}
+        checksum/keeper-configd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-keeper-operator-configd-files.yaml") }}
+        checksum/keeper-templatesd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-keeper-operator-templatesd-files.yaml") }}
+        checksum/keeper-usersd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-keeper-operator-usersd-files.yaml") }}
     spec:
       serviceAccountName: {{ include "altinity-clickhouse-operator.serviceAccountName" . }}
       volumes:
@@ -64,9 +64,17 @@ spec:
         - name: etc-keeper-operator-usersd-folder
           configMap:
             name: {{ include "altinity-clickhouse-operator.fullname" . }}-keeper-usersd-files
+        # IPC token volume shared between operator and metrics-exporter containers.
+        # Pod-local emptyDir (never persisted, never visible via kubectl get secret).
+        # Operator writes a random per-Pod token here at startup; exporter reads it
+        # for the X-CHOP-Token header check. Only used when clickhouse.security.ipc.mode=Secure.
+        - name: clickhouse-operator-ipc
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
       containers:
         - name: {{ .Chart.Name }}
-          image: {{ .Values.operator.image.repository }}:{{ include "altinity-clickhouse-operator.operator.tag" . }}
+          image: {{ if .Values.operator.image.registry }}{{ .Values.operator.image.registry | trimSuffix "/" }}/{{ end }}{{ .Values.operator.image.repository }}:{{ include "altinity-clickhouse-operator.operator.tag" . }}
           imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -87,6 +95,8 @@ spec:
               mountPath: /etc/clickhouse-operator/chk/templates.d
             - name: etc-keeper-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/chk/users.d
+            - name: clickhouse-operator-ipc
+              mountPath: /etc/clickhouse-operator-ipc
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -121,30 +131,40 @@ spec:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: requests.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_CPU_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: limits.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_MEM_REQUEST
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: requests.memory
+                  divisor: "1Mi"
             - name: OPERATOR_CONTAINER_MEM_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: limits.memory
+                  divisor: "1Mi"
             {{ with .Values.operator.env }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 9999
               name: op-metrics
           resources: {{ toYaml .Values.operator.resources | nindent 12 }}
           securityContext: {{ toYaml .Values.operator.containerSecurityContext | nindent 12 }}
+          {{- with .Values.operator.livenessProbe }}
+          livenessProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.operator.readinessProbe }}
+          readinessProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
 {{ if .Values.metrics.enabled }}
         - name: metrics-exporter
-          image: {{ .Values.metrics.image.repository }}:{{ include "altinity-clickhouse-operator.metrics.tag" . }}
+          image: {{ if .Values.metrics.image.registry }}{{ .Values.metrics.image.registry | trimSuffix "/" }}/{{ end }}{{ .Values.metrics.image.repository }}:{{ include "altinity-clickhouse-operator.metrics.tag" . }}
           imagePullPolicy: {{ .Values.metrics.image.pullPolicy }}
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -165,6 +185,8 @@ spec:
               mountPath: /etc/clickhouse-operator/chk/templates.d
             - name: etc-keeper-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/chk/users.d
+            - name: clickhouse-operator-ipc
+              mountPath: /etc/clickhouse-operator-ipc
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -199,27 +221,37 @@ spec:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: requests.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_CPU_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: limits.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_MEM_REQUEST
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: requests.memory
+                  divisor: "1Mi"
             - name: OPERATOR_CONTAINER_MEM_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: {{ .Chart.Name }}
                   resource: limits.memory
+                  divisor: "1Mi"
             {{ with .Values.metrics.env }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 8888
               name: ch-metrics
           resources: {{ toYaml .Values.metrics.resources | nindent 12 }}
           securityContext: {{ toYaml .Values.metrics.containerSecurityContext | nindent 12 }}
+          {{- with .Values.metrics.livenessProbe }}
+          livenessProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.metrics.readinessProbe }}
+          readinessProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
 {{ end }}
       imagePullSecrets: {{ toYaml .Values.imagePullSecrets | nindent 8 }}
       {{ if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName | quote }}{{ end }}

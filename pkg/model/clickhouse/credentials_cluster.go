@@ -14,6 +14,10 @@
 
 package clickhouse
 
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+)
+
 // ClusterCredentials specifies cluster endpoint credentials
 type ClusterCredentials struct {
 	Scheme   string
@@ -21,6 +25,15 @@ type ClusterCredentials struct {
 	Password string
 	RootCA   string
 	Port     int
+
+	// TLS hardening knobs — empty values preserve current behavior. Populated
+	// from chopconf security.clickhouse.tls.* by NewClusterConnectionParamsFromCHOpConfig
+	// and then overlaid per-cluster by OverlayClusterSecurityTLS. Valid values
+	// are the api.TLSVerify*/api.TLSMinVersion* constants; empty preserves the
+	// legacy path.
+	TLSVerify     api.TLSVerify
+	TLSMinVersion api.TLSMinVersion
+	TLSServerName string
 }
 
 // NewClusterCredentials creates new ClusterCredentials
@@ -32,4 +45,15 @@ func NewClusterCredentials(scheme, username, password, rootCA string, port int) 
 		RootCA:   rootCA,
 		Port:     port,
 	}
+}
+
+// SetTLSSecurity injects TLS hardening knobs. Empty values preserve legacy behavior.
+func (c *ClusterCredentials) SetTLSSecurity(verify api.TLSVerify, minVersion api.TLSMinVersion, serverName string) *ClusterCredentials {
+	if c == nil {
+		return nil
+	}
+	c.TLSVerify = verify
+	c.TLSMinVersion = minVersion
+	c.TLSServerName = serverName
+	return c
 }

@@ -19,6 +19,9 @@ import (
 	"fmt"
 	"time"
 
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -30,9 +33,13 @@ import (
 )
 
 type CR struct {
+	// Deliberately cached, unlike every narrowed type here: the ClickHouseKeeperInstallation is
+	// user-authored and carries no operator label, so it is never narrowed and a cached read of
+	// it cannot be filtered away. See NewAdapter.
 	kubeClient client.Client
 }
 
+// NewCR is a constructor
 func NewCR(kubeClient client.Client) *CR {
 	return &CR{
 		kubeClient: kubeClient,
@@ -40,31 +47,35 @@ func NewCR(kubeClient client.Client) *CR {
 }
 
 func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResource, error) {
-	cm := &apiChk.ClickHouseKeeperInstallation{}
-	err := c.kubeClient.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, cm)
-	if err == nil {
+	return commonKube.GetWithRetry(ctx, func() (api.ICustomResource, error) {
+		cm := &apiChk.ClickHouseKeeperInstallation{}
+		err := c.kubeClient.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		}, cm)
+		if err != nil {
+			return nil, err
+		}
 		return cm, nil
-	} else {
-		return nil, err
-	}
+	})
 }
 
 // StatusUpdate updates CR object's Status
 func (c *CR) StatusUpdate(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return nil
 	}
 
 	return c.statusUpdateRetry(ctx, cr, opts)
 }
 
+const maxRetryAttempts = 50
+
 func (c *CR) statusUpdateRetry(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) (err error) {
 	for retry, attempt := true, 1; retry; attempt++ {
-		if attempt > 60 {
+		if attempt >= maxRetryAttempts {
+			// Make last attempt
 			retry = false
 		}
 
@@ -74,10 +85,10 @@ func (c *CR) statusUpdateRetry(ctx context.Context, cr api.ICustomResource, opts
 		}
 
 		if retry {
-			log.V(2).M(cr).F().Warning("got error, will retry. err: %q", err)
+			log.V(2).M(cr).F().Warning("got error, will retry attempt %d. err: %q", attempt, err)
 			time.Sleep(1 * time.Second)
 		} else {
-			log.V(1).M(cr).F().Error("got error, all retries are exhausted. err: %q", err)
+			log.V(1).M(cr).F().Error("got error, attempt %d all retries are exhausted. err: %q", attempt, err)
 		}
 	}
 	return
@@ -86,22 +97,33 @@ func (c *CR) statusUpdateRetry(ctx context.Context, cr api.ICustomResource, opts
 // statusUpdateProcess updates CR object's Status
 func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+		log.V(1).Info("Reconcile is aborted. cr: %s ", icr.GetName())
 		return nil
 	}
 
-	cr := icr.(*apiChk.ClickHouseKeeperInstallation)
+	cr, ok := icr.(*apiChk.ClickHouseKeeperInstallation)
+	if !ok {
+		return nil
+	}
+
 	namespace, name := cr.NamespaceName()
 	log.V(3).M(cr).F().Info("Update CR status")
 
 	_cur, err := c.Get(ctx, namespace, name)
-	cur := _cur.(*apiChk.ClickHouseKeeperInstallation)
 	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			return nil
+		}
 		if opts.TolerateAbsence {
 			return nil
 		}
 		log.V(1).M(cr).F().Error("%q", err)
 		return err
+	}
+
+	cur, ok := _cur.(*apiChk.ClickHouseKeeperInstallation)
+	if !ok {
+		return nil
 	}
 	if cur == nil {
 		if opts.TolerateAbsence {
@@ -111,7 +133,7 @@ func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, o
 		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", namespace, name)
 	}
 
-	// Update status of a real object.
+	// Update status of a real (current) object.
 	cur.EnsureStatus().CopyFrom(cr.Status, opts.CopyStatusOptions)
 
 	err = c.statusUpdate(ctx, cur)
@@ -122,9 +144,15 @@ func (c *CR) statusUpdateProcess(ctx context.Context, icr api.ICustomResource, o
 	}
 
 	_cur, err = c.Get(ctx, namespace, name)
-	cur = _cur.(*apiChk.ClickHouseKeeperInstallation)
+	if err != nil {
+		return nil
+	}
+	cur, ok = _cur.(*apiChk.ClickHouseKeeperInstallation)
+	if !ok {
+		return nil
+	}
 
-	// Propagate updated ResourceVersion into chi
+	// Propagate updated ResourceVersion upstairs into the CR
 	if cr.GetResourceVersion() != cur.GetResourceVersion() {
 		log.V(3).M(cr).F().Info("ResourceVersion change: %s to %s", cr.GetResourceVersion(), cur.GetResourceVersion())
 		cr.SetResourceVersion(cur.GetResourceVersion())

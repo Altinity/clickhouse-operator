@@ -1,0 +1,30 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-062-hooks
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: default
+        reconcile:
+          hooks:
+            pre:
+              - sql:
+                  queries:
+                    - "SELECT 'cluster_pre_hook_marker'"
+                events:
+                  - ClusterReconcile
+            post:
+              - sql:
+                  queries:
+                    - "SELECT 'cluster_post_hook_marker'"
+                events:
+                  - ClusterReconcile
+        layout:
+          shardsCount: 1
+          replicasCount: 1

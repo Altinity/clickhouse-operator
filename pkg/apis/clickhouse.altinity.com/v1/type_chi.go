@@ -18,6 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 
 	"github.com/imdario/mergo"
@@ -200,14 +202,8 @@ func (cr *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type 
 	}
 
 	// Merge Meta
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta)
-		_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta)
-	case MergeTypeOverrideByNonEmptyValues:
-		_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta, mergo.WithOverride)
-		_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta, mergo.WithOverride)
-	}
+	_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta, MergoOptions(_type)...)
+	_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta, MergoOptions(_type)...)
 	// Exclude skipped annotations
 	cr.SetAnnotations(
 		util.CopyMapFilter(
@@ -302,6 +298,12 @@ func (cr *ClickHouseInstallation) HostsWithAttributesCount(a *types.ReconcileAtt
 		return nil
 	})
 	return count
+}
+
+// HasReconcileWork reports whether the CR has any work to reconcile:
+// either the ActionPlan has spec/label/finalizer changes, or child resources have drifted.
+func (cr *ClickHouseInstallation) HasReconcileWork() bool {
+	return cr.EnsureRuntime().ActionPlan.HasActionsToDo() || cr.GetHostsAttributesCounters().HasDrift()
 }
 
 // GetHostsAttributesCounters
@@ -415,13 +417,15 @@ func (cr *ClickHouseInstallation) FoundIn(haystack []*ClickHouseInstallation) bo
 	return false
 }
 
-// Possible templating policies
+// Possible templating policies (canonical humped form; CRD also accepts all-lowercase)
 const (
-	TemplatingPolicyAuto   = "auto"
-	TemplatingPolicyManual = "manual"
+	TemplatingPolicyAuto   = "Auto"
+	TemplatingPolicyManual = "Manual"
 )
 
-// IsAuto checks whether templating policy is auto
+// IsAuto checks whether templating policy is auto.
+// Uses EqualFold: this is read from template CRs that are NOT run through the normalizer
+// (readCHITemplates → GetAutoTemplates), so the raw letter-casing must be tolerated here.
 func (cr *ClickHouseInstallation) IsAuto() bool {
 	if cr == nil {
 		return false
@@ -429,7 +433,7 @@ func (cr *ClickHouseInstallation) IsAuto() bool {
 	if (cr.Namespace == "") && (cr.Name == "") {
 		return false
 	}
-	return cr.GetSpecT().GetTemplating().GetPolicy() == TemplatingPolicyAuto
+	return strings.EqualFold(cr.GetSpecT().GetTemplating().GetPolicy(), TemplatingPolicyAuto)
 }
 
 // IsStopped checks whether CR is stopped
@@ -448,12 +452,13 @@ const (
 	RestartRollingUpdate = "RollingUpdate"
 )
 
-// IsRollingUpdate checks whether CHI should perform rolling update
+// IsRollingUpdate checks whether CHI should perform rolling update.
+// The restart field is read un-normalized, so fold casing here (RollingUpdate/rollingupdate).
 func (cr *ClickHouseInstallation) IsRollingUpdate() bool {
 	if cr == nil {
 		return false
 	}
-	return cr.GetSpecT().GetRestart().Value() == RestartRollingUpdate
+	return cr.GetSpecT().GetRestart().EqualFoldString(RestartRollingUpdate)
 }
 
 // IsTroubleshoot checks whether CHI is in troubleshoot mode
@@ -482,20 +487,20 @@ func (cr *ClickHouseInstallation) Copy(opts types.CopyCROptions) *ClickHouseInst
 		return nil
 	}
 
-	var chi2 *ClickHouseInstallation
-	if err := json.Unmarshal(jsonBytes, &chi2); err != nil {
+	var cr2 *ClickHouseInstallation
+	if err := json.Unmarshal(jsonBytes, &cr2); err != nil {
 		return nil
 	}
 
 	if opts.SkipStatus {
-		chi2.Status = nil
+		cr2.Status = nil
 	}
 
 	if opts.SkipManagedFields {
-		chi2.SetManagedFields(nil)
+		cr2.SetManagedFields(nil)
 	}
 
-	return chi2
+	return cr2
 }
 
 // JSON returns JSON string
@@ -527,7 +532,7 @@ func (cr *ClickHouseInstallation) YAML(opts types.CopyCROptions) string {
 	return string(yamlBytes)
 }
 
-// FirstHost returns first host of the CHI
+// FirstHost returns first host of the CR
 func (cr *ClickHouseInstallation) FirstHost() *Host {
 	var result *Host
 	cr.WalkHosts(func(host *Host) error {

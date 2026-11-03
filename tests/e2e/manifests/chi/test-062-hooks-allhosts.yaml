@@ -1,0 +1,28 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-062-hooks
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: default
+        reconcile:
+          hooks:
+            pre:
+              - sql:
+                  queries:
+                    # The row, not the table, is what the test asserts - see test_010062.
+                    - "SELECT 'allhosts_hook_marker'"
+                    - "CREATE TABLE IF NOT EXISTS default.hook_allhosts_trace (h String) ENGINE = MergeTree ORDER BY tuple()"
+                    - "INSERT INTO default.hook_allhosts_trace SELECT hostName()"
+                target: AllHosts
+                events:
+                  - ClusterReconcile
+        layout:
+          shardsCount: 2
+          replicasCount: 1

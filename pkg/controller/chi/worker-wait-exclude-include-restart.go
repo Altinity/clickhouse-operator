@@ -22,6 +22,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -29,25 +30,25 @@ import (
 )
 
 // waitForIPAddresses waits for all pods to get IP address assigned
-func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInstallation) {
+func (w *worker) waitForIPAddresses(ctx context.Context, cr *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
-		log.V(1).Info("Reconcile is aborted. CR polling IP: %s ", chi.GetName())
+		log.V(1).Info("Reconcile is aborted. CR polling IP: %s ", cr.GetName())
 		return
 	}
 
-	if chi.IsStopped() {
+	if cr.IsStopped() {
 		// No need to wait for stopped CHI
 		return
 	}
 
-	l := w.a.V(1).M(chi)
+	l := w.a.V(1).M(cr)
 	l.F().S().Info("wait for IP addresses to be assigned to all pods")
 
 	// Let's limit polling time
 	start := time.Now()
 	timeout := 1 * time.Minute
 
-	w.c.poll(ctx, chi, func(c *api.ClickHouseInstallation, e error) bool {
+	w.c.poll(ctx, cr, func(c *api.ClickHouseInstallation, e error) bool {
 		// TODO fix later
 		// status IPs list can be empty
 		// Instead of doing in status:
@@ -55,7 +56,7 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInst
 		//	cur.EnsureStatus().SetPodIPs(podIPs)
 		// and here
 		// c.Status.GetPodIPs()
-		podIPs := w.c.getPodsIPs(ctx, chi)
+		podIPs := w.c.getPodsIPs(ctx, cr)
 		if len(podIPs) >= len(c.Status.GetPods()) {
 			l.Info("all IP addresses are in place")
 			// Stop polling
@@ -321,14 +322,19 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error 
 
 	w.a.V(1).
 		M(host).F().
+		WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileInProgress).
 		Info("Wait for host to catch replication lag - START "+
 			"Host/shard/cluster: %d/%d/%s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+
+	// Host is alive but catching up - add to monitoring so metrics are collected during the wait
+	w.addHostToMonitoring(host)
 
 	err := w.waitHostHasNoReplicationDelay(ctx, host)
 	if err == nil {
 		w.a.V(1).
 			M(host).F().
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
 			Info("Wait for host to catch replication lag - COMPLETED "+
 				"Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName,
@@ -338,6 +344,7 @@ func (w *worker) catchReplicationLag(ctx context.Context, host *api.Host) error 
 	} else {
 		w.a.V(1).
 			M(host).F().
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileFailed).
 			Info("Wait for host to catch replication lag - FAILED "+
 				"Host/shard/cluster: %d/%d/%s"+
 				"err: %v ",
@@ -373,7 +380,46 @@ func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
 
+	// Image upgrades defer SQL restart to the StatefulSet rollout (see shouldForceRestartHost /
+	// isImageChangeRequested), but the host still goes down and must be drained first
+	case w.isImageChangeRequested(host):
+		if !w.isHostHealthyForReconcile(ctx, host) {
+			w.a.V(1).M(host).F().Info(
+				"Host image change but host is unhealthy - skip exclude. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
+		if !w.isShardSafeToDisruptHost(ctx, host) {
+			w.a.V(1).M(host).F().Warning(
+				"Host image change needs no exclude: shard has no other healthy replica, rollout will be deferred. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
+		w.a.V(1).
+			M(host).F().
+			Info("Host image change via STS rollout, need to exclude. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return true
+
 	case w.shouldForceRestartHost(ctx, host):
+		if !w.isHostHealthyForReconcile(ctx, host) {
+			w.a.V(1).M(host).F().Info(
+				"Host requires restart but is unhealthy - skip exclude. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
+		// Do not drain a host we are about to defer. reconcileHostStatefulSet skips the
+		// restart when the shard has no other healthy replica, and it returns before
+		// reconcileHostIncludeIntoAllActivities - so a host drained here would lose its
+		// ready label, drop out of the CHI/cluster/shard Service endpoints, and have
+		// nothing left in the pass to put it back. On a shard whose only other replica is
+		// down that empties the entrypoint Service while the pod is up and serving.
+		if !w.isShardSafeToDisruptHost(ctx, host) {
+			w.a.V(1).M(host).F().Warning(
+				"Host restart needs no exclude: shard has no other healthy replica, restart will be deferred. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+			return false
+		}
 		w.a.V(1).
 			M(host).F().
 			Info("Host should be restarted, need to exclude. Host/shard/cluster: %d/%d/%s",
@@ -395,12 +441,14 @@ func (w *worker) shouldExcludeHost(ctx context.Context, host *api.Host) bool {
 		return false
 	}
 
+	shouldExcludeHost := false
 	w.a.V(1).
 		M(host).F().
-		Info("Host should be excluded. Host/shard/cluster: %d/%d/%s",
+		Info("No explicit case on whether host should be excluded - going default %t. Host/shard/cluster: %d/%d/%s",
+			shouldExcludeHost,
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	return true
+	return shouldExcludeHost
 }
 
 // shouldWaitExcludeHost determines whether reconciler should wait for the host to be excluded from cluster
