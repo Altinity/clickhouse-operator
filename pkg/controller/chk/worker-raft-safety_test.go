@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -37,6 +38,8 @@ import (
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
+	chkNamer "github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
 )
 
 func TestRaftQuorumSize(t *testing.T) {
@@ -399,6 +402,45 @@ func TestPrepareStsReconcileOptsWaitSection(t *testing.T) {
 		}
 	})
 
+	t.Run("1→3 staged join does not wait Ready before existing members roll", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		added := hostAtOnCR(cr, 1)
+		added.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+
+		opts := w.prepareStsReconcileOptsWaitSection(added, nil, false)
+		require.False(t, opts.WaitUntilReady(),
+			"a new peer cannot reach /ready until existing members reload or roll, and this wait is decided before they do")
+		require.True(t, opts.WaitUntilStarted())
+	})
+
+	t.Run("interrupted 1→3 joiner is still a staged join after STS status is Same", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		joiner := hostAtOnCR(cr, 1)
+		require.False(t, joiner.HasAncestor(), "host 1 is absent from the 1-host ancestor")
+		// Production: PrepareHostStatefulSetWithStatus overwrites Requested once the
+		// joiner STS exists (cancelled Ready wait, operator restart). ObjectStatusSame
+		// never consumes WaitUntilReady; the retry gate is deferUnreadyStagedAdmit.
+		joiner.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
+
+		require.True(t, hostIsStagedScaleUpJoin(joiner),
+			"staged-join identity is topological, not ObjectStatusRequested")
+		require.False(t, w.prepareStsReconcileOptsWaitSection(joiner, nil, false).WaitUntilReady(),
+			"Same STS reconcile returns before WaitUntilReady, so this flag cannot serialize the next admit")
+	})
+
+	t.Run("staged join honors readiness false", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		joiner := hostAtOnCR(cr, 1)
+		joiner.GetCluster().GetReconcile().Host.Wait.Probes.Readiness = types.NewStringBool(false)
+
+		opts := w.prepareStsReconcileOptsWaitSection(joiner, nil, false)
+		require.False(t, opts.WaitUntilReady(),
+			"readiness false must not be overridden; the next admit is gated on live ReadyReplicas")
+	})
+
 	t.Run("single-host post-restart still waits Ready", func(t *testing.T) {
 		w.countReadyEnsembleMembersFn = func(context.Context, api.ICustomResource) int { return 0 }
 		host := hostOnCR(chkWithAncestorHosts(1))
@@ -684,6 +726,86 @@ func TestUpscaleFromSingleMemberClassifiesAsBootstrap(t *testing.T) {
 	require.False(t, snap.rolling,
 		"1->3 must classify bootstrap: a rolling pass waits for a Ready that needs a peer it has not created yet")
 	require.Equal(t, 3, snap.members, "a 1-member ancestor cannot lose a member, so sizing falls back to the desired set")
+}
+
+func TestStageUncommittedScaleUpHosts(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("1→3 excludes only hosts whose STS is absent", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		h0 := hostAtOnCR(cr, 0)
+		h1 := hostAtOnCR(cr, 1)
+		h2 := hostAtOnCR(cr, 2)
+		h1.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+		h2.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+
+		fake := newRaftFakeSTS()
+		fake.setReady(h0, 1)
+		w := raftWorkerWithSTS(fake)
+		w.a = a.NewAnnouncer(nil, nil)
+		require.NoError(t, w.stageUncommittedScaleUpHosts(ctx, cr))
+
+		require.False(t, h0.GetReconcileAttributes().IsExclude())
+		require.True(t, h1.GetReconcileAttributes().IsExclude(), "new host without STS must be staged")
+		require.True(t, h2.GetReconcileAttributes().IsExclude(), "new host without STS must be staged")
+	})
+
+	t.Run("does not re-exclude a new host that already has an STS", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		h1 := hostAtOnCR(cr, 1)
+		h1.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+
+		fake := newRaftFakeSTS()
+		fake.setReady(h1, 0)
+		w := raftWorkerWithSTS(fake)
+		w.a = a.NewAnnouncer(nil, nil)
+		require.NoError(t, w.stageUncommittedScaleUpHosts(ctx, cr))
+
+		require.False(t, h1.GetReconcileAttributes().IsExclude(),
+			"an interrupted pass must not roll back a member whose STS already exists")
+	})
+
+	t.Run("fresh bootstrap is not staged", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		h0 := hostAtOnCR(cr, 0)
+		h0.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+		w := raftWorkerWithSTS(newRaftFakeSTS())
+		w.a = a.NewAnnouncer(nil, nil)
+		require.NoError(t, w.stageUncommittedScaleUpHosts(ctx, cr))
+		require.False(t, h0.GetReconcileAttributes().IsExclude())
+	})
+
+	t.Run("3→5 is not staged", func(t *testing.T) {
+		cr := chkWithHosts(5)
+		cr.SetAncestor(chkWithHosts(3))
+		h3 := hostAtOnCR(cr, 3)
+		h3.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+		w := raftWorkerWithSTS(newRaftFakeSTS())
+		w.a = a.NewAnnouncer(nil, nil)
+		require.NoError(t, w.stageUncommittedScaleUpHosts(ctx, cr))
+		require.False(t, h3.GetReconcileAttributes().IsExclude(),
+			"3→N is outside this staging pass; existing members must roll first")
+	})
+
+	t.Run("STS get error fails closed", func(t *testing.T) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		h1 := hostAtOnCR(cr, 1)
+		h2 := hostAtOnCR(cr, 2)
+		h1.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+		h2.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+
+		fake := newRaftFakeSTS()
+		fake.err = errors.New("apiserver timeout")
+		w := raftWorkerWithSTS(fake)
+		w.a = a.NewAnnouncer(nil, nil)
+		require.Error(t, w.stageUncommittedScaleUpHosts(ctx, cr))
+		require.False(t, h1.GetReconcileAttributes().IsExclude(),
+			"unknown STS state must not publish an expanded membership")
+		require.False(t, h2.GetReconcileAttributes().IsExclude())
+	})
 }
 
 // TestDegradedUpscaleKeepsGateArmed pins the growth direction against the unsafe half.
@@ -1302,6 +1424,265 @@ func TestMembershipSettleDelayIsActuallyWaited(t *testing.T) {
 		require.Less(t, time.Since(start), time.Second,
 			"a same-size reconcile must not pause at all")
 	})
+}
+
+// TestStagedAdmitDefersWhilePreviousJoinerNotReady is the retry the option flag cannot see.
+// Pass 1 created h1 and then stopped before it was Ready. Pass 2 finds that StatefulSet
+// Same with ReadyReplicas=0. h2 must not be published or created, and the loop must still
+// reach h0 so the existing member can roll onto the config that admits h1.
+func TestStagedAdmitDefersWhilePreviousJoinerNotReady(t *testing.T) {
+	ctx := context.Background()
+
+	newScaleUp := func(h1Ready int32) (*apiChk.ClickHouseKeeperInstallation, *raftFakeSTS, api.IShard) {
+		cr := chkWithHosts(3)
+		cr.SetAncestor(chkWithHosts(1))
+		h0 := hostAtOnCR(cr, 0)
+		h1 := hostAtOnCR(cr, 1)
+		h2 := hostAtOnCR(cr, 2)
+		h0.Runtime.CurStatefulSet = &apps.StatefulSet{}
+		h0.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+		h1.Runtime.CurStatefulSet = &apps.StatefulSet{}
+		h1.Runtime.CurStatefulSet.Status.ReadyReplicas = h1Ready
+		h1.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
+		h2.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+		h2.GetReconcileAttributes().SetExclude()
+
+		fake := newRaftFakeSTS()
+		fake.setReady(h0, 1)
+		fake.setReady(h1, h1Ready)
+		return cr, fake, cr.Spec.Configuration.Clusters[0].Layout.Shards[0]
+	}
+
+	t.Run("unready previous joiner blocks the next admit and still reconciles the existing member", func(t *testing.T) {
+		cr, fake, shard := newScaleUp(0)
+		h2 := hostAtOnCR(cr, 2)
+		var visited []string
+		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
+			visited = append(visited, host.GetName())
+			return nil
+		}
+
+		require.ErrorIs(t, w.reconcileShardWithHosts(ctx, shard), common.ErrCRUDDeferred)
+		require.Equal(t, []string{"h1", "h0"}, visited,
+			"h2 must not be published or created while h1 is not Ready; h0 must still be reconciled")
+		require.True(t, h2.GetReconcileAttributes().IsExclude(), "h2 stays out of raft_configuration")
+		require.Zero(t, fake.mutationCount())
+	})
+
+	t.Run("ready previous joiner admits the next host", func(t *testing.T) {
+		_, fake, shard := newScaleUp(1)
+		var visited []string
+		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
+			visited = append(visited, host.GetName())
+			return nil
+		}
+
+		require.NoError(t, w.reconcileShardWithHosts(ctx, shard))
+		require.Equal(t, []string{"h2", "h0", "h1"}, visited)
+	})
+
+	t.Run("unknown StatefulSet existence does not admit the next host", func(t *testing.T) {
+		_, fake, shard := newScaleUp(0)
+		fake.err = errors.New("apiserver unavailable")
+		var visited []string
+		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
+			visited = append(visited, host.GetName())
+			return nil
+		}
+
+		err := w.reconcileShardWithHosts(ctx, shard)
+		require.Error(t, err)
+		require.False(t, errors.Is(err, common.ErrCRUDDeferred))
+		require.Empty(t, visited, "a Get failure must stop the loop before another joiner is admitted")
+	})
+
+	t.Run("stopped CHK skips the missing joiner and still completes the pass", func(t *testing.T) {
+		cr, fake, shard := newScaleUp(0)
+		cr.Spec.Stop = types.NewStringBool(true)
+		h2 := hostAtOnCR(cr, 2)
+		var visited []string
+		w := &worker{a: a.NewAnnouncer(nil, nil), c: &Controller{kube: &raftFakeKube{sts: fake}}}
+		w.reconcileHostFn = func(_ context.Context, host *api.Host) error {
+			visited = append(visited, host.GetName())
+			return nil
+		}
+
+		require.NoError(t, w.reconcileShardWithHosts(ctx, shard))
+		require.Equal(t, []string{"h0", "h1"}, visited,
+			"h2 must not be created while the CHK is stopped, and the pass must not stay deferred")
+		require.True(t, h2.GetReconcileAttributes().IsExclude())
+		require.Zero(t, fake.mutationCount())
+	})
+}
+
+func TestIncludeHostIntoRaftClusterRestoresOnlyStagedExclude(t *testing.T) {
+	ctx := context.Background()
+	conflict := errors.New("conflict")
+
+	t.Run("existing voter is not excluded when publication fails", func(t *testing.T) {
+		host := hostAtOnCR(chkWithHosts(1), 0)
+		w := &worker{
+			a: a.NewAnnouncer(nil, nil),
+			publishRaftFn: func(context.Context, *api.Host) error {
+				return conflict
+			},
+		}
+		require.ErrorIs(t, w.includeHostIntoRaftCluster(ctx, host), conflict)
+		require.False(t, host.GetReconcileAttributes().IsExclude())
+		require.NoError(t, w.includeHost(ctx, host),
+			"a steady-state ConfigMap conflict must not abort the pass")
+	})
+
+	t.Run("staged host is excluded again when publication fails", func(t *testing.T) {
+		cr := chkWithHosts(2)
+		cr.SetAncestor(chkWithHosts(1))
+		host := hostAtOnCR(cr, 1)
+		host.GetReconcileAttributes().SetExclude()
+		w := &worker{
+			a: a.NewAnnouncer(nil, nil),
+			publishRaftFn: func(context.Context, *api.Host) error {
+				return conflict
+			},
+		}
+		require.ErrorIs(t, w.includeHostIntoRaftCluster(ctx, host), conflict)
+		require.True(t, host.GetReconcileAttributes().IsExclude())
+	})
+}
+
+func TestRollbackStagedRaftAdmitRepublishesExclude(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("missing StatefulSet drops the host from raft XML", func(t *testing.T) {
+		cr := chkWithHosts(2)
+		cr.Spec.Defaults = &api.Defaults{}
+		cr.SetAncestor(chkWithHosts(1))
+		hostAtOnCR(cr, 0)
+		host := hostAtOnCR(cr, 1)
+		fake := newRaftFakeSTS()
+		var published string
+		w := &worker{
+			a: a.NewAnnouncer(nil, nil),
+			c: &Controller{kube: &raftFakeKube{sts: fake}},
+		}
+		w.publishRaftFn = func(context.Context, *api.Host) error {
+			published = renderedRaft(t, w, cr)
+			return nil
+		}
+
+		w.rollbackStagedRaftAdmit(ctx, host)
+		require.True(t, host.GetReconcileAttributes().IsExclude())
+		require.NotContains(t, published, raftHostname(host),
+			"rollback must republish raft_configuration without the host that has no Pod")
+		require.Zero(t, fake.mutationCount())
+	})
+
+	t.Run("existing StatefulSet stays published", func(t *testing.T) {
+		cr := chkWithHosts(2)
+		cr.SetAncestor(chkWithHosts(1))
+		host := hostAtOnCR(cr, 1)
+		fake := newRaftFakeSTS()
+		fake.setReady(host, 0)
+		published := false
+		w := &worker{
+			a: a.NewAnnouncer(nil, nil),
+			c: &Controller{kube: &raftFakeKube{sts: fake}},
+			publishRaftFn: func(context.Context, *api.Host) error {
+				published = true
+				return nil
+			},
+		}
+
+		w.rollbackStagedRaftAdmit(ctx, host)
+		require.False(t, published, "a start-wait failure must not unpublish a StatefulSet that exists")
+		require.False(t, host.GetReconcileAttributes().IsExclude())
+		require.Zero(t, fake.mutationCount())
+	})
+}
+
+// TestStagedAdmitPublishesRaftWithoutTheHostSeam renders the raft XML the
+// ConfigMap would get. reconcileHostFn is not installed, so a publish has to
+// come from publishStagedAdmit, which is what reconcileHostMain calls.
+func TestStagedAdmitPublishesRaftWithoutTheHostSeam(t *testing.T) {
+	ctx := context.Background()
+	cr := chkWithHosts(5)
+	cr.Name = "scale"
+	cr.Spec.Defaults = &api.Defaults{}
+	cr.SetAncestor(chkWithHosts(1))
+	fake := newRaftFakeSTS()
+	for i := 0; i < 5; i++ {
+		host := hostAtOnCR(cr, i)
+		switch i {
+		case 0:
+			host.Runtime.CurStatefulSet = &apps.StatefulSet{}
+			host.Runtime.CurStatefulSet.Status.ReadyReplicas = 1
+			fake.setReady(host, 1)
+		case 1:
+			host.Runtime.CurStatefulSet = &apps.StatefulSet{}
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusSame)
+			fake.setReady(host, 0)
+		default:
+			host.GetReconcileAttributes().SetStatus(types.ObjectStatusRequested)
+			host.GetReconcileAttributes().SetExclude()
+		}
+	}
+
+	var published []string
+	w := &worker{
+		a: a.NewAnnouncer(nil, nil),
+		c: &Controller{kube: &raftFakeKube{sts: fake}},
+	}
+	w.publishRaftFn = func(context.Context, *api.Host) error {
+		published = append(published, renderedRaft(t, w, cr))
+		return nil
+	}
+
+	deferred := false
+	for _, host := range shardHostsRecoveryFirst(cr.Spec.Configuration.Clusters[0].Layout.Shards[0], func(h *api.Host) bool {
+		return w.isHostHealthyForReconcile(ctx, h)
+	}) {
+		err := w.deferUnreadyStagedAdmit(ctx, host)
+		if errors.Is(err, errSkipStagedAdmit) {
+			continue
+		}
+		if errors.Is(err, common.ErrCRUDDeferred) {
+			deferred = true
+			continue
+		}
+		require.NoError(t, err)
+		_, err = w.publishStagedAdmit(ctx, host)
+		require.NoError(t, err)
+	}
+
+	require.True(t, deferred, "h2 must be postponed while h1 is not Ready")
+	require.Empty(t, published, "no raft_configuration publish may admit h2, h3, or h4")
+	xml := renderedRaft(t, w, cr)
+	require.Contains(t, xml, raftHostname(hostAtOnCR(cr, 0)))
+	require.Contains(t, xml, raftHostname(hostAtOnCR(cr, 1)))
+	for i := 2; i < 5; i++ {
+		require.NotContains(t, xml, raftHostname(hostAtOnCR(cr, i)),
+			"1→5 must keep every not-yet-created member out of raft_configuration")
+		require.True(t, hostAtOnCR(cr, i).GetReconcileAttributes().IsExclude())
+	}
+	require.Zero(t, fake.mutationCount(), "admitting into raft_configuration must not create or update a StatefulSet")
+}
+
+func renderedRaft(t *testing.T, w *worker, cr *apiChk.ClickHouseKeeperInstallation) string {
+	t.Helper()
+	sections := map[string]string{}
+	chkConfig.NewFilesGeneratorDomain(chkConfig.NewGenerator(cr, chkNamer.New(), nil)).
+		CreateConfigFilesGroupCommon(sections, w.options())
+	var b strings.Builder
+	for _, body := range sections {
+		b.WriteString(body)
+	}
+	return b.String()
+}
+
+func raftHostname(host *api.Host) string {
+	return chkNamer.New().Name(interfaces.NameInstanceHostname, host)
 }
 
 // TestReconcileShardWithHostsLoop pins the two host-loop invariants that no test reached before:

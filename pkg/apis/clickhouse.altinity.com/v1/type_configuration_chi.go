@@ -116,6 +116,29 @@ func (c *Configuration) GetFiles() *Settings {
 	return c.Files
 }
 
+// OwnClusters replaces the clusters with copies of their own. A merge gives the configuration the very
+// clusters of its source: those of a template, which every installation the template applies to shares,
+// and which a normalization would change for all of them, while others read them. It expects clusters as
+// the API delivers them: only the runtime of a cluster itself is left out of its copy, while a cluster a
+// normalization has linked to its shards and hosts, which link back to it, would have DeepCopy follow
+// these links without end.
+func (c *Configuration) OwnClusters() {
+	if (c == nil) || (len(c.Clusters) == 0) {
+		return
+	}
+	own := make([]*Cluster, 0, len(c.Clusters))
+	for _, cluster := range c.Clusters {
+		if cluster == nil {
+			own = append(own, nil)
+			continue
+		}
+		source := *cluster
+		source.Runtime = ChiClusterRuntime{}
+		own = append(own, source.DeepCopy())
+	}
+	c.Clusters = own
+}
+
 // MergeFrom merges from specified source
 func (c *Configuration) MergeFrom(from *Configuration, _type MergeType) *Configuration {
 	if from == nil {

@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -31,6 +30,9 @@ import (
 	controller "github.com/altinity/clickhouse-operator/pkg/controller/chk"
 	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 )
+
+// keeperComponent names the Keeper controllers in start-up logs.
+const keeperComponent = "keeper"
 
 var (
 	scheme  *apiMachineryRuntime.Scheme
@@ -73,11 +75,6 @@ var (
 // log is a parameter rather than the package-level logger because a logr zero value discards Info
 // silently, so reading that var would let this line vanish if the sole call site ever moved.
 func newKeeperCacheOptions(log logr.Logger, cacheNamespaces []string) cache.Options {
-	defaultNamespaces := make(map[string]cache.Config)
-	for _, ns := range cacheNamespaces {
-		defaultNamespaces[ns] = cache.Config{}
-	}
-
 	selector := k8sLabels.SelectorFromSet(chkLabeler.New(nil).CHOPGeneratedSelector())
 	byObject := make(map[client.Object]cache.ByObject)
 	for _, object := range []client.Object{
@@ -98,20 +95,10 @@ func newKeeperCacheOptions(log logr.Logger, cacheNamespaces []string) cache.Opti
 		"selector", selector.String(), "types", len(byObject))
 
 	return cache.Options{
-		// GetCacheNamespaces returns exact namespace names when all configured watch namespaces are
-		// valid DNS labels, enabling per-namespace cache scoping. Falls back to NamespaceAll when
-		// the include list is unset or any watch namespace is a regexp pattern (the controller's
-		// Reconcile guard handles filtering in that case). ByObject entries leave Namespaces nil,
-		// so they inherit this scoping.
-		DefaultNamespaces: defaultNamespaces,
+		DefaultNamespaces: newCacheNamespaces(cacheNamespaces),
 		ByObject:          byObject,
 	}
 }
-
-// errKeeperInitTerminal marks an initKeeper failure that no retry can clear, as opposed to one
-// that merely reflects the state of the API server at this instant. initKeeper attaches it to its
-// own deterministic failures so the retry never has to infer intent from an error's shape.
-var errKeeperInitTerminal = errors.New("keeper init cannot succeed on retry")
 
 // newKeeperInitializer resolves the clients that must be built exactly once, then returns the step
 // that is safe to retry.
@@ -145,11 +132,11 @@ func initKeeper(ctx context.Context, extClient *apiextensions.Clientset) error {
 	scheme = apiMachineryRuntime.NewScheme()
 	if err = clientGoScheme.AddToScheme(scheme); err != nil {
 		logger.Error(err, "init keeper - unable to clientGoScheme.AddToScheme")
-		return fmt.Errorf("%w: %w", errKeeperInitTerminal, err)
+		return fmt.Errorf("%w: %w", errInitTerminal, err)
 	}
 	if err = api.AddToScheme(scheme); err != nil {
 		logger.Error(err, "init keeper - unable to api.AddToScheme")
-		return fmt.Errorf("%w: %w", errKeeperInitTerminal, err)
+		return fmt.Errorf("%w: %w", errInitTerminal, err)
 	}
 
 	// GetConfig, not GetConfigOrDie: the latter exits the process, which is exactly what this
@@ -203,7 +190,7 @@ func initKeeper(ctx context.Context, extClient *apiextensions.Clientset) error {
 		// Building the controller resolves the scheme and records watches; it issues no API calls,
 		// so like the scheme registration above this can only be a programming fault.
 		logger.Error(err, "init keeper - unable to ctrlRuntime.NewControllerManagedBy")
-		return fmt.Errorf("%w: %w", errKeeperInitTerminal, err)
+		return fmt.Errorf("%w: %w", errInitTerminal, err)
 	}
 
 	// Initialization successful

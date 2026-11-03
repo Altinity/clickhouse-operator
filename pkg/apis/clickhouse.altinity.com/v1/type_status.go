@@ -51,6 +51,12 @@ const (
 	// or key that the operator cannot read. Aborts rather than silently falling
 	// back to system roots — empty CA + Verify=Strict would refuse all dials.
 	StatusReasonRootCASecretUnresolved = "RootCASecretUnresolved"
+	// StatusReasonBackupSecretUnresolved: the operator-generated backup Secret of a CR with backup enabled
+	// cannot be read for any reason but its absence. Aborts rather than dropping the backup user. Updates
+	// that keep the generation do not reconcile the CR anew, so it stays Aborted until a spec edit, an
+	// operator restart or auto-recovery - on a pod turning Ready, say - which this reason does not opt
+	// out of, as the Secret may well be readable by then.
+	StatusReasonBackupSecretUnresolved = "BackupSecretUnresolved"
 	// StatusReasonFIPSImagePolicyViolation: security.images.policy=Required
 	// rejected this CR because a ClickHouse/Keeper container image lacks the
 	// "fips" tag substring (admission gate) or the running binary's
@@ -87,6 +93,12 @@ const (
 	// only on its next reconcile as template.chi.policy allows - such as after a new taskID under
 	// ApplyOnNextReconcile, or after an operator restart under ReadOnStart.
 	StatusReasonInvalidPodTemplate = "InvalidPodTemplate"
+	// StatusReasonInvalidBackupStorage: a cluster that turns backup on uses a backup storage neither it nor the
+	// installation declares, or declares several without naming the one it uses. Aborts rather than leaving the
+	// cluster without a storage: that would turn its backup off, which removes the sidecars and restarts every
+	// host, over what is mostly a typo. Requires an edit of the CR, or of its template, which reaches the CR only
+	// on its next reconcile as template.chi.policy allows.
+	StatusReasonInvalidBackupStorage = "InvalidBackupStorage"
 )
 
 // Status defines status section of the custom resource.

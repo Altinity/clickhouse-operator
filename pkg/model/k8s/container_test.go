@@ -57,3 +57,73 @@ func TestPodSpecContainerGet(t *testing.T) {
 	_, ok = PodSpecContainerGet(&core.PodSpec{}, "clickhouse", 0)
 	require.False(t, ok)
 }
+
+func TestPodSpecContainerGetOrFirstOther(t *testing.T) {
+	for name, tc := range map[string]struct {
+		containers []string
+		// want is the index of the container found, -1 for none
+		want int
+	}{
+		"by name, past another first":       {containers: []string{"server", "log", "clickhouse"}, want: 2},
+		"the first other":                   {containers: []string{"log", "backup", "server", "proxy"}, want: 2},
+		"the first, one of the others next": {containers: []string{"server", "log"}, want: 0},
+		"none but the others":               {containers: []string{"log", "backup"}, want: -1},
+		"no container":                      {want: -1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			spec := &core.PodSpec{}
+			for _, container := range tc.containers {
+				spec.Containers = append(spec.Containers, core.Container{Name: container})
+			}
+			got, ok := PodSpecContainerGetOrFirstOther(spec, "clickhouse", "log", "backup")
+			require.Equal(t, tc.want >= 0, ok)
+			if ok {
+				require.Same(t, &spec.Containers[tc.want], got)
+			}
+		})
+	}
+}
+
+// lookupIn finds a variable in env, as kubelet finds one among the env vars of a container
+func lookupIn(env map[string]string) func(string) (string, bool) {
+	return func(name string) (string, bool) {
+		value, ok := env[name]
+		return value, ok
+	}
+}
+
+// Kubelet reduces "$$" to "$" and replaces a $(VAR_NAME) reference to a variable of the container, leaving any other
+// "$" - a reference to no variable, an unclosed one, a shell's own "$x" - as it is.
+func TestExpandVariableReferences(t *testing.T) {
+	env := lookupIn(map[string]string{"PORT": "7171", "EMPTY": ""})
+	for in, want := range map[string]string{
+		"plain":                  "plain",
+		"$$":                     "$",
+		"pid $$ and $$$":         "pid $ and $$",
+		"$(PORT)":                "7171",
+		"port $(PORT)/$(EMPTY)x": "port 7171/x",
+		"$(UNSET) stays":         "$(UNSET) stays",
+		"$(date +%s)":            "$(date +%s)",
+		"$$(PORT) is escaped":    "$(PORT) is escaped",
+		"unclosed $(PORT":        "unclosed $(PORT",
+		"${PORT} and $PORT":      "${PORT} and $PORT",
+		"trailing $":             "trailing $",
+	} {
+		require.Equal(t, want, ExpandVariableReferences(in, env), in)
+	}
+}
+
+// A script escaped for the command of a container reaches it as written, whatever variables the container has: a
+// script reading /proc/$$/environ must not read /proc/$/environ.
+func TestEscapeVariableReferencesRoundTrips(t *testing.T) {
+	env := lookupIn(map[string]string{"PORT": "7171", "HOME": "/root"})
+	for _, script := range []string{
+		"done </proc/$$/environ",
+		"echo $(PORT) ${PORT} $PORT $(date +%s) $$(PORT) $",
+		"unclosed $(HOME",
+		"",
+	} {
+		require.Equal(t, script, ExpandVariableReferences(EscapeVariableReferences(script), env), script)
+	}
+	require.Equal(t, []string{"bash", "-c", "a $$ b", "$$(PORT)"}, EscapeVariableReferencesAll([]string{"bash", "-c", "a $ b", "$(PORT)"}))
+}

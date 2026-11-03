@@ -140,6 +140,12 @@ const (
 
 	// defaultTerminationGracePeriod specifies default value for TerminationGracePeriod
 	defaultTerminationGracePeriod = 30
+	// defaultBackupStoragePath and defaultBackupStorageObjectDiskPath specify default values for Backup.StoragePath and
+	// Backup.StorageObjectDiskPath. The namespace and the installation keep its backups apart from those of every other
+	// installation of the Kubernetes cluster on a shared storage, the cluster and the shard keep those of its
+	// shards apart
+	defaultBackupStoragePath           = "backup/{namespace}/{installation}/{cluster}/{shard}"
+	defaultBackupStorageObjectDiskPath = "object_disks/{namespace}/{installation}/{cluster}/{shard}"
 	// defaultRevisionHistoryLimit specifies default value for RevisionHistoryLimit
 	defaultRevisionHistoryLimit = 10
 )
@@ -901,6 +907,18 @@ type ConfigCRSource struct {
 	Name      string
 }
 
+// OperatorConfigBackup sets the defaults of operator-managed backup
+type OperatorConfigBackup struct {
+	// StoragePath and StorageObjectDiskPath are where in its storage the clickhouse-backup sidecar of a host keeps the
+	// backups it makes, and their data on object disks, when the settings of the storage of its cluster set no path of
+	// their own. Each is a template that clickhouse-backup expands with the ClickHouse macros of the host - {namespace},
+	// {installation}, {cluster}, {shard} and {replica} - and the backup Jobs alike. The sidecar takes them as arguments
+	// of its command: changing either rolls the pods of every backup-enabled cluster, and leaves the backups made under
+	// the old paths where they are.
+	StoragePath           string `json:"storagePath"           yaml:"storagePath"`
+	StorageObjectDiskPath string `json:"storageObjectDiskPath" yaml:"storageObjectDiskPath"`
+}
+
 // OperatorConfig specifies operator config
 type OperatorConfig struct {
 	Runtime    OperatorConfigRuntime    `json:"runtime"    yaml:"runtime"`
@@ -919,7 +937,9 @@ type OperatorConfig struct {
 	// Target-scoped sub-structs (ClickHouse/Zookeeper/Kubernetes) serve as
 	// defaults inherited into CHIs and clusters via MergeFrom (3-level
 	// inheritance); IPC and FIPS are operator-only.
-	Security    OperatorConfigSecurity `json:"security" yaml:"security"`
+	Security OperatorConfigSecurity `json:"security" yaml:"security"`
+	// Backup sets the defaults of operator-managed backup
+	Backup      OperatorConfigBackup `json:"backup" yaml:"backup"`
 	StatefulSet struct {
 		// Revision history limit
 		RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`
@@ -1439,6 +1459,15 @@ func (c *OperatorConfig) normalizeSectionPod() {
 	}
 }
 
+func (c *OperatorConfig) normalizeSectionBackup() {
+	if c.Backup.StoragePath == "" {
+		c.Backup.StoragePath = defaultBackupStoragePath
+	}
+	if c.Backup.StorageObjectDiskPath == "" {
+		c.Backup.StorageObjectDiskPath = defaultBackupStorageObjectDiskPath
+	}
+}
+
 // normalize() makes fully-and-correctly filled OperatorConfig
 func (c *OperatorConfig) normalize() {
 	c.move()
@@ -1458,6 +1487,7 @@ func (c *OperatorConfig) normalize() {
 	c.normalizeSectionLabel()
 	c.normalizeSectionStatefulSet()
 	c.normalizeSectionPod()
+	c.normalizeSectionBackup()
 	// FIPS coercion runs LAST so it overrides any user-specified per-component
 	// values for the knobs it tightens. Field-level overrides are logged.
 	c.applyEnforcedHardening()
