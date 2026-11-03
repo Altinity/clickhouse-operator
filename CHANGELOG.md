@@ -8,7 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* **Hot-reload ClickHouse user passwords from Kubernetes Secrets.** Set `valueFrom.hotReload: true` on `password`, `password_sha256_hex`, or `password_double_sha1_hex` to rotate credentials without restarting Pods. Enabling requires a one-time rollout; automatic Secret-change detection applies to references declared directly in the CHI. See [documentation](docs/security_hardening.md#rotating-user-passwords-without-pod-restarts). by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2100](https://github.com/Altinity/clickhouse-operator/pull/2100). Fixes [#2092](https://github.com/Altinity/clickhouse-operator/issues/2092)
+* **Hot-reload ClickHouse user passwords from Kubernetes Secrets.** Set `valueFrom.hotReload: true` on `password`, `password_sha256_hex`, or `password_double_sha1_hex` to rotate credentials without restarting Pods. Enabling requires a one-time rollout; automatic Secret-change detection applies to references declared directly in the CHI. See [documentation](docs/security_hardening.md#rotating-user-passwords-without-pod-restarts).
+
+  ```yaml
+  users:
+    user1/password:
+      valueFrom:
+        secretKeyRef:
+          name: clickhouse-secret
+          key: pwduser1
+        hotReload: true
+  ```
+
+ by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2100](https://github.com/Altinity/clickhouse-operator/pull/2100). Fixes [#2092](https://github.com/Altinity/clickhouse-operator/issues/2092)
 
 * **EXPERIMENTAL: Operator-managed backup and restore.** Added `ClickHouseBackup`, `ClickHouseBackupSchedule`, and `ClickHouseRestore` resources using `clickhouse-backup`. Supports per-cluster backups and restores, scheduled backups, retention, configurable storage paths, and cross-installation restores. Enable with `spec.backup.enabled: "yes"`. See [backup documentation](docs/backup.md). by [@discostur](https://github.com/discostur) and [@sunsingerus](https://github.com/sunsingerus) in [#2015](https://github.com/Altinity/clickhouse-operator/pull/2015). Related [#1795](https://github.com/Altinity/clickhouse-operator/issues/1795), [#862](https://github.com/Altinity/clickhouse-operator/issues/862)
 
