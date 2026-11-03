@@ -286,10 +286,12 @@ func (c *CR) statusUpdateCM(ctx context.Context, cm *core.ConfigMap) error {
 	if cm == nil {
 		return nil
 	}
-	cmm := NewConfigMap(c.kubeClient)
-	_, err := cmm.Update(ctx, cm)
+	// Runs inside statusUpdateRetry's loop. It is best effort and rewritten on every status
+	// update, so write once: the ConfigMap driver's owner-ref retry would repeat per attempt.
+	cms := c.kubeClient.CoreV1().ConfigMaps(cm.Namespace)
+	_, err := cms.Update(k8sCtx(ctx), cm, controller.NewUpdateOptions())
 	if apiErrors.IsNotFound(err) {
-		_, err = cmm.Create(ctx, cm)
+		_, err = cms.Create(k8sCtx(ctx), cm, controller.NewCreateOptions())
 	}
 	return err
 }

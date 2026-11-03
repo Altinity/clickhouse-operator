@@ -793,6 +793,7 @@ func (c *Controller) addHostWatch(host *api.Host) {
 		CRNamespace: host.Runtime.Address.Namespace,
 		CRName:      host.Runtime.Address.CHIName,
 		ClusterName: host.Runtime.Address.ClusterName,
+		ClusterTLS:  metrics.NewWatchedTLS(host.GetCluster()),
 		Host: &metrics.WatchedHost{
 			Name:      host.Name,
 			Hostname:  host.Runtime.Address.FQDN,

@@ -7321,7 +7321,8 @@ data:
           - version: "*"
             rules:
               # see https://kb.altinity.com/altinity-kb-setup-and-maintenance/altinity-kb-server-config-files/#server-config-configxml-sections-which-dont-require-restart
-              # to be replaced with "select * from system.server_settings where changeable_without_restart = 'No'"
+              # changeable_without_restart = Yes reloads that server setting even when a wildcard rule below says restart.
+              # An exact rule such as settings/<name>: "yes" still restarts. Other server settings follow the rules below.
     
               - settings/*: "yes"
     

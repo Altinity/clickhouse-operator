@@ -269,6 +269,17 @@ func (s *ClusterSchemer) sqlVersion() string {
 	return `SELECT version()`
 }
 
+// sqlSettingsChangeableWithoutRestartColumn is 1 when system.server_settings has
+// changeable_without_restart. Asking system.columns avoids a failing query
+func (s *ClusterSchemer) sqlSettingsChangeableWithoutRestartColumn() string {
+	return `SELECT count() FROM system.columns WHERE database = 'system' AND table = 'server_settings' AND name = 'changeable_without_restart'`
+}
+
+// sqlSettingsChangeableWithoutRestart lists server settings ClickHouse applies without a restart.
+func (s *ClusterSchemer) sqlSettingsChangeableWithoutRestart() string {
+	return `SELECT name FROM system.server_settings WHERE changeable_without_restart = 'Yes'`
+}
+
 func (s *ClusterSchemer) sqlHostInCluster(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
