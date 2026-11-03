@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         hotReload: true
   ```
 
- by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2100](https://github.com/Altinity/clickhouse-operator/pull/2100). Fixes [#2092](https://github.com/Altinity/clickhouse-operator/issues/2092)
+  by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2100](https://github.com/Altinity/clickhouse-operator/pull/2100). Fixes [#2092](https://github.com/Altinity/clickhouse-operator/issues/2092)
 
 * **EXPERIMENTAL: Operator-managed backup and restore.** Added `ClickHouseBackup`, `ClickHouseBackupSchedule`, and `ClickHouseRestore` resources using `clickhouse-backup`. Supports per-cluster backups and restores, scheduled backups, retention, configurable storage paths, and cross-installation restores. Enable with `spec.backup.enabled: "yes"`. See [backup documentation](docs/backup.md). by [@discostur](https://github.com/discostur) and [@sunsingerus](https://github.com/sunsingerus) in [#2015](https://github.com/Altinity/clickhouse-operator/pull/2015). Related [#1795](https://github.com/Altinity/clickhouse-operator/issues/1795), [#862](https://github.com/Altinity/clickhouse-operator/issues/862)
 
