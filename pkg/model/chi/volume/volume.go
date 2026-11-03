@@ -100,7 +100,7 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 // chop-generated-users.xml for users that do not opt in. The Secret adds
 // chop-generated-hot-reload-users.xml. Sidecars get the ConfigMap alone.
 // The application container is the one named clickhouse, or the first container
-// when a PodTemplate renames it.
+// that is not an operator-managed sidecar when a PodTemplate renames it.
 func appendHotReloadUsersVolume(statefulSet *apps.StatefulSet, configMapName, secretName string) error {
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
@@ -111,7 +111,11 @@ func appendHotReloadUsersVolume(statefulSet *apps.StatefulSet, configMapName, se
 			config.ChopGeneratedHotReloadUsersConfigFilename(),
 		),
 	)
-	app, ok := k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseContainerName, 0)
+	app, ok := k8s.PodSpecContainerGetOrFirstOther(
+		&statefulSet.Spec.Template.Spec,
+		config.ClickHouseContainerName,
+		config.ClickHouseSidecarContainerNames...,
+	)
 	k8s.StatefulSetWalkContainers(statefulSet, func(container *core.Container) {
 		if ok && container == app {
 			return

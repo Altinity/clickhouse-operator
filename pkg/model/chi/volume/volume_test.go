@@ -56,6 +56,29 @@ func TestAppendHotReloadUsersVolumeFallsBackToFirstContainer(t *testing.T) {
 	require.Equal(t, "users-secret", sts.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name)
 }
 
+func TestAppendHotReloadUsersVolumeSkipsSidecarsBeforeCustomServer(t *testing.T) {
+	sts := statefulSet(config.ClickHouseLogContainerName, config.ClickHouseBackupContainerName, "clickhouse-pod")
+	err := appendHotReloadUsersVolume(sts, "users-cm", "users-secret")
+	require.NoError(t, err)
+
+	for _, sidecar := range sts.Spec.Template.Spec.Containers[:2] {
+		require.Len(t, sidecar.VolumeMounts, 1)
+		require.Equal(t, "users-cm", sidecar.VolumeMounts[0].Name)
+		require.Equal(t, config.DirPathConfigUsers, sidecar.VolumeMounts[0].MountPath)
+	}
+
+	server := &sts.Spec.Template.Spec.Containers[2]
+	require.Len(t, server.VolumeMounts, 1)
+	require.Equal(t, "users-secret", server.VolumeMounts[0].Name)
+	require.Equal(t, config.DirPathConfigUsers, server.VolumeMounts[0].MountPath)
+}
+
+func TestAppendHotReloadUsersVolumeErrorsWhenOnlySidecars(t *testing.T) {
+	sts := statefulSet(config.ClickHouseLogContainerName, config.ClickHouseBackupContainerName)
+	err := appendHotReloadUsersVolume(sts, "users-cm", "users-secret")
+	require.Error(t, err)
+}
+
 func TestAppendHotReloadUsersVolumeErrorsWhenMissing(t *testing.T) {
 	err := appendHotReloadUsersVolume(&apps.StatefulSet{}, "users-cm", "users-secret")
 	require.Error(t, err)
