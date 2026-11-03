@@ -1,0 +1,9 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-078-fips-verify-none-chopconf"
+spec:
+  security:
+    # Policy-only Enforced — exercises the policy branch without fips.enforced,
+    # so the verify:None bypass must be rejected purely by transport policy.
+    policy: Enforced

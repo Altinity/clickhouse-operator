@@ -23,7 +23,9 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
@@ -65,16 +67,24 @@ func (c *Pod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
 	default:
 		panic(any("incorrect number or params"))
 	}
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, controller.NewGetOptions())
+	return commonKube.GetWithRetry(ctx, func() (*core.Pod, error) {
+		return c.kubeClient.CoreV1().Pods(namespace).Get(k8sCtx(ctx), name, controller.NewGetOptions())
+	})
 }
 
+// GetRestartCounters maps the name of the pod's ClickHouse container => its restarts count. A restart of the host is
+// one of its ClickHouse: the other containers do not count, as the liveness probe of the backup sidecar restarts the
+// sidecar alone, also while ClickHouse is shut down to restart.
 func (c *Pod) GetRestartCounters(ctx context.Context, params ...any) (map[string]int, error) {
 	pod, err := c.Get(ctx, params...)
 	if err != nil {
 		return nil, err
 	}
-	return k8s.PodContainersRestartCountsGet(pod), nil
+	clickHouse, ok := creator.PodSpecContainerGetClickHouse(&pod.Spec)
+	if !ok {
+		return nil, nil
+	}
+	return k8s.PodContainersRestartCountsGet(pod, clickHouse.Name), nil
 }
 
 // GetAll gets all pods for provided entity

@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 
@@ -35,6 +36,69 @@ const (
 	StatusCompleted   = "Completed"
 	StatusAborted     = "Aborted"
 	StatusTerminating = "Terminating"
+)
+
+// Status reasons distinguish flavors of StatusAborted. The reason is pushed
+// into the error stream so operators can grep / dashboards can branch on it
+// (existing CR status schema has no first-class Reason field — preserving
+// the schema is the back-compat trade-off).
+const (
+	StatusReasonFIPSValidationFailed = "FIPSValidationFailed"
+	// StatusReasonRootCAConflict: both inline RootCA and RootCASecretRef set on
+	// the same security.tls block. User must pick one.
+	StatusReasonRootCAConflict = "RootCAConflict"
+	// StatusReasonRootCASecretUnresolved: the RootCASecretRef points at a Secret
+	// or key that the operator cannot read. Aborts rather than silently falling
+	// back to system roots — empty CA + Verify=Strict would refuse all dials.
+	StatusReasonRootCASecretUnresolved = "RootCASecretUnresolved"
+	// StatusReasonBackupSecretUnresolved: the operator-generated backup Secret of a CR with backup enabled
+	// cannot be read for any reason but its absence. Aborts rather than dropping the backup user. Updates
+	// that keep the generation do not reconcile the CR anew, so it stays Aborted until a spec edit, an
+	// operator restart or auto-recovery - on a pod turning Ready, say - which this reason does not opt
+	// out of, as the Secret may well be readable by then.
+	StatusReasonBackupSecretUnresolved = "BackupSecretUnresolved"
+	// StatusReasonFIPSImagePolicyViolation: security.images.policy=Required
+	// rejected this CR because a ClickHouse/Keeper container image lacks the
+	// "fips" tag substring (admission gate) or the running binary's
+	// `SELECT version()` reply lacks "fips" (post-Ready gate). Separate from
+	// FIPSValidationFailed so dashboards can distinguish operator-config bypass
+	// from per-CR image-policy violations.
+	StatusReasonFIPSImagePolicyViolation = "FIPSImagePolicyViolation"
+	// StatusReasonNoKeeperListener: the CHK cluster has both insecure=no AND
+	// secure=no (or secure unset), so no client-facing Keeper port would be
+	// emitted onto the Service. The resulting CR would be unreachable to
+	// ClickHouse clients. Caught at admission to surface the misconfiguration
+	// instead of producing a silently-broken cluster.
+	StatusReasonNoKeeperListener = "NoKeeperListener"
+	// StatusReasonShardHasNoHealthyPeer: a host's reconcile would have restarted or rolled it
+	// while its shard had no other healthy replica to serve, so the disruption was deferred and
+	// the shard left serving. Recoverable without a spec edit - the peer coming back triggers
+	// a retry - so it is deliberately absent from normalizeTimeAbortReasons.
+	StatusReasonShardHasNoHealthyPeer = "ShardHasNoHealthyPeer"
+	// StatusReasonRaftQuorumUnsafe: a CHK host's reconcile would disrupt a Ready replica while
+	// the ensemble lacks Raft quorum headroom. Disruption is deferred until siblings recover.
+	StatusReasonRaftQuorumUnsafe = "RaftQuorumUnsafe"
+	// StatusReasonRemovedSecretRefSyntax: a user settings field uses the `k8s_secret_` or
+	// `k8s_secret_env_` prefix, removed in 0.27.4 because it accepted a namespace/name/key
+	// triple and could therefore read a Secret from any namespace. Aborts rather than
+	// ignoring the field: an ignored field renders verbatim into the users ConfigMap and
+	// leaves the account on the default password from ClickHouse.Config.User.Default.Password.
+	// Requires a spec edit to migrate to valueFrom.secretKeyRef.
+	StatusReasonRemovedSecretRefSyntax = "RemovedSecretRefSyntax"
+	// StatusReasonInvalidPodTemplate: a host's resolved pod template has a container that cannot
+	// run - without a name or an image, or named like another - or, merged from several layers,
+	// starts a duplicate ClickHouse server, since a template's container named unlike the one it was
+	// meant to extend stays a container of its own. Caught at admission, before the
+	// StatefulSet is written. Requires an edit of the CR, or of its template, which reaches the CR
+	// only on its next reconcile as template.chi.policy allows - such as after a new taskID under
+	// ApplyOnNextReconcile, or after an operator restart under ReadOnStart.
+	StatusReasonInvalidPodTemplate = "InvalidPodTemplate"
+	// StatusReasonInvalidBackupStorage: a cluster that turns backup on uses a backup storage neither it nor the
+	// installation declares, or declares several without naming the one it uses. Aborts rather than leaving the
+	// cluster without a storage: that would turn its backup off, which removes the sidecars and restarts every
+	// host, over what is mostly a typo. Requires an edit of the CR, or of its template, which reaches the CR only
+	// on its next reconcile as template.chi.policy allows.
+	StatusReasonInvalidBackupStorage = "InvalidBackupStorage"
 )
 
 // Status defines status section of the custom resource.
@@ -74,6 +138,7 @@ type Status struct {
 	Endpoints                []string                `json:"endpoints,omitempty"                yaml:"endpoints,omitempty"`
 	NormalizedCR             *ClickHouseInstallation `json:"normalized,omitempty"               yaml:"normalized,omitempty"`
 	NormalizedCRCompleted    *ClickHouseInstallation `json:"normalizedCompleted,omitempty"      yaml:"normalizedCompleted,omitempty"`
+	ActionPlan               *ActionPlan             `json:"actionPlan,omitempty"               yaml:"actionPlan,omitempty"`
 	HostsWithTablesCreated   []string                `json:"hostsWithTablesCreated,omitempty"   yaml:"hostsWithTablesCreated,omitempty"`
 	HostsWithReplicaCaughtUp []string                `json:"hostsWithReplicaCaughtUp,omitempty" yaml:"hostsWithReplicaCaughtUp,omitempty"`
 	UsedTemplates            []*TemplateRef          `json:"usedTemplates,omitempty"            yaml:"usedTemplates,omitempty"`
@@ -124,10 +189,13 @@ func (s *Status) Fill(params *FillStatusParams) {
 		s.HostsDeleteCount = params.HostsDeleteCount
 		s.HostsDeletedCount = params.HostsDeletedCount
 		s.Pods = params.Pods
-		s.FQDNs = params.FQDNs
-		s.Endpoint = params.Endpoint
-		s.Endpoints = append([]string{}, params.Endpoints...)
+		s.FQDNs = util.NormalizeFQDNs(params.FQDNs)
+		s.Endpoint = util.NormalizeFQDN(params.Endpoint)
+		s.Endpoints = util.NormalizeFQDNs(params.Endpoints)
 		s.NormalizedCR = params.NormalizedCR
+
+		s.HostsWithTablesCreated = util.TrimHostListToFQDNs(s.HostsWithTablesCreated, s.FQDNs)
+		s.HostsWithReplicaCaughtUp = util.TrimHostListToFQDNs(s.HostsWithReplicaCaughtUp, s.FQDNs)
 	})
 }
 
@@ -161,6 +229,7 @@ func (s *Status) SetAndPushError(err string) {
 
 // PushHostReplicaCaughtUp pushes host to the list of hosts with replica caught-up
 func (s *Status) PushHostReplicaCaughtUp(host string) {
+	host = util.NormalizeFQDN(host)
 	doWithWriteLock(s, func(s *Status) {
 		if util.InArray(host, s.HostsWithReplicaCaughtUp) {
 			return
@@ -171,6 +240,7 @@ func (s *Status) PushHostReplicaCaughtUp(host string) {
 
 // PushHostTablesCreated pushes host to the list of hosts with created tables
 func (s *Status) PushHostTablesCreated(host string) {
+	host = util.NormalizeFQDN(host)
 	doWithWriteLock(s, func(s *Status) {
 		if util.InArray(host, s.HostsWithTablesCreated) {
 			return
@@ -182,10 +252,14 @@ func (s *Status) PushHostTablesCreated(host string) {
 // SyncHostTablesCreated syncs list of hosts with tables created with actual list of hosts
 func (s *Status) SyncHostTablesCreated() {
 	doWithWriteLock(s, func(s *Status) {
-		if s.FQDNs == nil {
-			return
-		}
-		s.HostsWithTablesCreated = util.IntersectStringArrays(s.HostsWithTablesCreated, s.FQDNs)
+		s.HostsWithTablesCreated = util.TrimHostListToFQDNs(s.HostsWithTablesCreated, s.FQDNs)
+	})
+}
+
+// SyncHostsWithReplicaCaughtUp syncs hostsWithReplicaCaughtUp with the current FQDN list
+func (s *Status) SyncHostsWithReplicaCaughtUp() {
+	doWithWriteLock(s, func(s *Status) {
+		s.HostsWithReplicaCaughtUp = util.TrimHostListToFQDNs(s.HostsWithReplicaCaughtUp, s.FQDNs)
 	})
 }
 
@@ -280,7 +354,7 @@ func (s *Status) HostCompleted() {
 }
 
 // ReconcileStart marks reconcile start
-func (s *Status) ReconcileStart(deleteHostsCount int) {
+func (s *Status) ReconcileStart(ap IActionPlan) {
 	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
@@ -291,7 +365,8 @@ func (s *Status) ReconcileStart(deleteHostsCount int) {
 		s.HostsUnchangedCount = 0
 		s.HostsCompletedCount = 0
 		s.HostsDeletedCount = 0
-		s.HostsDeleteCount = deleteHostsCount
+		s.HostsDeleteCount = ap.GetRemovedHostsNum()
+		s.ActionPlan = ap.(*ActionPlan)
 		pushTaskIDStartedNoSync(s)
 	})
 }
@@ -320,6 +395,28 @@ func (s *Status) ReconcileAbort() {
 	})
 }
 
+// ReconcileAbortWithReason marks reconcile abortion AND records a reason-tagged
+// error so callers can distinguish flavors of Aborted (e.g. FIPSValidationFailed)
+// from the generic case. The reason is prepended to the message in `[reason] msg`
+// form — operators and dashboards grep the error stream for the bracketed tag.
+func (s *Status) ReconcileAbortWithReason(reason, msg string) {
+	doWithWriteLock(s, func(s *Status) {
+		if s == nil {
+			return
+		}
+		s.Status = StatusAborted
+		s.Action = ""
+		pushTaskIDCompletedNoSync(s)
+		if (reason != "") || (msg != "") {
+			tagged := fmt.Sprintf("[%s] %s", reason, msg)
+			s.Errors = append([]string{tagged}, s.Errors...)
+			if len(s.Errors) > maxErrors {
+				s.Errors = s.Errors[:maxErrors]
+			}
+		}
+	})
+}
+
 // DeleteStart marks deletion start
 func (s *Status) DeleteStart() {
 	doWithWriteLock(s, func(s *Status) {
@@ -337,6 +434,13 @@ func (s *Status) DeleteStart() {
 	})
 }
 
+// SetActionPlan sets action plan
+func (s *Status) SetActionPlan(ap IActionPlan) {
+	doWithWriteLock(s, func(s *Status) {
+		s.ActionPlan = ap.(*ActionPlan)
+	})
+}
+
 func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 	if opts.FieldGroupInheritable {
 		opts.Copy.TaskIDsStarted = true
@@ -344,7 +448,6 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.Actions = true
 		opts.Copy.Errors = true
 		opts.Copy.HostsWithTablesCreated = true
-		opts.Copy.UsedTemplates = true
 	}
 
 	if opts.FieldGroupActions {
@@ -388,11 +491,13 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.FQDNs = true
 		opts.Copy.Endpoint = true
 		opts.Copy.NormalizedCR = true
+		opts.Copy.ActionPlan = true
 		opts.Copy.UsedTemplates = true
 	}
 
 	if opts.FieldGroupNormalized {
 		opts.Copy.NormalizedCR = true
+		opts.Copy.ActionPlan = true
 	}
 
 	if opts.FieldGroupWholeStatus {
@@ -425,6 +530,7 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.Endpoint = true
 		opts.Copy.NormalizedCR = true
 		opts.Copy.NormalizedCRCompleted = true
+		opts.Copy.ActionPlan = true
 		opts.Copy.UsedTemplates = true
 	}
 
@@ -531,6 +637,9 @@ func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 			if opts.Copy.NormalizedCRCompleted {
 				s.NormalizedCRCompleted = from.NormalizedCRCompleted
 			}
+			if opts.Copy.ActionPlan {
+				s.ActionPlan = from.ActionPlan
+			}
 			if opts.Copy.HostsWithTablesCreated {
 				s.HostsWithTablesCreated = nil
 				if len(from.HostsWithTablesCreated) > 0 {
@@ -542,8 +651,8 @@ func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 				}
 			}
 			if opts.Copy.UsedTemplates {
-				if len(from.UsedTemplates) > len(s.UsedTemplates) {
-					s.UsedTemplates = nil
+				s.UsedTemplates = nil
+				if len(from.UsedTemplates) > 0 {
 					s.UsedTemplates = append(s.UsedTemplates, from.UsedTemplates...)
 				}
 			}
@@ -771,15 +880,14 @@ func (s *Status) GetNormalizedCRCompleted() *ClickHouseInstallation {
 // GetHostsWithTablesCreated gets hosts with created tables
 func (s *Status) GetHostsWithTablesCreated() []string {
 	return getStringArrWithReadLock(s, func(s *Status) []string {
-		return s.HostsWithTablesCreated
+		return util.NormalizeFQDNs(s.HostsWithTablesCreated)
 	})
 }
 
 // GetHostsWithReplicaCaughtUp gets hosts with replica caught-up
 func (s *Status) GetHostsWithReplicaCaughtUp() []string {
 	return getStringArrWithReadLock(s, func(s *Status) []string {
-		return s.HostsWithReplicaCaughtUp
-
+		return util.NormalizeFQDNs(s.HostsWithReplicaCaughtUp)
 	})
 }
 
@@ -846,7 +954,16 @@ func getStringArrWithReadLock(s *Status, f func(*Status) []string) []string {
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return f(s)
+	// Return a COPY so callers may iterate the snapshot after the read lock is
+	// released without racing concurrent writers (PushError/SetAndPushError/
+	// ReconcileAbortWithReason mutate the underlying slice).
+	src := f(s)
+	if src == nil {
+		return emptyArr
+	}
+	cp := make([]string, len(src))
+	copy(cp, src)
+	return cp
 }
 
 // mergeActionsNoSync merges the actions of from into those of s (without synchronization, because synchronized

@@ -6,13 +6,14 @@ spec:
   defaults:
     templates:
       podTemplate: default
+  useTemplates:
+    - name: clickhouse-version
   templates:
     podTemplates:
       - name: default
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:24.8
               imagePullPolicy: IfNotPresent
               command:
                 - /bin/bash

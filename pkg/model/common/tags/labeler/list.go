@@ -41,6 +41,7 @@ const (
 	LabelServiceValueCluster         = "cluster"
 	LabelServiceValueShard           = "shard"
 	LabelServiceValueHost            = "host"
+	LabelServiceValueHostClient      = "host-client"
 	LabelPVCReclaimPolicyName        = "APIGroupName" + "/" + "reclaimPolicy"
 
 	// Supplementary service labels - used to cooperate with k8s

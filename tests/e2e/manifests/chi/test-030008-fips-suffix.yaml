@@ -1,0 +1,23 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-030008-fips-suffix
+spec:
+  defaults:
+    templates:
+      podTemplate: fips-suffix
+  configuration:
+    clusters:
+      - name: c1
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    podTemplates:
+      # Image tag contains "fips" substring — SHALL be detected as FIPS.
+      # Image is unpullable; we only verify admission acceptance.
+      - name: fips-suffix
+        spec:
+          containers:
+            - name: clickhouse
+              image: example.com/clickhouse-server:25.3.8.30001.fips

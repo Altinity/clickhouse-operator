@@ -15,8 +15,11 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"fmt"
+
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 type ICustomResource interface {
@@ -76,6 +79,8 @@ type IConfiguration interface {
 	GetQuotas() *Settings
 	GetSettings() *Settings
 	GetFiles() *Settings
+	GetZookeeper() *ZookeeperConfig
+	GetClusters() []*Cluster
 }
 
 type ICustomResourceRuntime interface {
@@ -104,6 +109,11 @@ type IStatus interface {
 	HostAdded()
 	HostFailed()
 	HostCompleted()
+
+	// ReconcileAbortWithReason marks the CR Aborted and prepends a
+	// reason-tagged error to the error stream. Callers reach this via
+	// ICustomResource.IEnsureStatus().
+	ReconcileAbortWithReason(reason, msg string)
 }
 
 type ICluster interface {
@@ -117,6 +127,8 @@ type ICluster interface {
 	GetInsecure() *types.StringBool
 	GetSecure() *types.StringBool
 	GetSecret() *ClusterSecret
+	GetSecurity() *ClusterSecurity
+	GetBackup() *ClusterBackup
 	GetPDBManaged() *types.StringBool
 	GetPDBMaxUnavailable() *types.Int32
 
@@ -124,6 +136,7 @@ type ICluster interface {
 	WalkHosts(func(host *Host) error) []error
 
 	HostsCount() int
+	IsSingleNode() bool
 
 	FindShard(needle interface{}) IShard
 	FindHost(needleShard interface{}, needleHost interface{}) *Host
@@ -131,7 +144,7 @@ type ICluster interface {
 	SelectSettingsSourceFrom(shard IShard, replica IReplica) any
 
 	GetRuntime() IClusterRuntime
-	GetReconcile() ClusterReconcile
+	GetReconcile() *ClusterReconcile
 	GetServiceTemplate() (*ServiceTemplate, bool)
 	GetAncestor() ICluster
 }
@@ -281,4 +294,27 @@ type WalkHostsAddressFn func(
 type IGenerateName interface {
 	HasGenerateName() bool
 	GetGenerateName() string
+}
+
+type IActionPlan interface {
+	fmt.Stringer
+	HasActionsToDo() bool
+	GetRemovedHostsNum() int
+	Log(tag string) string
+	WalkRemoved(
+		clusterFunc func(cluster ICluster),
+		shardFunc func(shard IShard),
+		hostFunc func(host *Host),
+	)
+	WalkAdded(
+		clusterFunc func(cluster ICluster),
+		shardFunc func(shard IShard),
+		hostFunc func(host *Host),
+	)
+	WalkModified(
+		clusterFunc func(cluster ICluster),
+		shardFunc func(shard IShard),
+		hostFunc func(host *Host),
+	)
+	DeepCopyIActionPlan() IActionPlan
 }

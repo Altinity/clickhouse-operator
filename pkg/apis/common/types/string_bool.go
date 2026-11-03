@@ -14,10 +14,86 @@
 
 package types
 
-import "strings"
+import (
+	"bytes"
+	"encoding/json"
+	"strings"
+)
 
 // StringBool defines string representation of a bool type
 type StringBool string
+
+// UnmarshalJSON accepts native JSON bool (true/false), integer (0/1, any other
+// integer that fits an int reads as 1), or any string (the vocabulary IsValid
+// accepts is "true", "yes", "On", "enabled", "1", etc.) and keeps it as a
+// string: a bool as True/False, an integer as 0/1, a string as written; null
+// leaves it unset. Lets users write `secure: true` (native YAML bool) or
+// `secure: "true"` (string) interchangeably in their CRs — kubectl converts
+// YAML to JSON before submitting, so this is the load-bearing surface. A whole
+// number written as 1.0 or 1e3 reaches it as the integer 1 or 1000: the YAML to
+// JSON conversion and the API server re-encode the value.
+//
+// It never fails on a value the API server admits. The CRD schema cannot
+// express the bool|integer|string union, so the &TypeStringBool anchor in
+// deploy/builder/templates-install-bundle leaves the field untyped
+// (x-kubernetes-preserve-unknown-fields), and the API server stores any JSON
+// value: `secure: 1.5`, `suspend: {}` or `verify: [true]` apply cleanly. An
+// error here would not stay with the one resource that carries such a value: an
+// informer decodes all the resources it watches as one list, so a single item
+// that fails to decode fails the whole list, the reflector retries it forever,
+// its cache never syncs, and none of those resources is reconciled until the
+// value is fixed. A watch event that carries it breaks the watch the same way.
+//
+// Any other value — a fraction, an integer beyond an int, an object, an array —
+// is therefore kept as its compacted JSON text. IsValid refuses it, as it
+// refuses any string outside the vocabulary, and the value fares as such a
+// string does: the backup resources, for instance, report InvalidSpec. Whatever
+// a field makes of it, no decode fails: every other resource the informer
+// watches decodes as before.
+func (s *StringBool) UnmarshalJSON(data []byte) error {
+	// null → leave at zero value (the parent's *StringBool stays nil-like)
+	str := string(data)
+	if str == "null" {
+		return nil
+	}
+	// String form ("true", "yes", "On", "1", etc.) — most common path through
+	// the legacy kubectl→sigs.k8s.io/yaml pipeline. Quotes are present in JSON.
+	if len(data) > 0 && data[0] == '"' {
+		var v string
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		*s = StringBool(v)
+		return nil
+	}
+	// Bool form (native YAML bool round-tripped to JSON bool by kubectl)
+	if str == "true" {
+		*s = StringBoolTrueFirstCapital
+		return nil
+	}
+	if str == "false" {
+		*s = StringBoolFalseFirstCapital
+		return nil
+	}
+	// Integer form (0/1 — the legacy ClickHouse-config vocabulary)
+	var n int
+	if err := json.Unmarshal(data, &n); err == nil {
+		if n == 0 {
+			*s = StringBool0
+		} else {
+			*s = StringBool1
+		}
+		return nil
+	}
+	// Any other JSON value, kept as its compacted text. Compact cannot fail: the
+	// decoder validated the JSON before handing it over.
+	var written bytes.Buffer
+	if err := json.Compact(&written, data); err != nil {
+		return err
+	}
+	*s = StringBool(written.String())
+	return nil
+}
 
 // Set of string boolean constants
 const (

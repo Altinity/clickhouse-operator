@@ -3,7 +3,6 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-036-volume-re-provisioning"
 spec:
-
   useTemplates:
     - name: clickhouse-version
   configuration:
@@ -16,6 +15,8 @@ spec:
       layout:
         shardsCount: 1
         replicasCount: 2
+    profiles:
+      clickhouse_operator/log_queries: 1
   defaults:
     storageManagement:
       provisioner: Operator

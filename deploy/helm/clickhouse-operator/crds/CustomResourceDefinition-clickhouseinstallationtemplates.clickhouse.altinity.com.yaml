@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.25.4
+# OPERATOR_VERSION=0.28.0
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.25.4
+    clickhouse.altinity.com/chop: 0.28.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -26,6 +26,10 @@ spec:
       served: true
       storage: true
       additionalPrinterColumns:
+        - name: status
+          type: string
+          description: Resource status
+          jsonPath: .status.status
         - name: version
           type: string
           description: Operator version
@@ -49,10 +53,6 @@ spec:
           description: TaskID
           priority: 1 # show in wide view
           jsonPath: .status.taskID
-        - name: status
-          type: string
-          description: Resource status
-          jsonPath: .status.status
         - name: hosts-completed
           type: integer
           description: Completed hosts count
@@ -237,10 +237,17 @@ spec:
                 normalized:
                   type: object
                   description: "Normalized resource requested"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
                   description: "Normalized resource completed"
+                  nullable: true
+                  x-kubernetes-preserve-unknown-fields: true
+                actionPlan:
+                  type: object
+                  description: "Action Plan"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
@@ -276,45 +283,31 @@ spec:
                     Displayed in all .status.taskID* fields.
                     By default (if not filled) every update of CHI manifest will generate random taskID
                 stop: &TypeStringBool
-                  type: string
                   description: |
                     Allows to stop all ClickHouse clusters defined in a CHI.
                     Works as the following:
                      - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
                      - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
-                  enum:
-                    # List StringBoolXXX constants from model
-                    - ""
-                    - "0"
-                    - "1"
-                    - "False"
-                    - "false"
-                    - "True"
-                    - "true"
-                    - "No"
-                    - "no"
-                    - "Yes"
-                    - "yes"
-                    - "Off"
-                    - "off"
-                    - "On"
-                    - "on"
-                    - "Disable"
-                    - "disable"
-                    - "Enable"
-                    - "enable"
-                    - "Disabled"
-                    - "disabled"
-                    - "Enabled"
-                    - "enabled"
+                  # StringBool is polymorphic — accepts native YAML bool (true/false),
+                  # integer (0/1), or string from the recognized vocabulary
+                  # (true/True/TRUE, yes/Yes, on/On, 1, enable/enabled, and their
+                  # false/no/off/0/disable/disabled counterparts). Validation moves
+                  # into the operator: pkg/apis/common/types StringBool.UnmarshalJSON
+                  # normalizes input, IsValid() rejects garbage at normalize time.
+                  # Structural-schema rules don't natively support bool|int|string
+                  # union, so we use x-kubernetes-preserve-unknown-fields: true as
+                  # the documented escape hatch (k8s apiextensions.k8s.io/v1).
+                  x-kubernetes-preserve-unknown-fields: true
                 restart:
                   type: string
                   description: |
                     In case 'RollingUpdate' specified, the operator will always restart ClickHouse pods during reconcile.
                     This options is used in rare cases when force restart is required and is typically removed after the use in order to avoid unneeded restarts.
                   enum:
+                    # both humped and all-lowercase accepted
                     - ""
                     - "RollingUpdate"
+                    - "rollingupdate"
                 suspend:
                   !!merge <<: *TypeStringBool
                   description: |
@@ -351,7 +344,9 @@ spec:
                         Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                       enum:
                         - ""
+                        - "Auto"
                         - "auto"
+                        - "Manual"
                         - "manual"
                     chiSelector:
                       type: object
@@ -372,9 +367,12 @@ spec:
                         Possible values:
                          - wait - should wait to exclude host, complete queries and include host back into the cluster
                          - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                        (case-insensitive)
                       enum:
                         - ""
+                        - "Wait"
                         - "wait"
+                        - "NoWait"
                         - "nowait"
                     configMapPropagationTimeout:
                       type: integer
@@ -398,12 +396,14 @@ spec:
                           properties:
                             statefulSet: &TypeObjectsCleanup
                               type: string
-                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default (case-insensitive)"
                               enum:
-                                # List ObjectsCleanupXXX constants from model
+                                # List ObjectsCleanupXXX constants from model (both humped and all-lowercase accepted)
                                 - ""
                                 - "Retain"
+                                - "retain"
                                 - "Delete"
+                                - "delete"
                             pvc:
                               type: string
                               !!merge <<: *TypeObjectsCleanup
@@ -490,6 +490,90 @@ spec:
                           minimum: 0
                           maximum: 100
                           description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
+                    statefulSet: &TypeReconcileStatefulSet
+                      type: object
+                      description: "Optional, StatefulSet reconcile behavior tuning"
+                      properties:
+                        create:
+                          type: object
+                          description: "Behavior during create StatefulSet"
+                          properties:
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "Abort"
+                                - "abort"
+                                - "Delete"
+                                - "delete"
+                                - "Ignore"
+                                - "ignore"
+                        update:
+                          type: object
+                          description: "Behavior during update StatefulSet"
+                          properties:
+                            timeout:
+                              type: integer
+                              description: "How many seconds to wait for StatefulSet to be 'Ready' during update"
+                              minimum: 0
+                              maximum: 3600
+                            pollInterval:
+                              type: integer
+                              description: "How many seconds to wait between checks for StatefulSet status during update"
+                              minimum: 1
+                              maximum: 600
+                            onFailure:
+                              type: string
+                              description: |
+                                What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is.
+                                2. rollback - delete Pod and rollback StatefulSet to previous Generation. Follow 'abort' path afterwards.
+                                3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
+                              enum:
+                                - ""
+                                - "Abort"
+                                - "abort"
+                                - "Rollback"
+                                - "rollback"
+                                - "Ignore"
+                                - "ignore"
+                        recreate:
+                          type: object
+                          description: "Behavior during recreate StatefulSet"
+                          properties:
+                            onDataLoss:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to PVC data loss or missing volumes.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "Abort"
+                                - "abort"
+                                - "Recreate"
+                                - "recreate"
+                            onUpdateFailure:
+                              type: string
+                              description: |
+                                What to do in case operator needs to recreate StatefulSet due to update failure or StatefulSet not ready.
+                                Possible options:
+                                1. abort - abort the process, do nothing with the problematic StatefulSet.
+                                2. recreate - proceed and recreate StatefulSet.
+                              enum:
+                                - ""
+                                - "Abort"
+                                - "abort"
+                                - "Recreate"
+                                - "recreate"
                     host: &TypeReconcileHost
                       type: object
                       description: |
@@ -539,6 +623,248 @@ spec:
                                     Whether the operator during host launch procedure should wait for ready probe to succeed.
                                     In case probe is unspecified wait is assumed to be completed successfully.
                                     Default option value is to wait.
+                        drop:
+                          type: object
+                          properties:
+                            replicas:
+                              type: object
+                              description: |
+                                Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
+                              properties:
+                                onDelete:
+                                  !!merge <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica is deleted
+                                onLostVolume:
+                                  !!merge <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop replicas when replica volume is lost
+                                active:
+                                  !!merge <<: *TypeStringBool
+                                  description: |
+                                    Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
+                        hooks: &TypeReconcileHooks
+                          type: object
+                          description: "hooks to execute before and after host reconcile"
+                          properties:
+                            pre:
+                              type: array
+                              description: "actions to execute before reconcile"
+                              nullable: true
+                              items: &TypeHookAction
+                                type: object
+                                required:
+                                  - events
+                                properties:
+                                  sql:
+                                    type: object
+                                    properties:
+                                      queries:
+                                        type: array
+                                        nullable: true
+                                        items:
+                                          type: string
+                                  shell:
+                                    type: object
+                                    properties:
+                                      command:
+                                        type: array
+                                        nullable: true
+                                        items:
+                                          type: string
+                                      container:
+                                        type: string
+                                  http:
+                                    type: object
+                                    properties:
+                                      url:
+                                        type: string
+                                      method:
+                                        type: string
+                                  target:
+                                    type: string
+                                    description: "where to execute hook for cluster-level hooks: FirstHost (default), AllHosts, AllShards"
+                                    # Both camelCase and all-lowercase forms are accepted; the
+                                    # runtime normalizes via strings.EqualFold (firstHost == firsthost).
+                                    enum:
+                                      - ""
+                                      - "FirstHost"
+                                      - "firsthost"
+                                      - "AllHosts"
+                                      - "allhosts"
+                                      - "AllShards"
+                                      - "allshards"
+                                  events:
+                                    type: array
+                                    minItems: 1
+                                    description: |
+                                      Reconcile lifecycle events that trigger this hook. Required, must be non-empty.
+                                      The hook is skipped on any reconcile whose classifier does not emit at least one
+                                      of the listed events. Supported values:
+                                        Any               - wildcard match: fires on every hook-evaluation point,
+                                                            including the pre-delete sweep on the dying host
+                                        HostCreate        - first reconcile that creates a host (no ancestor); best
+                                                            paired with POST hooks because PRE hooks on first creation
+                                                            are skipped (no live pod yet)
+                                        HostUpdate        - reconcile that has prior state for the host; catch-all
+                                                            for ongoing reconciles
+                                        HostStart         - host transitions from stopped to running
+                                        HostStop          - host is being stopped (current spec marks it stopped)
+                                        HostConfigRestart - in-place software restart for a configuration change
+                                        HostRollout       - pod-template change forces a StatefulSet rollout
+                                        HostShutdown      - aggregate: fires whenever the pod is going down for any
+                                                            reason (Stop, ConfigRestart, Rollout, or Delete)
+                                        HostDelete        - host is being removed from the cluster (downsize); fires
+                                                            on the dying host before tear-down. Always emitted
+                                                            alongside HostShutdown.
+                                    items:
+                                      type: string
+                                      # Both PascalCase and all-lowercase forms are accepted; the
+                                      # runtime comparison is case-insensitive (strings.EqualFold).
+                                      enum:
+                                        - "Any"
+                                        - "any"
+                                        - "HostCreate"
+                                        - "hostcreate"
+                                        - "HostDelete"
+                                        - "hostdelete"
+                                        - "HostUpdate"
+                                        - "hostupdate"
+                                        - "HostStart"
+                                        - "hoststart"
+                                        - "HostStop"
+                                        - "hoststop"
+                                        - "HostConfigRestart"
+                                        - "hostconfigrestart"
+                                        - "HostRollout"
+                                        - "hostrollout"
+                                        - "HostShutdown"
+                                        - "hostshutdown"
+                                  failurePolicy:
+                                    type: string
+                                    description: |
+                                      Controls what happens when this hook returns an error.
+                                      Fail (default): error propagates — pre-hook aborts reconcile / host deletion.
+                                      Ignore: error is logged and the reconcile continues.
+                                    # Both PascalCase and all-lowercase forms are accepted; the
+                                    # runtime normalizes via strings.EqualFold (Fail == fail).
+                                    enum:
+                                      - "Fail"
+                                      - "fail"
+                                      - "Ignore"
+                                      - "ignore"
+                            post:
+                              type: array
+                              description: "actions to execute after reconcile"
+                              nullable: true
+                              items:
+                                !!merge <<: *TypeHookAction
+                    cluster:
+                      type: object
+                      description: |
+                        CHI-level cluster reconcile defaults inherited by every cluster's
+                        spec.configuration.clusters[N].reconcile section. Use this as a single
+                        place to define cluster-level hooks that should apply to all clusters
+                        in this CHI; per-cluster hooks (under clusters[N].reconcile.hooks)
+                        are appended to (and dedup'd against) the inherited set.
+                      properties:
+                        hooks:
+                          type: object
+                          description: "cluster-level hooks inherited by every cluster"
+                          properties:
+                            pre:
+                              type: array
+                              description: "actions to execute before each cluster reconcile"
+                              nullable: true
+                              items: &TypeClusterHookAction
+                                type: object
+                                required:
+                                  - events
+                                properties:
+                                  sql:
+                                    type: object
+                                    properties:
+                                      queries:
+                                        type: array
+                                        nullable: true
+                                        items:
+                                          type: string
+                                  shell:
+                                    type: object
+                                    properties:
+                                      command:
+                                        type: array
+                                        nullable: true
+                                        items:
+                                          type: string
+                                      container:
+                                        type: string
+                                  http:
+                                    type: object
+                                    properties:
+                                      url:
+                                        type: string
+                                      method:
+                                        type: string
+                                  target:
+                                    type: string
+                                    description: "where to execute hook for cluster-level hooks: FirstHost (default), AllHosts, AllShards"
+                                    # Both camelCase and all-lowercase forms are accepted; the
+                                    # runtime normalizes via strings.EqualFold (firstHost == firsthost).
+                                    enum:
+                                      - ""
+                                      - "FirstHost"
+                                      - "firsthost"
+                                      - "AllHosts"
+                                      - "allhosts"
+                                      - "AllShards"
+                                      - "allshards"
+                                  events:
+                                    type: array
+                                    minItems: 1
+                                    description: |
+                                      Cluster-scope reconcile lifecycle events. Required, non-empty.
+                                        Any              - wildcard match: fires on every cluster reconcile pass
+                                                           and the cluster delete sweep
+                                        ClusterCreate    - all hosts in the cluster are new (no ancestor); fires
+                                                           only on the first reconcile of a brand-new cluster
+                                        ClusterReconcile - ongoing reconcile pass over an existing cluster (at
+                                                           least one host has prior state). Fires on every
+                                                           operator reconcile cycle the upstream gates allow,
+                                                           including taskID-only force-reconciles. NOT a "spec
+                                                           changed" signal.
+                                        ClusterDelete    - cluster is being removed (delete sweep — wiring follow-up)
+                                    items:
+                                      type: string
+                                      # Both PascalCase and all-lowercase forms are accepted; the
+                                      # runtime comparison is case-insensitive (strings.EqualFold).
+                                      enum:
+                                        - "Any"
+                                        - "any"
+                                        - "ClusterCreate"
+                                        - "clustercreate"
+                                        - "ClusterDelete"
+                                        - "clusterdelete"
+                                        - "ClusterReconcile"
+                                        - "clusterreconcile"
+                                  failurePolicy:
+                                    type: string
+                                    description: |
+                                      Controls what happens when this hook returns an error.
+                                      Fail (default) propagates the error; Ignore logs a warning and continues.
+                                    # Both PascalCase and all-lowercase forms are accepted; the
+                                    # runtime normalizes via strings.EqualFold (Fail == fail).
+                                    enum:
+                                      - "Fail"
+                                      - "fail"
+                                      - "Ignore"
+                                      - "ignore"
+                            post:
+                              type: array
+                              description: "actions to execute after each cluster reconcile"
+                              nullable: true
+                              items:
+                                !!merge <<: *TypeClusterHookAction
                 reconcile:
                   !!merge <<: *TypeReconcile
                   description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
@@ -571,20 +897,24 @@ spec:
                       properties:
                         provisioner: &TypePVCProvisioner
                           type: string
-                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator"
+                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator (case-insensitive)"
                           enum:
                             - ""
                             - "StatefulSet"
+                            - "statefulset"
                             - "Operator"
+                            - "operator"
                         reclaimPolicy: &TypePVCReclaimPolicy
                           type: string
                           description: |
-                            defines behavior of `PVC` deletion.
+                            defines behavior of `PVC` deletion (case-insensitive).
                             `Delete` by default, if `Retain` specified then `PVC` will be kept when deleting StatefulSet
                           enum:
                             - ""
                             - "Retain"
+                            - "retain"
                             - "Delete"
+                            - "delete"
                     templates: &TypeTemplateNames
                       type: object
                       description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
@@ -660,6 +990,30 @@ spec:
                               availabilityZone:
                                 type: string
                                 description: "availability zone for Zookeeper node"
+                        keeper:
+                          type: object
+                          description: |
+                            reference to a ClickHouseKeeperInstallation (CHK) resource.
+                            The operator resolves this to ZooKeeper node addresses automatically.
+                          properties:
+                            name:
+                              type: string
+                              description: "name of the ClickHouseKeeperInstallation custom resource"
+                            namespace:
+                              type: string
+                              description: "namespace of the CHK resource, defaults to the CHI namespace if omitted"
+                            serviceType:
+                              type: string
+                              description: |
+                                how to discover keeper endpoints (case-insensitive):
+                                  Replicas (default) — enumerate per-host services, one ZK node per keeper replica
+                                  Service — use the CR-level headless service as a single ZK node entry
+                              enum:
+                                - ""
+                                - "Replicas"
+                                - "replicas"
+                                - "Service"
+                                - "service"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
@@ -689,13 +1043,9 @@ spec:
 
                         look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
-                        any key with prefix `k8s_secret_` shall has value with format namespace/secret/key or secret/key
-                        in this case value from secret will write directly into XML tag during render *-usersd ConfigMap
-
-                        any key with prefix `k8s_secret_env` shall has value with format namespace/secret/key or secret/key
-                        in this case value from secret will write into environment variable and write to XML tag via from_env=XXX
-
-                        look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
+                        the `k8s_secret_` and `k8s_secret_env_` key prefixes were REMOVED in 0.27.4
+                        they accepted a namespace/secret/key value and could therefore read a secret from any namespace
+                        a CHI still using them is rejected with reason RemovedSecretRefSyntax - use `valueFrom`/`secretKeyRef` above
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
                     profiles:
@@ -796,21 +1146,26 @@ spec:
                             properties:
                               replica:
                                 type: string
-                                description: "how schema is propagated within a replica"
+                                description: "how schema is propagated within a replica (case-insensitive)"
                                 enum:
-                                  # List SchemaPolicyReplicaXXX constants from model
+                                  # List SchemaPolicyReplicaXXX constants from model (both humped and all-lowercase accepted)
                                   - ""
                                   - "None"
+                                  - "none"
                                   - "All"
+                                  - "all"
                               shard:
                                 type: string
-                                description: "how schema is propagated between shards"
+                                description: "how schema is propagated between shards (case-insensitive)"
                                 enum:
-                                  # List SchemaPolicyShardXXX constants from model
+                                  # List SchemaPolicyShardXXX constants from model (both humped and all-lowercase accepted)
                                   - ""
                                   - "None"
+                                  - "none"
                                   - "All"
+                                  - "all"
                                   - "DistributedTablesOnly"
+                                  - "distributedtablesonly"
                           insecure:
                             !!merge <<: *TypeStringBool
                             description: optional, open insecure ports for cluster, defaults to "yes"
@@ -851,6 +1206,106 @@ spec:
                                     required:
                                       - name
                                       - key
+                          security:
+                            type: object
+                            description: |
+                              Per-cluster security toggles for outbound TLS connections the operator makes
+                              to this cluster's ClickHouse and ZooKeeper / Keeper hosts. Nil fields fall
+                              through to the operator-wide defaults in ClickHouseOperatorConfiguration.
+                              See docs/security_hardening.md for details.
+                            x-kubernetes-preserve-unknown-fields: true
+                          backup: &TypeClusterBackup
+                            type: object
+                            description: |
+                              EXPERIMENTAL. Operator-managed backup for this cluster, overriding `chi.spec.backup`.
+                              Fields left empty are inherited from `chi.spec.backup`; set `enabled: "no"` to opt this cluster out.
+                              When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
+                              so turning it on or off rolls the cluster's Pods. Customize the sidecar through a container named
+                              clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the storage
+                              the cluster uses has a `secretRef`, or `podTemplate` is set: without either the sidecar would have no
+                              backup storage, so backup stays off and the operator warns.
+                              See docs/backup.md for details.
+                            properties:
+                              enabled:
+                                !!merge <<: *TypeStringBool
+                                description: |
+                                  Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
+                                  the cluster. Takes effect only with a storage that has a `secretRef`, or `podTemplate` set, which name where the
+                                  sidecar takes its storage from: without either, backup stays off
+                              podTemplate:
+                                type: string
+                                description: |
+                                  Pod template whose container named clickhouse-backup the sidecar is built on: what the container sets is kept,
+                                  and the operator fills in only what it lacks. Only that container is taken, not the other containers, volumes
+                                  or Pod settings of the template. Left empty, the operator builds the sidecar on its own
+                              storages:
+                                type: array
+                                description: |
+                                  Storages the backups may be kept in, each under a name of its own; one per level for now. A cluster takes
+                                  those of the installation along with its own, pairing them by name: a storage of its own that the installation
+                                  declares too takes what it leaves out from the installation's. Templates contribute theirs alike
+                                maxItems: 1
+                                x-kubernetes-list-type: map
+                                x-kubernetes-list-map-keys:
+                                  - name
+                                items:
+                                  type: object
+                                  required:
+                                    - name
+                                  properties:
+                                    name:
+                                      type: string
+                                      description: |
+                                        Name of the storage, which `storage` names: a DNS label of at most 45 characters
+                                      maxLength: 45
+                                      pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                                    secretRef:
+                                      type: object
+                                      description: |
+                                        Secret in the installation's namespace whose keys are passed to the sidecar as environment variables,
+                                        configuring the storage, e.g. REMOTE_STORAGE, S3_BUCKET, S3_PATH, S3_ACCESS_KEY, S3_SECRET_KEY.
+                                        Without one, of its own or of the storage of the same name it pairs with, the storage is configured by the
+                                        container of the Pod template `podTemplate` names
+                                      properties:
+                                        name:
+                                          description: |
+                                            Name of the referent. More info:
+                                            https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                          type: string
+                              storage:
+                                type: string
+                                description: |
+                                  Name of the storage of `storages` the sidecar keeps the backups in. Left out, it is the only storage the same
+                                  level declares, or else the one the level a cluster inherits from uses; required where a level declares
+                                  several. On a cluster that turns backup on, a name no level declares aborts the reconcile. An explicit ""
+                                  on a cluster leaves the cluster without a storage
+                              recovery:
+                                type: object
+                                description: |
+                                  Restore a new installation from a backup once it has completed its first reconcile: the operator
+                                  creates a ClickHouseRestore of every backup-enabled cluster that inherits a backup name, users, roles and
+                                  grants included, and records the recovery in the `clickhouse.altinity.com/recovered-from` annotation.
+                                  Changing it changes no Pod. Taken from the installation only, never from a ClickHouseInstallationTemplate.
+                                properties:
+                                  backupName:
+                                    type: string
+                                    description: "Backup to recover from. An explicit empty name on a cluster leaves the cluster out of a recovery the installation asks for"
+                                    maxLength: 128
+                                    pattern: '^([A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?)?$'
+                                  sourceInstallation:
+                                    type: string
+                                    description: |
+                                      ClickHouseInstallation that made the backup, when not this one: the recovery reads the backup from the
+                                      storage paths the {installation} macro gives there. Empty, this installation
+                                    maxLength: 253
+                                    pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+                                  sourceNamespace:
+                                    type: string
+                                    description: |
+                                      Namespace of the ClickHouseInstallation that made the backup, when not this one: the recovery reads the
+                                      backup from the storage paths the {namespace} macro gives there. Empty, the namespace of this installation
+                                    maxLength: 63
+                                    pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
                           pdbManaged:
                             !!merge <<: *TypeStringBool
                             description: |
@@ -876,6 +1331,26 @@ spec:
                                 !!merge <<: *TypeReconcileRuntime
                               host:
                                 !!merge <<: *TypeReconcileHost
+                              hooks:
+                                # Per-cluster cluster-scope hooks. The schema (TypeClusterHookAction) is
+                                # defined once at spec.reconcile.cluster.hooks above; this block just
+                                # references it. Hooks defined here are merged with any inherited from
+                                # CHI-level spec.reconcile.cluster.hooks via dedup'd MergeFrom.
+                                type: object
+                                description: "cluster-level hooks to execute before and after cluster reconcile"
+                                properties:
+                                  pre:
+                                    type: array
+                                    description: "actions to execute before cluster reconcile"
+                                    nullable: true
+                                    items:
+                                      !!merge <<: *TypeClusterHookAction
+                                  post:
+                                    type: array
+                                    description: "actions to execute after cluster reconcile"
+                                    nullable: true
+                                    items:
+                                      !!merge <<: *TypeClusterHookAction
                           layout:
                             type: object
                             description: |
@@ -1152,10 +1627,12 @@ spec:
                                   type: string
                                   description: "type of distribution, when `Unspecified` (default value) then all listen ports on clickhouse-server configuration in all Pods will have the same value, when `ClusterScopeIndex` then ports will increment to offset from base value depends on shard and replica index inside cluster with combination of `chi.spec.templates.podTemlates.spec.HostNetwork` it allows setup ClickHouse cluster inside Kubernetes and provide access via external network bypass Kubernetes internal network"
                                   enum:
-                                    # List PortDistributionXXX constants
+                                    # List PortDistributionXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "ClusterScopeIndex"
+                                    - "clusterscopeindex"
                           spec:
                             # Host
                             type: object
@@ -1251,13 +1728,6 @@ spec:
                                 # nullable: true
                                 items:
                                   type: string
-                          distribution:
-                            type: string
-                            description: "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
-                            enum:
-                              - ""
-                              - "Unspecified"
-                              - "OnePerHost"
                           podDistribution:
                             type: array
                             description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
@@ -1271,35 +1741,56 @@ spec:
                                   type: string
                                   description: "you can define multiple affinity policy types"
                                   enum:
-                                    # List PodDistributionXXX constants
+                                    # List PodDistributionXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "ClickHouseAntiAffinity"
+                                    - "clickhouseantiaffinity"
                                     - "ShardAntiAffinity"
+                                    - "shardantiaffinity"
                                     - "ReplicaAntiAffinity"
+                                    - "replicaantiaffinity"
                                     - "AnotherNamespaceAntiAffinity"
+                                    - "anothernamespaceantiaffinity"
                                     - "AnotherClickHouseInstallationAntiAffinity"
+                                    - "anotherclickhouseinstallationantiaffinity"
                                     - "AnotherClusterAntiAffinity"
+                                    - "anotherclusterantiaffinity"
                                     - "MaxNumberPerNode"
+                                    - "maxnumberpernode"
                                     - "NamespaceAffinity"
+                                    - "namespaceaffinity"
                                     - "ClickHouseInstallationAffinity"
+                                    - "clickhouseinstallationaffinity"
                                     - "ClusterAffinity"
+                                    - "clusteraffinity"
                                     - "ShardAffinity"
+                                    - "shardaffinity"
                                     - "ReplicaAffinity"
+                                    - "replicaaffinity"
                                     - "PreviousTailAffinity"
+                                    - "previoustailaffinity"
                                     - "CircularReplication"
+                                    - "circularreplication"
                                 scope:
                                   type: string
                                   description: "scope for apply each podDistribution"
                                   enum:
-                                    # list PodDistributionScopeXXX constants
+                                    # list PodDistributionScopeXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "Shard"
+                                    - "shard"
                                     - "Replica"
+                                    - "replica"
                                     - "Cluster"
+                                    - "cluster"
                                     - "ClickHouseInstallation"
+                                    - "clickhouseinstallation"
                                     - "Namespace"
+                                    - "namespace"
                                 number:
                                   type: integer
                                   description: "define, how much ClickHouse Pods could be inside selected scope with selected distribution type"
@@ -1400,6 +1891,23 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/services-networking/service/
                             # nullable: true
                             x-kubernetes-preserve-unknown-fields: true
+                security:
+                  type: object
+                  description: |
+                    CHI-level security defaults, applied to every cluster that does not override
+                    them. Each cluster can shadow these via spec.configuration.clusters[].security.
+                    See docs/security_hardening.md for details.
+                  x-kubernetes-preserve-unknown-fields: true
+                backup:
+                  !!merge <<: *TypeClusterBackup
+                  description: |
+                    EXPERIMENTAL. Operator-managed backup defaults, applied to every cluster. Each cluster can override
+                    them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
+                    When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
+                    so turning it on or off rolls the cluster's Pods. Backup takes effect only where the storage a cluster
+                    uses has a `secretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
+                    so backup stays off and the operator warns.
+                    See docs/backup.md for details.
                 useTemplates:
                   type: array
                   description: |
@@ -1419,8 +1927,9 @@ spec:
                         description: "Kubernetes namespace where need search `chit` resource, depending on `watchNamespaces` settings in `clickhouse-operator`"
                       useType:
                         type: string
-                        description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit`"
+                        description: "optional, current strategy is only merge, and current `chi` settings have more priority than merged template `chit` (case-insensitive)"
                         enum:
-                          # List useTypeXXX constants from model
+                          # List useTypeXXX constants from model (both humped and all-lowercase accepted)
                           - ""
+                          - "Merge"
                           - "merge"

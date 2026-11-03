@@ -11,4 +11,4 @@ metadata:
   namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
   labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
   annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
-data: {{ include "altinity-clickhouse-operator.configmap-data" (list . .Values.configs.files) | nindent 2 }}
+data: {{ include "altinity-clickhouse-operator.configmap-files" (list . .Values.configs.files .Values.watchNamespaces) | nindent 2 }}

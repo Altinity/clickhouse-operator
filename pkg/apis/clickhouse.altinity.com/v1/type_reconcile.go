@@ -33,15 +33,96 @@ type ChiReconcile struct {
 
 	// Runtime specifies runtime settings
 	Runtime ReconcileRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
-	// Host specifies host-lever reconcile settings
+	// StatefulSet specifies StatefulSet reconcile settings
+	StatefulSet ReconcileStatefulSet `json:"statefulSet,omitempty" yaml:"statefulSet,omitempty"`
+	// Host specifies host-level reconcile settings inherited by every cluster's
+	// reconcile.host (each cluster can append/override per-host).
 	Host ReconcileHost `json:"host" yaml:"host"`
+	// Cluster specifies cluster-level reconcile settings inherited by every
+	// cluster's reconcile (each cluster can append/override its own pre/post hooks
+	// via the existing dedup'd merge). Provides a single CHI-level place to define
+	// "every cluster of this CHI does X on reconcile" patterns.
+	// +optional
+	Cluster *ReconcileCluster `json:"cluster,omitempty" yaml:"cluster,omitempty"`
+}
+
+// ReconcileCluster defines CHI-level cluster reconcile defaults that are inherited
+// by every cluster's reconcile section. Currently carries cluster-scope hooks; future
+// cluster-wide reconcile knobs can be added here.
+type ReconcileCluster struct {
+	// Hooks specifies cluster-level pre/post hooks inherited by every cluster.
+	// +optional
+	Hooks *ReconcileHooks `json:"hooks,omitempty" yaml:"hooks,omitempty"`
+}
+
+// GetHooks returns CHI-level cluster hooks, nil-safe when ReconcileCluster itself is nil.
+func (rc *ReconcileCluster) GetHooks() *ReconcileHooks {
+	if rc == nil {
+		return nil
+	}
+	return rc.Hooks
 }
 
 type ClusterReconcile struct {
 	// Runtime specifies runtime settings
 	Runtime ReconcileRuntime `json:"runtime" yaml:"runtime"`
+	// StatefulSet specifies StatefulSet reconcile settings
+	StatefulSet ReconcileStatefulSet `json:"statefulSet,omitempty" yaml:"statefulSet,omitempty"`
 	// Host specifies host-lever reconcile settings
 	Host ReconcileHost `json:"host" yaml:"host"`
+	// Hooks specifies pre/post actions for cluster-level reconcile
+	Hooks *ReconcileHooks `json:"hooks,omitempty" yaml:"hooks,omitempty"`
+}
+
+// ReconcileStatefulSet defines StatefulSet reconcile settings
+type ReconcileStatefulSet struct {
+	Create   ReconcileStatefulSetCreate   `json:"create,omitempty"   yaml:"create,omitempty"`
+	Update   ReconcileStatefulSetUpdate   `json:"update,omitempty"   yaml:"update,omitempty"`
+	Recreate ReconcileStatefulSetRecreate `json:"recreate,omitempty" yaml:"recreate,omitempty"`
+}
+
+// ReconcileStatefulSetCreate defines StatefulSet create settings
+type ReconcileStatefulSetCreate struct {
+	OnFailure string `json:"onFailure,omitempty" yaml:"onFailure,omitempty"`
+}
+
+// ReconcileStatefulSetUpdate defines StatefulSet update settings
+type ReconcileStatefulSetUpdate struct {
+	Timeout      uint64 `json:"timeout,omitempty"      yaml:"timeout,omitempty"`
+	PollInterval uint64 `json:"pollInterval,omitempty" yaml:"pollInterval,omitempty"`
+	OnFailure    string `json:"onFailure,omitempty"    yaml:"onFailure,omitempty"`
+}
+
+// ReconcileStatefulSetRecreate defines StatefulSet recreate settings
+type ReconcileStatefulSetRecreate struct {
+	OnDataLoss      string `json:"onDataLoss,omitempty"      yaml:"onDataLoss,omitempty"`
+	OnUpdateFailure string `json:"onUpdateFailure,omitempty" yaml:"onUpdateFailure,omitempty"`
+}
+
+// MergeFrom merges from specified ReconcileStatefulSet
+func (s ReconcileStatefulSet) MergeFrom(from ReconcileStatefulSet, _type MergeType) ReconcileStatefulSet {
+	s.Create.OnFailure = MergeValue(s.Create.OnFailure, from.Create.OnFailure, _type)
+	s.Update.Timeout = MergeValue(s.Update.Timeout, from.Update.Timeout, _type)
+	s.Update.PollInterval = MergeValue(s.Update.PollInterval, from.Update.PollInterval, _type)
+	s.Update.OnFailure = MergeValue(s.Update.OnFailure, from.Update.OnFailure, _type)
+	s.Recreate.OnDataLoss = MergeValue(s.Recreate.OnDataLoss, from.Recreate.OnDataLoss, _type)
+	s.Recreate.OnUpdateFailure = MergeValue(s.Recreate.OnUpdateFailure, from.Recreate.OnUpdateFailure, _type)
+	return s
+}
+
+func (reconcile *ClusterReconcile) Ensure() *ClusterReconcile {
+	if reconcile == nil {
+		reconcile = &ClusterReconcile{}
+	}
+	return reconcile
+}
+
+// GetHooks returns cluster-level hooks or nil.
+func (reconcile *ClusterReconcile) GetHooks() *ReconcileHooks {
+	if reconcile == nil {
+		return nil
+	}
+	return reconcile.Hooks
 }
 
 // NewChiReconcile creates new reconcile
@@ -59,29 +140,14 @@ func (r *ChiReconcile) MergeFrom(from *ChiReconcile, _type MergeType) *ChiReconc
 		r = NewChiReconcile()
 	}
 
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		if r.Policy == "" {
-			r.Policy = from.Policy
-		}
-		if r.ConfigMapPropagationTimeout == 0 {
-			r.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
-		}
-	case MergeTypeOverrideByNonEmptyValues:
-		if from.Policy != "" {
-			// Override by non-empty values only
-			r.Policy = from.Policy
-		}
-		if from.ConfigMapPropagationTimeout != 0 {
-			// Override by non-empty values only
-			r.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
-		}
-	}
+	r.Policy = MergeValue(r.Policy, from.Policy, _type)
+	r.ConfigMapPropagationTimeout = MergeValue(r.ConfigMapPropagationTimeout, from.ConfigMapPropagationTimeout, _type)
 
 	r.Cleanup = r.Cleanup.MergeFrom(from.Cleanup, _type)
 	r.Macros = r.Macros.MergeFrom(from.Macros, _type)
 	r.Runtime = r.Runtime.MergeFrom(from.Runtime, _type)
-	r.Host = r.Host.MergeFrom(from.Host)
+	r.StatefulSet = r.StatefulSet.MergeFrom(from.StatefulSet, _type)
+	r.Host = r.Host.MergeFrom(from.Host, _type)
 
 	return r
 }
@@ -141,21 +207,23 @@ func (r *ChiReconcile) GetConfigMapPropagationTimeoutDuration() time.Duration {
 	return time.Duration(r.GetConfigMapPropagationTimeout()) * time.Second
 }
 
-// Possible reconcile policy values
+// Possible reconcile policy values (canonical humped form; CRD also accepts all-lowercase)
 const (
-	ReconcilingPolicyUnspecified = "unspecified"
-	ReconcilingPolicyWait        = "wait"
-	ReconcilingPolicyNoWait      = "nowait"
+	ReconcilingPolicyUnspecified = "Unspecified"
+	ReconcilingPolicyWait        = "Wait"
+	ReconcilingPolicyNoWait      = "NoWait"
 )
 
-// IsReconcilingPolicyWait checks whether reconcile policy is "wait"
+// IsReconcilingPolicyWait checks whether reconcile policy is "Wait".
+// EqualFold so both humped and all-lowercase inputs match regardless of normalization order.
 func (r *ChiReconcile) IsReconcilingPolicyWait() bool {
-	return strings.ToLower(r.GetPolicy()) == ReconcilingPolicyWait
+	return strings.EqualFold(r.GetPolicy(), ReconcilingPolicyWait)
 }
 
-// IsReconcilingPolicyNoWait checks whether reconcile policy is "no wait"
+// IsReconcilingPolicyNoWait checks whether reconcile policy is "NoWait".
+// EqualFold so both humped and all-lowercase inputs match regardless of normalization order.
 func (r *ChiReconcile) IsReconcilingPolicyNoWait() bool {
-	return strings.ToLower(r.GetPolicy()) == ReconcilingPolicyNoWait
+	return strings.EqualFold(r.GetPolicy(), ReconcilingPolicyNoWait)
 }
 
 // GetCleanup gets cleanup
@@ -187,6 +255,31 @@ func (r *ChiReconcile) InheritRuntimeFrom(from OperatorConfigReconcileRuntime) {
 	}
 }
 
+func (r *ChiReconcile) InheritStatefulSetFrom(from OperatorConfigReconcile) {
+	if r == nil {
+		return
+	}
+
+	if r.StatefulSet.Create.OnFailure == "" {
+		r.StatefulSet.Create.OnFailure = from.StatefulSet.Create.OnFailure
+	}
+	if r.StatefulSet.Update.Timeout == 0 {
+		r.StatefulSet.Update.Timeout = from.StatefulSet.Update.Timeout
+	}
+	if r.StatefulSet.Update.PollInterval == 0 {
+		r.StatefulSet.Update.PollInterval = from.StatefulSet.Update.PollInterval
+	}
+	if r.StatefulSet.Update.OnFailure == "" {
+		r.StatefulSet.Update.OnFailure = from.StatefulSet.Update.OnFailure
+	}
+	if r.StatefulSet.Recreate.OnDataLoss == "" {
+		r.StatefulSet.Recreate.OnDataLoss = from.StatefulSet.Recreate.OnDataLoss
+	}
+	if r.StatefulSet.Recreate.OnUpdateFailure == "" {
+		r.StatefulSet.Recreate.OnUpdateFailure = from.StatefulSet.Recreate.OnUpdateFailure
+	}
+}
+
 func (r *ChiReconcile) InheritHostFrom(from ReconcileHost) {
-	r.Host = r.Host.MergeFrom(from)
+	r.Host = r.Host.MergeFrom(from, MergeTypeFillEmptyValues)
 }

@@ -58,6 +58,24 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
 {{/*
+Pod template labels
+
+The common labels minus helm.sh/chart and app.kubernetes.io/version. Both of those
+change on a version bump, and anything inside the pod template feeds
+pod-template-hash, so leaving them there rolls the Deployment on a chart bump even
+when the image and the configuration are identical. They stay on the objects
+themselves. commonLabels and managed-by are kept, since a user who sets
+commonLabels reasonably expects them on the pods.
+*/}}
+{{- define "altinity-clickhouse-operator.podTemplateLabels" -}}
+{{ include "altinity-clickhouse-operator.selectorLabels" . }}
+{{- if .Values.commonLabels }}
+{{ toYaml .Values.commonLabels }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end -}}
+
+{{/*
 Selector labels
 */}}
 {{- define "altinity-clickhouse-operator.selectorLabels" -}}
@@ -122,3 +140,42 @@ null
 {{- tpl (toYaml (dict $k $v)) $root }}
 {{ end }}
 {{- end }}
+
+{{/*
+altinity-clickhouse-operator.configmap-files merges watchNamespaces into the
+operator config before rendering the ConfigMap data block.
+
+This exists because configs.files.config.yaml.watch.namespaces.include is
+deep inside a nested structure — Helm's values merge cannot target it
+directly. Instead we deepCopy the files map, patch the nested value in-place,
+and pass the result to configmap-data.
+
+Arguments (list): root context, configs.files, watchNamespaces list
+*/}}
+{{- define "altinity-clickhouse-operator.configmap-files" -}}
+{{- $root := index . 0 -}}
+{{- $files := deepCopy (index . 1) -}}
+{{- $watchNamespaces := index . 2 -}}
+{{- if $watchNamespaces -}}
+  {{- $namespaces := dig "watch" "namespaces" "" (index $files "config.yaml") -}}
+  {{- if kindIs "map" $namespaces -}}
+    {{- $_ := set $namespaces "include" $watchNamespaces -}}
+  {{- else -}}
+    {{- fail "watchNamespaces is set but configs.files.\"config.yaml\".watch.namespaces is missing or null; cannot apply the namespace filter" -}}
+  {{- end -}}
+{{- end -}}
+{{- include "altinity-clickhouse-operator.configmap-data" (list $root $files) -}}
+{{- end -}}
+
+{{/*
+Compute a ConfigMap checksum from its data only, for the checksum/* pod annotations.
+Hashing the whole manifest includes the helm.sh/chart label, which changes on every chart version
+bump and would restart the operator when no configuration changed.
+
+fromYaml decodes only the first document of a multi-document file, without reporting an error.
+None of the generated ConfigMaps is multi-document, so this is latent rather than a live bug,
+but it is a difference from the raw-include form this replaced.
+*/}}
+{{- define "altinity-clickhouse-operator.configMapContentHash" -}}
+{{ pick (include (print .ctx.Template.BasePath .name) .ctx | fromYaml) "data" "binaryData" | toYaml | sha256sum }}
+{{- end -}}

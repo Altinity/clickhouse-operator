@@ -14,17 +14,18 @@ spec:
           readiness: "no"
   defaults:
     templates:
-      podTemplate: not-ready-replica
+      podTemplate: default
+  useTemplates:
+    - name: clickhouse-version
   configuration:
     clusters:
       - name: default
   templates:
     podTemplates:
-      - name: not-ready-replica
+      - name: default
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:24.8
               # startupProbe:
               #   httpGet:
               #     path: /ping

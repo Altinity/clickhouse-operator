@@ -244,7 +244,7 @@ func Map2String[TKey constraints.Ordered, TValue any](name string, m map[TKey]TV
 	b := &bytes.Buffer{}
 	Fprintf(b, "%s (%d):\n", name, len(m))
 	for _, key := range keys {
-		Fprintf(b, "  - [%s]=%s\n", key, m[key])
+		Fprintf(b, "  - [%v]=%v\n", key, m[key])
 	}
 
 	return b.String()

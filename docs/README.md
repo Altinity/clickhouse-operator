@@ -1,5 +1,6 @@
 # Table of Contents
 1. [architecture.md](./architecture.md) - architecture overview
+1. [backup.md](./backup.md) - backup and restore (experimental)
 1. [chi_update_add_replication.md](./chi_update_add_replication.md) - how to add replication
 1. [chi_update_clickhouse_version.md](./chi_update_clickhouse_version.md) - how to update version
 1. [clickhouse_config_errors_handling.md](./clickhouse_config_errors_handling.md) - how operator handles ClickHouse's config errors

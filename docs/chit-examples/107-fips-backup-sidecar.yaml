@@ -1,0 +1,67 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: clickhouse-fips-backup-template
+spec:
+  defaults:
+    templates:
+      podTemplate: fips
+  templates:
+    podTemplates:
+      - name: fips
+        spec:
+          containers:
+            - name: clickhouse
+              image: altinity/clickhouse-server:25.3.8.30001.altinityfips
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - name: clickhouse-data
+                  mountPath: /var/lib/clickhouse
+
+            - name: clickhouse-backup
+              image: altinity/clickhouse-backup:latest-fips
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/clickhouse-backup
+              args:
+                - server
+              env:
+                - name: LOG_LEVEL
+                  value: warn
+                - name: API_LISTEN
+                  value: "0.0.0.0:7171"
+                - name: API_SECURE
+                  value: "true"
+                - name: API_CERTIFICATE_FILE
+                  value: /etc/clickhouse-backup/tls/server.crt
+                - name: API_PRIVATE_KEY_FILE
+                  value: /etc/clickhouse-backup/tls/server.key
+                - name: CLICKHOUSE_HOST
+                  value: "127.0.0.1"
+                - name: CLICKHOUSE_PORT
+                  value: "9440"
+                - name: CLICKHOUSE_USERNAME
+                  value: default
+                - name: CLICKHOUSE_PASSWORD
+                  value: ""
+                - name: CLICKHOUSE_SECURE
+                  value: "true"
+                - name: CLICKHOUSE_TLS_CA
+                  value: /etc/clickhouse-backup/tls/ca.crt
+                - name: CLICKHOUSE_SKIP_VERIFY
+                  value: "false"
+              ports:
+                - name: backup-rest
+                  containerPort: 7171
+              volumeMounts:
+                - name: clickhouse-backup-tls
+                  mountPath: /etc/clickhouse-backup/tls
+                - name: clickhouse-data
+                  mountPath: /var/lib/clickhouse
+          volumes:
+            - name: clickhouse-backup-tls
+              secret:
+                secretName: clickhouse-certs
+            - name: clickhouse-data
+              emptyDir: {}

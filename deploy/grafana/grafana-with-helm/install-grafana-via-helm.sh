@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# reproduce behavior for https://github.com/Altinity/clickhouse-operator/issues/1721
+# Install the operator and Grafana via Helm, wiring the operator's dashboards
+# ConfigMap into Grafana's default provider. Use to reproduce a vanilla
+# operator + Grafana setup with port-forward access on http://localhost:3000.
 kubectl create ns test
 
-helm repo add altinity-clickhouse-operator https://docs.altinity.com/clickhouse-operator/
+helm repo add altinity-clickhouse-operator https://helm.altinity.com
 helm install -n test test-operator --set dashboards.enabled=true altinity-clickhouse-operator/altinity-clickhouse-operator
 
 helm repo add grafana https://grafana.github.io/helm-charts

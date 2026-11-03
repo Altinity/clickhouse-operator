@@ -33,6 +33,8 @@ type ChiSpec struct {
 	Configuration          *Configuration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates              *Templates        `json:"templates,omitempty"              yaml:"templates,omitempty"`
 	UseTemplates           []*TemplateRef    `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
+	Security               *ClusterSecurity  `json:"security,omitempty"               yaml:"security,omitempty"`
+	Backup                 *ClusterBackup    `json:"backup,omitempty"                 yaml:"backup,omitempty"`
 }
 
 // HasTaskID checks whether task id is specified
@@ -107,6 +109,22 @@ func (spec *ChiSpec) GetTemplates() *Templates {
 	return spec.Templates
 }
 
+// GetSecurity returns the spec-level Security block, nil-safe.
+func (spec *ChiSpec) GetSecurity() *ClusterSecurity {
+	if spec == nil {
+		return nil
+	}
+	return spec.Security
+}
+
+// GetBackup returns the spec-level Backup block, nil-safe.
+func (spec *ChiSpec) GetBackup() *ClusterBackup {
+	if spec == nil {
+		return nil
+	}
+	return spec.Backup
+}
+
 // MergeFrom merges from spec
 func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	if from == nil {
@@ -117,50 +135,12 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		spec = &ChiSpec{}
 	}
 
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		if !spec.HasTaskID() {
-			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
-		}
-		if !spec.Stop.HasValue() {
-			spec.Stop = spec.Stop.MergeFrom(from.Stop)
-		}
-		if !spec.Restart.HasValue() {
-			spec.Restart = spec.Restart.MergeFrom(from.Restart)
-		}
-		if !spec.Troubleshoot.HasValue() {
-			spec.Troubleshoot = spec.Troubleshoot.MergeFrom(from.Troubleshoot)
-		}
-		if !spec.NamespaceDomainPattern.HasValue() {
-			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
-		}
-		if !spec.Suspend.HasValue() {
-			spec.Suspend = spec.Suspend.MergeFrom(from.Suspend)
-		}
-	case MergeTypeOverrideByNonEmptyValues:
-		if from.HasTaskID() {
-			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
-		}
-		if from.Stop.HasValue() {
-			// Override by non-empty values only
-			spec.Stop = from.Stop
-		}
-		if from.Restart.HasValue() {
-			// Override by non-empty values only
-			spec.Restart = spec.Restart.MergeFrom(from.Restart)
-		}
-		if from.Troubleshoot.HasValue() {
-			// Override by non-empty values only
-			spec.Troubleshoot = from.Troubleshoot
-		}
-		if from.NamespaceDomainPattern.HasValue() {
-			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
-		}
-		if from.Suspend.HasValue() {
-			// Override by non-empty values only
-			spec.Suspend = from.Suspend
-		}
-	}
+	spec.TaskID = MergeScalar(spec.TaskID, from.TaskID, _type)
+	spec.Stop = MergeScalar(spec.Stop, from.Stop, _type)
+	spec.Restart = MergeScalar(spec.Restart, from.Restart, _type)
+	spec.Troubleshoot = MergeScalar(spec.Troubleshoot, from.Troubleshoot, _type)
+	spec.NamespaceDomainPattern = MergeScalar(spec.NamespaceDomainPattern, from.NamespaceDomainPattern, _type)
+	spec.Suspend = MergeScalar(spec.Suspend, from.Suspend, _type)
 
 	spec.Templating = spec.Templating.MergeFrom(from.Templating, _type)
 	spec.Reconcile = spec.Reconcile.MergeFrom(from.Reconcile, _type)
@@ -169,4 +149,16 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	spec.Templates = spec.Templates.MergeFrom(from.Templates, _type)
 	// TODO may be it would be wiser to make more intelligent merge
 	spec.UseTemplates = append(spec.UseTemplates, from.UseTemplates...)
+
+	// Security has no single MergeFrom on the parent struct; merge each sub-block
+	// individually so CHI/CHIT/template overlays preserve user-specified security
+	// knobs. Matches the pattern used by Cluster.InheritClusterSecurityFrom.
+	if fromSecurity := from.GetSecurity(); fromSecurity != nil {
+		if spec.Security == nil {
+			spec.Security = &ClusterSecurity{}
+		}
+		spec.Security.ClickHouse = spec.Security.ClickHouse.MergeFrom(fromSecurity.GetClickHouse(), _type)
+		spec.Security.Zookeeper = spec.Security.Zookeeper.MergeFrom(fromSecurity.GetZookeeper(), _type)
+	}
+	spec.Backup = spec.Backup.MergeFrom(from.GetBackup(), _type)
 }

@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 
@@ -36,6 +37,18 @@ const (
 	StatusCompleted   = "Completed"
 	StatusAborted     = "Aborted"
 	StatusTerminating = "Terminating"
+)
+
+// Status reasons distinguish flavors of StatusAborted. The reason is pushed
+// into the error stream so operators can grep / dashboards can branch on it
+// (existing CR status schema has no first-class Reason field — preserving
+// the schema is the back-compat trade-off). Aliased to the CHI value so
+// operator dashboards can pattern-match a single tag across both kinds.
+const (
+	StatusReasonFIPSValidationFailed     = chi.StatusReasonFIPSValidationFailed
+	StatusReasonFIPSImagePolicyViolation = chi.StatusReasonFIPSImagePolicyViolation
+	StatusReasonNoKeeperListener         = chi.StatusReasonNoKeeperListener
+	StatusReasonRaftQuorumUnsafe         = chi.StatusReasonRaftQuorumUnsafe
 )
 
 // Status defines status section of the custom resource.
@@ -75,6 +88,7 @@ type Status struct {
 	Endpoints                []string                      `json:"endpoints,omitempty"                yaml:"endpoints,omitempty"`
 	NormalizedCR             *ClickHouseKeeperInstallation `json:"normalized,omitempty"               yaml:"normalized,omitempty"`
 	NormalizedCRCompleted    *ClickHouseKeeperInstallation `json:"normalizedCompleted,omitempty"      yaml:"normalizedCompleted,omitempty"`
+	ActionPlan               *chi.ActionPlan               `json:"actionPlan,omitempty"               yaml:"actionPlan,omitempty"`
 	HostsWithTablesCreated   []string                      `json:"hostsWithTablesCreated,omitempty"   yaml:"hostsWithTablesCreated,omitempty"`
 	HostsWithReplicaCaughtUp []string                      `json:"hostsWithReplicaCaughtUp,omitempty" yaml:"hostsWithReplicaCaughtUp,omitempty"`
 	UsedTemplates            []*chi.TemplateRef            `json:"usedTemplates,omitempty"            yaml:"usedTemplates,omitempty"`
@@ -125,9 +139,9 @@ func (s *Status) Fill(params *FillStatusParams) {
 		s.HostsDeleteCount = params.HostsDeleteCount
 		s.HostsDeletedCount = params.HostsDeletedCount
 		s.Pods = params.Pods
-		s.FQDNs = params.FQDNs
-		s.Endpoint = params.Endpoint
-		s.Endpoints = append([]string{}, params.Endpoints...)
+		s.FQDNs = util.NormalizeFQDNs(params.FQDNs)
+		s.Endpoint = util.NormalizeFQDN(params.Endpoint)
+		s.Endpoints = util.NormalizeFQDNs(params.Endpoints)
 		s.NormalizedCR = params.NormalizedCR
 	})
 }
@@ -162,6 +176,7 @@ func (s *Status) SetAndPushError(err string) {
 
 // PushHostReplicaCaughtUp pushes host to the list of hosts with replica caught-up
 func (s *Status) PushHostReplicaCaughtUp(host string) {
+	host = util.NormalizeFQDN(host)
 	doWithWriteLock(s, func(s *Status) {
 		if util.InArray(host, s.HostsWithReplicaCaughtUp) {
 			return
@@ -172,6 +187,7 @@ func (s *Status) PushHostReplicaCaughtUp(host string) {
 
 // PushHostTablesCreated pushes host to the list of hosts with created tables
 func (s *Status) PushHostTablesCreated(host string) {
+	host = util.NormalizeFQDN(host)
 	doWithWriteLock(s, func(s *Status) {
 		if util.InArray(host, s.HostsWithTablesCreated) {
 			return
@@ -186,7 +202,12 @@ func (s *Status) SyncHostTablesCreated() {
 		if s.FQDNs == nil {
 			return
 		}
-		s.HostsWithTablesCreated = util.IntersectStringArrays(s.HostsWithTablesCreated, s.FQDNs)
+		// Normalize both sides to handle status data written by older operator versions
+		// that may contain trailing dots.
+		s.HostsWithTablesCreated = util.IntersectStringArrays(
+			util.NormalizeFQDNs(s.HostsWithTablesCreated),
+			util.NormalizeFQDNs(s.FQDNs),
+		)
 	})
 }
 
@@ -281,7 +302,7 @@ func (s *Status) HostCompleted() {
 }
 
 // ReconcileStart marks reconcile start
-func (s *Status) ReconcileStart(deleteHostsCount int) {
+func (s *Status) ReconcileStart(ap chi.IActionPlan) {
 	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
@@ -292,7 +313,8 @@ func (s *Status) ReconcileStart(deleteHostsCount int) {
 		s.HostsUnchangedCount = 0
 		s.HostsCompletedCount = 0
 		s.HostsDeletedCount = 0
-		s.HostsDeleteCount = deleteHostsCount
+		s.HostsDeleteCount = ap.GetRemovedHostsNum()
+		s.ActionPlan = ap.(*chi.ActionPlan)
 		pushTaskIDStartedNoSync(s)
 	})
 }
@@ -321,6 +343,28 @@ func (s *Status) ReconcileAbort() {
 	})
 }
 
+// ReconcileAbortWithReason marks reconcile abortion AND records a reason-tagged
+// error so callers can distinguish flavors of Aborted (e.g. FIPSValidationFailed)
+// from the generic case. The reason is prepended to the message in `[reason] msg`
+// form — operators and dashboards grep the error stream for the bracketed tag.
+func (s *Status) ReconcileAbortWithReason(reason, msg string) {
+	doWithWriteLock(s, func(s *Status) {
+		if s == nil {
+			return
+		}
+		s.Status = StatusAborted
+		s.Action = ""
+		pushTaskIDCompletedNoSync(s)
+		if (reason != "") || (msg != "") {
+			tagged := fmt.Sprintf("[%s] %s", reason, msg)
+			s.Errors = append([]string{tagged}, s.Errors...)
+			if len(s.Errors) > maxErrors {
+				s.Errors = s.Errors[:maxErrors]
+			}
+		}
+	})
+}
+
 // DeleteStart marks deletion start
 func (s *Status) DeleteStart() {
 	doWithWriteLock(s, func(s *Status) {
@@ -338,13 +382,19 @@ func (s *Status) DeleteStart() {
 	})
 }
 
+// SetActionPlan sets action plan
+func (s *Status) SetActionPlan(ap chi.IActionPlan) {
+	doWithWriteLock(s, func(s *Status) {
+		s.ActionPlan = ap.(*chi.ActionPlan)
+	})
+}
+
 func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 	if opts.FieldGroupInheritable {
 		opts.Copy.TaskIDsStarted = true
 		opts.Copy.TaskIDsCompleted = true
 		opts.Copy.Actions = true
 		opts.Copy.Errors = true
-		opts.Copy.UsedTemplates = true
 	}
 
 	if opts.FieldGroupActions {
@@ -386,11 +436,13 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.FQDNs = true
 		opts.Copy.Endpoint = true
 		opts.Copy.NormalizedCR = true
+		opts.Copy.ActionPlan = true
 		opts.Copy.UsedTemplates = true
 	}
 
 	if opts.FieldGroupNormalized {
 		opts.Copy.NormalizedCR = true
+		opts.Copy.ActionPlan = true
 	}
 
 	if opts.FieldGroupWholeStatus {
@@ -422,6 +474,7 @@ func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
 		opts.Copy.Endpoint = true
 		opts.Copy.NormalizedCR = true
 		opts.Copy.NormalizedCRCompleted = true
+		opts.Copy.ActionPlan = true
 		opts.Copy.UsedTemplates = true
 	}
 
@@ -528,6 +581,9 @@ func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 			if opts.Copy.NormalizedCRCompleted {
 				s.NormalizedCRCompleted = from.NormalizedCRCompleted
 			}
+			if opts.Copy.ActionPlan {
+				s.ActionPlan = from.ActionPlan
+			}
 			if opts.Copy.HostsWithTablesCreated {
 				s.HostsWithTablesCreated = nil
 				if len(from.HostsWithTablesCreated) > 0 {
@@ -539,8 +595,8 @@ func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
 				}
 			}
 			if opts.Copy.UsedTemplates {
-				if len(from.UsedTemplates) > len(s.UsedTemplates) {
-					s.UsedTemplates = nil
+				s.UsedTemplates = nil
+				if len(from.UsedTemplates) > 0 {
 					s.UsedTemplates = append(s.UsedTemplates, from.UsedTemplates...)
 				}
 			}
@@ -768,15 +824,14 @@ func (s *Status) GetNormalizedCRCompleted() *ClickHouseKeeperInstallation {
 // GetHostsWithTablesCreated gets hosts with created tables
 func (s *Status) GetHostsWithTablesCreated() []string {
 	return getStringArrWithReadLock(s, func(s *Status) []string {
-		return s.HostsWithTablesCreated
+		return util.NormalizeFQDNs(s.HostsWithTablesCreated)
 	})
 }
 
 // GetHostsWithReplicaCaughtUp gets hosts with replica caught-up
 func (s *Status) GetHostsWithReplicaCaughtUp() []string {
 	return getStringArrWithReadLock(s, func(s *Status) []string {
-		return s.HostsWithReplicaCaughtUp
-
+		return util.NormalizeFQDNs(s.HostsWithReplicaCaughtUp)
 	})
 }
 
@@ -843,7 +898,16 @@ func getStringArrWithReadLock(s *Status, f func(*Status) []string) []string {
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return f(s)
+	// Return a COPY so callers may iterate the snapshot after the read lock is
+	// released without racing concurrent writers (PushError/SetAndPushError/
+	// ReconcileAbortWithReason mutate the underlying slice).
+	src := f(s)
+	if src == nil {
+		return emptyArr
+	}
+	cp := make([]string, len(src))
+	copy(cp, src)
+	return cp
 }
 
 // mergeActionsNoSync merges the actions of from into those of s (without synchronization, because synchronized

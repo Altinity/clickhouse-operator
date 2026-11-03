@@ -1,0 +1,28 @@
+# Example: refuse to run with an insecure Kubernetes API kubeconfig.
+#
+# By default the operator honors whatever's in the loaded kubeconfig — if you
+# specified `insecure-skip-tls-verify: true` in your kubeconfig, the operator's
+# K8s client talks to the API server without verifying its cert. That's fine
+# for kind/minikube development but unacceptable in any production posture.
+#
+# Setting `kubernetes.tls.verify: Strict` in the OPERATOR'S security section
+# makes the operator REFUSE TO START when the kubeconfig is marked insecure,
+# logging a clear error and exiting before any API call.
+#
+# This knob is operator-process-scoped (the operator runs ONE K8s API client
+# from kubeconfig) and lives in ClickHouseOperatorConfiguration only — there
+# is no per-CHI override. The file-based chopconf wins for the startup gate;
+# CR-based ChOpConfig merges happen AFTER, by which point the ServiceAccount
+# bearer token has already crossed the unverified channel.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: strict-k8s-tls
+spec:
+  security:
+    kubernetes:
+      tls:
+        # Unset preserves current behavior (kubeconfig wins). Set Strict
+        # to reject any kubeconfig with TLSClientConfig.Insecure=true at
+        # operator startup. None is the explicit opt-in to permit.
+        verify: Strict

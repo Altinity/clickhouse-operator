@@ -1,0 +1,49 @@
+# Example: 3-level security inheritance — operator-wide default Strict,
+# one cluster overrides to None for local debugging.
+#
+# Inheritance order: CHOP-config → CHI spec → cluster spec. Lower level wins.
+# Empty fields fall through to the next level up. So when the OPERATOR-WIDE
+# chopconf sets `security.clickhouse.tls.verify: Strict`, every CHI inherits
+# Strict by default; a CHI or cluster that explicitly sets `verify: None`
+# escapes it (typically for short-lived dev environments).
+#
+# Cluster-level overrides win — `verify: None` here applies only to this one
+# cluster, leaving any other clusters on their inherited Strict default.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: mixed-posture
+spec:
+  # CHI-level default — applies to all clusters that don't override.
+  # (Operator-wide default lives in the ClickHouseOperatorConfiguration; this
+  # CHI-level block only adds CHI-scoped defaults.)
+  # security:
+  #   clickhouse:
+  #     tls:
+  #       verify: Strict
+  configuration:
+    clusters:
+      - name: prod
+        secure: "yes"
+        security:
+          clickhouse:
+            tls:
+              verify: Strict
+              # REPLACE with the CA that signed your ClickHouse server certs.
+              rootCA: |
+                -----BEGIN CERTIFICATE-----
+                <paste your CA PEM here>
+                -----END CERTIFICATE-----
+        layout:
+          shardsCount: 2
+      - name: dev-debug
+        secure: "yes"
+        # Local debugging against a self-signed cert without a corresponding CA:
+        # disable verify for THIS cluster only. The `prod` cluster above still
+        # runs Strict.
+        security:
+          clickhouse:
+            tls:
+              verify: None
+        layout:
+          shardsCount: 1

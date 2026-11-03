@@ -1,13 +1,13 @@
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.25.4
+# OPERATOR_VERSION=0.28.0
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.25.4
+    clickhouse-keeper.altinity.com/chop: 0.28.0
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -22,6 +22,10 @@ spec:
       served: true
       storage: true
       additionalPrinterColumns:
+        - name: status
+          type: string
+          description: Resource status
+          jsonPath: .status.status
         - name: version
           type: string
           description: Operator version
@@ -45,15 +49,10 @@ spec:
           description: TaskID
           priority: 1 # show in wide view
           jsonPath: .status.taskID
-        - name: status
-          type: string
-          description: Resource status
-          jsonPath: .status.status
-        - name: hosts-unchanged
+        - name: hosts-completed
           type: integer
-          description: Unchanged hosts count
-          priority: 1 # show in wide view
-          jsonPath: .status.hostsUnchanged
+          description: Completed hosts count
+          jsonPath: .status.hostsCompleted
         - name: hosts-updated
           type: integer
           description: Updated hosts count
@@ -64,20 +63,11 @@ spec:
           description: Added hosts count
           priority: 1 # show in wide view
           jsonPath: .status.hostsAdded
-        - name: hosts-completed
-          type: integer
-          description: Completed hosts count
-          jsonPath: .status.hostsCompleted
         - name: hosts-deleted
           type: integer
           description: Hosts deleted count
           priority: 1 # show in wide view
           jsonPath: .status.hostsDeleted
-        - name: hosts-delete
-          type: integer
-          description: Hosts to be deleted count
-          priority: 1 # show in wide view
-          jsonPath: .status.hostsDelete
         - name: endpoint
           type: string
           description: Client access endpoint
@@ -243,10 +233,12 @@ spec:
                 normalized:
                   type: object
                   description: "Normalized resource requested"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
                   description: "Normalized resource completed"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
@@ -282,37 +274,17 @@ spec:
                     Displayed in all .status.taskID* fields.
                     By default (if not filled) every update of CHI manifest will generate random taskID
                 stop: &TypeStringBool
-                  type: string
                   description: |
-                    Allows to stop all ClickHouse clusters defined in a CHI.
+                    Allows to stop all ClickHouse Keeper clusters defined in a CHK.
                     Works as the following:
                      - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
                      - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
-                  enum:
-                    # List StringBoolXXX constants from model
-                    - ""
-                    - "0"
-                    - "1"
-                    - "False"
-                    - "false"
-                    - "True"
-                    - "true"
-                    - "No"
-                    - "no"
-                    - "Yes"
-                    - "yes"
-                    - "Off"
-                    - "off"
-                    - "On"
-                    - "on"
-                    - "Disable"
-                    - "disable"
-                    - "Enable"
-                    - "enable"
-                    - "Disabled"
-                    - "disabled"
-                    - "Enabled"
-                    - "enabled"
+                  # StringBool is polymorphic — accepts native YAML bool (true/false),
+                  # integer (0/1), or string from the recognized vocabulary.
+                  # See pkg/apis/common/types/string_bool.go (UnmarshalJSON + IsValid).
+                  # Structural-schema rules don't natively support bool|int|string
+                  # union, so we use x-kubernetes-preserve-unknown-fields: true.
+                  x-kubernetes-preserve-unknown-fields: true
                 suspend:
                   !!merge <<: *TypeStringBool
                   description: |
@@ -340,9 +312,12 @@ spec:
                         Possible values:
                          - wait - should wait to exclude host, complete queries and include host back into the cluster
                          - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                        (case-insensitive)
                       enum:
                         - ""
+                        - "Wait"
                         - "wait"
+                        - "NoWait"
                         - "nowait"
                     configMapPropagationTimeout:
                       type: integer
@@ -366,12 +341,14 @@ spec:
                           properties:
                             statefulSet: &TypeObjectsCleanup
                               type: string
-                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default (case-insensitive)"
                               enum:
-                                # List ObjectsCleanupXXX constants from model
+                                # List ObjectsCleanupXXX constants from model (both humped and all-lowercase accepted)
                                 - ""
                                 - "Retain"
+                                - "retain"
                                 - "Delete"
+                                - "delete"
                             pvc:
                               type: string
                               !!merge <<: *TypeObjectsCleanup
@@ -430,20 +407,24 @@ spec:
                       properties:
                         provisioner: &TypePVCProvisioner
                           type: string
-                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator"
+                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator (case-insensitive)"
                           enum:
                             - ""
                             - "StatefulSet"
+                            - "statefulset"
                             - "Operator"
+                            - "operator"
                         reclaimPolicy: &TypePVCReclaimPolicy
                           type: string
                           description: |
-                            defines behavior of `PVC` deletion.
+                            defines behavior of `PVC` deletion (case-insensitive).
                             `Delete` by default, if `Retain` specified then `PVC` will be kept when deleting StatefulSet
                           enum:
                             - ""
                             - "Retain"
+                            - "retain"
                             - "Delete"
+                            - "delete"
                     templates: &TypeTemplateNames
                       type: object
                       description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
@@ -527,6 +508,11 @@ spec:
                             description: |
                               optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                               override top-level `chi.spec.configuration.files`
+                          templates:
+                            !!merge <<: *TypeTemplateNames
+                            description: |
+                              optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
+                              override top-level `chi.spec.configuration.templates`
                           pdbManaged:
                             !!merge <<: *TypeStringBool
                             description: |
@@ -544,11 +530,37 @@ spec:
                               by specifying 0. This is a mutually exclusive setting with "minAvailable".
                             minimum: 0
                             maximum: 65535
-                          templates:
-                            !!merge <<: *TypeTemplateNames
+                          security:
+                            type: object
                             description: |
-                              optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
-                              override top-level `chi.spec.configuration.templates`
+                              Per-cluster security toggles. Nil fields fall through to CHK spec security and
+                              then to operator-wide defaults in ClickHouseOperatorConfiguration. Symmetric
+                              with chi.spec.configuration.clusters[].security. See docs/security_hardening.md.
+                            x-kubernetes-preserve-unknown-fields: true
+                          insecure:
+                            !!merge <<: *TypeStringBool
+                            description: |
+                              optional, controls exposure of the plaintext Keeper
+                              client port (zk:2181). Defaults to "yes" (legacy
+                              behavior, byte-stable). Set to "no" to:
+                              - suppress zk:2181 from the per-cluster Service and
+                                from per-host StatefulSet container ports;
+                              - emit <tcp_port remove="1"/> in the per-host overlay
+                                so the Keeper process binds no plaintext listener at
+                                all (the liveness probe automatically falls back to
+                                `pgrep clickhouse-keeper` because 4LW does not work
+                                over TLS upstream).
+                              Must be paired with `secure: yes` — the normalizer
+                              aborts reconcile with reason NoKeeperListener when
+                              `insecure: no` is set without `secure: yes` (no
+                              client port would be emitted).
+                          secure:
+                            !!merge <<: *TypeStringBool
+                            description: |
+                              optional, open secure (TLS) Keeper client ports for this cluster.
+                              Translates into <secure>1</secure> in Raft server entries so peer
+                              Keeper instances dial each other over TLS. Mirrors the cluster.secure
+                              flag on CHI.
                           layout:
                             type: object
                             description: |
@@ -615,6 +627,11 @@ spec:
                                             type: integer
                                             minimum: 1
                                             maximum: 65535
+                                          zkPortSecure:
+                                            type: integer
+                                            description: "optional, secure (TLS) Keeper client port; emitted alongside zkPort when the cluster opts into secure mode"
+                                            minimum: 1
+                                            maximum: 65535
                                           raftPort:
                                             type: integer
                                             minimum: 1
@@ -635,6 +652,12 @@ spec:
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
+                security:
+                  type: object
+                  description: |
+                    CHK-level security defaults, applied to every cluster that does not override
+                    them. Symmetric with chi.spec.security. See docs/security_hardening.md.
+                  x-kubernetes-preserve-unknown-fields: true
                 templates:
                   type: object
                   description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
@@ -665,10 +688,12 @@ spec:
                                   type: string
                                   description: "type of distribution, when `Unspecified` (default value) then all listen ports on clickhouse-server configuration in all Pods will have the same value, when `ClusterScopeIndex` then ports will increment to offset from base value depends on shard and replica index inside cluster with combination of `chi.spec.templates.podTemlates.spec.HostNetwork` it allows setup ClickHouse cluster inside Kubernetes and provide access via external network bypass Kubernetes internal network"
                                   enum:
-                                    # List PortDistributionXXX constants
+                                    # List PortDistributionXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "ClusterScopeIndex"
+                                    - "clusterscopeindex"
                           spec:
                             # Host
                             type: object
@@ -682,6 +707,11 @@ spec:
                                 pattern: "^[a-zA-Z0-9-]{0,15}$"
                               zkPort:
                                 type: integer
+                                minimum: 1
+                                maximum: 65535
+                              zkPortSecure:
+                                type: integer
+                                description: "optional, secure (TLS) Keeper client port; emitted alongside zkPort when the cluster opts into secure mode"
                                 minimum: 1
                                 maximum: 65535
                               raftPort:
@@ -732,13 +762,6 @@ spec:
                                 # nullable: true
                                 items:
                                   type: string
-                          distribution:
-                            type: string
-                            description: "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
-                            enum:
-                              - ""
-                              - "Unspecified"
-                              - "OnePerHost"
                           podDistribution:
                             type: array
                             description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
@@ -752,35 +775,56 @@ spec:
                                   type: string
                                   description: "you can define multiple affinity policy types"
                                   enum:
-                                    # List PodDistributionXXX constants
+                                    # List PodDistributionXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "ClickHouseAntiAffinity"
+                                    - "clickhouseantiaffinity"
                                     - "ShardAntiAffinity"
+                                    - "shardantiaffinity"
                                     - "ReplicaAntiAffinity"
+                                    - "replicaantiaffinity"
                                     - "AnotherNamespaceAntiAffinity"
+                                    - "anothernamespaceantiaffinity"
                                     - "AnotherClickHouseInstallationAntiAffinity"
+                                    - "anotherclickhouseinstallationantiaffinity"
                                     - "AnotherClusterAntiAffinity"
+                                    - "anotherclusterantiaffinity"
                                     - "MaxNumberPerNode"
+                                    - "maxnumberpernode"
                                     - "NamespaceAffinity"
+                                    - "namespaceaffinity"
                                     - "ClickHouseInstallationAffinity"
+                                    - "clickhouseinstallationaffinity"
                                     - "ClusterAffinity"
+                                    - "clusteraffinity"
                                     - "ShardAffinity"
+                                    - "shardaffinity"
                                     - "ReplicaAffinity"
+                                    - "replicaaffinity"
                                     - "PreviousTailAffinity"
+                                    - "previoustailaffinity"
                                     - "CircularReplication"
+                                    - "circularreplication"
                                 scope:
                                   type: string
                                   description: "scope for apply each podDistribution"
                                   enum:
-                                    # list PodDistributionScopeXXX constants
+                                    # list PodDistributionScopeXXX constants (both humped and all-lowercase accepted)
                                     - ""
                                     - "Unspecified"
+                                    - "unspecified"
                                     - "Shard"
+                                    - "shard"
                                     - "Replica"
+                                    - "replica"
                                     - "Cluster"
+                                    - "cluster"
                                     - "ClickHouseInstallation"
+                                    - "clickhouseinstallation"
                                     - "Namespace"
+                                    - "namespace"
                                 number:
                                   type: integer
                                   description: "define, how much ClickHouse Pods could be inside selected scope with selected distribution type"

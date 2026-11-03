@@ -4,6 +4,13 @@ metadata:
   name: clickhouse-operator.v${OPERATOR_VERSION}
   namespace: placeholder
   annotations:
+    features.operators.openshift.io/disconnected: "true"
+    features.operators.openshift.io/fips-compliant: "false"
+    features.operators.openshift.io/proxy-aware: "false"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
     capabilities: Full Lifecycle
     categories: Database
     containerImage: docker.io/altinity/clickhouse-operator:${OPERATOR_VERSION}
@@ -16,9 +23,9 @@ metadata:
       "{HERE WILL BE THE EXAMPLES}"
 spec:
   version: ${OPERATOR_VERSION}
-  minKubeVersion: 1.12.6
+  minKubeVersion: 1.16.0
   maturity: alpha
-  replaces: clickhouse-operator.v${PREVIOUS_OPERATOR_VERSION}
+  replaces: clickhouse-operator.v0.26.0
   maintainers:
     - email: support@altinity.com
       name: Altinity
@@ -144,6 +151,48 @@ spec:
             name: ''
             version: v1
           - kind: PersistentVolumeClaim
+            name: ''
+            version: v1
+      - description: ClickHouse Backup (experimental) - one-off backup of a ClickHouse Installation
+        displayName: ClickHouseBackup
+        group: clickhouse.altinity.com
+        kind: ClickHouseBackup
+        name: clickhousebackups.clickhouse.altinity.com
+        version: v1
+        resources:
+          - kind: Job
+            name: ''
+            version: v1
+          - kind: Event
+            name: ''
+            version: v1
+      - description: ClickHouse Backup Schedule (experimental) - recurring backups of a ClickHouse Installation
+        displayName: ClickHouseBackupSchedule
+        group: clickhouse.altinity.com
+        kind: ClickHouseBackupSchedule
+        name: clickhousebackupschedules.clickhouse.altinity.com
+        version: v1
+        resources:
+          - kind: CronJob
+            name: ''
+            version: v1
+          - kind: Job
+            name: ''
+            version: v1
+          - kind: Event
+            name: ''
+            version: v1
+      - description: ClickHouse Restore (experimental) - one-off restore of a backup into a ClickHouse Installation
+        displayName: ClickHouseRestore
+        group: clickhouse.altinity.com
+        kind: ClickHouseRestore
+        name: clickhouserestores.clickhouse.altinity.com
+        version: v1
+        resources:
+          - kind: Job
+            name: ''
+            version: v1
+          - kind: Event
             name: ''
             version: v1
   description: |-
@@ -1265,31 +1314,51 @@ spec:
                           resourceFieldRef:
                             containerName: clickhouse-operator
                             resource: requests.cpu
+                            divisor: "1m"
                       - name: OPERATOR_CONTAINER_CPU_LIMIT
                         valueFrom:
                           resourceFieldRef:
                             containerName: clickhouse-operator
                             resource: limits.cpu
+                            divisor: "1m"
                       - name: OPERATOR_CONTAINER_MEM_REQUEST
                         valueFrom:
                           resourceFieldRef:
                             containerName: clickhouse-operator
                             resource: requests.memory
+                            divisor: "1Mi"
                       - name: OPERATOR_CONTAINER_MEM_LIMIT
                         valueFrom:
                           resourceFieldRef:
                             containerName: clickhouse-operator
                             resource: limits.memory
-                      - name: WATCH_NAMESPACE
+                            divisor: "1Mi"
+                      # Honor the OperatorGroup's target namespaces so every advertised
+                      # installMode works (AllNamespaces sends an empty string = watch all).
+                      - name: WATCH_NAMESPACES
                         valueFrom:
                           fieldRef:
-                            fieldPath: metadata.namespace
+                            fieldPath: metadata.annotations['olm.targetNamespaces']
                     image: docker.io/altinity/clickhouse-operator:${OPERATOR_VERSION}
                     imagePullPolicy: Always
                     name: clickhouse-operator
+                    resources:
+                      requests:
+                        cpu: 50m
+                        memory: 64Mi
+                      limits:
+                        cpu: "1"
+                        memory: 512Mi
                   - image: docker.io/altinity/metrics-exporter:${OPERATOR_VERSION}
                     imagePullPolicy: Always
                     name: metrics-exporter
+                    resources:
+                      requests:
+                        cpu: 50m
+                        memory: 64Mi
+                      limits:
+                        cpu: 500m
+                        memory: 256Mi
                 serviceAccountName: clickhouse-operator
       permissions:
         - serviceAccountName: clickhouse-operator

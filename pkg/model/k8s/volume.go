@@ -52,3 +52,13 @@ func CreateVolumeMount(name, mountPath string) core.VolumeMount {
 		MountPath: mountPath,
 	}
 }
+
+// PodSpecHasVolumeByName checks whether the pod spec declares a volume of the name given
+func PodSpecHasVolumeByName(podSpec *core.PodSpec, name string) bool {
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Name == name {
+			return true
+		}
+	}
+	return false
+}

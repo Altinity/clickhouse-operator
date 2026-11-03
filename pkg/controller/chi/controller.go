@@ -30,17 +30,17 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	kubeTypes "k8s.io/apimachinery/pkg/types"
 	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	kubeInformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedCore "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-
-	"github.com/altinity/queue"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -56,10 +56,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/queue"
 )
 
 // Controller defines CRO controller
@@ -70,9 +70,10 @@ type Controller struct {
 	//
 	// Native clients
 	//
-	kubeClient kube.Interface
-	extClient  apiExtensions.Interface
-	chopClient chopClientSet.Interface
+	kubeClient    kube.Interface
+	extClient     apiExtensions.Interface
+	chopClient    chopClientSet.Interface
+	dynamicClient dynamic.Interface
 
 	// queues used to organize events queue processed by the operator
 	queues []queue.PriorityQueue
@@ -89,6 +90,8 @@ func NewController(
 	chopClient chopClientSet.Interface,
 	extClient apiExtensions.Interface,
 	kubeClient kube.Interface,
+	dynamicClient dynamic.Interface,
+	chopConfigInformerFactory chopInformers.SharedInformerFactory,
 	chopInformerFactory chopInformers.SharedInformerFactory,
 	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) *Controller {
@@ -116,17 +119,18 @@ func NewController(
 
 	// Create Controller instance
 	controller := &Controller{
-		kubeClient:  kubeClient,
-		extClient:   extClient,
-		chopClient:  chopClient,
-		recorder:    recorder,
-		namer:       namer,
-		kube:        kube,
-		ctrlLabeler: ctrlLabeler.New(kube),
-		pvcDeleter:  volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
+		kubeClient:    kubeClient,
+		extClient:     extClient,
+		chopClient:    chopClient,
+		dynamicClient: dynamicClient,
+		recorder:      recorder,
+		namer:         namer,
+		kube:          kube,
+		ctrlLabeler:   ctrlLabeler.New(kube),
+		pvcDeleter:    volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
 	}
 	controller.initQueues()
-	controller.addEventHandlers(chopInformerFactory, kubeInformerFactory)
+	controller.addEventHandlers(chopConfigInformerFactory, chopInformerFactory, kubeInformerFactory)
 
 	return controller
 }
@@ -150,13 +154,40 @@ func (c *Controller) createQueue() queue.PriorityQueue {
 	//),
 }
 
+// deletedObject decodes an informer delete payload into *T, transparently
+// unwrapping a client-go DeletedFinalStateUnknown tombstone (delivered when a
+// watch delete is missed and a relist finds the cached object gone). T is the
+// value type so the result stays pointer-nil-comparable: a tombstone can carry
+// a typed-nil *T that satisfies the assertion, so the nil check is required.
+func deletedObject[T any](obj interface{}) (*T, error) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	deleted, ok := obj.(*T)
+	if !ok || deleted == nil {
+		return nil, fmt.Errorf("unexpected object type %T", obj)
+	}
+	return deleted, nil
+}
+
+func deleteHandler[T any](name string, handle func(*T)) func(interface{}) {
+	return func(obj interface{}) {
+		deleted, err := deletedObject[T](obj)
+		if err != nil {
+			utilRuntime.HandleError(fmt.Errorf("%s: %w", name, err))
+			return
+		}
+		handle(deleted)
+	}
+}
+
 func (c *Controller) addEventHandlersCHI(
 	chopInformerFactory chopInformers.SharedInformerFactory,
 ) {
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chi := obj.(*api.ClickHouseInstallation)
-			if !shouldEnqueue(chi) {
+			if !ShouldEnqueue(chi) {
 				return
 			}
 			log.V(3).M(chi).Info("chiInformer.AddFunc")
@@ -165,20 +196,19 @@ func (c *Controller) addEventHandlersCHI(
 		UpdateFunc: func(old, new interface{}) {
 			oldChi := old.(*api.ClickHouseInstallation)
 			newChi := new.(*api.ClickHouseInstallation)
-			if !shouldEnqueue(newChi) {
+			if !ShouldEnqueue(newChi) {
 				return
 			}
 			log.V(3).M(newChi).Info("chiInformer.UpdateFunc")
 			c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileUpdate, oldChi, newChi))
 		},
-		DeleteFunc: func(obj interface{}) {
-			chi := obj.(*api.ClickHouseInstallation)
+		DeleteFunc: deleteHandler("chiInformer.DeleteFunc", func(chi *api.ClickHouseInstallation) {
 			if !chop.Config().IsNamespaceWatched(chi.Namespace) {
 				return
 			}
 			log.V(3).M(chi).Info("chiInformer.DeleteFunc")
 			c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileDelete, chi, nil))
-		},
+		}),
 	})
 }
 
@@ -204,47 +234,35 @@ func (c *Controller) addEventHandlersCHIT(
 			log.V(3).M(newChit).Info("chitInformer.UpdateFunc")
 			c.enqueueObject(cmd_queue.NewReconcileCHIT(cmd_queue.ReconcileUpdate, oldChit, newChit))
 		},
-		DeleteFunc: func(obj interface{}) {
-			chit := obj.(*api.ClickHouseInstallationTemplate)
+		DeleteFunc: deleteHandler("chitInformer.DeleteFunc", func(chit *api.ClickHouseInstallationTemplate) {
 			if !chop.Config().IsNamespaceWatched(chit.Namespace) {
 				return
 			}
 			log.V(3).M(chit).Info("chitInformer.DeleteFunc")
 			c.enqueueObject(cmd_queue.NewReconcileCHIT(cmd_queue.ReconcileDelete, chit, nil))
-		},
+		}),
 	})
 }
 
 func (c *Controller) addEventHandlersChopConfig(
-	chopInformerFactory chopInformers.SharedInformerFactory,
+	chopConfigInformerFactory chopInformers.SharedInformerFactory,
 ) {
-	chopInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	chopConfigInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chopConfig := obj.(*api.ClickHouseOperatorConfiguration)
-			if !chop.Config().IsNamespaceWatched(chopConfig.Namespace) {
-				log.V(2).M(chopConfig).Info("chopInformer: skip event, namespace '%s' is not watched or is in deny list", chopConfig.Namespace)
-				return
-			}
 			log.V(3).M(chopConfig).Info("chopInformer.AddFunc")
 			c.enqueueObject(cmd_queue.NewReconcileChopConfig(cmd_queue.ReconcileAdd, nil, chopConfig))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			newChopConfig := new.(*api.ClickHouseOperatorConfiguration)
 			oldChopConfig := old.(*api.ClickHouseOperatorConfiguration)
-			if !chop.Config().IsNamespaceWatched(newChopConfig.Namespace) {
-				return
-			}
 			log.V(3).M(newChopConfig).Info("chopInformer.UpdateFunc")
 			c.enqueueObject(cmd_queue.NewReconcileChopConfig(cmd_queue.ReconcileUpdate, oldChopConfig, newChopConfig))
 		},
-		DeleteFunc: func(obj interface{}) {
-			chopConfig := obj.(*api.ClickHouseOperatorConfiguration)
-			if !chop.Config().IsNamespaceWatched(chopConfig.Namespace) {
-				return
-			}
+		DeleteFunc: deleteHandler("chopInformer.DeleteFunc", func(chopConfig *api.ClickHouseOperatorConfiguration) {
 			log.V(3).M(chopConfig).Info("chopInformer.DeleteFunc")
 			c.enqueueObject(cmd_queue.NewReconcileChopConfig(cmd_queue.ReconcileDelete, chopConfig, nil))
-		},
+		}),
 	})
 }
 
@@ -266,13 +284,12 @@ func (c *Controller) addEventHandlersService(
 			}
 			log.V(3).M(oldService).Info("serviceInformer.UpdateFunc")
 		},
-		DeleteFunc: func(obj interface{}) {
-			service := obj.(*core.Service)
+		DeleteFunc: deleteHandler("serviceInformer.DeleteFunc", func(service *core.Service) {
 			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
 			log.V(3).M(service).Info("serviceInformer.DeleteFunc")
-		},
+		}),
 	})
 }
 
@@ -315,7 +332,7 @@ func isUpdatedEndpoints(old, new *core.Endpoints) bool {
 	oldSubsets := normalizeEndpoints(old).Subsets
 	newSubsets := normalizeEndpoints(new).Subsets
 
-	log.V(1).M(new).F().Info("Check whether is updated Endpoints. %s/%s", new.Namespace, new.Name)
+	log.V(2).M(new).F().Info("Check whether is updated Endpoints. %s/%s", new.Namespace, new.Name)
 
 	diff, equal := messagediff.DeepDiff(oldSubsets[0].Addresses, newSubsets[0].Addresses)
 	if equal {
@@ -342,7 +359,7 @@ func isUpdatedEndpoints(old, new *core.Endpoints) bool {
 	}
 
 	if assigned {
-		log.V(2).M(old).Info("endpointsInformer.UpdateFunc: IP ASSIGNED: %s", litter.Sdump(new.Subsets))
+		log.V(1).M(old).Info("endpointsInformer.UpdateFunc: IP ASSIGNED: %s", litter.Sdump(new.Subsets))
 		return true
 	}
 
@@ -350,7 +367,7 @@ func isUpdatedEndpoints(old, new *core.Endpoints) bool {
 }
 
 func isUpdatedEndpointSlice(old, new *discovery.EndpointSlice) bool {
-	log.V(1).M(new).F().Info("Check whether is updated EndpointSlice. %s/%s Transition: '%s'=>'%s'", new.Namespace, new.Name, buildComparableEndpointAddresses(old), buildComparableEndpointAddresses(new))
+	log.V(2).M(new).F().Info("Check whether is updated EndpointSlice. %s/%s Transition: '%s'=>'%s'", new.Namespace, new.Name, buildComparableEndpointAddresses(old), buildComparableEndpointAddresses(new))
 	return buildComparableEndpointAddresses(old) != buildComparableEndpointAddresses(new)
 }
 
@@ -358,10 +375,12 @@ func buildComparableEndpointAddresses(epSlice *discovery.EndpointSlice) string {
 	return strings.Join(fetchUniqueReadyAddresses(epSlice), ",")
 }
 
+// fetchUniqueReadyAddresses returns sorted list of ready addresses
 func fetchUniqueReadyAddresses(epSlice *discovery.EndpointSlice) (res []string) {
 	if epSlice == nil {
 		return nil
 	}
+	// Extract ready addresses from endpoints
 	for _, ep := range epSlice.Endpoints {
 		if (ep.Conditions.Ready != nil) && (*ep.Conditions.Ready == false) {
 			// Skip not-ready address
@@ -369,9 +388,12 @@ func fetchUniqueReadyAddresses(epSlice *discovery.EndpointSlice) (res []string) 
 		}
 		res = append(res, ep.Addresses...)
 	}
+	// Be ready for duplicate endpoints, though
+	res = util.Unique(res)
+	// And unique does not preserve order
 	sort.Strings(res)
 
-	return util.Unique(res)
+	return res
 }
 
 func (c *Controller) addEventHandlersEndpoints(
@@ -396,13 +418,12 @@ func (c *Controller) addEventHandlersEndpoints(
 				c.enqueueObject(cmd_queue.NewReconcileEndpoints(cmd_queue.ReconcileUpdate, oldEndpoints, newEndpoints))
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
-			endpoints := obj.(*core.Endpoints)
+		DeleteFunc: deleteHandler("endpointsInformer.DeleteFunc", func(endpoints *core.Endpoints) {
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
 			log.V(3).M(endpoints).Info("endpointsInformer.DeleteFunc")
-		},
+		}),
 	})
 }
 
@@ -428,13 +449,12 @@ func (c *Controller) addEventHandlersEndpointSlice(
 				c.enqueueObject(cmd_queue.NewReconcileEndpointSlice(cmd_queue.ReconcileUpdate, oldEndpointSlice, newEndpointSlice))
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
-			endpointSlice := obj.(*discovery.EndpointSlice)
+		DeleteFunc: deleteHandler("endpointSliceInformer.DeleteFunc", func(endpointSlice *discovery.EndpointSlice) {
 			if !c.isTrackedObject(&endpointSlice.ObjectMeta) {
 				return
 			}
 			log.V(3).M(endpointSlice).Info("endpointSliceInformer.DeleteFunc")
-		},
+		}),
 	})
 }
 
@@ -456,13 +476,12 @@ func (c *Controller) addEventHandlersConfigMap(
 			}
 			log.V(3).M(configMap).Info("configMapInformer.UpdateFunc")
 		},
-		DeleteFunc: func(obj interface{}) {
-			configMap := obj.(*core.ConfigMap)
+		DeleteFunc: deleteHandler("configMapInformer.DeleteFunc", func(configMap *core.ConfigMap) {
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
 			log.V(3).M(configMap).Info("configMapInformer.DeleteFunc")
-		},
+		}),
 	})
 }
 
@@ -476,7 +495,6 @@ func (c *Controller) addEventHandlersStatefulSet(
 				return
 			}
 			log.V(3).M(statefulSet).Info("statefulSetInformer.AddFunc")
-			//controller.handleObject(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			statefulSet := old.(*apps.StatefulSet)
@@ -485,14 +503,12 @@ func (c *Controller) addEventHandlersStatefulSet(
 			}
 			log.V(3).M(statefulSet).Info("statefulSetInformer.UpdateFunc")
 		},
-		DeleteFunc: func(obj interface{}) {
-			statefulSet := obj.(*apps.StatefulSet)
+		DeleteFunc: deleteHandler("statefulSetInformer.DeleteFunc", func(statefulSet *apps.StatefulSet) {
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
 			log.V(3).M(statefulSet).Info("statefulSetInformer.DeleteFunc")
-			//controller.handleObject(obj)
-		},
+		}),
 	})
 }
 
@@ -517,31 +533,97 @@ func (c *Controller) addEventHandlersPod(
 			log.V(3).M(newPod).Info("podInformer.UpdateFunc")
 			c.enqueueObject(cmd_queue.NewReconcilePod(cmd_queue.ReconcileUpdate, oldPod, newPod))
 		},
-		DeleteFunc: func(obj interface{}) {
-			pod := obj.(*core.Pod)
+		DeleteFunc: deleteHandler("podInformer.DeleteFunc", func(pod *core.Pod) {
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.DeleteFunc")
 			c.enqueueObject(cmd_queue.NewReconcilePod(cmd_queue.ReconcileDelete, pod, nil))
-		},
+		}),
 	})
 }
 
-// addEventHandlers
+func (c *Controller) addEventHandlersSecret(
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
+) {
+	kubeInformerFactory.Core().V1().Secrets().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		DeleteFunc: deleteHandler("secretInformer.DeleteFunc", func(secret *core.Secret) {
+			if !c.isTrackedObject(&secret.ObjectMeta) {
+				return
+			}
+			log.V(3).M(secret).Info("secretInformer.DeleteFunc")
+			c.enqueueBackupSecretOwner(secret)
+		}),
+	})
+}
+
+// NewInformerFactoryForCHOPGeneratedObjects builds the kube informer factory, narrowed at the
+// API server to objects the operator generated.
+//
+// Without the selector these caches, and the DeltaFIFO feeding them, scale with the size of the
+// whole cluster rather than with the number of managed installations: GetInformerNamespace falls
+// back to NamespaceAll for every watch-namespace form except a single literal name, which covers
+// the shipped kube-system bundle (where an empty include means watch-all) and OLM AllNamespaces
+// (which arrives as ".*" and fails the DNS-label check).
+//
+// Safe because these informers are an event source only - nothing takes a Lister or an Indexer off
+// this factory, and reads go through the kube client directly - and because every handler already
+// gates on the same label through isTrackedObject. The selector tests one of that gate's two
+// conjuncts - the gate also requires the namespace to be watched - so everything it drops was
+// already discarded by the handlers.
+//
+// One behaviour does change: an object that LOSES the label leaves the selector, and the API server
+// reports that to a filtered watch as a deletion carrying the last matching version. The handler
+// therefore runs, and for a Pod that means one log line and one PodDelete counter - nothing
+// destructive, and no further events for that object.
+//
+// EndpointSlices are watched but written by kube, not by us; they match only because the
+// EndpointSlice controller mirrors the Service's labels onto them.
+func NewInformerFactoryForCHOPGeneratedObjects(
+	kubeClient kube.Interface,
+	resyncPeriod time.Duration,
+) kubeInformers.SharedInformerFactory {
+	selector := k8sLabels.SelectorFromSet(chiLabeler.New(nil).CHOPGeneratedSelector()).String()
+
+	// This narrowing fails silently when it is wrong - the operator simply stops seeing objects -
+	// so the effective selector goes in the boot log, where support will look for it first.
+	// Unconditional, not V(1): one line at startup, and it is the first thing to check when the
+	// operator appears to ignore objects that exist.
+	log.F().Info("Kube informers label selector: '%s'", selector)
+
+	return kubeInformers.NewSharedInformerFactoryWithOptions(
+		kubeClient,
+		resyncPeriod,
+		kubeInformers.WithNamespace(chop.Config().GetInformerNamespace()),
+		kubeInformers.WithTweakListOptions(func(options *meta.ListOptions) {
+			options.LabelSelector = selector
+		}),
+	)
+}
+
+// addEventHandlers registers the handlers for every informer the operator consumes.
+//
+// NOTE on kubeInformerFactory: despite the name it is NOT every kube object. It is narrowed
+// server-side to those carrying the operator's app label (see
+// NewInformerFactoryForCHOPGeneratedObjects), so any informer taken from it delivers only
+// labelled objects - one added here for a type the operator does not label returns nothing at
+// all, silently. Types the operator creates are labelled; EndpointSlices are not created by us
+// and match only because kube mirrors the Service's labels onto them.
 func (c *Controller) addEventHandlers(
+	chopConfigInformerFactory chopInformers.SharedInformerFactory,
 	chopInformerFactory chopInformers.SharedInformerFactory,
 	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) {
+	c.addEventHandlersChopConfig(chopConfigInformerFactory)
 	c.addEventHandlersCHI(chopInformerFactory)
 	c.addEventHandlersCHIT(chopInformerFactory)
-	c.addEventHandlersChopConfig(chopInformerFactory)
 	c.addEventHandlersService(kubeInformerFactory)
 	//c.addEventHandlersEndpoints(kubeInformerFactory)
 	c.addEventHandlersEndpointSlice(kubeInformerFactory)
 	c.addEventHandlersConfigMap(kubeInformerFactory)
 	c.addEventHandlersStatefulSet(kubeInformerFactory)
 	c.addEventHandlersPod(kubeInformerFactory)
+	c.addEventHandlersSecret(kubeInformerFactory)
 }
 
 // isTrackedObject checks whether operator is interested in changes of this object
@@ -611,7 +693,7 @@ func prepareCHIAdd(command *cmd_queue.ReconcileCHI) bool {
 }
 
 func prepareCHIUpdate(command *cmd_queue.ReconcileCHI) bool {
-	actionPlan := action_plan.NewActionPlan(command.Old, command.New)
+	actionPlan := api.MakeActionPlan(command.Old, command.New)
 	if !actionPlan.HasActionsToDo() {
 		return false
 	}
@@ -689,12 +771,47 @@ func (c *Controller) updateWatch(chi *api.ClickHouseInstallation) {
 	go c.updateWatchAsync(watched)
 }
 
+// allocateWatch
+func (c *Controller) allocateWatch(chi *api.ClickHouseInstallation) {
+	watched := metrics.NewWatchedCR(chi)
+	watched.Clusters = nil
+	go c.updateWatchAsync(watched)
+}
+
 // updateWatchAsync
 func (c *Controller) updateWatchAsync(chi *metrics.WatchedCR) {
 	if err := clickhouse.InformMetricsExporterAboutWatchedCHI(chi); err != nil {
 		log.V(1).F().Info("FAIL update watch (%s/%s): %q", chi.Namespace, chi.Name, err)
 	} else {
 		log.V(1).Info("OK update watch (%s/%s): %s", chi.Namespace, chi.Name, chi)
+	}
+}
+
+// addHostWatch adds a single host to monitoring
+func (c *Controller) addHostWatch(host *api.Host) {
+	req := &clickhouse.HostRequest{
+		CRNamespace: host.Runtime.Address.Namespace,
+		CRName:      host.Runtime.Address.CHIName,
+		ClusterName: host.Runtime.Address.ClusterName,
+		ClusterTLS:  metrics.NewWatchedTLS(host.GetCluster()),
+		Host: &metrics.WatchedHost{
+			Name:      host.Name,
+			Hostname:  host.Runtime.Address.FQDN,
+			TCPPort:   host.TCPPort.Value(),
+			TLSPort:   host.TLSPort.Value(),
+			HTTPPort:  host.HTTPPort.Value(),
+			HTTPSPort: host.HTTPSPort.Value(),
+		},
+	}
+	go c.addHostWatchAsync(req)
+}
+
+// addHostWatchAsync
+func (c *Controller) addHostWatchAsync(req *clickhouse.HostRequest) {
+	if err := clickhouse.InformMetricsExporterAboutWatchedHost(req); err != nil {
+		log.V(1).F().Info("FAIL add host watch (%s/%s/%s/%s): %q", req.CRNamespace, req.CRName, req.ClusterName, req.Host.Hostname, err)
+	} else {
+		log.V(1).Info("OK add host watch (%s/%s/%s/%s)", req.CRNamespace, req.CRName, req.ClusterName, req.Host.Hostname)
 	}
 }
 
@@ -718,10 +835,8 @@ func (c *Controller) addChopConfig(chopConfig *api.ClickHouseOperatorConfigurati
 	if chop.Get().ConfigManager.IsConfigListed(chopConfig) {
 		log.V(1).M(chopConfig).F().Info("already known config - do nothing")
 	} else {
-		log.V(1).M(chopConfig).F().Info("new, previously unknown config, need to apply")
-		// TODO
-		// NEED REFACTORING
-		// os.Exit(0)
+		log.V(1).M(chopConfig).F().Info("new, previously unknown config")
+		c.restartOperatorOnConfigChange("ClickHouseOperatorConfiguration added")
 	}
 
 	return nil
@@ -736,21 +851,24 @@ func (c *Controller) updateChopConfig(old, new *api.ClickHouseOperatorConfigurat
 	}
 
 	log.V(2).M(new).F().Info("ResourceVersion change: %s to %s", old.GetObjectMeta().GetResourceVersion(), new.GetObjectMeta().GetResourceVersion())
-	// TODO
-	// NEED REFACTORING
-	//os.Exit(0)
+	c.restartOperatorOnConfigChange("ClickHouseOperatorConfiguration updated")
 
 	return nil
 }
 
-// deleteChit deletes CHIT
+// deleteChopConfig deletes CHOPCONF
 func (c *Controller) deleteChopConfig(chopConfig *api.ClickHouseOperatorConfiguration) error {
 	log.V(2).M(chopConfig).F().P()
-	// TODO
-	// NEED REFACTORING
-	//os.Exit(0)
+	c.restartOperatorOnConfigChange("ClickHouseOperatorConfiguration deleted")
 
 	return nil
+}
+
+func (c *Controller) restartOperatorOnConfigChange(reason string) {
+	// Delegate to the shared helper so the operator and the metrics-exporter
+	// react to ClickHouseOperatorConfiguration changes identically. See
+	// chop.RestartOnConfigChange and the exporter's chopconf watcher.
+	chop.RestartOnConfigChange(reason)
 }
 
 type patchFinalizers struct {
@@ -875,61 +993,10 @@ func (c *Controller) uninstallFinalizer(ctx context.Context, chi *api.ClickHouse
 	return c.patchCHIFinalizers(ctx, cur)
 }
 
-// handleObject enqueues CHI which is owner of `obj` into reconcile loop
-func (c *Controller) handleObject(obj interface{}) {
-	// TODO review
-	object, ok := obj.(meta.Object)
-	if !ok {
-		ts, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilRuntime.HandleError(fmt.Errorf(messageUnableToDecode))
-			return
-		}
-		object, ok = ts.Obj.(meta.Object)
-		if !ok {
-			utilRuntime.HandleError(fmt.Errorf(messageUnableToDecode))
-			return
-		}
-	}
-
-	// object is an instance of meta.Object
-
-	// Checking that we control current StatefulSet Object
-	ownerRef := meta.GetControllerOf(object)
-	if ownerRef == nil {
-		// No owner
-		return
-	}
-
-	// Ensure owner is of a proper kind
-	if ownerRef.Kind != api.ClickHouseInstallationCRDResourceKind {
-		return
-	}
-
-	log.V(1).Info("Processing object: %s", object.GetName())
-
-	// Get owner - it is expected to be CHI
-	// TODO chi, err := c.chi.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
-
-	// TODO
-	//if err != nil {
-	//	log.V(1).Infof("ignoring orphaned object '%s' of ClickHouseInstallation '%s'", object.GetSelfLink(), ownerRef.Name)
-	//	return
-	//}
-
-	// Add CHI object into reconcile loop
-	// TODO c.enqueueObject(chi.Namespace, chi.Name, chi)
-}
-
-func shouldEnqueue(chi *api.ClickHouseInstallation) bool {
-	if !chop.Config().IsNamespaceWatched(chi.Namespace) {
-		log.V(2).M(chi).Info("chiInformer: skip enqueue, namespace '%s' is not watched or is in deny list", chi.Namespace)
-		return false
-	}
-
-	// if CR is suspended, should skip reconciliation
-	if chi.Spec.Suspend.Value() {
-		log.V(5).M(chi).Info("chiInformer: skip enqueue, CHI suspended")
+func ShouldEnqueue(cr *api.ClickHouseInstallation) bool {
+	ns := cr.GetNamespace()
+	if !chop.Config().IsNamespaceWatched(ns) {
+		log.V(2).M(cr).Info("skip enqueue, namespace '%s' is not watched or is in deny list", ns)
 		return false
 	}
 

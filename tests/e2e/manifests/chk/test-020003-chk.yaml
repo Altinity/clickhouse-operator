@@ -1,0 +1,20 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020003-chk
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    clusters:
+      - name: keeper
+        layout:
+          replicasCount: 3
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              image: "clickhouse/clickhouse-keeper:25.8"

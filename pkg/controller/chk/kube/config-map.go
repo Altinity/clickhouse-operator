@@ -17,6 +17,7 @@ package kube
 import (
 	"context"
 
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -26,35 +27,41 @@ import (
 
 type ConfigMap struct {
 	kubeClient client.Client
+	// apiReader reads live; see NewAdapter on why every by-name Get here bypasses the cache.
+	apiReader client.Reader
 }
 
-func NewConfigMap(kubeClient client.Client) *ConfigMap {
+func NewConfigMap(kubeClient client.Client, apiReader client.Reader) *ConfigMap {
 	return &ConfigMap{
 		kubeClient: kubeClient,
+		apiReader:  apiReader,
 	}
 }
 
 func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
-	err := c.kubeClient.Create(ctx, cm)
-	return cm, err
+	return commonKube.CreateWithRetry(ctx, func() (*core.ConfigMap, error) {
+		return cm, c.kubeClient.Create(ctx, cm)
+	})
 }
 
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
-	cm := &core.ConfigMap{}
-	err := c.kubeClient.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, cm)
-	if err == nil {
+	return commonKube.GetWithRetry(ctx, func() (*core.ConfigMap, error) {
+		cm := &core.ConfigMap{}
+		err := c.apiReader.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		}, cm)
+		if err != nil {
+			return nil, err
+		}
 		return cm, nil
-	} else {
-		return nil, err
-	}
+	})
 }
 
 func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
-	err := c.kubeClient.Update(ctx, cm)
-	return cm, err
+	return commonKube.UpdateWithRetry(ctx, func() (*core.ConfigMap, error) {
+		return cm, c.kubeClient.Update(ctx, cm)
+	})
 }
 
 func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {

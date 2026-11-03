@@ -1,0 +1,31 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-062-hooks
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  useTemplates:
+    - name: clickhouse-version
+  reconcile:
+    host:
+      hooks:
+        pre:
+          - sql:
+              queries:
+                - "SELECT 'host_pre_hook_marker'"
+            events:
+              - HostUpdate
+        post:
+          - sql:
+              queries:
+                - "SELECT 'host_post_hook_marker'"
+            events:
+              - HostUpdate
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1

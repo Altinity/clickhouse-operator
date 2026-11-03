@@ -62,8 +62,9 @@ const (
 const (
 	// patternNamespaceDomain presents Domain Name pattern of a namespace
 	// In this pattern "%s" is substituted namespace name's value
-	// Ex.: my-dev-namespace.svc.cluster.local
-	patternNamespaceDomain = "%s.svc.cluster.local"
+	// Trailing dot forces absolute DNS lookup, avoiding slow search-suffix resolution with ndots:5
+	// Ex.: my-dev-namespace.svc.cluster.local.
+	patternNamespaceDomain = "%s.svc.cluster.local."
 
 	// ServiceName.domain.name
 	patternServiceFQDN = "%s" + "." + patternNamespaceDomain

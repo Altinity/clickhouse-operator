@@ -2,9 +2,12 @@
 package v1
 
 import (
-	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 var normalizedChiA = &ClickHouseInstallation{}
@@ -74,6 +77,36 @@ var copyTestStatusFrom = &Status{
 	NormalizedCR:           normalizedChiA,
 	NormalizedCRCompleted:  normalizedChiA,
 	HostsWithTablesCreated: []string{"host-a-1", "host-a-2"},
+}
+
+func TestCopyFromUsedTemplates(t *testing.T) {
+	t.Run("does not copy through inheritable status", func(t *testing.T) {
+		opts := prepareOptions(types.CopyStatusOptions{
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupInheritable: true,
+			},
+		})
+
+		require.False(t, opts.Copy.UsedTemplates)
+	})
+
+	t.Run("replaces with empty source list", func(t *testing.T) {
+		status := &Status{
+			UsedTemplates: []*TemplateRef{
+				{Name: "old-template"},
+			},
+		}
+
+		status.CopyFrom(&Status{}, types.CopyStatusOptions{
+			CopyStatusField: types.CopyStatusField{
+				Copy: types.Status{
+					UsedTemplates: true,
+				},
+			},
+		})
+
+		require.Empty(t, status.UsedTemplates)
+	})
 }
 
 // NB: These tests mostly exist to exercise synchronization and detect regressions related to them via the
@@ -158,31 +191,39 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 			name: "CopyFrom",
 			goRoutineA: func(s *Status) {
 				s.PushAction("always-present-action") // CopyFrom preserves existing actions (does not clobber)
-				s.CopyFrom(copyTestStatusFrom, CopyStatusOptions{
-					Actions:           true,
-					Errors:            true,
-					MainFields:        true,
-					WholeStatus:       true,
-					InheritableFields: true,
+				s.CopyFrom(copyTestStatusFrom, types.CopyStatusOptions{
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupActions:     true,
+						FieldGroupErrors:      true,
+						FieldGroupMain:        true,
+						FieldGroupWholeStatus: true,
+						FieldGroupInheritable: true,
+					},
 				})
 			},
 			goRoutineB: func(s *Status) {
 				s.PushAction("additional-action") // this may or may not win the race, but the race will be sync
 			},
 			postConditionsVerification: func(tt *testing.T, s *Status) {
-				if len(s.GetActions()) == len(copyTestStatusFrom.GetActions())+2 {
-					require.Equal(tt, copyTestStatusFrom.GetActions(), s.GetActions())
+				// Race-dependent outcome.
+				//   - Both pushes survived around CopyFrom: len == len(from.Actions) + 2
+				//   - B's push raced A's CopyFrom (A's push was overwritten): len == len(from.Actions) + 1
+				// In either case, all copy-source actions must be present and at least
+				// "additional-action" (B's push) is guaranteed to survive.
+				switch len(s.GetActions()) {
+				case len(copyTestStatusFrom.GetActions()) + 2:
 					require.Contains(tt, s.GetActions(), "always-present-action")
 					require.Contains(tt, s.GetActions(), "additional-action")
 					for _, action := range copyTestStatusFrom.GetActions() {
 						require.Contains(tt, s.GetActions(), action)
 					}
-				} else {
-					require.Equal(tt, len(copyTestStatusFrom.GetActions())+1, len(s.GetActions()))
+				case len(copyTestStatusFrom.GetActions()) + 1:
 					require.Contains(tt, s.GetActions(), "additional-action")
 					for _, action := range copyTestStatusFrom.GetActions() {
 						require.Contains(tt, s.GetActions(), action)
 					}
+				default:
+					require.Fail(tt, "unexpected actions length", "got %d actions: %v", len(s.GetActions()), s.GetActions())
 				}
 				require.Equal(tt, copyTestStatusFrom.GetAction(), s.GetAction())
 				require.Equal(tt, copyTestStatusFrom.GetCHOpCommit(), s.GetCHOpCommit())
@@ -201,8 +242,6 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 				require.Equal(tt, copyTestStatusFrom.GetHostsDeleteCount(), s.GetHostsDeleteCount())
 				require.Equal(tt, copyTestStatusFrom.GetHostsDeletedCount(), s.GetHostsDeletedCount())
 				require.Equal(tt, copyTestStatusFrom.GetHostsUpdatedCount(), s.GetHostsUpdatedCount())
-				require.Equal(tt, copyTestStatusFrom.GetHostsWithTablesCreated(), s.GetHostsWithTablesCreated())
-				require.Equal(tt, copyTestStatusFrom.GetHostsWithTablesCreated(), s.GetHostsWithTablesCreated())
 				require.Equal(tt, copyTestStatusFrom.GetHostsWithTablesCreated(), s.GetHostsWithTablesCreated())
 				require.Equal(tt, copyTestStatusFrom.GetNormalizedCR(), s.GetNormalizedCR())
 				require.Equal(tt, copyTestStatusFrom.GetNormalizedCRCompleted(), s.GetNormalizedCRCompleted())
