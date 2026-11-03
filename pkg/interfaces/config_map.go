@@ -17,8 +17,9 @@ package interfaces
 type ConfigMapType string
 
 const (
-	ConfigMapCommon      ConfigMapType = "common"
-	ConfigMapCommonUsers ConfigMapType = "common users"
-	ConfigMapHost        ConfigMapType = "host"
-	ConfigMapConfig      ConfigMapType = "config"
+	ConfigMapCommon        ConfigMapType = "common"
+	ConfigMapCommonUsers   ConfigMapType = "common users"
+	ConfigMapHost          ConfigMapType = "host"
+	ConfigMapRemoteServers ConfigMapType = "remote servers"
+	ConfigMapConfig        ConfigMapType = "config"
 )

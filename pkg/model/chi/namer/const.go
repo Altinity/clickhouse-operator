@@ -24,6 +24,9 @@ const (
 	// patternConfigMapHostName is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
 	patternConfigMapHostName = "chi- + macro.List.Get(macroCommon.MacrosCRName) + -deploy-confd- + macro.List.Get(macroCommon.MacrosClusterName) + - + macro.List.Get(macroCommon.MacrosHostName)"
 
+	// patternConfigMapRemoteServersName is a template of per-fragment remote_servers ConfigMap.
+	patternConfigMapRemoteServersName = "chi- + macro.List.Get(macroCommon.MacrosCRName) + - + macro.List.Get(macroCommon.MacrosClusterName) + -remote-servers-shard-%s"
+
 	// patternCRServiceName is a template of Custom Resource Service name. "clickhouse-{chi}"
 	patternCRServiceName = "clickhouse- + macro.MacrosCRName"
 

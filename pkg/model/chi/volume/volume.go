@@ -16,6 +16,7 @@ package volume
 
 import (
 	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -56,11 +57,19 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 	configMapCommonName := m.namer.Name(interfaces.NameConfigMapCommon, m.cr)
 	configMapCommonUsersName := m.namer.Name(interfaces.NameConfigMapCommonUsers, m.cr)
 	configMapHostName := m.namer.Name(interfaces.NameConfigMapHost, host)
+	remoteServersMounts := host.GetCR().GetRuntime().GetAttributes().GetRemoteServersMounts()
+
+	var configCommonVolume core.Volume
+	if len(remoteServersMounts) > 0 {
+		configCommonVolume = createProjectedConfigCommonVolume(configMapCommonName, remoteServersMounts)
+	} else {
+		configCommonVolume = k8s.CreateVolumeForConfigMap(configMapCommonName)
+	}
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
-		k8s.CreateVolumeForConfigMap(configMapCommonName),
+		configCommonVolume,
 		k8s.CreateVolumeForConfigMap(configMapCommonUsersName),
 		k8s.CreateVolumeForConfigMap(configMapHostName),
 	)
@@ -73,6 +82,37 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 		k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathConfigUsers),
 		k8s.CreateVolumeMount(configMapHostName, config.DirPathConfigHost),
 	)
+}
+
+func createProjectedConfigCommonVolume(configMapCommonName string, remoteServersMounts []api.RemoteServersMount) core.Volume {
+	var defaultMode int32 = 0644
+
+	sources := []core.VolumeProjection{
+		{
+			ConfigMap: &core.ConfigMapProjection{
+				LocalObjectReference: core.LocalObjectReference{Name: configMapCommonName},
+			},
+		},
+	}
+
+	for _, mount := range remoteServersMounts {
+		sources = append(sources, core.VolumeProjection{
+			ConfigMap: &core.ConfigMapProjection{
+				LocalObjectReference: core.LocalObjectReference{Name: mount.ConfigMapName},
+				Items:                []core.KeyToPath{{Key: mount.FileName, Path: mount.FileName}},
+			},
+		})
+	}
+
+	return core.Volume{
+		Name: configMapCommonName,
+		VolumeSource: core.VolumeSource{
+			Projected: &core.ProjectedVolumeSource{
+				Sources:     sources,
+				DefaultMode: &defaultMode,
+			},
+		},
+	}
 }
 
 // stsSetupVolumesUserDataWithFixedPaths

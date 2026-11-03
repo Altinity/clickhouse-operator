@@ -16,13 +16,16 @@ package chi
 
 import (
 	"context"
+
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	clickhouseAltinityCom "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
@@ -75,6 +78,29 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *api.ClickHous
 		err = nil
 	default:
 		log.V(1).M(chi).F().Error("FAIL delete ConfigMap %s/%s err:%v", chi.Namespace, configMapCommonUsersName, err)
+	}
+
+	opts := controller.NewListOptions(map[string]string{
+		clickhouseAltinityCom.APIGroupName + "/chi": chi.GetName(),
+	})
+	configMaps, listErr := c.kube.ConfigMap().List(ctx, chi.GetNamespace(), opts)
+	if listErr == nil {
+		for i := range configMaps {
+			cm := &configMaps[i]
+			if _, ok := cm.GetLabels()[clickhouseAltinityCom.APIGroupName+"/remote-servers-shard"]; !ok {
+				continue
+			}
+			err = c.kube.ConfigMap().Delete(ctx, cm.GetNamespace(), cm.GetName())
+			switch {
+			case err == nil:
+				log.V(1).M(chi).Info("OK delete ConfigMap %s/%s", cm.Namespace, cm.Name)
+			case apiErrors.IsNotFound(err):
+				log.V(1).M(chi).Info("NEUTRAL not found ConfigMap %s/%s", cm.Namespace, cm.Name)
+				err = nil
+			default:
+				log.V(1).M(chi).F().Error("FAIL delete ConfigMap %s/%s err:%v", cm.Namespace, cm.Name, err)
+			}
+		}
 	}
 
 	return err

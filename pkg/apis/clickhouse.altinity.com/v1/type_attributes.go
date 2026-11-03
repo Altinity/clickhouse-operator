@@ -18,10 +18,17 @@ import core "k8s.io/api/core/v1"
 
 // ComparableAttributes specifies CHI attributes that are comparable
 type ComparableAttributes struct {
-	additionalEnvVars      []core.EnvVar      `json:"-" yaml:"-"`
-	additionalVolumes      []core.Volume      `json:"-" yaml:"-"`
-	additionalVolumeMounts []core.VolumeMount `json:"-" yaml:"-"`
-	skipOwnerRef           bool               `json:"-" yaml:"-"`
+	additionalEnvVars                []core.EnvVar        `json:"-" yaml:"-"`
+	additionalVolumes                []core.Volume        `json:"-" yaml:"-"`
+	additionalVolumeMounts           []core.VolumeMount   `json:"-" yaml:"-"`
+	remoteServersMounts              []RemoteServersMount `json:"-" yaml:"-"`
+	additionalPodTemplateAnnotations map[string]string    `json:"-" yaml:"-"`
+	skipOwnerRef                     bool                 `json:"-" yaml:"-"`
+}
+
+type RemoteServersMount struct {
+	ConfigMapName string
+	FileName      string
 }
 
 func (a *ComparableAttributes) GetAdditionalEnvVars() []core.EnvVar {
@@ -134,6 +141,44 @@ func (a *ComparableAttributes) GetSkipOwnerRef() bool {
 		return false
 	}
 	return a.skipOwnerRef
+}
+
+func (a *ComparableAttributes) SetRemoteServersMounts(mounts []RemoteServersMount) {
+	if a == nil {
+		return
+	}
+	a.remoteServersMounts = mounts
+}
+
+func (a *ComparableAttributes) GetRemoteServersMounts() []RemoteServersMount {
+	if a == nil {
+		return nil
+	}
+	return a.remoteServersMounts
+}
+
+func (a *ComparableAttributes) SetAdditionalPodTemplateAnnotation(key, value string) {
+	if a == nil {
+		return
+	}
+	if a.additionalPodTemplateAnnotations == nil {
+		a.additionalPodTemplateAnnotations = make(map[string]string)
+	}
+	a.additionalPodTemplateAnnotations[key] = value
+}
+
+func (a *ComparableAttributes) DeleteAdditionalPodTemplateAnnotation(key string) {
+	if a == nil || a.additionalPodTemplateAnnotations == nil {
+		return
+	}
+	delete(a.additionalPodTemplateAnnotations, key)
+}
+
+func (a *ComparableAttributes) GetAdditionalPodTemplateAnnotations() map[string]string {
+	if a == nil {
+		return nil
+	}
+	return a.additionalPodTemplateAnnotations
 }
 
 func (a *ComparableAttributes) SetSkipOwnerRef(skip bool) {
