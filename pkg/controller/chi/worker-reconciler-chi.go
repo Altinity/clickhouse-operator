@@ -153,6 +153,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		operatorIPTheSame:               operatorIPTheSame,
 		backupSecretChanged:             backupSecretChanged,
 		hasHostNeedingStuckRecovery:     func() bool { return w.crHasHostNeedingStuckRecovery(ctx, new) },
+		passwordSecretChanged:           passwordSecretReconcile(ctx),
 	}); decision {
 	case gateReconcileWork:
 		w.a.M(new).F().Info("CR has reconcile work - continue reconcile")
@@ -160,6 +161,8 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
 	case gateOperatorIPChanged:
 		w.a.M(new).F().Info("Operator IP changed - continue reconcile to refresh clickhouse-operator user networks")
+	case gatePasswordSecretChanged:
+		w.a.M(new).F().Info("Referenced password Secret changed - continue reconcile to refresh users configuration")
 	case gateBackupSecretChanged:
 		w.a.M(new).F().Info("Backup Secret created or completed - continue reconcile to give the backup user its new password")
 	case gateStuckHostRecovery:
@@ -401,9 +404,13 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 	}
 	cr.GetRuntime().UnlockCommonConfig()
 
-	// CR users ConfigMap - common for all hosts
+	// CR users ConfigMap - common for all hosts.
+	// The managed users Secret is regenerated here when hotReload is on. A failed
+	// render returns before either object is written, so the last valid users
+	// configuration stays mounted.
 	if err := w.reconcileConfigMapCommonUsers(ctx, cr); err != nil {
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
+		return err
 	}
 
 	return w.reconcileCRAuxObjectsPreliminaryDomain(ctx, cr)
@@ -487,6 +494,18 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 
 	w.includeAllHostsIntoCluster(ctx, cr)
 	w.restartNewlyAddedHosts(ctx, cr)
+
+	// Host rollout has finished, so a Secret that hotReload no longer uses can
+	// be removed once the new Pods have dropped the projected volume. The
+	// preliminary pass keeps it while the previous Pods still mount it.
+	if !cr.GetRuntime().GetAttributes().GetHotReloadUsers() {
+		if delErr := w.deleteObsoleteHotReloadUsersSecret(ctx, cr); delErr != nil {
+			w.a.F().Error("failed to delete obsolete hot-reload users Secret. err: %v", delErr)
+			if err == nil {
+				err = delErr
+			}
+		}
+	}
 	return err
 }
 
@@ -635,6 +654,13 @@ func (w *worker) reconcileConfigMapCommon(
 // reconcileConfigMapCommonUsers reconciles all CHI's users ConfigMap
 // ConfigMap common for all users resources in CHI
 func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, cr api.ICustomResource) error {
+	if chi, ok := cr.(*api.ClickHouseInstallation); ok {
+		// Render failure returns here and leaves the previous Secret and ConfigMap in place.
+		if err := w.reconcileHotReloadUsersSecret(ctx, chi); err != nil {
+			return err
+		}
+	}
+
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommonUsers)
 	err := w.reconcileConfigMap(ctx, cr, configMapUsers)
