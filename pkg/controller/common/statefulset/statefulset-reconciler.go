@@ -79,8 +79,14 @@ func NewReconciler(
 
 // PrepareHostStatefulSetWithStatus prepares host's StatefulSet status
 func (r *Reconciler) PrepareHostStatefulSetWithStatus(ctx context.Context, host *api.Host, shutdown bool) {
+	r.PrepareHostStatefulSetWithListedStatus(ctx, host, shutdown, nil)
+}
+
+// PrepareHostStatefulSetWithListedStatus is PrepareHostStatefulSetWithStatus for a caller that has
+// already listed the StatefulSets: one found in listed by name is used instead of a fresh Get.
+func (r *Reconciler) PrepareHostStatefulSetWithListedStatus(ctx context.Context, host *api.Host, shutdown bool, listed map[string]*apps.StatefulSet) {
 	r.prepareDesiredStatefulSet(host, shutdown)
-	host.GetReconcileAttributes().SetStatus(r.getStatefulSetStatus(host))
+	host.GetReconcileAttributes().SetStatus(r.getStatefulSetStatus(host, listed))
 }
 
 // Fallback reports the create/update failure policy this Reconciler was built with.
@@ -94,7 +100,7 @@ func (r *Reconciler) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
 }
 
 // getStatefulSetStatus gets StatefulSet status
-func (r *Reconciler) getStatefulSetStatus(host *api.Host) types.ObjectStatus {
+func (r *Reconciler) getStatefulSetStatus(host *api.Host, listed map[string]*apps.StatefulSet) types.ObjectStatus {
 	new := host.Runtime.DesiredStatefulSet
 	r.a.V(2).M(new).S().Info(util.NamespaceNameString(new))
 	defer r.a.V(2).M(new).E().Info(util.NamespaceNameString(new))
@@ -105,7 +111,11 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) types.ObjectStatus {
 		host.GetCR().IEnsureStatus().GetHostsAddedCount(),
 	)
 
-	cur, err := r.sts.Get(context.TODO(), new)
+	cur, found := listed[new.GetName()]
+	var err error
+	if !found {
+		cur, err = r.sts.Get(context.TODO(), new)
+	}
 	switch {
 	case (err == nil) && (cur != nil):
 		// StatefulSet is found

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +30,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
@@ -245,8 +247,8 @@ func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *
 	// a different fingerprint than the one computed later during reconcileHostStatefulSet
 	// (where CurStatefulSet IS available). This hash mismatch can cause unnecessary STS
 	// updates that cascade into STS deletion via the recreate-on-update-failure path.
-	w.fillCurSTS(ctx, cr)
-	w.findMinMaxVersions(ctx, cr)
+	listed := w.fillCurSTS(ctx, cr)
+	w.findMinMaxVersions(ctx, cr, listed)
 	common.LogOldAndNew("norm stage 1:", cr.GetAncestorT(), cr)
 
 	templates := w.buildTemplates(cr)
@@ -260,8 +262,8 @@ func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *
 		cr = w.createTemplatedCR(_cr, opts)
 		w.newTask(cr, cr.GetAncestorT())
 		// fillCurSTS again because createTemplatedCR creates new host objects
-		w.fillCurSTS(ctx, cr)
-		w.findMinMaxVersions(ctx, cr)
+		listed = w.fillCurSTS(ctx, cr)
+		w.findMinMaxVersions(ctx, cr, listed)
 		common.LogOldAndNew("norm stage 2:", cr.GetAncestorT(), cr)
 	}
 
@@ -293,10 +295,10 @@ func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*a
 	return templates
 }
 
-func (w *worker) findMinMaxVersions(ctx context.Context, cr *api.ClickHouseInstallation) {
+func (w *worker) findMinMaxVersions(ctx context.Context, cr *api.ClickHouseInstallation, listed map[string]*apps.StatefulSet) {
 	// Create artifacts
 	cr.WalkHosts(func(host *api.Host) error {
-		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+		w.stsReconciler.PrepareHostStatefulSetWithListedStatus(ctx, host, host.IsStopped(), listed)
 		version := w.getHostSoftwareVersion(ctx, host)
 		host.Runtime.Version = version
 		return nil
@@ -304,11 +306,25 @@ func (w *worker) findMinMaxVersions(ctx context.Context, cr *api.ClickHouseInsta
 	cr.FindMinMaxVersions()
 }
 
-func (w *worker) fillCurSTS(ctx context.Context, cr *api.ClickHouseInstallation) {
+// fillCurSTS reads the CR's StatefulSets with one live List and returns them by name. A host the
+// List misses (e.g. its StatefulSet lost its labels), or every host if the List fails, is read by name.
+func (w *worker) fillCurSTS(ctx context.Context, cr *api.ClickHouseInstallation) map[string]*apps.StatefulSet {
+	listed := map[string]*apps.StatefulSet{}
+	opts := controller.NewListOptions(getLabeler(cr).Selector(interfaces.SelectorCRScope))
+	if list, err := w.c.kube.STS().List(ctx, cr.GetNamespace(), opts); err == nil {
+		for i := range list {
+			listed[list[i].Name] = &list[i]
+		}
+	}
 	cr.WalkHosts(func(host *api.Host) error {
-		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+		if sts, found := listed[w.c.namer.Name(interfaces.NameStatefulSet, host)]; found {
+			host.Runtime.CurStatefulSet = sts
+		} else {
+			host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+		}
 		return nil
 	})
+	return listed
 }
 
 func (w *worker) logSWVersion(ctx context.Context, cr *api.ClickHouseInstallation) {
