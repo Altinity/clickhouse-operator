@@ -103,10 +103,12 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 		return n.createClusterPDBName(cluster)
 
 	default:
+		// Delegate any type not handled above to the common namer, whose Name()
+		// has no default case and panics on an unspecified type. That is the
+		// single fail-loud guard, so an unknown type cannot sneak through to a
+		// silent zero-value return here.
 		return n.commonNamer.Name(what, params...)
 	}
-
-	panic("unknown name type")
 }
 
 func (n *Namer) Names(what interfaces.NameType, params ...any) []string {

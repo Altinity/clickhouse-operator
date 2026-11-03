@@ -53,6 +53,17 @@ func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, ho
 func (cm *ContainerManager) EnsureLogContainer(statefulSet *apps.StatefulSet) {
 }
 
+// NewBackupContainer builds no backup sidecar: ClickHouse Keeper runs none
+func (cm *ContainerManager) NewBackupContainer(host *chi.Host) (core.Container, bool) {
+	return core.Container{}, false
+}
+
+func (cm *ContainerManager) EnsureBackupContainer(statefulSet *apps.StatefulSet, host *chi.Host) {
+}
+
+func (cm *ContainerManager) EnsureBackupContainerVolumeMounts(statefulSet *apps.StatefulSet, host *chi.Host) {
+}
+
 func (cm *ContainerManager) SetupAdditionalEnvVars(host *chi.Host, appContainer *core.Container) {
 }
 

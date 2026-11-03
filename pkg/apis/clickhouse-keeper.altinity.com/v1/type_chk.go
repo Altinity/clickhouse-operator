@@ -201,14 +201,8 @@ func (cr *ClickHouseKeeperInstallation) MergeFrom(from *ClickHouseKeeperInstalla
 	}
 
 	// Merge Meta
-	switch _type {
-	case apiChi.MergeTypeFillEmptyValues:
-		_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta)
-		_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta)
-	case apiChi.MergeTypeOverrideByNonEmptyValues:
-		_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta, mergo.WithOverride)
-		_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta, mergo.WithOverride)
-	}
+	_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta, apiChi.MergoOptions(_type)...)
+	_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta, apiChi.MergoOptions(_type)...)
 	// Exclude skipped annotations
 	cr.SetAnnotations(
 		util.CopyMapFilter(

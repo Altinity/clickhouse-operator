@@ -101,7 +101,8 @@ clickhouse:
       - version: "*"
         rules:
           # see https://kb.altinity.com/altinity-kb-setup-and-maintenance/altinity-kb-server-config-files/#server-config-configxml-sections-which-dont-require-restart
-          # to be replaced with "select * from system.server_settings where changeable_without_restart = 'No'"
+          # changeable_without_restart = Yes reloads that server setting even when a wildcard rule below says restart.
+          # An exact rule such as settings/<name>: "yes" still restarts. Other server settings follow the rules below.
 
           - settings/*: "yes"
 
@@ -391,17 +392,10 @@ template:
     # Templates are added to the list of all templates and used when CHI is reconciled.
     # Templates are applied in sorted alpha-numeric order.
     path: chi/templates.d
-  chk:
-    # CHK template updates handling policy
-    # Possible policy values:
-    #   - ReadOnStart. Accept CHIT updates on the operators start only.
-    #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply new CHITs on next regular reconcile of the CHI
-    policy: ApplyOnNextReconcile
-
-    # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
-    # Templates are added to the list of all templates and used when CHI is reconciled.
-    # Templates are applied in sorted alpha-numeric order.
-    path: chk/templates.d
+  # NB there is deliberately no `chk:` section here. OperatorConfigTemplate declares only a CHI
+  # field, so any template.chk.* key unmarshals into nothing and is pruned by the chopconf CRD -
+  # it read as a supported knob while doing nothing. CHK templating is not implemented; adding
+  # the keys back requires the Go field and a reader first.
 
 ################################################
 ##
@@ -528,7 +522,7 @@ reconcile:
       # Reaction when a referenced CHK resource changes:
       #   none      — do nothing (default, backward-compatible)
       #   reconcile — trigger CHI reconcile
-      # onKeeperResourceUpdate: none
+      onKeeperResourceUpdate: none
 
   ################################################
   ##
@@ -674,6 +668,21 @@ pod:
   # SIGTERM and SIGKILL during Pod termination process.
   # Increase this number is case of slow shutdown.
   terminationGracePeriod: 30
+
+################################################
+##
+## Backup section
+##
+################################################
+backup:
+  # EXPERIMENTAL. Where in its storage the clickhouse-backup sidecar of a host keeps its backups,
+  # and their object disk data, when the settings of that storage set no path of their own.
+  # Templates clickhouse-backup expands with the macros of the host: {namespace},
+  # {installation}, {cluster}, {shard}, {replica}. Changing them rolls the pods of every
+  # backup-enabled cluster and leaves the backups made under the old paths where they are.
+  # See docs/backup.md#storage-paths.
+  storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
+  storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
 
 ################################################
 ##

@@ -1,0 +1,77 @@
+# test_010088
+# A new installation recovered from the backup of test-088-src. Its cluster main has the name and
+# the shards of the source's, and the recovery names the source installation, so it reads the
+# storage paths backup/<namespace>/test-088-src/main/<shard> the source wrote rather than its own.
+# Cluster extra is new: with recovery.backupName "" it has nothing to recover, and does not stand
+# in the way of the others. The scenario fills in spec.backup.recovery.backupName, which carries
+# the namespace of the run.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-088-dr"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  backup:
+    enabled: "yes"
+    podTemplate: default
+    storages:
+      - name: main
+        secretRef:
+          name: backup-storage
+    recovery:
+      backupName: set-by-the-scenario
+      sourceInstallation: test-088-src
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    users:
+      default/access_management: 1
+    clusters:
+      - name: main
+        layout:
+          shardsCount: 2
+          replicasCount: 1
+      - name: extra
+        backup:
+          recovery:
+            backupName: ""
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  defaults:
+    templates:
+      dataVolumeClaimTemplate: default
+  templates:
+    podTemplates:
+      # Merged by name into pod template default of the clickhouse-version template, whose ClickHouse
+      # container stays first. spec.backup.podTemplate names it, so the operator builds the sidecar of
+      # every host on this container.
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-backup
+              env:
+                # The restart command of clickhouse-backup's own default configuration, which a sidecar
+                # cannot run: the restored access objects would stay unloaded. The operator pins the one
+                # that loads them.
+                - name: CLICKHOUSE_RESTART_COMMAND
+                  value: "exec:systemctl restart clickhouse-server"
+                # An API the Jobs could not reach, with credentials they do not have: the operator pins
+                # its own, so the recovery restore still drives every sidecar.
+                - name: API_LISTEN
+                  value: "127.0.0.1:7171"
+                - name: API_USERNAME
+                  value: someone-else
+                - name: API_PASSWORD
+                  value: something-else
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

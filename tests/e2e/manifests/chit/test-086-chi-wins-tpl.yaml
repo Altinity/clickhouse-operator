@@ -1,0 +1,33 @@
+# test_010086
+#
+# An auto template that competes with the CHI on the pod image, a user and a server setting.
+# `templating.policy: auto` applies it to every CHI in every watched namespace, so a same-named
+# `default` pod template is applied first; the CHI is the top layer and its values win
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: test-086-chi-wins-tpl
+spec:
+  templating:
+    policy: auto
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    users:
+      # sha256("chit_password")
+      chi_wins_user/password_sha256_hex: 02476f8444e9b6bbef38a6e607811550b8ceb09d53adb9c133cf2d818574b15e
+    settings:
+      max_concurrent_queries: 111
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:25.3
+              env:
+                - name: TEST_ENV_FROM_CHIT
+                  value: TEST_ENV_FROM_CHIT_VALUE

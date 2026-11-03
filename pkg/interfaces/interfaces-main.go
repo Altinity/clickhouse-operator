@@ -73,10 +73,13 @@ type IVolumeManager interface {
 
 type IContainerManager interface {
 	NewDefaultAppContainer(host *api.Host) core.Container
+	NewBackupContainer(host *api.Host) (core.Container, bool)
 	GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool)
 	GetAppImageTag(statefulSet *apps.StatefulSet) (string, bool)
 	EnsureAppContainer(statefulSet *apps.StatefulSet, host *api.Host)
 	EnsureLogContainer(statefulSet *apps.StatefulSet)
+	EnsureBackupContainer(statefulSet *apps.StatefulSet, host *api.Host)
+	EnsureBackupContainerVolumeMounts(statefulSet *apps.StatefulSet, host *api.Host)
 	SetupAdditionalEnvVars(host *api.Host, container *core.Container)
 }
 
@@ -105,6 +108,7 @@ type ICreator interface {
 		template *api.VolumeClaimTemplate,
 	) *core.PersistentVolumeClaim
 	CreateClusterSecret(cluster api.ICluster) *core.Secret
+	CreateBackupSecret() *core.Secret
 	CreateService(what ServiceType, params ...any) util.Slice[*core.Service]
 	CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet
 	GetAppImageTag(host *api.Host) (string, bool)
