@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakeKube "k8s.io/client-go/kubernetes/fake"
 	fakeMetadata "k8s.io/client-go/metadata/fake"
 	"k8s.io/client-go/tools/cache"
@@ -38,10 +37,7 @@ import (
 // This tests the factory used by initClickHouse and the cache it actually builds.
 func TestPasswordSecretInformerCachesOnlyMetadata(t *testing.T) {
 	scheme := fakeMetadata.NewTestScheme()
-	scheme.AddKnownTypeWithName(
-		schema.GroupVersionKind{Version: "v1", Kind: "Secret"},
-		&meta.PartialObjectMetadata{},
-	)
+	require.NoError(t, meta.AddMetaToScheme(scheme))
 	client := fakeMetadata.NewSimpleMetadataClient(scheme,
 		&meta.PartialObjectMetadata{
 			TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"},
