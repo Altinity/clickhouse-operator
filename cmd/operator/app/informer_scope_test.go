@@ -25,7 +25,9 @@ import (
 	"github.com/stretchr/testify/require"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakeKube "k8s.io/client-go/kubernetes/fake"
+	fakeMetadata "k8s.io/client-go/metadata/fake"
 	"k8s.io/client-go/tools/cache"
 	ctrlCache "sigs.k8s.io/controller-runtime/pkg/cache"
 
@@ -38,6 +40,44 @@ import (
 // A selector that is correct but never handed to the factory is indistinguishable, in any test
 // that only inspects the selector, from one that is. This drives the real constructor and asserts
 // on what the informer ends up holding, so deleting the WithTweakListOptions line fails here.
+// The password watcher must use PartialObjectMetadata, never full Secret values.
+// This tests the factory used by initClickHouse and the cache it actually builds.
+func TestPasswordSecretInformerCachesOnlyMetadata(t *testing.T) {
+	scheme := fakeMetadata.NewTestScheme()
+	scheme.AddKnownTypeWithName(
+		schema.GroupVersionKind{Version: "v1", Kind: "Secret"},
+		&meta.PartialObjectMetadata{},
+	)
+	client := fakeMetadata.NewSimpleMetadataClient(scheme,
+		&meta.PartialObjectMetadata{
+			TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+			ObjectMeta: meta.ObjectMeta{
+				Namespace: "ns", Name: "passwords", ResourceVersion: "1",
+			},
+		},
+		&meta.PartialObjectMetadata{
+			TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+			ObjectMeta: meta.ObjectMeta{
+				Namespace: "another-ns", Name: "not-watched", ResourceVersion: "1",
+			},
+		},
+	)
+	factory, informer := newPasswordSecretMetadataInformerFactory(client, "ns")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	defer factory.Shutdown()
+
+	factory.Start(ctx.Done())
+	require.True(t, cache.WaitForCacheSync(ctx.Done(), informer.HasSynced))
+
+	cached := informer.GetStore().List()
+	require.Len(t, cached, 1)
+	secret, ok := cached[0].(*meta.PartialObjectMetadata)
+	require.True(t, ok, "Secret data must not be cached")
+	require.Equal(t, "ns", secret.Namespace)
+	require.Equal(t, "passwords", secret.Name)
+}
+
 func TestKubeInformerFactoryFiltersToCHOPGeneratedObjects(t *testing.T) {
 	ours := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{

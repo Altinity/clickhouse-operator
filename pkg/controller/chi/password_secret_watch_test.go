@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -29,6 +30,33 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 )
+
+func TestPasswordSecretEventHandlersUseOnlyMetadata(t *testing.T) {
+	var events []string
+	handler := passwordSecretEventHandlers(func(secret meta.Object) {
+		events = append(events, secret.GetNamespace()+"/"+secret.GetName())
+	})
+	secret := &meta.PartialObjectMetadata{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace: "ns",
+			Name: "passwords",
+			ResourceVersion: "10",
+		},
+	}
+	handler.AddFunc(secret)
+	handler.AddFunc(&core.Secret{}) // Full Secret objects are not accepted.
+
+	// An informer resync must not reconcile a Secret with unchanged metadata.
+	handler.UpdateFunc(secret, secret.DeepCopy())
+	changed := secret.DeepCopy()
+	changed.ResourceVersion = "11"
+	handler.UpdateFunc(secret, changed)
+
+	// Delete events may arrive as tombstones after a missed watch event.
+	handler.DeleteFunc(cache.DeletedFinalStateUnknown{Key: "ns/passwords", Obj: changed})
+
+	require.Equal(t, []string{"ns/passwords", "ns/passwords", "ns/passwords"}, events)
+}
 
 func TestChiReferencesHotReloadSecret(t *testing.T) {
 	cr := &api.ClickHouseInstallation{}

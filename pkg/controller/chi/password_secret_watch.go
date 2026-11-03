@@ -17,10 +17,8 @@ package chi
 import (
 	"context"
 
-	core "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	kubeInformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -40,59 +38,64 @@ func passwordSecretReconcile(ctx context.Context) bool {
 	return v
 }
 
-// WatchPasswordSecrets watches Secrets that are not created by the operator.
-// The kube informer factory used for Pods and StatefulSets is limited to
-// objects carrying the operator's app label, so a user's password Secret would
-// never be delivered there. This factory must not use that label selector.
+// WatchPasswordSecrets reacts to changes in source password Secret metadata.
+// The regular Kubernetes informer factory is restricted to operator-generated
+// objects, so source Secrets need a separate, unfiltered metadata informer.
 func (c *Controller) WatchPasswordSecrets(
 	chopInformerFactory chopInformers.SharedInformerFactory,
-	secretInformerFactory kubeInformers.SharedInformerFactory,
+	secretInformer cache.SharedIndexInformer,
 ) {
 	c.chiLister = chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Lister()
-	secretInformerFactory.Core().V1().Secrets().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			secret, ok := obj.(*core.Secret)
-			if !ok {
-				return
-			}
-			c.onPasswordSecret(secret)
-		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			oldSecret, okOld := oldObj.(*core.Secret)
-			newSecret, okNew := newObj.(*core.Secret)
-			if !okOld || !okNew {
-				return
-			}
-			if apiequality.Semantic.DeepEqual(oldSecret.Data, newSecret.Data) {
-				return
-			}
-			c.onPasswordSecret(newSecret)
-		},
-		DeleteFunc: deleteHandler("passwordSecretInformer.DeleteFunc", func(secret *core.Secret) {
-			c.onPasswordSecret(secret)
-		}),
-	})
+	secretInformer.AddEventHandler(passwordSecretEventHandlers(c.onPasswordSecret))
 }
 
-func (c *Controller) onPasswordSecret(secret *core.Secret) {
+// passwordSecretEventHandlers handles metadata only: resource-version changes
+// may include non-password updates, but the renderer avoids writing an unchanged
+// managed Secret. Data is never fetched or cached by this informer.
+func passwordSecretEventHandlers(onSecret func(meta.Object)) cache.ResourceEventHandlerFuncs {
+	return cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			secret, ok := obj.(*meta.PartialObjectMetadata)
+			if ok && secret != nil {
+				onSecret(secret)
+			}
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			oldSecret, okOld := oldObj.(*meta.PartialObjectMetadata)
+			newSecret, okNew := newObj.(*meta.PartialObjectMetadata)
+			if !okOld || !okNew || oldSecret == nil || newSecret == nil {
+				return
+			}
+			if oldSecret.ResourceVersion == newSecret.ResourceVersion {
+				return
+			}
+			onSecret(newSecret)
+		},
+		DeleteFunc: deleteHandler("passwordSecretInformer.DeleteFunc", func(secret *meta.PartialObjectMetadata) {
+			onSecret(secret)
+		}),
+	}
+}
+
+func (c *Controller) onPasswordSecret(secret meta.Object) {
 	if secret == nil || c.chiLister == nil {
 		return
 	}
-	if !chop.Config().IsNamespaceWatched(secret.Namespace) {
+	namespace, name := secret.GetNamespace(), secret.GetName()
+	if !chop.Config().IsNamespaceWatched(namespace) {
 		return
 	}
-	// The managed users Secret is operator-generated. Reconciling it again
-	// would rewrite it and enqueue another pass.
+	// The managed users Secret is operator-generated; ignore its own updates.
 	if chiLabeler.New(nil).IsCHOPGeneratedObject(secret) {
 		return
 	}
-	chis, err := c.chiLister.ClickHouseInstallations(secret.Namespace).List(labels.Everything())
+	chis, err := c.chiLister.ClickHouseInstallations(namespace).List(labels.Everything())
 	if err != nil {
-		log.V(1).F().Error("unable to list ClickHouseInstallations for Secret %s/%s: %v", secret.Namespace, secret.Name, err)
+		log.V(1).F().Error("unable to list ClickHouseInstallations for Secret %s/%s: %v", namespace, name, err)
 		return
 	}
 	for _, cr := range chis {
-		if chiReferencesHotReloadSecret(cr, secret.Name) {
+		if chiReferencesHotReloadSecret(cr, name) {
 			c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcilePasswordSecret, nil, cr))
 		}
 	}
