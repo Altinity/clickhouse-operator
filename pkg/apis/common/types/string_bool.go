@@ -15,22 +15,41 @@
 package types
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
 	"strings"
 )
 
 // StringBool defines string representation of a bool type
 type StringBool string
 
-// UnmarshalJSON accepts native JSON bool (true/false), integer (0/1), or string
-// ("true", "yes", "On", "enabled", "1", etc.) and normalizes to a canonical
-// string form. Lets users write `secure: true` (native YAML bool) or
+// UnmarshalJSON accepts native JSON bool (true/false), integer (0/1, any other
+// integer that fits an int reads as 1), or any string (the vocabulary IsValid
+// accepts is "true", "yes", "On", "enabled", "1", etc.) and keeps it as a
+// string: a bool as True/False, an integer as 0/1, a string as written; null
+// leaves it unset. Lets users write `secure: true` (native YAML bool) or
 // `secure: "true"` (string) interchangeably in their CRs — kubectl converts
-// YAML to JSON before submitting, so this is the load-bearing surface.
+// YAML to JSON before submitting, so this is the load-bearing surface. A whole
+// number written as 1.0 or 1e3 reaches it as the integer 1 or 1000: the YAML to
+// JSON conversion and the API server re-encode the value.
 //
-// The CRD schema mirrors this polymorphism via `anyOf:[boolean,integer,string]`
-// at the &TypeStringBool anchor in deploy/builder/templates-install-bundle.
+// It never fails on a value the API server admits. The CRD schema cannot
+// express the bool|integer|string union, so the &TypeStringBool anchor in
+// deploy/builder/templates-install-bundle leaves the field untyped
+// (x-kubernetes-preserve-unknown-fields), and the API server stores any JSON
+// value: `secure: 1.5`, `suspend: {}` or `verify: [true]` apply cleanly. An
+// error here would not stay with the one resource that carries such a value: an
+// informer decodes all the resources it watches as one list, so a single item
+// that fails to decode fails the whole list, the reflector retries it forever,
+// its cache never syncs, and none of those resources is reconciled until the
+// value is fixed. A watch event that carries it breaks the watch the same way.
+//
+// Any other value — a fraction, an integer beyond an int, an object, an array —
+// is therefore kept as its compacted JSON text. IsValid refuses it, as it
+// refuses any string outside the vocabulary, and the value fares as such a
+// string does: the backup resources, for instance, report InvalidSpec. Whatever
+// a field makes of it, no decode fails: every other resource the informer
+// watches decodes as before.
 func (s *StringBool) UnmarshalJSON(data []byte) error {
 	// null → leave at zero value (the parent's *StringBool stays nil-like)
 	str := string(data)
@@ -66,7 +85,14 @@ func (s *StringBool) UnmarshalJSON(data []byte) error {
 		}
 		return nil
 	}
-	return fmt.Errorf("StringBool: cannot unmarshal %s — expected bool, integer (0/1), or string", str)
+	// Any other JSON value, kept as its compacted text. Compact cannot fail: the
+	// decoder validated the JSON before handing it over.
+	var written bytes.Buffer
+	if err := json.Compact(&written, data); err != nil {
+		return err
+	}
+	*s = StringBool(written.String())
+	return nil
 }
 
 // Set of string boolean constants

@@ -21,20 +21,29 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// ApplyTemplates applies templates provided by 'templatesSrc' over 'target'
-func ApplyTemplates(target *api.ClickHouseInstallation, templatesSrc TemplateRefListSource) (appliedTemplates []*api.TemplateRef) {
+// ApplyTemplates applies templates provided by 'templatesSrc' over 'target', and returns the
+// references and the templates it applied, in the order applied
+func ApplyTemplates(
+	target *api.ClickHouseInstallation,
+	templatesSrc TemplateRefListSource,
+) (
+	appliedTemplateRefs []*api.TemplateRef,
+	appliedTemplates []*api.ClickHouseInstallation,
+) {
 	// Prepare list of templates to be applied to the target
-	templates := prepareListOfTemplates(templatesSrc)
+	templateRefs := prepareListOfTemplates(templatesSrc)
 
-	// Apply templates from the list and count applied templates - just to make nice log entry
-	for _, template := range templates {
-		if applyTemplate(target, template, templatesSrc) {
+	// Apply templates from the list
+	for _, templateRef := range templateRefs {
+		if template := findApplicableTemplate(templateRef, templatesSrc); template != nil {
+			mergeFromTemplate(target, template)
+			appliedTemplateRefs = append(appliedTemplateRefs, templateRef)
 			appliedTemplates = append(appliedTemplates, template)
 		}
 	}
 
-	log.V(1).M(templatesSrc).F().Info("Applied templates num: %d", len(appliedTemplates))
-	return appliedTemplates
+	log.V(1).M(templatesSrc).F().Info("Applied templates num: %d", len(appliedTemplateRefs))
+	return appliedTemplateRefs, appliedTemplates
 }
 
 func getListOfAutoTemplates() []*api.ClickHouseInstallation {
@@ -86,18 +95,8 @@ func prepareListOfManualTemplates(templatesSrc TemplateRefListSource) (templates
 	return templates
 }
 
-// applyTemplate finds and applies a template over target
-// 'templatesSrc' is used to determine whether the template should be applied or not
-func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.TemplateRef, templatesSrc TemplateRefListSource) bool {
-	// Find and apply (merge) template
-	if template := findApplicableTemplate(templateRef, templatesSrc); template != nil {
-		mergeFromTemplate(target, template)
-		return true
-	}
-
-	return false
-}
-
+// findApplicableTemplate returns the template 'templateRef' points to when its selector matches
+// the labels of 'templatesSrc', and nil otherwise
 func findApplicableTemplate(templateRef *api.TemplateRef, templatesSrc TemplateRefListSource) *api.ClickHouseInstallation {
 	if templateRef == nil {
 		log.Warning("unable to apply template - nil templateRef provided")

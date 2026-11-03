@@ -10,11 +10,84 @@ import yaml
 import time
 import inspect
 import pathlib
+import sys
 from testflows.core import current
 from testflows.asserts import error
 
 import e2e.kubectl as kubectl
 import e2e.settings as settings
+
+
+def _test_run_failed(test=None):
+    """True when the current scenario (or a sibling step) already failed."""
+    if sys.exc_info()[0] is not None:
+        return True
+
+    node = test if test is not None else current()
+    while node is not None:
+        result = getattr(node, "result", None)
+        if isinstance(result, (Fail, Error)):
+            return True
+        parent = getattr(node, "parent", None)
+        if parent is not None:
+            for subtest in getattr(parent, "subtests", {}).values():
+                subtest_result = getattr(subtest, "result", None)
+                if isinstance(subtest_result, (Fail, Error)):
+                    return True
+        node = parent
+    return False
+
+
+_dump_log_lines = 20
+def _dump_failed_test_namespace(test, ns, shell):
+    """Best-effort cluster snapshot before namespace teardown."""
+    operator_ns = getattr(test.context, "operator_namespace", None) or ns
+    print(f"\n=== DEBUG DUMP (test failed) namespace={ns} ===")
+
+    for kind in ("pods", "chi", "chk"):
+        try:
+            print(f"\n--- {kind.upper()} ---")
+            items = kubectl.launch(f"get {kind}", ns=ns, ok_to_fail=True, shell=shell)
+            print(items or f"(no {kind})")
+        except Exception as exc:
+            print(f"failed to list {kind}: {exc}")
+
+    try:
+        print(f"\n--- ClickHouse log (last {_dump_log_lines} lines) ---")
+        chis = kubectl.get_obj_names("", obj_type = "chi", kind = "", ns=ns, shell=shell)
+        for chi in chis:
+            names = kubectl.get_pod_names(chi, ns=ns, shell=shell)
+            for name in names:
+                logs = kubectl.launch(f"logs {name} --tail={_dump_log_lines}", ns=ns, ok_to_fail=True, shell=shell)
+                print(f"\n# {name}")
+                print(logs or "(empty ClickHouse log)")
+    except Exception as exc:
+        print(f"failed to fetch ClickHouse logs: {exc}")
+
+    try:
+        print("\n--- CHI action plan ---")
+        chis = kubectl.get_obj_names("", obj_type = "chi", kind = "", ns=ns, shell=shell)
+        if not chis:
+            print("(no chi)")
+        for chi in chis:
+            plan = kubectl.get_actionPlan("chi", chi, ns=ns, shell=shell)
+            print(f"\n# chi-storage-{chi} status-actionPlan")
+            print(plan or "(empty action plan)")
+    except Exception as exc:
+        print(f"failed to fetch CHI action plan: {exc}")
+
+    try:
+        print(f"\n--- Operator log (last {_dump_log_lines} lines) ---")
+        operator_pod = kubectl.get_operator_pod(ns=operator_ns, shell=shell)
+        if not operator_pod:
+            print(f"(operator pod not found in namespace {operator_ns})")
+        else:
+            logs = kubectl.launch(f"logs {operator_pod} -c clickhouse-operator --tail={_dump_log_lines}", ns=operator_ns, ok_to_fail=True, shell=shell)
+            print(logs or "(empty operator log)")
+    except Exception as exc:
+        print(f"failed to fetch operator logs: {exc}")
+
+    print("=== END DEBUG DUMP ===\n")
 
 
 @TestStep(Given)
@@ -26,6 +99,18 @@ def get_shell(self, timeout=600):
         yield shell
     finally:
         shell.close()
+
+
+@TestStep(Given)
+def create_shell(self):
+    """Create shell only, without a namespace."""
+    # For host-only scenarios, which need a shell but no cluster. Without their own
+    # they fall back to the module-level shell created once in test(), which every
+    # scenario in the parallel pool shares. A testflows Shell drives a single pty and
+    # does not lock it, so two scenarios sending commands at the same time consume
+    # each other's prompts and both park in expect() with no way out.
+    shell = get_shell()
+    self.context.shell = shell
 
 
 @TestStep(Given)
@@ -59,6 +144,8 @@ def delete_test_namespace(self):
         return
     shell = get_shell()
     self.context.shell = shell
+    if _test_run_failed(self):
+        _dump_failed_test_namespace(self, ns, shell)
     util.delete_namespace(namespace=ns, delete_chi=True)
     shell.close()
 
@@ -130,7 +217,6 @@ def set_settings(self):
     self.context.release_version = define("release_version", open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../../release")).read(1024).strip(" \r\n\t"))
     self.context.operator_namespace = define("operator_namespace", os.getenv("OPERATOR_NAMESPACE") if "OPERATOR_NAMESPACE" in os.environ else self.context.test_namespace)
     self.context.operator_install = define("operator_install", os.getenv("OPERATOR_INSTALL") if "OPERATOR_INSTALL" in os.environ else "yes")
-    self.context.minio_namespace = define("minio_namespace", os.getenv("MINIO_NAMESPACE") if "MINIO_NAMESPACE" in os.environ else "minio")
     self.context.operator_docker_repo = define("operator_docker_repo", (
         os.getenv("OPERATOR_DOCKER_REPO") if "OPERATOR_DOCKER_REPO" in os.environ else "altinity/clickhouse-operator"
     ))
@@ -150,18 +236,14 @@ def set_settings(self):
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-23.3.yaml"
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-23.8.yaml"
     self.context.clickhouse_template = define("clickhouse_template",  os.getenv("CLICKHOUSE_TEMPLATE") if "CLICKHOUSE_TEMPLATE" in os.environ else "manifests/chit/tpl-clickhouse-stable.yaml")
-    self.context.clickhouse_template_old = define("clickhouse_template_old", "manifests/chit/tpl-clickhouse-23.3.yaml")
 
     self.context.clickhouse_version = define("clickhouse_version", get_ch_version(test_file=self.context.clickhouse_template))
-    self.context.clickhouse_version_old = define("clickhouse_version_old", get_ch_version(test_file=self.context.clickhouse_template_old))
 
     self.context.prometheus_namespace = define("prometheus_namespace", "prometheus")
     self.context.prometheus_operator_version = define("prometheus_operator_version", "0.68")
     self.context.prometheus_scrape_interval = define("prometheus_scrape_interval", 10)
 
     self.context.keeper_type = define("keeper_type", os.getenv("KEEPER_TYPE") if "KEEPER_TYPE" in os.environ else "zookeeper") # zookeeper | clickhouse_keeper
-
-    self.context.minio_version = define("minio_version", "latest")
 
 
 @TestStep(Given)

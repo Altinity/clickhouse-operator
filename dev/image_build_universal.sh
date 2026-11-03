@@ -141,8 +141,13 @@ else
     exit 1
 fi
 
-DOCKER_BUILDX_NUM=$(docker buildx ls | grep -E 'linux/arm.+\*' | grep -E 'running|inactive' | wc -l)
-if [[ "${DOCKER_BUILDX_NUM}" == "0" ]]; then
+# Minikube uses a single-arch docker-driver builder (often "default *") pointed at by
+# `minikube docker-env`. Creating a multi-platform buildx instance against that TLS
+# env fails ("create a docker context …"), and probing for `linux/arm.+*` is wrong:
+# buildx ls puts `*` on the builder name line, not next to the platform.
+if [[ "${MINIKUBE}" == "yes" ]]; then
+    echo "MINIKUBE=yes: using existing buildx builder (skip multi-platform create)."
+elif ! docker buildx ls 2>/dev/null | grep -E 'linux/arm' | grep -Eq 'running|inactive'; then
     echo "Looks like there is no appropriate buildx instance available."
     echo "Create a new buildx instance."
     docker buildx create --use --name multi-platform --platform=linux/amd64,linux/arm64

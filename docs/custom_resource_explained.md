@@ -448,6 +448,67 @@ Another example with selectively described replicas. Note - `replicasCount` spec
                     logVolumeClaimTemplate: default-volume-claim
 ```
 
+## .spec.backup
+**EXPERIMENTAL.**
+```yaml
+  backup:
+    enabled: "yes"
+    podTemplate: backup-sidecar  # its clickhouse-backup container is the sidecar's base
+    storages:                # storages the backups may be kept in, one per level for now
+      - name: main
+        secretRef:
+          name: clickhouse-backup-storage
+    # storage: main          # the storage the sidecar uses; left out, the only one declared
+    recovery:                # a new installation only
+      backupName: default-prod-nightly-20261003-020000
+  configuration:
+    clusters:
+      - name: scratch
+        backup:
+          enabled: "no"
+```
+`.spec.backup` turns on operator-managed backup with [clickhouse-backup](https://github.com/Altinity/clickhouse-backup)
+for every cluster of the installation; `.spec.configuration.clusters[].backup` overrides it for one cluster.
+A cluster inherits every field it leaves empty from `.spec.backup`, so `enabled: "no"` on a cluster opts it out. For every enabled cluster the operator injects a `clickhouse-backup`
+sidecar into each Pod - enabling or disabling it rolls the cluster's Pods - and the cluster can then be targeted by
+`ClickHouseBackup`, `ClickHouseBackupSchedule` and `ClickHouseRestore` resources, which run one Job per cluster.
+  - `enabled` - turn operator-managed backup on (`"yes"`) or off (`"no"`, the default)
+  - `podTemplate` - the pod template whose container named `clickhouse-backup` the sidecar is built on, its `image`, `env`,
+    `resources`, `securityContext` and more; only that container is taken, and the Jobs run its image under its identity.
+    Left empty, the operator builds the sidecar on its own (see [backup.md](backup.md#customizing-the-sidecar))
+  - `storages` - the storages the backups may be kept in, one per level for now, each a `name` (a DNS label of
+    at most 45 characters) and a `secretRef`: the `name` of a Secret in the installation's namespace whose keys become
+    the sidecar's environment variables and configure the storage, e.g. `REMOTE_STORAGE`, `S3_BUCKET`, `S3_PATH`,
+    `S3_ACCESS_KEY`, `S3_SECRET_KEY`; without `secretRef`, the container `podTemplate` names configures the storage.
+    A cluster takes the installation's storages along with its own, pairing them by name: a storage of its own that
+    the installation declares too takes what it leaves out, such as `secretRef`, from the installation's. Templates
+    contribute theirs alike. Pods start without the Secret, but backups and restores fail until it exists.
+    The sidecars follow the Secret: once it is created or changed, each restarts by itself within minutes - ClickHouse
+    does not - when it runs no backup or restore (see [backup.md](backup.md#secret-changes)). The storage path defaults
+    to `backup/{namespace}/{installation}/{cluster}/{shard}`, or the default the operator configuration sets in
+    `backup.storagePath`, and no two shards may share one; with several backup-enabled clusters, keep the whole
+    sidecar configuration in this Secret and the sidecar container's `env`, as backups and restores refuse to run on
+    paths they cannot check, such as those of a configuration file (see [backup.md](backup.md#storage-paths))
+  - `storage` - the storage of `storages` the sidecar keeps the backups in. Left out, it is the only storage the same
+    level declares, or else the one the level a cluster inherits from uses, so a cluster's own storage wins over the
+    installation's; `""` on a cluster leaves it without a storage. Backup takes effect only where the storage a
+    cluster uses has a `secretRef`, or `podTemplate` is set. On a cluster that turns backup on, a name no level
+    declares aborts the reconcile with `InvalidBackupStorage` before anything changes (see
+    [backup.md](backup.md#storages))
+  - `recovery.backupName` - for a new installation: the backup it starts from. Once its first reconcile completes,
+    the operator restores every backup-enabled cluster from it, once, provided the installation holds no tables yet;
+    a cluster may name another backup, or `""` for none. Taken from the installation only, never from a template;
+    changing it restarts nothing (see [backup.md](backup.md#recover-a-new-chi-from-a-backup))
+  - `recovery.sourceInstallation`, `recovery.sourceNamespace` - the installation, and its namespace, that made the
+    backup, when not this one: the backup is read from the storage paths the `{installation}` and `{namespace}`
+    macros give there (see [backup.md](backup.md#storage-paths))
+
+The sidecar works on ClickHouse's data volume, so give backup-enabled clusters a `dataVolumeClaimTemplate`.
+Without a volume mounted at `/var/lib/clickhouse`, the operator shares an `emptyDir` there between the two containers,
+which is lost whenever the Pod is deleted.
+
+See [backup.md](./backup.md) for details.
+
 ## .spec.templates.serviceTemplates
 ```yaml
   templates:
@@ -574,10 +635,11 @@ with additional sections, such as:
         #  values:
         #    - "us-east-1a"
 
-        # Possible values for distribution are:
+        # Possible values for podDistribution are:
         # Unspecified
-        # OnePerHost
-        distribution: "Unspecified"
+        # ClickHouseAntiAffinity
+        podDistribution:
+          - type: ClickHouseAntiAffinity
 
         # type PodSpec struct {} from k8s.io/core/v1
         spec:
@@ -598,24 +660,26 @@ with additional sections, such as:
 `.spec.templates.podTemplates` represents [Pod Templates][pod-templates] 
 with additional sections, such as:
 1. `zone`
-1. `distribution`
+1. `podDistribution`
 
-**`zone`** and **`distribution`** together define zoned layout of ClickHouse instances over nodes. Internally it is a shortcut to `affinity.nodeAffinity` and `affinity.podAntiAffinity` properly filled.
+**`zone`** and **`podDistribution`** together define zoned layout of ClickHouse instances over nodes. Internally it is a shortcut to `affinity.nodeAffinity` and `affinity.podAntiAffinity` properly filled.
 
-Example - how to place ClickHouse instances in AWS `us-east-1a` availability zone with one ClickHouse per host 
+Example - how to place ClickHouse instances in AWS `us-east-1a` availability zone, ensuring Pods from the same ClickHouse cluster are scheduled on different Kubernetes nodes. 
 ```yaml
         zone:
           values:
             - "us-east-1a"
-        distribution: "OnePerHost"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
 ```
-Example - how to place ClickHouse instances on nodes labeled as `clickhouse=allow` with one ClickHouse per host 
+Example - how to place ClickHouse instances on nodes labeled `clickhouse=allow`, preventing Pods from the same ClickHouse cluster from sharing a Kubernetes node. 
 ```yaml
         zone:
           key: "clickhouse"
           values:
             - "allow"
-        distribution: "OnePerHost"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
 ```
 
 [custom-resource]: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/

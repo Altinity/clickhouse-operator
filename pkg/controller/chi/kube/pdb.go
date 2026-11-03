@@ -25,6 +25,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 )
 
@@ -39,18 +40,21 @@ func NewPDB(kubeClient kube.Interface) *PDB {
 }
 
 func (c *PDB) Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(ctx, pdb, controller.NewCreateOptions())
+	return commonKube.CreateWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
+		return c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(k8sCtx(ctx), pdb, controller.NewCreateOptions())
+	})
 }
 
 func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).Get(ctx, name, controller.NewGetOptions())
+	return commonKube.GetWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
+		return c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).Get(k8sCtx(ctx), name, controller.NewGetOptions())
+	})
 }
 
 func (c *PDB) Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Update(ctx, pdb, controller.NewUpdateOptions())
+	return commonKube.UpdateWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
+		return c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Update(k8sCtx(ctx), pdb, controller.NewUpdateOptions())
+	})
 }
 
 func (c *PDB) Remove(ctx context.Context, namespace, name string) error {

@@ -1,0 +1,14 @@
+# test_010087
+# Restores the cold cluster alone, and of it only the tables matching spec.tables: the hot
+# cluster, and the other database of the cold cluster, are left as they are. overwrite is left at
+# its default (false): the restored database has been dropped, so none of the backup's matching
+# tables exists and the overwrite guard lets the restore through.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseRestore"
+metadata:
+  name: restore
+spec:
+  clickHouseInstallation: test-087-backup
+  cluster: cold
+  backupName: e2e-087-full
+  tables: "test_087.*"

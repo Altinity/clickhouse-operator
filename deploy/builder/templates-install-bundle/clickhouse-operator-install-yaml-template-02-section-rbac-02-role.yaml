@@ -156,6 +156,35 @@ rules:
       - watch
 
   #
+  # batch.* resources - backup/restore Jobs and CronJobs
+  # They are owned by their backup resource and garbage-collected with it. The operator never deletes
+  # a Job; a schedule deletes the CronJob of a cluster it no longer backs up.
+  #
+
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - patch
+      - watch
+      - create
+  - apiGroups:
+      - batch
+    resources:
+      - cronjobs
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+      - create
+      - delete
+
+  #
   # apiextensions
   #
 
@@ -241,6 +270,45 @@ rules:
       - patch
       - create
       - delete
+
+  # clickhouse backup - related resources
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhousebackups
+      - clickhousebackupschedules
+    verbs:
+      - get
+      - list
+      - watch
+  # The operator creates a restore itself to recover an installation from a backup
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhouserestores
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+  # Jobs and CronJobs carry a blocking owner reference to their backup resource, which requires
+  # update on the owner's finalizers where OwnerReferencesPermissionEnforcement is enabled (OpenShift)
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhousebackups/finalizers
+      - clickhousebackupschedules/finalizers
+      - clickhouserestores/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhousebackups/status
+      - clickhousebackupschedules/status
+      - clickhouserestores/status
+    verbs:
+      - update
 ---
 # Specifies either
 #   ClusterRoleBinding between ClusterRole and ServiceAccount.

@@ -37,4 +37,5 @@ const (
 	AnnotateConfigMapCommonUsers AnnotateType = "annotate cm common users"
 	AnnotateConfigMapHost        AnnotateType = "annotate cm host"
 	AnnotateConfigMapStorage     AnnotateType = "annotate cm starage"
+	AnnotateSecretBackup         AnnotateType = "annotate secret backup"
 )

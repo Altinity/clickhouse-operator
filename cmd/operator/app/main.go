@@ -24,6 +24,7 @@ import (
 	"syscall"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/util/fips"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
@@ -99,6 +100,7 @@ func Run() {
 	launchClickHouse(ctx, &wg)
 	launchClickHouseReconcilerMetricsExporter(ctx, &wg)
 	launchKeeper(ctx, &wg)
+	launchBackup(ctx, &wg)
 
 	// Wait for completion
 	<-ctx.Done()
@@ -124,20 +126,61 @@ func launchClickHouseReconcilerMetricsExporter(ctx context.Context, wg *sync.Wai
 }
 
 func launchKeeper(ctx context.Context, wg *sync.WaitGroup) {
-	keeperErr := initKeeper(ctx)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if keeperErr == nil {
-			log.Info("Starting keeper")
-			keeperErr = runKeeper(ctx)
-			if keeperErr == nil {
-				log.Info("Starting keeper OK")
-			} else {
-				log.Warning("Starting keeper FAILED with err: %v", keeperErr)
+
+		// In the goroutine rather than before it: initKeeper retries until the API server lets it
+		// through, and start-up must not block on that. The ClickHouse controller is already
+		// running by this point and stays independent of whatever happens here.
+		if err := initWithRetry(ctx, keeperComponent, newKeeperInitializer()); err != nil {
+			if util.IsContextDone(ctx) {
+				log.Warning("Starting keeper ABORTED - shutting down, err: %v", err)
+				return
 			}
-		} else {
-			log.Warning("Starting keeper skipped due to failed initialization with err: %v", keeperErr)
+			// Not Fatal: see initRetryBackoff. The operator keeps reconciling ClickHouse,
+			// and this log is the only signal that Keeper is not being reconciled - the shipped
+			// Deployment defines no readinessProbe, so the pod stays Ready regardless.
+			log.Warning("Starting keeper FAILED - keeper reconciliation is DISABLED for the "+
+				"lifetime of this process, err: %v", err)
+			return
+		}
+
+		log.Info("Starting keeper")
+		// Warning, not Fatal - and an absent ClickHouseKeeperInstallation CRD fails HERE rather
+		// than in init: initKeeper's only API access is REST-mapping discovery, which lists the
+		// cluster's API groups and then resolves apps/v1 - all built-in - so it succeeds on a
+		// cluster that has never seen the Keeper CRD. The missing CRD surfaces when the manager
+		// starts its watches, which is the normal state of a ClickHouse-only installation.
+		if err := runKeeper(ctx); err != nil {
+			log.Warning("Starting keeper FAILED with err: %v", err)
+			return
+		}
+		log.Info("Starting keeper OK")
+	}()
+}
+
+// launchBackup starts the backup controllers once their CRDs are served. Like Keeper, nothing
+// here may block or terminate the ClickHouse controller, which is already running.
+func launchBackup(ctx context.Context, wg *sync.WaitGroup) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		if err := initWithRetry(ctx, backupComponent, newBackupInitializer()); err != nil {
+			if util.IsContextDone(ctx) {
+				log.Warning("Starting backup ABORTED - shutting down, err: %v", err)
+				return
+			}
+			// Not Fatal: see initRetryBackoff.
+			log.Warning("Starting backup FAILED - backup reconciliation is DISABLED for the "+
+				"lifetime of this process, err: %v", err)
+			return
+		}
+
+		log.Info("Starting backup")
+		if err := runBackup(ctx); err != nil {
+			log.Warning("Starting backup FAILED with err: %v", err)
 		}
 	}()
 }

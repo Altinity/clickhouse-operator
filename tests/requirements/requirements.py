@@ -1,6 +1,6 @@
 # These requirements were auto generated
 # from software requirements specification (SRS)
-# document by TestFlows v2.0.240111.1210833.
+# document by TestFlows v2.0.231215.1221232.
 # Do not edit by hand but re-generate instead
 # using 'tfs requirements generate' command.
 from testflows.core import Specification
@@ -295,10 +295,22 @@ RQ_SRS_026_ClickHouseOperator_Secrets = Requirement(
         '  configuration:\n'
         '    users:\n'
         '      default/password: default\n'
-        '      # reference to namespace/name/field in the secret containing passwords\n'
-        '      user1/k8s_secret_password: test/test-011-secret/pwduser1\n'
-        '      user2/k8s_secret_password_sha256_hex: test/test-011-secret/pwduser2\n'
-        '      user3/k8s_secret_password_double_sha1_hex: test/test-011-secret/pwduser3\n'
+        "      # reference a secret in the CHI's own namespace containing passwords\n"
+        '      user1/password:\n'
+        '        valueFrom:\n'
+        '          secretKeyRef:\n'
+        '            name: test-011-secret\n'
+        '            key: pwduser1\n'
+        '      user2/password_sha256_hex:\n'
+        '        valueFrom:\n'
+        '          secretKeyRef:\n'
+        '            name: test-011-secret\n'
+        '            key: pwduser2\n'
+        '      user3/password_double_sha1_hex:\n'
+        '        valueFrom:\n'
+        '          secretKeyRef:\n'
+        '            name: test-011-secret\n'
+        '            key: pwduser3\n'
         '    clusters:\n'
         '    - name: default\n'
         '      layout:\n'
@@ -511,14 +523,14 @@ RQ_SRS_026_ClickHouseOperator_PodTemplates = Requirement(
     description=(
         '[ClickHouse Operator] SHALL support customized [Pod] templates for cluster, shard, replica and [CHI] level.\n'
         '[Pod] templates SHALL correspond to [Kubernetes] `PodTemplate` standard specification with\n'
-        'two additional properties `distribution` and `zones` to simplify affinity and anti-affinity rules.\n'
+        'two additional properties `podDistribution` and `zones` to simplify affinity and anti-affinity rules.\n'
         '\n'
         'Pod templates SHALL support defining the following:\n'
         '\n'
         '* image reference for particular [ClickHouse] version\n'
         '* CPU/memory requests\n'
         '* affinity and anti-affinity rules that are also available as separate shortcuts:\n'
-        '  * `distribution`’ property streamlines OnePerHost semantics\n'
+        '  * `podDistribution` property streamlines pod anti-affinity semantics\n'
         '  * `zones` property streamlines multi-AZ deployment (tested with AWS)\n'
         '\n'
     ),
@@ -8397,10 +8409,22 @@ spec:
   configuration:
     users:
       default/password: default
-      # reference to namespace/name/field in the secret containing passwords
-      user1/k8s_secret_password: test/test-011-secret/pwduser1
-      user2/k8s_secret_password_sha256_hex: test/test-011-secret/pwduser2
-      user3/k8s_secret_password_double_sha1_hex: test/test-011-secret/pwduser3
+      # reference a secret in the CHI's own namespace containing passwords
+      user1/password:
+        valueFrom:
+          secretKeyRef:
+            name: test-011-secret
+            key: pwduser1
+      user2/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: test-011-secret
+            key: pwduser2
+      user3/password_double_sha1_hex:
+        valueFrom:
+          secretKeyRef:
+            name: test-011-secret
+            key: pwduser3
     clusters:
     - name: default
       layout:
@@ -8533,14 +8557,14 @@ version: 1.0
 
 [ClickHouse Operator] SHALL support customized [Pod] templates for cluster, shard, replica and [CHI] level.
 [Pod] templates SHALL correspond to [Kubernetes] `PodTemplate` standard specification with
-two additional properties `distribution` and `zones` to simplify affinity and anti-affinity rules.
+two additional properties `podDistribution` and `zones` to simplify affinity and anti-affinity rules.
 
 Pod templates SHALL support defining the following:
 
 * image reference for particular [ClickHouse] version
 * CPU/memory requests
 * affinity and anti-affinity rules that are also available as separate shortcuts:
-  * `distribution`’ property streamlines OnePerHost semantics
+  * `podDistribution` property streamlines pod anti-affinity semantics
   * `zones` property streamlines multi-AZ deployment (tested with AWS)
 
 ### Custom Service Templates

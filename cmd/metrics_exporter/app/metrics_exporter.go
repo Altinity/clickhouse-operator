@@ -165,6 +165,26 @@ func Run() {
 // restarts the container with the new merged config. It mirrors the operator's
 // chopconf handlers (pkg/controller/chi/controller.go addEventHandlersChopConfig
 // + addChopConfig/updateChopConfig) so both containers react identically.
+// deletedChopConfig decodes an informer delete payload, unwrapping a client-go
+// DeletedFinalStateUnknown tombstone - delivered when a watch delete is missed and
+// a relist finds the object gone. Returns nil for anything that does not decode:
+// this handler exits the process, so an unrecognized payload must not take the
+// container down with it. Mirrors deleteHandler in pkg/controller/chi/controller.go,
+// duplicated rather than shared because importing package chi would pull the whole
+// operator controller into the exporter binary.
+func deletedChopConfig(obj interface{}) *api.ClickHouseOperatorConfiguration {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	// A tombstone can carry a typed nil, which satisfies the assertion - check it.
+	cfg, ok := obj.(*api.ClickHouseOperatorConfiguration)
+	if !ok || (cfg == nil) {
+		log.Errorf("chopConfigInformer.DeleteFunc: unexpected object type %T", obj)
+		return nil
+	}
+	return cfg
+}
+
 func startChopConfigRestartWatcher(ctx context.Context, chopClient *chopclientset.Clientset) {
 	factory := chopinformers.NewSharedInformerFactoryWithOptions(
 		chopClient,
@@ -192,6 +212,10 @@ func startChopConfigRestartWatcher(ctx context.Context, chopClient *chopclientse
 			chop.RestartOnConfigChange("ClickHouseOperatorConfiguration updated")
 		},
 		DeleteFunc: func(obj interface{}) {
+			cfg := deletedChopConfig(obj)
+			if cfg == nil {
+				return
+			}
 			chop.RestartOnConfigChange("ClickHouseOperatorConfiguration deleted")
 		},
 	})

@@ -351,6 +351,35 @@ spec:
     # Note: Kubernetes-API-client TLS is operator-process-scoped — there is no
     # per-CHI override. Configure it in ClickHouseOperatorConfiguration only.
 
+  # EXPERIMENTAL. Operator-managed backup defaults, inherited by every cluster that does not
+  # override them (spec.configuration.clusters[].backup). When enabled, the operator injects a
+  # clickhouse-backup sidecar into every Pod of the cluster. See docs/backup.md.
+  backup:
+    # "yes" | "no" (default). Takes effect only where the storage in use has a secretRef, or with
+    # podTemplate set: without either the sidecar would have no backup storage, so backup stays off.
+    enabled: "no"
+    # Pod template whose container named clickhouse-backup the sidecar is built on - image, env,
+    # resources, securityContext; only that container is taken, and the backup/restore Jobs run its
+    # image under its identity. Empty, the operator builds the sidecar on its own.
+    # See docs/backup.md#customizing-the-sidecar.
+    podTemplate: ""
+    # Storages the backups may be kept in, one per level for now. name: a DNS label of at
+    # most 45 characters. secretRef: Secret in this CHI's namespace with the storage
+    # configuration of clickhouse-backup, one environment variable per key: REMOTE_STORAGE,
+    # S3_BUCKET, S3_PATH, S3_ACCESS_KEY, ...; without it, the clickhouse-backup container of the
+    # pod template podTemplate names configures the storage. A cluster takes these along with its
+    # own, pairing them by name: its own storage of a name declared here takes what it leaves out,
+    # such as secretRef, from this one.
+    storages:
+      - name: main
+        secretRef:
+          name: clickhouse-backup-storage
+    # Storage of storages the sidecar keeps the backups in. Left out, the only storage this level
+    # declares, or else the one the level a cluster inherits from uses. "" on a cluster: no storage.
+    # On a cluster that turns backup on, a name no level declares aborts the reconcile
+    # (InvalidBackupStorage).
+    storage: main
+
   defaults:
     replicasUseFQDN: "no"
     distributedDDL:
@@ -497,6 +526,10 @@ spec:
               minVersion: ""
           # Kubernetes-API-client TLS is operator-process-scoped — no per-cluster
           # override exists. Configure it in ClickHouseOperatorConfiguration only.
+        # EXPERIMENTAL. Cluster-level backup settings. Same shape as spec.backup above;
+        # fields left empty are inherited from it, so "no" here opts the cluster out.
+        backup:
+          enabled: "no"
         reconcile:
           # Optional, overwrites reconcile.runtime from the operator's config
           runtime:
