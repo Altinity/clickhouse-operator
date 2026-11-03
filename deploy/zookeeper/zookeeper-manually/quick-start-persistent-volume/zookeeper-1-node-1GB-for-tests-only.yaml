@@ -82,7 +82,7 @@ spec:
       containers:
         - name: kubernetes-zookeeper
           imagePullPolicy: IfNotPresent
-          image: "docker.io/zookeeper:3.8.3"
+          image: "docker.io/zookeeper:3.8.4"
           ports:
             - containerPort: 2181
               name: client
@@ -211,8 +211,8 @@ spec:
                     exit 1;  
                   fi
                    '
-            initialDelaySeconds: 10
-            periodSeconds: 60
+            initialDelaySeconds: 15
+            periodSeconds: 10
             timeoutSeconds: 60
           livenessProbe:
             exec:

@@ -94,7 +94,7 @@ spec:
       containers:
         - name: kubernetes-zookeeper
           imagePullPolicy: IfNotPresent
-          image: "docker.io/zookeeper:3.8.3"
+          image: "docker.io/zookeeper:3.8.4"
           resources:
             requests:
               memory: "512M"
@@ -230,8 +230,8 @@ spec:
                     exit 1;  
                   fi
                    '
-            initialDelaySeconds: 10
-            periodSeconds: 60
+            initialDelaySeconds: 15
+            periodSeconds: 10
             timeoutSeconds: 60
           livenessProbe:
             exec:

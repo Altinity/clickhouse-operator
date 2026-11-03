@@ -1,13 +1,85 @@
 name: run_tests
-on: workflow_dispatch
+on:
+  pull_request:
+    branches:
+      - '*'
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Test mode'
+        type: choice
+        options:
+        - Run all
+        - Fail fast
+      test_mask:
+        description: 'Wildcard mask to run only some tests. Empty means all.'
+        type: string
+        required: false
 jobs:
+  # Go unit tests were previously run by nothing at all, which is how pkg/model's registry
+  # concurrency test sat broken for two years without anyone noticing. Runs beside the e2e
+  # job, so it costs no extra wall clock. -race is the point: those tests exist to catch
+  # locking regressions and only the detector can see them.
+  go_unit_tests:
+    name: Go unit tests (race)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          # go.mod is the single source of the build Go version.
+          go-version-file: go.mod
+
+      # -vet=off is the project convention: plain `go test` fails to build a few packages
+      # on pre-existing vet noise unrelated to the tests.
+      - name: go test -race
+        run: go test -vet=off -race -count=1 ./pkg/...
+
   run_tests:
     name: Run Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      # The e2e suite (notably test_010025's 100M-row insert + its replica) fills the
+      # runner's small root partition (~14 GB): with the minikube docker driver the k8s
+      # node runs as a container under the docker data-root (/var/lib/docker on /), so
+      # ClickHouse pod ephemeral storage lands there and exhausts it — the runner then
+      # loses communication mid-run. Move the docker data-root onto the large /mnt
+      # ephemeral SSD (~65 GB) before minikube starts, and trim unused preinstalled
+      # toolchains from / for headroom. MUST run before setup-minikube (no docker is
+      # used before this step, so restarting the daemon here is safe).
+      - name: Free disk and relocate docker data-root to /mnt
+        run: |
+          set -euxo pipefail
+          # If docker fails to restart on the moved data-root, surface disk + daemon logs
+          # so the failure is triageable rather than a bare non-zero exit at this early step.
+          trap 'ec=$?; echo "::error::disk/docker prep failed (exit $ec)"; df -h / /mnt || true; sudo journalctl -u docker --no-pager -n 50 || true' ERR
+          df -h /
+          # Reclaim space on / — none of these toolchains are used by this Go+Python+k8s job.
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          # Relocate docker data-root to /mnt so the minikube node container (and thus the
+          # ClickHouse pod storage inside it) uses the 65 GB SSD, not the 14 GB root.
+          sudo systemctl stop docker docker.socket
+          sudo mkdir -p /mnt/docker
+          # Merge data-root into any existing daemon.json — do NOT clobber runner defaults
+          # (cgroup driver, registry mirrors) or the daemon may fail to restart.
+          if [ -s /etc/docker/daemon.json ]; then
+            sudo jq '. + {"data-root":"/mnt/docker"}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp >/dev/null
+            sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
+          else
+            echo '{"data-root":"/mnt/docker"}' | sudo tee /etc/docker/daemon.json >/dev/null
+          fi
+          sudo systemctl start docker
+          # Fail loudly if the relocation did not take effect.
+          test "$(docker info -f '{{.DockerRootDir}}')" = "/mnt/docker"
+          df -h /mnt /
+
       - name: Cache python
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-python
         with:
           path: ~/venv/qa
@@ -28,40 +100,109 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y conntrack clickhouse-client
 
+      # test_010084 render-tests the Helm chart. The runner image happens to preinstall helm,
+      # but declaring it keeps the suite from silently skipping that scenario if that changes.
+      - uses: azure/setup-helm@v4
+        with:
+          version: latest
+
       - uses: medyagh/setup-minikube@master
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.25.3
+          kubernetes-version: v1.33.5
           cpus: max
           memory: max
 
-      - name: Run Tests
+      - name: Build clickhouse-operator locally without push to registry
         run: |
+          minikube status
+          export CHO_RELEASE=$(cat release)
+          export GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
+          export GOFIPS140=v1.0.0
+          echo "current release=$CHO_RELEASE"
+          echo "current go version=$GO_VERSION"
+
+          docker build -f dockerfile/operator/Dockerfile         --build-arg GO_VERSION=${GO_VERSION} --build-arg GOFIPS140=${GOFIPS140} -t altinity/clickhouse-operator:${CHO_RELEASE} --pull .
+          docker build -f dockerfile/metrics-exporter/Dockerfile --build-arg GO_VERSION=${GO_VERSION} --build-arg GOFIPS140=${GOFIPS140} -t altinity/metrics-exporter:${CHO_RELEASE}    --pull .
+
+          docker image save altinity/clickhouse-operator:${CHO_RELEASE} -o operator.tar
+          docker image save altinity/metrics-exporter:${CHO_RELEASE}    -o metrics-exporter.tar
+
+          minikube image load operator.tar
+          minikube image load metrics-exporter.tar
+          minikube image ls | grep -F "docker.io/altinity/clickhouse-operator:${CHO_RELEASE}"
+          minikube image ls | grep -F "docker.io/altinity/metrics-exporter:${CHO_RELEASE}"
+
+      # Local runners (run_tests_operator_local.sh) call common_preload_images so
+      # the first CHI/CHK in the pool does not cold-pull 26.3 / 25.8 / keeper / ZK
+      # from the registry. CI never did, so those pulls serialized onto a 4-CPU
+      # runner and added tens of minutes. Skip when test_mask selects one test —
+      # same as the local ONLY= path — so a debug dispatch stays cheap.
+      - name: Preload ClickHouse images into minikube
+        if: ${{ github.event.inputs.test_mask == '' || github.event.inputs.test_mask == null }}
+        run: |
+          set -euxo pipefail
+          source ./tests/e2e/test_common.sh
+          export MINIKUBE_PRELOAD_IMAGES=yes
+          common_preload_images "${PRELOAD_IMAGES_ALL[@]}"
+
+      - name: Deploy prometheus
+        run: |
+          cp ./deploy/prometheus/prometheus-sensitive-data.example.sh ./deploy/prometheus/prometheus-sensitive-data.sh
+          NO_WAIT=1 bash ./deploy/prometheus/create-prometheus.sh
+
+      - name: Deploy zookeeper-operator
+        run: |
+          bash ./deploy/zookeeper/zookeeper-with-zookeeper-operator/install-zookeeper-operator.sh
+
+      - name: Run Tests
+        id: run-tests
+        continue-on-error: true
+        run: |
+          echo "Test run settings:"
+          echo "  test mode: ${{ github.event.inputs.test_mode }}"
+          echo "  test mask: ${{ github.event.inputs.test_mask }}"
+          echo
+
           source ~/venv/qa/bin/activate
           set -x
+          set +e # disable the "exit on failure"
 
-          # bash -xe ./deploy/prometheus/create-prometheus.sh
-          # bash -xe ./deploy/minio/install-minio-operator.sh
-          # bash -xe ./deploy/minio/install-minio-tenant.sh
-
-          # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-operator.sh
-          # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-with-operator.sh
-          
-          # docker compose -f ./tests/docker-compose/docker-compose.yml pull runner
-          # ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/*" --trim-results on --debug --log ./tests/raw.log
-
-          # bash ./tests/e2e/run_tests_parallel.sh
           sudo ln -snvf ~/venv/qa/bin/tfs /bin/tfs
-          ONLY='*'
-          # ONLY='*test_036*'
-          ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/${ONLY}" --trim-results on --debug --native --log ./tests/raw.log
-          ~/venv/qa/bin/tfs --debug --no-colors transform compact ./tests/raw.log ./tests/compact.log
-          ~/venv/qa/bin/tfs --debug --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
-          ~/venv/qa/bin/tfs --debug --no-colors transform short ./tests/raw.log ./tests/short.log.txt
-          ~/venv/qa/bin/tfs --debug --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity LTD" --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report.html
+          export IMAGE_PULL_POLICY="IfNotPresent"
+          echo "  image pull policy: ${IMAGE_PULL_POLICY}"
+          echo
 
-      - uses: actions/upload-artifact@v3
+          if [[ "${{ github.event.inputs.test_mask }}" != '' ]]
+          then
+            ONLY="${{ github.event.inputs.test_mask }}"
+          else
+            ONLY="*"
+          fi
+
+          if [[ "${{ github.event.inputs.test_mode }}" == 'Run all' ]]
+          then
+            test_mode="--test-to-end"
+          fi
+
+          # Skip retries when test_mask selects a specific test — retries mask real bugs during debugging.
+          retry_args=()
+          if [[ -z "${{ github.event.inputs.test_mask }}" ]]; then
+            retry_args+=(--retry "/regression/e2e.test_operator/test_0:,5,,30")
+          fi
+
+          ~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e.test_operator/${ONLY} $test_mode "${retry_args[@]}" --trim-results on -o short --no-colors --native --log ./tests/raw.log
+          test_result=$?
+          ~/venv/qa/bin/tfs --no-colors transform compact ./tests/raw.log ./tests/compact.log
+          ~/venv/qa/bin/tfs --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
+          ~/venv/qa/bin/tfs --no-colors transform short ./tests/raw.log ./tests/short.log.txt
+          ~/venv/qa/bin/tfs --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity Inc." --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report.html
+
+          echo "test_result=$test_result" >> $GITHUB_OUTPUT
+          exit "$test_result"
+
+      - uses: actions/upload-artifact@v4
         with:
           name: testflows-logs
           path: |
@@ -70,10 +211,17 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: testflows-report
           path: |
-            tests/report.html
+            tests/*.html
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 90
+
+      - name: Test Failed
+        if: ${{ steps.run-tests.outputs.test_result != '0' }}
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('Test suite has failures! Check test run status and logs.')

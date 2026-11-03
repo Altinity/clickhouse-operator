@@ -1,0 +1,306 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package types
+
+import (
+	"bytes"
+	"encoding/json"
+	"strings"
+)
+
+// StringBool defines string representation of a bool type
+type StringBool string
+
+// UnmarshalJSON accepts native JSON bool (true/false), integer (0/1, any other
+// integer that fits an int reads as 1), or any string (the vocabulary IsValid
+// accepts is "true", "yes", "On", "enabled", "1", etc.) and keeps it as a
+// string: a bool as True/False, an integer as 0/1, a string as written; null
+// leaves it unset. Lets users write `secure: true` (native YAML bool) or
+// `secure: "true"` (string) interchangeably in their CRs — kubectl converts
+// YAML to JSON before submitting, so this is the load-bearing surface. A whole
+// number written as 1.0 or 1e3 reaches it as the integer 1 or 1000: the YAML to
+// JSON conversion and the API server re-encode the value.
+//
+// It never fails on a value the API server admits. The CRD schema cannot
+// express the bool|integer|string union, so the &TypeStringBool anchor in
+// deploy/builder/templates-install-bundle leaves the field untyped
+// (x-kubernetes-preserve-unknown-fields), and the API server stores any JSON
+// value: `secure: 1.5`, `suspend: {}` or `verify: [true]` apply cleanly. An
+// error here would not stay with the one resource that carries such a value: an
+// informer decodes all the resources it watches as one list, so a single item
+// that fails to decode fails the whole list, the reflector retries it forever,
+// its cache never syncs, and none of those resources is reconciled until the
+// value is fixed. A watch event that carries it breaks the watch the same way.
+//
+// Any other value — a fraction, an integer beyond an int, an object, an array —
+// is therefore kept as its compacted JSON text. IsValid refuses it, as it
+// refuses any string outside the vocabulary, and the value fares as such a
+// string does: the backup resources, for instance, report InvalidSpec. Whatever
+// a field makes of it, no decode fails: every other resource the informer
+// watches decodes as before.
+func (s *StringBool) UnmarshalJSON(data []byte) error {
+	// null → leave at zero value (the parent's *StringBool stays nil-like)
+	str := string(data)
+	if str == "null" {
+		return nil
+	}
+	// String form ("true", "yes", "On", "1", etc.) — most common path through
+	// the legacy kubectl→sigs.k8s.io/yaml pipeline. Quotes are present in JSON.
+	if len(data) > 0 && data[0] == '"' {
+		var v string
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		*s = StringBool(v)
+		return nil
+	}
+	// Bool form (native YAML bool round-tripped to JSON bool by kubectl)
+	if str == "true" {
+		*s = StringBoolTrueFirstCapital
+		return nil
+	}
+	if str == "false" {
+		*s = StringBoolFalseFirstCapital
+		return nil
+	}
+	// Integer form (0/1 — the legacy ClickHouse-config vocabulary)
+	var n int
+	if err := json.Unmarshal(data, &n); err == nil {
+		if n == 0 {
+			*s = StringBool0
+		} else {
+			*s = StringBool1
+		}
+		return nil
+	}
+	// Any other JSON value, kept as its compacted text. Compact cannot fail: the
+	// decoder validated the JSON before handing it over.
+	var written bytes.Buffer
+	if err := json.Compact(&written, data); err != nil {
+		return err
+	}
+	*s = StringBool(written.String())
+	return nil
+}
+
+// Set of string boolean constants
+const (
+	StringBool0                    = "0"
+	StringBool1                    = "1"
+	StringBoolFalseFirstCapital    = "False"
+	StringBoolFalseLowercase       = "false"
+	StringBoolTrueFirstCapital     = "True"
+	StringBoolTrueLowercase        = "true"
+	StringBoolNoFirstCapital       = "No"
+	StringBoolNoLowercase          = "no"
+	StringBoolYesFirstCapital      = "Yes"
+	StringBoolYesLowercase         = "yes"
+	StringBoolOffFirstCapital      = "Off"
+	StringBoolOffLowercase         = "off"
+	StringBoolOnFirstCapital       = "On"
+	StringBoolOnLowercase          = "on"
+	StringBoolDisableFirstCapital  = "Disable"
+	StringBoolDisableLowercase     = "disable"
+	StringBoolEnableFirstCapital   = "Enable"
+	StringBoolEnableLowercase      = "enable"
+	StringBoolDisabledFirstCapital = "Disabled"
+	StringBoolDisabledLowercase    = "disabled"
+	StringBoolEnabledFirstCapital  = "Enabled"
+	StringBoolEnabledLowercase     = "enabled"
+)
+
+// NewStringBool creates new StringBool variable with optional value
+func NewStringBool(value ...bool) *StringBool {
+	r := new(StringBool)
+	if len(value) > 0 {
+		if value[0] {
+			*r = StringBoolTrueFirstCapital
+			return r
+		}
+	}
+	*r = StringBoolFalseFirstCapital
+	return r
+}
+
+// From casts bool to a StringBool
+func (s *StringBool) From(value bool) *StringBool {
+	return NewStringBool(value)
+}
+
+// String casts StringBool to a string
+func (s *StringBool) String() string {
+	if s == nil {
+		return ""
+	}
+	return string(*s)
+}
+
+// HasValue checks whether value is specified
+func (s *StringBool) HasValue() bool {
+	return s != nil
+}
+
+// Value returns bool value
+func (s *StringBool) Value() bool {
+	if s == nil {
+		return false
+	}
+
+	if s.IsTrue() {
+		return true
+	}
+
+	if s.IsFalse() {
+		return false
+	}
+
+	// Default
+	return false
+}
+
+// IsValid checks whether StringBool has a proper value
+func (s *StringBool) IsValid() bool {
+	switch strings.ToLower(s.String()) {
+	case
+		StringBool0,
+		StringBool1,
+
+		StringBoolFalseLowercase,
+		StringBoolTrueLowercase,
+
+		StringBoolNoLowercase,
+		StringBoolYesLowercase,
+
+		StringBoolOffLowercase,
+		StringBoolOnLowercase,
+
+		StringBoolDisableLowercase,
+		StringBoolEnableLowercase,
+
+		StringBoolDisabledLowercase,
+		StringBoolEnabledLowercase:
+		return true
+
+	default:
+		return false
+	}
+}
+
+// IsFalse checks whether str is a string as bool "false" value
+func (s *StringBool) IsFalse() bool {
+	switch strings.ToLower(s.String()) {
+	case
+		StringBool0,
+		StringBoolFalseLowercase,
+		StringBoolNoLowercase,
+		StringBoolOffLowercase,
+		StringBoolDisableLowercase,
+		StringBoolDisabledLowercase:
+		return true
+
+	default:
+		return false
+	}
+}
+
+// IsTrue checks whether str is a string as bool "true" value
+func (s *StringBool) IsTrue() bool {
+	switch strings.ToLower(s.String()) {
+	case
+		StringBool1,
+		StringBoolTrueLowercase,
+		StringBoolYesLowercase,
+		StringBoolOnLowercase,
+		StringBoolEnableLowercase,
+		StringBoolEnabledLowercase:
+		return true
+
+	default:
+		return false
+	}
+}
+
+// CastTo01 casts string-bool into string "0"/"1"
+func (s *StringBool) CastTo01(defaultValue bool) string {
+	// True and False string values
+	_true := StringBool1
+	_false := StringBool0
+
+	if s.IsTrue() {
+		return _true
+	}
+	if s.IsFalse() {
+		return _false
+	}
+
+	// String value unrecognized, return default value
+
+	if defaultValue {
+		return _true
+	}
+
+	return _false
+}
+
+// CastToStringTrueFalse casts string-bool into string "true"/"false"
+func (s *StringBool) CastToStringTrueFalse(defaultValue bool) string {
+	// True and False values
+	_true := StringBoolTrueLowercase
+	_false := StringBoolFalseLowercase
+
+	if s.IsTrue() {
+		return _true
+	}
+	if s.IsFalse() {
+		return _false
+	}
+
+	// String value unrecognized, return default value
+
+	if defaultValue {
+		return _true
+	}
+
+	return _false
+}
+
+// Normalize normalizes StringBool value with fallback to defaultValue in case initial value is incorrect
+func (s *StringBool) Normalize(defaultValue bool) *StringBool {
+	if s.IsValid() {
+		return s
+	}
+
+	// Value is unrecognized, return default value
+	return NewStringBool(defaultValue)
+}
+
+// MergeFrom merges value from another variable
+func (s *StringBool) MergeFrom(from *StringBool) *StringBool {
+	if from == nil {
+		// Nothing to merge from, keep original value
+		return s
+	}
+
+	// From now on we have `from` specified
+
+	if s == nil {
+		// Recipient is not specified, just use `from` value
+		return from
+	}
+
+	// Both recipient and `from` are specified, need to pick one value.
+	// Prefer local value
+	return s
+}

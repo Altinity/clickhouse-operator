@@ -34,6 +34,8 @@ CH_PASSWORD_PLAIN="" \
 CH_CREDENTIALS_SECRET_NAME="clickhouse-operator" \
 CH_USERNAME_SECRET_PLAIN="clickhouse_operator" \
 CH_PASSWORD_SECRET_PLAIN="clickhouse_operator_password" \
+MANIFEST_PRINT_RBAC_NAMESPACED=yes \
+MANIFEST_PRINT_RBAC_CLUSTERED=yes \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-bundle.yaml"
 
 # Build templated installation .yaml manifest
@@ -103,3 +105,6 @@ MANIFEST_PRINT_RBAC_NAMESPACED="no" \
 MANIFEST_PRINT_DEPLOYMENT="no" \
 MANIFEST_PRINT_SERVICE_METRICS="no" \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/parts/crd.yaml"
+
+# resolve &Type* to allow properly works IDEA, look details https://youtrack.jetbrains.com/issue/IJPL-67381/Kubernetes-ignores-new-version-of-CRD
+yq -i ". | explode(.)" "${MANIFEST_ROOT}/operator/parts/crd.yaml"

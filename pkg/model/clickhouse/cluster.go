@@ -16,7 +16,9 @@ package clickhouse
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -77,7 +79,7 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error
 	// Try to fetch data from any of the endpoints.
 	for _, host := range c.Hosts {
 		if util.IsContextDone(ctx) {
-			c.l.V(2).Info("ctx is done")
+			c.l.V(1).Info("ctx is done")
 			return nil, nil
 		}
 
@@ -93,15 +95,16 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error
 
 	str := fmt.Sprintf("FAILED to run query on all hosts %v", c.Hosts)
 	c.l.V(1).F().Error(str)
-	return nil, fmt.Errorf(str)
+	return nil, errors.New(str)
 }
 
 // ExecAll runs set of SQL queries on all endpoints of the cluster.
 // No data is expected to be returned back.
 // Retry logic traverses the list of SQLs multiple times until all SQLs succeed.
+// Every endpoint receives the full list of queries. The queries slice is not modified.
 func (c *Cluster) ExecAll(ctx context.Context, queries []string, _opts ...*QueryOptions) error {
 	if util.IsContextDone(ctx) {
-		c.l.V(2).Info("ctx is done")
+		c.l.V(1).Info("ctx is done")
 		return nil
 	}
 
@@ -129,10 +132,11 @@ func (c *Cluster) ExecAll(ctx context.Context, queries []string, _opts ...*Query
 
 // exec runs set of SQL queries on specified host.
 // No data is expected to be returned back.
-// Retry logic traverses the list of SQLs multiple times until all SQLs succeed
+// Retry logic traverses the list of SQLs multiple times until all SQLs succeed.
+// The queries slice is not modified.
 func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts ...*QueryOptions) error {
 	if util.IsContextDone(ctx) {
-		c.l.V(2).Info("ctx is done")
+		c.l.V(1).Info("ctx is done")
 		return nil
 	}
 	conn := c.getHostConnection(host)
@@ -142,12 +146,17 @@ func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts
 	}
 
 	opts := QueryOptionsNormalize(_opts...)
+	// Own the list: the blanking below is this host's progress marker and must not escape to
+	// the caller, who reuses the slice for other hosts - reconcile hooks pass the CR spec's
+	// sql.Queries, which left every host after the first with an empty list (issue #2052).
+	// Cloned outside Retry() so retries still skip the queries that already landed here.
+	queries = slices.Clone(queries)
 	err := r.Retry(ctx, opts.Tries, "Applying sqls", c.l.V(1).M(host).F(),
 		func() error {
 			var errors []error
 			for i, sql := range queries {
 				if util.IsContextDone(ctx) {
-					c.l.V(2).Info("ctx is done")
+					c.l.V(1).Info("ctx is done")
 					return nil
 				}
 				if len(sql) == 0 {
@@ -161,8 +170,21 @@ func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts
 					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
 					err = conn.Exec(ctx, sqlAttach, opts)
 				}
+				if err != nil && strings.Contains(err.Error(), "Code: 57") && strings.Contains(sql, "CREATE TABLE") {
+					// WARNING: error message or code may change in newer ClickHouse versions
+					c.l.V(1).M(host).F().Info("Directory for table already exists. Trying ATTACH TABLE instead")
+					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
+					err = conn.Exec(ctx, sqlAttach, opts)
+				}
+				if err != nil && strings.Contains(err.Error(), "Code: 117") && strings.Contains(sql, "CREATE TABLE") {
+					// WARNING: error message or code may change in newer ClickHouse versions
+					c.l.V(1).M(host).F().Info("Directory for table already exists. Trying ATTACH TABLE instead")
+					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
+					err = conn.Exec(ctx, sqlAttach, opts)
+				}
 				if err == nil || strings.Contains(err.Error(), "ALREADY_EXISTS") {
-					queries[i] = "" // Query is executed or object already exists, removing from the list
+					// Done on this host - blank it in our own copy so the next retry attempt skips it
+					queries[i] = ""
 				} else {
 					errors = append(errors, err)
 				}

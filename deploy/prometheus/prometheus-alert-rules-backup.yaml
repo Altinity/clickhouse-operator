@@ -232,3 +232,21 @@ spec:
 
               Check clickhouse-backup logs
               ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=48h```
+        # https://github.com/Altinity/clickhouse-backup/issues/836
+        - alert: ClickHouseBackupLocalBackupUnexpectedPresent
+          expr: |-
+            in_progress_commands == 0 and (
+              (clickhouse_backup_number_backups_expected == -1 and clickhouse_backup_number_backups_local > 0)
+              or
+              (clickhouse_backup_number_backups_expected > 0 and clickhouse_backup_number_backups_local > clickhouse_backup_number_backups_expected)
+            )
+          for: "4h"
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "clickhouse-backup have unexpected local backup"
+            description: |-
+              unexpected local backups could allocate additional disk space
+              `clickhouse_backup_number_backups_local{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_number_backups_local{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value }}{{ end }}
+              `clickhouse_backup_number_backups_local_expected{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_number_backups_local_expected{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value }}{{ end }}
+              Check clickhouse-backup logs and remove local backup if necessary
+              ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=24h```

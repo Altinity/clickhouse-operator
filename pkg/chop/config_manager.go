@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -29,9 +28,16 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
+
+// ErrInsecureKubeconfigRejected is returned by ConfigManager.Init when the loaded
+// kubeconfig has TLSClientConfig.Insecure=true but the file-based chopconf has
+// security.kubernetes.tls.verify=Strict. Sentinel so callers/tests
+// can errors.Is against it.
+var ErrInsecureKubeconfigRejected = errors.New("kubeconfig declares TLSClientConfig.Insecure=true but security.kubernetes.tls.verify=Strict — refusing to start")
 
 // ConfigManager specifies configuration manager in charge of operator's configuration
 type ConfigManager struct {
@@ -62,8 +68,8 @@ type ConfigManager struct {
 	runtimeParams map[string]string
 }
 
-// NewConfigManager creates new ConfigManager
-func NewConfigManager(
+// newConfigManager creates new ConfigManager
+func newConfigManager(
 	kubeClient *kube.Clientset,
 	chopClient *chopClientSet.Clientset,
 	initConfigFilePath string,
@@ -91,6 +97,25 @@ func (cm *ConfigManager) Init() error {
 	log.V(1).Info("File-based CHOP config:")
 	log.V(1).Info("\n" + cm.fileConfig.String(true))
 
+	// Refuse a FIPS switch that is not a boolean before the first network call.
+	// The file-based checks below would read it as off, and the FIPS gate of
+	// the binary, which refuses it as well, runs only after them.
+	if err = cm.fileConfig.Security.GetFIPS().Validate(); err != nil {
+		return err
+	}
+
+	// Refuse an insecure kubeconfig before issuing the first network call.
+	// Evaluated against the FILE-based config only — moving this check after the
+	// CR-based merge (which requires a List over the kube wire) would defeat the
+	// purpose, since the ServiceAccount bearer token would already have crossed
+	// the unverified channel once. Users who place security.kubernetes.tls.verify=Strict
+	// (or security.policy=Enforced, which one-way coerces verify to Strict) in a
+	// CR-based ChOpConfig accept that the file-based config still wins for the
+	// startup gate.
+	if lastKubeConfigInsecure && cm.fileConfig.RequiresStrictK8sTLS() {
+		return ErrInsecureKubeconfigRejected
+	}
+
 	// Get configs from all config Custom Resources that are located in the namespace where Operator is running
 	if namespace, ok := cm.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE); ok {
 		cm.getAllCRBasedConfigs(namespace)
@@ -101,6 +126,8 @@ func (cm *ConfigManager) Init() error {
 	cm.buildUnifiedConfig()
 
 	cm.fetchSecretCredentials()
+	cm.fetchSecurityRootCA()
+	cm.fetchAccessRootCA()
 
 	// From now on we have one unified CHOP config
 	log.V(1).Info("Unified CHOP config - with secret data fetched (but not post-processed yet):")
@@ -161,7 +188,7 @@ func (cm *ConfigManager) getAllCRBasedConfigs(namespace string) {
 
 				cm.crConfigs = append(cm.crConfigs, &chOperatorConfiguration.Spec)
 
-				log.V(1).F().Error("Append ClickHouseOperatorConfigurations '%s/%s'.", namespace, name)
+				log.V(1).F().Info("Append ClickHouseOperatorConfigurations '%s/%s'.", namespace, name)
 				continue
 			}
 		}
@@ -184,7 +211,7 @@ func (cm *ConfigManager) buildUnifiedConfig() {
 
 	// Merge all the rest CR-based configs into base config
 	for _, chOperatorConfiguration := range cm.crConfigs {
-		_ = cm.config.MergeFrom(chOperatorConfiguration, api.MergeTypeOverrideByNonEmptyValues)
+		_ = cm.config.MergeFrom(chOperatorConfiguration)
 		cm.config.Runtime.ConfigCRSources = append(cm.config.Runtime.ConfigCRSources, api.ConfigCRSource{
 			Namespace: chOperatorConfiguration.Runtime.ConfigCRNamespace,
 			Name:      chOperatorConfiguration.Runtime.ConfigCRName,
@@ -340,6 +367,7 @@ func (cm *ConfigManager) listSupportedEnvVarNames() []string {
 
 		deployment.WATCH_NAMESPACE,
 		deployment.WATCH_NAMESPACES,
+		deployment.WATCH_NAMESPACES_EXCLUDE,
 	}
 }
 
@@ -441,6 +469,119 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 			log.V(1).Info("Password read from the secret: '%s/%s'", namespace, name)
 		}
 	}
+}
+
+// secretDataGetter returns the data map of a Secret in the given namespace.
+// Extracted as a function-type seam so fetchSecurityRootCAResolve is unit-testable
+// without faking the whole kubernetes.Clientset.
+type secretDataGetter func(namespace, name string) (map[string][]byte, error)
+
+// fetchSecurityRootCA resolves a chopconf-level security.clickhouse.tls.rootCASecretRef
+// to an inline RootCA string at config-load time, BEFORE the value flows into CHIs
+// via the 3-level MergeFrom inheritance. The Secret is looked up in the operator's
+// pod namespace because chopconf-level references are operator-scoped.
+//
+// Cluster- and CHI-level rootCASecretRefs are resolved separately in the CHI
+// normalizer (resolveTLSRootCASecretRef) against the CHI's own namespace; this
+// chopconf-level resolution must happen here because the normalizer cannot
+// know which namespace originally owned the reference after merge.
+//
+// On ANY failure (Secret missing, key missing, API error, conflict), the ref
+// is CLEARED so the CHI normalizer does not later try to resolve it against
+// every CHI's namespace and abort every CHI forever. The failure is logged at
+// Warning so operators see it in default-verbosity logs; the user fixes the
+// Secret and restarts the operator.
+func (cm *ConfigManager) fetchSecurityRootCA() {
+	ns, _ := cm.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
+	fetchSecurityRootCAResolve(cm.config.Security.GetClickHouse().GetTLS(), ns, cm.getSecretData)
+}
+
+// fetchAccessRootCA resolves clickhouse.access.rootCASecretRef into the inline
+// clickhouse.access.rootCA via the shared resolver (see resolveRootCAFromSecret).
+// Unlike the security path it does not clear the ref afterwards: Access.RootCASecretRef
+// is read only here and never flows into per-CHI merges, so there is nothing to clear.
+func (cm *ConfigManager) fetchAccessRootCA() {
+	ns, _ := cm.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
+	access := &cm.config.ClickHouse.Access
+	resolveRootCAFromSecret(
+		&access.RootCA,
+		access.RootCASecretRef.Name,
+		access.RootCASecretRef.Key,
+		ns,
+		"chopconf clickhouse.access",
+		cm.getSecretData,
+	)
+}
+
+// getSecretData adapts the operator's kubeClient to the secretDataGetter seam.
+func (cm *ConfigManager) getSecretData(namespace, name string) (map[string][]byte, error) {
+	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
+	if err != nil {
+		return nil, err
+	}
+	return secret.Data, nil
+}
+
+// resolveRootCAFromSecret is the shared decision logic for inlining a CA bundle
+// from a Kubernetes Secret into an inline RootCA PEM string at config-load time.
+// Used by BOTH chopconf security.clickhouse.tls (fetchSecurityRootCA) and
+// clickhouse.access (fetchAccessRootCA). It sets *inline on success and is
+// nil-safe / fail-open: empty secretName is the "not used" sentinel; an inline
+// value already set wins; any fetch/key failure leaves *inline untouched and logs
+// at Warning so operators see it at default verbosity (fix the Secret, restart).
+// `what` labels the config path in log messages. Callers own clearing their own
+// ref form (e.g. the *core.SecretKeySelector on the security TLS struct).
+func resolveRootCAFromSecret(inline *string, secretName, secretKey, operatorNs, what string, getSecret secretDataGetter) {
+	if (inline == nil) || (secretName == "") {
+		// Empty secretName is the documented "not used" sentinel — silent no-op.
+		return
+	}
+	if *inline != "" {
+		// Inline rootCA wins; operators see the warning and pick one.
+		log.Warning("%s: both rootCA and rootCASecretRef=%q set — using inline rootCA, ignoring ref", what, secretName)
+		return
+	}
+	if getSecret == nil {
+		// Defensive: a nil getter would panic below. Treat as a fetch failure.
+		log.Warning("%s rootCASecretRef=%q: secret getter is nil — ignoring ref", what, secretName)
+		return
+	}
+	if operatorNs == "" {
+		log.Warning("%s rootCASecretRef=%q: operator namespace unknown; secret-sourced CA disabled", what, secretName)
+		return
+	}
+	keys := []string{secretKey}
+	if secretKey == "" {
+		keys = []string{"ca.crt", "tls.crt"}
+	}
+	data, err := getSecret(operatorNs, secretName)
+	if err != nil {
+		log.Warning("%s rootCASecretRef: unable to fetch %s/%s: %v — ignoring ref (fix the Secret and restart the operator)", what, operatorNs, secretName, err)
+		return
+	}
+	for _, k := range keys {
+		if v, ok := data[k]; ok {
+			*inline = string(v)
+			log.V(1).Info("%s: inlined RootCA from %s/%s key=%s", what, operatorNs, secretName, k)
+			return
+		}
+	}
+	log.Warning("%s rootCASecretRef: secret %s/%s exists but none of keys %v found — ignoring ref (fix the Secret and restart the operator)", what, operatorNs, secretName, keys)
+}
+
+// fetchSecurityRootCAResolve resolves the chopconf security.clickhouse.tls
+// rootCASecretRef via the shared resolveRootCAFromSecret, then ALWAYS clears
+// RootCASecretRef: this ref is operator-scoped and terminal once processed here
+// (success or failure), so it must not propagate into the per-CHI MergeFrom
+// inheritance where the normalizer would re-resolve it against every CHI's
+// namespace. Nil-safe: nil tls or nil RootCASecretRef return early.
+func fetchSecurityRootCAResolve(tls *api.ClusterSecurityClickHouseTLS, operatorNs string, getSecret secretDataGetter) {
+	if (tls == nil) || (tls.RootCASecretRef == nil) {
+		return
+	}
+	ref := tls.RootCASecretRef
+	resolveRootCAFromSecret(&tls.RootCA, ref.Name, ref.Key, operatorNs, "chopconf security.clickhouse.tls", getSecret)
+	tls.RootCASecretRef = nil
 }
 
 // Postprocess performs postprocessing of the configuration

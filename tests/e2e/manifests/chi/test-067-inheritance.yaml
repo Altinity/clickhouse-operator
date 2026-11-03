@@ -1,0 +1,27 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-067-inheritance
+spec:
+  # CHI-level security: applies to every cluster that doesn't override.
+  security:
+    clickhouse:
+      tls:
+        verify: Strict
+        minVersion: "1.3"
+  configuration:
+    clusters:
+      # Inherits CHI-level Strict (verify=Strict, minVersion=1.3).
+      - name: inherit
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+      # Cluster-level override wins: verify=None, but minVersion still inherits 1.3.
+      - name: override-verify
+        security:
+          clickhouse:
+            tls:
+              verify: None
+        layout:
+          shardsCount: 1
+          replicasCount: 1

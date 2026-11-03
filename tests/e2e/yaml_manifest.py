@@ -1,8 +1,8 @@
 import yaml
 
 
-def get_chi_name(chi_manifest_filename):
-    return yaml.safe_load(open(chi_manifest_filename, "r"))["metadata"]["name"]
+def get_name(manifest_filename):
+    return yaml.safe_load(open(manifest_filename, "r"))["metadata"]["name"]
 
 
 def get_manifest_data(manifest_filename):

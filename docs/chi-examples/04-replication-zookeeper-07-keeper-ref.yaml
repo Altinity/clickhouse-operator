@@ -1,0 +1,31 @@
+# Replication with ClickHouseKeeper reference
+#
+# Instead of specifying ZooKeeper nodes explicitly via host:port,
+# reference a ClickHouseKeeperInstallation (CHK) resource by name.
+# The operator discovers keeper endpoints automatically.
+#
+# serviceType controls endpoint discovery:
+#   replicas (default) — one ZK node per keeper replica (recommended)
+#   service            — single CR-level service as one ZK node entry
+#
+# Other zookeeper fields (session_timeout_ms, root, identity, etc.)
+# can be used alongside the keeper reference.
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "repl-keeper-ref"
+spec:
+  configuration:
+    zookeeper:
+      keeper:
+        name: my-keeper
+        # namespace: my-namespace  # optional, defaults to CHI namespace
+        # serviceType: replicas    # optional, default is "replicas"
+      session_timeout_ms: 30000
+      operation_timeout_ms: 10000
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 2

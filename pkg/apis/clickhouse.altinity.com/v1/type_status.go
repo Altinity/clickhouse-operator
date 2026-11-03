@@ -15,9 +15,11 @@
 package v1
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
@@ -28,7 +30,7 @@ const (
 	maxTaskIDs = 10
 )
 
-// Possible CHI statuses
+// Possible CR statuses
 const (
 	StatusInProgress  = "InProgress"
 	StatusCompleted   = "Completed"
@@ -36,56 +38,112 @@ const (
 	StatusTerminating = "Terminating"
 )
 
-// ChiStatus defines status section of ClickHouseInstallation resource.
+// Status reasons distinguish flavors of StatusAborted. The reason is pushed
+// into the error stream so operators can grep / dashboards can branch on it
+// (existing CR status schema has no first-class Reason field — preserving
+// the schema is the back-compat trade-off).
+const (
+	StatusReasonFIPSValidationFailed = "FIPSValidationFailed"
+	// StatusReasonRootCAConflict: both inline RootCA and RootCASecretRef set on
+	// the same security.tls block. User must pick one.
+	StatusReasonRootCAConflict = "RootCAConflict"
+	// StatusReasonRootCASecretUnresolved: the RootCASecretRef points at a Secret
+	// or key that the operator cannot read. Aborts rather than silently falling
+	// back to system roots — empty CA + Verify=Strict would refuse all dials.
+	StatusReasonRootCASecretUnresolved = "RootCASecretUnresolved"
+	// StatusReasonBackupSecretUnresolved: the operator-generated backup Secret of a CR with backup enabled
+	// cannot be read for any reason but its absence. Aborts rather than dropping the backup user. Updates
+	// that keep the generation do not reconcile the CR anew, so it stays Aborted until a spec edit, an
+	// operator restart or auto-recovery - on a pod turning Ready, say - which this reason does not opt
+	// out of, as the Secret may well be readable by then.
+	StatusReasonBackupSecretUnresolved = "BackupSecretUnresolved"
+	// StatusReasonFIPSImagePolicyViolation: security.images.policy=Required
+	// rejected this CR because a ClickHouse/Keeper container image lacks the
+	// "fips" tag substring (admission gate) or the running binary's
+	// `SELECT version()` reply lacks "fips" (post-Ready gate). Separate from
+	// FIPSValidationFailed so dashboards can distinguish operator-config bypass
+	// from per-CR image-policy violations.
+	StatusReasonFIPSImagePolicyViolation = "FIPSImagePolicyViolation"
+	// StatusReasonNoKeeperListener: the CHK cluster has both insecure=no AND
+	// secure=no (or secure unset), so no client-facing Keeper port would be
+	// emitted onto the Service. The resulting CR would be unreachable to
+	// ClickHouse clients. Caught at admission to surface the misconfiguration
+	// instead of producing a silently-broken cluster.
+	StatusReasonNoKeeperListener = "NoKeeperListener"
+	// StatusReasonShardHasNoHealthyPeer: a host's reconcile would have restarted or rolled it
+	// while its shard had no other healthy replica to serve, so the disruption was deferred and
+	// the shard left serving. Recoverable without a spec edit - the peer coming back triggers
+	// a retry - so it is deliberately absent from normalizeTimeAbortReasons.
+	StatusReasonShardHasNoHealthyPeer = "ShardHasNoHealthyPeer"
+	// StatusReasonRaftQuorumUnsafe: a CHK host's reconcile would disrupt a Ready replica while
+	// the ensemble lacks Raft quorum headroom. Disruption is deferred until siblings recover.
+	StatusReasonRaftQuorumUnsafe = "RaftQuorumUnsafe"
+	// StatusReasonRemovedSecretRefSyntax: a user settings field uses the `k8s_secret_` or
+	// `k8s_secret_env_` prefix, removed in 0.27.4 because it accepted a namespace/name/key
+	// triple and could therefore read a Secret from any namespace. Aborts rather than
+	// ignoring the field: an ignored field renders verbatim into the users ConfigMap and
+	// leaves the account on the default password from ClickHouse.Config.User.Default.Password.
+	// Requires a spec edit to migrate to valueFrom.secretKeyRef.
+	StatusReasonRemovedSecretRefSyntax = "RemovedSecretRefSyntax"
+	// StatusReasonInvalidPodTemplate: a host's resolved pod template has a container that cannot
+	// run - without a name or an image, or named like another - or, merged from several layers,
+	// starts a duplicate ClickHouse server, since a template's container named unlike the one it was
+	// meant to extend stays a container of its own. Caught at admission, before the
+	// StatefulSet is written. Requires an edit of the CR, or of its template, which reaches the CR
+	// only on its next reconcile as template.chi.policy allows - such as after a new taskID under
+	// ApplyOnNextReconcile, or after an operator restart under ReadOnStart.
+	StatusReasonInvalidPodTemplate = "InvalidPodTemplate"
+	// StatusReasonInvalidBackupStorage: a cluster that turns backup on uses a backup storage neither it nor the
+	// installation declares, or declares several without naming the one it uses. Aborts rather than leaving the
+	// cluster without a storage: that would turn its backup off, which removes the sidecars and restarts every
+	// host, over what is mostly a typo. Requires an edit of the CR, or of its template, which reaches the CR only
+	// on its next reconcile as template.chi.policy allows.
+	StatusReasonInvalidBackupStorage = "InvalidBackupStorage"
+)
+
+// Status defines status section of the custom resource.
 //
-// Note: application level reads and writes to ChiStatus fields should be done through synchronized getter/setter functions.
+// Note: application level reads and writes to Status fields should be done through synchronized getter/setter functions.
 // While all of these fields need to be exported for JSON and YAML serialization/deserialization, we can at least audit
 // that application logic sticks to the synchronized getter/setters by auditing whether all explicit Go field-level
 // accesses are strictly within _this_ source file OR the generated deep copy source file.
-type ChiStatus struct {
-	CHOpVersion            string                  `json:"chop-version,omitempty"           yaml:"chop-version,omitempty"`
-	CHOpCommit             string                  `json:"chop-commit,omitempty"            yaml:"chop-commit,omitempty"`
-	CHOpDate               string                  `json:"chop-date,omitempty"              yaml:"chop-date,omitempty"`
-	CHOpIP                 string                  `json:"chop-ip,omitempty"                yaml:"chop-ip,omitempty"`
-	ClustersCount          int                     `json:"clusters,omitempty"               yaml:"clusters,omitempty"`
-	ShardsCount            int                     `json:"shards,omitempty"                 yaml:"shards,omitempty"`
-	ReplicasCount          int                     `json:"replicas,omitempty"               yaml:"replicas,omitempty"`
-	HostsCount             int                     `json:"hosts,omitempty"                  yaml:"hosts,omitempty"`
-	Status                 string                  `json:"status,omitempty"                 yaml:"status,omitempty"`
-	TaskID                 string                  `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
-	TaskIDsStarted         []string                `json:"taskIDsStarted,omitempty"         yaml:"taskIDsStarted,omitempty"`
-	TaskIDsCompleted       []string                `json:"taskIDsCompleted,omitempty"       yaml:"taskIDsCompleted,omitempty"`
-	Action                 string                  `json:"action,omitempty"                 yaml:"action,omitempty"`
-	Actions                []string                `json:"actions,omitempty"                yaml:"actions,omitempty"`
-	Error                  string                  `json:"error,omitempty"                  yaml:"error,omitempty"`
-	Errors                 []string                `json:"errors,omitempty"                 yaml:"errors,omitempty"`
-	HostsUpdatedCount      int                     `json:"hostsUpdated,omitempty"           yaml:"hostsUpdated,omitempty"`
-	HostsAddedCount        int                     `json:"hostsAdded,omitempty"             yaml:"hostsAdded,omitempty"`
-	HostsUnchangedCount    int                     `json:"hostsUnchanged,omitempty"         yaml:"hostsUnchanged,omitempty"`
-	HostsFailedCount       int                     `json:"hostsFailed,omitempty"            yaml:"hostsFailed,omitempty"`
-	HostsCompletedCount    int                     `json:"hostsCompleted,omitempty"         yaml:"hostsCompleted,omitempty"`
-	HostsDeletedCount      int                     `json:"hostsDeleted,omitempty"           yaml:"hostsDeleted,omitempty"`
-	HostsDeleteCount       int                     `json:"hostsDelete,omitempty"            yaml:"hostsDelete,omitempty"`
-	Pods                   []string                `json:"pods,omitempty"                   yaml:"pods,omitempty"`
-	PodIPs                 []string                `json:"pod-ips,omitempty"                yaml:"pod-ips,omitempty"`
-	FQDNs                  []string                `json:"fqdns,omitempty"                  yaml:"fqdns,omitempty"`
-	Endpoint               string                  `json:"endpoint,omitempty"               yaml:"endpoint,omitempty"`
-	NormalizedCHI          *ClickHouseInstallation `json:"normalized,omitempty"             yaml:"normalized,omitempty"`
-	NormalizedCHICompleted *ClickHouseInstallation `json:"normalizedCompleted,omitempty"    yaml:"normalizedCompleted,omitempty"`
-	HostsWithTablesCreated []string                `json:"hostsWithTablesCreated,omitempty" yaml:"hostsWithTablesCreated,omitempty"`
-	UsedTemplates          []*ChiTemplateRef       `json:"usedTemplates,omitempty"          yaml:"usedTemplates,omitempty"`
+type Status struct {
+	CHOpVersion              string                  `json:"chop-version,omitempty"             yaml:"chop-version,omitempty"`
+	CHOpCommit               string                  `json:"chop-commit,omitempty"              yaml:"chop-commit,omitempty"`
+	CHOpDate                 string                  `json:"chop-date,omitempty"                yaml:"chop-date,omitempty"`
+	CHOpIP                   string                  `json:"chop-ip,omitempty"                  yaml:"chop-ip,omitempty"`
+	ClustersCount            int                     `json:"clusters,omitempty"                 yaml:"clusters,omitempty"`
+	ShardsCount              int                     `json:"shards,omitempty"                   yaml:"shards,omitempty"`
+	ReplicasCount            int                     `json:"replicas,omitempty"                 yaml:"replicas,omitempty"`
+	HostsCount               int                     `json:"hosts,omitempty"                    yaml:"hosts,omitempty"`
+	Status                   string                  `json:"status,omitempty"                   yaml:"status,omitempty"`
+	TaskID                   string                  `json:"taskID,omitempty"                   yaml:"taskID,omitempty"`
+	TaskIDsStarted           []string                `json:"taskIDsStarted,omitempty"           yaml:"taskIDsStarted,omitempty"`
+	TaskIDsCompleted         []string                `json:"taskIDsCompleted,omitempty"         yaml:"taskIDsCompleted,omitempty"`
+	Action                   string                  `json:"action,omitempty"                   yaml:"action,omitempty"`
+	Actions                  []string                `json:"actions,omitempty"                  yaml:"actions,omitempty"`
+	Error                    string                  `json:"error,omitempty"                    yaml:"error,omitempty"`
+	Errors                   []string                `json:"errors,omitempty"                   yaml:"errors,omitempty"`
+	HostsUpdatedCount        int                     `json:"hostsUpdated,omitempty"             yaml:"hostsUpdated,omitempty"`
+	HostsAddedCount          int                     `json:"hostsAdded,omitempty"               yaml:"hostsAdded,omitempty"`
+	HostsUnchangedCount      int                     `json:"hostsUnchanged,omitempty"           yaml:"hostsUnchanged,omitempty"`
+	HostsFailedCount         int                     `json:"hostsFailed,omitempty"              yaml:"hostsFailed,omitempty"`
+	HostsCompletedCount      int                     `json:"hostsCompleted,omitempty"           yaml:"hostsCompleted,omitempty"`
+	HostsDeletedCount        int                     `json:"hostsDeleted,omitempty"             yaml:"hostsDeleted,omitempty"`
+	HostsDeleteCount         int                     `json:"hostsDelete,omitempty"              yaml:"hostsDelete,omitempty"`
+	Pods                     []string                `json:"pods,omitempty"                     yaml:"pods,omitempty"`
+	PodIPs                   []string                `json:"pod-ips,omitempty"                  yaml:"pod-ips,omitempty"`
+	FQDNs                    []string                `json:"fqdns,omitempty"                    yaml:"fqdns,omitempty"`
+	Endpoint                 string                  `json:"endpoint,omitempty"                 yaml:"endpoint,omitempty"`
+	Endpoints                []string                `json:"endpoints,omitempty"                yaml:"endpoints,omitempty"`
+	NormalizedCR             *ClickHouseInstallation `json:"normalized,omitempty"               yaml:"normalized,omitempty"`
+	NormalizedCRCompleted    *ClickHouseInstallation `json:"normalizedCompleted,omitempty"      yaml:"normalizedCompleted,omitempty"`
+	ActionPlan               *ActionPlan             `json:"actionPlan,omitempty"               yaml:"actionPlan,omitempty"`
+	HostsWithTablesCreated   []string                `json:"hostsWithTablesCreated,omitempty"   yaml:"hostsWithTablesCreated,omitempty"`
+	HostsWithReplicaCaughtUp []string                `json:"hostsWithReplicaCaughtUp,omitempty" yaml:"hostsWithReplicaCaughtUp,omitempty"`
+	UsedTemplates            []*TemplateRef          `json:"usedTemplates,omitempty"            yaml:"usedTemplates,omitempty"`
 
 	mu sync.RWMutex `json:"-" yaml:"-"`
-}
-
-// CopyCHIStatusOptions specifies what to copy in CHI status options
-type CopyCHIStatusOptions struct {
-	Actions           bool
-	Errors            bool
-	Normalized        bool
-	MainFields        bool
-	WholeStatus       bool
-	InheritableFields bool
 }
 
 // FillStatusParams is a struct used to fill status params
@@ -104,14 +162,15 @@ type FillStatusParams struct {
 	Pods                []string
 	FQDNs               []string
 	Endpoint            string
-	NormalizedCHI       *ClickHouseInstallation
+	Endpoints           []string
+	NormalizedCR        *ClickHouseInstallation
 }
 
 // Fill is a synchronized setter for a fairly large number of fields. We take a struct type "params" argument to avoid
 // confusion of similarly typed positional arguments, and to avoid defining a lot of separate synchronized setters
 // for these fields that are typically all set together at once (during "fills").
-func (s *ChiStatus) Fill(params *FillStatusParams) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) Fill(params *FillStatusParams) {
+	doWithWriteLock(s, func(s *Status) {
 		// We always set these (build-hardcoded) version fields.
 		s.CHOpVersion = version.Version
 		s.CHOpCommit = version.GitSHA
@@ -130,22 +189,36 @@ func (s *ChiStatus) Fill(params *FillStatusParams) {
 		s.HostsDeleteCount = params.HostsDeleteCount
 		s.HostsDeletedCount = params.HostsDeletedCount
 		s.Pods = params.Pods
-		s.FQDNs = params.FQDNs
-		s.Endpoint = params.Endpoint
-		s.NormalizedCHI = params.NormalizedCHI
+		s.FQDNs = util.NormalizeFQDNs(params.FQDNs)
+		s.Endpoint = util.NormalizeFQDN(params.Endpoint)
+		s.Endpoints = util.NormalizeFQDNs(params.Endpoints)
+		s.NormalizedCR = params.NormalizedCR
+
+		s.HostsWithTablesCreated = util.TrimHostListToFQDNs(s.HostsWithTablesCreated, s.FQDNs)
+		s.HostsWithReplicaCaughtUp = util.TrimHostListToFQDNs(s.HostsWithReplicaCaughtUp, s.FQDNs)
 	})
 }
 
 // SetError sets status error
-func (s *ChiStatus) SetError(err string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) SetError(err string) {
+	doWithWriteLock(s, func(s *Status) {
 		s.Error = err
 	})
 }
 
+// PushError sets and pushes error into status
+func (s *Status) PushError(error string) {
+	doWithWriteLock(s, func(s *Status) {
+		s.Errors = append([]string{error}, s.Errors...)
+		if len(s.Errors) > maxErrors {
+			s.Errors = s.Errors[:maxErrors]
+		}
+	})
+}
+
 // SetAndPushError sets and pushes error into status
-func (s *ChiStatus) SetAndPushError(err string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) SetAndPushError(err string) {
+	doWithWriteLock(s, func(s *Status) {
 		s.Error = err
 		s.Errors = append([]string{err}, s.Errors...)
 		if len(s.Errors) > maxErrors {
@@ -154,9 +227,21 @@ func (s *ChiStatus) SetAndPushError(err string) {
 	})
 }
 
+// PushHostReplicaCaughtUp pushes host to the list of hosts with replica caught-up
+func (s *Status) PushHostReplicaCaughtUp(host string) {
+	host = util.NormalizeFQDN(host)
+	doWithWriteLock(s, func(s *Status) {
+		if util.InArray(host, s.HostsWithReplicaCaughtUp) {
+			return
+		}
+		s.HostsWithReplicaCaughtUp = append(s.HostsWithReplicaCaughtUp, host)
+	})
+}
+
 // PushHostTablesCreated pushes host to the list of hosts with created tables
-func (s *ChiStatus) PushHostTablesCreated(host string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) PushHostTablesCreated(host string) {
+	host = util.NormalizeFQDN(host)
+	doWithWriteLock(s, func(s *Status) {
 		if util.InArray(host, s.HostsWithTablesCreated) {
 			return
 		}
@@ -165,116 +250,112 @@ func (s *ChiStatus) PushHostTablesCreated(host string) {
 }
 
 // SyncHostTablesCreated syncs list of hosts with tables created with actual list of hosts
-func (s *ChiStatus) SyncHostTablesCreated() {
-	doWithWriteLock(s, func(s *ChiStatus) {
-		if s.FQDNs == nil {
-			return
-		}
-		s.HostsWithTablesCreated = util.IntersectStringArrays(s.HostsWithTablesCreated, s.FQDNs)
+func (s *Status) SyncHostTablesCreated() {
+	doWithWriteLock(s, func(s *Status) {
+		s.HostsWithTablesCreated = util.TrimHostListToFQDNs(s.HostsWithTablesCreated, s.FQDNs)
 	})
 }
 
-// PushUsedTemplate pushes used template to the list of used templates
-func (s *ChiStatus) PushUsedTemplate(templateRef *ChiTemplateRef) {
-	doWithWriteLock(s, func(s *ChiStatus) {
-		s.UsedTemplates = append(s.UsedTemplates, templateRef)
+// SyncHostsWithReplicaCaughtUp syncs hostsWithReplicaCaughtUp with the current FQDN list
+func (s *Status) SyncHostsWithReplicaCaughtUp() {
+	doWithWriteLock(s, func(s *Status) {
+		s.HostsWithReplicaCaughtUp = util.TrimHostListToFQDNs(s.HostsWithReplicaCaughtUp, s.FQDNs)
 	})
+}
+
+// PushUsedTemplate pushes used templates to the list of used templates
+func (s *Status) PushUsedTemplate(templateRefs ...*TemplateRef) {
+	if len(templateRefs) > 0 {
+		doWithWriteLock(s, func(s *Status) {
+			s.UsedTemplates = append(s.UsedTemplates, templateRefs...)
+		})
+	}
 }
 
 // GetUsedTemplatesCount gets used templates count
-func (s *ChiStatus) GetUsedTemplatesCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetUsedTemplatesCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return len(s.UsedTemplates)
 	})
 }
 
 // SetAction action setter
-func (s *ChiStatus) SetAction(action string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) SetAction(action string) {
+	doWithWriteLock(s, func(s *Status) {
 		s.Action = action
 	})
 }
 
-// HasNormalizedCHICompleted is a checker
-func (s *ChiStatus) HasNormalizedCHICompleted() bool {
-	return s.GetNormalizedCHICompleted() != nil
-}
-
-// HasNormalizedCHI is a checker
-func (s *ChiStatus) HasNormalizedCHI() bool {
-	return s.GetNormalizedCHI() != nil
-}
-
 // PushAction pushes action into status
-func (s *ChiStatus) PushAction(action string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) PushAction(action string) {
+	doWithWriteLock(s, func(s *Status) {
 		s.Actions = append([]string{action}, s.Actions...)
 		trimActionsNoSync(s)
 	})
 }
 
-// PushError sets and pushes error into status
-func (s *ChiStatus) PushError(error string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
-		s.Errors = append([]string{error}, s.Errors...)
-		if len(s.Errors) > maxErrors {
-			s.Errors = s.Errors[:maxErrors]
-		}
-	})
+// HasNormalizedCRCompleted is a checker
+func (s *Status) HasNormalizedCRCompleted() bool {
+	return s.GetNormalizedCRCompleted() != nil
+}
+
+// HasNormalizedCR is a checker
+func (s *Status) HasNormalizedCR() bool {
+	return s.GetNormalizedCR() != nil
 }
 
 // SetPodIPs sets pod IPs
-func (s *ChiStatus) SetPodIPs(podIPs []string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) SetPodIPs(podIPs []string) {
+	doWithWriteLock(s, func(s *Status) {
 		s.PodIPs = podIPs
 	})
 }
 
 // HostDeleted increments deleted hosts counter
-func (s *ChiStatus) HostDeleted() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostDeleted() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsDeletedCount++
 	})
 }
 
 // HostUpdated increments updated hosts counter
-func (s *ChiStatus) HostUpdated() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostUpdated() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsUpdatedCount++
 	})
 }
 
 // HostAdded increments added hosts counter
-func (s *ChiStatus) HostAdded() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostAdded() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsAddedCount++
 	})
 }
 
 // HostUnchanged increments unchanged hosts counter
-func (s *ChiStatus) HostUnchanged() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostUnchanged() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsUnchangedCount++
 	})
 }
 
 // HostFailed increments failed hosts counter
-func (s *ChiStatus) HostFailed() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostFailed() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsFailedCount++
 	})
 }
 
 // HostCompleted increments completed hosts counter
-func (s *ChiStatus) HostCompleted() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostCompleted() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsCompletedCount++
 	})
 }
 
 // ReconcileStart marks reconcile start
-func (s *ChiStatus) ReconcileStart(deleteHostsCount int) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) ReconcileStart(ap IActionPlan) {
+	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
 		}
@@ -284,14 +365,15 @@ func (s *ChiStatus) ReconcileStart(deleteHostsCount int) {
 		s.HostsUnchangedCount = 0
 		s.HostsCompletedCount = 0
 		s.HostsDeletedCount = 0
-		s.HostsDeleteCount = deleteHostsCount
+		s.HostsDeleteCount = ap.GetRemovedHostsNum()
+		s.ActionPlan = ap.(*ActionPlan)
 		pushTaskIDStartedNoSync(s)
 	})
 }
 
 // ReconcileComplete marks reconcile completion
-func (s *ChiStatus) ReconcileComplete() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) ReconcileComplete() {
+	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
 		}
@@ -302,8 +384,8 @@ func (s *ChiStatus) ReconcileComplete() {
 }
 
 // ReconcileAbort marks reconcile abortion
-func (s *ChiStatus) ReconcileAbort() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) ReconcileAbort() {
+	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
 		}
@@ -313,9 +395,31 @@ func (s *ChiStatus) ReconcileAbort() {
 	})
 }
 
+// ReconcileAbortWithReason marks reconcile abortion AND records a reason-tagged
+// error so callers can distinguish flavors of Aborted (e.g. FIPSValidationFailed)
+// from the generic case. The reason is prepended to the message in `[reason] msg`
+// form — operators and dashboards grep the error stream for the bracketed tag.
+func (s *Status) ReconcileAbortWithReason(reason, msg string) {
+	doWithWriteLock(s, func(s *Status) {
+		if s == nil {
+			return
+		}
+		s.Status = StatusAborted
+		s.Action = ""
+		pushTaskIDCompletedNoSync(s)
+		if (reason != "") || (msg != "") {
+			tagged := fmt.Sprintf("[%s] %s", reason, msg)
+			s.Errors = append([]string{tagged}, s.Errors...)
+			if len(s.Errors) > maxErrors {
+				s.Errors = s.Errors[:maxErrors]
+			}
+		}
+	})
+}
+
 // DeleteStart marks deletion start
-func (s *ChiStatus) DeleteStart() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) DeleteStart() {
+	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
 		}
@@ -330,336 +434,466 @@ func (s *ChiStatus) DeleteStart() {
 	})
 }
 
-// CopyFrom copies the state of a given ChiStatus f into the receiver ChiStatus of the call.
-func (s *ChiStatus) CopyFrom(f *ChiStatus, opts CopyCHIStatusOptions) {
-	doWithWriteLock(s, func(s *ChiStatus) {
-		doWithReadLock(f, func(from *ChiStatus) {
+// SetActionPlan sets action plan
+func (s *Status) SetActionPlan(ap IActionPlan) {
+	doWithWriteLock(s, func(s *Status) {
+		s.ActionPlan = ap.(*ActionPlan)
+	})
+}
+
+func prepareOptions(opts types.CopyStatusOptions) types.CopyStatusOptions {
+	if opts.FieldGroupInheritable {
+		opts.Copy.TaskIDsStarted = true
+		opts.Copy.TaskIDsCompleted = true
+		opts.Copy.Actions = true
+		opts.Copy.Errors = true
+		opts.Copy.HostsWithTablesCreated = true
+	}
+
+	if opts.FieldGroupActions {
+		opts.Copy.Action = true
+		opts.Merge.Actions = true
+		opts.Copy.HostsWithTablesCreated = true
+		opts.Copy.UsedTemplates = true
+	}
+
+	if opts.FieldGroupErrors {
+		opts.Copy.Error = true
+		opts.Merge.Errors = true
+	}
+
+	if opts.FieldGroupMain {
+		opts.Copy.CHOpVersion = true
+		opts.Copy.CHOpCommit = true
+		opts.Copy.CHOpDate = true
+		opts.Copy.CHOpIP = true
+		opts.Copy.ClustersCount = true
+		opts.Copy.ShardsCount = true
+		opts.Copy.ReplicasCount = true
+		opts.Copy.HostsCount = true
+		opts.Copy.Status = true
+		opts.Copy.TaskID = true
+		opts.Copy.TaskIDsStarted = true
+		opts.Copy.TaskIDsCompleted = true
+		opts.Copy.Action = true
+		opts.Merge.Actions = true
+		opts.Copy.Error = true
+		opts.Copy.Errors = true
+		opts.Copy.HostsUpdatedCount = true
+		opts.Copy.HostsAddedCount = true
+		opts.Copy.HostsUnchangedCount = true
+		opts.Copy.HostsCompletedCount = true
+		opts.Copy.HostsDeletedCount = true
+		opts.Copy.HostsDeleteCount = true
+		opts.Copy.HostsWithTablesCreated = true
+		opts.Copy.Pods = true
+		opts.Copy.PodIPs = true
+		opts.Copy.FQDNs = true
+		opts.Copy.Endpoint = true
+		opts.Copy.NormalizedCR = true
+		opts.Copy.ActionPlan = true
+		opts.Copy.UsedTemplates = true
+	}
+
+	if opts.FieldGroupNormalized {
+		opts.Copy.NormalizedCR = true
+		opts.Copy.ActionPlan = true
+	}
+
+	if opts.FieldGroupWholeStatus {
+		opts.Copy.CHOpVersion = true
+		opts.Copy.CHOpCommit = true
+		opts.Copy.CHOpDate = true
+		opts.Copy.CHOpIP = true
+		opts.Copy.ClustersCount = true
+		opts.Copy.ShardsCount = true
+		opts.Copy.ReplicasCount = true
+		opts.Copy.HostsCount = true
+		opts.Copy.Status = true
+		opts.Copy.TaskID = true
+		opts.Copy.TaskIDsStarted = true
+		opts.Copy.TaskIDsCompleted = true
+		opts.Copy.Action = true
+		opts.Merge.Actions = true
+		opts.Copy.Error = true
+		opts.Copy.Errors = true
+		opts.Copy.HostsUpdatedCount = true
+		opts.Copy.HostsAddedCount = true
+		opts.Copy.HostsUnchangedCount = true
+		opts.Copy.HostsCompletedCount = true
+		opts.Copy.HostsDeletedCount = true
+		opts.Copy.HostsDeleteCount = true
+		opts.Copy.HostsWithTablesCreated = true
+		opts.Copy.Pods = true
+		opts.Copy.PodIPs = true
+		opts.Copy.FQDNs = true
+		opts.Copy.Endpoint = true
+		opts.Copy.NormalizedCR = true
+		opts.Copy.NormalizedCRCompleted = true
+		opts.Copy.ActionPlan = true
+		opts.Copy.UsedTemplates = true
+	}
+
+	return opts
+}
+
+// CopyFrom copies the state of a given Status f into the receiver Status of the call.
+func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
+	doWithWriteLock(s, func(s *Status) {
+		doWithReadLock(f, func(from *Status) {
 			if s == nil || from == nil {
 				return
 			}
 
-			if opts.InheritableFields {
-				s.TaskIDsStarted = from.TaskIDsStarted
-				s.TaskIDsCompleted = from.TaskIDsCompleted
-				s.Actions = from.Actions
-				s.Errors = from.Errors
-				s.HostsWithTablesCreated = from.HostsWithTablesCreated
-			}
+			opts = prepareOptions(opts)
 
-			if opts.Actions {
+			// Copy fields
+			if opts.Copy.CHOpVersion {
+				s.CHOpVersion = from.CHOpVersion
+			}
+			if opts.Copy.CHOpCommit {
+				s.CHOpCommit = from.CHOpCommit
+			}
+			if opts.Copy.CHOpDate {
+				s.CHOpDate = from.CHOpDate
+			}
+			if opts.Copy.CHOpIP {
+				s.CHOpIP = from.CHOpIP
+			}
+			if opts.Copy.ClustersCount {
+				s.ClustersCount = from.ClustersCount
+			}
+			if opts.Copy.ShardsCount {
+				s.ShardsCount = from.ShardsCount
+			}
+			if opts.Copy.ReplicasCount {
+				s.ReplicasCount = from.ReplicasCount
+			}
+			if opts.Copy.HostsCount {
+				s.HostsCount = from.HostsCount
+			}
+			if opts.Copy.Status {
+				s.Status = from.Status
+			}
+			if opts.Copy.TaskID {
+				s.TaskID = from.TaskID
+			}
+			if opts.Copy.TaskIDsStarted {
+				s.TaskIDsStarted = from.TaskIDsStarted
+			}
+			if opts.Copy.TaskIDsCompleted {
+				s.TaskIDsCompleted = from.TaskIDsCompleted
+			}
+			if opts.Copy.Action {
 				s.Action = from.Action
+			}
+			if opts.Merge.Actions {
 				mergeActionsNoSync(s, from)
+			}
+			if opts.Copy.Error {
+				s.Error = from.Error
+			}
+			if opts.Copy.Errors {
+				s.Errors = from.Errors
+			}
+			if opts.Merge.Errors {
+				s.Errors = util.MergeStringArrays(s.Errors, from.Errors)
+				sort.Sort(sort.Reverse(sort.StringSlice(s.Errors)))
+			}
+			if opts.Copy.HostsUpdatedCount {
+				s.HostsUpdatedCount = from.HostsUpdatedCount
+			}
+			if opts.Copy.HostsAddedCount {
+				s.HostsAddedCount = from.HostsAddedCount
+			}
+			if opts.Copy.HostsUnchangedCount {
+				s.HostsUnchangedCount = from.HostsUnchangedCount
+			}
+			if opts.Copy.HostsCompletedCount {
+				s.HostsCompletedCount = from.HostsCompletedCount
+			}
+			if opts.Copy.HostsDeletedCount {
+				s.HostsDeletedCount = from.HostsDeletedCount
+			}
+			if opts.Copy.HostsDeleteCount {
+				s.HostsDeleteCount = from.HostsDeleteCount
+			}
+			if opts.Copy.Pods {
+				s.Pods = from.Pods
+			}
+			if opts.Copy.PodIPs {
+				s.PodIPs = from.PodIPs
+			}
+			if opts.Copy.FQDNs {
+				s.FQDNs = from.FQDNs
+			}
+			if opts.Copy.Endpoint {
+				s.Endpoint = from.Endpoint
+				s.Endpoints = from.Endpoints
+			}
+			if opts.Copy.NormalizedCR {
+				s.NormalizedCR = from.NormalizedCR
+			}
+			if opts.Copy.NormalizedCRCompleted {
+				s.NormalizedCRCompleted = from.NormalizedCRCompleted
+			}
+			if opts.Copy.ActionPlan {
+				s.ActionPlan = from.ActionPlan
+			}
+			if opts.Copy.HostsWithTablesCreated {
 				s.HostsWithTablesCreated = nil
 				if len(from.HostsWithTablesCreated) > 0 {
 					s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, from.HostsWithTablesCreated...)
 				}
+				s.HostsWithReplicaCaughtUp = nil
+				if len(from.HostsWithReplicaCaughtUp) > 0 {
+					s.HostsWithReplicaCaughtUp = append(s.HostsWithReplicaCaughtUp, from.HostsWithReplicaCaughtUp...)
+				}
+			}
+			if opts.Copy.UsedTemplates {
 				s.UsedTemplates = nil
 				if len(from.UsedTemplates) > 0 {
 					s.UsedTemplates = append(s.UsedTemplates, from.UsedTemplates...)
 				}
 			}
-
-			if opts.Errors {
-				s.Error = from.Error
-				s.Errors = util.MergeStringArrays(s.Errors, from.Errors)
-				sort.Sort(sort.Reverse(sort.StringSlice(s.Errors)))
-			}
-
-			if opts.MainFields {
-				s.CHOpVersion = from.CHOpVersion
-				s.CHOpCommit = from.CHOpCommit
-				s.CHOpDate = from.CHOpDate
-				s.CHOpIP = from.CHOpIP
-				s.ClustersCount = from.ClustersCount
-				s.ShardsCount = from.ShardsCount
-				s.ReplicasCount = from.ReplicasCount
-				s.HostsCount = from.HostsCount
-				s.Status = from.Status
-				s.TaskID = from.TaskID
-				s.TaskIDsStarted = from.TaskIDsStarted
-				s.TaskIDsCompleted = from.TaskIDsCompleted
-				s.Action = from.Action
-				mergeActionsNoSync(s, from)
-				s.Error = from.Error
-				s.Errors = from.Errors
-				s.HostsUpdatedCount = from.HostsUpdatedCount
-				s.HostsAddedCount = from.HostsAddedCount
-				s.HostsUnchangedCount = from.HostsUnchangedCount
-				s.HostsCompletedCount = from.HostsCompletedCount
-				s.HostsDeletedCount = from.HostsDeletedCount
-				s.HostsDeleteCount = from.HostsDeleteCount
-				s.Pods = from.Pods
-				s.PodIPs = from.PodIPs
-				s.FQDNs = from.FQDNs
-				s.Endpoint = from.Endpoint
-				s.NormalizedCHI = from.NormalizedCHI
-			}
-
-			if opts.Normalized {
-				s.NormalizedCHI = from.NormalizedCHI
-			}
-
-			if opts.WholeStatus {
-				s.CHOpVersion = from.CHOpVersion
-				s.CHOpCommit = from.CHOpCommit
-				s.CHOpDate = from.CHOpDate
-				s.CHOpIP = from.CHOpIP
-				s.ClustersCount = from.ClustersCount
-				s.ShardsCount = from.ShardsCount
-				s.ReplicasCount = from.ReplicasCount
-				s.HostsCount = from.HostsCount
-				s.Status = from.Status
-				s.TaskID = from.TaskID
-				s.TaskIDsStarted = from.TaskIDsStarted
-				s.TaskIDsCompleted = from.TaskIDsCompleted
-				s.Action = from.Action
-				mergeActionsNoSync(s, from)
-				s.Error = from.Error
-				s.Errors = from.Errors
-				s.HostsUpdatedCount = from.HostsUpdatedCount
-				s.HostsAddedCount = from.HostsAddedCount
-				s.HostsUnchangedCount = from.HostsUnchangedCount
-				s.HostsCompletedCount = from.HostsCompletedCount
-				s.HostsDeletedCount = from.HostsDeletedCount
-				s.HostsDeleteCount = from.HostsDeleteCount
-				s.Pods = from.Pods
-				s.PodIPs = from.PodIPs
-				s.FQDNs = from.FQDNs
-				s.Endpoint = from.Endpoint
-				s.NormalizedCHI = from.NormalizedCHI
-				s.NormalizedCHICompleted = from.NormalizedCHICompleted
-			}
 		})
 	})
 }
 
-// ClearNormalizedCHI clears normalized CHI in status
-func (s *ChiStatus) ClearNormalizedCHI() {
-	doWithWriteLock(s, func(s *ChiStatus) {
-		s.NormalizedCHI = nil
+// ClearNormalizedCR clears normalized CR in status
+func (s *Status) ClearNormalizedCR() {
+	doWithWriteLock(s, func(s *Status) {
+		s.NormalizedCR = nil
 	})
 }
 
-// SetNormalizedCompletedFromCurrentNormalized sets completed CHI from current CHI
-func (s *ChiStatus) SetNormalizedCompletedFromCurrentNormalized() {
-	doWithWriteLock(s, func(s *ChiStatus) {
-		s.NormalizedCHICompleted = s.NormalizedCHI
+// SetNormalizedCompletedFromCurrentNormalized sets completed CR from current CR
+func (s *Status) SetNormalizedCompletedFromCurrentNormalized() {
+	doWithWriteLock(s, func(s *Status) {
+		s.NormalizedCRCompleted = s.NormalizedCR
 	})
 }
 
 // GetCHOpVersion gets operator version
-func (s *ChiStatus) GetCHOpVersion() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetCHOpVersion() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.CHOpVersion
 	})
 }
 
 // GetCHOpCommit gets operator build commit
-func (s *ChiStatus) GetCHOpCommit() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetCHOpCommit() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.CHOpCommit
 	})
 }
 
 // GetCHOpDate gets operator build date
-func (s *ChiStatus) GetCHOpDate() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetCHOpDate() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.CHOpDate
 	})
 }
 
 // GetCHOpIP gets operator pod's IP
-func (s *ChiStatus) GetCHOpIP() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetCHOpIP() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.CHOpIP
 	})
 }
 
 // GetClustersCount gets clusters count
-func (s *ChiStatus) GetClustersCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetClustersCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.ClustersCount
 	})
 }
 
 // GetShardsCount gets shards count
-func (s *ChiStatus) GetShardsCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetShardsCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.ShardsCount
 	})
 }
 
 // GetReplicasCount gets replicas count
-func (s *ChiStatus) GetReplicasCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetReplicasCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.ReplicasCount
 	})
 }
 
 // GetHostsCount gets hosts count
-func (s *ChiStatus) GetHostsCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsCount
 	})
 }
 
 // GetStatus gets status
-func (s *ChiStatus) GetStatus() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetStatus() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.Status
 	})
 }
 
 // GetTaskID gets task ipd
-func (s *ChiStatus) GetTaskID() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetTaskID() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.TaskID
 	})
 }
 
 // GetTaskIDsStarted gets started task id
-func (s *ChiStatus) GetTaskIDsStarted() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetTaskIDsStarted() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.TaskIDsStarted
 	})
 }
 
 // GetTaskIDsCompleted gets completed task id
-func (s *ChiStatus) GetTaskIDsCompleted() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetTaskIDsCompleted() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.TaskIDsCompleted
 	})
 }
 
 // GetAction gets last action
-func (s *ChiStatus) GetAction() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetAction() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.Action
 	})
 }
 
 // GetActions gets all actions
-func (s *ChiStatus) GetActions() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetActions() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.Actions
 	})
 }
 
 // GetError gets last error
-func (s *ChiStatus) GetError() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetError() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.Error
 	})
 }
 
 // GetErrors gets all errors
-func (s *ChiStatus) GetErrors() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetErrors() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.Errors
 	})
 }
 
 // GetHostsUpdatedCount gets updated hosts counter
-func (s *ChiStatus) GetHostsUpdatedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsUpdatedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsUpdatedCount
 	})
 }
 
 // GetHostsAddedCount gets added hosts counter
-func (s *ChiStatus) GetHostsAddedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsAddedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsAddedCount
 	})
 }
 
 // GetHostsUnchangedCount gets unchanged hosts counter
-func (s *ChiStatus) GetHostsUnchangedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsUnchangedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsUnchangedCount
 	})
 }
 
 // GetHostsFailedCount gets failed hosts counter
-func (s *ChiStatus) GetHostsFailedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsFailedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsFailedCount
 	})
 }
 
 // GetHostsCompletedCount gets completed hosts counter
-func (s *ChiStatus) GetHostsCompletedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsCompletedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsCompletedCount
 	})
 }
 
 // GetHostsDeletedCount gets deleted hosts counter
-func (s *ChiStatus) GetHostsDeletedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsDeletedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsDeletedCount
 	})
 }
 
 // GetHostsDeleteCount gets hosts to be deleted counter
-func (s *ChiStatus) GetHostsDeleteCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsDeleteCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsDeleteCount
 	})
 }
 
 // GetPods gets list of pods
-func (s *ChiStatus) GetPods() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetPods() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.Pods
 	})
 }
 
 // GetPodIPs gets list of pod ips
-func (s *ChiStatus) GetPodIPs() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetPodIPs() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.PodIPs
 	})
 }
 
 // GetFQDNs gets list of all FQDNs of hosts
-func (s *ChiStatus) GetFQDNs() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetFQDNs() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.FQDNs
 	})
 }
 
 // GetEndpoint gets API endpoint
-func (s *ChiStatus) GetEndpoint() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetEndpoint() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.Endpoint
 	})
 }
 
-// GetNormalizedCHI gets target CHI
-func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
-	return getInstallationWithReadLock(s, func(s *ChiStatus) *ClickHouseInstallation {
-		return s.NormalizedCHI
+// GetNormalizedCR gets target CR
+func (s *Status) GetNormalizedCR() *ClickHouseInstallation {
+	return getCRWithReadLock(s, func(s *Status) *ClickHouseInstallation {
+		return s.NormalizedCR
 	})
 }
 
-// GetNormalizedCHICompleted gets completed CHI
-func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
-	return getInstallationWithReadLock(s, func(s *ChiStatus) *ClickHouseInstallation {
-		return s.NormalizedCHICompleted
+// GetNormalizedCRCompleted gets completed CR
+func (s *Status) GetNormalizedCRCompleted() *ClickHouseInstallation {
+	return getCRWithReadLock(s, func(s *Status) *ClickHouseInstallation {
+		return s.NormalizedCRCompleted
 	})
 }
 
 // GetHostsWithTablesCreated gets hosts with created tables
-func (s *ChiStatus) GetHostsWithTablesCreated() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
-		return s.HostsWithTablesCreated
+func (s *Status) GetHostsWithTablesCreated() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
+		return util.NormalizeFQDNs(s.HostsWithTablesCreated)
+	})
+}
+
+// GetHostsWithReplicaCaughtUp gets hosts with replica caught-up
+func (s *Status) GetHostsWithReplicaCaughtUp() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
+		return util.NormalizeFQDNs(s.HostsWithReplicaCaughtUp)
 	})
 }
 
 // Begin helpers
 
-func doWithWriteLock(s *ChiStatus, f func(s *ChiStatus)) {
+func doWithWriteLock(s *Status, f func(*Status)) {
 	if s == nil {
 		return
 	}
@@ -669,7 +903,7 @@ func doWithWriteLock(s *ChiStatus, f func(s *ChiStatus)) {
 	f(s)
 }
 
-func doWithReadLock(s *ChiStatus, f func(s *ChiStatus)) {
+func doWithReadLock(s *Status, f func(*Status)) {
 	if s == nil {
 		return
 	}
@@ -679,7 +913,7 @@ func doWithReadLock(s *ChiStatus, f func(s *ChiStatus)) {
 	f(s)
 }
 
-func getIntWithReadLock(s *ChiStatus, f func(s *ChiStatus) int) int {
+func getIntWithReadLock(s *Status, f func(*Status) int) int {
 	var zeroVal int
 	if s == nil {
 		return zeroVal
@@ -690,7 +924,7 @@ func getIntWithReadLock(s *ChiStatus, f func(s *ChiStatus) int) int {
 	return f(s)
 }
 
-func getStringWithReadLock(s *ChiStatus, f func(s *ChiStatus) string) string {
+func getStringWithReadLock(s *Status, f func(*Status) string) string {
 	var zeroVal string
 	if s == nil {
 		return zeroVal
@@ -701,7 +935,7 @@ func getStringWithReadLock(s *ChiStatus, f func(s *ChiStatus) string) string {
 	return f(s)
 }
 
-func getInstallationWithReadLock(s *ChiStatus, f func(s *ChiStatus) *ClickHouseInstallation) *ClickHouseInstallation {
+func getCRWithReadLock(s *Status, f func(*Status) *ClickHouseInstallation) *ClickHouseInstallation {
 	var zeroVal *ClickHouseInstallation
 	if s == nil {
 		return zeroVal
@@ -712,7 +946,7 @@ func getInstallationWithReadLock(s *ChiStatus, f func(s *ChiStatus) *ClickHouseI
 	return f(s)
 }
 
-func getStringArrWithReadLock(s *ChiStatus, f func(s *ChiStatus) []string) []string {
+func getStringArrWithReadLock(s *Status, f func(*Status) []string) []string {
 	emptyArr := make([]string, 0, 0)
 	if s == nil {
 		return emptyArr
@@ -720,26 +954,35 @@ func getStringArrWithReadLock(s *ChiStatus, f func(s *ChiStatus) []string) []str
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return f(s)
+	// Return a COPY so callers may iterate the snapshot after the read lock is
+	// released without racing concurrent writers (PushError/SetAndPushError/
+	// ReconcileAbortWithReason mutate the underlying slice).
+	src := f(s)
+	if src == nil {
+		return emptyArr
+	}
+	cp := make([]string, len(src))
+	copy(cp, src)
+	return cp
 }
 
 // mergeActionsNoSync merges the actions of from into those of s (without synchronization, because synchronized
 // functions call into this).
-func mergeActionsNoSync(s *ChiStatus, from *ChiStatus) {
+func mergeActionsNoSync(s *Status, from *Status) {
 	s.Actions = util.MergeStringArrays(s.Actions, from.Actions)
 	sort.Sort(sort.Reverse(sort.StringSlice(s.Actions)))
 	trimActionsNoSync(s)
 }
 
 // trimActionsNoSync trims actions (without synchronization, because synchronized functions call into this).
-func trimActionsNoSync(s *ChiStatus) {
+func trimActionsNoSync(s *Status) {
 	if len(s.Actions) > maxActions {
 		s.Actions = s.Actions[:maxActions]
 	}
 }
 
 // pushTaskIDStartedNoSync pushes task id into status
-func pushTaskIDStartedNoSync(s *ChiStatus) {
+func pushTaskIDStartedNoSync(s *Status) {
 	s.TaskIDsStarted = append([]string{s.TaskID}, s.TaskIDsStarted...)
 	if len(s.TaskIDsStarted) > maxTaskIDs {
 		s.TaskIDsStarted = s.TaskIDsStarted[:maxTaskIDs]
@@ -747,7 +990,7 @@ func pushTaskIDStartedNoSync(s *ChiStatus) {
 }
 
 // pushTaskIDCompletedNoSync pushes task id into status w/o sync
-func pushTaskIDCompletedNoSync(s *ChiStatus) {
+func pushTaskIDCompletedNoSync(s *Status) {
 	s.TaskIDsCompleted = append([]string{s.TaskID}, s.TaskIDsCompleted...)
 	if len(s.TaskIDsCompleted) > maxTaskIDs {
 		s.TaskIDsCompleted = s.TaskIDsCompleted[:maxTaskIDs]

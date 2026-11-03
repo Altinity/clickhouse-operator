@@ -1,0 +1,1024 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package chk
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chk/metrics"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
+	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+)
+
+// reconcileCR runs reconcile cycle for a Custom Resource
+func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKeeperInstallation) error {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("Reconcile is aborted. CR before start: %s ", new.GetName())
+		return nil
+	}
+
+	common.LogOldAndNew("non-normalized yet (native)", old, new)
+
+	switch {
+	case w.isAfterFinalizerInstalled(old, new):
+		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-1")
+	case w.isGenerationTheSame(old, new):
+		log.V(2).M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
+		return nil
+	}
+
+	w.a.M(new).S().P()
+	defer w.a.M(new).E().P()
+
+	metrics.CRInitZeroValues(ctx, new)
+	metrics.CRReconcilesStarted(ctx, new)
+	startTime := time.Now()
+
+	new = w.buildCR(ctx, new)
+
+	// If buildCR's normalize already aborted the CR (e.g. FIPS strict rejected
+	// plain-text security bypass), persist the abort and skip reconcile —
+	// otherwise markReconcileStart below would overwrite Status=Aborted with
+	// InProgress. Recovery is via spec edit: informer UpdateFunc re-enqueues
+	// on next apply.
+	if new.EnsureStatus().GetStatus() == api.StatusAborted {
+		w.a.M(new).F().Info("Normalize marked CR Aborted — skipping reconcile (recovery via spec edit)")
+		_ = w.c.updateCRObjectStatus(ctx, new, types.UpdateStatusOptions{
+			CopyStatusOptions: types.CopyStatusOptions{
+				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+					FieldGroupMain: true,
+				},
+			},
+		})
+		metrics.CRReconcilesAborted(ctx, new)
+		return nil
+	}
+
+	switch {
+	case new.Spec.Suspend.Value():
+		// if CR is suspended, should skip reconciliation
+		w.a.M(new).F().Info("Suspended CR")
+		if new.EnsureStatus().GetStatus() == api.StatusInProgress || new.EnsureRuntime().ActionPlan.HasActionsToDo() {
+			// Either was mid-reconcile when suspended, or has pending changes suppressed by suspend — mark as Aborted
+			new.EnsureStatus().ReconcileAbort()
+			_ = w.c.updateCRObjectStatus(ctx, new, types.UpdateStatusOptions{
+				CopyStatusOptions: types.CopyStatusOptions{
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupMain: true,
+					},
+				},
+			})
+			w.a.V(1).
+				WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
+				WithAction(new).
+				M(new).F().
+				Warning("reconcile aborted due to suspend")
+			metrics.CRReconcilesAborted(ctx, new)
+		} else {
+			metrics.CRReconcilesCompleted(ctx, new)
+		}
+		return nil
+	case new.HasReconcileWork():
+		w.a.M(new).F().Info("CR has reconcile work - continue reconcile")
+	case w.isAfterFinalizerInstalled(new.GetAncestorT(), new):
+		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
+	default:
+		w.a.M(new).F().Info("No reconcile work - abort reconcile")
+		metrics.CRReconcilesCompleted(ctx, new)
+		return nil
+	}
+
+	if err := w.markReconcileStart(ctx, new); err != nil {
+		return err
+	}
+	w.prepareMonitoring(new)
+	w.setHostStatusesPreliminary(ctx, new)
+	// Staging and reconcile share one failure path. An early return here would
+	// leave the CHK InProgress after markReconcileStart.
+	err := w.stageUncommittedScaleUpHosts(ctx, new)
+	if err == nil {
+		err = w.reconcile(ctx, new)
+	}
+	if err != nil {
+		if errors.Is(err, common.ErrCRUDDeferred) {
+			w.a.V(1).M(new).F().Info("Reconcile deferred — waiting for Raft quorum headroom")
+			new.EnsureStatus().PushError(fmt.Sprintf(
+				"[%s] deferred host disruption until Raft quorum headroom is available",
+				apiChk.StatusReasonRaftQuorumUnsafe,
+			))
+			_ = w.c.updateCRObjectStatus(ctx, new, types.UpdateStatusOptions{
+				CopyStatusOptions: types.CopyStatusOptions{
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupMain: true,
+					},
+				},
+			})
+			return err
+		}
+		// Something went wrong
+		w.a.WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithError(new).
+			M(new).F().
+			Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
+		err = common.ErrCRUDAbort
+		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
+		if errors.Is(err, common.ErrCRUDAbort) {
+			metrics.CRReconcilesAborted(ctx, new)
+		}
+		return err
+	}
+
+	// Reconcile successful
+	// Post-process added items
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("Reconcile is aborted. CR post-process: %s ", new.GetName())
+		return nil
+	}
+
+	w.clean(ctx, new)
+	w.addToMonitoring(new)
+	w.waitForIPAddresses(ctx, new)
+	if err := w.finalizeReconcileAndMarkCompleted(ctx, new); err != nil {
+		return err
+	}
+
+	metrics.CRReconcilesCompleted(ctx, new)
+	metrics.CRReconcilesTimings(ctx, new, time.Since(startTime).Seconds())
+
+	return nil
+}
+
+func (w *worker) buildCR(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
+	cr := w.createTemplatedCR(_cr)
+	w.newTask(cr, cr.GetAncestorT())
+	// fillCurSTS must be called before findMinMaxVersions to ensure deterministic
+	w.fillCurSTS(ctx, cr)
+	w.findMinMaxVersions(ctx, cr)
+	common.LogOldAndNew("norm stage 1:", cr.GetAncestorT(), cr)
+
+	templates := w.buildTemplates(cr)
+	ips := w.c.getPodsIPs(ctx, cr)
+	w.a.V(1).M(cr).Info("IPs of the CR %s: len: %d %v", util.NamespacedName(cr), len(ips), ips)
+	if len(ips) > 0 || len(templates) > 0 {
+		// Rebuild CR with known list of templates and additional IPs
+		opts := commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()
+		opts.DefaultUserAdditionalIPs = ips
+		opts.Templates = templates
+		cr = w.createTemplatedCR(_cr, opts)
+		w.newTask(cr, cr.GetAncestorT())
+		// fillCurSTS again because createTemplatedCR creates new host objects
+		w.fillCurSTS(ctx, cr)
+		w.findMinMaxVersions(ctx, cr)
+		common.LogOldAndNew("norm stage 2:", cr.GetAncestorT(), cr)
+	}
+
+	w.logSWVersion(ctx, cr)
+
+	actionPlan := api.MakeActionPlan(cr.GetAncestorT(), cr)
+	cr.EnsureRuntime().ActionPlan = actionPlan
+	cr.EnsureStatus().SetActionPlan(actionPlan)
+	w.a.V(1).M(cr).Info(actionPlan.Log("buildCR"))
+
+	return cr
+}
+
+func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
+	_cr, err := w.c.GetCR(obj)
+	if err != nil {
+		w.a.M(obj).F().Error("UNABLE-1 to find obj by labels: %v err: %v", obj.GetLabels(), err)
+		return nil, err
+	}
+	return w.buildCR(ctx, _cr), nil
+}
+
+func (w *worker) buildTemplates(chi *apiChk.ClickHouseKeeperInstallation) (templates []*apiChk.ClickHouseKeeperInstallation) {
+	return templates
+}
+
+func (w *worker) findMinMaxVersions(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+	// Create artifacts
+	cr.WalkHosts(func(host *api.Host) error {
+		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+		version := w.getHostSoftwareVersion(ctx, host)
+		host.Runtime.Version = version
+		return nil
+	})
+	cr.FindMinMaxVersions()
+}
+
+func (w *worker) fillCurSTS(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+	cr.WalkHosts(func(host *api.Host) error {
+		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+		return nil
+	})
+}
+
+func (w *worker) logSWVersion(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+	l := w.a.V(1).F()
+	cr.WalkHosts(func(host *api.Host) error {
+		l.M(host).Info("Host software version: %s %s", host.GetName(), host.Runtime.Version.Render())
+		return nil
+	})
+	l.M(cr).Info("CR software versions min=%s max=%s", cr.GetMinVersion().Render(), cr.GetMaxVersion().Render())
+}
+
+// reconcile reconciles Custom Resource
+func (w *worker) reconcile(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("Reconcile is aborted. CR: %s ", cr.GetName())
+		return nil
+	}
+
+	w.a.V(2).M(cr).S().P()
+	defer w.a.V(2).M(cr).E().P()
+
+	if counters := cr.GetHostsAttributesCounters(); counters.HasOnly(types.ObjectStatusRequested) {
+		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CR: %s", util.NamespaceNameString(cr))
+		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
+			FullFanOut: true,
+		})
+	} else {
+		w.a.V(1).M(cr).Info("Unable to use full fan-out mode. Counters: %s. CR: %s", counters, util.NamespaceNameString(cr))
+	}
+
+	return cr.WalkTillError(
+		ctx,
+		w.reconcileCRAuxObjectsPreliminary,
+		w.reconcileCluster,
+		w.reconcileCRAuxObjectsFinal,
+	)
+}
+
+// reconcileCRAuxObjectsPreliminary reconciles CR preliminary in order to ensure that ConfigMaps are in place
+func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("Reconcile is aborted. CR aux preliminary: %s ", cr.GetName())
+		return nil
+	}
+
+	w.a.V(2).M(cr).S().P()
+	defer w.a.V(2).M(cr).E().P()
+
+	// CR common ConfigMap without added hosts
+	cr.GetRuntime().LockCommonConfig()
+	if err := w.reconcileConfigMapCommon(ctx, cr, w.options()); err != nil {
+		w.a.F().Error("failed to reconcile config map common. err: %v", err)
+	}
+	cr.GetRuntime().UnlockCommonConfig()
+
+	// CR users ConfigMap - common for all hosts
+	if err := w.reconcileConfigMapCommonUsers(ctx, cr); err != nil {
+		w.a.F().Error("failed to reconcile config map users. err: %v", err)
+	}
+
+	return w.reconcileCRAuxObjectsPreliminaryDomain(ctx, cr)
+}
+
+func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
+	// Use a context-aware wait so a controller shutdown does not stall the
+	// worker for up to two minutes mid-reconcile. The wait windows below are
+	// best-effort pacing only; the function returns early on ctx cancellation.
+	// Same-size reconciles do not wait at all — a fixed 10s sleep previously left
+	// healthy ensembles cycling and delayed Completed.
+	d := w.membershipSettleDelay(cr)
+	if d == 0 {
+		return nil
+	}
+	w.a.V(1).M(cr).Info("Waiting %s for Keeper Raft membership to settle", d)
+	util.WaitContextDoneOrTimeout(ctx, d)
+	return nil
+}
+
+// reconcileCRServicePreliminary runs first stage of CR reconcile process
+func (w *worker) reconcileCRServicePreliminary(ctx context.Context, cr api.ICustomResource) error {
+	if cr.IsStopped() {
+		// Stopped CR must have no entry point
+		_ = w.c.deleteServiceCR(ctx, cr)
+	}
+	return nil
+}
+
+// reconcileCRServiceFinal runs second stage of CR reconcile process
+func (w *worker) reconcileCRServiceFinal(ctx context.Context, cr api.ICustomResource) error {
+	log.V(2).F().S().Info("second stage")
+	defer log.V(2).F().E().Info("second stage")
+
+	if cr.IsStopped() {
+		// Stopped CR must have no entry point
+		return nil
+	}
+
+	// Create entry point for the whole CR
+	for _, service := range w.task.Creator().CreateService(interfaces.ServiceCR) {
+		if service != nil {
+			prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCR).First()
+			if err := w.reconcileService(ctx, cr, service, prevService); err != nil {
+				// Service not reconciled
+				w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
+				return err
+			}
+			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
+		}
+	}
+
+	return nil
+}
+
+// reconcileCRAuxObjectsFinal reconciles CR global objects
+func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) (err error) {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("Reconcile is aborted. CR aux final: %s ", cr.GetName())
+		return nil
+	}
+
+	w.a.V(2).M(cr).S().P()
+	defer w.a.V(2).M(cr).E().P()
+
+	// CR ConfigMaps with update
+	cr.GetRuntime().LockCommonConfig()
+	err = w.reconcileConfigMapCommon(ctx, cr)
+	cr.GetRuntime().UnlockCommonConfig()
+
+	w.includeAllHostsIntoCluster(ctx, cr)
+	return err
+}
+
+func (w *worker) includeAllHostsIntoCluster(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+	// Not applicable
+}
+
+// reconcileConfigMapCommon reconciles common ConfigMap
+func (w *worker) reconcileConfigMapCommon(
+	ctx context.Context,
+	cr api.ICustomResource,
+	options ...*config.FilesGeneratorOptions,
+) error {
+	var opts *config.FilesGeneratorOptions
+	if len(options) > 0 {
+		opts = options[0]
+	}
+
+	// ConfigMap common for all resources in CR
+	// contains several sections, mapped as separated chopConfig files,
+	// such as remote servers, zookeeper setup, etc
+	configMapCommon := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommon, opts)
+	err := w.reconcileConfigMap(ctx, cr, configMapCommon)
+	if err == nil {
+		w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
+	} else {
+		w.task.RegistryFailed().RegisterConfigMap(configMapCommon.GetObjectMeta())
+	}
+	return err
+}
+
+// reconcileConfigMapCommonUsers reconciles all CHI's users ConfigMap
+// ConfigMap common for all users resources in CHI
+func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, cr api.ICustomResource) error {
+	// ConfigMap common for all users resources in CHI
+	configMapUsers := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommonUsers)
+	err := w.reconcileConfigMap(ctx, cr, configMapUsers)
+	if err == nil {
+		w.task.RegistryReconciled().RegisterConfigMap(configMapUsers.GetObjectMeta())
+	} else {
+		w.task.RegistryFailed().RegisterConfigMap(configMapUsers.GetObjectMeta())
+	}
+	return err
+}
+
+// reconcileConfigMapHost reconciles host's personal ConfigMap
+func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) error {
+	// ConfigMap for a host
+	configMap := w.task.Creator().CreateConfigMap(interfaces.ConfigMapHost, host)
+	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
+	if err == nil {
+		w.task.RegistryReconciled().RegisterConfigMap(configMap.GetObjectMeta())
+	} else {
+		w.task.RegistryFailed().RegisterConfigMap(configMap.GetObjectMeta())
+		return err
+	}
+
+	return nil
+}
+
+// reconcileHostStatefulSet reconciles host's StatefulSet
+func (w *worker) reconcileHostStatefulSet(
+	ctx context.Context,
+	host *api.Host,
+	opts *statefulset.ReconcileOptions,
+	snap hostEnsembleSnapshot,
+) error {
+	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
+	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
+
+	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. App version: %s", host.GetName(), host.Runtime.Version.Render())
+
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+	opts = w.prepareStsReconcileOptsWaitSection(host, opts, snap.rolling)
+	if err := w.ensureQuorumSafeToDisruptHost(ctx, host, opts, &snap); err != nil {
+		return err
+	}
+
+	forcedRestart := false
+	if w.shouldForceRestartHost(ctx, host) {
+		w.a.V(1).M(host).F().Info("Reconcile host STS force restart: %s", host.GetName())
+		_ = w.hostForceRestart(ctx, host, opts)
+		forcedRestart = true
+		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+	}
+	// After a force restart the STS was scaled down to 0 replicas. PrepareHostStatefulSetWithStatus
+	// compares fingerprints of the desired STS (replicas=1) vs the current STS (replicas=0, set by
+	// hostScaleDown). In the current codebase these fingerprints differ, so ObjectStatusSame is not
+	// returned. However, this is a safety guard: if the fingerprints ever compare equal (e.g. due to
+	// a litter serialization quirk in a specific build), ObjectStatusSame would cause ReconcileStatefulSet
+	// to skip the update and leave the host at 0 replicas. Override to ObjectStatusModified to guarantee
+	// the scale-up always proceeds after a forced restart of a non-stopped host.
+	if forcedRestart && !host.IsStopped() && host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) {
+		w.a.V(1).M(host).F().Info("Override ObjectStatusSame after force restart to ensure scale-up: %s", host.GetName())
+		host.GetReconcileAttributes().SetStatus(types.ObjectStatusModified)
+	}
+
+	// We are in place, where we can  reconcile StatefulSet to desired configuration.
+	w.a.V(1).M(host).F().Info("Reconcile host STS: %s. Reconcile StatefulSet", host.GetName())
+	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, true, opts)
+	if err == nil {
+		w.task.RegistryReconciled().RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
+	} else {
+		w.task.RegistryFailed().RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
+		if err == common.ErrCRUDIgnore {
+			// Pretend nothing happened in case of ignore
+			err = nil
+		}
+
+		host.GetCR().IEnsureStatus().HostFailed()
+		w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(host.GetCR()).
+			WithError(host.GetCR()).
+			M(host).F().
+			Error("FAILED to reconcile StatefulSet for host: %s", host.GetName())
+	}
+
+	return err
+}
+
+func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
+	w.a.V(1).M(host).F().Info("Reconcile host. Force restart: %s", host.GetName())
+
+	if host.IsStopped() || (w.hostSoftwareRestart(ctx, host) != nil) {
+		_ = w.hostScaleDown(ctx, host, opts)
+	}
+
+	metrics.HostReconcilesRestart(ctx, host.GetCR())
+
+	return nil
+}
+
+func (w *worker) hostSoftwareRestart(ctx context.Context, host *api.Host) error {
+	return fmt.Errorf("inapplicable so far")
+}
+
+func (w *worker) hostScaleDown(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
+	w.a.V(1).M(host).F().Info("Reconcile host. Host shutdown via scale down: %s", host.GetName())
+
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
+	// Use WaitUntilReady so the reconciler waits for Status.ReadyReplicas to reach 0
+	// (i.e., the pod fully terminates) before returning. Without this wait, the
+	// subsequent scale-up in reconcileHostStatefulSet sees Status.ReadyReplicas=1 for
+	// a Spec.Replicas=0 STS, making IsStatefulSetReady return false. That triggers the
+	// ErrCRUDRecreate path, which deletes the STS and then fails to recreate it with
+	// "already exists" (async deletion not yet complete), leaving the STS stuck at 0.
+	scaleDownOpts := statefulset.NewReconcileStatefulSetOptions().SetWaitUntilReady()
+	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, false, scaleDownOpts)
+	if err != nil {
+		w.a.V(1).M(host).F().Info("Host shutdown abort 1. Host: %s err: %v", host.GetName(), err)
+		return err
+	}
+
+	w.a.V(1).M(host).F().Info("Host shutdown success. Host: %s", host.GetName())
+	return nil
+}
+
+// reconcileHostService reconciles host's Service(s). A host may expose more than one Service
+// (the peer/Raft Service and the client-facing Service — see creator.createServiceHost), so all
+// of them are reconciled and registered; failing to register every reconciled Service would let
+// the cleanup pass purge it as an unknown object.
+func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error {
+	services := w.task.Creator().CreateService(interfaces.ServiceHost, host)
+	if len(services) == 0 {
+		// This is not a problem, service may be omitted
+		return nil
+	}
+	prevServices := w.task.CreatorPrev().CreateService(interfaces.ServiceHost, host.GetAncestor())
+	for i, service := range services {
+		if service == nil {
+			continue
+		}
+		// Pair with the previous-generation Service at the same index (creators emit a stable order).
+		var prevService *core.Service
+		if i < len(prevServices) {
+			prevService = prevServices[i]
+		}
+		err := w.reconcileService(ctx, host.GetCR(), service, prevService)
+		if err == nil {
+			w.a.V(1).M(host).F().Info("DONE Reconcile service %s of the host: %s", service.GetName(), host.GetName())
+			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
+		} else {
+			w.a.V(1).M(host).F().Warning("FAILED Reconcile service %s of the host: %s", service.GetName(), host.GetName())
+			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
+			return err
+		}
+	}
+	return nil
+}
+
+// reconcileCluster reconciles cluster, excluding nested shards
+func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.Cluster) error {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("Reconcile is aborted. Cluster: %s ", cluster.GetName())
+		return nil
+	}
+
+	w.a.V(2).M(cluster).S().P()
+	defer w.a.V(2).M(cluster).E().P()
+
+	if err := w.reconcileClusterService(ctx, cluster); err != nil {
+		return err
+	}
+	if err := w.reconcileClusterSecret(ctx, cluster); err != nil {
+		return err
+	}
+	if err := w.reconcileClusterPodDisruptionBudget(ctx, cluster); err != nil {
+		return err
+	}
+	if err := w.reconcileClusterShardsAndHosts(ctx, cluster); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (w *worker) reconcileClusterService(ctx context.Context, cluster *apiChk.Cluster) error {
+	// Add Cluster Service
+	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster).First(); service != nil {
+		prevService := w.task.CreatorPrev().CreateService(interfaces.ServiceCluster, cluster.GetAncestor()).First()
+		if err := w.reconcileService(ctx, cluster.GetRuntime().GetCR(), service, prevService); err == nil {
+			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
+		} else {
+			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
+		}
+	}
+	return nil
+}
+
+func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *apiChk.Cluster) error {
+	return nil
+}
+
+func (w *worker) reconcileClusterPodDisruptionBudget(ctx context.Context, cluster *apiChk.Cluster) error {
+	if cluster.GetPDBManaged().IsFalse() {
+		return nil
+	}
+
+	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
+	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
+		w.task.RegistryReconciled().RegisterPDB(pdb.GetObjectMeta())
+	} else {
+		w.task.RegistryFailed().RegisterPDB(pdb.GetObjectMeta())
+	}
+	return nil
+}
+
+// reconcileClusterShardsAndHosts reconciles shards and hosts of each shard
+func (w *worker) reconcileClusterShardsAndHosts(ctx context.Context, cluster *apiChk.Cluster) error {
+	shards := cluster.Layout.Shards[:]
+
+	// Sanity check - has to have shard(s)
+	if len(shards) == 0 {
+		return nil
+	}
+
+	log.V(1).F().S().Info("reconcileClusterShardsAndHosts start")
+	defer log.V(1).F().E().Info("reconcileClusterShardsAndHosts end")
+
+	opts := w.reconcileShardsAndHostsFetchOpts(ctx)
+
+	// Which shard to start concurrent processing with
+	var startShard int
+	deferred := false
+	if opts.FullFanOut {
+		// For full fan-out scenarios we'll start shards processing from the very beginning
+		startShard = 0
+		w.a.V(1).Info("full fan-out requested")
+	} else {
+		// For non-full fan-out scenarios, we'll process the first shard separately.
+		// This gives us some early indicator on whether the reconciliation would fail,
+		// and for large clusters it is a small price to pay before performing concurrent fan-out.
+		w.a.V(1).Info("starting first shard separately")
+		if err := w.reconcileShardWithHosts(ctx, shards[0]); err != nil {
+			if hard := noteCRUDResult(err, &deferred); hard != nil {
+				w.a.V(1).Warning("first shard failed, skipping rest of shards due to an error: %v", hard)
+				return hard
+			}
+		}
+
+		// Since shard with 0 index is already done, we'll proceed concurrently starting with the 1-st
+		startShard = 1
+	}
+
+	// Process shards using specified concurrency level while maintaining specified max concurrency percentage.
+	// Loop over shards.
+	workersNum := w.getReconcileShardsWorkersNum(cluster, opts)
+	w.a.V(1).Info("Starting rest of shards on workers. Workers num: %d", workersNum)
+	if err := w.runConcurrently(ctx, workersNum, startShard, shards[startShard:]); err != nil {
+		if hard := noteCRUDResult(err, &deferred); hard != nil {
+			w.a.V(1).Info("Finished with ERROR rest of shards on workers: %d, err: %v", workersNum, hard)
+			return hard
+		}
+	}
+	w.a.V(1).Info("Finished successfully rest of shards on workers: %d", workersNum)
+	if deferred {
+		return common.ErrCRUDDeferred
+	}
+	return nil
+}
+
+func (w *worker) reconcileShardWithHosts(ctx context.Context, shard api.IShard) error {
+	if err := w.reconcileShard(ctx, shard); err != nil {
+		return err
+	}
+
+	// Recovery first, then rollout: bring a replica that is already down back up before
+	// touching its healthy peer, so an interrupted roll cannot take the ensemble below
+	// Raft quorum. Disruption itself is gated in reconcileHostStatefulSet, which
+	// only engages at 3+ members - this ordering is what protects the smaller ensembles.
+	deferred := false
+	for _, host := range shardHostsRecoveryFirst(shard, func(h *api.Host) bool {
+		return w.isHostHealthyForReconcile(ctx, h)
+	}) {
+		if err := noteCRUDResult(w.reconcileHost(ctx, host), &deferred); err != nil {
+			return err
+		}
+	}
+	if deferred {
+		return common.ErrCRUDDeferred
+	}
+	return nil
+}
+
+// reconcileShard reconciles specified shard, excluding nested replicas
+func (w *worker) reconcileShard(ctx context.Context, shard api.IShard) error {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("Reconcile is aborted. Shard: %s ", shard.GetName())
+		return nil
+	}
+
+	w.a.V(2).M(shard).S().P()
+	defer w.a.V(2).M(shard).E().P()
+
+	err := w.reconcileShardService(ctx, shard)
+
+	return err
+}
+
+func (w *worker) reconcileShardService(ctx context.Context, shard api.IShard) error {
+	return nil
+}
+
+// reconcileHost reconciles specified ClickHouse host
+func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("Reconcile is aborted. Host: %s ", host.GetName())
+		return nil
+	}
+	// Before the test seam: an interrupted 1→N retry never reaches STS reconcile
+	// for the previous joiner's Ready wait (ObjectStatusSame returns first).
+	// The next missing joiner has to be postponed here, while the loop continues
+	// so existing members can still roll.
+	if err := w.deferUnreadyStagedAdmit(ctx, host); err != nil {
+		if errors.Is(err, errSkipStagedAdmit) {
+			return nil
+		}
+		return err
+	}
+	// Below the ctx check on purpose: a cancelled reconcile must short-circuit identically
+	// whether or not the seam is armed, or the host loop becomes un-modellable under shutdown.
+	if w.reconcileHostFn != nil {
+		return w.reconcileHostFn(ctx, host)
+	}
+
+	w.a.V(2).M(host).S().P()
+	defer w.a.V(2).M(host).E().P()
+
+	metrics.HostReconcilesStarted(ctx, host.GetCR())
+	startTime := time.Now()
+
+	if host.IsFirstInCR() {
+		_ = w.reconcileCRServicePreliminary(ctx, host.GetCR())
+		defer w.reconcileCRServiceFinal(ctx, host.GetCR())
+	}
+
+	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), host.Runtime.Version.Render())
+
+	if err := w.reconcileHostPrepare(ctx, host); err != nil {
+		return err
+	}
+	if err := w.reconcileHostMain(ctx, host); err != nil {
+		return err
+	}
+	// Host is now added and functional
+
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
+		host.GetReconcileAttributes().SetStatus(types.ObjectStatusCreated)
+	}
+	if err := w.reconcileHostIncludeIntoAllActivities(ctx, host); err != nil {
+		return err
+	}
+
+	now := time.Now()
+	hostsCompleted := 0
+	hostsCount := 0
+	host.GetCR().IEnsureStatus().HostCompleted()
+	if host.GetCR() != nil && host.GetCR().GetStatus() != nil {
+		hostsCompleted = host.GetCR().GetStatus().GetHostsCompletedCount()
+		hostsCount = host.GetCR().GetStatus().GetHostsCount()
+	}
+	w.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionProgress, a.EventReasonProgressHostsCompleted).
+		WithAction(host.GetCR()).
+		M(host).F().
+		Info("[now: %s] %s: %d of %d", now, a.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+
+	_ = w.c.updateCRObjectStatus(ctx, host.GetCR(), types.UpdateStatusOptions{
+		CopyStatusOptions: types.CopyStatusOptions{
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupMain: true,
+			},
+		},
+	})
+
+	metrics.HostReconcilesCompleted(ctx, host.GetCR())
+	metrics.HostReconcilesTimings(ctx, host.GetCR(), time.Since(startTime).Seconds())
+
+	return nil
+}
+
+// reconcileHostPrepare reconciles specified ClickHouse host
+func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error {
+	if host.GetReconcileAttributes().IsExclude() {
+		// Stay out of raft_configuration until immediately before STS create.
+		// Publishing here would leave the server in XML if ConfigMapHost / PVC
+		// abort before the StatefulSet exists.
+		w.a.V(1).
+			M(host).F().
+			Info("Skip raft include in prepare; host is staged. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return nil
+	}
+
+	w.a.V(1).
+		M(host).F().
+		Info("Include host into cluster. Host/shard/cluster: %d/%d/%s",
+			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+
+	// Steady state. A transient ConfigMap conflict must not abort the pass;
+	// the next reconcile republishes. Staged admission checks this error itself.
+	if err := w.includeHostIntoRaftCluster(ctx, host); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Prepare - unable to publish raft_configuration, continuing. Host: %s Err: %v", host.GetName(), err)
+	}
+	return nil
+}
+
+// reconcileHostMain reconciles specified ClickHouse host
+func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
+	var (
+		stsReconcileOpts *statefulset.ReconcileOptions
+	)
+
+	// Reconcile ConfigMap
+	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to reconcile ConfigMap. Host: %s Err: %v", host.GetName(), err)
+		return err
+	}
+
+	w.setHasData(host)
+
+	w.a.V(1).M(host).F().Info("Reconcile PVCs and data loss for host: %s", host.GetName())
+
+	// In case data loss or volumes missing detected we may
+	// 1. need to specify additional reconcile options
+	// 2. abort the reconcile completely
+	err := w.reconcileHostPVCs(ctx, host)
+	onDataLoss := host.GetCluster().GetReconcile().StatefulSet.Recreate.OnDataLoss
+	switch {
+	case storage.ErrIsVolumeAdded(err):
+		// A volume was ADDED to a host that already has data - nothing was lost, so onDataLoss
+		// deliberately does not gate this. CHI mirror: worker-reconciler-chi.go.
+		stsReconcileOpts = w.hostPVCsDataVolumeAddedDetectedOptions(host)
+	case storage.ErrIsDataLoss(err):
+		if onDataLoss == api.OnStatefulSetRecreateOnDataLossActionAbort {
+			w.a.V(1).M(host).F().Warning("Data loss detected for host: %s. Aborting reconcile as configured (onDataLoss: abort)", host.GetName())
+			return common.ErrCRUDAbort
+		}
+		stsReconcileOpts = w.hostPVCsDataLossDetectedOptions(host)
+		w.a.V(1).
+			M(host).F().
+			Info("Data loss detected for host: %s.", host.GetName())
+	case storage.ErrIsVolumeMissed(err):
+		if onDataLoss == api.OnStatefulSetRecreateOnDataLossActionAbort {
+			w.a.V(1).M(host).F().Warning("Data volume missed for host: %s. Aborting reconcile as configured (onDataLoss: abort)", host.GetName())
+			return common.ErrCRUDAbort
+		}
+		// stsReconcileOpts, migrateTableOpts = w.hostPVCsDataVolumeMissedDetectedOptions(host)
+		stsReconcileOpts = w.hostPVCsDataLossDetectedOptions(host)
+		w.a.V(1).
+			M(host).F().
+			Info("Data volume missed detected for host: %s.", host.GetName())
+	}
+
+	// Reconcile Service
+	if err := w.reconcileHostService(ctx, host); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to reconcile Service. Host: %s Err: %v", host.GetName(), err)
+	}
+
+	// Admit this host into raft_configuration before creating its StatefulSet,
+	// so the new pod starts with itself already in the published membership.
+	// Remaining staged hosts stay excluded.
+	admitted, admitErr := w.publishStagedAdmit(ctx, host)
+	if admitErr != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to publish host into raft_configuration. Host: %s Err: %v", host.GetName(), admitErr)
+		return admitErr
+	}
+
+	// Snapshot the ensemble and reconcile the StatefulSet against that same snapshot.
+	snap, err := w.reconcileHostStatefulSetWithEnsembleSnapshot(ctx, host, stsReconcileOpts)
+	if err != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
+		// Publication already cleared exclude. Put the host back and republish
+		// so a 1+1 scale-up does not keep a 2-of-2 quorum with no Pod.
+		if admitted {
+			w.rollbackStagedRaftAdmit(ctx, host)
+		}
+		return err
+	}
+
+	// Polish all new volumes that the operator has to create
+	if err := w.reconcileHostPVCs(ctx, host); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to reconcile PVC. Host: %s Err: %v", host.GetName(), err)
+	}
+
+	// Finalize main reconcile with domain activities.
+	// Membership / ensemble gates must abort the host loop — continuing would
+	// recreate the next replica while this one never rejoined.
+	if err := w.reconcileHostMainDomain(ctx, host, snap); err != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - ensemble join gate failed. Host: %s Err: %v", host.GetName(), err)
+		return err
+	}
+
+	return nil
+}
+
+// reconcileHostStatefulSetWithEnsembleSnapshot freezes ensemble state and reconciles the host
+// StatefulSet against that very snapshot.
+//
+// The two steps are one unit on purpose. Both quorum protections - the Raft disrupt gate and the
+// STS Ready wait - hang off snap.rolling, and an empty snapshot reads as bootstrap, which turns
+// both OFF silently. Wired inline this pairing had no unit under test: every gate test supplies a
+// snapshot of its own, so passing a literal, taking the snapshot after the disruption, or
+// demoting its error to a warning all left the suite green while the operator rolled an ensemble
+// below Raft majority.
+func (w *worker) reconcileHostStatefulSetWithEnsembleSnapshot(
+	ctx context.Context,
+	host *api.Host,
+	opts *statefulset.ReconcileOptions,
+) (hostEnsembleSnapshot, error) {
+	// Snapshot rolling vs bootstrap before any STS disruption on this host.
+	snap, err := w.snapshotHostEnsemble(ctx, host)
+	if err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to read ensemble readiness. Host: %s Err: %v", host.GetName(), err)
+		return hostEnsembleSnapshot{}, err
+	}
+
+	if err := w.reconcileHostStatefulSet(ctx, host, opts, snap); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to reconcile StatefulSet. Host: %s Err: %v", host.GetName(), err)
+		return snap, err
+	}
+
+	return snap, nil
+}
+
+func (w *worker) reconcileHostPVCs(ctx context.Context, host *api.Host) storage.ErrorDataPersistence {
+	return storage.NewStorageReconciler(
+		w.task,
+		w.c.namer,
+		storage.NewStoragePVC(w.c.kube.Storage()),
+	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+}
+
+func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, snap hostEnsembleSnapshot) error {
+	if !host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusRequested) {
+		return nil
+	}
+
+	// Staged 1→N joins are serialized by deferUnreadyStagedAdmit, not by this sleep.
+	if hostIsStagedScaleUpJoin(host) {
+		return w.verifyHostEnsembleMembership(ctx, host)
+	}
+
+	if !snap.rolling {
+		// Fresh bootstrap / resume-from-stopped / recovery: peers start together;
+		// legacy pacing wait (Ready wait was skipped on STS).
+		util.WaitContextDoneOrTimeout(ctx, 7*time.Second)
+		return nil
+	}
+
+	// Extension point for richer Raft membership confirmation.
+	return w.verifyHostEnsembleMembership(ctx, host)
+}
+
+// reconcileHostIncludeIntoAllActivities includes specified ClickHouse host into all activities
+func (w *worker) reconcileHostIncludeIntoAllActivities(ctx context.Context, host *api.Host) error {
+	if !w.shouldIncludeHost(host) {
+		w.a.V(1).
+			M(host).F().
+			Info("No need to include host into cluster. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return nil
+	}
+
+	// Include host back into all activities - such as cluster, service, etc
+	err := w.includeHost(ctx, host)
+	if err != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host interrupted with an error 4. Host: %s Err: %v", host.GetName(), err)
+		return err
+	}
+
+	l := w.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileCompleted).
+		WithAction(host.GetCR()).
+		M(host).F()
+
+	// In case host is unable to report its version we are done with inclusion
+	switch {
+	case host.IsStopped():
+		l.Info("Reconcile Host completed. Host is stopped: %s", host.GetName())
+		return nil
+	case host.IsTroubleshoot():
+		l.Info("Reconcile Host completed. Host is in troubleshoot mode: %s", host.GetName())
+		return nil
+	}
+
+	// Report host software version
+	version := w.getHostSoftwareVersion(ctx, host)
+	l.Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version.Render())
+
+	return nil
+}

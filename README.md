@@ -1,6 +1,6 @@
-# Altinity Kubernetes Operator for ClickHouse
+# Altinity® Kubernetes Operator for ClickHouse®
 
-Altinity Kubernetes Operator for ClickHouse creates, configures and manages ClickHouse clusters running on Kubernetes.
+The Altinity Kubernetes Operator for ClickHouse creates, configures and manages ClickHouse clusters running on Kubernetes.
 
 [![Build Master](https://github.com/Altinity/clickhouse-operator/actions/workflows/build_master.yaml/badge.svg)](https://github.com/Altinity/clickhouse-operator/actions/workflows/build_master.yaml)
 [![GitHub release](https://img.shields.io/github/v/release/altinity/clickhouse-operator?include_prereleases)](https://img.shields.io/github/v/release/altinity/clickhouse-operator?include_prereleases)
@@ -9,6 +9,9 @@ Altinity Kubernetes Operator for ClickHouse creates, configures and manages Clic
 [![Go version](https://img.shields.io/github/go-mod/go-version/altinity/clickhouse-operator)](https://img.shields.io/github/go-mod/go-version/altinity/clickhouse-operator)
 [![Go Report Card](https://goreportcard.com/badge/github.com/altinity/clickhouse-operator)](https://goreportcard.com/report/github.com/altinity/clickhouse-operator)
 [![issues](https://img.shields.io/github/issues/altinity/clickhouse-operator.svg)](https://github.com/altinity/clickhouse-operator/issues)
+<a href="https://altinity.com/slack">
+  <img src="https://img.shields.io/static/v1?logo=slack&logoColor=959DA5&label=Slack&labelColor=333a41&message=join%20conversation&color=3AC358" alt="AltinityDB Slack" />
+</a>
 
 ## Features
 
@@ -21,10 +24,24 @@ Altinity Kubernetes Operator for ClickHouse creates, configures and manages Clic
 - ClickHouse cluster scaling including automatic schema propagation
 - ClickHouse version upgrades
 - Exporting ClickHouse metrics to Prometheus
+- FIPS 140-3 compatible operator + metrics-exporter images
+  (`GOFIPS140=v1.0.0`, `GODEBUG=fips140=on` by default) — see
+  [Security Hardening][security_hardening] for the FIPS scope, prerequisites,
+  and opt-in strict mode. An optional ACVP responder (NIST cryptographic
+  validation protocol) is available via `-tags acvp_wrapper` builds; see
+  [`pkg/util/fips/acvp/README.md`](./pkg/util/fips/acvp/README.md).
+
+## Community
+
+The Altinity Kubernetes Operator for ClickHouse is a community effort sponsored by Altinity. The best way to reach us or ask questions is:
+
+* Join the [Altinity Slack](https://altinity.com/slack) - Chat with the developers and other users
+* Log an [issue on GitHub](https://github.com/Altinity/clickhouse-operator/issues) - Ask questions, log bugs and feature requests
 
 ## Requirements
 
- * Kubernetes 1.19+
+ * Kubernetes 1.25+
+ * ClickHouse 21.11+. For older ClickHouse versions use operator 0.23.7 or earlier.
  
 ## Documentation
 
@@ -37,6 +54,7 @@ Altinity Kubernetes Operator for ClickHouse creates, configures and manages Clic
    * [Setting up Zookeeper][zookeeper_setup]
  * [Persistent Storage Configuration][storage_configuration]
  * [Security Hardening][security_hardening]
+ * [FIPS configuration][fips_setup]
  * [ClickHouse Installation Custom Resource specification][crd_explained]
  
 **Maintenance tasks**
@@ -60,11 +78,12 @@ Altinity Kubernetes Operator for ClickHouse creates, configures and manages Clic
  
 ## License
 
-Copyright (c) 2019-2023, Altinity Inc and/or its affiliates. All rights reserved.
+Copyright (c) 2019-2026, Altinity Inc and/or its affiliates.
 
-Altinity Kubernetes Operator for ClickHouse is licensed under the Apache License 2.0.
+Altinity Kubernetes Operator for ClickHouse is licensed under the Apache License, Version 2.0.
+See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
 
-See [LICENSE](./LICENSE) for more details.
+Third-party Go dependency attributions are listed in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
 ## Commercial Support
 
@@ -75,7 +94,7 @@ services related to ClickHouse and analytic applications on Kubernetes.
 - [Official website](https://altinity.com/) - Get a high level overview of Altinity and our offerings.
 - [Altinity.Cloud](https://altinity.com/cloud-database/) - Run ClickHouse in our cloud or yours.
 - [Altinity Support](https://altinity.com/support/) - Get Enterprise-class support for ClickHouse.
-- [Slack](https://altinitydbworkspace.slack.com/join/shared_invite/zt-1togw9b4g-N0ZOXQyEyPCBh_7IEHUjdw#/shared-invite/email) - Talk directly with ClickHouse users and Altinity devs.
+- [Slack](https://altinity.com/slack) - Talk directly with ClickHouse users and Altinity devs.
 - [Contact us](https://hubs.la/Q020sH3Z0) - Contact Altinity with your questions or issues.
 - [Free consultation](https://hubs.la/Q020sHkv0) - Get a free consultation with a ClickHouse expert today.
  
@@ -99,3 +118,5 @@ services related to ClickHouse and analytic applications on Kubernetes.
 [devspace_manual]: ./docs/devspace.md
 [all_docs_list]: ./docs/README.md
 [security_hardening]: ./docs/security_hardening.md
+[security_hardening_fips]: ./docs/security_hardening_fips.md
+[fips_setup]: ./docs/fips_setup.md

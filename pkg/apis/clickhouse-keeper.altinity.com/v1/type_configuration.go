@@ -1,0 +1,94 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package v1
+
+import (
+	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+)
+
+// Configuration defines configuration section of .spec
+type Configuration struct {
+	Settings *apiChi.Settings `json:"settings,omitempty"  yaml:"settings,omitempty"`
+	Files    *apiChi.Settings `json:"files,omitempty"     yaml:"files,omitempty"`
+	Clusters []*Cluster       `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
+}
+
+// NewConfiguration creates new ChkConfiguration objects
+func NewConfiguration() *Configuration {
+	return new(Configuration)
+}
+
+func (c *Configuration) Ensure() *Configuration {
+	if c == nil {
+		c = NewConfiguration()
+	}
+	return c
+}
+
+func (c *Configuration) GetUsers() *apiChi.Settings {
+	return nil
+}
+
+func (c *Configuration) GetProfiles() *apiChi.Settings {
+	return nil
+}
+
+func (c *Configuration) GetQuotas() *apiChi.Settings {
+	return nil
+}
+
+func (c *Configuration) GetSettings() *apiChi.Settings {
+	if c == nil {
+		return nil
+	}
+	return c.Settings
+}
+
+func (c *Configuration) GetFiles() *apiChi.Settings {
+	if c == nil {
+		return nil
+	}
+	return c.Files
+}
+
+// GetZookeeper is a no-op for CHK's Configuration — CHK doesn't reference zookeeper/keeper.
+// Satisfies apiChi.IConfiguration.
+func (c *Configuration) GetZookeeper() *apiChi.ZookeeperConfig {
+	return nil
+}
+
+// GetClusters is a no-op for CHK's Configuration — CHK clusters are not CHI clusters and
+// don't participate in CHI zookeeper resolution. Satisfies apiChi.IConfiguration.
+func (c *Configuration) GetClusters() []*apiChi.Cluster {
+	return nil
+}
+
+// MergeFrom merges from specified source
+func (c *Configuration) MergeFrom(from *Configuration, _type apiChi.MergeType) *Configuration {
+	if from == nil {
+		return c
+	}
+
+	c = c.Ensure()
+
+	c.Settings = c.Settings.MergeFrom(from.Settings, _type)
+	c.Files = c.Files.MergeFrom(from.Files, _type)
+
+	// TODO merge clusters
+	// Copy Clusters for now
+	c.Clusters = from.Clusters
+
+	return c
+}

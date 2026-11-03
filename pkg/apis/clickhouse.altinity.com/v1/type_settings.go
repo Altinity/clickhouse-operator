@@ -15,15 +15,17 @@
 package v1
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
 	"strings"
 
-	"gopkg.in/d4l3k/messagediff.v1"
-
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/xml"
+	"gopkg.in/d4l3k/messagediff.v1"
 )
 
 // Specify returned errors for being re-used
@@ -46,27 +48,39 @@ type SettingsName2KeyConverter interface {
 
 // Settings specifies settings
 type Settings struct {
-	// m is a data storage
-	m map[string]*Setting
+	// data is a data storage
+	data map[string]*Setting
 	// converter is an interface to describe different converters.
 	// Implements 'Strategy' pattern.
 	converter SettingsName2KeyConverter `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
+var (
+	// unimplemented
+	//_ yaml.Marshaler   = &Settings{}
+	//_ yaml.Unmarshaler = &Settings{}
+	_ json.Marshaler   = &Settings{}
+	_ json.Unmarshaler = &Settings{}
+)
+
 // NewSettings creates new settings
 func NewSettings() *Settings {
 	s := &Settings{}
-	s.ensureInternals()
+	s.ensureDataStorage()
 	return s
 }
 
-// ensureInternals ensures all internals of the structure are in place
-func (s *Settings) ensureInternals() {
+func NewSettingsScalarFromMap(m map[string]string) *Settings {
+	return NewSettings().SetScalarsFromMap(m)
+}
+
+// ensureDataStorage ensures all internals of the structure are in place
+func (s *Settings) ensureDataStorage() {
 	if s == nil {
 		return
 	}
-	if s.m == nil {
-		s.m = make(map[string]*Setting)
+	if s.data == nil {
+		s.data = make(map[string]*Setting)
 	}
 }
 
@@ -76,10 +90,28 @@ func (s *Settings) ensureConverter() SettingsName2KeyConverter {
 		// Just return converter
 		return NewSettingsName2KeyConverterPlain()
 	}
-	if s.converter == nil {
-		s.converter = NewSettingsName2KeyConverterPlain()
+	if !s.HasConverter() {
+		s.SetConverter(NewSettingsName2KeyConverterPlain())
+	}
+	return s.GetConverter()
+}
+
+func (s *Settings) SetConverter(converter SettingsName2KeyConverter) *Settings {
+	if s != nil {
+		s.converter = converter
+	}
+	return s
+}
+
+func (s *Settings) GetConverter() SettingsName2KeyConverter {
+	if s == nil {
+		return nil
 	}
 	return s.converter
+}
+
+func (s *Settings) HasConverter() bool {
+	return s.GetConverter() != nil
 }
 
 // Ensure ensures settings are in place
@@ -105,7 +137,7 @@ func (s *Settings) Len() int {
 	if s == nil {
 		return 0
 	}
-	return len(s.m)
+	return len(s.data)
 }
 
 // WalkKeys walks over settings with a function. Function receives key and setting.
@@ -117,7 +149,7 @@ func (s *Settings) WalkKeys(f func(key string, setting *Setting)) {
 		return
 	}
 	// Walk storage keys
-	for key := range s.m {
+	for key := range s.data {
 		f(key, s.GetKey(key))
 	}
 }
@@ -155,6 +187,14 @@ func (s *Settings) WalkSafe(f func(name string, setting *Setting)) {
 	})
 }
 
+// WalkNames walks over settings with a function. Function receives name.
+// Storage key is used internally.
+func (s *Settings) WalkNames(f func(name string)) {
+	s.WalkKeys(func(key string, _setting *Setting) {
+		f(s.Key2Name(key))
+	})
+}
+
 // HasKey checks whether key setting exists.
 func (s *Settings) HasKey(key string) bool {
 	if s == nil {
@@ -164,7 +204,7 @@ func (s *Settings) HasKey(key string) bool {
 		return false
 	}
 	// Check storage key exists
-	_, ok := s.m[key]
+	_, ok := s.data[key]
 	return ok
 }
 
@@ -183,7 +223,7 @@ func (s *Settings) GetKey(key string) *Setting {
 		return nil
 	}
 	// get value by storage key
-	return s.m[key]
+	return s.data[key]
 }
 
 // Get gets named setting.
@@ -192,14 +232,20 @@ func (s *Settings) Get(name string) *Setting {
 	return s.GetKey(s.Name2Key(name))
 }
 
+// GetA gets named setting.
+// Storage key is used internally.
+func (s *Settings) GetA(name string) any {
+	return s.GetKey(s.Name2Key(name))
+}
+
 // SetKey sets key setting.
 func (s *Settings) SetKey(key string, setting *Setting) *Settings {
 	if s == nil {
 		return s
 	}
-	s.ensureInternals()
+	s.ensureDataStorage()
 	// Set with storage key
-	s.m[key] = setting
+	s.data[key] = setting
 	return s
 }
 
@@ -218,7 +264,7 @@ func (s *Settings) DeleteKey(key string) {
 		return
 	}
 	// Delete storage key
-	delete(s.m, key)
+	delete(s.data, key)
 }
 
 // Delete deletes named setting
@@ -254,11 +300,15 @@ func (s *Settings) SetScalarsFromMap(m map[string]string) *Settings {
 	return s
 }
 
-// Keys gets keys of the settings
+// Keys gets keys of the settings in alphabetical order
 func (s *Settings) Keys() (keys []string) {
 	s.WalkKeys(func(key string, setting *Setting) {
 		keys = append(keys, key)
 	})
+
+	// Sort keys to ensure deterministic ordering for Kubernetes manifest stability.
+	// Consistent ordering prevents unnecessary resource updates during reconciliation.
+	sort.Strings(keys)
 	return keys
 }
 
@@ -293,8 +343,28 @@ func (s *Settings) Groups() []string {
 
 // UnmarshalJSON unmarshal JSON
 func (s *Settings) UnmarshalJSON(data []byte) error {
+	return s.unmarshal(data, json.Unmarshal)
+}
+
+// MarshalJSON marshals JSON
+func (s *Settings) MarshalJSON() ([]byte, error) {
+	return s.marshal(json.Marshal)
+}
+
+//// UnmarshalYAML unmarshal YAML
+//func (s *Settings) UnmarshalYAML(data []byte) error {
+//	return s.unmarshal(data, yaml.Unmarshal)
+//}
+
+//// MarshalYAML marshals YAML
+//func (s *Settings) MarshalYAML() ([]byte, error) {
+//	return s.marshal(yaml.Marshal)
+//}
+
+// unmarshal
+func (s *Settings) unmarshal(data []byte, unmarshaller func(data []byte, v any) error) error {
 	if s == nil {
-		return fmt.Errorf("unable to unmashal with nil")
+		return fmt.Errorf("unable to unmarshal with nil")
 	}
 
 	// Prepare untyped map at first
@@ -302,7 +372,7 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 	var untypedMap untypedMapType
 
 	// Provided binary data is expected to unmarshal into untyped map, because settings are map-like struct
-	if err := json.Unmarshal(data, &untypedMap); err != nil {
+	if err := unmarshaller(data, &untypedMap); err != nil {
 		return err
 	}
 
@@ -313,96 +383,105 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 
 	// Create entries from untyped map in result settings
 	for key, untyped := range untypedMap {
-		if scalarSetting, ok := NewSettingScalarFromAny(untyped); ok && scalarSetting.HasValue() {
-			s.SetKey(key, scalarSetting)
-			continue // for
+		if setting, err := NewSettingFromAny(untyped); err == nil {
+			s.SetKey(key, setting)
+		} else {
+			// Unknown type of entry in untyped map
+			// Should error be reported?
+			// Skip for now
 		}
-
-		if vectorSetting, ok := NewSettingVectorFromAny(untyped); ok && vectorSetting.HasValue() {
-			s.SetKey(key, vectorSetting)
-			continue // for
-		}
-
-		if srcSetting, ok := NewSettingSourceFromAny(untyped); ok && srcSetting.HasValue() {
-			s.SetKey(key, srcSetting)
-			continue // for
-		}
-
-		// Unknown type of entry in untyped map
-		// Should error be reported?
-		// Skip for now
 	}
 
 	return nil
 }
 
-// MarshalJSON marshals JSON
-func (s *Settings) MarshalJSON() ([]byte, error) {
+// marshal
+func (s *Settings) marshal(marshaller func(v any) ([]byte, error)) ([]byte, error) {
 	if s == nil {
-		return json.Marshal(nil)
+		return marshaller(nil)
 	}
 
-	raw := make(map[string]interface{})
+	raw := make(map[string]any)
 	s.WalkKeys(func(key string, setting *Setting) {
 		raw[key] = setting.AsAny()
 	})
 
-	return json.Marshal(raw)
+	return marshaller(raw)
 }
 
-// fetchPort is the base function to fetch int32 port value
-func (s *Settings) fetchPort(name string) int32 {
-	return int32(s.Get(name).ScalarInt())
+// getInt32Ptr gets Int32 pointer value
+func (s *Settings) getInt32Ptr(name string) *types.Int32 {
+	return s.Get(name).ScalarInt32Ptr()
 }
 
 // GetTCPPort gets TCP port from settings
-func (s *Settings) GetTCPPort() int32 {
-	return s.fetchPort("tcp_port")
+func (s *Settings) GetTCPPort() *types.Int32 {
+	return s.getInt32Ptr("tcp_port")
 }
 
 // GetTCPPortSecure gets TCP port secure from settings
-func (s *Settings) GetTCPPortSecure() int32 {
-	return s.fetchPort("tcp_port_secure")
+func (s *Settings) GetTCPPortSecure() *types.Int32 {
+	return s.getInt32Ptr("tcp_port_secure")
 }
 
 // GetHTTPPort gets HTTP port from settings
-func (s *Settings) GetHTTPPort() int32 {
-	return s.fetchPort("http_port")
+func (s *Settings) GetHTTPPort() *types.Int32 {
+	return s.getInt32Ptr("http_port")
 }
 
 // GetHTTPSPort gets HTTPS port from settings
-func (s *Settings) GetHTTPSPort() int32 {
-	return s.fetchPort("https_port")
+func (s *Settings) GetHTTPSPort() *types.Int32 {
+	return s.getInt32Ptr("https_port")
 }
 
 // GetInterserverHTTPPort gets interserver HTTP port from settings
-func (s *Settings) GetInterserverHTTPPort() int32 {
-	return s.fetchPort("interserver_http_port")
+func (s *Settings) GetInterserverHTTPPort() *types.Int32 {
+	return s.getInt32Ptr("interserver_http_port")
 }
 
-// MergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
-func (s *Settings) MergeFrom(src *Settings) *Settings {
-	if src.Len() == 0 {
+// GetZKPort gets Zookeeper port from settings
+func (s *Settings) GetZKPort() *types.Int32 {
+	return s.getInt32Ptr("keeper_server/tcp_port")
+}
+
+// GetZKPortSecure gets Zookeeper secure (TLS) port from settings
+func (s *Settings) GetZKPortSecure() *types.Int32 {
+	return s.getInt32Ptr("keeper_server/tcp_port_secure")
+}
+
+// GetRaftPort gets Raft port from settings
+func (s *Settings) GetRaftPort() *types.Int32 {
+	return s.getInt32Ptr("keeper_server/raft_configuration/server/port")
+}
+
+// MergeFrom merges `from` into the receiver: override replaces a key the receiver already has, fill-empty keeps it
+func (s *Settings) MergeFrom(from *Settings, _type MergeType) *Settings {
+	if from.Len() == 0 {
 		return s
 	}
 
-	src.Walk(func(name string, value *Setting) {
-		s = s.Ensure().SetIfNotExists(name, value)
+	s = s.Ensure()
+	set := s.SetIfNotExists
+	if _type == MergeTypeOverrideByNonEmptyValues {
+		set = s.Set
+	}
+	from.Walk(func(key string, setting *Setting) {
+		set(key, setting.Clone())
 	})
 
 	return s
 }
 
 // MergeFromCB merges settings from src approved by filtering callback function
-func (s *Settings) MergeFromCB(src *Settings, filter func(name string, setting *Setting) bool) *Settings {
+func (s *Settings) MergeFromCB(src *Settings, filter func(key string, setting *Setting) bool) *Settings {
 	if src.Len() == 0 {
 		return s
 	}
 
-	src.Walk(func(name string, value *Setting) {
-		if filter(name, value) {
+	src.Walk(func(key string, setting *Setting) {
+		if filter(key, setting) {
 			// Accept this setting
-			s = s.Ensure().Set(name, value)
+			s = s.Ensure().Set(key, setting.Clone())
 		}
 	})
 
@@ -416,7 +495,7 @@ func (s *Settings) GetSection(section SettingsSection, includeSettingWithNoSecti
 	}
 
 	s.WalkKeys(func(key string, setting *Setting) {
-		_section, err := getSectionFromPath(key)
+		_section, err := GetSectionFromPath(key)
 		switch {
 		case (err == nil) && !_section.Equal(section):
 			// Section is specified in this key.
@@ -467,7 +546,7 @@ func (s *Settings) Filter(
 	}
 
 	s.WalkKeys(func(key string, _ *Setting) {
-		section, err := getSectionFromPath(key)
+		section, err := GetSectionFromPath(key)
 
 		if (err != nil) && (err != errorNoSectionSpecified) {
 			// We have a complex error, skip to the next
@@ -518,9 +597,20 @@ func (s *Settings) AsSortedSliceOfStrings() []string {
 	return res
 }
 
+// +k8s:deepcopy-gen=false
+type SettingsNormalizerOptions struct {
+	Replacers []*util.Replacer
+}
+
 // Normalize normalizes settings
-func (s *Settings) Normalize() *Settings {
+func (s *Settings) Normalize(_opts ...*SettingsNormalizerOptions) *Settings {
 	s.normalizeKeys()
+	if len(_opts) > 0 {
+		opts := _opts[0]
+		macros := util.NewReplacerFrom(opts.Replacers...)
+		s.applyMacrosOnKeys(macros)
+		s.applyMacrosOnValues(macros)
+	}
 	return s
 }
 
@@ -550,6 +640,65 @@ func (s *Settings) normalizeKeys() {
 	for _, unNormalizedKey := range keysToNormalize {
 		s.DeleteKey(unNormalizedKey)
 	}
+}
+
+// applyMacrosOnKeys - applies macros on keys. Values are kept intact
+func (s *Settings) applyMacrosOnKeys(macros *util.Replacer) {
+	if s.Len() == 0 {
+		return
+	}
+
+	var keysToModify []string
+
+	// Find keys which are to be modified
+	s.WalkKeys(func(key string, _ *Setting) {
+		if _, modified := macros.LineEx(key); modified {
+			// Applied macros will modify the key
+			keysToModify = append(keysToModify, key)
+		}
+	})
+
+	// Add entries with modified keys [modified key] => value
+	for _, originalKey := range keysToModify {
+		modifiedKey := macros.Line(originalKey)
+		s.SetKey(modifiedKey, s.GetKey(originalKey))
+	}
+
+	// Delete entries with before-modification keys
+	for _, beforeModificationKey := range keysToModify {
+		s.DeleteKey(beforeModificationKey)
+	}
+}
+
+// applyMacrosOnValues - applies macros on values. Keys are kept intact
+func (s *Settings) applyMacrosOnValues(macros *util.Replacer) {
+	s.Walk(func(name string, setting *Setting) {
+		setting.ApplyMacros(macros)
+	})
+}
+
+const xmlTagClickHouse = "clickhouse"
+
+// ClickHouseConfig produces ClickHouse config
+func (s *Settings) ClickHouseConfig(_prefix ...string) string {
+	if s.Len() == 0 {
+		return ""
+	}
+
+	prefix := ""
+	if len(_prefix) > 0 {
+		prefix = _prefix[0]
+	}
+
+	b := &bytes.Buffer{}
+	// <clickhouse>
+	//   XML code
+	// </clickhouse>
+	util.Iline(b, 0, "<"+xmlTagClickHouse+">")
+	xml.GenerateFromSettings(b, s, prefix)
+	util.Iline(b, 0, "</"+xmlTagClickHouse+">")
+
+	return b.String()
 }
 
 // normalizeKeyAsPath normalizes key which is treated as a path
@@ -602,8 +751,8 @@ func getSuffixFromPath(path string) (string, error) {
 	return suffix, nil
 }
 
-// getSectionFromPath
-func getSectionFromPath(path string) (SettingsSection, error) {
+// GetSectionFromPath
+func GetSectionFromPath(path string) (SettingsSection, error) {
 	// String representation of the section
 	section, err := getPrefixFromPath(path)
 	if err != nil {
@@ -614,11 +763,17 @@ func getSectionFromPath(path string) (SettingsSection, error) {
 	// Check dir names to determine which section path points to
 	configDir := section
 	switch {
-	case strings.EqualFold(configDir, CommonConfigDir):
+	case strings.EqualFold(configDir, CommonConfigDirClickHouse):
 		return SectionCommon, nil
-	case strings.EqualFold(configDir, UsersConfigDir):
+	case strings.EqualFold(configDir, UsersConfigDirClickHouse):
 		return SectionUsers, nil
-	case strings.EqualFold(configDir, HostConfigDir):
+	case strings.EqualFold(configDir, HostConfigDirClickHouse):
+		return SectionHost, nil
+	case strings.EqualFold(configDir, CommonConfigDirKeeper):
+		return SectionCommon, nil
+	case strings.EqualFold(configDir, UsersConfigDirKeeper):
+		return SectionUsers, nil
+	case strings.EqualFold(configDir, HostConfigDirKeeper):
 		return SectionHost, nil
 	}
 

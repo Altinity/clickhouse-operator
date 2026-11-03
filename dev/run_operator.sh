@@ -10,20 +10,24 @@ source "${CUR_DIR}/go_build_config.sh"
 # Setup paths
 LOG_DIR="${CUR_DIR}/log"
 
-echo "Building ${OPERATOR_BIN}, please wait..."
-if [[ $1 == "nobuild" ]]; then
+echo "Check whether we need to build the operator"
+if [[ "${1}" == "nobuild" ]]; then
     echo "Build step skipped, starting old binary"
 else
+    echo "Building executable: ${OPERATOR_BIN}"
+    echo "Please wait..."
     if "${CUR_DIR}/go_build_operator.sh"; then
         echo "Successfully built ${OPERATOR_BIN}."
     else
-        echo "Unable to build ${OPERATOR_BIN}. Abort."
+        echo "Unable to build ${OPERATOR_BIN}."
+        echo "Abort."
         exit 1
     fi
 fi
 
 if [[ ! -x "${OPERATOR_BIN}" ]]; then
-    echo "Unable to start ${OPERATOR_BIN} Is not executable or not found. Abort"
+    echo "Unable to start ${OPERATOR_BIN} Is not executable or not found."
+    echo "Abort."
     exit 2
 fi
 
@@ -37,7 +41,7 @@ rm -f "${LOG_DIR}"/clickhouse-operator.*.log.*
     -config="${SRC_ROOT}/config/config-dev.yaml" \
     -alsologtostderr=true \
     -log_dir=log \
-    -v=${VERBOSITY} 2>&1 | tee operator_output
+    -v="${VERBOSITY}" 2>&1 | tee operator_output
 #	-logtostderr=true \
 #	-stderrthreshold=FATAL \
 
@@ -46,7 +50,7 @@ rm -f "${LOG_DIR}"/clickhouse-operator.*.log.*
 # -logtostderr=true  Logs are written to standard error instead of to files
 # -stderrthreshold=FATAL Log events at or above this severity are logged to standard	error as well as to files
 
-if [[ $2 == "noclean" ]]; then
+if [[ "${2}" == "noclean" ]]; then
     echo "Clean step skipped"
 else
     # And clean binary after run. It'll be rebuilt next time

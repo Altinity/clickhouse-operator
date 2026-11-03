@@ -20,38 +20,18 @@ import (
 )
 
 // StatefulSetContainerGet gets container from the StatefulSet either by name or by index
-func StatefulSetContainerGet(statefulSet *apps.StatefulSet, name string, index int) (*core.Container, bool) {
-	// Find by name
-	if len(name) > 0 {
-		for i := range statefulSet.Spec.Template.Spec.Containers {
-			// Convenience wrapper
-			container := &statefulSet.Spec.Template.Spec.Containers[i]
-			if container.Name == name {
-				return container, true
-			}
-		}
-	}
-
-	// Find by index
-	if index >= 0 {
-		if len(statefulSet.Spec.Template.Spec.Containers) > index {
-			return &statefulSet.Spec.Template.Spec.Containers[index], true
-		}
-	}
-
-	return nil, false
+func StatefulSetContainerGet(statefulSet *apps.StatefulSet, namesOrIndexes ...any) (*core.Container, bool) {
+	return PodSpecContainerGet(&statefulSet.Spec.Template.Spec, namesOrIndexes...)
 }
 
-// IsStatefulSetGeneration returns whether StatefulSet has requested generation or not
-func IsStatefulSetGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
+// IsStatefulSetReconcileCompleted returns whether StatefulSet reconcile completed
+func IsStatefulSetReconcileCompleted(statefulSet *apps.StatefulSet) bool {
 	if statefulSet == nil {
 		return false
 	}
 
-	// StatefulSet has .spec generation we are looking for
-	return (statefulSet.Generation == generation) &&
-		// and this .spec generation is being applied to replicas - it is observed right now
-		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
+	// the .spec generation is being applied to replicas - it is observed right now
+	return (statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
 		// and all replicas are of expected generation
 		(statefulSet.Status.CurrentReplicas == *statefulSet.Spec.Replicas) &&
 		// and all replicas are updated - meaning rolling update completed over all replicas
@@ -96,17 +76,9 @@ func StatefulSetHasVolumeClaimTemplateByName(statefulSet *apps.StatefulSet, name
 	return false
 }
 
+// StatefulSetHasVolumeByName checks whether the pod template of the StatefulSet declares a volume of the name given
 func StatefulSetHasVolumeByName(statefulSet *apps.StatefulSet, name string) bool {
-	for i := range statefulSet.Spec.Template.Spec.Volumes {
-		// Convenience wrapper
-		volume := &statefulSet.Spec.Template.Spec.Volumes[i]
-		if volume.Name == name {
-			// This Volume name is already listed in statefulSet.Spec.Template.Spec.Volumes
-			return true
-		}
-	}
-
-	return false
+	return PodSpecHasVolumeByName(&statefulSet.Spec.Template.Spec, name)
 }
 
 // StatefulSetAppendVolumes appends multiple Volume(s) to the specified StatefulSet
@@ -117,15 +89,34 @@ func StatefulSetAppendVolumes(statefulSet *apps.StatefulSet, volumes ...core.Vol
 	)
 }
 
-func StatefulSetAppendVolumeMounts(statefulSet *apps.StatefulSet, volumeMounts ...core.VolumeMount) {
+func StatefulSetAppendPersistentVolumeClaims(statefulSet *apps.StatefulSet, pvcs ...core.PersistentVolumeClaim) {
+	statefulSet.Spec.VolumeClaimTemplates = append(
+		statefulSet.Spec.VolumeClaimTemplates,
+		pvcs...,
+	)
+}
+
+func StatefulSetAppendVolumeMountsInAllContainers(statefulSet *apps.StatefulSet, volumeMounts ...core.VolumeMount) {
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have VolumeMounts mounted as Volumes
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		// Convenience wrapper
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
+	StatefulSetWalkContainers(statefulSet, func(container *core.Container) {
 		ContainerAppendVolumeMounts(
 			container,
 			volumeMounts...,
 		)
+	})
+}
+
+func StatefulSetWalkContainers(statefulSet *apps.StatefulSet, f func(*core.Container)) {
+	for i := range statefulSet.Spec.Template.Spec.Containers {
+		// Convenience wrapper
+		container := &statefulSet.Spec.Template.Spec.Containers[i]
+		f(container)
 	}
+}
+
+func StatefulSetWalkVolumeMounts(statefulSet *apps.StatefulSet, f func(*core.VolumeMount)) {
+	StatefulSetWalkContainers(statefulSet, func(container *core.Container) {
+		ContainerWalkVolumeMounts(container, f)
+	})
 }

@@ -1,0 +1,220 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package chi
+
+import (
+	"context"
+	"fmt"
+
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+)
+
+type migrateTableOptions struct {
+	forceMigrate                    bool
+	forceDropReplicaUponStorageLoss bool
+}
+
+func NewMigrateTableOptions() *migrateTableOptions {
+	return &migrateTableOptions{}
+}
+
+func (o *migrateTableOptions) SetForceMigrate() *migrateTableOptions {
+	if o == nil {
+		return o
+	}
+	o.forceMigrate = true
+	return o
+}
+
+func (o *migrateTableOptions) ForceMigrate() bool {
+	if o == nil {
+		return false
+	}
+	return o.forceMigrate
+}
+
+func (o *migrateTableOptions) SetForceDropReplicaUponStorageLoss() *migrateTableOptions {
+	if o == nil {
+		return o
+	}
+	o.forceDropReplicaUponStorageLoss = true
+	return o
+}
+
+func (o *migrateTableOptions) ForceDropReplicaUponStorageLoss() bool {
+	if o == nil {
+		return false
+	}
+	return o.forceDropReplicaUponStorageLoss
+}
+
+type migrateTableOptionsArr []*migrateTableOptions
+
+// NewMigrateTableOptionsArr creates new migrateTableOptions array
+func NewMigrateTableOptionsArr(opts ...*migrateTableOptions) (res migrateTableOptionsArr) {
+	return append(res, opts...)
+}
+
+// First gets first option
+func (a migrateTableOptionsArr) First() *migrateTableOptions {
+	if len(a) > 0 {
+		return a[0]
+	}
+	return nil
+}
+
+// migrateTables
+func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrateTableOptions) error {
+	if opts.ForceDropReplicaUponStorageLoss() {
+		w.a.V(1).
+			M(host).F().
+			Info(
+				"Need to drop replica on host %d to shard %d in cluster %s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		w.dropZKReplica(ctx, host, NewDropReplicaOptions().SetForceDropUponStorageLoss())
+	}
+
+	w.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
+		WithAction(host.GetCR()).
+		M(host).F().
+		Info(
+			"Adding tables on shard/host:%d/%d cluster:%s",
+			host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
+
+	if err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host); err != nil {
+		w.a.V(1).
+			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(host.GetCR()).
+			M(host).F().
+			Error("ERROR add tables failed on shard/host:%d/%d cluster:%s err:%v",
+				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName, err)
+		// Do NOT fall through to the success announcement or PushHostTablesCreated. That listing is
+		// persisted on the CR and feeds HasData(), which makes shouldMigrateTables() skip the host,
+		// so recording tables-created after a FAILED migration does not merely hide the failure - it
+		// makes it permanent across operator restarts. Status is left untouched here: the
+		// post-restart re-migration caller swallows this error, so writing status would poison the
+		// CR from a path that is allowed to fail.
+		return migrateTablesFailure(host, err)
+	}
+
+	// HostCreateTables reports success on a done context having run zero DDL, and the reconcile
+	// context is cancelled on any re-enqueue of the same CR - a routine event. Announcing success
+	// and recording the host on that path is the same defect as swallowing the error: the listing
+	// feeds HasData(), so a host that was never actually migrated would never be migrated again.
+	if util.IsContextDone(ctx) {
+		return nil
+	}
+
+	w.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
+		WithAction(host.GetCR()).
+		M(host).F().
+		Info("Tables added successfully on shard/host:%d/%d cluster:%s",
+			host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
+
+	host.GetCR().IEnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
+
+	return nil
+}
+
+// migrateTablesFailure wraps a table-creation failure in the sentinel reconcileHostMain propagates.
+// Losing the wrap is the silent regression: reconcileHostMain forwards only the two CRUD sentinels
+// and logs anything else as a Warning before carrying on to a Completed CR.
+//
+// Deferred rather than Abort on purpose. Both end the CR non-Completed (reconcile() coerces any
+// error to ErrCRUDAbort before markReconcileCompletedUnsuccessfully), but Abort unwinds the shard
+// walk on the first bad host, so one un-creatable object - a Dictionary with a missing source, an
+// MV over a dropped table - would halt every remaining shard mid-upgrade. Deferred is what the
+// shard walk already understands: siblings in the cluster keep reconciling and the deferral
+// surfaces once at the end of the pass. WalkTillError still stops at the first failing cluster.
+//
+// Separate func so the wrap is reachable from a test without a live schemer.
+func migrateTablesFailure(host *api.Host, err error) error {
+	return fmt.Errorf("%w: add tables failed on host %s: %w", common.ErrCRUDDeferred, host.GetName(), err)
+}
+
+func (w *worker) setHasData(host *api.Host) {
+	host.SetHasData(host.HasListedTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host)))
+}
+
+// shouldMigrateTables
+func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOptions) bool {
+	o := NewMigrateTableOptionsArr(opts...).First()
+
+	// Deal with special cases in order of priority
+	switch {
+	case host.IsStopped():
+		// Stopped host is not able to receive any data, migration is inapplicable
+		return false
+
+	case host.IsTroubleshoot():
+		// Troubleshooted host is not able to receive any data, migration is inapplicable
+		return false
+
+	case o.ForceMigrate():
+		// Force migration requested
+		return true
+
+	case host.HasData():
+		// This host is listed as having tables created already, no need to migrate again
+		return false
+
+	case host.IsInNewCluster():
+		// CHI is new, all hosts were added
+		return false
+	}
+
+	// In all the rest cases - perform migration
+	return true
+}
+
+func (w *worker) ensureClusterSchemer(host *api.Host) *schemer.ClusterSchemer {
+	if w == nil {
+		return nil
+	}
+	// Make base cluster connection params from CHOP-config defaults, then
+	// overlay the per-cluster security.clickhouse.tls fields populated by the
+	// normalizer (3-level inheritance: CHOP-config → CHI → cluster). Without
+	// the overlay the cluster-level Verify/MinVersion/ServerName/RootCA
+	// wouldn't reach the dial — CHOP-config values would silently win.
+	clusterConnectionParams := clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config())
+	clusterConnectionParams.OverlayClusterSecurityTLS(host.GetCluster().GetSecurity().GetClickHouse().GetTLS())
+	// Adjust base cluster connection params with per-host props
+	switch clusterConnectionParams.Scheme {
+	case api.ChSchemeAuto:
+		switch {
+		case host.HTTPPort.HasValue():
+			clusterConnectionParams.Scheme = api.ChSchemeHTTP
+			clusterConnectionParams.Port = host.HTTPPort.IntValue()
+		case host.HTTPSPort.HasValue():
+			clusterConnectionParams.Scheme = api.ChSchemeHTTPS
+			clusterConnectionParams.Port = host.HTTPSPort.IntValue()
+		}
+	case api.ChSchemeHTTP:
+		clusterConnectionParams.Port = host.HTTPPort.IntValue()
+	case api.ChSchemeHTTPS:
+		clusterConnectionParams.Port = host.HTTPSPort.IntValue()
+	}
+	// Each call gets its own schemer. Shard reconcile runs several of these at once.
+	return schemer.NewClusterSchemer(clusterConnectionParams, host.Runtime.Version)
+}

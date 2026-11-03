@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 function usage() {
-cat << EOT
+  cat << EOT
  Script splits clickhouse-operator-install-bundle.yaml to separate files and adjusts them to conform the helm standards
  NOTE script requires some pre-installed tools:
- - yq ( https://mikefarah.gitbook.io/yq/ ) > v4.14.x. Do not use brew install yq in MacOS，Version is lower than it.
+ - yq ( https://mikefarah.gitbook.io/yq/ ) > v4.14.x
  - jq ( https://github.com/stedolan/jq )
  - helm-docs ( https://github.com/norwoodj/helm-docs )
  - perl ( https://learn.perl.org/installing/ )
@@ -13,13 +13,19 @@ cat << EOT
 EOT
 }
 
-for cmd in yq jq helm-docs perl; do
-  if ! command -v ${cmd} &> /dev/null; then
-    usage
-    exit 1
-  fi
-done
-
+function check_required_tools() {
+  for cmd in yq jq helm-docs perl; do
+    if ! command -v "${cmd}" &> /dev/null; then
+      echo "======================================"
+      usage
+      echo "======================================"
+      echo "The following tool is missing: ${cmd}"
+      echo "Please install it."
+      echo "Abort."
+      exit 1
+    fi
+  done
+}
 
 set -o errexit
 set -o nounset
@@ -29,7 +35,7 @@ readonly script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pw
 readonly manifest_file_path="${script_dir}/../deploy/operator/clickhouse-operator-install-bundle.yaml"
 readonly release_file_path="${script_dir}/../release"
 readonly dashboards_path="${script_dir}/../grafana-dashboard"
-readonly chart_path="${script_dir}/../deploy/helm"
+readonly chart_path="${script_dir}/../deploy/helm/clickhouse-operator"
 readonly values_yaml="${chart_path}/values.yaml"
 
 function main() {
@@ -45,7 +51,7 @@ function main() {
   done
 
   # update version in Chart.yaml
-  readonly detected_version=$(cat ${release_file_path})
+  readonly detected_version=$(cat "${release_file_path}")
   readonly chart_yaml="${chart_path}/Chart.yaml"
   yq e '.version = "'"${detected_version}"'"' -i "${chart_yaml}"
   yq e '.appVersion = "'"${detected_version}"'"' -i "${chart_yaml}"
@@ -53,11 +59,13 @@ function main() {
   # process grafana dashboards
   readonly prom_ds='{"current":{"selected":false,"text":"","value":""},"hide":0,"includeAll":false,"multi":false,"name":"ds_prometheus","options":[],"query":"prometheus","queryValue":"","refresh":1,"regex":"","skipUrlSync":false,"type":"datasource"}'
   readonly files_dir="${chart_path}/files"
-  rm -f "${files_dir}/*"
+  # Glob must be UNQUOTED to expand; quoting the `*` treats it as a literal
+  # filename and leaves stale dashboards from a previous regen on disk.
+  rm -f "${files_dir}"/*
   for dashboard in "${dashboards_path}"/*.json; do
     local dashboard_name
     dashboard_name=$(basename "${dashboard}")
-    echo "${dashboard_name}"
+    #echo "${dashboard_name}"
     jq '(.templating.list) |= ['"${prom_ds}"'] + .' "${dashboard}" >"${files_dir}/${dashboard_name}"
     perl -pi -e 's/"datasource": "\${DS_PROMETHEUS}"/"datasource": {"type":"prometheus","uid":"\${ds_prometheus}"}/g' "${files_dir}/${dashboard_name}"
     perl -pi -e 's/"datasource": "\$db"/"datasource": {"type":"vertamedia-clickhouse-datasource","uid":"\${db}"}/g' "${files_dir}/${dashboard_name}"
@@ -69,14 +77,17 @@ function main() {
     echo "WARNING"
     echo "helm-docs is not available, skip docs generation"
   fi
+
+#  if [[ "0" == $(helm plugin list | grep -c schema) ]]; then
+#    helm plugin install https://github.com/losisin/helm-values-schema-json.git
+#  fi
+#  helm schema --use-helm-docs -f "${values_yaml}" --output "${chart_path}/values.schema.json"
 }
 
 function process() {
   local file="${1}"
-  local kind
-  kind=$(yq e '.kind' "${file}")
-  local name
-  name=$(yq e '.metadata.name' "${file}")
+  local kind=$(yq e '.kind' "${file}")
+  local name=$(yq e '.metadata.name' "${file}")
 
   local processed_file="${kind}-${name}.yaml"
   local copied_file="${processed_file}"
@@ -94,7 +105,7 @@ function process() {
     local templates_dir="${chart_path}/templates/generated"
     processed_file="${templates_dir}/${processed_file}"
   fi
-  echo $(basename "${processed_file}")
+  #echo $(basename "${processed_file}")
   mkdir -p "$(dirname "${processed_file}")"
   mv -f "${file}" "${processed_file}"
 
@@ -118,6 +129,12 @@ function process() {
   ClusterRole)
     update_clusterrole_resource "${processed_file}"
     ;;
+  RoleBinding)
+    update_rolebinding_resource "${processed_file}"
+    ;;
+  Role)
+    update_role_resource "${processed_file}"
+    ;;
   ServiceAccount)
     update_serviceaccount_resource "${processed_file}"
     ;;
@@ -127,7 +144,8 @@ function process() {
   CustomResourceDefinition) ;;
 
   *)
-    echo "do not know how to process ${kind}"
+    echo "Do not know how to process resource kind: ${kind}"
+    echo "Abort."
     exit 1
     ;;
   esac
@@ -157,10 +175,13 @@ function update_service_resource() {
   fi
 
   yq e -i '.metadata.name |= "{{ printf \"%s-metrics\" (include \"altinity-clickhouse-operator.fullname\" .) }}"' "${file}"
-  yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
+  yq e -i '.metadata.namespace |= "{{ include \"altinity-clickhouse-operator.namespace\" . }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
+  yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
   yq e -i '.spec.selector |= "{{ include \"altinity-clickhouse-operator.selectorLabels\" . | nindent 4 }}"' "${file}"
 
+  perl -pi -e 's/(\s+- port: 8888)/{{ if .Values.metrics.enabled }}\n$1/g' "${file}"
+  perl -pi -e 's/(name: ch-metrics)/$1\n{{ end }}/g' "${file}"
   perl -pi -e "s/'//g" "${file}"
 }
 
@@ -174,49 +195,71 @@ function update_deployment_resource() {
   fi
 
   yq e -i '.metadata.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
-  yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
+  yq e -i '.metadata.namespace |= "{{ include \"altinity-clickhouse-operator.namespace\" . }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
+  yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
   yq e -i '.spec.selector.matchLabels |= "{{ include \"altinity-clickhouse-operator.selectorLabels\" . | nindent 6 }}"' "${file}"
+  yq e -i '.spec.strategy |= "{{ toYaml .Values.deployment.strategy | nindent 4 }}"' "${file}"
 
   readonly annotations=$(yq e '.spec.template.metadata.annotations' "${file}")
   a_data="${annotations}" yq e -i '.podAnnotations |= env(a_data)' "${values_yaml}"
   yq e -i '.spec.template.metadata.annotations = {}' "${file}"
 
-  yq e -i '.spec.template.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 8 }}"' "${file}"
-  yq e -i '.spec.template.metadata.annotations += {"{{ toYaml .Values.podAnnotations | nindent 8 }}": null}' "${file}"
+  yq e -i '.spec.template.metadata.labels |= "{{ include \"altinity-clickhouse-operator.podTemplateLabels\" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}"' "${file}"
+  yq e -i '.spec.template.metadata.annotations += {"{{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations | nindent 8 }}{{ end }}": null}' "${file}"
   yq e -i '.spec.template.spec.imagePullSecrets |= "{{ toYaml .Values.imagePullSecrets | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.serviceAccountName |= "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}"' "${file}"
+  yq e -i '.spec.template.spec += {"{{ if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName | quote }}{{ end }}": null}' "${file}"
   yq e -i '.spec.template.spec.nodeSelector |= "{{ toYaml .Values.nodeSelector | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.affinity |= "{{ toYaml .Values.affinity | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.tolerations |= "{{ toYaml .Values.tolerations | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.securityContext |= "{{ toYaml .Values.podSecurityContext | nindent 8 }}"' "${file}"
+  yq e -i '.spec.template.spec.topologySpreadConstraints |= "{{ toYaml .Values.topologySpreadConstraints | nindent 8 }}"' "${file}"
 
-  for cm in $(yq e '.spec.template.spec.volumes[].configMap.name' "${file}"); do
+  # Iterate only over volumes that actually use a configMap source. The plain
+  # `.volumes[].configMap.name` form yields a literal `null` for non-configMap
+  # volumes (e.g. emptyDir for the IPC token share); processing that `null`
+  # downstream produces a malformed volume entry with both source kinds set
+  # and a checksum annotation referencing a non-existent ConfigMap-null.yaml.
+  for cm in $(yq e '.spec.template.spec.volumes[] | select(.configMap != null) | .configMap.name' "${file}"); do
     local prefix='{{ include \"altinity-clickhouse-operator.fullname\" . }}'
     local newCm="${cm/etc-clickhouse-operator/$prefix}"
-    yq e -i '(.spec.template.spec.volumes[].configMap.name | select(. == "'"${cm}"'") | .) |= "'"${newCm}"'"' "${file}"
+    newCm="${newCm/etc-keeper-operator/${prefix}-keeper}"
+    # Filter at the volume level so `|=` does not auto-create `.configMap.name`
+    # on non-configMap volumes (e.g. emptyDir for the IPC token share).
+    yq e -i '(.spec.template.spec.volumes[] | select(.configMap != null) | .configMap.name | select(. == "'"${cm}"'")) |= "'"${newCm}"'"' "${file}"
     local cmName="${cm/etc-clickhouse-operator-/}"
-    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include (print $.Template.BasePath \"/generated/ConfigMap-etc-clickhouse-operator-'"${cmName}"'.yaml\") . | sha256sum }}"}' "${file}"
+    cmName="${cmName/etc-keeper-operator-/keeper-}"
+    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include \"altinity-clickhouse-operator.configMapContentHash\" (dict \"ctx\" . \"name\" \"/generated/ConfigMap-'"${cm}"'.yaml\") }}"}' "${file}"
   done
-
+  
   yq e -i '.spec.template.spec.containers[0].name |= "{{ .Chart.Name }}"' "${file}"
-  yq e -i '.spec.template.spec.containers[0].image |= "{{ .Values.operator.image.repository }}:{{ include \"altinity-clickhouse-operator.operator.tag\" . }}"' "${file}"
+  yq e -i '.spec.template.spec.containers[0].image |= "{{ if .Values.operator.image.registry }}{{ .Values.operator.image.registry | trimSuffix \"/\" }}/{{ end }}{{ .Values.operator.image.repository }}:{{ include \"altinity-clickhouse-operator.operator.tag\" . }}"' "${file}"
   yq e -i '.spec.template.spec.containers[0].imagePullPolicy |= "{{ .Values.operator.image.pullPolicy }}"' "${file}"
   yq e -i '.spec.template.spec.containers[0].resources |= "{{ toYaml .Values.operator.resources | nindent 12 }}"' "${file}"
   yq e -i '.spec.template.spec.containers[0].securityContext |= "{{ toYaml .Values.operator.containerSecurityContext | nindent 12 }}"' "${file}"
   yq e -i '(.spec.template.spec.containers[0].env[] | select(.valueFrom.resourceFieldRef.containerName == "clickhouse-operator") | .valueFrom.resourceFieldRef.containerName) = "{{ .Chart.Name }}"' "${file}"
   yq e -i '.spec.template.spec.containers[0].env += ["{{ with .Values.operator.env }}{{ toYaml . | nindent 12 }}{{ end }}"]' "${file}"
+  yq e -i '.spec.template.spec.containers[0] += {"__OPERATOR_LIVENESS_PROBE__": null}' "${file}"
+  yq e -i '.spec.template.spec.containers[0] += {"__OPERATOR_READINESS_PROBE__": null}' "${file}"
 
-  yq e -i '.spec.template.spec.containers[1].image |= "{{ .Values.metrics.image.repository }}:{{ include \"altinity-clickhouse-operator.metrics.tag\" . }}"' "${file}"
+  yq e -i '.spec.template.spec.containers[1].image |= "{{ if .Values.metrics.image.registry }}{{ .Values.metrics.image.registry | trimSuffix \"/\" }}/{{ end }}{{ .Values.metrics.image.repository }}:{{ include \"altinity-clickhouse-operator.metrics.tag\" . }}"' "${file}"
   yq e -i '.spec.template.spec.containers[1].imagePullPolicy |= "{{ .Values.metrics.image.pullPolicy }}"' "${file}"
   yq e -i '.spec.template.spec.containers[1].resources |= "{{ toYaml .Values.metrics.resources | nindent 12 }}"' "${file}"
   yq e -i '.spec.template.spec.containers[1].securityContext |= "{{ toYaml .Values.metrics.containerSecurityContext | nindent 12 }}"' "${file}"
   yq e -i '(.spec.template.spec.containers[1].env[] | select(.valueFrom.resourceFieldRef.containerName == "clickhouse-operator") | .valueFrom.resourceFieldRef.containerName) = "{{ .Chart.Name }}"' "${file}"
   yq e -i '.spec.template.spec.containers[1].env += ["{{ with .Values.metrics.env }}{{ toYaml . | nindent 12 }}{{ end }}"]' "${file}"
+  yq e -i '.spec.template.spec.containers[1] += {"__METRICS_LIVENESS_PROBE__": null}' "${file}"
+  yq e -i '.spec.template.spec.containers[1] += {"__METRICS_READINESS_PROBE__": null}' "${file}"
 
-  perl -pi -e "s/'{{ toYaml .Values.podAnnotations \| nindent 8 }}': null/{{ toYaml .Values.podAnnotations \| nindent 8 }}/g" "${file}"
+  perl -pi -e "s/'{{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations \| nindent 8 }}{{ end }}': null/{{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations \| nindent 8 }}{{ end }}/g" "${file}"
+  perl -pi -e "s/'{{ if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName \| quote }}{{ end }}': null/{{ if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName | quote }}{{ end }}/g" "${file}"
   perl -pi -e "s/- '{{ with .Values.operator.env }}{{ toYaml . \| nindent 12 }}{{ end }}'/{{ with .Values.operator.env }}{{ toYaml . \| nindent 12 }}{{ end }}/g" "${file}"
   perl -pi -e "s/- '{{ with .Values.metrics.env }}{{ toYaml . \| nindent 12 }}{{ end }}'/{{ with .Values.metrics.env }}{{ toYaml . \| nindent 12 }}{{ end }}/g" "${file}"
+  perl -0pi -e 's/\n\s*__OPERATOR_LIVENESS_PROBE__: null/\n          {{- with .Values.operator.livenessProbe }}\n          livenessProbe: {{- toYaml . | nindent 12 }}\n          {{- end }}/g' "${file}"
+  perl -0pi -e 's/\n\s*__OPERATOR_READINESS_PROBE__: null/\n          {{- with .Values.operator.readinessProbe }}\n          readinessProbe: {{- toYaml . | nindent 12 }}\n          {{- end }}/g' "${file}"
+  perl -0pi -e 's/\n\s*__METRICS_LIVENESS_PROBE__: null/\n          {{- with .Values.metrics.livenessProbe }}\n          livenessProbe: {{- toYaml . | nindent 12 }}\n          {{- end }}/g' "${file}"
+  perl -0pi -e 's/\n\s*__METRICS_READINESS_PROBE__: null/\n          {{- with .Values.metrics.readinessProbe }}\n          readinessProbe: {{- toYaml . | nindent 12 }}\n          {{- end }}/g' "${file}"
   perl -pi -e 's/(\s+\- name: metrics-exporter)/{{ if .Values.metrics.enabled }}\n$1/g' "${file}"
   perl -pi -e "s/(\s+imagePullSecrets: '\{\{ toYaml \.Values\.imagePullSecrets \| nindent 8 \}\}')/{{ end }}\n\$1/g" "${file}"
   perl -pi -e "s/'//g" "${file}"
@@ -227,7 +270,18 @@ function update_configmap_resource() {
   readonly name=$(yq e '.metadata.name' "${file}")
   local data
   data=$(yq e '.data' "${file}")
+  
+  local name_suffix="${name/etc-clickhouse-operator-/}"
+  local name_suffix="${name_suffix/etc-keeper-operator-/keeper-}"
+  local camel_cased_name
+  camel_cased_name=$(to_camel_case "${name_suffix}")
 
+  # The operator config ConfigMap gets special handling: fullname substitution,
+  # config.yaml block-scalar → map conversion (so the configmap-files helper can
+  # patch the nested watch.namespaces.include), and the configmap-files helper
+  # (which wires in the top-level watchNamespaces value). Every other ConfigMap
+  # uses the generic configmap-data helper.
+  local data_helper
   if [ "${name}" = "etc-clickhouse-operator-files" ]; then
     local search='name: "clickhouse-operator"'
     local replace="name: '{{ include \"altinity-clickhouse-operator.fullname\" . }}'"
@@ -236,21 +290,22 @@ function update_configmap_resource() {
     search='config.yaml: |'
     replace='config.yaml:'
     data=${data/"${search}"/"${replace}"}
+
+    data_helper='{{ include "altinity-clickhouse-operator.configmap-files" (list . .Values.configs.files .Values.watchNamespaces) | nindent 2 }}'
+  else
+    data_helper='{{ include "altinity-clickhouse-operator.configmap-data" (list . .Values.configs.'"${camel_cased_name}"') | nindent 2 }}'
   fi
 
-  local name_suffix="${name/etc-clickhouse-operator-/}"
-  local cameled_name
-  cameled_name=$(to_camel_case "${name_suffix}")
-
   yq e -i '.metadata.name |= "{{ printf \"%s-'"${name_suffix}"'\" (include \"altinity-clickhouse-operator.fullname\" .) }}"' "${file}"
-  yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
+  yq e -i '.metadata.namespace |= "{{ include \"altinity-clickhouse-operator.namespace\" . }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
-  yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${cameled_name}"') | nindent 2 }}"' "${file}"
+  yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
+  data_helper="${data_helper}" yq e -i '.data |= strenv(data_helper)' "${file}"
 
   if [ -z "${data}" ]; then
-    yq e -i '.configs.'"${cameled_name}"' |= null' "${values_yaml}"
+    yq e -i '.configs.'"${camel_cased_name}"' |= null' "${values_yaml}"
   else
-    data_arg="${data}" yq e -i '.configs.'"${cameled_name}"' |= env(data_arg)' "${values_yaml}"
+    data_arg="${data}" yq e -i '.configs.'"${camel_cased_name}"' |= env(data_arg)' "${values_yaml}"
   fi
 
   perl -pi -e "s/'//g" "${file}"
@@ -266,12 +321,12 @@ function update_clusterrolebinding_resource() {
   fi
 
   yq e -i '.metadata.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
-  yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
+  yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
   yq e -i '.roleRef.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
-  yq e -i '(.subjects[] | select(.kind == "ServiceAccount")) |= with(. ; .name = "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}" | .namespace = "{{ .Release.Namespace }}")' "${file}"
+  yq e -i '(.subjects[] | select(.kind == "ServiceAccount")) |= with(. ; .name = "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}" | .namespace = "{{ include \"altinity-clickhouse-operator.namespace\" . }}")' "${file}"
 
-  printf '%s\n%s\n' '{{- if .Values.rbac.create -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' '{{- if (and .Values.rbac.create (not .Values.rbac.namespaceScoped)) -}}' "$(cat "${file}")" >"${file}"
   printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
 
   perl -pi -e "s/'//g" "${file}"
@@ -287,12 +342,54 @@ function update_clusterrole_resource() {
   fi
 
   yq e -i '.metadata.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
-  yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
-
+  yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
   yq e -i '(.rules[] | select(.resourceNames | contains(["clickhouse-operator"])) | .resourceNames) = ["{{ include \"altinity-clickhouse-operator.fullname\" . }}"]' "${file}"
 
-  printf '%s\n%s\n' '{{- if .Values.rbac.create -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' '{{- if (and .Values.rbac.create (not .Values.rbac.namespaceScoped)) -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
+
+  perl -pi -e "s/'//g" "${file}"
+}
+
+function update_rolebinding_resource() {
+  readonly file="${1}"
+  readonly name=$(yq e '.metadata.name' "${file}")
+
+  if [ "${name}" != 'clickhouse-operator' ]; then
+    echo "do not know how to process ${name} role binding"
+    exit 1
+  fi
+
+  yq e -i '.metadata.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
+  yq e -i '.metadata.namespace |= "{{ include \"altinity-clickhouse-operator.namespace\" . }}"' "${file}"
+  yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
+  yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
+  yq e -i '.roleRef.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
+  yq e -i '(.subjects[] | select(.kind == "ServiceAccount")) |= with(. ; .name = "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}" | .namespace = "{{ include \"altinity-clickhouse-operator.namespace\" . }}")' "${file}"
+
+  printf '%s\n%s\n' '{{- if (and .Values.rbac.create .Values.rbac.namespaceScoped) -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
+
+  perl -pi -e "s/'//g" "${file}"
+}
+
+function update_role_resource() {
+  readonly file="${1}"
+  readonly name=$(yq e '.metadata.name' "${file}")
+
+  if [ "${name}" != 'clickhouse-operator' ]; then
+    echo "do not know how to process ${name} role"
+    exit 1
+  fi
+
+  yq e -i '.metadata.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
+  yq e -i '.metadata.namespace |= "{{ include \"altinity-clickhouse-operator.namespace\" . }}"' "${file}"
+  yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
+  yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
+  yq e -i '(.rules[] | select(.resourceNames | contains(["clickhouse-operator"])) | .resourceNames) = ["{{ include \"altinity-clickhouse-operator.fullname\" . }}"]' "${file}"
+
+  printf '%s\n%s\n' '{{- if (and .Values.rbac.create .Values.rbac.namespaceScoped) -}}' "$(cat "${file}")" >"${file}"
   printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
 
   perl -pi -e "s/'//g" "${file}"
@@ -308,9 +405,9 @@ function update_serviceaccount_resource() {
   fi
 
   yq e -i '.metadata.name |= "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}"' "${file}"
-  yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
+  yq e -i '.metadata.namespace |= "{{ include \"altinity-clickhouse-operator.namespace\" . }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
-  yq e -i '.metadata.annotations |= "{{ toYaml .Values.serviceAccount.annotations | nindent 4 }}"' "${file}"
+  yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}{{ if .Values.serviceAccount.annotations }}{{ toYaml .Values.serviceAccount.annotations | nindent 4 }}{{ end }}"' "${file}"
 
   printf '%s\n%s\n' '{{- if .Values.serviceAccount.create -}}' "$(cat "${file}")" >"${file}"
   printf '%s\n%s\n' "$(cat "${file}")" '{{- end -}}' >"${file}"
@@ -328,8 +425,9 @@ function update_secret_resource() {
   fi
 
   yq e -i '.metadata.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
-  yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
+  yq e -i '.metadata.namespace |= "{{ include \"altinity-clickhouse-operator.namespace\" . }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
+  yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
 
   yq e -i '.data.username |= "{{ .Values.secret.username | b64enc }}"' "${file}"
   yq e -i '.data.password |= "{{ .Values.secret.password | b64enc }}"' "${file}"
@@ -354,7 +452,9 @@ function to_camel_case() {
 }
 
 function get_abs_filename() {
-  echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+  readonly filename="${1}"
+  echo "$(cd "$(dirname "${filename}")" && pwd)/$(basename "${filename}")"
 }
 
+check_required_tools
 main

@@ -1,0 +1,20 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020009-chk-bypass
+spec:
+  # Spec-level security explicitly relaxes verify; InheritClusterSecurityFrom
+  # propagates it into every cluster, so under FIPS strict this is a bypass
+  # attempt that rejectFIPSBypass must catch.
+  security:
+    clickhouse:
+      tls:
+        verify: None
+  configuration:
+    clusters:
+      - name: keeper
+        # secure: "yes" so rejectFIPSInsecureKeeperCluster cannot fire; this
+        # isolates the test to its named intent (rejectFIPSBypass on verify=None).
+        secure: "yes"
+        layout:
+          replicasCount: 1

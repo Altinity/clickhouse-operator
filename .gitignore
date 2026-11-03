@@ -15,10 +15,13 @@
 .idea
 .project
 .pydevproject
+.vscode
 
 # Skip logs and caches
 log
 *.log
+*.log.txt
+tests/report_*.html
 __pycache__
 
 # Skip dev runtime-produced
@@ -47,3 +50,11 @@ tests/image/cache
 
 # Ignore DevSpace cache and log folder
 /.devspace
+
+# agents
+.aider*
+CLAUDE.md
+AGENTS.md
+.claude
+
+/.cr-release-packages

@@ -1,0 +1,509 @@
+# Comprehensive ClickHouseKeeperInstallation (CHK) example covering every
+# toggle the CHK CRD exposes. Counterpart of CHI's 99-clickhouseinstallation-max.yaml.
+#
+# Designed as documentation, not for direct deployment — the four cluster
+# variants below are illustrative shapes and a real CHK ships at most one
+# cluster (Keeper's Raft quorum spans one ensemble). The podTemplates pin
+# a specific Keeper version; replace with the image you actually run.
+#
+# Fields the CHK CRD intentionally OMITS vs CHI (do not add — they will be
+# rejected at admission):
+#  - spec.restart / spec.troubleshoot       (CHK auto-restart triggers via configMap propagation)
+#  - spec.templating                        (no CHKIT today)
+#  - spec.useTemplates                      (no CHKIT today)
+#  - spec.configuration.zookeeper           (CHK IS the Keeper — no ZK ref)
+#  - spec.configuration.users/profiles/quotas (Keeper has no users config)
+#  - spec.reconcile.host.hooks / cluster.hooks (hooks are CHI-only)
+#  - spec.reconcile.runtime / statefulSet   (CHK uses chopconf defaults)
+#  - cluster.zookeeper / cluster.schemaPolicy / cluster.secret (CHK-irrelevant)
+#  - host.tcpPort / tlsPort / httpPort / interserverHTTPPort (CHK is Raft-only)
+
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: "clickhouse-keeper-installation-max"
+  labels:
+    label1: label1_value
+    label2: label2_value
+  annotations:
+    annotation1: annotation1_value
+    annotation2: annotation2_value
+
+spec:
+  # Custom taskID for CHK update tracking. Surfaces in .status.taskID*
+  # fields. Omit to let the operator generate one per spec change.
+  taskID: "qweqwe"
+
+  # Stop the entire CHK by scaling every StatefulSet to 0 replicas.
+  # PVCs are retained; setting `stop: "no"` re-attaches them on restart.
+  stop: "no"
+
+  # Pause the reconciler entirely. While suspended the operator ignores
+  # spec changes and does not touch the underlying StatefulSets/Pods.
+  suspend: "no"
+
+  # Custom domain suffix for the generated DNS names of Services and Pods.
+  # Useful when the Kubernetes cluster DNS uses a non-default search domain.
+  namespaceDomainPattern: "%s.svc.my.test"
+
+  # CHK reconciling knobs. CHK exposes a STRICT SUBSET of the CHI reconcile
+  # surface — only policy, configMapPropagationTimeout, and cleanup are
+  # recognized today. Host- and cluster-level hooks (CHI's spec.reconcile.host
+  # / spec.reconcile.cluster) are NOT supported on CHK.
+  reconciling:
+    # Sugar over reconcile.host.wait.{exclude,queries,include} from chopconf.
+    #   wait   - wait for exclude / drain / include around each host reconcile
+    #   nowait - skip those waits
+    policy: "nowait"
+
+    # Seconds to wait for a modified ConfigMap to propagate into the Pod
+    # via the mounted-CM auto-update mechanism. See:
+    # https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
+    configMapPropagationTimeout: 90
+
+    cleanup:
+      # What to do with K8s resources that the operator thinks it manages
+      # (label match) but whose ownerReference points elsewhere. Default Delete.
+      unknownObjects:
+        statefulSet: Delete
+        pvc: Delete
+        configMap: Delete
+        service: Delete
+      # What to do with the operator's own resources that ended a reconcile
+      # cycle in a failed state. Default Retain (keep for triage).
+      reconcileFailedObjects:
+        statefulSet: Retain
+        pvc: Retain
+        configMap: Retain
+        service: Retain
+
+  # CHK-level security defaults applied to every cluster that does not
+  # override. Inheritance: chopconf → CHK spec → cluster spec; lower wins.
+  # All fields default to nil/empty so upgrades preserve legacy behavior.
+  security:
+    clickhouse:
+      # Outbound TLS knobs for the operator's ClickHouse client. Present
+      # on the CHK spec for parity with CHI but only used when the operator
+      # talks to a co-deployed CHI; the Keeper service itself does not use
+      # them. The fields are accepted and inherited unchanged.
+      tls:
+        # Strict | None | "" (unset: legacy InsecureSkipVerify=true preserved).
+        verify: ""
+        # "1.2" | "1.3" | "" (Go stdlib default).
+        minVersion: ""
+        # SNI / cert-verify name override. Empty derives from dial host.
+        serverName: ""
+        # Inline PEM CA bundle. Mutually exclusive with rootCASecretRef below.
+        rootCA: ""
+        # Alternate source: read PEM CA from a K8s Secret in this CHK's
+        # namespace. When key is empty, the operator tries "ca.crt" then "tls.crt".
+        rootCASecretRef:
+          name: ""
+          key: ""
+    zookeeper:
+      # Outbound TLS knobs for the operator's ZooKeeper / Keeper client.
+      # Drives client-side TLS when the operator dials this Keeper ensemble
+      # for its own purposes (e.g. health probing, schema discovery).
+      tls:
+        verify: ""
+        minVersion: ""
+    # Kubernetes-API-client TLS is operator-process-scoped — there is no
+    # per-CHK override. Configure it in ClickHouseOperatorConfiguration only.
+
+  defaults:
+    # Use FQDN form in generated <host></host> entries when CHK clusters
+    # cross-reference each other. CHK is rarely federated so "no" suffices.
+    replicasUseFQDN: "no"
+    distributedDDL:
+      # Profile used by distributed DDL on Keeper's host CHI side. Inert on
+      # the Keeper itself but accepted for spec uniformity.
+      profile: default
+    storageManagement:
+      # PVC provisioner choice:
+      #   StatefulSet — STS controller materializes PVCs (default, fastest)
+      #   Operator   — clickhouse-operator materializes PVCs (allows operator
+      #                to honor reclaimPolicy=Retain on STS deletion)
+      provisioner: Operator
+      # PVC retention on STS deletion. Retain keeps the PV intact when the
+      # Keeper STS is deleted — critical for not losing Raft state.
+      reclaimPolicy: Retain
+    # Default templates referenced by cluster/host config. Each is the
+    # `name` field of an entry under spec.templates below.
+    templates:
+      hostTemplate: keeper-host-template
+      podTemplate: clickhouse-keeper-v25.3
+      dataVolumeClaimTemplate: keeper-data-volume-claim
+      logVolumeClaimTemplate: keeper-log-volume-claim
+      serviceTemplate: chk-service-template
+      clusterServiceTemplate: cluster-service-template
+      shardServiceTemplate: shard-service-template
+      replicaServiceTemplate: replica-service-template
+
+  configuration:
+    # Keeper-server settings. These render into chop-generated-settings.xml
+    # (and per-host overrides) inside the common ConfigMap. Use forward
+    # slashes to nest tags; e.g. `keeper_server/four_letter_word_white_list`
+    # becomes <keeper_server><four_letter_word_white_list>…</four_letter_word_white_list></keeper_server>.
+    settings:
+      logger/level: information
+      logger/console: "true"
+      listen_host: "0.0.0.0"
+      # Keeper's 4LW allow-list. Operator probes use ruok+imok.
+      keeper_server/four_letter_word_white_list: "ruok,conf,stat,mntr"
+      # Raft-coordination knobs surface as Keeper-side defaults.
+      keeper_server/coordination_settings/operation_timeout_ms: "5000"
+      keeper_server/coordination_settings/session_timeout_ms: "10000"
+      keeper_server/coordination_settings/raft_logs_level: information
+      # Prometheus exporter on a dedicated port.
+      prometheus/endpoint: /metrics
+      prometheus/port: "7000"
+      prometheus/metrics: "true"
+      prometheus/events: "true"
+      prometheus/asynchronous_metrics: "true"
+
+    # Arbitrary additional Keeper config files mounted into the container.
+    # Key is the filename, value is the file contents. Section is inferred
+    # from filename prefix (config.d/, conf.d/, users.d/ are not used by
+    # Keeper, so files land in /etc/clickhouse-keeper/conf.d/ by default).
+    files:
+      keeper_extra.xml: |
+        <clickhouse>
+            <!-- Place additional Keeper config snippets here. The file is
+                 mounted into the Keeper container's conf.d directory. -->
+        </clickhouse>
+
+    # Four cluster variants below illustrate every supported layout shape.
+    # In production a CHK has ONE cluster (the Raft ensemble) — the extras
+    # are documentation only.
+    clusters:
+
+      # 1) Simplest: replicasCount only. ALL hosts in the same shard
+      # (Keeper's data is fully replicated across the ensemble).
+      - name: "all-counts"
+        templates:
+          podTemplate: clickhouse-keeper-v25.3
+          dataVolumeClaimTemplate: keeper-data-volume-claim
+          logVolumeClaimTemplate: keeper-log-volume-claim
+        # PodDisruptionBudget knobs. CHK auto-manages a PDB to keep at most
+        # `pdbMaxUnavailable` Keeper pods voluntarily evicted at once.
+        # pdbMaxUnavailable=1 is the safe value for a 3-node ensemble
+        # (quorum survives one evicted pod).
+        pdbManaged: "true"
+        pdbMaxUnavailable: 1
+
+        # Cluster-level security knobs. Same shape as spec.security; values
+        # here win over CHK-level and chopconf-level defaults (fill-empty merge).
+        security:
+          clickhouse:
+            tls:
+              verify: ""
+              minVersion: ""
+              serverName: ""
+              rootCA: ""
+              rootCASecretRef:
+                name: ""
+                key: ""
+          zookeeper:
+            tls:
+              verify: ""
+              minVersion: ""
+
+        # TLS / port-exposure flags on the cluster:
+        #
+        # cluster.secure
+        #   "yes" advertises zk-secure:2281 on the Service AND the StatefulSet
+        #   container ports, emits <tcp_port_secure>2281</tcp_port_secure> in
+        #   the per-host overlay (so Keeper binds the TLS port), and emits
+        #   <secure>1</secure> per <server> in the Raft XML so peer Keepers
+        #   dial each other over TLS.
+        #
+        # cluster.insecure (default "yes")
+        #   "no" suppresses zk:2181 from the Service + StatefulSet container
+        #   ports AND emits <tcp_port remove="1"/> in the per-host overlay so
+        #   the Keeper process binds no plaintext listener at all. Liveness
+        #   probe automatically falls back to `pgrep` (4LW does not work over
+        #   TLS upstream). Setting insecure=no without secure=yes is rejected
+        #   on reconcile with reason NoKeeperListener (no listener at all).
+        #
+        # User-supplied <openSSL> server XML and cert mounts must be added via
+        # `spec.configuration.files` (or per-host settings) for Keeper to
+        # actually accept TLS connections — the operator opens the port but
+        # does not yet generate the openSSL block.
+        insecure: "yes"
+        secure: "no"
+
+        layout:
+          # All three replicas share shard 0 — Keeper's standard ensemble shape.
+          replicasCount: 3
+
+      # 2) Replicas with per-replica overrides. Replica names are explicit;
+      # shardsCount per replica defaults to 1 if omitted.
+      - name: "replicas-only"
+        templates:
+          podTemplate: clickhouse-keeper-v25.3
+          dataVolumeClaimTemplate: keeper-data-volume-claim
+          logVolumeClaimTemplate: keeper-log-volume-claim
+        layout:
+          replicas:
+            - name: r0
+              # Per-replica settings/files/templates ride on top of the
+              # cluster-level ones (fill-empty merge, lower wins).
+              templates:
+                podTemplate: clickhouse-keeper-v25.3
+            - name: r1
+              templates:
+                podTemplate: clickhouse-keeper-v25.3
+            - name: r2
+              templates:
+                podTemplate: clickhouse-keeper-v25.3
+
+      # 3) Fully explicit per-host topology. Used when individual hosts need
+      # custom Raft / ZK ports (e.g. for HostNetwork deployments with
+      # ClusterScopeIndex port distribution). Each `shards[]` entry under a
+      # replica IS a host (CHK reuses the CHI shard struct for host-level
+      # overrides).
+      - name: "customized"
+        templates:
+          podTemplate: clickhouse-keeper-v25.3
+          dataVolumeClaimTemplate: keeper-data-volume-claim
+          logVolumeClaimTemplate: keeper-log-volume-claim
+        layout:
+          replicas:
+            - name: r0
+              shards:
+                - name: host0
+                  zkPort: 2181
+                  # zkPortSecure is the secure (TLS) Keeper client port. Set
+                  # it explicitly here OR let it fall back to the default 2281
+                  # automatically when the enclosing cluster has `secure: yes`.
+                  # zkPortSecure: 2281
+                  raftPort: 9444
+            - name: r1
+              shards:
+                - name: host1
+                  zkPort: 2181
+                  raftPort: 9444
+            - name: r2
+              shards:
+                - name: host2
+                  zkPort: 2181
+                  raftPort: 9444
+
+      # 4) Secure cluster — dual-port. Opens BOTH plaintext zk:2181 and TLS
+      # zk-secure:2281 on the Service and the StatefulSet container ports;
+      # emits <secure>1</secure> in Raft XML so peer Keepers dial each other
+      # over TLS. The user must supply server-side <openSSL> XML + cert mounts
+      # for Keeper to actually accept TLS on 2281 — see
+      # docs/security_hardening_fips.md.
+      #
+      # To lock down to TLS-only (no plaintext listener at all), flip
+      # `insecure` to "no". That also emits <tcp_port remove="1"/> in the
+      # per-host overlay so Keeper binds no plaintext port, and switches the
+      # liveness probe to `pgrep clickhouse-keeper` (4LW does not work over
+      # TLS upstream). Admission will reject `insecure: no` without
+      # `secure: yes` with reason NoKeeperListener.
+      - name: "secure"
+        insecure: "yes"
+        secure: "yes"
+        templates:
+          podTemplate: clickhouse-keeper-v25.3
+        layout:
+          replicasCount: 3
+
+  templates:
+    # hostTemplates apply per-host customization (ports, host-level settings,
+    # host-level files, template overrides).
+    #
+    # Note: the CHK CRD's `hostTemplate.spec` does NOT currently expose the
+    # `secure` / `insecure` toggles — those fields exist on the underlying Go
+    # Host type (shared with CHI) but the CHK schema's `properties:` list
+    # omits them, and the K8s API server prunes unlisted fields. Drive
+    # secure mode at the cluster level (`secure: yes` on configuration.
+    # clusters[]) — that is the source of truth today. `zkPort` /
+    # `zkPortSecure` / `raftPort` ARE schema-listed and accepted here.
+    hostTemplates:
+      # Default host template referenced by spec.defaults.templates.hostTemplate.
+      - name: keeper-host-template
+        portDistribution:
+          # ClusterScopeIndex makes every host's ports unique within the
+          # cluster by adding the host's 0-based cluster-scope index. Useful
+          # for HostNetwork deployments where pods share the node's network
+          # namespace and ports must not collide.
+          - type: ClusterScopeIndex
+        spec:
+          zkPort: 2181
+          raftPort: 9444
+
+    # podTemplates describe the Pod spec (container image, resources, volume
+    # mounts, scheduling, etc.) materialized into the StatefulSet.spec.template.
+    podTemplates:
+      - name: clickhouse-keeper-v25.3
+        # Zone-affinity shortcut. The operator translates this into a
+        # nodeAffinity term selecting nodes with label key=values[i].
+        zone:
+          key: "clickhouse"
+          values:
+            - "allow"
+        # Inter-pod (anti-)affinity policy. CHK ensembles benefit strongly
+        # from one-pod-per-node so a single node failure does not knock out
+        # quorum. ShardAntiAffinity + MaxNumberPerNode=1 is the canonical pair.
+        podDistribution:
+          - type: ShardAntiAffinity
+          - type: MaxNumberPerNode
+            number: 1
+            topologyKey: "kubernetes.io/hostname"
+        metadata:
+          labels:
+            app: clickhouse-keeper
+          annotations:
+            # Standard Prometheus scrape annotations matched by the chopconf
+            # Prometheus service discovery.
+            prometheus.io/port: "7000"
+            prometheus.io/scrape: "true"
+        spec:
+          # securityContext + fsGroup are typical for Keeper's data dir
+          # (default uid/gid is 101:101 in the upstream image).
+          securityContext:
+            fsGroup: 101
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: IfNotPresent
+              image: "clickhouse/clickhouse-keeper:25.3"
+              volumeMounts:
+                - name: keeper-data-volume-claim
+                  mountPath: /var/lib/clickhouse-keeper
+                - name: keeper-log-volume-claim
+                  mountPath: /var/log/clickhouse-keeper
+              resources:
+                requests:
+                  memory: "1Gi"
+                  cpu: "500m"
+                limits:
+                  memory: "4Gi"
+                  cpu: "2"
+
+      # Log sidecar — illustrative; mirror of CHI's clickhouse-log container.
+      - name: clickhouse-keeper-v25.3-with-log-sidecar
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              image: "clickhouse/clickhouse-keeper:25.3"
+              volumeMounts:
+                - name: keeper-data-volume-claim
+                  mountPath: /var/lib/clickhouse-keeper
+                - name: keeper-log-volume-claim
+                  mountPath: /var/log/clickhouse-keeper
+            - name: clickhouse-keeper-log
+              image: "clickhouse/clickhouse-keeper:25.3"
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "--"
+              args:
+                - "tail -F /var/log/clickhouse-keeper/clickhouse-keeper.log"
+              volumeMounts:
+                - name: keeper-log-volume-claim
+                  mountPath: /var/log/clickhouse-keeper
+
+    volumeClaimTemplates:
+      - name: keeper-data-volume-claim
+        # Operator-provisioned to honor reclaimPolicy=Retain on STS deletion.
+        # StatefulSet-provisioned PVCs are subject to the STS controller's
+        # built-in delete behavior, which may differ across K8s versions.
+        provisioner: Operator
+        reclaimPolicy: Retain
+        metadata:
+          labels:
+            app: clickhouse-keeper
+            role: data
+        spec:
+          # storageClassName omitted — falls back to the default StorageClass.
+          # Pin it (e.g. "gold") for predictable IOPS in production.
+          # storageClassName: gold
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+
+      - name: keeper-log-volume-claim
+        provisioner: StatefulSet
+        reclaimPolicy: Delete
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+
+    serviceTemplates:
+      # CR-scope Service template. The default Service emitted by the
+      # operator (`keeper-{chk}`) uses headless ClusterIP=None; this template
+      # overrides it with a LoadBalancer for external Keeper clients.
+      - name: chk-service-template
+        # generateName macros for CHK Services (same vocabulary as CHI):
+        # CHK-level:  {chi}, {chiID}
+        # cluster:    + {cluster}, {clusterID}, {clusterIndex}
+        # shard:      + {shard}, {shardID}, {shardIndex}
+        # replica:    + {replica}, {replicaID}, {replicaIndex},
+        #               {chiScopeIndex}, {clusterScopeIndex}, {shardScopeIndex},
+        #               {replicaScopeIndex}, cycle variants
+        generateName: "keeper-{chi}"
+        metadata:
+          labels:
+            custom.label: "custom.value"
+          annotations:
+            # Cloud-provider internal-LB annotations. Pick the one(s) that
+            # match your environment.
+            cloud.google.com/load-balancer-type: "Internal"
+            service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+            service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+            service.beta.kubernetes.io/openstack-internal-load-balancer: "true"
+            service.beta.kubernetes.io/cce-load-balancer-internal-vpc: "true"
+            # NLB on AWS.
+            service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+        spec:
+          ports:
+            - name: zk
+              port: 2181
+            # Add zk-secure: 2281 when cluster.secure=yes is in effect.
+            # - name: zk-secure
+            #   port: 2281
+            - name: raft
+              port: 9444
+          type: LoadBalancer
+
+      # Cluster-scope Service template (one per cluster).
+      - name: cluster-service-template
+        spec:
+          ports:
+            - name: zk
+              port: 2181
+            - name: raft
+              port: 9444
+          type: ClusterIP
+          clusterIP: None
+
+      # Shard-scope Service template (one per shard).
+      - name: shard-service-template
+        spec:
+          ports:
+            - name: zk
+              port: 2181
+            - name: raft
+              port: 9444
+          type: ClusterIP
+          clusterIP: None
+
+      # Replica-scope Service template (one per replica/host). For Keeper
+      # this is the per-Pod headless Service used for stable DNS within the
+      # Raft ensemble.
+      - name: replica-service-template
+        spec:
+          ports:
+            - name: zk
+              port: 2181
+            - name: raft
+              port: 9444
+          type: ClusterIP
+          clusterIP: None

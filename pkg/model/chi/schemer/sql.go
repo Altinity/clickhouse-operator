@@ -21,14 +21,25 @@ import (
 	"github.com/MakeNowJust/heredoc"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 const createTableDBEngines = `'Ordinary','Atomic','Memory','Lazy'`
 
+func (s *ClusterSchemer) sqlMaxReplicaDelay() string {
+	sql := heredoc.Docf(`
+		SELECT
+			MAX(absolute_delay)
+		FROM
+			system.replicas
+		`,
+	)
+	return sql
+}
+
 // sqlDropTable returns set of 'DROP TABLE ...' SQLs
-func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Docf(`
@@ -41,16 +52,16 @@ func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([
 	    UNION ALL
 		SELECT
 			DISTINCT name,
-			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
+			concat('DROP TABLE IF EXISTS "', database, '"."', name, '" SYNC') AS drop_table_query
 		FROM
 			system.tables
 		WHERE
 			database NOT IN (%s) AND
-			(engine like 'Replicated%%' OR engine like '%%View%%')
+			(engine like '%%MergeTree%%' OR engine like '%%View%%')
 		UNION ALL
 		SELECT
 			DISTINCT name,
-			concat('DROP DATABASE IF EXISTS "', name, '"') AS drop_table_query
+			concat('DROP DATABASE IF EXISTS "', name, '" SYNC') AS drop_table_query
 		FROM
 			system.databases
 		WHERE
@@ -59,12 +70,12 @@ func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, s.Names(interfaces.NameFQDNs, host, api.Host{}, false), sql)
 	return names, sqlStatements, nil
 }
 
 // sqlSyncTable returns set of 'SYSTEM SYNC REPLICA database.table ...' SQLs
-func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	sql := heredoc.Doc(`
 		SELECT
 			DISTINCT name,
@@ -76,7 +87,7 @@ func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.ChiHost) ([
 		`,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, s.Names(interfaces.NameFQDNs, host, api.Host{}, false), sql)
 	return names, sqlStatements, nil
 }
 
@@ -137,13 +148,13 @@ func (s *ClusterSchemer) sqlCreateTableDistributed(cluster string) string {
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
 			SELECT
-				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS database,
-				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
+				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS e_database,
+				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS e_name,
 				t.create_table_query,
 				1 AS order
 			FROM
 				clusterAllReplicas('%s', system.tables) tables
-				LEFT JOIN
+			LEFT JOIN
 				(
 					SELECT
 						DISTINCT database,
@@ -153,7 +164,7 @@ func (s *ClusterSchemer) sqlCreateTableDistributed(cluster string) string {
 						clusterAllReplicas('%s', system.tables)
 					SETTINGS skip_unavailable_shards = 1, show_table_uuid_in_table_create_query_if_not_nil=1
 				) t
-				USING (database, name)
+				ON (t.database = e_database and  t.name = e_name)
 			WHERE
 				engine = 'Distributed' AND t.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1
@@ -194,15 +205,16 @@ func (s *ClusterSchemer) sqlCreateDatabaseReplicated(cluster string) string {
 func (s *ClusterSchemer) sqlCreateTableReplicated(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
-			DISTINCT name,
+			DISTINCT tables.name,
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY|LIVE VIEW|WINDOW VIEW)', 'CREATE \\1 IF NOT EXISTS'),
 			extract(create_table_query, 'UUID \'([^\(\']*)') AS uuid,
 			extract(create_table_query, 'INNER UUID \'([^\(\']*)') AS inner_uuid
 		FROM
 			clusterAllReplicas('%s', system.tables) tables
+        LOCAL JOIN system.databases databases on (databases.name = tables.database)
 		WHERE
 			database NOT IN (%s) AND
-			has((SELECT groupArray(name) FROM system.databases WHERE engine IN (%s)), database) AND
+			databases.engine IN (%s) AND
 			create_table_query != '' AND
 			name NOT LIKE '.inner.%%' AND
 			name NOT LIKE '.inner_id.%%'
@@ -236,28 +248,51 @@ func (s *ClusterSchemer) sqlDropReplica(shard int, replica string) []string {
 	}
 }
 
-func (s *ClusterSchemer) sqlDropDNSCache() string {
-	return `SYSTEM DROP DNS CACHE`
+func (s *ClusterSchemer) sqlIsReplicaActive(replica string) string {
+	return fmt.Sprintf("SELECT sumMap(replica_is_active)['%s'] FROM system.replicas", replica)
 }
 
 func (s *ClusterSchemer) sqlActiveQueriesNum() string {
 	return `SELECT count() FROM system.processes`
 }
 
+// sqlClusterDoesNotExistErrorCount counts CLUSTER_DOESNT_EXIST occurrences on a host.
+// Non-zero means a cluster-dependent object (Distributed / DICTIONARY / refreshable MV) hit a
+// terminal async startup-load failure because the host booted before its remote_servers was
+// complete - i.e. the issue #2013 condition. A host with no cluster-dependent objects (or one that
+// loaded them cleanly) reports 0.
+func (s *ClusterSchemer) sqlClusterDoesNotExistErrorCount() string {
+	return `SELECT sum(value) FROM system.errors WHERE name = 'CLUSTER_DOESNT_EXIST'`
+}
+
 func (s *ClusterSchemer) sqlVersion() string {
 	return `SELECT version()`
 }
 
-func (s *ClusterSchemer) sqlHostInCluster() string {
-	// TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
+// sqlSettingsChangeableWithoutRestartColumn is 1 when system.server_settings has
+// changeable_without_restart. Asking system.columns avoids a failing query
+func (s *ClusterSchemer) sqlSettingsChangeableWithoutRestartColumn() string {
+	return `SELECT count() FROM system.columns WHERE database = 'system' AND table = 'server_settings' AND name = 'changeable_without_restart'`
+}
+
+// sqlSettingsChangeableWithoutRestart lists server settings ClickHouse applies without a restart.
+func (s *ClusterSchemer) sqlSettingsChangeableWithoutRestart() string {
+	return `SELECT name FROM system.server_settings WHERE changeable_without_restart = 'Yes'`
+}
+
+func (s *ClusterSchemer) sqlHostInCluster(cluster string) string {
 	return heredoc.Docf(`
-		SELECT 
-			throwIf(count()=0) 
-		FROM 
-			system.clusters 
-		WHERE 
+		SELECT
+			count()
+		FROM
+			system.clusters
+		WHERE
 			cluster='%s' AND is_local
 		`,
-		chi.AllShardsOneReplicaClusterName,
+		cluster,
 	)
+}
+
+func (s *ClusterSchemer) sqlShutDown() []string {
+	return []string{"SYSTEM SHUTDOWN"}
 }

@@ -15,12 +15,13 @@
 package announcer
 
 import (
-	"reflect"
+	"fmt"
 	"strconv"
 
 	log "github.com/golang/glog"
 
-	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util/runtime"
 )
 
@@ -44,14 +45,6 @@ type Announcer struct {
 	meta string
 }
 
-// announcer which would be used in top-level functions, can be called as a 'default announcer'
-var announcer Announcer
-
-// init creates default announcer
-func init() {
-	announcer = New()
-}
-
 // skip specifies file name which to be skipped from address
 const skip = "announcer.go"
 
@@ -69,21 +62,11 @@ func (a Announcer) Silence() Announcer {
 	return b
 }
 
-// Silence produces silent announcer
-func Silence() Announcer {
-	return announcer.Silence()
-}
-
 // V is inspired by log.V()
 func (a Announcer) V(level log.Level) Announcer {
 	b := a
 	b.v = level
 	return b
-}
-
-// V is inspired by log.V()
-func V(level log.Level) Announcer {
-	return announcer.V(level)
 }
 
 // F adds function name
@@ -93,21 +76,11 @@ func (a Announcer) F() Announcer {
 	return b
 }
 
-// F adds function name
-func F() Announcer {
-	return announcer.F()
-}
-
 // L adds line number
 func (a Announcer) L() Announcer {
 	b := a
 	_, b.line, _ = runtime.Caller(skip)
 	return b
-}
-
-// L adds line number
-func L() Announcer {
-	return announcer.L()
 }
 
 // FL adds filename
@@ -117,21 +90,11 @@ func (a Announcer) FL() Announcer {
 	return b
 }
 
-// FL adds filename
-func FL() Announcer {
-	return announcer.FL()
-}
-
 // A adds full code address as 'file:line:function'
 func (a Announcer) A() Announcer {
 	b := a
 	b.file, b.line, b.function = runtime.Caller(skip)
 	return b
-}
-
-// A adds full code address as 'file:line:function'
-func A() Announcer {
-	return announcer.A()
 }
 
 // S adds 'start of the function' tag, which includes:
@@ -143,12 +106,6 @@ func (a Announcer) S() Announcer {
 	return b
 }
 
-// S adds 'start of the function' tag, which includes:
-// file, line, function and start prefix
-func S() Announcer {
-	return announcer.S()
-}
-
 // E adds 'end of the function' tag, which includes:
 // file, line, function and start prefix
 func (a Announcer) E() Announcer {
@@ -156,12 +113,6 @@ func (a Announcer) E() Announcer {
 	b.prefix = "end"
 	b.file, b.line, b.function = runtime.Caller(skip)
 	return b
-}
-
-// E adds 'end of the function' tag, which includes:
-// file, line, function and start prefix
-func E() Announcer {
-	return announcer.E()
 }
 
 // M adds object meta as 'namespace/name'
@@ -176,42 +127,109 @@ func (a Announcer) M(m ...interface{}) Announcer {
 		switch typed := m[0].(type) {
 		case string:
 			b.meta = typed
-		case *v1.ClickHouseInstallation:
+			return b
+		case *api.ClickHouseInstallation:
 			if typed == nil {
 				return a
 			}
-			b.meta = typed.Namespace + "/" + typed.Name
-			if typed.Spec.HasTaskID() {
-				b.meta += "/" + typed.Spec.GetTaskID()
-			}
-		default:
-			if meta, ok := a.findMeta(m[0]); ok {
-				b.meta = meta
-			} else {
+		case *apiChk.ClickHouseKeeperInstallation:
+			if typed == nil {
 				return a
 			}
+		case *api.Cluster:
+			if typed == nil {
+				return a
+			}
+		case *apiChk.Cluster:
+			if typed == nil {
+				return a
+			}
+		case *api.ChiShard:
+			if typed == nil {
+				return a
+			}
+		case *api.ChiReplica:
+			if typed == nil {
+				return a
+			}
+		case *apiChk.ChkReplica:
+			if typed == nil {
+				return a
+			}
+		case *api.Host:
+			if typed == nil {
+				return a
+			}
+		case *api.ClickHouseOperatorConfiguration:
+			if typed == nil {
+				return a
+			}
+		case *api.ClickHouseInstallationTemplate:
+			if typed == nil {
+				return a
+			}
+		}
+
+		switch typed := m[0].(type) {
+		case *api.ClickHouseInstallation:
+			b.meta = fmt.Sprintf("CHI:%s/%s", typed.GetNamespace(), typed.GetName())
+		case *apiChk.ClickHouseKeeperInstallation:
+			b.meta = fmt.Sprintf("CHK:%s/%s", typed.GetNamespace(), typed.GetName())
+		case *api.Cluster:
+			b.meta = fmt.Sprintf("Cluster:%s[%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetClusterName(),
+				typed.GetRuntime().GetAddress().GetClusterIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *apiChk.Cluster:
+			b.meta = fmt.Sprintf("Cluster:%s[%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetClusterName(),
+				typed.GetRuntime().GetAddress().GetClusterIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *api.ChiShard:
+			b.meta = fmt.Sprintf("Shard:%s[%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetShardName(),
+				typed.GetRuntime().GetAddress().GetShardIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *api.ChiReplica:
+			b.meta = fmt.Sprintf("Replica:%s[%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetReplicaName(),
+				typed.GetRuntime().GetAddress().GetReplicaIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *apiChk.ChkReplica:
+			b.meta = fmt.Sprintf("Replica:%s[%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetReplicaName(),
+				typed.GetRuntime().GetAddress().GetReplicaIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *api.Host:
+			b.meta = fmt.Sprintf("Host:%s[%d/%d]:%s/%s",
+				typed.GetRuntime().GetAddress().GetHostName(),
+				typed.GetRuntime().GetAddress().GetShardIndex(),
+				typed.GetRuntime().GetAddress().GetReplicaIndex(),
+				typed.GetRuntime().GetAddress().GetNamespace(),
+				typed.GetRuntime().GetAddress().GetCRName())
+		case *api.ClickHouseOperatorConfiguration:
+			b.meta = fmt.Sprintf("ChopConfig:%s/%s", typed.GetNamespace(), typed.GetName())
+		case *api.ClickHouseInstallationTemplate:
+			b.meta = fmt.Sprintf("CHIT:%s/%s", typed.GetNamespace(), typed.GetName())
+		default:
+			b.meta = fmt.Sprintf("unknown")
 		}
 	case 2:
 		namespace, _ := m[0].(string)
 		name, _ := m[1].(string)
-		b.meta = namespace + "/" + name
+		b.meta = fmt.Sprintf("%s/%s", namespace, name)
 	}
 	return b
-}
-
-// M adds object meta as 'namespace/name'
-func M(m ...interface{}) Announcer {
-	return announcer.M(m...)
 }
 
 // P triggers log to print line
 func (a Announcer) P() {
 	a.Info("")
-}
-
-// P triggers log to print line
-func P() {
-	announcer.P()
 }
 
 // Info is inspired by log.Infof()
@@ -237,11 +255,6 @@ func (a Announcer) Info(format string, args ...interface{}) {
 	}
 }
 
-// Info is inspired by log.Infof()
-func Info(format string, args ...interface{}) {
-	announcer.Info(format, args...)
-}
-
 // Warning is inspired by log.Warningf()
 func (a Announcer) Warning(format string, args ...interface{}) {
 	// Produce classic log line
@@ -255,11 +268,6 @@ func (a Announcer) Warning(format string, args ...interface{}) {
 	} else {
 		log.Warning(format)
 	}
-}
-
-// Warning is inspired by log.Warningf()
-func Warning(format string, args ...interface{}) {
-	announcer.Warning(format, args...)
 }
 
 // Error is inspired by log.Errorf()
@@ -277,11 +285,6 @@ func (a Announcer) Error(format string, args ...interface{}) {
 	}
 }
 
-// Error is inspired by log.Errorf()
-func Error(format string, args ...interface{}) {
-	announcer.Error(format, args...)
-}
-
 // Fatal is inspired by log.Fatalf()
 func (a Announcer) Fatal(format string, args ...interface{}) {
 	format = a.prependFormat(format)
@@ -291,11 +294,6 @@ func (a Announcer) Fatal(format string, args ...interface{}) {
 	} else {
 		log.Fatal(format)
 	}
-}
-
-// Fatal is inspired by log.Fatalf()
-func Fatal(format string, args ...interface{}) {
-	announcer.Fatal(format, args...)
 }
 
 // prependFormat
@@ -338,97 +336,4 @@ func (a Announcer) prependFormat(format string) string {
 		}
 	}
 	return format
-}
-
-// findMeta
-func (a Announcer) findMeta(m interface{}) (string, bool) {
-	if meta, ok := a.findInObjectMeta(m); ok {
-		return meta, ok
-	}
-	if meta, ok := a.findInCHI(m); ok {
-		return meta, ok
-	}
-	if meta, ok := a.findInAddress(m); ok {
-		return meta, ok
-	}
-	return "", false
-}
-
-// findInObjectMeta
-func (a Announcer) findInObjectMeta(m interface{}) (string, bool) {
-	if m == nil {
-		return "", false
-	}
-	meta := reflect.ValueOf(m)
-	if !meta.IsValid() || meta.IsZero() || ((meta.Kind() == reflect.Ptr) && meta.IsNil()) {
-		return "", false
-	}
-	var namespace, name reflect.Value
-	if meta.Kind() == reflect.Ptr {
-		namespace = meta.Elem().FieldByName("Namespace")
-		name = meta.Elem().FieldByName("Name")
-	} else {
-		namespace = meta.FieldByName("Namespace")
-		name = meta.FieldByName("Name")
-	}
-	if !namespace.IsValid() {
-		return "", false
-	}
-	if !name.IsValid() {
-		return "", false
-	}
-	return namespace.String() + "/" + name.String(), true
-}
-
-// findInCHI
-func (a Announcer) findInCHI(m interface{}) (string, bool) {
-	if m == nil {
-		return "", false
-	}
-	object := reflect.ValueOf(m)
-	if !object.IsValid() || object.IsZero() || ((object.Kind() == reflect.Ptr) && object.IsNil()) {
-		return "", false
-	}
-	chiValue := object.Elem().FieldByName("CHI")
-	if !chiValue.IsValid() ||
-		chiValue.IsZero() ||
-		((chiValue.Kind() == reflect.Ptr) && chiValue.IsNil()) {
-		return "", false
-	}
-
-	chi, ok := chiValue.Interface().(v1.ClickHouseInstallation)
-	if !ok {
-		return "", false
-	}
-	res := chi.Namespace + "/" + chi.Name
-	if chi.Spec.HasTaskID() {
-		res += "/" + chi.Spec.GetTaskID()
-	}
-	return res, true
-}
-
-// findInAddress
-func (a Announcer) findInAddress(m interface{}) (string, bool) {
-	if m == nil {
-		return "", false
-	}
-	address := reflect.ValueOf(m)
-	if !address.IsValid() || address.IsZero() || ((address.Kind() == reflect.Ptr) && address.IsNil()) {
-		return "", false
-	}
-	var namespace, name reflect.Value
-	if address.Kind() == reflect.Ptr {
-		namespace = address.Elem().FieldByName("Namespace")
-		name = address.Elem().FieldByName("Name")
-	} else {
-		namespace = address.FieldByName("Namespace")
-		name = address.FieldByName("Name")
-	}
-	if !namespace.IsValid() {
-		return "", false
-	}
-	if !name.IsValid() {
-		return "", false
-	}
-	return namespace.String() + "/" + name.String(), true
 }

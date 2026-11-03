@@ -1,0 +1,64 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-030009-chk
+spec:
+  defaults:
+    templates:
+      podTemplate: fips
+  configuration:
+    clusters:
+      - name: keeper
+        secure: "yes"
+        insecure: "no"
+        layout:
+          replicasCount: 2
+    settings:
+      keeper_server/log_storage_path: /var/lib/clickhouse/coordination/log
+      keeper_server/snapshot_storage_path: /var/lib/clickhouse/coordination/snapshots
+      keeper_server/raft_configuration/server/port: 9444
+    files:
+      openssl.xml: |
+        <clickhouse>
+          <openSSL>
+              <server>
+                <certificateFile>/etc/clickhouse-server/secrets.d/server.crt/clickhouse-certs/server.crt</certificateFile>
+                <privateKeyFile>/etc/clickhouse-server/secrets.d/server.key/clickhouse-certs/server.key</privateKeyFile>
+                <!-- Server-auth TLS only: clients validate this certificate; the server does not require client certificates (not mTLS). -->
+                <verificationMode>none</verificationMode>
+                <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1,tlsv1_3</disableProtocols>
+                <cipherSuites>TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384</cipherSuites>
+              </server>
+              <client>
+                <caConfig>/etc/clickhouse-server/secrets.d/ca.crt/clickhouse-certs/ca.crt</caConfig>
+                <loadDefaultCAFile>false</loadDefaultCAFile>
+                <verificationMode>strict</verificationMode>
+                <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1</disableProtocols>
+                <cipherSuites>TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384</cipherSuites>
+              </client>
+          </openSSL>
+        </clickhouse>
+      ca.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: ca.crt
+      server.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.crt
+
+      server.key:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.key
+  templates:
+    podTemplates:
+      - name: fips
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              image: altinity/clickhouse-keeper:25.3.8.30001.altinityfips
+              imagePullPolicy: IfNotPresent

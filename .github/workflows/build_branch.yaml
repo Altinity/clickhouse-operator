@@ -4,26 +4,104 @@ on:
   push:
     branches:
       - "[0-9]+.[0-9]+.[0-9]+"
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  packages: write
+  attestations: write
 
 jobs:
-  build_master:
+  build_version:
     name: Build branch
+    # Version-branch pushes always build. A published GitHub Release only
+    # rebuilds when the tag matches the project's release-* convention
+    # (e.g. release-0.27.4), so a random/other-product release does not
+    # re-push operator images.
+    if: ${{ github.event_name != 'release' || startsWith(github.event.release.tag_name, 'release-') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Build and push Docker images
         env:
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
           DOCKER_USER: ${{ secrets.DOCKER_USER }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
         run: |
+          set -euo pipefail
           export CHO_RELEASE=$(cat release)
+          export GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
+          export GOFIPS140=v1.0.0
+          # GODEBUG_FIPS140 selects the runtime FIPS enforcement level baked
+          # into the image's ENV GODEBUG. Accepted values:
+          #   off   — module not active (shipped default; preserves pre-0.27.1
+          #           runtime behavior on the GOFIPS140-linked binary)
+          #   on    — module active; TLS/cipher/sig filtering; non-FIPS calls
+          #           outside TLS still allowed
+          #   only  — strict; non-FIPS primitive calls panic at call time
+          #   debug — same as on + per-call stderr logging
+          # Override at runtime via Pod env without rebuilding.
+          export GODEBUG_FIPS140=off
 
           echo "${DOCKER_PASS}" | docker login -u $DOCKER_USER --password-stdin docker.io
-          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/operator/Dockerfile -t docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE} --pull --push  .
-          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/metrics-exporter/Dockerfile -t docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE} --pull --push .
+          echo "Building operator image with SBOM + provenance + metadata capture"
+          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/operator/Dockerfile         --build-arg GO_VERSION=${GO_VERSION} --build-arg GOFIPS140=${GOFIPS140} --build-arg GODEBUG_FIPS140=${GODEBUG_FIPS140} -t docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE} --sbom=true --provenance=mode=max --metadata-file operator-build-metadata.json          --pull --push .
+          echo "Building metrics-exporter image with SBOM + provenance + metadata capture"
+          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/metrics-exporter/Dockerfile --build-arg GO_VERSION=${GO_VERSION} --build-arg GOFIPS140=${GOFIPS140} --build-arg GODEBUG_FIPS140=${GODEBUG_FIPS140} -t docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE}    --sbom=true --provenance=mode=max --metadata-file metrics-exporter-build-metadata.json --pull --push .
+      - name: Install syft (SBOM tool) if missing
+        run: |
+          set -euo pipefail
+          if ! command -v syft >/dev/null 2>&1; then
+            echo "syft not pre-installed on runner; installing to /usr/local/bin"
+            curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          fi
+          syft --version
+      - name: Capture release evidence
+        env:
+          DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
+        run: |
+          set -euo pipefail
+          export CHO_RELEASE=$(cat release)
+          echo "Collecting build metadata + digest + SBOM + provenance into release-evidence/"
+          mkdir -p release-evidence
+          cp operator-build-metadata.json         release-evidence/clickhouse-operator__${CHO_RELEASE}.metadata.json
+          cp metrics-exporter-build-metadata.json release-evidence/metrics-exporter__${CHO_RELEASE}.metadata.json
+          ./dev/release_evidence.sh docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE} release-evidence/
+          ./dev/release_evidence.sh docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE} release-evidence/
+      - name: Upload release evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.event.release.tag_name || github.ref_name }}
+          path: release-evidence/
+          retention-days: 365
+      - name: Attach evidence to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          CHO_RELEASE=$(cat release)
+          TAG=""
+          # Prefer the tag that published this run; otherwise the project
+          # convention is release-<version> (not the 0.27.4 version branch).
+          for candidate in "${EVENT_RELEASE_TAG}" "release-${CHO_RELEASE}" "${CHO_RELEASE}"; do
+            if [ -n "${candidate}" ] && gh release view "${candidate}" >/dev/null 2>&1; then
+              TAG="${candidate}"
+              break
+            fi
+          done
+          if [ -z "${TAG}" ]; then
+            echo "no GitHub Release for ${CHO_RELEASE} yet; skipping upload"
+            exit 0
+          fi
+          echo "Attaching release-evidence to GH Release ${TAG}"
+          gh release upload "${TAG}" release-evidence/*.{digest.txt,sbom.spdx.json,manifest.json,metadata.json} --clobber

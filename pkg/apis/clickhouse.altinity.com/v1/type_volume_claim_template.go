@@ -15,16 +15,18 @@
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
+
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ChiVolumeClaimTemplate defines PersistentVolumeClaim Template
-type ChiVolumeClaimTemplate struct {
-	Name string `json:"name"                    yaml:"name"`
+// VolumeClaimTemplate defines PersistentVolumeClaim Template
+type VolumeClaimTemplate struct {
+	Name string `json:"name" yaml:"name"`
 	StorageManagement
-	ObjectMeta metav1.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
-	Spec       corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
+	ObjectMeta meta.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
+	Spec       core.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
 }
 
 // PVCProvisioner defines PVC provisioner
@@ -42,6 +44,19 @@ func NewPVCProvisionerFromString(s string) PVCProvisioner {
 	return PVCProvisioner(s)
 }
 
+// Normalize folds any letter-casing of a recognized value to its canonical
+// PVCProvisioner const, so the CRD can accept both humped and all-lowercase forms
+// (e.g. "operator" -> "Operator"). Unrecognized values are returned unchanged for
+// the caller's IsValid()/reset to handle.
+func (v PVCProvisioner) Normalize() PVCProvisioner {
+	for _, known := range []PVCProvisioner{PVCProvisionerStatefulSet, PVCProvisionerOperator} {
+		if strings.EqualFold(string(v), string(known)) {
+			return known
+		}
+	}
+	return v
+}
+
 // IsValid checks whether PVCProvisioner is valid
 func (v PVCProvisioner) IsValid() bool {
 	switch v {
@@ -52,6 +67,16 @@ func (v PVCProvisioner) IsValid() bool {
 		return true
 	}
 	return false
+}
+
+// IsUnspecified checks whether PVCProvisioner is unspecified
+func (v PVCProvisioner) IsUnspecified() bool {
+	return v == PVCProvisionerUnspecified
+}
+
+// IsSpecified checks whether PVCProvisioner is specified
+func (v PVCProvisioner) IsSpecified() bool {
+	return v.IsValid() && !v.IsUnspecified()
 }
 
 // String returns string value for PVCProvisioner
@@ -74,6 +99,19 @@ func NewPVCReclaimPolicyFromString(s string) PVCReclaimPolicy {
 	return PVCReclaimPolicy(s)
 }
 
+// Normalize folds any letter-casing of a recognized value to its canonical
+// PVCReclaimPolicy const, so the CRD can accept both humped and all-lowercase forms
+// (e.g. "delete" -> "Delete"). Unrecognized values are returned unchanged for the
+// caller's IsValid()/reset to handle.
+func (v PVCReclaimPolicy) Normalize() PVCReclaimPolicy {
+	for _, known := range []PVCReclaimPolicy{PVCReclaimPolicyRetain, PVCReclaimPolicyDelete} {
+		if strings.EqualFold(string(v), string(known)) {
+			return known
+		}
+	}
+	return v
+}
+
 // IsValid checks whether PVCReclaimPolicy is valid
 func (v PVCReclaimPolicy) IsValid() bool {
 	switch v {
@@ -86,7 +124,37 @@ func (v PVCReclaimPolicy) IsValid() bool {
 	return false
 }
 
+// IsUnspecified checks whether PVCReclaimPolicy is unspecified
+func (v PVCReclaimPolicy) IsUnspecified() bool {
+	return v == PVCReclaimPolicyUnspecified
+}
+
+// IsSpecified checks whether PVCReclaimPolicy is specified
+func (v PVCReclaimPolicy) IsSpecified() bool {
+	return v.IsValid() && !v.IsUnspecified()
+}
+
 // String returns string value for PVCReclaimPolicy
 func (v PVCReclaimPolicy) String() string {
 	return string(v)
+}
+
+// GetName returns template name
+func (s *VolumeClaimTemplate) GetName() string {
+	if s == nil {
+		return ""
+	}
+	return s.Name
+}
+
+// MergeFrom merges volume claim template by k8s strategic-merge semantics, direction decided by merge type
+func (s *VolumeClaimTemplate) MergeFrom(from *VolumeClaimTemplate, _type MergeType) *VolumeClaimTemplate {
+	if from == nil {
+		return s
+	}
+	if s == nil {
+		s = new(VolumeClaimTemplate)
+	}
+	mergeTemplate(s, from, _type)
+	return s
 }

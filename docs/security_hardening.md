@@ -10,7 +10,17 @@ With the default settings, the ClickHouse operator deploys ClickHouse with two u
 
 The '**default**' user is used to connect to ClickHouse instance from a pod where it is running, and also for distributed queries. It is deployed with an **empty password** that was a long-time default for ClickHouse out-of-the-box installation.
 
-To secure it, the operator applies network security rules that restrict connections to the pods running the ClickHouse cluster, and nothing else.
+For security purposes, we recommend that you disable the `default` user altogether. As an example, create a file named `remove_default_user.xml` and place it in the `users.d` directory. This markup does the trick:
+
+```xml
+<clickhouse>
+   <users>
+      <default remove="1"/>
+   </users>
+</clickhouse>
+```
+
+However, if you do use the `default` user, the operator applies network security rules that restrict connections to the pods running the ClickHouse cluster, and nothing else.
 
 Before version **0.19.0**  `hostRegexp` was applied that captured pod names. This did not work correctly in some Kubernetes distributions, such as GKE. In later versions, the operator additionally applies a restrictive set of pod IP addresses and rebuilds this set if the IP address of a pod changes for whatever reason.
 
@@ -63,7 +73,7 @@ stringData:
 
 We recommend that you do not include the **user** and **password** within the operator configuration without a **secret**, though it is also supported.
 
-To change '**clickhouse_operator**' user password you can modify `etc-clickhouse-operator-files` configmap or create `ClickHouseOperatorConfiguration` object.
+To change '**clickhouse_operator**' user password you can modify `etc-clickhouse-operator-files` configmap or create `ClickHouseOperatorConfiguration` object, then restart the operator to apply the change.
 
 See [operator configuration](https://github.com/Altinity/clickhouse-operator/blob/master/docs/operator_configuration.md) for more information about operator configuration files.
 
@@ -134,7 +144,19 @@ stringData:
 
 ```
 
-**DEPRECATED**: Since version 0.23.x the syntax to read passwords and password hashes from a secret using special 'k8s\_secret\_' and 'k8s\_secret\_env\_' prefixes is deprecated:
+**REMOVED in 0.27.4**: the syntax that read passwords and password hashes from a secret using the
+special 'k8s\_secret\_' and 'k8s\_secret\_env\_' prefixes has been removed. It accepted a
+`namespace/secret/key` value and resolved the secret with the operator's own ServiceAccount, so a
+ClickHouseInstallation could read a secret out of **any** namespace.
+
+A ClickHouseInstallation that still uses these prefixes is **rejected**: reconcile aborts with
+reason `RemovedSecretRefSyntax` and the offending field is dropped. The CHI is not reconciled until
+the manifest is migrated - this is deliberate, since silently ignoring the field would leave the
+account with the operator's default password.
+
+Migrate to `valueFrom`/`secretKeyRef`, which resolves only within the CHI's own namespace:
+
+BEFORE - removed, no longer accepted:
 
 ```yaml
 spec:
@@ -142,17 +164,30 @@ spec:
     users:
       user1/k8s_secret_password: clickhouse-secret/pwduser1
       user2/k8s_secret_password_sha256_hex: clickhouse-secret/pwduser2
-      user3/k8s_secret_password_double_sha1_hex: clickhouse-secret/pwduser3
 ```
+
+AFTER:
 
 ```yaml
 spec:
   configuration:
     users:
-      user1/k8s_secret_env_password: clickhouse-secret/pwduser1
-      user2/k8s_secret_env_password_sha256_hex: clickhouse-secret/pwduser2
-      user3/k8s_secret_env_password_double_sha1_hex: clickhouse-secret/pwduser3
+      user1/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: pwduser1
+      user2/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-secret
+            key: pwduser2
 ```
+
+Note that `valueFrom`/`secretKeyRef` always passes the value through an environment variable
+(rendered as `from_env=...` in the generated XML). The operator does not hash it, so where you
+previously relied on `k8s_secret_password` being hashed into `password_sha256_hex` for you, store
+the already-hashed value in the secret and reference it from `password_sha256_hex` as shown above.
 
 ### Securing the 'default' user
 
@@ -228,7 +263,7 @@ stringData:
   AWS_ACCESS_KEY_ID: *****
 ```
 
-Secret can be referred in ```ClickHouseInstllation``` as follows:
+Secret can be referred in ```ClickHouseInstallation``` as follows:
 
 ```yaml
 spec:
@@ -257,7 +292,7 @@ spec:
         spec:
           containers:
           - name: clickhouse
-            image: altinity/clickhouse-server:23.3.8.22.altinitystable
+            image: altinity/clickhouse-server:24.3.12.76.altinitystable
             env:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
@@ -512,7 +547,7 @@ spec:
     - name: default
       containers:
       - name: clickhouse-pod
-        image: clickhouse/clickhouse-server:23.8
+        image: altinity/clickhouse-server:24.3.12.76.altinitystable
         ports:
         - name: http
           containerPort: 8123
@@ -554,3 +589,573 @@ spec:
 **TODO**:
 
 - Coming soon
+
+---
+
+# Operator-side security toggles (added in 0.27.1)
+
+> The sections above document ClickHouse-side hardening (users, passwords,
+> secrets, network). The sections below document the per-component **operator-side**
+> security toggles introduced in 0.27.1 — TLS verification on the operator's
+> outbound clients (ClickHouse / ZooKeeper / Kubernetes API), the
+> operator↔metrics-exporter IPC channel, and the transport-hardening master
+> switch.
+>
+> FIPS-specific controls (the cryptographic-module gate, the workload-image
+> policy gate, the ACVP responder, the FIPS-built image, and per-release
+> evidence) are documented in
+> [`security_hardening_fips.md`](./security_hardening_fips.md).
+
+The toggles below are opt-in: with no configuration changes the operator behaves
+exactly as in 0.26.x. Each toggle is independent — the operator does not infer
+one knob from another. This lets users harden one surface (e.g. ClickHouse
+client TLS) without disturbing others.
+
+## What is configurable
+
+| Surface | Knob | Default | Strict value |
+|---|---|---|---|
+| ClickHouse client TLS | `verify` | (legacy `InsecureSkipVerify=true`) | `Strict` |
+| ClickHouse client TLS | `minVersion` | Go default (1.2) | `"1.3"` |
+| ClickHouse client TLS | `serverName` | derived from dial host | explicit |
+| ClickHouse client TLS | `rootCA` | from chopconf `access.rootCA` | (unchanged; per-cluster override available) |
+| ZooKeeper / Keeper TLS | `verify` | strict (RootCAs+ServerName always set) | `Strict` |
+| ZooKeeper / Keeper TLS | `minVersion` | Go default | `"1.3"` |
+| Kubernetes client (chopconf only) | `tls.verify` | (unset; kubeconfig wins) | `Strict` |
+| Kubernetes client (chopconf only) | `tls.minVersion` | (unset; declared but not yet wired to K8s transport) | `"1.3"` |
+| Operator↔exporter IPC | `mode` | `Plain` | `Secure` |
+| Operator↔exporter IPC | `bindHost` | (Plain: all interfaces) | `127.0.0.1` |
+
+## Where toggles live
+
+Toggles surface at two levels with 3-level inheritance (CHOP-config → CHI spec
+→ cluster spec). Lower level wins; empty fields fall through.
+
+### Operator-wide (chopconf — `ClickHouseOperatorConfiguration` CR)
+
+```yaml
+spec:
+  security:
+    clickhouse:
+      tls:
+        verify: Strict
+        minVersion: "1.2"
+    zookeeper:
+      tls:
+        minVersion: "1.2"
+    kubernetes:
+      tls:
+        verify: Strict
+    ipc:
+      mode: Secure
+    policy: Enforced     # TLS-hardening master switch (orthogonal to fips)
+    fips:
+      enforced: true     # cryptographic-module gate — Fatals if binary lacks GOFIPS140
+    images:
+      policy: FIPSRequired   # workload supply-chain gate — refuse non-FIPS CH/Keeper images
+```
+
+**Location note**: `security:` lives at the top level of the chopconf spec —
+sibling of `spec.clickhouse`, not under it. The block covers more than ClickHouse
+(ZooKeeper TLS, Kubernetes client posture, operator-internal IPC, operator-wide
+FIPS), so nesting it under `clickhouse` would be misleading.
+
+### Per-CHI (ClickHouseInstallation CR — `spec.configuration.clusters[].security`)
+
+```yaml
+spec:
+  configuration:
+    clusters:
+      - name: prod
+        security:
+          clickhouse:
+            tls:
+              verify: Strict
+              rootCA: |
+                -----BEGIN CERTIFICATE-----
+                ...
+                -----END CERTIFICATE-----
+```
+
+The CHI block does NOT contain `ipc` or `kubernetes` — IPC is between the
+operator and the metrics-exporter sidecar (both in the operator's own Pod),
+and the Kubernetes API client is operator-process-scoped (one kubeconfig per
+operator pod). Both are configurable in ClickHouseOperatorConfiguration only.
+
+## How each toggle works
+
+### `security.clickhouse.tls.verify`
+
+Controls peer-certificate + hostname verification on outbound TLS connections
+the operator makes to ClickHouse hosts (schema reconciliation, metrics fetch).
+
+- `Strict` — verify the chain against `rootCA` (or system trust store if
+  unset) and check ServerName against the cert SANs. Handshake fails if the
+  cert is invalid.
+- `None` — equivalent to today's behavior: `InsecureSkipVerify=true`. Skip
+  chain and hostname validation. Useful for local development against
+  self-signed certs without ship-able CA bundles.
+- Unset (`""`) — preserve legacy behavior. Same as `None` today.
+
+The default is intentionally `None` (via "unset") so existing CHIs reconcile
+unchanged on upgrade.
+
+### `security.clickhouse.tls.minVersion`
+
+Floors the TLS protocol version negotiated with ClickHouse hosts. Accepts
+`"1.2"` or `"1.3"`. Empty uses Go's default (`1.2` today).
+
+If the ClickHouse server doesn't support the requested floor, the handshake
+fails with a clear `protocol version not supported` error.
+
+### `security.clickhouse.tls.serverName`
+
+Overrides the SNI / hostname used during TLS verification. By default the
+operator uses the dial host (per-host FQDN derived from the CHI's cluster
+shape). Set this when your certs are issued for a single reference name that
+doesn't match per-pod FQDNs.
+
+### `security.clickhouse.tls.rootCA`
+
+PEM-encoded CA bundle (or base64-wrapped PEM — auto-detected). Used to verify
+the ClickHouse host's cert when `verify: Strict`. If empty, the operator falls
+back to the chopconf `access.rootCA`, then to the system trust store.
+
+**Back-compat note**: setting `rootCA` alone — without `verify: Strict` — preserves
+pre-0.27.1 behavior (`InsecureSkipVerify=true`). The bundle is loaded but not
+enforced. To actually verify the chain against your CA, set `verify: Strict`
+explicitly.
+
+### `security.zookeeper.tls.verify` / `.minVersion`
+
+Same semantics as the ClickHouse TLS knobs but applied to the operator's
+ZooKeeper / Keeper client (used during initial cluster setup).
+
+**These knobs apply ONLY when a TLS-enabled ZK dial is in flight** — i.e. when
+the underlying `zookeeper.ConnectionParams` has `CertFile` / `KeyFile` set.
+With a plain-TCP ZK endpoint (the default in many development environments),
+the knobs are inert: there is no TLS handshake to configure. Setting
+`verify: Strict` on a plain-TCP ZK does NOT upgrade the dial to TLS; it is
+silently a no-op. To enforce TLS-protected ZK end-to-end, also configure
+client cert/key/CA via the chopconf-level ZK section.
+
+When TLS IS active, these knobs add explicit `MinVersion` and an
+`InsecureSkipVerify` opt-out on top of the existing ZK TLS pipeline (which
+always supplies `RootCAs` and `ServerName`).
+
+### `security.kubernetes.tls.verify` (chopconf-only)
+
+Operator-process-scoped — there is no CHI/cluster-level override. Gates startup
+against the loaded kubeconfig's `TLSClientConfig.Insecure` field.
+
+- `Strict` — refuse to start if the kubeconfig has `Insecure=true`. Typical
+  for production operators that must never honor an accidentally-insecure
+  kubeconfig.
+- `None` — explicit opt-in to permit an insecure kubeconfig (development).
+- Unset — preserve current behavior (kubeconfig wins).
+
+Unlike `clickhouse.tls.verify` and `zookeeper.tls.verify`, this knob is a
+LOAD-TIME GATE: the operator does not build the kubeconfig's `tls.Config`
+(client-go does), so `Strict` only refuses startup — it does not actively
+override the kubeconfig at the wire.
+
+The check runs once at startup, after the chopconf is loaded — if the gate
+fires, the operator exits with a `Fatal` log line including the exact problem.
+
+### `security.kubernetes.tls.minVersion` (chopconf-only)
+
+Declared for shape uniformity with ClickHouse/Zookeeper and coerced under FIPS,
+but not yet enforced on the operator's K8s API transport. A future enhancement
+will wire it into `rest.Config` when the operator wraps the kubeconfig with
+stricter TLS settings.
+
+### `security.ipc.mode`
+
+Hardens the operator↔metrics-exporter REST channel. The exporter runs as a
+sidecar in the operator's Pod and exposes `/chi` on port 8888 for the operator
+to push CR/host registration. Without hardening, this endpoint binds all
+interfaces and accepts unauthenticated requests from any pod on the same node
+network.
+
+- `Plain` (default) — preserve today's behavior. `/chi` binds all interfaces,
+  no auth.
+- `Secure` — the `/chi` handler enforces two checks:
+  1. The remote address of the request must be loopback (`127.0.0.1`).
+  2. An `X-CHOP-Token` header must match the per-Pod token at
+     `/etc/clickhouse-operator-ipc/token`.
+
+The token is generated by the operator at startup (32 bytes from
+`crypto/rand`, hex-encoded → 64 chars) and written to a shared
+`emptyDir{medium:Memory}` volume mounted into both containers. Token lifetime
+= Pod lifetime; no rotation is required.
+
+**Note**: In Secure mode the `/metrics` Prometheus endpoint still binds all
+interfaces — only the `/chi` handler is loopback-restricted. ServiceMonitor /
+Prometheus scrapes are unaffected.
+
+**Container UID note**: The token file is written with mode `0o400` (owner-only
+read). Operator and metrics-exporter containers MUST share a UID — or be in a
+shared group via Pod-level `securityContext.fsGroup` — for the exporter to read
+the token. The default Deployment satisfies this (both containers run as the
+same user); custom per-container `securityContext` overrides that diverge UIDs
+will break Secure mode at exporter startup.
+
+### Externally-managed token (advanced)
+
+The default flow generates a fresh per-Pod random token. If you need the token
+to come from a Kubernetes Secret instead — for GitOps reproducibility, external
+rotation by Vault / cert-manager / sealed-secrets, or audit/compliance reasons —
+**no operator change is required**. Override the `clickhouse-operator-ipc`
+volume in the operator Deployment from `emptyDir` to a `secret` projection
+mounted at the same path:
+
+```yaml
+volumes:
+  - name: clickhouse-operator-ipc
+    secret:
+      secretName: my-ipc-token
+      items:
+        - key: token
+          path: token
+          mode: 0400
+```
+
+The operator's startup logic at `pkg/chop/ipc_token.go` reuses any non-empty
+file already present at `tokenPath`, so a pre-populated Secret-backed file is
+adopted as-is and no random token is generated. Both containers continue to
+read the same file via the shared mount — no client/server code path changes.
+
+**Trade-offs vs the default `emptyDir{medium: Memory}` flow:**
+
+- The token is now persisted in `etcd`. Verify your cluster has
+  [encryption-at-rest](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/)
+  enabled before relying on this; without it the token leaks into etcd backups.
+- Rotation is your responsibility. Both containers cache the token in process
+  memory after startup, so Secret edits do NOT propagate live — you must
+  restart the operator Pod to pick up a rotated value.
+- Entropy is your responsibility. The default flow guarantees 32 bytes from
+  `crypto/rand`; a hand-rolled Secret could weaken this if it contains a short
+  or predictable value. Recommend ≥32 random bytes hex-encoded.
+
+This is intentionally a Deployment-level escape hatch, not a CRD field — the
+IPC token is operator-internal trust material and users who don't need this
+should keep the default `emptyDir` flow.
+
+## Certificates and CA trust
+
+FIPS and strict-TLS deployments typically store server material in a Kubernetes
+Secret (the [`fips_setup.md`](./fips_setup.md) examples use
+`clickhouse-certs`):
+
+```text
+server.crt
+server.key
+ca.crt
+dhparam.pem
+```
+
+The server certificate must contain Subject Alternative Names for the DNS names
+used by the operator and by ClickHouse/Keeper clients. For example, ClickHouse
+host certificates must cover names like:
+
+```text
+chi-<chi-name>-default-0-0.<namespace>.svc.cluster.local
+chi-<chi-name>-default-0-1.<namespace>.svc.cluster.local
+```
+
+Keeper certificates must cover names like:
+
+```text
+chk-<keeper-name>-keeper-0-0.<namespace>.svc.cluster.local
+chk-<keeper-name>-keeper-0-1.<namespace>.svc.cluster.local
+```
+
+This matters because `verify: Strict` validates both the CA chain and hostname.
+A certificate that is trusted but missing the Kubernetes DNS SAN will fail
+hostname validation. See also the Debug section below for SAN mismatch
+troubleshooting.
+
+The ClickHouseInstallation tells the operator which CA to trust:
+
+```yaml
+spec:
+  security:
+    clickhouse:
+      tls:
+        rootCASecretRef:
+          name: clickhouse-certs
+          key: ca.crt
+```
+
+This CA is used by the operator when it connects to ClickHouse over HTTPS.
+Alternatively, paste the PEM into `security.clickhouse.tls.rootCA` at the
+chopconf or CHI level (see `security.clickhouse.tls.rootCA` above).
+
+## Setup
+
+The toggles below are pure CR fields. No new images, no new RBAC.
+
+### Operator-wide via Helm
+
+```yaml
+# values.yaml
+configs:
+  files:
+    config.yaml: |
+      security:
+        clickhouse:
+          tls:
+            verify: Strict
+            minVersion: "1.3"
+        ipc:
+          mode: Secure
+```
+
+Then `helm upgrade clickhouse-operator altinity/clickhouse-operator -f values.yaml`.
+
+### Operator-wide via ClickHouseOperatorConfiguration CR
+
+```yaml
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseOperatorConfiguration
+metadata:
+  name: chop-config
+spec:
+  security:
+    clickhouse:
+      tls:
+        verify: Strict
+```
+
+If `RestartOnOperatorConfigurationChange` is enabled (chopconf option), the
+operator auto-restarts when this CR changes; otherwise restart the operator
+pod manually for changes to apply.
+
+### Per-CHI
+
+```yaml
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: my-chi
+spec:
+  configuration:
+    clusters:
+      - name: c1
+        security:
+          clickhouse:
+            tls:
+              verify: Strict
+              rootCA: ...
+```
+
+Apply with `kubectl apply -f chi.yaml`. The operator re-normalizes on next
+reconcile.
+
+## Debug
+
+### Verify a toggle is loaded
+
+The operator logs the resolved chopconf at startup (level INFO):
+
+```
+$ kubectl logs -n kube-system deploy/clickhouse-operator -c clickhouse-operator | grep -i security
+... Config parsed ...
+security:
+  clickhouse:
+    tls:
+      verify: "Strict"
+      minVersion: "1.3"
+  ipc:
+    mode: "Secure"
+```
+
+### Check a CHI's resolved Security after inheritance
+
+The 3-level merged values aren't directly exposed in CHI status. To inspect:
+
+```bash
+kubectl get chi <name> -o yaml | yq '.spec.configuration.clusters[].security'
+```
+
+That shows ONLY what's set at the cluster level. To see the effective merged
+value, watch the operator logs during reconcile — TLS-setup paths emit:
+
+```
+TLS setup OK - root Cert registered (verify=Strict minVersion=1.3)
+```
+
+### TLS verify rejecting connections
+
+If `verify: Strict` is set and connections start failing, check:
+
+1. **Cert chain** — does your `rootCA` actually sign the ClickHouse server cert?
+   ```bash
+   openssl verify -CAfile rootca.pem clickhouse-server.crt
+   ```
+2. **SAN / hostname mismatch** — the cert's SANs must include the dial host
+   the operator uses. Find the dial host in operator logs:
+   ```
+   Establishing connection: http://chi-<name>-<cluster>-<shard>-<replica>...
+   ```
+   Then inspect the cert:
+   ```bash
+   openssl s_client -connect <host>:8443 </dev/null 2>/dev/null \
+     | openssl x509 -noout -text | grep -A1 'Subject Alternative Name'
+   ```
+   If the SANs don't match, either re-issue the cert with proper SANs (cleanest)
+   or set `serverName:` to one of the existing SANs (workaround).
+3. **MinVersion mismatch** — if the ClickHouse server is old and only supports
+   1.2 but you set `minVersion: "1.3"`, handshakes will fail.
+
+### IPC Secure mode debugging
+
+If `ipc.mode: Secure` is enabled and the operator's CR registrations fail:
+
+1. **Token presence on the exporter side**:
+   ```bash
+   kubectl exec -n kube-system deploy/clickhouse-operator -c metrics-exporter \
+     -- sh -c '[ -r /etc/clickhouse-operator-ipc/token ] && echo readable'
+   ```
+   Should print `readable`. (The operator/exporter images are distroless and
+   ship only `bash`/`sh`/`curl`; there is no `ls` or `stat` available.)
+
+2. **Token presence on the operator side** (same path, same file — it's a
+   shared volume):
+   ```bash
+   kubectl exec -n kube-system deploy/clickhouse-operator -c clickhouse-operator \
+     -- sh -c '[ -r /etc/clickhouse-operator-ipc/token ] && echo readable'
+   ```
+
+3. **Reject reason in exporter logs**:
+   ```bash
+   kubectl logs -n kube-system deploy/clickhouse-operator -c metrics-exporter \
+     | grep "IPC:"
+   ```
+   - `rejected non-loopback request from <addr>` — the operator is dialing
+     non-loopback (shouldn't happen in normal operation — file a bug).
+   - `rejected request from <addr> missing or invalid X-CHOP-Token header` —
+     the operator's read of the token failed or the file content drifted.
+
+4. **Operator side errors**:
+   ```bash
+   kubectl logs ... -c clickhouse-operator | grep "IPC Secure mode but token unreadable"
+   ```
+
+### Kubernetes tls.verify=Strict firing
+
+The check runs once at startup. If you set it and the operator crash-loops
+with the message:
+```
+kubeconfig declares TLSClientConfig.Insecure=true but
+security.kubernetes.tls.verify=Strict — refusing to start
+```
+…then your kubeconfig (either the file mounted into the operator or the
+in-cluster auto-discovered one) has `insecure-skip-tls-verify: true`. Either:
+- Fix the kubeconfig (issue a CA-signed API-server cert and provide its CA in
+  the kubeconfig), or
+- Set `kubernetes.tls.verify: None` if you explicitly accept the dev posture,
+  or leave the field unset to preserve pre-0.27.1 behavior.
+
+## Upgrade compatibility
+
+All toggles default to nil / unset such that an upgrade from 0.26.x
+preserves identical runtime behavior:
+
+- ClickHouse client still runs with `InsecureSkipVerify=true` until you opt in.
+- ZooKeeper / Keeper TLS unchanged.
+- Kubernetes client honors kubeconfig as before (unset `tls.verify` ≡ permissive).
+- Operator↔exporter IPC is plain HTTP on all interfaces.
+- Prometheus scrape topology unaffected (`/metrics` stays open even in Secure IPC mode; only `/chi` is loopback-restricted).
+
+No CRD field is required, no Helm value is required. Existing chopconfs and
+CHIs validate and apply unchanged.
+
+**Upgrade ordering**: the new CRDs (with `security:` schema blocks) must be
+applied BEFORE any CR using the `security:` block. `helm upgrade` handles this
+automatically (CRDs ship in the chart). Manual installs must apply
+`deploy/operator/clickhouse-operator-install-bundle.yaml` (which includes the
+CRDs) first, then the CR. Applying a `security:`-bearing CR against a
+pre-0.27.1 CRD returns `BadRequest: unknown field "spec.security"`.
+
+**Typo handling**: the security schema blocks use
+`x-kubernetes-preserve-unknown-fields: true`, so `kubectl apply` accepts unknown
+field names without error. A typo like `tls.verifi: Strict` (missing 'y') is
+silently swallowed and the operator falls through to default behavior. To
+confirm a setting took effect, grep the operator logs for the relevant marker —
+e.g. `TLS setup OK - root Cert registered (verify=Strict ...)` for TLS verify,
+or `IPC: Secure mode — provisioned token` for IPC mode.
+
+
+## Hardening axes overview
+
+The operator's hardening posture splits across three orthogonal chopconf
+knobs. Only the transport-hardening axis is documented in detail below; the
+two FIPS axes live in [`security_hardening_fips.md`](./security_hardening_fips.md).
+
+| Axis | Knob | Concern | Detailed docs |
+|---|---|---|---|
+| Transport hardening | `security.policy` | TLS verification + IPC + scheme coercion across the operator's outbound clients (CH / ZK / K8s) | below |
+| Cryptographic-module gate | `security.fips.enforced` | Runtime assertion that the operator binary links the Go FIPS 140-3 module (`GOFIPS140=v1.0.0`) and is running under `GODEBUG=fips140=only` / `fips140=on` | [`security_hardening_fips.md`](./security_hardening_fips.md) |
+| Workload supply-chain gate | `security.images.policy` | Admission + post-Ready check that every CH/Keeper container image carries `fips` in its tag and reports `fips` in `SELECT version()` | [`security_hardening_fips.md`](./security_hardening_fips.md) |
+
+Each axis is opt-in and orthogonal — a deployment may enable any one, any two,
+or all three. The 2×2 over the two operator-runtime axes (workload axis
+flipped on/off independently):
+
+| `security.policy` | `security.fips.enforced` | Operator posture |
+|---|---|---|
+| `Permissive` (default) | `false` (default) | Pre-0.27.1 behavior. No coercion, no FIPS gate, no image gate. |
+| `Enforced` | `false` | TLS-only hardening (described below). |
+| `Permissive` | `true` | FIPS module gate — see [`security_hardening_fips.md`](./security_hardening_fips.md). |
+| `Enforced` | `true` | Full operator-side FIPS posture — see [`security_hardening_fips.md`](./security_hardening_fips.md). |
+
+### `security.policy: Enforced` — TLS-hardening master switch
+
+`security.policy` (default `Permissive`) is the master switch for the
+operator's outbound TLS posture. When `Enforced` at startup, the operator:
+
+1. **Coerces every per-component toggle to its Strict position** — logged at INFO
+   per-field:
+   - `security.clickhouse.tls.verify` → `Strict`
+   - `security.clickhouse.tls.minVersion` → `1.3`
+   - `security.zookeeper.tls.verify` → `Strict`
+   - `security.zookeeper.tls.minVersion` → `1.3`
+   - `security.kubernetes.tls.verify` → `Strict`
+   - `security.kubernetes.tls.minVersion` → `1.3`
+   - `security.ipc.mode` → `Secure`
+
+   User-set values in any of these fields are overridden (one-way tightening).
+
+2. **Re-registers the legacy ClickHouse TLS config to verifying mode**
+   (`InsecureSkipVerify=false`), so DSNs that didn't go through the per-CHI
+   security pipeline still get a verified handshake.
+
+3. **Coerces `clickhouse.access.scheme: http` → `https`** so a hardened
+   deployment cannot silently dial unencrypted ClickHouse. `auto` and `https`
+   pass through unchanged.
+
+4. **Rejects CHIs that reference plain-text external ZooKeeper.** Each
+   `spec.configuration.zookeeper.nodes[].secure: true` is required; any node
+   missing `secure: true` causes the CHI to land in `status: Aborted` with the
+   bracketed reason `[FIPSValidationFailed]` in the error stream. The
+   `secure: true` field is the enforced proxy for "FIPS-compatible ClickHouse
+   Keeper over TLS" — plain-text ZK is not permitted under transport-hardened
+   mode.
+
+5. **Rejects ZK `digest:` auth files** — the vendored go-zookeeper digest
+   scheme hashes user:password pairs with SHA-1 (see "ZooKeeper digest-auth
+   policy" below).
+
+`security.policy: Enforced` no longer Fatals on a non-FIPS-built binary. It
+governs transport hardening only — the cryptographic-module assertion is a
+separate axis (`security.fips.enforced`), documented in
+[`security_hardening_fips.md`](./security_hardening_fips.md).
+
+## Related
+
+- FIPS-specific controls (cryptographic-module gate, image policy, ACVP, FIPS build, release evidence): [`security_hardening_fips.md`](./security_hardening_fips.md)
+- End-to-end FIPS deployment: [`fips_setup.md`](./fips_setup.md)
+- Per-release verification recipes (digest / SBOM / cosign): [`fips_evidence_verification.md`](./fips_evidence_verification.md)
+- Concrete YAML examples: `docs/chi-examples/24-security-*.yaml`
+- Operator-config surface: `docs/chi-examples/70-chop-config.yaml`

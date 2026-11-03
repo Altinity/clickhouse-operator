@@ -1,13 +1,16 @@
 #!/bin/bash
 set -e
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-pip3 install -r "$CUR_DIR/../image/requirements.txt"
+source "${CUR_DIR}/test_common.sh"
+
+IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-"Always"}"
+
+common_install_pip_requirements
+common_export_test_env
+
 rm -rfv /tmp/test*.log
 pad="000"
 MAX_PARALLEL=${MAX_PARALLEL:-5}
-
-export IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-"Always"}"
-export OPERATOR_INSTALL="${OPERATOR_INSTALL:-"yes"}"
 
 function run_test_parallel() {
   test_names=("$@")

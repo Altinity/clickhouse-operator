@@ -18,7 +18,7 @@ import (
 	"context"
 	"flag"
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/metrics"
+	"github.com/altinity/clickhouse-operator/pkg/metrics/operator"
 )
 
 // Prometheus exporter defaults
@@ -50,5 +50,5 @@ func runClickHouseReconcilerMetricsExporter(ctx context.Context) {
 	defer log.E().P()
 
 	log.V(1).F().Info("Starting operator metrics exporter")
-	metrics.StartMetricsExporter(metricsEP, metricsPath)
+	operator.StartMetricsExporter(metricsEP, metricsPath)
 }

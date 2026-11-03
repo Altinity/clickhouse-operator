@@ -1,0 +1,213 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package templates
+
+import (
+	"encoding/json"
+	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/affinity"
+)
+
+// NormalizePodTemplate normalizes .spec.templates.podTemplates
+func NormalizePodTemplate(macro interfaces.IMacro, labeler interfaces.ILabeler, replicasCount int, template *api.PodTemplate) {
+	// Name
+	// GenerateName
+	// No normalization so far for these
+
+	// Zone
+	normalizePodTemplateZone(template)
+
+	// PodDistribution
+	normalizePodTemplateDistribution(replicasCount, template)
+
+	// Spec
+	template.Spec.Affinity = affinity.Merge(
+		template.Spec.Affinity,
+		affinity.New(macro, labeler).Make(template),
+	)
+
+	// In case we have hostNetwork specified, we need to have ClusterFirstWithHostNet DNS policy, because of
+	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
+	// which tells:  For Pods running with hostNetwork, you should explicitly set its DNS policy “ClusterFirstWithHostNet”.
+	if template.Spec.HostNetwork {
+		template.Spec.DNSPolicy = core.DNSClusterFirstWithHostNet
+	}
+
+	normalizePodTemplateContainers(template)
+}
+
+func normalizePodTemplateContainers(template *api.PodTemplate) {
+	for i := range template.Spec.InitContainers {
+		container := &template.Spec.InitContainers[i]
+		normalizeContainer(container)
+	}
+	for i := range template.Spec.Containers {
+		container := &template.Spec.Containers[i]
+		normalizeContainer(container)
+	}
+	for i := range template.Spec.EphemeralContainers {
+		container := &template.Spec.EphemeralContainers[i]
+		normalizeEphemeralContainer(container)
+	}
+}
+
+func normalizeContainer(container *core.Container) {
+	resources := &container.Resources
+	normalizeResources(resources)
+}
+
+func normalizeEphemeralContainer(container *core.EphemeralContainer) {
+	resources := &container.Resources
+	normalizeResources(resources)
+}
+
+func normalizeResources(resources *core.ResourceRequirements) {
+	normalizeResourceList(&resources.Limits)
+	normalizeResourceList(&resources.Requests)
+}
+
+func normalizeResourceList(list *core.ResourceList) {
+	for name, quantity := range *list {
+		if buf, err := json.Marshal(quantity); err == nil {
+			var normalizedQuantity resource.Quantity
+			if err := json.Unmarshal(buf, &normalizedQuantity); err == nil {
+				(*list)[name] = normalizedQuantity
+			}
+		}
+	}
+}
+
+func normalizePodTemplateZone(template *api.PodTemplate) {
+	switch {
+	case len(template.Zone.Values) == 0:
+		// In case no values specified - no key is reasonable
+		template.Zone.Key = ""
+	case template.Zone.Key == "":
+		// We have values specified, but no key
+		// Use default zone key in this case
+		template.Zone.Key = core.LabelTopologyZone
+	default:
+		// We have both key and value(s) specified explicitly
+		// No need to do anything, all params are set
+	}
+}
+
+func normalizePodTemplateDistribution(replicasCount int, template *api.PodTemplate) {
+	for i := range template.PodDistribution {
+		if additionalPodDistributions := normalizePodDistribution(replicasCount, &template.PodDistribution[i]); additionalPodDistributions != nil {
+			template.PodDistribution = append(template.PodDistribution, additionalPodDistributions...)
+		}
+	}
+}
+
+const defaultTopologyKey = core.LabelHostname
+
+func normalizePodDistribution(replicasCount int, podDistribution *api.PodDistribution) []api.PodDistribution {
+	// Ensure topology key
+	if podDistribution.TopologyKey == "" {
+		podDistribution.TopologyKey = defaultTopologyKey
+	}
+
+	// Fold any accepted casing to the canonical const so the switch below (and downstream
+	// affinity builders) can compare with plain ==.
+	podDistribution.Type = deployment.NormalizePodDistributionType(podDistribution.Type)
+	podDistribution.Scope = deployment.NormalizePodDistributionScope(podDistribution.Scope)
+
+	switch podDistribution.Type {
+	case
+		deployment.PodDistributionUnspecified,
+		// AntiAffinity section
+		deployment.PodDistributionClickHouseAntiAffinity,
+		deployment.PodDistributionShardAntiAffinity,
+		deployment.PodDistributionReplicaAntiAffinity:
+		// PodDistribution is known
+		if podDistribution.Scope == "" {
+			podDistribution.Scope = deployment.PodDistributionScopeCluster
+		}
+		return nil
+	case
+		deployment.PodDistributionAnotherNamespaceAntiAffinity,
+		deployment.PodDistributionAnotherClickHouseInstallationAntiAffinity,
+		deployment.PodDistributionAnotherClusterAntiAffinity:
+		// PodDistribution is known
+		return nil
+	case
+		deployment.PodDistributionMaxNumberPerNode:
+		// PodDistribution is known
+		if podDistribution.Number < 0 {
+			podDistribution.Number = 0
+		}
+		return nil
+	case
+		// Affinity section
+		deployment.PodDistributionNamespaceAffinity,
+		deployment.PodDistributionClickHouseInstallationAffinity,
+		deployment.PodDistributionClusterAffinity,
+		deployment.PodDistributionShardAffinity,
+		deployment.PodDistributionReplicaAffinity,
+		deployment.PodDistributionPreviousTailAffinity:
+		// PodDistribution is known
+		return nil
+
+	case deployment.PodDistributionCircularReplication:
+		// PodDistribution is known
+		// PodDistributionCircularReplication is a shortcut to simplify complex set of other distributions
+		// All shortcuts have to be expanded
+
+		if podDistribution.Scope == "" {
+			podDistribution.Scope = deployment.PodDistributionScopeCluster
+		}
+
+		// Expand shortcut
+		return []api.PodDistribution{
+			{
+				Type:  deployment.PodDistributionShardAntiAffinity,
+				Scope: podDistribution.Scope,
+			},
+			{
+				Type:  deployment.PodDistributionReplicaAntiAffinity,
+				Scope: podDistribution.Scope,
+			},
+			{
+				Type:   deployment.PodDistributionMaxNumberPerNode,
+				Scope:  podDistribution.Scope,
+				Number: replicasCount,
+			},
+
+			{
+				Type: deployment.PodDistributionPreviousTailAffinity,
+			},
+
+			{
+				Type: deployment.PodDistributionNamespaceAffinity,
+			},
+			{
+				Type: deployment.PodDistributionClickHouseInstallationAffinity,
+			},
+			{
+				Type: deployment.PodDistributionClusterAffinity,
+			},
+		}
+	}
+
+	// PodDistribution is not known
+	podDistribution.Type = deployment.PodDistributionUnspecified
+	return nil
+}

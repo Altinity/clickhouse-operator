@@ -1,0 +1,20 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-010080-chopconf-good"
+spec:
+  clickhouse:
+    access:
+      scheme: https
+      port: 8443
+      # Source the operator's ClickHouse-TLS rootCA from a Secret in the operator
+      # namespace holding the SAN-correct CA that issued the server cert.
+      rootCASecretRef:
+        name: test-010080-correct-ca
+        key: ca.crt
+  security:
+    clickhouse:
+      tls:
+        # Strict turns off InsecureSkipVerify so the secret-sourced rootCA is
+        # actually exercised on the wire (otherwise verification is bypassed).
+        verify: Strict

@@ -1,0 +1,28 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-059-macros
+
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 2
+        # should be parsed by ClickHouse
+        settings:
+          default_replica_path: /clickhouse/{cluster}/tables/{shard}/{uuid}
+          default_replica_name: "{replica}"
+          # BEWARE 'replica' macro has different value in ClickHouse (hostname) and Operator (replica name, default to index)
+          macros/my_replica: "{replica}"
+    files:
+      # should be parsed by ClickHouse
+      conf.d/custom.xml: |
+         <yandex>
+            <macros>
+              <my_endpoint>https://s3_url/{cluster}/{shard}/</my_endpoint>
+            </macros>
+         </yandex>

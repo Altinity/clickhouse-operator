@@ -1,0 +1,16 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-044-chopconf"
+spec:
+  reconcile:
+    host:
+      wait:
+        exclude: "false"
+        replicas:
+          new: "no"
+    statefulSet:
+      create:
+        onFailure: abort
+      update:
+        timeout: 60

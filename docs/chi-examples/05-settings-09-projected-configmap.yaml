@@ -1,0 +1,68 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-http-handlers
+data:
+  http_handlers.xml: |
+    <clickhouse>
+        <http_handlers>
+            <rule>
+                <url>/xmetrics/test_dashboard_count</url>
+                <methods>POST,GET</methods>
+                <handler>
+                    <type>predefined_query_handler</type>
+                    <query>SELECT
+                        'test_metric' AS name,
+                        map('service', 'Test') AS labels,
+                        count(*) AS value
+                        FROM
+                        db.table
+                        WHERE
+                        service_name = 'Test'
+                        AND event_time &gt;= now() - INTERVAL 24 HOUR
+                        AND event_time &lt;= now()
+                        GROUP BY ALL 
+                        FORMAT Prometheus;
+                    </query>
+                    <content_type>text/plain; charset=utf-8</content_type>
+                </handler>
+            </rule>
+        </http_handlers>
+    </clickhouse>  
+
+---
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: projected-configmap
+
+spec:
+  configuration:
+    clusters:
+      - name: cluster
+        layout:
+          replicasCount: 1
+          shardsCount: 1
+  defaults:
+    templates:
+      podTemplate: projected-configmap
+  templates:
+    podTemplates:
+      - name: projected-configmap
+        spec:
+          containers:
+          - name: clickhouse
+            image: clickhouse/clickhouse-server:latest
+            volumeMounts:
+              - name: config-volume
+                mountPath: /etc/clickhouse-server/config.d
+            volumes:
+              - name: config-volume
+                projected:
+                  sources:
+                    - configMap:
+                        name: clickhouse-http-handlers
+                    # this configmap will generate by operator use name conversion `chi-<chi-name>-common-configd`
+                    - configMap:
+                        name: chi-projected-configmap-common-configd

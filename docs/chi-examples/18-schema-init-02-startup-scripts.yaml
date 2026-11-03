@@ -1,0 +1,54 @@
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "startup-script-example"
+spec:
+  configuration:
+    files:
+      config.d/startup_scripts.xml: |
+        <clickhouse>
+          <startup_scripts>
+            <scripts>
+              <query>CREATE ROLE OR REPLACE test_role</query>
+            </scripts>
+            <scripts>
+              <query>CREATE TABLE TestTable (id UInt64) ENGINE=TinyLog</query>
+              <condition>SELECT 1;</condition>
+            </scripts>
+          </startup_scripts>
+        </clickhouse>
+    clusters:
+      - name: "default"
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  defaults:
+    templates:
+      podTemplate: pod-template
+      dataVolumeClaimTemplate: data-volume-template
+      logVolumeClaimTemplate: log-volume-template
+
+  templates:
+    podTemplates:
+      - name: pod-template
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:latest
+
+    volumeClaimTemplates:
+      - name: data-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+      - name: log-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi

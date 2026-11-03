@@ -9,11 +9,10 @@ spec:
       restartPolicy: Never
       containers:
         - name: minio-client
-          image: "minio/mc:${MINIO_CLIENT_VERSION}"
+          image: "quay.io/minio/mc:${MINIO_CLIENT_VERSION}"
           imagePullPolicy: IfNotPresent
           command:
             - /bin/bash
             - -xc
-            - mc alias set miniok8s https://minio-hl.minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY} --insecure && mc mb miniok8s/${MINIO_BACKUP_BUCKET} --ignore-existing --insecure
-
+            - mc alias set miniok8s http://minio-hl.${MINIO_NAMESPACE}:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY} && mc mb miniok8s/${MINIO_BACKUP_BUCKET} --ignore-existing --insecure
   backoffLimit: 10

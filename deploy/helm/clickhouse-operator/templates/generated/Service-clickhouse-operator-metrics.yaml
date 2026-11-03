@@ -1,0 +1,26 @@
+# Template Parameters:
+#
+# NAMESPACE=kube-system
+# COMMENT=
+#
+# Setup ClusterIP Service to provide monitoring metrics for Prometheus
+# Service would be created in kubectl-specified namespace
+# In order to get access outside of k8s it should be exposed as:
+# kubectl --namespace prometheus port-forward service/prometheus 9090
+# and point browser to localhost:9090
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ printf "%s-metrics" (include "altinity-clickhouse-operator.fullname" .) }}
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
+  labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+  annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
+spec:
+  ports:
+{{ if .Values.metrics.enabled }}
+    - port: 8888
+      name: ch-metrics
+{{ end }}
+    - port: 9999
+      name: op-metrics
+  selector: {{ include "altinity-clickhouse-operator.selectorLabels" . | nindent 4 }}

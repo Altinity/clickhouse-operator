@@ -1,0 +1,263 @@
+# Template Parameters:
+#
+# OPERATOR_VERSION=0.23.6
+#
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
+  labels:
+    clickhouse-keeper.altinity.com/chop: 0.23.6
+spec:
+  group: clickhouse-keeper.altinity.com
+  scope: Namespaced
+  names:
+    kind: ClickHouseKeeperInstallation
+    singular: clickhousekeeperinstallation
+    plural: clickhousekeeperinstallations
+    shortNames:
+      - chk
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: status
+          type: string
+          description: CHK status
+          jsonPath: .status.status
+        - name: replicas
+          type: integer
+          description: Replica count
+          priority: 1 # show in wide view
+          jsonPath: .status.replicas
+        - name: age
+          type: date
+          description: Age of the resource
+          # Displayed in all priorities
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one ClickHouse Keeper cluster"
+          properties:
+            apiVersion:
+              type: string
+              description: |
+                APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            kind:
+              type: string
+              description: |
+                Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            metadata:
+              type: object
+            status:
+              type: object
+              description: |
+                Current ClickHouseKeeperInstallation status, contains many fields like overall status, desired replicas and ready replica list with their endpoints
+              properties:
+                chop-version:
+                  type: string
+                  description: "ClickHouse operator version"
+                chop-commit:
+                  type: string
+                  description: "ClickHouse operator git commit SHA"
+                chop-date:
+                  type: string
+                  description: "ClickHouse operator build date"
+                chop-ip:
+                  type: string
+                  description: "IP address of the operator's pod which managed this CHI"
+                status:
+                  type: string
+                  description: "Status"
+                replicas:
+                  type: integer
+                  format: int32
+                  description: Replicas is the number of number of desired replicas in the cluster
+                readyReplicas:
+                  type: array
+                  description: ReadyReplicas is the array of endpoints of those ready replicas in the cluster
+                  items:
+                    type: object
+                    properties:
+                      host:
+                        type: string
+                        description: dns name or ip address for Keeper node
+                      port:
+                        type: integer
+                        minimum: 0
+                        maximum: 65535
+                        description: TCP port which used to connect to Keeper node
+                      secure:
+                        type: string
+                        description: if a secure connection to Keeper is required
+                normalized:
+                  type: object
+                  description: "Normalized CHK requested"
+                  x-kubernetes-preserve-unknown-fields: true
+                normalizedCompleted:
+                  type: object
+                  description: "Normalized CHK completed"
+                  x-kubernetes-preserve-unknown-fields: true
+            spec:
+              type: object
+              description: KeeperSpec defines the desired state of a Keeper cluster
+              properties:
+                namespaceDomainPattern:
+                  type: string
+                  description: |
+                    Custom domain pattern which will be used for DNS names of `Service` or `Pod`.
+                    Typical use scenario - custom cluster domain in Kubernetes cluster
+                    Example: %s.svc.my.test
+                replicas:
+                  type: integer
+                  format: int32
+                  description: |
+                    Replicas is the expected size of the keeper cluster.
+                    The valid range of size is from 1 to 7.
+                  minimum: 1
+                  maximum: 7
+                configuration:
+                  type: object
+                  description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
+                  # nullable: true
+                  properties:
+                    settings:
+                      type: object
+                      description: "allows configure multiple aspects and behavior for `clickhouse-keeper` instance"
+                      x-kubernetes-preserve-unknown-fields: true
+                    clusters:
+                      type: array
+                      description: |
+                        describes ClickHouseKeeper clusters layout and allows change settings on cluster-level and replica-level
+                      # nullable: true
+                      items:
+                        type: object
+                        #required:
+                        #  - name
+                        properties:
+                          name:
+                            type: string
+                            description: "cluster name, used to identify set of ClickHouseKeeper servers and wide used during generate names of related Kubernetes resources"
+                            minLength: 1
+                            # See namePartClusterMaxLen const
+                            maxLength: 15
+                            pattern: "^[a-zA-Z0-9-]{0,15}$"
+                          layout:
+                            type: object
+                            description: |
+                              describe current cluster layout, how many replicas
+                            # nullable: true
+                            properties:
+                              replicasCount:
+                                type: integer
+                                description: "how many replicas in ClickHouseKeeper cluster"
+                templates:
+                  type: object
+                  description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
+                  # nullable: true
+                  properties:
+                    podTemplates:
+                      type: array
+                      description: |
+                        podTemplate will use during render `Pod` inside `StatefulSet.spec` and allows define rendered `Pod.spec`, pod scheduling distribution and pod zone
+                        More information: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatespodtemplates
+                      # nullable: true
+                      items:
+                        type: object
+                        #required:
+                        #  - name
+                        properties:
+                          name:
+                            type: string
+                            description: "template name, could use to link inside top-level `chi.spec.defaults.templates.podTemplate`, cluster-level `chi.spec.configuration.clusters.templates.podTemplate`, shard-level `chi.spec.configuration.clusters.layout.shards.temlates.podTemplate`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates.podTemplate`"
+                          metadata:
+                            type: object
+                            description: |
+                              allows pass standard object's metadata from template to Pod
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+                            # nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                          spec:
+                            # TODO specify PodSpec
+                            type: object
+                            description: "allows define whole Pod.spec inside StaefulSet.spec, look to https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates for details"
+                            # nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                    volumeClaimTemplates:
+                      type: array
+                      description: "allows define template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mount clickhouse `data`, clickhouse `logs` or something else"
+                      # nullable: true
+                      items:
+                        type: object
+                        #required:
+                        #  - name
+                        #  - spec
+                        properties:
+                          name:
+                            type: string
+                            description: |
+                              template name, could use to link inside
+                              top-level `chi.spec.defaults.templates.dataVolumeClaimTemplate` or `chi.spec.defaults.templates.logVolumeClaimTemplate`,
+                              cluster-level `chi.spec.configuration.clusters.templates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.templates.logVolumeClaimTemplate`,
+                              shard-level `chi.spec.configuration.clusters.layout.shards.temlates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.layout.shards.temlates.logVolumeClaimTemplate`
+                              replica-level `chi.spec.configuration.clusters.layout.replicas.templates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.layout.replicas.templates.logVolumeClaimTemplate`
+                          metadata:
+                            type: object
+                            description: |
+                              allows to pass standard object's metadata from template to PVC
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+                            # nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                          spec:
+                            type: object
+                            description: |
+                              allows define all aspects of `PVC` resource
+                              More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
+                            # nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                    serviceTemplates:
+                      type: array
+                      description: |
+                        allows define template for rendering `Service` which would get endpoint from Pods which scoped chi-wide, cluster-wide, shard-wide, replica-wide level
+                      # nullable: true
+                      items:
+                        type: object
+                        #required:
+                        #  - name
+                        #  - spec
+                        properties:
+                          name:
+                            type: string
+                            description: |
+                              template name, could use to link inside
+                              chi-level `chi.spec.defaults.templates.serviceTemplate`
+                              cluster-level `chi.spec.configuration.clusters.templates.clusterServiceTemplate`
+                              shard-level `chi.spec.configuration.clusters.layout.shards.temlates.shardServiceTemplate`
+                              replica-level `chi.spec.configuration.clusters.layout.replicas.templates.replicaServiceTemplate` or `chi.spec.configuration.clusters.layout.shards.replicas.replicaServiceTemplate`
+                          metadata:
+                            # TODO specify ObjectMeta
+                            type: object
+                            description: |
+                              allows pass standard object's metadata from template to Service
+                              Could be use for define specificly for Cloud Provider metadata which impact to behavior of service
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+                            # nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                          spec:
+                            # TODO specify ServiceSpec
+                            type: object
+                            description: |
+                              describe behavior of generated Service
+                              More info: https://kubernetes.io/docs/concepts/services-networking/service/
+                            # nullable: true
+                            x-kubernetes-preserve-unknown-fields: true

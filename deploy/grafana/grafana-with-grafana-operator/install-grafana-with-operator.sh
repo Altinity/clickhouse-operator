@@ -78,12 +78,8 @@ function wait_grafana_to_start() {
     local namespace=$1
     local name=$2
 
-    echo -n "Waiting Grafana '${namespace}/${name}' to start"
-    # Check grafana deployment have all pods ready
-    while [[ $(kubectl --namespace="${namespace}" get deployments | grep "${name}-deployment" | grep "1/1" | wc -l) == "0" ]]; do
-        printf "."
-        sleep 1
-    done
+    echo "Waiting Grafana '${namespace}/${name}' to start"
+    kubectl wait deployment/grafana-deployment -n "${GRAFANA_NAMESPACE}" --for=condition=available --timeout=300s
     echo "...DONE"
 }
 
@@ -95,7 +91,7 @@ function wait_grafana_plugin_ch_datasource_to_start() {
     local namespace=$1
 
     echo -n "Waiting vertamedia-clickhouse-datasource plugin to start in '${namespace}' namespace"
-    while [[ $(kubectl --namespace="${namespace}" get deployments -o='custom-columns=PLUGINS:.spec.template.spec.initContainers[*].env[?(@.name=="GRAFANA_PLUGINS")].value' | grep "vertamedia" | wc -l) == "0" ]]; do
+    while [[ $(kubectl --namespace="${namespace}" get deployments -o='custom-columns=PLUGINS:.spec.template.spec.containers[*].env[?(@.name=="GF_INSTALL_PLUGINS")].value' | grep "vertamedia" | wc -l) == "0" ]]; do
         printf "."
         sleep 1
     done
@@ -153,7 +149,14 @@ wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 #
 
 echo "Install Prometheus DataSource"
-kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
+kubectl create --validate=${VALIDATE_YAML}  --namespace="${GRAFANA_NAMESPACE}" -f <( \
+    cat ${CUR_DIR}/grafana-data-source-prometheus-cr-template.yaml | \
+    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
+    PROMETHEUS_URL="$PROMETHEUS_URL" \
+    envsubst \
+) || true
+
+kubectl replace --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-data-source-prometheus-cr-template.yaml | \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
     PROMETHEUS_URL="$PROMETHEUS_URL" \
@@ -163,7 +166,13 @@ wait_grafana_datasource_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_PROMETHEUS_DA
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 
 echo "Install Operator dashboard"
-kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
+kubectl create --validate=${VALIDATE_YAML}  --namespace="${GRAFANA_NAMESPACE}" -f <( \
+    cat ${CUR_DIR}/grafana-dashboard-operator-cr-template.yaml | \
+    GRAFANA_DASHBOARD_NAME="$GRAFANA_OPERATOR_DASHBOARD_NAME" \
+    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
+    envsubst \
+) || true
+kubectl replace --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-operator-cr-template.yaml | \
     GRAFANA_DASHBOARD_NAME="$GRAFANA_OPERATOR_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
@@ -219,7 +228,16 @@ for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.meta
     GRAFANA_CLICKHOUSE_DATASOURCE_NAME="k8s-${NAMESPACE}-${CHI}"
     CLICKHOUSE_URL="http://${ENDPOINT}:${PORT}"
     echo "Create ClickHouse DataSource for ClickHouseInstallation ${CHI} '${GRAFANA_NAMESPACE}/${GRAFANA_CLICKHOUSE_DATASOURCE_NAME}'"
-    kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
+    kubectl create --validate=${VALIDATE_YAML}  --namespace="${GRAFANA_NAMESPACE}" -f <( \
+        cat ${CUR_DIR}/grafana-data-source-clickhouse-cr-template.yaml | \
+        GRAFANA_CLICKHOUSE_DATASOURCE_NAME="$GRAFANA_CLICKHOUSE_DATASOURCE_NAME" \
+        CLICKHOUSE_URL="$CLICKHOUSE_URL" \
+        ENDPOINT="$ENDPOINT" \
+        OPERATOR_CH_USER="$OPERATOR_CH_USER" \
+        OPERATOR_CH_PASS="$OPERATOR_CH_PASS" \
+        envsubst \
+    ) || true
+    kubectl replace --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
         cat ${CUR_DIR}/grafana-data-source-clickhouse-cr-template.yaml | \
         GRAFANA_CLICKHOUSE_DATASOURCE_NAME="$GRAFANA_CLICKHOUSE_DATASOURCE_NAME" \
         CLICKHOUSE_URL="$CLICKHOUSE_URL" \
@@ -233,7 +251,14 @@ done
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 
 echo "Install Queries dashboard"
-kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
+kubectl create --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
+    cat ${CUR_DIR}/grafana-dashboard-queries-cr-template.yaml | \
+    GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME" \
+    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
+    envsubst \
+) || true
+
+kubectl replace --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-queries-cr-template.yaml | \
     GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
@@ -241,7 +266,14 @@ kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f 
 )
 
 echo "Install Zookeeper dashboard"
-kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
+kubectl create --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
+    cat ${CUR_DIR}/grafana-dashboard-zookeeper-cr-template.yaml | \
+    GRAFANA_ZOOKEEPER_DASHBOARD_NAME="$GRAFANA_ZOOKEEPER_DASHBOARD_NAME" \
+    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
+    envsubst \
+) || true
+
+kubectl replace --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-zookeeper-cr-template.yaml | \
     GRAFANA_ZOOKEEPER_DASHBOARD_NAME="$GRAFANA_ZOOKEEPER_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
@@ -249,7 +281,14 @@ kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f 
 )
 
 echo "Install ClickHouse Keeper dashboard"
-kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
+kubectl create --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
+    cat ${CUR_DIR}/grafana-dashboard-clickhouse-keeper-cr-template.yaml | \
+    GRAFANA_CLICKHOUSE_KEEPER_DASHBOARD_NAME="$GRAFANA_CLICKHOUSE_KEEPER_DASHBOARD_NAME" \
+    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
+    envsubst '$GRAFANA_CLICKHOUSE_KEEPER_DASHBOARD_NAME $GRAFANA_PROMETHEUS_DATASOURCE_NAME' \
+) || true
+
+kubectl replace --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-clickhouse-keeper-cr-template.yaml | \
     GRAFANA_CLICKHOUSE_KEEPER_DASHBOARD_NAME="$GRAFANA_CLICKHOUSE_KEEPER_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
@@ -257,7 +296,14 @@ kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f 
 )
 
 echo "Install ClickHouse Kafka dashboard"
-kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
+kubectl create --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
+    cat ${CUR_DIR}/grafana-dashboard-kafka-cr-template.yaml | \
+    GRAFANA_CLICKHOUSE_KAFKA_DASHBOARD_NAME="$GRAFANA_CLICKHOUSE_KAFKA_DASHBOARD_NAME" \
+    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
+    envsubst '$GRAFANA_CLICKHOUSE_KAFKA_DASHBOARD_NAME $GRAFANA_PROMETHEUS_DATASOURCE_NAME' \
+) || true
+
+kubectl replace --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-kafka-cr-template.yaml | \
     GRAFANA_CLICKHOUSE_KAFKA_DASHBOARD_NAME="$GRAFANA_CLICKHOUSE_KAFKA_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \

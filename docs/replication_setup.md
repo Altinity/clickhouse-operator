@@ -7,6 +7,13 @@
 1. Zookeeper [installed][zookeeper_setup.md]
 
 
+## ZooKeeper / Keeper Configuration
+
+There are two ways to configure ZooKeeper/Keeper connectivity:
+
+1. **Explicit nodes** — specify `host:port` directly in `spec.configuration.zookeeper.nodes`
+2. **Keeper reference** — reference a `ClickHouseKeeperInstallation` by name in `spec.configuration.zookeeper.keeper` and the operator resolves endpoints automatically. See [Keeper Reference](keeper_reference.md) for details.
+
 ## Manifest
 
 Let's take a look on [example][chi-examples/04-replication-zookeeper-05-simple-PV.yaml], which creates a cluster with 2 shards and 2 replicas and persistent storage.
@@ -48,7 +55,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:24.8
 ```
 
 
@@ -57,6 +64,7 @@ spec:
 ### Macros
 Operator provides set of [macros][macros], which are:
  1. `{installation}` -- ClickHouse Installation name
+ 1. `{namespace}` -- namespace of the ClickHouse Installation
  1. `{cluster}` -- primary cluster name
  1. `{replica}` -- replica name in the cluster, maps to pod service name
  1. `{shard}` -- shard id

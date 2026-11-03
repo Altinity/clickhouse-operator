@@ -15,36 +15,217 @@
 package v1
 
 import (
-	"github.com/imdario/mergo"
+	log "github.com/golang/glog"
+
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NewChiTemplates creates new ChiTemplates object
-func NewChiTemplates() *ChiTemplates {
-	return new(ChiTemplates)
+// Templates defines templates section of .spec
+type Templates struct {
+	// Templates
+	HostTemplates        []HostTemplate        `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
+	PodTemplates         []PodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
+	VolumeClaimTemplates []VolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
+	ServiceTemplates     []ServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
+
+	// Index maps template name to template itself
+	HostTemplatesIndex        *HostTemplatesIndex        `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	PodTemplatesIndex         *PodTemplatesIndex         `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	VolumeClaimTemplatesIndex *VolumeClaimTemplatesIndex `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	ServiceTemplatesIndex     *ServiceTemplatesIndex     `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
-func (templates *ChiTemplates) GetHostTemplates() []ChiHostTemplate {
+// HostTemplate defines full Host Template
+type HostTemplate struct {
+	Name             string             `json:"name,omitempty"             yaml:"name,omitempty"`
+	PortDistribution []PortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution,omitempty"`
+	Spec             Host               `json:"spec,omitempty"             yaml:"spec,omitempty"`
+}
+
+// PortDistribution defines port distribution
+type PortDistribution struct {
+	Type string `json:"type,omitempty"   yaml:"type,omitempty"`
+}
+
+// PodTemplate defines full Pod Template, directly used by StatefulSet
+type PodTemplate struct {
+	Name            string            `json:"name"                      yaml:"name"`
+	GenerateName    string            `json:"generateName,omitempty"    yaml:"generateName,omitempty"`
+	Zone            PodTemplateZone   `json:"zone,omitempty"            yaml:"zone,omitempty"`
+	PodDistribution []PodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
+	ObjectMeta      meta.ObjectMeta   `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
+	Spec            core.PodSpec      `json:"spec,omitempty"            yaml:"spec,omitempty"`
+}
+
+func (s *PodTemplate) HasGenerateName() bool {
+	if s == nil {
+		return false
+	}
+	return s.GenerateName != ""
+}
+
+func (s *PodTemplate) GetGenerateName() string {
+	if s == nil {
+		return ""
+	}
+	return s.GenerateName
+}
+
+// GetName returns template name
+func (s *PodTemplate) GetName() string {
+	if s == nil {
+		return ""
+	}
+	return s.Name
+}
+
+// MergeFrom merges pod template by k8s strategic-merge semantics, direction decided by merge type
+func (s *PodTemplate) MergeFrom(from *PodTemplate, _type MergeType) *PodTemplate {
+	if from == nil {
+		return s
+	}
+	if s == nil {
+		s = new(PodTemplate)
+	}
+	mergeTemplate(s, from, _type)
+	return s
+}
+
+// PodTemplateZone defines pod template zone
+type PodTemplateZone struct {
+	Key    string   `json:"key,omitempty"    yaml:"key,omitempty"`
+	Values []string `json:"values,omitempty" yaml:"values,omitempty"`
+}
+
+// PodDistribution defines pod distribution
+type PodDistribution struct {
+	Type        string `json:"type,omitempty"        yaml:"type,omitempty"`
+	Scope       string `json:"scope,omitempty"       yaml:"scope,omitempty"`
+	Number      int    `json:"number,omitempty"      yaml:"number,omitempty"`
+	TopologyKey string `json:"topologyKey,omitempty" yaml:"topologyKey,omitempty"`
+}
+
+// ServiceTemplate defines CHI service template
+type ServiceTemplate struct {
+	Name         string           `json:"name"                   yaml:"name"`
+	GenerateName string           `json:"generateName,omitempty" yaml:"generateName,omitempty"`
+	ObjectMeta   meta.ObjectMeta  `json:"metadata,omitempty"     yaml:"metadata,omitempty"`
+	Spec         core.ServiceSpec `json:"spec,omitempty"         yaml:"spec,omitempty"`
+}
+
+func (s *ServiceTemplate) HasGenerateName() bool {
+	if s == nil {
+		return false
+	}
+	return s.GenerateName != ""
+}
+
+func (s *ServiceTemplate) GetGenerateName() string {
+	if s == nil {
+		return ""
+	}
+	return s.GenerateName
+}
+
+// GetName returns template name
+func (s *HostTemplate) GetName() string {
+	if s == nil {
+		return ""
+	}
+	return s.Name
+}
+
+// MergeFrom merges host template by k8s strategic-merge semantics, direction decided by merge type.
+// Host runtime is excluded from JSON, which the strategic merge travels through, so it is carried
+// across by hand. Settings and files are merged on their own: they marshal to maps under
+// user-defined keys, for which the strategic merge has no schema, and a vector under the same key
+// on both sides makes it fail outright.
+func (s *HostTemplate) MergeFrom(from *HostTemplate, _type MergeType) *HostTemplate {
+	if from == nil {
+		return s
+	}
+	if s == nil {
+		s = new(HostTemplate)
+	}
+	runtime := s.Spec.Runtime
+	settings := s.Spec.Settings.MergeFrom(from.Spec.Settings, _type)
+	files := s.Spec.Files.MergeFrom(from.Spec.Files, _type)
+
+	s.Spec.Settings, s.Spec.Files = nil, nil
+	stripped := from.DeepCopy()
+	stripped.Spec.Settings, stripped.Spec.Files = nil, nil
+	mergeTemplate(s, stripped, _type)
+
+	s.Spec.Runtime = runtime
+	s.Spec.Settings, s.Spec.Files = settings, files
+	return s
+}
+
+// GetName returns template name
+func (s *ServiceTemplate) GetName() string {
+	if s == nil {
+		return ""
+	}
+	return s.Name
+}
+
+// MergeFrom merges service template by k8s strategic-merge semantics, direction decided by merge type
+func (s *ServiceTemplate) MergeFrom(from *ServiceTemplate, _type MergeType) *ServiceTemplate {
+	if from == nil {
+		return s
+	}
+	if s == nil {
+		s = new(ServiceTemplate)
+	}
+	mergeTemplate(s, from, _type)
+	return s
+}
+
+// mergeTemplate merges one template. Should the merge itself fail, the winning side is taken as a whole,
+// so that the documented precedence holds even then.
+func mergeTemplate[T any, PT interface {
+	*T
+	GetName() string
+	DeepCopy() *T
+}](to, from *T, _type MergeType) {
+	err := mergeStrategic(to, from, _type)
+	if err == nil {
+		return
+	}
+	log.Warningf("unable to merge template '%s': %v; taking the winning side as a whole, what only the other side set is dropped", PT(to).GetName(), err)
+	if _type == MergeTypeOverrideByNonEmptyValues {
+		*to = *PT(from).DeepCopy()
+	}
+}
+
+// NewTemplates creates new Templates object
+func NewTemplates() *Templates {
+	return new(Templates)
+}
+
+func (templates *Templates) GetHostTemplates() []HostTemplate {
 	if templates == nil {
 		return nil
 	}
 	return templates.HostTemplates
 }
 
-func (templates *ChiTemplates) GetPodTemplates() []ChiPodTemplate {
+func (templates *Templates) GetPodTemplates() []PodTemplate {
 	if templates == nil {
 		return nil
 	}
 	return templates.PodTemplates
 }
 
-func (templates *ChiTemplates) GetVolumeClaimTemplates() []ChiVolumeClaimTemplate {
+func (templates *Templates) GetVolumeClaimTemplates() []VolumeClaimTemplate {
 	if templates == nil {
 		return nil
 	}
 	return templates.VolumeClaimTemplates
 }
 
-func (templates *ChiTemplates) GetServiceTemplates() []ChiServiceTemplate {
+func (templates *Templates) GetServiceTemplates() []ServiceTemplate {
 	if templates == nil {
 		return nil
 	}
@@ -52,7 +233,7 @@ func (templates *ChiTemplates) GetServiceTemplates() []ChiServiceTemplate {
 }
 
 // Len returns accumulated len of all templates
-func (templates *ChiTemplates) Len() int {
+func (templates *Templates) Len() int {
 	if templates == nil {
 		return 0
 	}
@@ -65,13 +246,13 @@ func (templates *ChiTemplates) Len() int {
 }
 
 // MergeFrom merges from specified object
-func (templates *ChiTemplates) MergeFrom(_from any, _type MergeType) *ChiTemplates {
+func (templates *Templates) MergeFrom(_from any, _type MergeType) *Templates {
 	// Typed from
-	var from *ChiTemplates
+	var from *Templates
 
 	// Ensure type
 	switch typed := _from.(type) {
-	case *ChiTemplates:
+	case *Templates:
 		from = typed
 	default:
 		return templates
@@ -84,158 +265,21 @@ func (templates *ChiTemplates) MergeFrom(_from any, _type MergeType) *ChiTemplat
 	}
 
 	if templates == nil {
-		templates = NewChiTemplates()
+		templates = NewTemplates()
 	}
 
 	// Merge sections
 
-	templates.mergeHostTemplates(from)
-	templates.mergePodTemplates(from)
-	templates.mergeVolumeClaimTemplates(from)
-	templates.mergeServiceTemplates(from)
+	templates.HostTemplates = mergeByName(templates.HostTemplates, from.HostTemplates, _type)
+	templates.PodTemplates = mergeByName(templates.PodTemplates, from.PodTemplates, _type)
+	templates.VolumeClaimTemplates = mergeByName(templates.VolumeClaimTemplates, from.VolumeClaimTemplates, _type)
+	templates.ServiceTemplates = mergeByName(templates.ServiceTemplates, from.ServiceTemplates, _type)
 
 	return templates
 }
 
-// mergeHostTemplates merges host templates section
-func (templates *ChiTemplates) mergeHostTemplates(from *ChiTemplates) {
-	if len(from.HostTemplates) == 0 {
-		return
-	}
-
-	// We have templates to merge from
-	// Loop over all 'from' templates and either copy it in case no such template in receiver or merge it
-	for fromIndex := range from.HostTemplates {
-		fromTemplate := &from.HostTemplates[fromIndex]
-
-		// Try to find entry with the same name among local templates in receiver
-		sameNameFound := false
-		for toIndex := range templates.HostTemplates {
-			toTemplate := &templates.HostTemplates[toIndex]
-			if toTemplate.Name == fromTemplate.Name {
-				// Receiver already have such a template
-				sameNameFound = true
-				// Merge `to` template with `from` template
-				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepMerge)
-				// Receiver `to` template is processed
-				break
-			}
-		}
-
-		if !sameNameFound {
-			// Receiver does not have template with such a name
-			// Append template from `from`
-			templates.HostTemplates = append(templates.HostTemplates, *fromTemplate.DeepCopy())
-		}
-	}
-}
-
-// mergePodTemplates merges pod templates section
-func (templates *ChiTemplates) mergePodTemplates(from *ChiTemplates) {
-	if len(from.PodTemplates) == 0 {
-		return
-	}
-
-	// We have templates to merge from
-	// Loop over all 'from' templates and either copy it in case no such template in receiver or merge it
-	for fromIndex := range from.PodTemplates {
-		fromTemplate := &from.PodTemplates[fromIndex]
-
-		// Try to find entry with the same name among local templates in receiver
-		sameNameFound := false
-		for toIndex := range templates.PodTemplates {
-			toTemplate := &templates.PodTemplates[toIndex]
-			if toTemplate.Name == fromTemplate.Name {
-				// Receiver already have such a template
-				sameNameFound = true
-
-				//toSpec := &toTemplate.Spec
-				//fromSpec := &fromTemplate.Spec
-				//_ = mergo.Merge(toSpec, *fromSpec, mergo.WithGrowSlice, mergo.WithOverride, mergo.WithOverrideEmptySlice)
-
-				// Merge `to` template with `from` template
-				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepMerge)
-				// Receiver `to` template is processed
-				break
-			}
-		}
-
-		if !sameNameFound {
-			// Receiver does not have template with such a name
-			// Append template from `from`
-			templates.PodTemplates = append(templates.PodTemplates, *fromTemplate.DeepCopy())
-		}
-	}
-}
-
-// mergeVolumeClaimTemplates merges volume claim templates section
-func (templates *ChiTemplates) mergeVolumeClaimTemplates(from *ChiTemplates) {
-	if len(from.VolumeClaimTemplates) == 0 {
-		return
-	}
-
-	// We have templates to merge from
-	// Loop over all 'from' templates and either copy it in case no such template in receiver or merge it
-	for fromIndex := range from.VolumeClaimTemplates {
-		fromTemplate := &from.VolumeClaimTemplates[fromIndex]
-
-		// Try to find entry with the same name among local templates in receiver
-		sameNameFound := false
-		for toIndex := range templates.VolumeClaimTemplates {
-			toTemplate := &templates.VolumeClaimTemplates[toIndex]
-			if toTemplate.Name == fromTemplate.Name {
-				// Receiver already have such a template
-				sameNameFound = true
-				// Merge `to` template with `from` template
-				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepMerge)
-				// Receiver `to` template is processed
-				break
-			}
-		}
-
-		if !sameNameFound {
-			// Receiver does not have template with such a name
-			// Append template from `from`
-			templates.VolumeClaimTemplates = append(templates.VolumeClaimTemplates, *fromTemplate.DeepCopy())
-		}
-	}
-}
-
-// mergeServiceTemplates merges service templates section
-func (templates *ChiTemplates) mergeServiceTemplates(from *ChiTemplates) {
-	if len(from.ServiceTemplates) == 0 {
-		return
-	}
-
-	// We have templates to merge from
-	// Loop over all 'from' templates and either copy it in case no such template in receiver or merge it
-	for fromIndex := range from.ServiceTemplates {
-		fromTemplate := &from.ServiceTemplates[fromIndex]
-
-		// Try to find entry with the same name among local templates in receiver
-		sameNameFound := false
-		for toIndex := range templates.ServiceTemplates {
-			toTemplate := &templates.ServiceTemplates[toIndex]
-			if toTemplate.Name == fromTemplate.Name {
-				// Receiver already have such a template
-				sameNameFound = true
-				// Merge `to` template with `from` template
-				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepCopy)
-				// Receiver `to` template is processed
-				break
-			}
-		}
-
-		if !sameNameFound {
-			// Receiver does not have template with such a name
-			// Append template from `from`
-			templates.ServiceTemplates = append(templates.ServiceTemplates, *fromTemplate.DeepCopy())
-		}
-	}
-}
-
 // GetHostTemplatesIndex returns index of host templates
-func (templates *ChiTemplates) GetHostTemplatesIndex() *HostTemplatesIndex {
+func (templates *Templates) GetHostTemplatesIndex() *HostTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -243,7 +287,7 @@ func (templates *ChiTemplates) GetHostTemplatesIndex() *HostTemplatesIndex {
 }
 
 // EnsureHostTemplatesIndex ensures index exists
-func (templates *ChiTemplates) EnsureHostTemplatesIndex() *HostTemplatesIndex {
+func (templates *Templates) EnsureHostTemplatesIndex() *HostTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -255,7 +299,7 @@ func (templates *ChiTemplates) EnsureHostTemplatesIndex() *HostTemplatesIndex {
 }
 
 // GetPodTemplatesIndex returns index of pod templates
-func (templates *ChiTemplates) GetPodTemplatesIndex() *PodTemplatesIndex {
+func (templates *Templates) GetPodTemplatesIndex() *PodTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -263,7 +307,7 @@ func (templates *ChiTemplates) GetPodTemplatesIndex() *PodTemplatesIndex {
 }
 
 // EnsurePodTemplatesIndex ensures index exists
-func (templates *ChiTemplates) EnsurePodTemplatesIndex() *PodTemplatesIndex {
+func (templates *Templates) EnsurePodTemplatesIndex() *PodTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -275,7 +319,7 @@ func (templates *ChiTemplates) EnsurePodTemplatesIndex() *PodTemplatesIndex {
 }
 
 // GetVolumeClaimTemplatesIndex returns index of VolumeClaim templates
-func (templates *ChiTemplates) GetVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
+func (templates *Templates) GetVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -283,7 +327,7 @@ func (templates *ChiTemplates) GetVolumeClaimTemplatesIndex() *VolumeClaimTempla
 }
 
 // EnsureVolumeClaimTemplatesIndex ensures index exists
-func (templates *ChiTemplates) EnsureVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
+func (templates *Templates) EnsureVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -295,7 +339,7 @@ func (templates *ChiTemplates) EnsureVolumeClaimTemplatesIndex() *VolumeClaimTem
 }
 
 // GetServiceTemplatesIndex returns index of Service templates
-func (templates *ChiTemplates) GetServiceTemplatesIndex() *ServiceTemplatesIndex {
+func (templates *Templates) GetServiceTemplatesIndex() *ServiceTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -303,7 +347,7 @@ func (templates *ChiTemplates) GetServiceTemplatesIndex() *ServiceTemplatesIndex
 }
 
 // EnsureServiceTemplatesIndex ensures index exists
-func (templates *ChiTemplates) EnsureServiceTemplatesIndex() *ServiceTemplatesIndex {
+func (templates *Templates) EnsureServiceTemplatesIndex() *ServiceTemplatesIndex {
 	if templates == nil {
 		return nil
 	}

@@ -1,16 +1,18 @@
+# 1. Change replica-service-template to headless
+# 2. Change cluster-service-template to LoadBalancer
+# 3. Change serviceTemplate to serviceTemplates and add service-template-internal
 apiVersion: "clickhouse.altinity.com/v1"
-
 kind: "ClickHouseInstallation"
-
 metadata:
   name: test-012
-
 spec:
   useTemplates:
     - name: clickhouse-version
   defaults:
     templates:
-      serviceTemplate: service-template
+      serviceTemplates:
+       - service-template
+       - service-template-internal
       replicaServiceTemplate: replica-service-template
   configuration:
     clusters:
@@ -32,6 +34,16 @@ spec:
               port: 9000
           type: LoadBalancer
           externalTrafficPolicy: Local
+      - name: service-template-internal
+        generateName: "service-{chi}-internal"
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: tcp
+              port: 9000
+          type: ClusterIP
+          clusterIP: None
       - name: cluster-service-template
         generateName: "service-{cluster}"
         spec:

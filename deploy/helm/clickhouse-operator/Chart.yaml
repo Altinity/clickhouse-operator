@@ -1,0 +1,33 @@
+apiVersion: v2
+name: altinity-clickhouse-operator
+description: |-
+  Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
+
+  The ClickHouse Operator creates, configures and manages ClickHouse clusters running on Kubernetes.
+
+  ## CRD Management
+
+  CRDs are automatically installed and updated during `helm install` and `helm upgrade` using pre-install/pre-upgrade hooks (enabled by default).
+
+  To disable automatic CRD updates, set `crdHook.enabled: false` in values.yaml. When disabled, CRDs must be installed manually:
+  ```bash
+    kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallations.clickhouse.altinity.com.yaml
+    kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseinstallationtemplates.clickhouse.altinity.com.yaml
+    kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouseoperatorconfigurations.clickhouse.altinity.com.yaml
+    kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousekeeperinstallations.clickhouse-keeper.altinity.com.yaml
+    kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousebackups.clickhouse.altinity.com.yaml
+    kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhousebackupschedules.clickhouse.altinity.com.yaml
+    kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/clickhouse-operator/crds/CustomResourceDefinition-clickhouserestores.clickhouse.altinity.com.yaml
+  ```
+type: application
+version: 0.28.0
+appVersion: 0.28.0
+home: https://github.com/Altinity/clickhouse-operator
+icon: https://logosandtypes.com/wp-content/uploads/2020/12/altinity.svg
+sources:
+  - https://github.com/Altinity/clickhouse-operator
+maintainers:
+  - name: altinity
+    email: support@altinity.com
+annotations:
+  artifacthub.io/license: Apache-2.0

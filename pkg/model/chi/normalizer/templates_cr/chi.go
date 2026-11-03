@@ -1,0 +1,167 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package templates_cr
+
+import (
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+)
+
+// ApplyTemplates applies templates provided by 'templatesSrc' over 'target', and returns the
+// references and the templates it applied, in the order applied
+func ApplyTemplates(
+	target *api.ClickHouseInstallation,
+	templatesSrc TemplateRefListSource,
+) (
+	appliedTemplateRefs []*api.TemplateRef,
+	appliedTemplates []*api.ClickHouseInstallation,
+) {
+	// Prepare list of templates to be applied to the target
+	templateRefs := prepareListOfTemplates(templatesSrc)
+
+	// Apply templates from the list
+	for _, templateRef := range templateRefs {
+		if template := findApplicableTemplate(templateRef, templatesSrc); template != nil {
+			mergeFromTemplate(target, template)
+			appliedTemplateRefs = append(appliedTemplateRefs, templateRef)
+			appliedTemplates = append(appliedTemplates, template)
+		}
+	}
+
+	log.V(1).M(templatesSrc).F().Info("Applied templates num: %d", len(appliedTemplateRefs))
+	return appliedTemplateRefs, appliedTemplates
+}
+
+func getListOfAutoTemplates() []*api.ClickHouseInstallation {
+	return chop.Config().GetAutoTemplates()
+}
+
+func getTemplate(templateRef *api.TemplateRef, fallbackNamespace string) *api.ClickHouseInstallation {
+	return chop.Config().FindTemplate(templateRef, fallbackNamespace)
+}
+
+// prepareListOfTemplates prepares list of CHI templates to be used by the CHI
+func prepareListOfTemplates(templatesSrc TemplateRefListSource) (templates []*api.TemplateRef) {
+	// 1. Get list of auto templates available
+	templates = append(templates, prepareListOfAutoTemplates(templatesSrc)...)
+	// 2. Append templates which are explicitly requested by the CHI
+	templates = append(templates, prepareListOfManualTemplates(templatesSrc)...)
+	// 3 Normalize list of templates
+	templates = NormalizeTemplateRefList(templates)
+
+	log.V(1).M(templatesSrc).F().Info("Found applicable templates num: %d", len(templates))
+	return templates
+}
+
+func prepareListOfAutoTemplates(subj any) (templates []*api.TemplateRef) {
+	// 1. Get list of auto templates available
+	if autoTemplates := getListOfAutoTemplates(); len(autoTemplates) > 0 {
+		log.V(1).M(subj).F().Info("Found auto-templates num: %d", len(autoTemplates))
+		for _, template := range autoTemplates {
+			log.V(1).M(subj).F().Info(
+				"Adding auto-template to the list of applicable templates: %s/%s ",
+				template.Namespace, template.Name)
+			templates = append(templates, &api.TemplateRef{
+				Name:      template.Name,
+				Namespace: template.Namespace,
+				UseType:   UseTypeMerge,
+			})
+		}
+	}
+
+	return templates
+}
+
+func prepareListOfManualTemplates(templatesSrc TemplateRefListSource) (templates []*api.TemplateRef) {
+	if len(templatesSrc.GetUsedTemplates()) > 0 {
+		log.V(1).M(templatesSrc).F().Info("Found manual-templates num: %d", len(templatesSrc.GetUsedTemplates()))
+		templates = append(templates, templatesSrc.GetUsedTemplates()...)
+	}
+
+	return templates
+}
+
+// findApplicableTemplate returns the template 'templateRef' points to when its selector matches
+// the labels of 'templatesSrc', and nil otherwise
+func findApplicableTemplate(templateRef *api.TemplateRef, templatesSrc TemplateRefListSource) *api.ClickHouseInstallation {
+	if templateRef == nil {
+		log.Warning("unable to apply template - nil templateRef provided")
+		// Template is not applied
+		return nil
+	}
+
+	// What template are we going to apply?
+	defaultNamespace := templatesSrc.GetNamespace()
+	template := getTemplate(templateRef, defaultNamespace)
+	if template == nil {
+		log.V(1).M(templateRef).F().Warning(
+			"Skip template - UNABLE to find by templateRef: '[%s|%s]/%s'",
+			templateRef.Namespace, defaultNamespace, templateRef.Name)
+		// Template is not applied
+		return nil
+	}
+
+	// What target(s) this template wants to be applied to?
+	// This is determined by matching selector of the template and target's labels
+	// Convenience wrapper
+	selector := template.GetSpecT().Templating.GetSelector()
+	if !selector.Matches(templatesSrc.GetLabels()) {
+		// This template does not want to be applied to this CHI
+		log.V(1).M(templateRef).F().Info(
+			"Skip template: '%s/%s'. Selector: '%v' does not match labels: '%v'",
+			template.GetNamespace(), template.GetName(), selector, templatesSrc.GetLabels())
+		// Template is not applied
+		return nil
+	}
+
+	//
+	// Template is found and wants to be applied on the target
+	//
+
+	log.V(1).M(templateRef).F().Info(
+		"Apply template: '%s/%s'. Selector: '%v' matches labels: '%v'",
+		template.GetNamespace(), template.GetName(), selector, templatesSrc.GetLabels())
+
+	return template
+}
+
+func mergeFromTemplate(target, template *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+	// Merge template's Labels over target's Labels
+	target.Labels = util.MergeStringMapsOverwrite(
+		target.Labels,
+		util.CopyMapFilter(
+			template.Labels,
+			chop.Config().Label.Include,
+			chop.Config().Label.Exclude,
+		),
+	)
+
+	// Merge template's Annotations over target's Annotations
+	target.Annotations = util.MergeStringMapsOverwrite(
+		target.Annotations,
+		util.CopyMapFilter(
+			template.Annotations,
+			chop.Config().Annotation.Include,
+			append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
+		),
+	)
+
+	// Merge template's Spec over target's Spec
+	target.GetSpecT().MergeFrom(template.GetSpecT(), api.MergeTypeOverrideByNonEmptyValues)
+
+	return target
+}

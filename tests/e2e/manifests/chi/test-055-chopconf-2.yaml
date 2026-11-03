@@ -1,0 +1,21 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-055-chopconf
+
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: default
+    files:
+      config.d/startup_scripts.xml: |
+        <clickhouse>
+          <startup_scripts>
+            <scripts>
+              <query>CREATE TABLE IF NOT EXISTS test_055(a Int8) Engine = Log</query>
+            </scripts>
+          </startup_scripts>
+        </clickhouse>

@@ -16,6 +16,7 @@ package runtime
 
 import (
 	"path"
+	"reflect"
 	"runtime"
 	"strings"
 )
@@ -34,7 +35,9 @@ func Caller(skip string) (string, int, string) {
 		// file = prog.go
 		file := path.Base(frame.File)
 		// function = Info
-		function := path.Base(strings.Replace(frame.Function, ".", "/", -1))
+		// Generic functions are reported as main.Fn[...]; drop the "[...]" or its dots
+		// become slashes and path.Base returns "]".
+		function := path.Base(strings.Replace(strings.TrimSuffix(frame.Function, "[...]"), ".", "/", -1))
 
 		if file != skip {
 			return file, frame.Line, function
@@ -45,4 +48,9 @@ func Caller(skip string) (string, int, string) {
 		}
 	}
 	return "", 0, ""
+}
+
+// FunctionName returns name of the calling function
+func FunctionName(fn interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
 }

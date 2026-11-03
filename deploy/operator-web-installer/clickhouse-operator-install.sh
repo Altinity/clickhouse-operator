@@ -63,18 +63,25 @@ function check_envsubst_available() {
 function get_file() {
     local url="$1"
 
-    if curl --version > /dev/null; then
+    if [[ -f "${url}" ]]; then
+        # local file is available - use it
+        cat "${url}"
+    elif curl --version > /dev/null; then
         # curl is available - use it
         curl -s "${url}"
     elif wget --version > /dev/null; then
         # wget is available - use it
         wget -qO- "${url}"
     else
-        echo "neither curl nor wget is available, can not continue"
+        echo "neither local file nor curl nor wget is available, can not continue"
         exit 1
     fi
 }
 
+#
+# Ensures specified namespace exists in k8s.
+# If namespace does not exist - will be created.
+#
 function ensure_namespace() {
     local namespace="${1}"
     if kubectl get namespace "${namespace}" 1>/dev/null 2>/dev/null; then
@@ -85,6 +92,9 @@ function ensure_namespace() {
     fi
 }
 
+#
+# Checks whether clickhouse-operator deployment is already deployed
+#
 function check_deployment() {
     local namespace="${1}"
     local update=""${2}
@@ -107,6 +117,10 @@ function check_deployment() {
     fi
 }
 
+#
+# Checks whether specified string starts with "http" (return 0 in this case) or "https".
+# Case-insensitive.
+#
 function check_http() {
     # ${1,,} converts $1 to lowercase
     if [[ ${1,,} =~ ^https?:// ]]; then
@@ -127,9 +141,6 @@ check_envsubst_available
 
 # Manifest is expected to be ready-to-use manifest file
 MANIFEST="${MANIFEST:-""}"
-# Template can have params to substitute
-DEFAULT_TEMPLATE="https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-template.yaml"
-TEMPLATE="${TEMPLATE:-"${DEFAULT_TEMPLATE}"}"
 # Namespace to install operator
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-"kube-system"}"
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
@@ -139,6 +150,9 @@ if [[ -z "${OPERATOR_VERSION}" ]]; then
     RELEASE_VERSION=$(get_file https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/release)
 fi
 OPERATOR_VERSION="${OPERATOR_VERSION:-"${RELEASE_VERSION}"}"
+# Template can have params to substitute
+DEFAULT_TEMPLATE="https://raw.githubusercontent.com/Altinity/clickhouse-operator/${OPERATOR_VERSION:-master}/deploy/operator/clickhouse-operator-install-template.yaml"
+TEMPLATE="${TEMPLATE:-"${DEFAULT_TEMPLATE}"}"
 OPERATOR_IMAGE="${OPERATOR_IMAGE:-"altinity/clickhouse-operator:${OPERATOR_VERSION}"}"
 OPERATOR_IMAGE_PULL_POLICY="${OPERATOR_IMAGE_PULL_POLICY:-"Always"}"
 METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-"altinity/metrics-exporter:${OPERATOR_VERSION}"}"
@@ -184,5 +198,5 @@ elif [[ ! -z "${TEMPLATE}" ]]; then
             envsubst \
     )
 else
-    echo "Neither manifest not template available. Abort."
+    echo "Neither manifest nor template available. Abort."
 fi

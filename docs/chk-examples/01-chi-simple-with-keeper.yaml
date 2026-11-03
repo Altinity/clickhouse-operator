@@ -1,0 +1,14 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: simple-with-keeper
+spec:
+  configuration:
+    zookeeper:
+      nodes:
+        - host: keeper-simple-1 # This is a service name of chk/simple-1
+          port: 2181
+    clusters:
+      - name: default
+        layout:
+          replicasCount: 2

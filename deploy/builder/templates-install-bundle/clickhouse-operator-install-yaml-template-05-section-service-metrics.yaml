@@ -19,8 +19,8 @@ metadata:
 spec:
   ports:
     - port: 8888
-      name: clickhouse-metrics
+      name: ch-metrics
     - port: 9999
-      name: operator-metrics
+      name: op-metrics
   selector:
     app: clickhouse-operator

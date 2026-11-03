@@ -1,0 +1,86 @@
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "s3-tiered"
+spec:
+  configuration:
+    clusters:
+      - name: "cluster"
+        templates:
+          podTemplate: pod-template
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+    files:
+      config.d/storage_configuration.xml: |
+        <clickhouse>
+            <storage_configuration>
+                <disks>
+                    <s3_disk>
+                        <type>s3</type>
+                        <endpoint>https://sample-bucket.s3.amazonaws.com/s3_disk/{replica}</endpoint>
+                        <access_key_id>your_access_key_id</access_key_id>
+                        <secret_access_key>your_secret_access_key</secret_access_key>
+                        <region>us-east-2</region>
+                        <metadata_path>/var/lib/clickhouse/disks/s3_disk/</metadata_path>
+                    </s3_disk>
+                    <s3_cache>
+                        <type>cache</type>
+                        <disk>s3_disk</disk>
+                        <path>/var/lib/clickhouse/disks/s3_cache/</path>
+                        <max_size>10Gi</max_size>
+                    </s3_cache>
+                </disks>
+                <policies>
+                  <s3_only>
+                      <volumes>
+                          <main>
+                              <disk>s3_disk</disk>
+                          </main>
+                      </volumes>
+                  </s3_only>
+                  <s3_cache>
+                      <volumes>
+                          <main>
+                              <disk>s3_cache</disk>
+                          </main>
+                      </volumes>
+                  </s3_cache>
+                  <s3_cache_tiered>
+                      <volumes>
+                          <hot>
+                              <disk>default</disk>
+                          </hot>
+                          <cold>
+                              <disk>s3_cache</disk>
+                          </cold>
+                      </volumes>
+                  </s3_cache_tiered>
+              </policies>
+            </storage_configuration>
+        </clickhouse>
+  templates:
+    podTemplates:
+      - name: pod-template
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:latest
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - name: data-storage-vc-template-1
+                  mountPath: /var/lib/clickhouse
+              command:
+                - clickhouse-server
+                - --config-file=/etc/clickhouse-server/config.xml
+
+    volumeClaimTemplates:
+      - name: data-storage-vc-template-1
+        spec:
+          # storageClassName: standard
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi

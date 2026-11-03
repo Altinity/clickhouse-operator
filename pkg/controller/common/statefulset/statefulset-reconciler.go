@@ -1,0 +1,663 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package statefulset
+
+import (
+	"context"
+	"errors"
+	"strings"
+
+	apps "k8s.io/api/apps/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+)
+
+type Reconciler struct {
+	a    a.Announcer
+	task *common.Task
+
+	hostObjectsPoller IHostObjectsPoller
+	namer             interfaces.INameManager
+	labeler           interfaces.ILabeler
+	storage           *storage.Reconciler
+
+	cr  interfaces.IKubeCR
+	sts interfaces.IKubeSTS
+	pod interfaces.IKubePod
+
+	fallback Fallback
+}
+
+func NewReconciler(
+	a a.Announcer,
+	task *common.Task,
+	hostObjectsPoller IHostObjectsPoller,
+	namer interfaces.INameManager,
+	labeler interfaces.ILabeler,
+	storage *storage.Reconciler,
+	kube interfaces.IKube,
+	fallback Fallback,
+) *Reconciler {
+	return &Reconciler{
+		a:    a,
+		task: task,
+
+		hostObjectsPoller: hostObjectsPoller,
+		namer:             namer,
+		labeler:           labeler,
+		storage:           storage,
+
+		cr:  kube.CR(),
+		sts: kube.STS(),
+		pod: kube.Pod(),
+
+		fallback: fallback,
+	}
+}
+
+// PrepareHostStatefulSetWithStatus prepares host's StatefulSet status
+func (r *Reconciler) PrepareHostStatefulSetWithStatus(ctx context.Context, host *api.Host, shutdown bool) {
+	r.prepareDesiredStatefulSet(host, shutdown)
+	host.GetReconcileAttributes().SetStatus(r.getStatefulSetStatus(host))
+}
+
+// Fallback reports the create/update failure policy this Reconciler was built with.
+func (r *Reconciler) Fallback() Fallback {
+	return r.fallback
+}
+
+// prepareDesiredStatefulSet prepares desired StatefulSet
+func (r *Reconciler) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
+	host.Runtime.DesiredStatefulSet = r.task.Creator().CreateStatefulSet(host, shutdown)
+}
+
+// getStatefulSetStatus gets StatefulSet status
+func (r *Reconciler) getStatefulSetStatus(host *api.Host) types.ObjectStatus {
+	new := host.Runtime.DesiredStatefulSet
+	r.a.V(2).M(new).S().Info(util.NamespaceNameString(new))
+	defer r.a.V(2).M(new).E().Info(util.NamespaceNameString(new))
+
+	r.a.V(2).M(new).Info("host sts preamble: ancestor: %t cnt: %d added: %d",
+		host.HasAncestor(),
+		host.GetCR().IEnsureStatus().GetHostsCount(),
+		host.GetCR().IEnsureStatus().GetHostsAddedCount(),
+	)
+
+	cur, err := r.sts.Get(context.TODO(), new)
+	switch {
+	case (err == nil) && (cur != nil):
+		// StatefulSet is found
+		r.a.V(1).M(new).Info("Have StatefulSet available, try to perform label-based comparison for sts: %s", util.NamespaceNameString(new))
+		return common.GetObjectStatusFromMetas(r.labeler, cur, new)
+
+	case apiErrors.IsNotFound(err):
+		// StatefulSet is not found at the moment.
+		// It is either new or - however - it may be just deleted
+		r.a.V(1).M(new).Info("No cur StatefulSet available and the reason is - not found. Either new one or a deleted sts: %s", util.NamespaceNameString(new))
+		if host.HasAncestor() {
+			r.a.V(1).M(new).Warning("No cur StatefulSet available but host has an ancestor. Found deleted sts. for: %s", util.NamespaceNameString(new))
+			return types.ObjectStatusModified
+		}
+		r.a.V(1).M(new).Info("No cur StatefulSet available and it is not found and is a new one. New sts: %s", util.NamespaceNameString(new))
+		return types.ObjectStatusRequested
+
+	default:
+		// Other error
+		r.a.V(1).M(new).Warning("Have no StatefulSet available, nor it is not found. sts: %s err: %v", util.NamespaceNameString(new), err)
+		r.a.V(2).M(new).Info("host sts cur: %s", cur)
+		r.a.V(2).M(new).Info("host sts err: %s", err)
+		return types.ObjectStatusUnknown
+	}
+}
+
+// ReconcileStatefulSet reconciles StatefulSet of a host
+func (r *Reconciler) ReconcileStatefulSet(
+	ctx context.Context,
+	host *api.Host,
+	register bool,
+	opts *ReconcileOptions,
+) (err error) {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("reconcile sts is aborted. Host: %s", host.GetName())
+		return nil
+	}
+
+	newStatefulSet := host.Runtime.DesiredStatefulSet
+
+	r.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet))
+	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet))
+
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) {
+		r.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
+		if register {
+			host.GetCR().IEnsureStatus().HostUnchanged()
+			_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
+				CopyStatusOptions: types.CopyStatusOptions{
+					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+						FieldGroupMain: true,
+					},
+				},
+			})
+		}
+		return nil
+	}
+
+	// Check whether this object already exists in k8s
+	host.Runtime.CurStatefulSet, err = r.sts.Get(ctx, newStatefulSet)
+
+	// Report diff to trace
+	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusModified) {
+		r.a.V(1).M(host).F().Info("Need to reconcile MODIFIED StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
+		common.DumpStatefulSetDiff(host, host.Runtime.CurStatefulSet, newStatefulSet)
+	}
+
+	switch {
+	case opts.ForceRecreate():
+		// Force recreate prevails over all other requests
+		err = r.recreateStatefulSet(ctx, host, register, opts)
+	case apiErrors.IsNotFound(err):
+		// StatefulSet not found in k8s — create it
+		err = r.createStatefulSet(ctx, host, register, opts)
+	case util.IsContextDone(ctx):
+		// Shutting down. Return rather than fall through: without this the arm below would read a
+		// cancelled-context error as an unreadable StatefulSet and turn an orderly stop into a
+		// host failure and a Warning event on every shutdown. The sibling guards in this file -
+		// the one at the top of this function included - return nil here for the same reason.
+		log.V(1).M(host).F().Info("reconcile StatefulSet aborted, shutting down: %s",
+			util.NamespaceNameString(newStatefulSet))
+		return nil
+	case err != nil:
+		// The read failed for a reason that is not absence - Forbidden, or a spent retry budget.
+		// That says nothing about whether the StatefulSet exists, so falling through would treat
+		// it as present-but-broken: updateStatefulSet finds no usable current StatefulSet (nil on
+		// the Keeper path, an empty one on the ClickHouse path, and IsStatefulSetReady rejects
+		// both), and escalates to a recreate. That recreate deletes the StatefulSet, and its pods,
+		// as soon as a re-read succeeds - so a blip that clears at the wrong moment destroys a
+		// host that was healthy throughout. doDeleteStatefulSet already separates absence from
+		// unreadability; make the same distinction here and let the next pass re-read.
+		r.a.V(1).M(host).F().Error("FAIL to get StatefulSet: %s err: %v",
+			util.NamespaceNameString(newStatefulSet), err)
+	default:
+		// We have StatefulSet - try to update|recreate it
+		err = r.updateStatefulSet(ctx, host, register, opts)
+	}
+
+	// Host has to know current StatefulSet and Pod
+	host.Runtime.CurStatefulSet, _ = r.sts.Get(ctx, newStatefulSet)
+
+	return err
+}
+
+// recreateStatefulSet
+func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("recreate sts is aborted host: %s", host.GetName())
+		return nil
+	}
+
+	r.a.V(2).M(host).S().Info(util.NamespaceNameString(host.GetCR()))
+	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(host.GetCR()))
+
+	if err := r.doDeleteStatefulSet(ctx, host); err != nil {
+		namespace := host.Runtime.Address.Namespace
+		name := r.namer.Name(interfaces.NameStatefulSet, host)
+		// Stable K8s Event/Status message (no err interpolation) so event-recorder dedupe
+		// aggregates repeated failures into a single event with bumped Count instead of
+		// minting a new row each reconcile cycle.
+		r.a.V(1).
+			WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateFailed).
+			WithAction(host.GetCR()).
+			WithError(host.GetCR()).
+			M(host).F().
+			Warning("Recreate aborted: StatefulSet delete failed %s/%s", namespace, name)
+		// Verbose err detail goes to the log only, not the K8s Event.
+		log.V(1).M(host).F().Error("Recreate aborted: StatefulSet delete failed %s/%s err: %v", namespace, name, err)
+		// Recovery is informer-driven: a subsequent spec edit, STS/Pod event, or the periodic
+		// resync will re-enqueue this CR. Host stays at Replicas=0 until then.
+		return err
+	}
+	_ = r.storage.ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+	return r.createStatefulSet(ctx, host, register, opts)
+}
+
+// copyKubectlAnnotationsBeforeUpdate copies kubectl annotations from old to new statefulset as they are set by external kubectl
+// operations and should be preserved during statefulset update
+func (r *Reconciler) copyKubectlAnnotationsBeforeUpdate(old, new *apps.StatefulSet) {
+	if old == nil || new == nil {
+		return
+	}
+
+	oldMeta := old.Spec.Template.ObjectMeta
+	newMeta := new.Spec.Template.ObjectMeta
+
+	for k, v := range oldMeta.Annotations {
+		if strings.HasPrefix(k, "kubectl.kubernetes.io/") {
+			if newMeta.Annotations == nil {
+				newMeta.Annotations = make(map[string]string)
+			}
+
+			newMeta.Annotations[k] = v
+		}
+	}
+}
+
+// updateStatefulSet
+func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
+	if util.IsContextDone(ctx) {
+		log.V(1).Info("update sts is aborted host: %s", host.GetName())
+		return nil
+	}
+
+	// Helpers
+	newStatefulSet := host.Runtime.DesiredStatefulSet.DeepCopy()
+	curStatefulSet := host.Runtime.CurStatefulSet
+
+	r.copyKubectlAnnotationsBeforeUpdate(curStatefulSet, newStatefulSet)
+
+	r.a.V(2).M(host).S().Info(newStatefulSet.Name)
+	defer r.a.V(2).M(host).E().Info(newStatefulSet.Name)
+
+	namespace := newStatefulSet.Namespace
+	name := newStatefulSet.Name
+
+	r.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
+		WithAction(host.GetCR()).
+		M(host).F().
+		Info("Update StatefulSet(%s) - started", util.NamespaceNameString(newStatefulSet))
+
+	if r.task.WaitForConfigMapPropagation(ctx, host) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	action := common.ErrCRUDRecreate
+	if k8s.IsStatefulSetReady(curStatefulSet) {
+		if action = r.doUpdateStatefulSet(ctx, curStatefulSet, newStatefulSet, host, opts); action == nil {
+			// Straightforward success
+			if register {
+				host.GetCR().IEnsureStatus().HostUpdated()
+				_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
+					CopyStatusOptions: types.CopyStatusOptions{
+						CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+							FieldGroupMain: true,
+						},
+					},
+				})
+			}
+			r.a.V(1).
+				WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateCompleted).
+				WithAction(host.GetCR()).
+				M(host).F().
+				Info("Update StatefulSet(%s/%s) - completed", namespace, name)
+
+			// All is done here
+			return nil
+		}
+	}
+
+	// Something is incorrect, need to decide next moves
+
+	switch action {
+	case common.ErrCRUDRecreate:
+		// Second attempt requested
+
+		onUpdateFailure := host.GetCluster().GetReconcile().StatefulSet.Recreate.OnUpdateFailure
+		if onUpdateFailure == api.OnStatefulSetRecreateOnUpdateFailureActionAbort {
+			r.a.V(1).M(host).Warning("Update StatefulSet(%s/%s) - would need recreate but aborting as configured (onUpdateFailure: abort)", namespace, name)
+			return common.ErrCRUDAbort
+		}
+
+		// Continue second attempt
+		r.a.WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateInProgress).
+			WithAction(host.GetCR()).
+			M(host).F().
+			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
+		common.DumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
+		return r.recreateStatefulSet(ctx, host, register, opts)
+
+	default:
+		// Decide on other non-successful cases
+		return r.shouldAbortOrContinueUpdateStatefulSet(action, host)
+	}
+}
+
+func (r *Reconciler) shouldAbortOrContinueUpdateStatefulSet(action error, host *api.Host) error {
+	newStatefulSet := host.Runtime.DesiredStatefulSet
+	namespace := newStatefulSet.Namespace
+	name := newStatefulSet.Name
+
+	switch action {
+	case common.ErrCRUDAbort:
+		// Abort
+		r.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got abort. Abort", namespace, name)
+		return common.ErrCRUDAbort
+
+	case common.ErrCRUDIgnore:
+		// Continue
+		r.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got ignore. Ignore", namespace, name)
+		return nil
+
+	case common.ErrCRUDUnexpectedFlow:
+		// Continue
+		r.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
+		return nil
+
+	default:
+		// Continue
+		r.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
+		return nil
+	}
+}
+
+// createStatefulSet
+func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
+	statefulSet := host.Runtime.DesiredStatefulSet
+
+	r.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
+	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
+
+	r.a.V(1).
+		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).
+		WithAction(host.GetCR()).
+		M(host).F().
+		Info("Create StatefulSet: %s - started", util.NamespaceNameString(statefulSet))
+
+	action := r.doCreateStatefulSet(ctx, host, opts)
+
+	if register {
+		host.GetCR().IEnsureStatus().HostAdded()
+		_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
+			CopyStatusOptions: types.CopyStatusOptions{
+				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+					FieldGroupMain: true,
+				},
+			},
+		})
+	}
+
+	return r.shouldAbortOrContinueCreateStatefulSet(action, host)
+}
+
+func (r *Reconciler) shouldAbortOrContinueCreateStatefulSet(action error, host *api.Host) error {
+	statefulSet := host.Runtime.DesiredStatefulSet
+	switch action {
+	case nil:
+		// Continue
+		r.a.V(1).
+			WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateCompleted).
+			WithAction(host.GetCR()).
+			M(host).F().
+			Info("Create StatefulSet: %s - completed", util.NamespaceNameString(statefulSet))
+		return nil
+
+	case common.ErrCRUDAbort:
+		// Abort
+		r.a.WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(host.GetCR()).
+			WithError(host.GetCR()).
+			M(host).F().
+			Error("Create StatefulSet: %s - failed with error: %v", util.NamespaceNameString(statefulSet), action)
+		return common.ErrCRUDAbort
+
+	case common.ErrCRUDIgnore:
+		// Continue
+		r.a.WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(host.GetCR()).
+			M(host).F().
+			Warning("Create StatefulSet: %s - error ignored", util.NamespaceNameString(statefulSet))
+		return nil
+
+	case common.ErrCRUDRecreate:
+		// Do NOT silently swallow as nil — doing so caused doomed reconciles
+		// (e.g. AlreadyExists from a stale-informer race or a prior failed
+		// delete) to be reported as success. Propagate the sentinel so the
+		// caller's failure branch runs and the next reconcile retries.
+		r.a.WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateFailed).
+			WithAction(host.GetCR()).
+			WithError(host.GetCR()).
+			M(host).F().
+			Error("Create StatefulSet: %s - failed and needs recreate; propagating as error",
+				util.NamespaceNameString(statefulSet))
+		return common.ErrCRUDRecreate
+
+	case common.ErrCRUDUnexpectedFlow:
+		// Continue
+		r.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
+		return nil
+
+	default:
+		// Continue
+		r.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
+		return nil
+	}
+}
+
+// createStatefulSet is an internal function, used in reconcileStatefulSet only
+func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host, opts *ReconcileOptions) common.ErrorCRUD {
+	log.V(1).M(host).F().P()
+	statefulSet := host.Runtime.DesiredStatefulSet
+
+	log.V(1).Info("Create StatefulSet: %s", util.NamespaceNameString(statefulSet))
+	if _, err := r.sts.Create(ctx, statefulSet); err != nil {
+		if apiErrors.IsAlreadyExists(err) {
+			log.V(1).M(host).F().Error(
+				"StatefulSet create failed - already exists (stale informer or prior failed delete). err: %v", err)
+		} else {
+			log.V(1).M(host).F().Error("StatefulSet create failed. err: %v", err)
+		}
+		return common.ErrCRUDRecreate
+	}
+
+	// StatefulSet created, wait until host is launched
+	if err := r.waitHostStatefulSetToLaunch(ctx, host, opts); err != nil {
+		log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
+		return r.fallback.OnStatefulSetCreateFailed(ctx, host)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) waitHostStatefulSetToLaunch(ctx context.Context, host *api.Host, opts *ReconcileOptions) error {
+	// Whether StatefulSet has launched successfully
+	launched := false
+
+	// Start with waiting for startup probe
+	if opts.WaitUntilStarted() {
+		log.V(1).M(host).F().Info("Wait host pod started. Host: %s", host.GetName())
+		if err := r.hostObjectsPoller.WaitHostPodStarted(ctx, host); err != nil {
+			log.V(1).M(host).F().Error("Host pod wait failed. host: %s err: %v", host.GetName(), err)
+			return err
+		}
+		log.V(1).M(host).F().Info("Host pod started. Host: %s", host.GetName())
+		launched = true
+	}
+
+	// Continue with waiting for ready probe
+	if opts.WaitUntilReady() {
+		log.V(1).M(host).F().Info("Wait host sts ready. Host: %s", host.GetName())
+		if err := r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
+			log.V(1).M(host).F().Error("Host sts wait failed. host: %s err: %v", host.GetName(), err)
+			return err
+		}
+		log.V(1).M(host).F().Info("Host sts ready. Host: %s", host.GetName())
+		launched = true
+	}
+
+	if launched {
+		log.V(1).M(host).F().Info("Host launched. Host: %s", host.GetName())
+	} else {
+		log.V(1).M(host).F().Warning("Host is not properly launched - no waiting sts at all. Host: %s", host.GetName())
+	}
+
+	return nil
+}
+
+// updateStatefulSet is an internal function, used in reconcileStatefulSet only
+func (r *Reconciler) doUpdateStatefulSet(
+	ctx context.Context,
+	oldStatefulSet *apps.StatefulSet,
+	newStatefulSet *apps.StatefulSet,
+	host *api.Host,
+	opts *ReconcileOptions,
+) common.ErrorCRUD {
+	log.V(2).M(host).F().P()
+	// Apply newStatefulSet and wait for Generation to change
+	updatedStatefulSet, err := r.sts.Update(ctx, newStatefulSet)
+	if err != nil {
+		log.V(1).M(host).F().Error("StatefulSet update failed. err: %v", err)
+		log.V(1).M(host).F().Error("%s", dumpDiff(oldStatefulSet, newStatefulSet))
+		return common.ErrCRUDRecreate
+	}
+
+	// After calling "Update()"
+	// 1. ObjectMeta.Generation is target generation
+	// 2. Status.ObservedGeneration may be <= ObjectMeta.Generation
+
+	if updatedStatefulSet.Generation == oldStatefulSet.Generation {
+		// Generation is not updated - no changes in .spec section were made
+		log.V(2).M(host).F().Info("no generation change")
+		return nil
+	}
+
+	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
+
+	// StatefulSet updated, wait until host is launched
+	if err := r.waitHostStatefulSetToLaunch(ctx, host, opts); err != nil {
+		log.V(1).M(host).F().Error("StatefulSet update FAILED - wait for ready StatefulSet failed. err: %v", err)
+		return r.fallback.OnStatefulSetUpdateFailed(ctx, oldStatefulSet, host, r.sts)
+	}
+
+	log.V(2).M(host).F().Info("Target generation reached, StatefulSet updated successfully")
+	return nil
+}
+
+// doDeleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count.
+// Scale-to-0 is best-effort; failures (e.g. 409 Conflict) must not block Delete.
+// A pod that outlasts the scale-down budget is force-deleted so Delete can finish in this pass,
+// rather than aborting Recreate and stranding the host at Replicas=0 with no pod - a state
+// nothing re-enqueues, because the recovery trigger is a pod event and the host has no pod.
+func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) error {
+	// IMPORTANT
+	// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
+	// To achieve ordered and graceful termination of the pods in the StatefulSet,
+	// it is possible to scale the StatefulSet down to 0 prior to deletion.
+
+	name := r.namer.Name(interfaces.NameStatefulSet, host)
+	namespace := host.Runtime.Address.Namespace
+	log.V(1).M(host).F().Info("%s/%s", namespace, name)
+
+	// Fetch cur host's StatefulSet
+	var err error
+	host.Runtime.CurStatefulSet, err = r.sts.Get(ctx, host)
+	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			// Already gone - nothing to delete
+			log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
+			return nil
+		}
+		log.V(1).M(host).F().Error("FAIL get StatefulSet %s/%s err:%v", namespace, name, err)
+		return err
+	}
+
+	// Scale cur host's StatefulSet down to 0 pods count - graceful path.
+	cur := host.Runtime.CurStatefulSet
+	var scaleDownErr error
+	if cur.Spec.Replicas == nil || *cur.Spec.Replicas != 0 {
+		var zero int32 = 0
+		cur.Spec.Replicas = &zero
+		// INTENTIONAL: fall through to Delete on Update failure.
+		if _, err := r.sts.Update(ctx, cur); err != nil {
+			log.V(1).M(host).F().Warning(
+				"Scale-to-0 update failed for StatefulSet %s/%s (%v) - proceeding to Delete",
+				namespace, name, err)
+		} else {
+			scaleDownErr = r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host)
+		}
+	} else {
+		// Already at 0, but that is also the state an earlier pass leaves behind when its own
+		// Delete timed out - so the wedged pod may still be here, and this is the pass that has
+		// to clear it. What holds the wait open is readyReplicas: the StatefulSet controller
+		// excludes terminating pods from currentReplicas but still counts them as ready, and a
+		// pod wedged in shutdown keeps reporting Ready. With no pod left both are 0 and the wait
+		// settles on its first look, so this costs nothing in the common case.
+		log.V(1).M(host).Info("StatefulSet %s/%s already at Replicas=0, skipping scale-down", namespace, name)
+		scaleDownErr = r.hostObjectsPoller.WaitHostStatefulSetReady(ctx, host)
+	}
+
+	// Escalate ONLY on a spent budget. The poller also returns early - within milliseconds - when
+	// a Get fails for any reason other than NotFound, and an API blip outlasting the Get retries
+	// would otherwise SIGKILL a host that had just been asked to stop and was shutting down
+	// cleanly. Waiting out the budget is what earns the right to force.
+	if errors.Is(scaleDownErr, poller.ErrTimeout) {
+		// Events are POSTed straight at the API with Count:1 and a GenerateName (see
+		// announcer/event-emitter.go); there is no client-go correlator to aggregate repeats.
+		// Left ungated anyway, unlike announceCleanupPostponed: every firing here is a fresh
+		// destructive attempt on a pod that is still refusing to go, which is worth a record.
+		r.a.V(1).
+			WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonHostPodForceDeleted).
+			WithAction(host.GetCR()).
+			M(host).F().
+			Warning("Scale-to-0 wait timed out for StatefulSet %s/%s - force-deleting pod so Delete can finish",
+				namespace, name)
+		if derr := r.deleteHostPod(ctx, host); derr != nil {
+			// Best-effort, exactly as the scale-to-0 Update above: Delete still has its own
+			// chance to succeed, and blocking here would make a transient pod-delete failure
+			// strictly worse than not having tried at all.
+			log.V(1).M(host).F().Warning(
+				"Force-delete of pod for StatefulSet %s/%s failed (%v) - proceeding to Delete",
+				namespace, name, derr)
+		}
+	}
+
+	if err := r.sts.Delete(ctx, namespace, name); err != nil {
+		if apiErrors.IsNotFound(err) {
+			log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
+			return nil
+		}
+		log.V(1).M(host).F().Error("FAIL delete StatefulSet %s/%s err: %v", namespace, name, err)
+		return err
+	}
+	log.V(1).M(host).Info("OK delete StatefulSet %s/%s", namespace, name)
+	return nil
+}
+
+// deleteHostPod removes the host's pod so a wedged graceful shutdown cannot block StatefulSet
+// deletion. Both adapters delete with grace period 0 - anything longer is the graceful delete the
+// pod is already ignoring. Caller decides when this is warranted; it is unconditional here.
+func (r *Reconciler) deleteHostPod(ctx context.Context, host *api.Host) error {
+	namespace := host.Runtime.Address.Namespace
+	name := r.namer.Name(interfaces.NamePod, host)
+	if err := r.pod.Delete(ctx, namespace, name); err != nil {
+		if apiErrors.IsNotFound(err) {
+			log.V(1).M(host).Info("NEUTRAL not found Pod %s/%s", namespace, name)
+			return nil
+		}
+		log.V(1).M(host).F().Error("FAIL delete Pod %s/%s err:%v", namespace, name, err)
+		return err
+	}
+	log.V(1).M(host).Info("OK delete Pod %s/%s", namespace, name)
+	return nil
+}

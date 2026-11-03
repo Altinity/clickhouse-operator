@@ -1,0 +1,17 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-010080-chopconf-missing"
+spec:
+  clickhouse:
+    access:
+      scheme: https
+      port: 8443
+      # Fail-open control: the referenced Secret does not exist. The operator
+      # must log a Warning, leave rootCA empty, and keep running/reconciling
+      # (no crashloop). scheme stays https but verify is left default (not
+      # Strict) so the operator still connects and serves — proving the bad
+      # ref did not brick the operator, isolated from a verification failure.
+      rootCASecretRef:
+        name: test-010080-no-such-secret
+        key: ca.crt

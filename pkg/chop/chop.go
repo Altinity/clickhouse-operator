@@ -21,7 +21,7 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 )
 
@@ -37,8 +37,8 @@ type CHOp struct {
 	ConfigManager *ConfigManager
 }
 
-// NewCHOp creates new CHOp
-func NewCHOp(
+// newCHOp creates new CHOp
+func newCHOp(
 	version string,
 	commit string,
 	date string,
@@ -50,7 +50,7 @@ func NewCHOp(
 		Version:       version,
 		Commit:        commit,
 		Date:          date,
-		ConfigManager: NewConfigManager(kubeClient, chopClient, initConfigFilePath),
+		ConfigManager: newConfigManager(kubeClient, chopClient, initConfigFilePath),
 	}
 }
 
@@ -63,11 +63,19 @@ func (c *CHOp) Init() error {
 }
 
 // Config returns operator config
-func (c *CHOp) Config() *v1.OperatorConfig {
+func (c *CHOp) Config() *api.OperatorConfig {
 	if c == nil {
 		return nil
 	}
 	return c.ConfigManager.Config()
+}
+
+// GetRuntimeParam returns operator runtime parameter by name
+func (c *CHOp) GetRuntimeParam(name string) (string, bool) {
+	if c == nil {
+		return "", false
+	}
+	return c.ConfigManager.GetRuntimeParam(name)
 }
 
 // SetupLog sets up logging options
@@ -92,6 +100,16 @@ func (c *CHOp) SetupLog() {
 		c.logUpdate("v", c.Config().Logger.V)
 		updated = true
 		_ = flag.Set("v", c.Config().Logger.V)
+	}
+	if c.Config().Logger.VModule != "" {
+		c.logUpdate("vmodule", c.Config().Logger.VModule)
+		updated = true
+		_ = flag.Set("vmodule", c.Config().Logger.VModule)
+	}
+	if c.Config().Logger.LogBacktraceAt != "" {
+		c.logUpdate("log_backtrace_at", c.Config().Logger.LogBacktraceAt)
+		updated = true
+		_ = flag.Set("log_backtrace_at", c.Config().Logger.LogBacktraceAt)
 	}
 
 	if updated {

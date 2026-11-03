@@ -1,0 +1,12 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+allowVolumeExpansion: true
+metadata:
+  name: openebs-lvm-test
+parameters:
+  fsType: xfs
+  storage: lvm
+  vgpattern: vg-test
+provisioner: local.csi.openebs.io
+reclaimPolicy: Delete
+volumeBindingMode: Immediate

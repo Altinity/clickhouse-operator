@@ -1,0 +1,59 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package operator
+
+import (
+	"github.com/altinity/clickhouse-operator/pkg/util"
+)
+
+// Labels that identify the installation an operator metric is about.
+const (
+	// LabelCHI is the name of the installation.
+	LabelCHI = "chi"
+	// LabelNamespace is the namespace of the installation.
+	LabelNamespace = "namespace"
+	// LabelCluster is the name of a cluster of the installation, for a metric about one.
+	LabelCluster = "cluster"
+)
+
+func GetLabelsFromSource(src labelsSource) (labels map[string]string) {
+	return util.MergeStringMapsOverwrite(
+		util.MergeStringMapsOverwrite(
+			util.MergeStringMapsOverwrite(labels, getLabelsFromName(src)),
+			getLabelsFromLabels(src),
+		),
+		getLabelsFromAnnotations(src),
+	)
+}
+
+func getLabelsFromName(src labelsSource) map[string]string {
+	return map[string]string{
+		LabelCHI:       src.GetName(),
+		LabelNamespace: src.GetNamespace(),
+	}
+}
+
+func getLabelsFromLabels(src labelsSource) map[string]string {
+	return src.GetLabels()
+}
+
+func getLabelsFromAnnotations(src labelsSource) map[string]string {
+	// Exclude skipped annotations
+	return util.CopyMapFilter(
+		src.GetAnnotations(),
+		nil,
+		util.ListSkippedAnnotations(),
+	)
+}

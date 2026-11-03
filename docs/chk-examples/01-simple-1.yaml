@@ -1,8 +1,9 @@
 apiVersion: "clickhouse-keeper.altinity.com/v1"
 kind: "ClickHouseKeeperInstallation"
 metadata:
-  name: chk-simple-1
+  name: simple-1
 spec:
   configuration:
     clusters:
-      - name: "simple-1"
+      - name: "cluster1"
+# see 01-chi-simple-with-keeper.yaml for CHI example using this

@@ -8,3 +8,7 @@ spec:
       # Port where to connect to ClickHouse instances to
       scheme: https
       port: 8443
+  reconcile:
+    statefulSet:
+      update:
+        timeout: 90

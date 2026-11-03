@@ -93,7 +93,7 @@ spec:
       containers:
         - name: kubernetes-zookeeper
           imagePullPolicy: IfNotPresent
-          image: "docker.io/zookeeper:3.8.3"
+          image: "docker.io/zookeeper:3.8.4"
           resources:
             requests:
               memory: "512M"
@@ -193,7 +193,8 @@ spec:
 #                - bash
 #                - -xc
 #                - 'OK=$(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "ruok" >&3 ; IFS=; tee <&3; exec 3<&- ;); if [[ "$OK" == "imok" ]]; then exit 0; else exit 1; fi'
-#            initialDelaySeconds: 20
+#            initialDelaySeconds: 15
+#            periodSeconds: 10
 #            timeoutSeconds: 15
           livenessProbe:
             exec:

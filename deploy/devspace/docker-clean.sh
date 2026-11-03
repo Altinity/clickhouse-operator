@@ -1,9 +1,9 @@
 #!/bin/bash
 
 set -e
-DOCKER_IMAGE=$1
+DOCKER_IMAGE=${1}
 echo "Wait when 'clickhouse-operator' Deployment will ready..."
-while [[ "0" == $(kubectl get deploy -n "${OPERATOR_NAMESPACE}" | grep -c -E "clickhouse-operator.+1/1") ]]; do
+while [[ $(kubectl get deploy -n "${OPERATOR_NAMESPACE}" | grep -c -E "clickhouse-operator.+1/1") == "0" ]]; do
     sleep 1
 done
 echo "...Done"

@@ -1,0 +1,20 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020008-chk-fips
+spec:
+  defaults:
+    templates:
+      podTemplate: fips
+  configuration:
+    clusters:
+      - name: keeper
+        layout:
+          replicasCount: 1
+  templates:
+    podTemplates:
+      - name: fips
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              image: altinity/clickhouse-keeper:25.3.8.30001.altinityfips

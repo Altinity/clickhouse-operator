@@ -16,13 +16,15 @@ package v1
 
 import (
 	core "k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // ClusterSecret defines the shared secret for nodes to authenticate each other with
 type ClusterSecret struct {
-	Auto      *StringBool `json:"auto,omitempty"      yaml:"auto,omitempty"`
-	Value     string      `json:"value,omitempty"     yaml:"value,omitempty"`
-	ValueFrom *DataSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
+	Auto      *types.StringBool `json:"auto,omitempty"      yaml:"auto,omitempty"`
+	Value     string            `json:"value,omitempty"     yaml:"value,omitempty"`
+	ValueFrom *types.DataSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
 }
 
 // ClusterSecretSourceName specifies name of the source where secret is provided

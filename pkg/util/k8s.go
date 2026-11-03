@@ -14,26 +14,44 @@
 
 package util
 
-import "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"slices"
+
+	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+type iNamespaceName interface {
+	GetNamespace() string
+	GetName() string
+}
 
 // NamespaceName returns namespace and anme from the meta
-func NamespaceName(meta v1.ObjectMeta) (string, string) {
-	return meta.Namespace, meta.Name
+func NamespaceName(meta iNamespaceName) (string, string) {
+	return meta.GetNamespace(), meta.GetName()
 }
 
 // NamespaceNameString returns namespace and name as one string
-func NamespaceNameString(meta v1.ObjectMeta) string {
-	return meta.Namespace + "/" + meta.Name
+func NamespaceNameString(meta iNamespaceName) string {
+	return meta.GetNamespace() + "/" + meta.GetName()
 }
 
-// AnnotationsTobeSkipped kubectl service annotation that we'd like to skip
-var AnnotationsTobeSkipped = []string{
+// NamespacedName returns NamespacedName from obj
+func NamespacedName(obj iNamespaceName) types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}
+}
+
+// AnnotationsToBeSkipped kubectl service annotation that we'd like to skip
+var AnnotationsToBeSkipped = []string{
 	"kubectl.kubernetes.io/last-applied-configuration",
 }
 
 // IsAnnotationToBeSkipped checks whether an annotation should be skipped
 func IsAnnotationToBeSkipped(annotation string) bool {
-	for _, a := range AnnotationsTobeSkipped {
+	for _, a := range AnnotationsToBeSkipped {
 		if a == annotation {
 			return true
 		}
@@ -43,7 +61,44 @@ func IsAnnotationToBeSkipped(annotation string) bool {
 
 // ListSkippedAnnotations provides list of annotations that should be skipped
 func ListSkippedAnnotations() []string {
-	return []string{
-		"kubectl.kubernetes.io/last-applied-configuration",
+	return AnnotationsToBeSkipped
+}
+
+// MergeEnvVars appends to `to` elements from `from` which are not found in `to`
+func MergeEnvVars(to []core.EnvVar, from ...core.EnvVar) []core.EnvVar {
+	for _, candidate := range from {
+		if !HasEnvVar(to, candidate) {
+			to = append(to, candidate)
+		}
 	}
+	return to
+}
+
+// OverwriteEnvVars sets in `to` every element of `from`, replacing the first element of the same name in place and
+// dropping any later one, which kubelet would apply over it
+func OverwriteEnvVars(to []core.EnvVar, from ...core.EnvVar) []core.EnvVar {
+	for _, candidate := range from {
+		i := slices.IndexFunc(to, func(envVar core.EnvVar) bool {
+			return envVar.Name == candidate.Name
+		})
+		if i < 0 {
+			to = append(to, candidate)
+			continue
+		}
+		to[i] = candidate
+		to = append(to[:i+1], slices.DeleteFunc(to[i+1:], func(envVar core.EnvVar) bool {
+			return envVar.Name == candidate.Name
+		})...)
+	}
+	return to
+}
+
+// HasEnvVar checks whether a haystack has a needle
+func HasEnvVar(haystack []core.EnvVar, needle core.EnvVar) bool {
+	for _, envVar := range haystack {
+		if needle.Name == envVar.Name {
+			return true
+		}
+	}
+	return false
 }

@@ -1,0 +1,33 @@
+# Reconcile hooks: Cluster hook with target: AllHosts
+#
+# Some SQL statements (e.g. SYSTEM FLUSH LOGS) do not support the
+# ON CLUSTER clause and must be executed on every host individually.
+#
+# The "target" field on a hook action controls where cluster-level
+# hooks execute:
+#   - FirstHost (default): one host, suitable for ON CLUSTER queries
+#   - AllHosts:            every host in the cluster
+#   - AllShards:           first replica of each shard
+#
+# Here we flush logs on every host after reconcile completes.
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "hooks-flush-logs"
+spec:
+  configuration:
+    clusters:
+      - name: "main"
+        reconcile:
+          hooks:
+            post:
+              - sql:
+                  queries:
+                    - "SYSTEM FLUSH LOGS"
+                target: AllHosts
+                events:
+                  - ClusterReconcile
+        layout:
+          shardsCount: 2
+          replicasCount: 1
