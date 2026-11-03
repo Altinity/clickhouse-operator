@@ -82,6 +82,22 @@ spec:
         name: ""
       # Port where to connect to ClickHouse instances to
       port: 8123
+      # `rootCA`: inline PEM CA bundle the operator uses to verify the ClickHouse
+      # server certificate when connecting over https (scheme: https, or auto when
+      # only TLS ports are open). Verification is enforced when TLS hardening is
+      # opted in — security.clickhouse.tls.verify: Strict, or a non-empty
+      # minVersion/serverName; otherwise the CA is loaded but verification stays
+      # relaxed for backward compatibility.
+      rootCA: ""
+      # `rootCASecretRef`: alternate source — read the PEM CA from a Kubernetes
+      # Secret in the operator's own namespace instead of inlining it above. The
+      # operator resolves it into `rootCA` once at config load (rotate the Secret +
+      # restart the operator to pick up a new CA). Mutually exclusive with the
+      # inline `rootCA` above (inline wins). Empty `name` = not used. When `key` is
+      # empty, the operator tries "ca.crt" then "tls.crt".
+      rootCASecretRef:
+        name: ""
+        key: ""
 
     ################################################
     ##
@@ -98,7 +114,7 @@ spec:
       # Multiple tables can be matched using regexp. Matched tables are merged using merge() table function.
       # Default is "^(metrics|custom_metrics)$" which fetches from both system.metrics and system.custom_metrics.
       tablesRegexp: "^(metrics|custom_metrics)$"
-      # List of regexps to match ClickHouse metrics to exclude from export.
+      # List of regexps to match ClickHouse metrics to exclude from collection/export.
       # Regexps match internal metric names before Prometheus normalization and prefixing.
       # Default is the per-CPU OS metrics filter shown below; set to [] to disable.
       excludeRegexp:
@@ -380,11 +396,11 @@ spec:
 
     ################################################
     ##
-    ## Auto-recovery from aborted reconcile
+    ## Auto-recovery from aborted/completed reconcile
     ##
     ################################################
     recovery:
-      from:
+      onStatus:
         aborted:
           # When a reconcile lands in status=Aborted (due to FIPS coercion
           # conflict, plain-text ZK under FIPS, etc.), the operator can
@@ -394,6 +410,20 @@ spec:
           #   none            — disable auto-recovery; operator user must
           #                     edit the CR spec to retrigger normalize.
           onPodReady: retry
+        completed:
+          # When a Completed CHI's pod regresses Ready=True→Ready=False and
+          # stays NotReady for at least onPodNotReadyThreshold, the operator
+          # can force-restart (recreate) the stuck host.
+          # OFF by default (opt-in): recreating a Completed CHI's pod is
+          # destructive — it can interrupt a replica's in-progress recovery
+          # and means hard downtime for a single-replica shard.
+          # Values:
+          #   none (default) — do nothing.
+          #   retry          — re-enqueue the CHI so the stuck host is recreated.
+          onPodNotReady: none
+          # Minimum time a pod must stay Ready=False before recovery fires, once
+          # enabled (Go duration string; default 5m). Raise it for slow replicas.
+          onPodNotReadyThreshold: 5m
 
   ################################################
   ##

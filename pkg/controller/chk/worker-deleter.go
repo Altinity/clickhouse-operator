@@ -16,9 +16,10 @@ package chk
 
 import (
 	"context"
+	"time"
+
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"time"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -51,6 +52,9 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	objs.Subtract(need)
 	w.a.V(1).M(cr).F().Info("List of non-reconciled objects:\n%s", objs)
 	if w.purge(ctx, cr, objs, w.task.RegistryFailed()) > 0 {
+		// Give Raft time to notice removed peers before Completed. Survivors
+		// often flip /ready → 503 briefly after purge.
+		w.a.V(1).M(cr).F().Info("Purged non-reconciled objects; waiting 1m for membership to settle")
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
 

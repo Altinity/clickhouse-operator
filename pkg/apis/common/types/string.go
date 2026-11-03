@@ -95,6 +95,14 @@ func (s *String) EqualFold(other *String) bool {
 	return strings.EqualFold(s.Value(), other.Value())
 }
 
+// EqualFoldString reports whether the String case-insensitively equals a plain string
+// value (typically an enum const). Nil-safe: a nil String compares as "" (so it never
+// equals a non-empty value). Lets callers fold enum casing without wrapping the const
+// in a *String, e.g. field.EqualFoldString(api.RecoveryActionRetry).
+func (s *String) EqualFoldString(value string) bool {
+	return strings.EqualFold(s.Value(), value)
+}
+
 // MergeFrom merges value from another variable
 func (s *String) MergeFrom(from *String) *String {
 	if from == nil {

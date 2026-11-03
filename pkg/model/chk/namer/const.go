@@ -44,4 +44,8 @@ const (
 
 	// patternClusterPDBName is a template of cluster scope PDB. "chi-{chi}-{cluster}"
 	patternClusterPDBName = "pdb chk- + macrosList.Get().Get(macro.MacrosCRName) + - + macrosList.Get().Get(macro.MacrosClusterName)"
+
+	// statefulSetClientServiceNameSuffix is appended to the per-host StatefulSet Service name to
+	// form the client-facing Service name (see createStatefulSetServiceClientName).
+	statefulSetClientServiceNameSuffix = "-client"
 )

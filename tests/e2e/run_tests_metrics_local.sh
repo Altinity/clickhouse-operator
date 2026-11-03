@@ -9,6 +9,6 @@ MINIKUBE_PRELOAD_IMAGES="${MINIKUBE_PRELOAD_IMAGES:-"yes"}"
 export MINIKUBE_PRELOAD_IMAGES
 
 common_minikube_reset
-common_preload_images "${PRELOAD_IMAGES_METRICS[@]}"
+common_preload_images "${PRELOAD_IMAGES_ALL[@]}"
 common_build_and_load_images && \
 common_run_test_script "run_tests_metrics.sh"

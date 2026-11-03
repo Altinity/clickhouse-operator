@@ -42,6 +42,8 @@ func (a *Annotator) Annotate(what interfaces.AnnotateType, params ...any) map[st
 		return a.GetCRScope()
 	case interfaces.AnnotateConfigMapCommonUsers:
 		return a.GetCRScope()
+	case interfaces.AnnotateSecretBackup:
+		return a.GetCRScope()
 	case interfaces.AnnotateConfigMapHost:
 		var host *api.Host
 		if len(params) > 0 {

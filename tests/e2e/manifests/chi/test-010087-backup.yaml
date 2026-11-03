@@ -1,0 +1,52 @@
+# test_010087
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-087-backup"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  backup:
+    enabled: "yes"
+    storages:
+      - name: main
+        secretRef:
+          name: backup-storage
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    clusters:
+      # Both inherit spec.backup and share its storage Secret, whose path keeps every
+      # (cluster, shard) apart. Their shapes differ: hot has two shards of one replica holding
+      # different row counts, cold one shard of two replicas.
+      - name: hot
+        layout:
+          shardsCount: 2
+          replicasCount: 1
+      - name: cold
+        layout:
+          shardsCount: 1
+          replicasCount: 2
+      # Opts out: no sidecar, and backups aimed at this cluster are refused.
+      - name: disabled
+        backup:
+          enabled: "no"
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  defaults:
+    templates:
+      # The sidecar freezes and restores parts through the data directory, so the data has to
+      # live on a volume both containers mount rather than in the container filesystem.
+      dataVolumeClaimTemplate: default
+  templates:
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

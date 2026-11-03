@@ -83,7 +83,9 @@ func (c *Controller) StartCHKWatcher(ctx context.Context) {
 // isKeeperWatchEnabled checks if the CHK watch is configured.
 func (c *Controller) isKeeperWatchEnabled() bool {
 	policy := chop.Config().Reconcile.Coordination.Keeper.OnKeeperResourceUpdate
-	return policy.HasValue() && policy.Value() == api.KeeperOnResourceUpdateReconcile
+	// EqualFoldString: the CRD accepts both "Reconcile" and "reconcile"; the chopconf value
+	// is not re-folded after load, so compare case-insensitively here.
+	return policy.HasValue() && policy.EqualFoldString(api.KeeperOnResourceUpdateReconcile)
 }
 
 // onCHKUpdate handles CHK update events. Triggers CHI reconcile only when CHK transitions to Completed.

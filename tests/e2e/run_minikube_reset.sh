@@ -21,6 +21,11 @@ DOCKER_VERSION="${DOCKER_VERSION:-""}"
 # Whether to prune minikube during reset process
 MINIKUBE_PRUNE="${MINIKUBE_PRUNE:-""}"
 
+# Minikube profile to operate on. Defaults to "minikube" (single-cluster, unchanged).
+# Set to an isolated name for dual-cluster e2e; for a non-default profile the
+# destructive cross-profile prune is skipped so a sibling cluster is never nuked.
+MINIKUBE_PROFILE="${MINIKUBE_PROFILE:-minikube}"
+
 echo "Reset kubernetes cluster."
 echo "k8s version:   ${KUBERNETES_VERSION}"
 echo "nodes:         ${NODES}"
@@ -28,9 +33,10 @@ echo "cpus:          ${CPUS}"
 echo "memory:        ${MEMORY}"
 echo "docker prune:  ${DOCKER_PRUNE}"
 echo "minikube prune:${MINIKUBE_PRUNE}"
+echo "minikube profile:${MINIKUBE_PROFILE}"
 
 echo "Delete cluster"
-minikube delete
+minikube delete -p "${MINIKUBE_PROFILE}"
 if [[ ! -z "${DOCKER_PRUNE}" ]]; then
     echo "Docker system prune"
     docker system prune -f
@@ -39,7 +45,10 @@ if [[ ! -z "${DOCKER_PRUNE_ALL}" ]]; then
     echo "Docker system prune all"
     docker system prune -f --all
 fi
-if [[ ! -z "${MINIKUBE_PRUNE}" ]]; then
+if [[ ! -z "${MINIKUBE_PRUNE}" && "${MINIKUBE_PROFILE}" == "minikube" ]]; then
+    # `--all --purge` + `rm -rf ~/.minikube` destroy EVERY profile, so this only
+    # runs for the default profile. A named (dual-cluster) profile skips it to
+    # avoid nuking the sibling cluster running concurrently.
     echo "Minikube prune"
     minikube stop
     minikube delete --all --purge
@@ -76,13 +85,13 @@ echo "-----------------------"
 echo "-- Starting minikube --"
 echo "-----------------------"
 
-minikube start --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}" --cpus="${CPUS}" --memory="${MEMORY}"
-#minikube start --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}" --cpus="${CPUS}" --memory="${MEMORY}" --cache-images=false
+minikube start -p "${MINIKUBE_PROFILE}" --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}" --cpus="${CPUS}" --memory="${MEMORY}"
+#minikube start -p "${MINIKUBE_PROFILE}" --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}" --cpus="${CPUS}" --memory="${MEMORY}" --cache-images=false
 
 echo "Enabling metrics-server addon"
-minikube addons enable metrics-server
+minikube addons enable metrics-server -p "${MINIKUBE_PROFILE}"
 
-if [[ -z "${SKIP_K9S}" ]]; then
+if [[ -z "${SKIP_K9S}" && "${MINIKUBE_PROFILE}" == "minikube" ]]; then
     echo "Launching k9s"
     k9s -c ns
 fi

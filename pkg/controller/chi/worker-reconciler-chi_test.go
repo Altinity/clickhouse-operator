@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,7 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 )
 
 // sts is a small builder for an apps/v1 StatefulSet with a single-container pod template
@@ -57,7 +59,7 @@ func hostWith(cur, desired *apps.StatefulSet) *api.Host {
 // ClickHouse needs to pick up new settings).
 func TestHostRequiresStatefulSetRollout(t *testing.T) {
 	same := sts("altinity/clickhouse-server:25.8")
-	other := sts("altinity/clickhouse-server:25.8.16.10001.altinitystable")
+	other := sts("altinity/clickhouse-server:25.8.28.10001.altinitystable")
 
 	t.Run("nil host", func(t *testing.T) {
 		require.False(t, hostRequiresStatefulSetRollout(nil))
@@ -169,5 +171,53 @@ func TestHostRequiresStatefulSetRollout(t *testing.T) {
 		desired := sts("a")
 		desired.Spec.Template.Spec.Containers[0].Env = []core.EnvVar{}
 		require.False(t, hostRequiresStatefulSetRollout(hostWith(cur, desired)))
+	})
+}
+
+// TestClusterDoesNotExistErrorIndicatesRestart exercises the pure decision that gates the #2013
+// scale-up recovery restart (restartNewlyAddedHosts): a newly-added host is rebooted only if it
+// recorded a terminal CLUSTER_DOESNT_EXIST async-load failure.
+//
+// This is the piece a live minikube run cannot deterministically reach — the boot-before-
+// remote_servers race is timing-dependent and observed restartCount=0 in e2e, so the firing path
+// is otherwise correct-by-construction only. The decision must fire iff count > 0, and a read
+// error must NEVER trigger a restart (inconclusive read → leave a healthy/syncing host alone,
+// which is what keeps a legitimately-lagging plain replica — test_010056 — untouched).
+func TestClusterDoesNotExistErrorIndicatesRestart(t *testing.T) {
+	readErr := errors.New("dial tcp: connection refused")
+
+	for _, tc := range []struct {
+		name string
+		n    int
+		err  error
+		want bool
+	}{
+		{"positive count → restart", 5, nil, true},
+		{"single occurrence → restart", 1, nil, true},
+		{"zero count → skip (no #2013 failure, e.g. lagging plain replica)", 0, nil, false},
+		{"read error → skip (inconclusive, never restart on a bad read)", 3, readErr, false},
+		{"read error with zero count → skip", 0, readErr, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, clusterDoesNotExistErrorIndicatesRestart(tc.n, tc.err))
+		})
+	}
+}
+
+// A deferred pass must keep the preliminary exclusions when rendering remote_servers. Inverting
+// this advertises a host that may have no StatefulSet at all - the shard-safety deferral returns
+// before one is created - to every existing pod, via the shared common ConfigMap.
+func TestFinalRemoteServersOptions(t *testing.T) {
+	filtered := config.NewFilesGeneratorOptions()
+
+	t.Run("a completed pass renders remote_servers unfiltered", func(t *testing.T) {
+		require.Empty(t, finalRemoteServersOptions(false, filtered),
+			"the final phase is where a newly-added host is finally advertised")
+	})
+
+	t.Run("a deferred pass keeps the exclusions", func(t *testing.T) {
+		got := finalRemoteServersOptions(true, filtered)
+		require.Len(t, got, 1)
+		require.Same(t, filtered, got[0])
 	})
 }

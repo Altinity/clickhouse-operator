@@ -10,7 +10,7 @@ spec:
       update:
         timeout: 30
     recovery:
-      from:
+      onStatus:
         aborted:
           # Opt-out: CHI should STAY Aborted even when pod becomes Ready
           onPodReady: none
