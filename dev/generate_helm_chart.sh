@@ -205,7 +205,7 @@ function update_deployment_resource() {
   a_data="${annotations}" yq e -i '.podAnnotations |= env(a_data)' "${values_yaml}"
   yq e -i '.spec.template.metadata.annotations = {}' "${file}"
 
-  yq e -i '.spec.template.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}"' "${file}"
+  yq e -i '.spec.template.metadata.labels |= "{{ include \"altinity-clickhouse-operator.podTemplateLabels\" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}"' "${file}"
   yq e -i '.spec.template.metadata.annotations += {"{{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations | nindent 8 }}{{ end }}": null}' "${file}"
   yq e -i '.spec.template.spec.imagePullSecrets |= "{{ toYaml .Values.imagePullSecrets | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.serviceAccountName |= "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}"' "${file}"
@@ -230,7 +230,7 @@ function update_deployment_resource() {
     yq e -i '(.spec.template.spec.volumes[] | select(.configMap != null) | .configMap.name | select(. == "'"${cm}"'")) |= "'"${newCm}"'"' "${file}"
     local cmName="${cm/etc-clickhouse-operator-/}"
     cmName="${cmName/etc-keeper-operator-/keeper-}"
-    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include (print $.Template.BasePath \"/generated/ConfigMap-'"${cm}"'.yaml\") . | sha256sum }}"}' "${file}"
+    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include \"altinity-clickhouse-operator.configMapContentHash\" (dict \"ctx\" . \"name\" \"/generated/ConfigMap-'"${cm}"'.yaml\") }}"}' "${file}"
   done
   
   yq e -i '.spec.template.spec.containers[0].name |= "{{ .Chart.Name }}"' "${file}"
