@@ -77,7 +77,5 @@ sed -e 's/imagePullPolicy: Always/imagePullPolicy: IfNotPresent/' < /home/master
 # need for metric alerts tests
 export NO_WAIT=1
 sudo -u master bash -xe /home/master/clickhouse-operator/deploy/prometheus/create-prometheus.sh
-sudo -u master bash -xe /home/master/clickhouse-operator/deploy/minio/install-minio-operator.sh
-sudo -u master bash -xe /home/master/clickhouse-operator/deploy/minio/install-minio-tenant.sh
 
 tail -f /dev/null

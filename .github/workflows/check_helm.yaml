@@ -29,6 +29,12 @@ jobs:
         with:
           version: latest
 
+      # Renders the chart under value combinations `helm install` with defaults never reaches -
+      # the ServiceMonitor templates are gated off by default. Needs no cluster, so it runs first
+      # and fails fast.
+      - name: Chart Rendering Tests
+        run: ./dev/test_helm_chart.sh
+
       - name: Local Helm Test
         run: |
           set -xe

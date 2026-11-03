@@ -197,15 +197,19 @@ func Test_finalizeCRLiveOwnershipGuard(t *testing.T) {
 			c := NewController(cachedClient, liveClient, scheme, nil)
 			w := c.newWorker()
 
-			mutated := false
-			err := w.finalizeCR(context.Background(), cachedCHK, commonTypes.UpdateStatusOptions{}, func(chk *apiChk.ClickHouseKeeperInstallation) {
-				mutated = true
-			})
+			_, err := w.finalizeCR(context.Background(), cachedCHK, commonTypes.UpdateStatusOptions{})
 			if err != nil {
 				t.Fatalf("finalizeCR() returned error: %v, want nil", err)
 			}
-			if mutated != tt.wantWrite {
-				t.Errorf("status mutation callback invoked = %v, want %v", mutated, tt.wantWrite)
+
+			// A proceeding finalize stamps Completed onto the status; a skipped one leaves it untouched.
+			got := &apiChk.ClickHouseKeeperInstallation{}
+			if err := cachedClient.Get(context.Background(), kubeTypes.NamespacedName{Namespace: "clickhouse", Name: "flipping-chk"}, got); err != nil {
+				t.Fatalf("Get() returned error: %v", err)
+			}
+			wrote := got.Status != nil && got.Status.GetStatus() == apiChk.StatusCompleted
+			if wrote != tt.wantWrite {
+				t.Errorf("status write happened = %v, want %v", wrote, tt.wantWrite)
 			}
 		})
 	}

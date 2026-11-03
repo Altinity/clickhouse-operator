@@ -30,12 +30,15 @@ import (
 
 type Service struct {
 	kubeClient client.Client
-	namer      interfaces.INameManager
+	// apiReader reads live; see NewAdapter on why every by-name Get here bypasses the cache.
+	apiReader client.Reader
+	namer     interfaces.INameManager
 }
 
-func NewService(kubeClient client.Client, namer interfaces.INameManager) *Service {
+func NewService(kubeClient client.Client, apiReader client.Reader, namer interfaces.INameManager) *Service {
 	return &Service{
 		kubeClient: kubeClient,
+		apiReader:  apiReader,
 		namer:      namer,
 	}
 }
@@ -64,7 +67,7 @@ func (c *Service) Get(ctx context.Context, params ...any) (*core.Service, error)
 	}
 	return commonKube.GetWithRetry(ctx, func() (*core.Service, error) {
 		service := &core.Service{}
-		err := c.kubeClient.Get(ctx, types.NamespacedName{
+		err := c.apiReader.Get(ctx, types.NamespacedName{
 			Namespace: namespace,
 			Name:      name,
 		}, service)
@@ -76,13 +79,15 @@ func (c *Service) Get(ctx context.Context, params ...any) (*core.Service, error)
 }
 
 func (c *Service) Create(ctx context.Context, svc *core.Service) (*core.Service, error) {
-	err := c.kubeClient.Create(ctx, svc)
-	return svc, err
+	return commonKube.CreateWithRetry(ctx, func() (*core.Service, error) {
+		return svc, c.kubeClient.Create(ctx, svc)
+	})
 }
 
 func (c *Service) Update(ctx context.Context, svc *core.Service) (*core.Service, error) {
-	err := c.kubeClient.Update(ctx, svc)
-	return svc, err
+	return commonKube.UpdateWithRetry(ctx, func() (*core.Service, error) {
+		return svc, c.kubeClient.Update(ctx, svc)
+	})
 }
 
 func (c *Service) Delete(ctx context.Context, namespace, name string) error {

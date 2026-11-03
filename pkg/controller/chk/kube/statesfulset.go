@@ -37,9 +37,10 @@ import (
 
 type STS struct {
 	kubeClient client.Client
-	// apiReader bypasses the controller-runtime cache for reads, giving up-to-date STS state.
-	// The cache is write-through but not synchronously invalidated, so a Get() immediately after
-	// an Update() can still return a stale object. Using a direct reader avoids that race.
+	// apiReader reads live; see NewAdapter on why every by-name Get here bypasses the cache.
+	// For StatefulSets the reason predates the label narrowing: the cache is not write-through, so
+	// an Update goes straight to the API server and the cache only catches up when the watch
+	// delivers it - a Get in between returns the pre-update object.
 	apiReader client.Reader
 	namer     interfaces.INameManager
 }
@@ -103,14 +104,16 @@ func (c *STS) get(ctx context.Context, namespace, name string) (*apps.StatefulSe
 func (c *STS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	yamlBytes, _ := yaml.Marshal(sts)
 	log.V(3).M(sts).Info("Going to create STS: %s\n%s", util.NamespaceNameString(sts), string(yamlBytes))
-	err := c.kubeClient.Create(ctx, sts)
-	return sts, err
+	return commonKube.CreateWithRetry(ctx, func() (*apps.StatefulSet, error) {
+		return sts, c.kubeClient.Create(ctx, sts)
+	})
 }
 
 func (c *STS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	log.V(3).M(sts).Info("Going to update STS: %s", util.NamespaceNameString(sts))
-	err := c.kubeClient.Update(ctx, sts)
-	return sts, err
+	return commonKube.UpdateWithRetry(ctx, func() (*apps.StatefulSet, error) {
+		return sts, c.kubeClient.Update(ctx, sts)
+	})
 }
 
 // Remove issues a fire-and-forget delete against the API server. It returns immediately after

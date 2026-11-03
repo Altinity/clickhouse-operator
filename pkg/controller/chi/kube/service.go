@@ -71,13 +71,15 @@ func (c *Service) Get(ctx context.Context, params ...any) (*core.Service, error)
 }
 
 func (c *Service) Create(ctx context.Context, svc *core.Service) (*core.Service, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().Services(svc.Namespace).Create(ctx, svc, controller.NewCreateOptions())
+	return commonKube.CreateWithRetry(ctx, func() (*core.Service, error) {
+		return c.kubeClient.CoreV1().Services(svc.Namespace).Create(k8sCtx(ctx), svc, controller.NewCreateOptions())
+	})
 }
 
 func (c *Service) Update(ctx context.Context, svc *core.Service) (*core.Service, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
+	return commonKube.UpdateWithRetry(ctx, func() (*core.Service, error) {
+		return c.kubeClient.CoreV1().Services(svc.Namespace).Update(k8sCtx(ctx), svc, controller.NewUpdateOptions())
+	})
 }
 
 func (c *Service) Remove(ctx context.Context, namespace, name string) error {

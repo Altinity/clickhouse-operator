@@ -87,12 +87,12 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	log.V(1).Infof("Launching host collectors [%s]", time.Since(start))
 
 	var wg = sync.WaitGroup{}
-	e.registry.Walk(func(cr *metrics.WatchedCR, _ *metrics.WatchedCluster, host *metrics.WatchedHost) {
+	e.registry.Walk(func(cr *metrics.WatchedCR, cluster *metrics.WatchedCluster, host *metrics.WatchedHost) {
 		wg.Add(1)
-		go func(ctx context.Context, cr *metrics.WatchedCR, host *metrics.WatchedHost, ch chan<- prometheus.Metric) {
+		go func(ctx context.Context, cr *metrics.WatchedCR, cluster *metrics.WatchedCluster, host *metrics.WatchedHost, ch chan<- prometheus.Metric) {
 			defer wg.Done()
-			e.collectHostMetrics(ctx, cr, host, ch)
-		}(ctx, cr, host, ch)
+			e.collectHostMetrics(ctx, cr, cluster, host, ch)
+		}(ctx, cr, cluster, host, ch)
 	})
 	wg.Wait()
 }
@@ -103,18 +103,22 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // collectHostMetrics collects metrics from one host and writes them into chan
-func (e *Exporter) collectHostMetrics(ctx context.Context, chi *metrics.WatchedCR, host *metrics.WatchedHost, c chan<- prometheus.Metric) {
+func (e *Exporter) collectHostMetrics(ctx context.Context, chi *metrics.WatchedCR, cluster *metrics.WatchedCluster, host *metrics.WatchedHost, c chan<- prometheus.Metric) {
 	collector := NewCollector(
-		e.newHostFetcher(host),
+		e.newHostFetcher(cluster, host),
 		NewCHIPrometheusWriter(c, chi, host, e.metricsFilter),
 	)
 	collector.CollectHostMetrics(ctx, host)
 }
 
 // newHostFetcher returns new Metrics Fetcher for specified host
-func (e *Exporter) newHostFetcher(host *metrics.WatchedHost) *MetricsFetcher {
-	// Make base cluster connection params
+func (e *Exporter) newHostFetcher(cluster *metrics.WatchedCluster, host *metrics.WatchedHost) *MetricsFetcher {
+	// Make base cluster connection params from CHOP-config defaults, then overlay the
+	// cluster's security.clickhouse.tls, as the operator does. Without it a cluster with
+	// its own CA is dialed with chopconf's CA only and fails verification.
 	clusterConnectionParams := clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config())
+	tls := cluster.GetTLS()
+	clusterConnectionParams.OverlayTLS(tls.GetVerify(), tls.GetMinVersion(), tls.GetServerName(), tls.GetRootCA())
 	// Adjust base cluster connection params with per-host props
 	switch clusterConnectionParams.Scheme {
 	case api.ChSchemeAuto:

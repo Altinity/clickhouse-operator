@@ -171,6 +171,13 @@ func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *api.Clust
 	return c.deleteSecretIfExists(ctx, namespace, secretName)
 }
 
+// deleteSecretBackup deletes the Secret with the credentials of the CR's clickhouse-backup sidecars
+func (c *Controller) deleteSecretBackup(ctx context.Context, cr api.ICustomResource) error {
+	secretName := c.namer.Name(interfaces.NameBackupAutoSecret, cr)
+	log.V(1).M(cr).F().Info("%s/%s", cr.GetNamespace(), secretName)
+	return c.deleteSecretIfExists(ctx, cr.GetNamespace(), secretName)
+}
+
 // deleteSecretIfExists deletes Secret in case it does not exist
 func (c *Controller) deleteSecretIfExists(ctx context.Context, namespace, name string) error {
 	// Check specified service exists

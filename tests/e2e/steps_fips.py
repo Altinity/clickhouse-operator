@@ -252,6 +252,25 @@ FIPS_LISTENER_REJECTED_TLS_CASES = (
     *fips_rejected_cipher_cases_from_ciphers_by_protocol(),
 )
 
+# One reject per *class*, not a sample of the full cipher list:
+#   - each legacy protocol (1.0 / 1.1 / 1.2) with the default suite
+#   - the only non-approved TLS 1.3 suite in ciphers_by_protocol (ChaCha)
+#   - one non-FIPS TLS 1.2 suite (ChaCha; same family as 030016's reject)
+# The full FIPS_LISTENER_REJECTED_TLS_CASES matrix is host-run 030017.
+FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE = (
+    *FIPS_REJECTED_PROTOCOL_CASES,
+    {
+        "name": "TLS 1.3 TLS_CHACHA20_POLY1305_SHA256",
+        "tls_version": "1.3",
+        "cipher_suite": "TLS_CHACHA20_POLY1305_SHA256",
+    },
+    {
+        "name": "TLS 1.2 ECDHE-RSA-CHACHA20-POLY1305",
+        "tls_version": "1.2",
+        "cipher_suite": "ECDHE-RSA-CHACHA20-POLY1305",
+    },
+)
+
 # clickhouse-backup's Go FIPS runtime pins ciphers but keeps stdlib default
 # MinVersion (TLS 1.2), so at TLS 1.2 it ACCEPTS any FIPS-approved suite it can
 # negotiate: bare `-tls1_2` (default → an approved suite) and any explicit cipher
@@ -259,12 +278,22 @@ FIPS_LISTENER_REJECTED_TLS_CASES = (
 # the ECDHE-ECDSA ones fail as "no shared cipher" but are excluded too so the sweep
 # stays cert-agnostic). Every non-approved 1.2 cipher and all legacy protocols
 # (1.0/1.1) stay in the rejected set.
-FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES = tuple(
-    case for case in FIPS_LISTENER_REJECTED_TLS_CASES
-    if not (
-        case["tls_version"] == "1.2"
-        and (case["cipher_suite"] is None or case["cipher_suite"] in approved_tls1_2_ciphers)
+def _fips_backup_rejected_tls_cases(cases):
+    """Backup accepts approved TLS 1.2; drop those from a rejected-case list."""
+    return tuple(
+        case for case in cases
+        if not (
+            case["tls_version"] == "1.2"
+            and (case["cipher_suite"] is None or case["cipher_suite"] in approved_tls1_2_ciphers)
+        )
     )
+
+
+FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES = _fips_backup_rejected_tls_cases(
+    FIPS_LISTENER_REJECTED_TLS_CASES
+)
+FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE = _fips_backup_rejected_tls_cases(
+    FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE
 )
 
 FIPS_APPROVED_TLS13_CIPHER_CASES = tuple(
@@ -742,6 +771,7 @@ def create_tls_secret_for_fips_hosts(
     )
 
     self.context.tls = {
+        "secret_name": secret_name,
         "ca_crt": ca_crt,
         "server_crt": server_crt,
         "server_key": server_key,
@@ -752,166 +782,166 @@ def create_tls_secret_for_fips_hosts(
 
 
 # ---------------------------------------------------------------------------
-# External ClickHouse client
+# External ClickHouse client (in-cluster pod, same pattern as test-034 / test-058)
 # ---------------------------------------------------------------------------
 
-@TestStep(Given)
-def start_external_ch_container(self, ns=None, cipher_suites=None):
-    ns = ns or self.context.test_namespace
-    ca_crt = self.context.tls["ca_crt"]
-    container = f"fips-ch-ext-{ns}"[:63]
-    fips_image = "altinity/clickhouse-server:25.3.8.30001.altinityfips"
+_FIPS_CLIENT_MANIFEST = "manifests/chi/fips-client.yaml"
+_FIPS_CLIENT_POD = "fips-client"
+_FIPS_CLIENT_CONFIGMAP = "fips-client-config"
 
-    cipher_suites_xml = ""
-    if cipher_suites:
-        cipher_suites_xml = (
-            f"\n      <cipherSuites>{':'.join(cipher_suites)}</cipherSuites>"
+_FIPS_OPENSSL_MANIFEST = "manifests/chi/fips-openssl.yaml"
+_FIPS_OPENSSL_POD = "fips-openssl"
+_FIPS_OPENSSL_CA_FILE = "/certs/ca.crt"
+
+
+def _chi_service_host_from_pod(pod):
+    """Map CHI/CHK pod name to its headless Service host (strip STS ordinal)."""
+    return re.sub(r"-\d+$", "", pod)
+
+
+def ensure_fips_openssl_pod(ns=None, secret_name=None):
+    """Ensure the in-cluster OpenSSL probe Pod is Running (idempotent).
+
+    CHI/CHK images do not ship an openssl CLI; host openssl is often LibreSSL.
+    Namespace teardown removes the pod — no separate Finally required.
+    """
+    ctx = current().context
+    ns = ns or ctx.test_namespace
+    secret_name = (
+        secret_name
+        or getattr(ctx, "tls", {}).get("secret_name")
+        or "clickhouse-certs"
+    )
+
+    existing = kubectl.get("pod", _FIPS_OPENSSL_POD, ns=ns, ok_to_fail=True)
+    if existing and (existing.get("status") or {}).get("phase") == "Running":
+        return _FIPS_OPENSSL_POD
+
+    manifest_host = util.get_full_path(_FIPS_OPENSSL_MANIFEST)
+    apply_path = util.get_full_path(_FIPS_OPENSSL_MANIFEST, lookup_in_host=False)
+    tmp_path = None
+
+    if secret_name != "clickhouse-certs":
+        doc = yaml.safe_load(open(manifest_host, encoding="utf-8"))
+        for vol in doc["spec"]["volumes"]:
+            if vol.get("name") == "cert" and "secret" in vol:
+                vol["secret"]["secretName"] = secret_name
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            yaml.safe_dump(doc, f, default_flow_style=False, sort_keys=False)
+            tmp_path = f.name
+            apply_path = tmp_path
+
+    try:
+        kubectl.launch(
+            f"delete pod {_FIPS_OPENSSL_POD} --ignore-not-found",
+            ns=ns,
+            ok_to_fail=True,
         )
+        kubectl.apply(apply_path, ns=ns)
+    finally:
+        if tmp_path:
+            os.unlink(tmp_path)
 
-    openssl_xml = f"""
-<clickhouse>
-  <openSSL>
-    <client>
-      <caConfig>/tmp/ca.crt</caConfig>
-      <loadDefaultCAFile>false</loadDefaultCAFile>
-      <verificationMode>strict</verificationMode>{cipher_suites_xml}
-    </client>
-  </openSSL>
-</clickhouse>
-""".strip()
+    kubectl.wait_pod_status(_FIPS_OPENSSL_POD, "Running", ns=ns)
+    note(f"openssl probe pod ready: {_FIPS_OPENSSL_POD}")
+    return _FIPS_OPENSSL_POD
 
-    with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as f:
-        client_config = f.name
-        f.write(openssl_xml)
 
-    subprocess.run(
-        ["docker", "rm", "-f", container],
-        capture_output=True,
-        text=True,
-        check=False,
+@TestStep(Given)
+def start_external_ch_container(self, ns=None, cipher_suites=None, secret_name=None):
+    """Start the in-cluster FIPS clickhouse-client Pod from ``fips-client.yaml``.
+
+    The step name is kept for call-site compatibility; this applies a Pod + ConfigMap
+    (test-034 / test-058 style), not a host Docker container.
+    """
+    ns = ns or self.context.test_namespace
+    secret_name = (
+        secret_name
+        or getattr(self.context, "tls", {}).get("secret_name")
+        or "clickhouse-certs"
     )
+    manifest_host = util.get_full_path(_FIPS_CLIENT_MANIFEST)
+    apply_path = util.get_full_path(_FIPS_CLIENT_MANIFEST, lookup_in_host=False)
+    tmp_path = None
 
-    result = subprocess.run(
-        [
-            "docker", "run", "-d",
-            "--name", container,
-            "--network", "host",
-            "-v", f"{ca_crt}:/tmp/ca.crt:ro",
-            "-v", f"{client_config}:/tmp/client.xml:ro",
-            fips_image,
-            "sleep", "infinity",
-        ],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    if cipher_suites or secret_name != "clickhouse-certs":
+        docs = list(yaml.safe_load_all(open(manifest_host, encoding="utf-8")))
+        for doc in docs:
+            if not doc:
+                continue
+            if doc.get("kind") == "ConfigMap" and cipher_suites:
+                xml = doc["data"]["config.xml"]
+                needle = "<verificationMode>strict</verificationMode>"
+                insert = (
+                    f"{needle}\n"
+                    f"                <cipherSuites>{':'.join(cipher_suites)}</cipherSuites>"
+                )
+                doc["data"]["config.xml"] = xml.replace(needle, insert, 1)
+            if doc.get("kind") == "Pod" and secret_name != "clickhouse-certs":
+                for vol in doc["spec"]["volumes"]:
+                    if vol.get("name") == "cert" and "secret" in vol:
+                        vol["secret"]["secretName"] = secret_name
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            yaml.dump_all(docs, f, default_flow_style=False, sort_keys=False)
+            tmp_path = f.name
+            apply_path = tmp_path
 
-    assert result.returncode == 0, error(
-        f"failed to start external ClickHouse client container\n"
-        f"image: {fips_image}\n"
-        f"exit code: {result.returncode}\n"
-        f"stdout:\n{result.stdout}\n"
-        f"stderr:\n{result.stderr}"
-    )
+    try:
+        kubectl.launch(f"delete pod {_FIPS_CLIENT_POD} --ignore-not-found", ns=ns, ok_to_fail=True)
+        kubectl.launch(
+            f"delete configmap {_FIPS_CLIENT_CONFIGMAP} --ignore-not-found",
+            ns=ns,
+            ok_to_fail=True,
+        )
+        kubectl.apply(apply_path, ns=ns)
+    finally:
+        if tmp_path:
+            os.unlink(tmp_path)
 
-    note(f"external ClickHouse client container started: {container}")
-    self.context.external_chi_container = container
+    kubectl.wait_pod_status(_FIPS_CLIENT_POD, "Running", ns=ns)
+    note(f"external ClickHouse client pod started: {_FIPS_CLIENT_POD}")
+    self.context.external_chi_container = _FIPS_CLIENT_POD
+    self.context.external_chi_client_config = _FIPS_CLIENT_CONFIGMAP
 
     yield
 
-    with Finally("stop external ClickHouse client container"):
+    with Finally("stop external ClickHouse client pod"):
         stop_external_ch_container()
+
 
 @TestStep(Finally)
 def stop_external_ch_container(self):
-    """Remove the scenario-scoped external ClickHouse Docker client container."""
-    container = self.context.external_chi_container
-    subprocess.run(
-        ["docker", "rm", "-f", container],
-        capture_output=True,
-        text=True,
-        check=False,
+    """Remove the FIPS clickhouse-client Pod and ConfigMap from ``fips-client.yaml``."""
+    ns = getattr(self.context, "test_namespace", None)
+    if not ns:
+        return
+    kubectl.launch(f"delete pod {_FIPS_CLIENT_POD} --ignore-not-found", ns=ns, ok_to_fail=True)
+    kubectl.launch(
+        f"delete configmap {_FIPS_CLIENT_CONFIGMAP} --ignore-not-found",
+        ns=ns,
+        ok_to_fail=True,
     )
 
 
 @TestStep(When)
 def fips_ch_external_secure_query(self, pod, sql, ns=None):
-    """Run a ClickHouse query from the scenario Docker client over port-forward TLS.
+    """Run a ClickHouse query from the FIPS client Pod over in-cluster TLS.
 
-    Requires ``start_external_ch_container`` at scenario start.
+    Requires ``start_external_ch_container`` at scenario start. Connects to the
+    CHI/CHK headless Service derived from ``pod`` (same pattern as test-034 / test-058).
     """
     ns = ns or self.context.test_namespace
-    container = self.context.external_chi_container
-    local_port = _free_local_port()
+    client_pod = self.context.external_chi_container
+    host = _chi_service_host_from_pod(pod)
 
-    pf = subprocess.Popen(
-        [
-            "kubectl",
-            *self.context.kubectl_context_args,
-            "-n", ns,
-            "port-forward",
-            f"pod/{pod}",
-            f"{local_port}:9440",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+    # Use run_shell (not launch) so shlex-quoted SQL with spaces survives.
+    out = kubectl.run_shell(
+        f"{current().context.kubectl_cmd} -n {shlex.quote(ns)} "
+        f"exec {shlex.quote(client_pod)} -c clickhouse-client -- "
+        f"clickhouse-client --secure --host {shlex.quote(host)} --port 9440 "
+        f"--query {shlex.quote(sql)}"
     )
-
-    try:
-        deadline = time.time() + 10
-        while time.time() < deadline:
-            if pf.poll() is not None:
-                out, err = pf.communicate()
-                raise RuntimeError(
-                    f"kubectl port-forward exited early\n"
-                    f"stdout:\n{out}\n"
-                    f"stderr:\n{err}"
-                )
-
-            try:
-                socket.create_connection(
-                    ("127.0.0.1", int(local_port)), timeout=0.5
-                ).close()
-                break
-            except OSError:
-                time.sleep(0.2)
-        else:
-            raise RuntimeError(
-                f"kubectl port-forward to {pod}:9440 "
-                f"did not become ready on 127.0.0.1:{local_port}"
-            )
-
-        query_result = subprocess.run(
-            [
-                "docker", "exec", container,
-                "clickhouse-client",
-                "--config-file", "/tmp/client.xml",
-                "--secure",
-                "--host", "127.0.0.1",
-                "--port", local_port,
-                "--query", sql,
-            ],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-
-        assert query_result.returncode == 0, error(
-            f"external Docker clickhouse-client failed\n"
-            f"container: {container}\n"
-            f"exit code: {query_result.returncode}\n"
-            f"stdout:\n{query_result.stdout}\n"
-            f"stderr:\n{query_result.stderr}"
-        )
-
-        return query_result.stdout.strip()
-    finally:
-        pf.terminate()
-        try:
-            pf.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            pf.kill()
+    return out.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -1223,91 +1253,57 @@ def fips_run_openssl_s_client_on_pod_port(
     tls_version="1.3",
     ok_to_fail=False,
     ns=None,
+    container=None,
 ):
-    """Run ``openssl s_client`` against a pod listener through ``kubectl port-forward``."""
+    """Run ``openssl s_client`` from the ``fips-openssl`` probe Pod.
+
+    Target is the CHI/CHK Service DNS name for ``pod`` (not host openssl and not
+    the workload image — those lack a usable OpenSSL 3 ``s_client``).
+    ``container`` is unused (kept for call-site compatibility).
+    """
+    del container  # probes always run in fips-openssl
     ns = ns or self.context.test_namespace
-    ca_crt = self.context.tls["ca_crt"]
-    local_port = _free_local_port()
+    target_host = _chi_service_host_from_pod(pod)
 
-    with Given(f"port-forward from localhost:{local_port} to {pod}:{port}"):
-        pf = subprocess.Popen(
-            [
-                "kubectl",
-                *self.context.kubectl_context_args,
-                "-n", ns,
-                "port-forward",
-                f"pod/{pod}",
-                f"{local_port}:{port}",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+    with Given("openssl probe pod is available"):
+        openssl_pod = ensure_fips_openssl_pod(ns=ns)
+
+    with When(
+        f"openssl s_client from {openssl_pod} to {target_host}:{port}"
+    ):
+        tls_args = " ".join(shlex.quote(a) for a in openssl_tls_version_args(tls_version))
+        cipher_args = " ".join(
+            shlex.quote(a) for a in openssl_cipher_args(tls_version, cipher_suite)
         )
+        # Feed "Q\n" so s_client exits after the handshake.
+        # -no_check_time: host openssl mints notBefore=now, but minikube
+        # node clocks often lag (laptop sleep / vfkit). Chain verify still
+        # runs; we only skip notBefore/notAfter so clock skew is not a fail.
+        cmd = (
+            f"printf 'Q\\n' | {current().context.kubectl_cmd} -n {shlex.quote(ns)} "
+            f"exec -i {shlex.quote(openssl_pod)} -- "
+            f"openssl s_client "
+            f"-connect {shlex.quote(target_host)}:{int(port)} "
+            f"-servername localhost "
+            f"-CAfile {_FIPS_OPENSSL_CA_FILE} "
+            f"-verify_return_error "
+            f"-no_check_time "
+            f"{tls_args} {cipher_args}"
+        )
+        shell = current().context.shell
+        result = shell(cmd, timeout=60)
+        output = result.output or ""
 
-    try:
-        with When("port-forward is ready on localhost"):
-            deadline = time.time() + 10
-            while time.time() < deadline:
-                if pf.poll() is not None:
-                    out, err = pf.communicate()
-                    assert False, error(
-                        "kubectl port-forward exited early\n"
-                        f"stdout:\n{out}\n"
-                        f"stderr:\n{err}"
-                    )
-
-                try:
-                    socket.create_connection(
-                        ("127.0.0.1", int(local_port)), timeout=0.5
-                    ).close()
-                    break
-                except OSError:
-                    time.sleep(0.2)
-            else:
-                assert False, error(
-                    f"kubectl port-forward to {pod}:{port} "
-                    f"did not become ready on 127.0.0.1:{local_port}"
-                )
-
-        with And("openssl s_client runs against the forwarded port"):
-            command = [
-                "openssl", "s_client",
-                "-connect", f"127.0.0.1:{local_port}",
-                "-servername", "localhost",
-                "-CAfile", ca_crt,
-                "-verify_return_error",
-            ]
-
-            command.extend(openssl_tls_version_args(tls_version))
-            command.extend(openssl_cipher_args(tls_version, cipher_suite))
-
-            result = subprocess.run(
-                command,
-                input="Q\n",
-                text=True,
-                capture_output=True,
-                check=False,
+    if not ok_to_fail:
+        with Then("openssl s_client handshake succeeds"):
+            assert result.exitcode == 0, error(
+                f"{pod}:{port}: openssl s_client failed for "
+                f"tls={tls_version}, cipher={cipher_suite}\n"
+                f"exit code: {result.exitcode}\n"
+                f"output:\n{output}"
             )
 
-            output = f"{result.stdout}\n{result.stderr}"
-
-        if not ok_to_fail:
-            with Then("openssl s_client handshake succeeds"):
-                assert result.returncode == 0, error(
-                    f"{pod}:{port}: openssl s_client failed for "
-                    f"tls={tls_version}, cipher={cipher_suite}\n"
-                    f"exit code: {result.returncode}\n"
-                    f"output:\n{output}"
-                )
-
-        return output
-
-    finally:
-        pf.terminate()
-        try:
-            pf.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            pf.kill()
+    return output
 
 @TestStep(Check)
 def fips_assert_rejected_tls_cases_on_endpoint(
@@ -1344,7 +1340,7 @@ def fips_assert_rejected_tls_cases_on_endpoint(
             )
 
             if case["tls_version"] in ("1.0", "1.1"):
-                # Downgrade cases: host openssl may refuse the legacy protocol
+                # Downgrade cases: in-pod openssl may refuse the legacy protocol
                 # LOCALLY and never contact the server -> a client-side refusal
                 # must NOT count as a pass. Require a SERVER-originated alert;
                 # else skip (an actually-accepting server is already caught above
@@ -1352,7 +1348,7 @@ def fips_assert_rejected_tls_cases_on_endpoint(
                 if not any(m in output_lower for m in TLS_SERVER_REJECT_MARKERS):
                     skip(
                         f"{label} {pod}:{port}: no server-side rejection alert for "
-                        f"{case['name']} - host openssl likely refused locally "
+                        f"{case['name']} - pod openssl likely refused locally "
                         f"(no ClientHello reached the server)\noutput:\n{output}"
                     )
             else:
@@ -1367,22 +1363,22 @@ def fips_assert_rejected_tls_cases_on_endpoint(
                 )
 
 
-@TestStep(Check)
-def fips_assert_all_rejected_tls_cases_on_all_endpoints(
-    self,
+def _fips_assert_rejected_tls_cases_on_all_endpoints(
     chi_pods,
     chk_pods,
+    chi_rejected_cases,
+    backup_rejected_cases,
     ns=None,
 ):
-    """Assert all rejected TLS cases fail on every FIPS TLS endpoint."""
-    ns = ns or self.context.test_namespace
+    """Run ``chi_rejected_cases`` on CH/Keeper listeners and backup cases on :7171."""
+    ns = ns or current().context.test_namespace
 
     endpoints = (
-        ("ClickHouse HTTPS", chi_pods[0], 8443, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("ClickHouse native TLS", chi_pods[0], 9440, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("ClickHouse interserver HTTPS", chi_pods[0], 9010, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("Keeper secure client", chk_pods[0], 2281, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("Backup API HTTPS", chi_pods[0], 7171, FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES),
+        ("ClickHouse HTTPS", chi_pods[0], 8443, chi_rejected_cases),
+        ("ClickHouse native TLS", chi_pods[0], 9440, chi_rejected_cases),
+        ("ClickHouse interserver HTTPS", chi_pods[0], 9010, chi_rejected_cases),
+        ("Keeper secure client", chk_pods[0], 2281, chi_rejected_cases),
+        ("Backup API HTTPS", chi_pods[0], 7171, backup_rejected_cases),
     )
 
     for label, pod, port, endpoint_rejected_cases in endpoints:
@@ -1393,6 +1389,40 @@ def fips_assert_all_rejected_tls_cases_on_all_endpoints(
             rejected_cases=endpoint_rejected_cases,
             ns=ns,
         )
+
+
+@TestStep(Check)
+def fips_assert_all_rejected_tls_cases_on_all_endpoints(
+    self,
+    chi_pods,
+    chk_pods,
+    ns=None,
+):
+    """Assert every case in FIPS_LISTENER_REJECTED_TLS_CASES fails on each endpoint."""
+    _fips_assert_rejected_tls_cases_on_all_endpoints(
+        chi_pods=chi_pods,
+        chk_pods=chk_pods,
+        chi_rejected_cases=FIPS_LISTENER_REJECTED_TLS_CASES,
+        backup_rejected_cases=FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES,
+        ns=ns,
+    )
+
+
+@TestStep(Check)
+def fips_assert_representative_rejected_tls_cases_on_all_endpoints(
+    self,
+    chi_pods,
+    chk_pods,
+    ns=None,
+):
+    """Assert FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE on each endpoint."""
+    _fips_assert_rejected_tls_cases_on_all_endpoints(
+        chi_pods=chi_pods,
+        chk_pods=chk_pods,
+        chi_rejected_cases=FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE,
+        backup_rejected_cases=FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE,
+        ns=ns,
+    )
 
 
 @TestStep(Then)
@@ -1603,7 +1633,7 @@ def check_operator_clickhouse_tls_logs(self, ns=None):
     pod = kubectl.get_operator_pod(ns=ns)
 
     logs = kubectl.launch(
-        f"logs {pod} -c clickhouse-operator",
+        f"logs {pod} -c clickhouse-operator --tail=8000",
         ns=ns,
     )
 
@@ -1613,28 +1643,44 @@ def check_operator_clickhouse_tls_logs(self, ns=None):
     assert "verify=Strict minVersion=1.3" in logs, error(
         "operator ClickHouse TLS config is not Strict / TLS 1.3"
     )
-    assert "Ping(https://clickhouse_operator:" in logs, error(
-        "operator did not log HTTPS ClickHouse ping"
-    )
-    assert ":8443?tls_config=" in logs, error(
-        "operator ClickHouse ping did not use HTTPS port 8443 with TLS config"
-    )
+    if "https://clickhouse_operator:" in logs:
+        assert ":8443?tls_config=" in logs, error(
+            "operator ClickHouse DSN did not use HTTPS port 8443 with TLS config"
+        )
 
 @TestStep(Then)
-def check_metrics_exporter_discovers_clickhouse_https(self, ns=None):
-    """Assert metrics-exporter discovers ClickHouse hosts using HTTPS :8443."""
+def check_metrics_exporter_scrapes_clickhouse_https(self, chi, replica_count, ns=None):
+    """Assert metrics-exporter scrapes every ClickHouse host of `chi` through HTTPS.
+
+    chi_clickhouse_metric_VersionInteger is written only after a successful query, so it
+    proves the exporter passed TLS verification with the cluster's CA. A discovery line in
+    the exporter log does not: it is written before the first dial.
+    """
 
     ns = ns or current().context.operator_namespace
     pod = kubectl.get_operator_pod(ns=ns)
-
-    logs = kubectl.launch(
-        f"logs {pod} -c metrics-exporter --tail=4000",
-        ns=ns,
+    rx = re.compile(
+        r'^chi_clickhouse_metric_VersionInteger\{[^}]*hostname="(chi-' + re.escape(chi) + r'-[^".]+)',
+        re.MULTILINE,
     )
 
-    assert '"httpsPort":8443' in logs, error(
-        "metrics-exporter did not discover ClickHouse hosts with httpsPort=8443\n"
-        f"{logs}"
+    hosts = set()
+    out = ""
+    for attempt in range(1, 13):
+        out = util.get_metrics(pod, ns)
+        hosts = set(rx.findall(out))
+        if len(hosts) >= replica_count:
+            break
+        with Then(f"metrics-exporter scrapes {len(hosts)}/{replica_count} hosts of {chi}. Wait for 10 seconds"):
+            time.sleep(10)
+
+    fetch_errors = [
+        line for line in out.splitlines()
+        if line.startswith("chi_clickhouse_metric_fetch_errors{") and f'hostname="chi-{chi}-' in line
+    ]
+    assert len(hosts) >= replica_count, error(
+        f"metrics-exporter scraped {sorted(hosts)} of {replica_count} hosts of {chi} over HTTPS\n"
+        + "\n".join(fetch_errors)
     )
 
 @TestStep(Then)
@@ -2041,12 +2087,35 @@ def check_clickhouse_backup_embeds_gofips(
 
 @TestStep(Then)
 def check_external_clickhouse_reports_fips_version(self, pod):
-    """Verify an external strict-TLS client sees a FIPS ClickHouse server."""
+    """Verify an in-cluster FIPS client Pod sees a FIPS ClickHouse server over TLS."""
     version = fips_ch_external_secure_query(pod=pod, sql="SELECT version()")
     note(f"external SELECT version(): {version}")
     assert "fips" in version.lower(), error(
         f"expected FIPS in ClickHouse version(), got {version!r}"
     )
+
+# The operator stamps the enclosing Go function name into every announcer line, so a marker like
+# "connect():FAILED" silently stops matching the moment that function is renamed - the assertion
+# then fails while the operator is behaving perfectly. That is exactly what happened when
+# Connection.connect() became Connection.openPools(): the rejection was still logged, 82 times,
+# and the test polled for 57 minutes for a string the binary could no longer emit.
+#
+# Match the OPERATION instead of the call stack. These cover the dial-time failures
+# (Open/Open2/Ping/Ping2) without the trailing "(" so the numbered variants match too. Kept
+# deliberately narrow: the caller still ANDs this against the specific rejection text, so widening
+# it to any "tls:" line - which would turn the assertion vacuous - is not on the table.
+_CH_CONNECT_FAILURE_MARKERS = (
+    "FAILED Ping",
+    "FAILED Open",
+    "FAILED connect(",
+)
+
+
+def _is_ch_connect_failure_line(line):
+    """Return True when the line is an operator connection-establishment failure, whatever the
+    enclosing Go function happens to be called."""
+    return any(marker in line for marker in _CH_CONNECT_FAILURE_MARKERS)
+
 
 def _fips_tls_rejection_present_in_logs(logs, min_version, rejection):
     """Return True when logs contain coerced TLS setup and a connect rejection."""
@@ -2059,7 +2128,7 @@ def _fips_tls_rejection_present_in_logs(logs, min_version, rejection):
         for line in logs.splitlines()
     )
     rejection_found = any(
-        "connect():FAILED" in line and rejection in line
+        _is_ch_connect_failure_line(line) and rejection in line
         for line in logs.splitlines()
     )
     return setup_found and rejection_found
@@ -2070,7 +2139,7 @@ def _fips_tls_rejection_log_excerpt(logs):
         line for line in logs.splitlines()
         if (
             "setupTLSAdvanced()" in line
-            or "connect():FAILED" in line
+            or _is_ch_connect_failure_line(line)
             or "tls:" in line
             or "minVersion" in line
         )
@@ -2435,6 +2504,35 @@ def check_clickhouse_backup_restore_roundtrip_https(
             ns=ns,
         ).strip()
 
+    def wait_command(operation, timeout=180):
+        # create and restore are asynchronous: the POST answers once the command is
+        # accepted. A second command while one runs is refused with 423 Locked.
+        # /backup/status lists commands as JSON lines with status "in progress",
+        # "success" or "error".
+        deadline = time.time() + timeout
+        commands = []
+        while True:
+            body = kubectl.launch(
+                f"exec {pod} -c clickhouse-backup -- "
+                "curl -sS --cacert /etc/clickhouse-backup/tls/ca.crt "
+                "https://127.0.0.1:7171/backup/status",
+                ns=ns,
+            )
+            commands = []
+            for line in body.splitlines():
+                line = line.strip()
+                if not line.startswith("{"):
+                    continue
+                entry = json.loads(line)
+                command = entry.get("command", "")
+                if command.startswith(operation) and backup_name in command:
+                    commands.append(entry)
+            if commands and all(c.get("status") != "in progress" for c in commands):
+                break
+            assert time.time() < deadline, error(f"{operation} {backup_name} did not finish: {commands}")
+            time.sleep(2)
+        assert commands[-1].get("status") == "success", error(f"{operation} {backup_name}: {commands[-1]}")
+
     with Given("test table exists with data"):
         fips_ch_external_secure_query(
             pod=pod,
@@ -2457,6 +2555,7 @@ def check_clickhouse_backup_restore_roundtrip_https(
             f"/backup/create?name={backup_name}&table=default.{table}",
         )
         assert out.startswith("HTTP:2"), error(out)
+        wait_command("create")
 
     with And("table is dropped"):
         fips_ch_external_secure_query(
@@ -2471,6 +2570,7 @@ def check_clickhouse_backup_restore_roundtrip_https(
             f"/backup/restore/{backup_name}?table=default.{table}",
         )
         assert out.startswith("HTTP:2"), error(out)
+        wait_command("restore")
 
     with Then("restored data is visible through strict TLS ClickHouse client"):
         fips_poll_secure_scalar(
@@ -2645,25 +2745,48 @@ def check_fips_integrity_failure(self, binary_path, binary_label):
     note(f"{binary_label}: integrity check successfully detected tampering")
 
 @TestStep(Then)
+def check_tls13_cipher_succeeds(
+    self,
+    pod,
+    port,
+    cipher,
+    ns=None,
+):
+    """Verify a TLS 1.3 cipher negotiates (via ``fips-openssl`` pod)."""
+    output = fips_run_openssl_s_client_on_pod_port(
+        pod=pod,
+        port=port,
+        cipher_suite=cipher,
+        tls_version="1.3",
+        ns=ns,
+    )
+    assert f"Cipher is {cipher}" in output, error(
+        f"{pod}:{port}: expected {cipher} to negotiate\n{output}"
+    )
+
+
+@TestStep(Then)
 def check_tls13_cipher_fails(
     self,
     pod,
     port,
     cipher,
-    target_host="localhost",
+    target_host=None,
     container=None,
     ns=None,
 ):
-    """Verify a TLS 1.3 cipher cannot be negotiated."""
-
+    """Verify a TLS 1.3 cipher cannot be negotiated (via ``fips-openssl`` pod)."""
+    del container  # probes always run in fips-openssl
     ns = ns or self.context.test_namespace
-
-    container_arg = f"-c {container} " if container else ""
+    target_host = target_host or _chi_service_host_from_pod(pod)
+    openssl_pod = ensure_fips_openssl_pod(ns=ns)
 
     out = kubectl.launch(
-        f"exec {pod} {container_arg}-- "
+        f"exec {openssl_pod} -- "
         "openssl s_client "
         f"-connect {target_host}:{port} "
+        "-servername localhost "
+        f"-CAfile {_FIPS_OPENSSL_CA_FILE} "
         "-tls1_3 "
         f"-ciphersuites {cipher}",
         ns=ns,
@@ -3103,7 +3226,7 @@ def assert_local_fake_k8s_rejected_tls_cases(
     """Run all FIPS_LISTENER_REJECTED_TLS_CASES against the local fake API."""
 
     for case in FIPS_LISTENER_REJECTED_TLS_CASES:
-        # Operator K8s client min TLS is 1.3 (PR #2020). Skip 1.2 *cipher* cases,
+        # Operator K8s client min TLS is 1.3. Skip 1.2 *cipher* cases,
         # but keep the single 1.2 *protocol* case as a live negative probe.
         if case["tls_version"] == "1.2" and case["cipher_suite"] is not None:
             continue
@@ -3846,9 +3969,12 @@ def _fips_assert(condition, message):
 
 _HOSTRUN_CH_TLS_FAILURE_MARKERS = (
     "setupTLSAdvanced",
-    "connect():FAILED",
+    # NB function-name-stamped markers rot on rename - see _CH_CONNECT_FAILURE_MARKERS. This is an
+    # any-match list that already carries the operation-shaped "FAILED Ping(", so it kept working
+    # when connect() became openPools(); the stale entry is dropped rather than updated.
     "QueryContext():FAILED",
     "FAILED Ping(",
+    "FAILED Open",
     "FAILED connect(",
     "remote error: tls",
     "handshake failure",

@@ -51,6 +51,12 @@ const (
 	// or key that the operator cannot read. Aborts rather than silently falling
 	// back to system roots — empty CA + Verify=Strict would refuse all dials.
 	StatusReasonRootCASecretUnresolved = "RootCASecretUnresolved"
+	// StatusReasonBackupSecretUnresolved: the operator-generated backup Secret of a CR with backup enabled
+	// cannot be read for any reason but its absence. Aborts rather than dropping the backup user. Updates
+	// that keep the generation do not reconcile the CR anew, so it stays Aborted until a spec edit, an
+	// operator restart or auto-recovery - on a pod turning Ready, say - which this reason does not opt
+	// out of, as the Secret may well be readable by then.
+	StatusReasonBackupSecretUnresolved = "BackupSecretUnresolved"
 	// StatusReasonFIPSImagePolicyViolation: security.images.policy=Required
 	// rejected this CR because a ClickHouse/Keeper container image lacks the
 	// "fips" tag substring (admission gate) or the running binary's
@@ -64,6 +70,35 @@ const (
 	// ClickHouse clients. Caught at admission to surface the misconfiguration
 	// instead of producing a silently-broken cluster.
 	StatusReasonNoKeeperListener = "NoKeeperListener"
+	// StatusReasonShardHasNoHealthyPeer: a host's reconcile would have restarted or rolled it
+	// while its shard had no other healthy replica to serve, so the disruption was deferred and
+	// the shard left serving. Recoverable without a spec edit - the peer coming back triggers
+	// a retry - so it is deliberately absent from normalizeTimeAbortReasons.
+	StatusReasonShardHasNoHealthyPeer = "ShardHasNoHealthyPeer"
+	// StatusReasonRaftQuorumUnsafe: a CHK host's reconcile would disrupt a Ready replica while
+	// the ensemble lacks Raft quorum headroom. Disruption is deferred until siblings recover.
+	StatusReasonRaftQuorumUnsafe = "RaftQuorumUnsafe"
+	// StatusReasonRemovedSecretRefSyntax: a user settings field uses the `k8s_secret_` or
+	// `k8s_secret_env_` prefix, removed in 0.27.4 because it accepted a namespace/name/key
+	// triple and could therefore read a Secret from any namespace. Aborts rather than
+	// ignoring the field: an ignored field renders verbatim into the users ConfigMap and
+	// leaves the account on the default password from ClickHouse.Config.User.Default.Password.
+	// Requires a spec edit to migrate to valueFrom.secretKeyRef.
+	StatusReasonRemovedSecretRefSyntax = "RemovedSecretRefSyntax"
+	// StatusReasonInvalidPodTemplate: a host's resolved pod template has a container that cannot
+	// run - without a name or an image, or named like another - or, merged from several layers,
+	// starts a duplicate ClickHouse server, since a template's container named unlike the one it was
+	// meant to extend stays a container of its own. Caught at admission, before the
+	// StatefulSet is written. Requires an edit of the CR, or of its template, which reaches the CR
+	// only on its next reconcile as template.chi.policy allows - such as after a new taskID under
+	// ApplyOnNextReconcile, or after an operator restart under ReadOnStart.
+	StatusReasonInvalidPodTemplate = "InvalidPodTemplate"
+	// StatusReasonInvalidBackupStorage: a cluster that turns backup on uses a backup storage neither it nor the
+	// installation declares, or declares several without naming the one it uses. Aborts rather than leaving the
+	// cluster without a storage: that would turn its backup off, which removes the sidecars and restarts every
+	// host, over what is mostly a typo. Requires an edit of the CR, or of its template, which reaches the CR only
+	// on its next reconcile as template.chi.policy allows.
+	StatusReasonInvalidBackupStorage = "InvalidBackupStorage"
 )
 
 // Status defines status section of the custom resource.
