@@ -1,0 +1,85 @@
+# Reconcile hooks: Combined cluster-level and host-level hooks
+#
+# Cluster hooks and host hooks serve different scopes and can be
+# used together:
+#
+# Execution order during reconcile:
+#   1. Cluster pre-hooks  (once, before any host is touched)
+#   2. For each host:
+#      a. Host pre-hooks  (per host, before host reconcile)
+#      b. Host reconcile  (restart, config update, etc.)
+#      c. Host post-hooks (per host, after host reconcile)
+#   3. Cluster post-hooks (once, after all hosts are done)
+#
+# Both scopes can be defined ONCE at CHI-level under spec.reconcile.{host,cluster}
+# and are inherited by every cluster of this CHI. Per-cluster overrides are
+# appended to (not replaced by) the inherited set, with deduplication.
+# This example uses the top-level form for readability.
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "hooks-combined"
+spec:
+  reconcile:
+    # Host-level hooks inherited by every cluster's reconcile.host.hooks.
+    # These run per host, around each individual host reconcile.
+    host:
+      hooks:
+        pre:
+          - sql:
+              queries:
+                - "SYSTEM STOP REPLICATION QUEUES"
+            events:
+              - HostShutdown
+        post:
+          - sql:
+              queries:
+                - "SYSTEM START REPLICATION QUEUES"
+            events:
+              - HostUpdate
+    # Cluster-level hooks inherited by every cluster's reconcile.hooks.
+    # These run once per cluster reconcile, around the host iteration.
+    # Cluster scope events: Always, ClusterCreate, ClusterReconcile, ClusterDelete.
+    # Host* events are NOT valid here.
+    #
+    # `target` is OPTIONAL on cluster hooks — it controls which host(s) the SQL
+    # is sent to. Allowed values:
+    #   FirstHost (DEFAULT) — send to one host only. Correct for SQL that already
+    #                         fans out cluster-wide via the `ON CLUSTER '{cluster}'`
+    #                         clause (ClickHouse propagates the DDL itself).
+    #   AllHosts            — send to every host individually. Use for queries
+    #                         that DON'T support ON CLUSTER (e.g. SYSTEM FLUSH LOGS).
+    #                         See 23-reconcile-hooks-03-target-all-hosts.yaml.
+    #   AllShards           — send to the first replica of each shard.
+    #
+    # Both hooks below use ON CLUSTER, so target is omitted (defaults to FirstHost).
+    cluster:
+      hooks:
+        pre:
+          - sql:
+              queries:
+                - "DETACH TABLE IF EXISTS db.kafka_events ON CLUSTER '{cluster}' PERMANENTLY"
+            events:
+              - ClusterReconcile
+            # target: FirstHost   # default — DDL propagates via ON CLUSTER
+        post:
+          - sql:
+              queries:
+                - "ATTACH TABLE db.kafka_events ON CLUSTER '{cluster}'"
+            events:
+              - ClusterReconcile
+            # target: FirstHost   # default — DDL propagates via ON CLUSTER
+  configuration:
+    clusters:
+      - name: "main"
+        # No need to redeclare hooks here — both host and cluster scopes
+        # are inherited from spec.reconcile.{host,cluster} above.
+        # If this cluster needed an extra hook, it would go in:
+        #   reconcile:
+        #     hooks:        # cluster-scope additions, appended (deduped) to inherited
+        #     host:
+        #       hooks:      # host-scope additions, appended (deduped) to inherited
+        layout:
+          shardsCount: 2
+          replicasCount: 2

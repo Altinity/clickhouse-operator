@@ -16,21 +16,38 @@ package chk
 
 import (
 	"context"
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"errors"
+	"sync"
 
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 )
 
 func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
+	// Try to report tag-based version
+	if tagBasedVersion := w.getTagBasedVersion(host); tagBasedVersion.IsKnown() {
+		// Able to report version from the tag
+		return tagBasedVersion.SetDescription("parsed from the tag: '%s'", tagBasedVersion.GetOriginal())
+	}
+
 	// Unable to acquire any version - report min one
-	return swversion.MaxVersion().SetDescription("so far so")
+	return swversion.MinVersion().SetDescription("min - unable to acquire neither from the tag nor from the app")
 }
 
-// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
-func (w *worker) getReconcileShardsWorkersNum(shards []*apiChk.ChkShard, opts *common.ReconcileShardsAndHostsOptions) int {
+// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile.
+//
+// The constant 1 is load-bearing for Raft safety, not a stub. Hosts within a shard are always
+// serial, so this only bites a multi-shard CHK - but countReadyEnsembleMembers walks the whole CR
+// and writes every peer's Runtime.CurStatefulSet, which hostContributesReady and
+// isHostHealthyForReconcile read. Two shards in flight is therefore a data race on that field and
+// on the unsynchronized quorumWaitSpent, plus a TOCTOU on the gate itself: both workers read the
+// same Ready tally, both conclude a disrupt is safe, and two members go down at once - the fan-out
+// this gate exists to prevent. Raising this needs a cluster-wide disrupt budget first.
+// Asserted by TestReconcileShardsWorkersNumIsOne.
+func (w *worker) getReconcileShardsWorkersNum(cluster *apiChk.Cluster, opts *common.ReconcileShardsAndHostsOptions) int {
 	return 1
 }
 
@@ -45,6 +62,92 @@ func (w *worker) reconcileShardsAndHostsFetchOpts(ctx context.Context) *common.R
 	}
 }
 
+// noteCRUDResult records ErrCRUDDeferred on deferred and returns hard errors only.
+// Soft deferred results return nil so the caller can continue other hosts/shards.
+func noteCRUDResult(err error, deferred *bool) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, common.ErrCRUDDeferred) {
+		if deferred != nil {
+			*deferred = true
+		}
+		return nil
+	}
+	return err
+}
+
+func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShardIndex int, shards []*apiChk.ChkShard) error {
+	if len(shards) == 0 {
+		return nil
+	}
+
+	type shardReconcile struct {
+		shard *apiChk.ChkShard
+		index int
+	}
+
+	ch := make(chan *shardReconcile)
+	wg := sync.WaitGroup{}
+
+	// Launch tasks feeder
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(ch)
+		for i, shard := range shards {
+			ch <- &shardReconcile{
+				shard,
+				startShardIndex + i,
+			}
+		}
+	}()
+
+	// Launch workers
+	var err error
+	var deferred bool
+	var errLock sync.Mutex
+	for i := 0; i < workersNum; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for rq := range ch {
+				w.a.V(1).Info("Starting shard index: %d on worker", rq.index)
+				if e := w.reconcileShardWithHosts(ctx, rq.shard); e != nil {
+					errLock.Lock()
+					if hard := noteCRUDResult(e, &deferred); hard != nil {
+						err = hard
+					}
+					errLock.Unlock()
+				}
+			}
+		}()
+	}
+
+	w.a.V(1).Info("Starting to wait shards from index: %d on workers.", startShardIndex)
+	wg.Wait()
+	w.a.V(1).Info("Finished to wait shards from index: %d on workers.", startShardIndex)
+	if err != nil {
+		return err
+	}
+	if deferred {
+		return common.ErrCRUDDeferred
+	}
+	return nil
+}
+
+// hostPVCsDataVolumeAddedDetectedOptions is the response to a volume being ADDED to a host that
+// already has data. CHI mirror: pkg/controller/chi/worker-reconciler-helper.go. Keeper has no table
+// migration or replica-drop concept, so this differs from the data-loss path only in what it logs -
+// but keeping the branch explicit keeps CHI and CHK reading the same way.
+func (w *worker) hostPVCsDataVolumeAddedDetectedOptions(host *api.Host) *statefulset.ReconcileOptions {
+	w.a.V(1).
+		M(host).F().
+		Info("Volume added to host: %s. Will recreate StatefulSet without data recovery", host.GetName())
+
+	return statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
+}
+
 func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) *statefulset.ReconcileOptions {
 	w.a.V(1).
 		M(host).F().
@@ -53,6 +156,7 @@ func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) *statefulset.Re
 	// In case of data loss detection on existing volumes, we need to:
 	// 1. recreate StatefulSet
 	// 2. run tables migration again
+
 	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
 	return stsReconcileOpts
 }

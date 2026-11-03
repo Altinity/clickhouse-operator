@@ -17,6 +17,7 @@ package kube
 import (
 	"context"
 
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,16 +34,17 @@ func NewReplicaSet(kubeClient client.Client) *ReplicaSet {
 }
 
 func (c *ReplicaSet) Get(ctx context.Context, namespace, name string) (*apps.ReplicaSet, error) {
-	rs := &apps.ReplicaSet{}
-	err := c.kubeClient.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, rs)
-	if err == nil {
+	return commonKube.GetWithRetry(ctx, func() (*apps.ReplicaSet, error) {
+		rs := &apps.ReplicaSet{}
+		err := c.kubeClient.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		}, rs)
+		if err != nil {
+			return nil, err
+		}
 		return rs, nil
-	} else {
-		return nil, err
-	}
+	})
 }
 
 func (c *ReplicaSet) Update(ctx context.Context, replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {

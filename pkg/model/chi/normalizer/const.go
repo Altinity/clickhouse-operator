@@ -26,4 +26,10 @@ const (
 	// reconciled concurrently, if the number of shard reconciliation threads is greater than or equal to the number
 	// of shards in the cluster.
 	defaultReconcileShardsMaxConcurrencyPercent = 50
+
+	// defaultStatefulSetUpdateTimeout specifies the default timeout in seconds for StatefulSet update
+	defaultStatefulSetUpdateTimeout = 300
+
+	// defaultStatefulSetUpdatePollInterval specifies the default poll interval in seconds for StatefulSet update
+	defaultStatefulSetUpdatePollInterval = 5
 )

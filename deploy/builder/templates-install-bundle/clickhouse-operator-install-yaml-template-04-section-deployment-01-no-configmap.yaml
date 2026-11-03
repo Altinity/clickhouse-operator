@@ -33,10 +33,22 @@ spec:
         clickhouse-operator-metrics/scrape: 'true'
     spec:
       serviceAccountName: clickhouse-operator
+      volumes:
+        # IPC token volume shared between operator and metrics-exporter containers.
+        # Pod-local emptyDir (never persisted, never visible via kubectl get secret).
+        # Operator writes a random per-Pod token here at startup; exporter reads it
+        # for the X-CHOP-Token header check. Only used when clickhouse.security.ipc.mode=Secure.
+        - name: clickhouse-operator-ipc
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
       containers:
         - name: clickhouse-operator
           image: ${OPERATOR_IMAGE}
           imagePullPolicy: ${OPERATOR_IMAGE_PULL_POLICY}
+          volumeMounts:
+            - name: clickhouse-operator-ipc
+              mountPath: /etc/clickhouse-operator-ipc
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -72,21 +84,25 @@ spec:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: requests.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_CPU_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: limits.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_MEM_REQUEST
               valueFrom:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: requests.memory
+                  divisor: "1Mi"
             - name: OPERATOR_CONTAINER_MEM_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: limits.memory
+                  divisor: "1Mi"
           ports:
             - containerPort: 9999
               name: op-metrics
@@ -94,6 +110,9 @@ spec:
         - name: metrics-exporter
           image: ${METRICS_EXPORTER_IMAGE}
           imagePullPolicy: ${METRICS_EXPORTER_IMAGE_PULL_POLICY}
+          volumeMounts:
+            - name: clickhouse-operator-ipc
+              mountPath: /etc/clickhouse-operator-ipc
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -129,21 +148,25 @@ spec:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: requests.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_CPU_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: limits.cpu
+                  divisor: "1m"
             - name: OPERATOR_CONTAINER_MEM_REQUEST
               valueFrom:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: requests.memory
+                  divisor: "1Mi"
             - name: OPERATOR_CONTAINER_MEM_LIMIT
               valueFrom:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: limits.memory
+                  divisor: "1Mi"
           ports:
             - containerPort: 8888
               name: ch-metrics

@@ -119,6 +119,12 @@ type IKubeSTS interface {
 	Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 	Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error)
 	Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error)
+	// Delete removes the StatefulSet and MUST block until it is fully gone from the API server,
+	// i.e. until a subsequent Get returns IsNotFound. Implementations are expected to poll until
+	// that condition holds (or the context is cancelled). This contract lets callers invoke
+	// Create() immediately after Delete() returns without racing the previous object's
+	// termination and hitting AlreadyExists. Fire-and-forget deletion belongs in an adapter-local
+	// helper, not behind this method.
 	Delete(ctx context.Context, namespace, name string) error
 	List(ctx context.Context, namespace string, opts meta.ListOptions) ([]apps.StatefulSet, error)
 }

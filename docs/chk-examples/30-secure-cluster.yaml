@@ -1,0 +1,54 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: keeper-secure
+spec:
+  configuration:
+    clusters:
+      - name: "keeper"
+        # secure: yes
+        #   Opens the TLS Keeper client port (2281, named zk-secure) on the
+        #   per-cluster Service AND on the per-host StatefulSet container
+        #   ports. Emits <tcp_port_secure>2281</tcp_port_secure> into the
+        #   per-host overlay so the Keeper process binds the TLS port.
+        #   Also emits <secure>1</secure> per <server> in the Raft XML so
+        #   peer Keepers dial each other over TLS.
+        #
+        # insecure: yes (default — both ports open)
+        #   Plaintext zk:2181 stays exposed alongside zk-secure:2281. Good
+        #   for gradual migration: existing clients keep working over 2181
+        #   while new clients switch to 2281.
+        #
+        # To lock down to TLS-only, change to `insecure: "no"`. That:
+        #  - Suppresses zk:2181 from the Service + StatefulSet container ports
+        #  - Emits <tcp_port remove="1"/> so the Keeper process binds NO
+        #    plaintext listener at all (not even on loopback)
+        #  - Switches the liveness probe to `pgrep clickhouse-keeper` (4LW
+        #    does not work over TLS upstream)
+        #  - Requires `secure: yes` (reconcile aborts on no+no with
+        #    StatusReasonNoKeeperListener)
+        #  - Requires user-supplied <openSSL> server XML + mounted certs
+        #    (operator does not yet emit <openSSL>; see the settings block
+        #    below for the canonical declarative path)
+        insecure: "yes"
+        secure: "yes"
+        layout:
+          replicasCount: 3
+    settings:
+      logger/level: "information"
+      listen_host: "0.0.0.0"
+      keeper_server/four_letter_word_white_list: "ruok,conf,stat"
+      # User-supplied server-side TLS: the operator opens tcp_port_secure
+      # (2281) but does NOT yet generate the <openSSL> block. To make the
+      # TLS listener actually accept connections, drop a file under
+      # `spec.configuration.files` with the <openSSL>/<server> XML pointing
+      # at certificate paths mounted from a Kubernetes Secret via
+      # `templates.podTemplates[].spec.volumes`. Same pattern CHI uses for
+      # ClickHouse server-side certs today.
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              image: "clickhouse/clickhouse-keeper:25.3"

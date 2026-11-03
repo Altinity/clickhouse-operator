@@ -65,7 +65,12 @@ echo "Setup Grafana operator into ${GRAFANA_NAMESPACE} namespace"
 kubectl create namespace "${GRAFANA_NAMESPACE}" || true
 
 # Setup grafana-operator into dedicated namespace
-sed -i "s/namespace: system/namespace: ${GRAFANA_NAMESPACE}/g" "${GRAFANA_OPERATOR_DIR}/deploy/kustomize/overlays/namespace_scoped/kustomization.yaml"
+# Use sed with compatibility for both macOS and Linux
+if [[ "$(uname)" == "Darwin" ]]; then
+    sed -i '' "s/namespace: system/namespace: ${GRAFANA_NAMESPACE}/g" "${GRAFANA_OPERATOR_DIR}/deploy/kustomize/overlays/namespace_scoped/kustomization.yaml"
+else
+    sed -i "s/namespace: system/namespace: ${GRAFANA_NAMESPACE}/g" "${GRAFANA_OPERATOR_DIR}/deploy/kustomize/overlays/namespace_scoped/kustomization.yaml"
+fi
 kubectl kustomize "${GRAFANA_OPERATOR_DIR}/deploy/kustomize/overlays/namespace_scoped" --load-restrictor LoadRestrictionsNone | kubectl apply --server-side -f -
 
 kubectl wait deployment/grafana-operator-controller-manager -n "${GRAFANA_NAMESPACE}" --for=condition=available --timeout=300s

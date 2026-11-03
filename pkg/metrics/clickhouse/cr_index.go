@@ -1,0 +1,64 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package clickhouse
+
+import "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
+
+type crInstallationsIndex map[string]*metrics.WatchedCR
+
+func newCRInstallationsIndex() crInstallationsIndex {
+	return make(map[string]*metrics.WatchedCR)
+}
+
+func (i crInstallationsIndex) slice() []*metrics.WatchedCR {
+	res := make([]*metrics.WatchedCR, 0)
+	for _, cr := range i {
+		res = append(res, cr)
+	}
+	return res
+}
+
+func (i crInstallationsIndex) get(key string) (*metrics.WatchedCR, bool) {
+	if i == nil {
+		return nil, false
+	}
+	if _, ok := i[key]; ok {
+		return i[key], true
+	}
+	return nil, false
+}
+
+func (i crInstallationsIndex) set(key string, value *metrics.WatchedCR) {
+	if i == nil {
+		return
+	}
+	i[key] = value
+}
+
+func (i crInstallationsIndex) remove(key string) {
+	if i == nil {
+		return
+	}
+	if _, ok := i[key]; ok {
+		delete(i, key)
+	}
+}
+
+func (i crInstallationsIndex) walk(f func(*metrics.WatchedCR, *metrics.WatchedCluster, *metrics.WatchedHost)) {
+	// Loop over Custom Resources
+	for _, cr := range i {
+		cr.WalkHosts(f)
+	}
+}

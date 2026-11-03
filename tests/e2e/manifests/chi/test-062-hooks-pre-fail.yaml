@@ -1,0 +1,24 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-062-hooks
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: default
+        reconcile:
+          hooks:
+            pre:
+              - sql:
+                  queries:
+                    - "SELECT throwIf(1, 'pre_hook_intentional_failure')"
+                events:
+                  - ClusterReconcile
+        layout:
+          shardsCount: 2
+          replicasCount: 1

@@ -12,6 +12,7 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
 # Possible options for code generator location
+GOPATH="${GOPATH:-$(go env GOPATH)}"
 CODE_GENERATOR_DIR_INSIDE_MODULES="${SRC_ROOT}/vendor/k8s.io/code-generator"
 CODE_GENERATOR_DIR_INSIDE_GOPATH="${GOPATH}/src/k8s.io/code-generator"
 
@@ -35,31 +36,32 @@ else
     echo "CUSTOM dir ${CODE_GENERATOR_DIR} is used to run code generator from"
 fi
 
-echo "Prepare local tmp folder for generator"
-mkdir -p "${GENERATOR_ROOT}"
+source "${CODE_GENERATOR_DIR}/kube_codegen.sh"
+
+# gengo v2's package parser logs "W parse.go:769] Making unsupported type entry"
+# for every Go type alias it encounters in the package graph (the standard-library
+# `any`/`reflect.uncommonType` aliases plus our HookTarget/HookFailurePolicy
+# documentation aliases of types.String). The warnings are harmless — gengo doesn't
+# need to emit deepcopy for these because no struct field uses them directly. Drop
+# them on display so the script's output stays focused on actionable errors.
+filter_gengo_noise() {
+    grep -Ev '^W.*parse\.go:[0-9]+\] Making unsupported type entry' >&2 || true
+}
 
 echo ""
-echo "Generate code for clickhouse.altinity.com:v1 into ${GENERATOR_ROOT}"
-bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
-    client,deepcopy,informer,lister \
-    "${REPO}/pkg/client" \
-    "${REPO}/pkg/apis" \
-    "clickhouse.altinity.com:v1" \
-    -o "${GENERATOR_ROOT}" \
-    --go-header-file "${SRC_ROOT}/hack/boilerplate.go.txt"
+echo "Generate deepcopy helpers for pkg/apis"
+kube::codegen::gen_helpers \
+    --boilerplate "${SRC_ROOT}/hack/boilerplate.go.txt" \
+    "${SRC_ROOT}/pkg/apis" \
+    2> >(filter_gengo_noise)
 
 echo ""
-echo "Generate code for clickhouse-keeper.altinity.com:v1 into ${GENERATOR_ROOT}"
-bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
-    deepcopy \
-    "${REPO}/pkg/client" \
-    "${REPO}/pkg/apis" \
-    "clickhouse-keeper.altinity.com:v1" \
-    -o "${GENERATOR_ROOT}" \
-    --go-header-file "${SRC_ROOT}/hack/boilerplate.go.txt"
-
-echo "Copy generated sources into: ${PKG_ROOT}"
-cp -r "${GENERATOR_ROOT}/${REPO}/pkg/"* "${PKG_ROOT}"
-
-echo "Cleanup local tmp folder"
-rm -rf "${GENERATOR_ROOT}"
+echo "Generate client code for clickhouse.altinity.com into ${SRC_ROOT}/pkg/client"
+kube::codegen::gen_client \
+    --with-watch \
+    --one-input-api "clickhouse.altinity.com" \
+    --output-dir "${SRC_ROOT}/pkg/client" \
+    --output-pkg "${REPO}/pkg/client" \
+    --boilerplate "${SRC_ROOT}/hack/boilerplate.go.txt" \
+    "${SRC_ROOT}/pkg/apis" \
+    2> >(filter_gengo_noise)

@@ -1,10 +1,19 @@
 #!/bin/bash
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-pip3 install -r "$CUR_DIR/../image/requirements.txt"
+source "${CUR_DIR}/test_common.sh"
 
-export OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-"test"}"
-export OPERATOR_INSTALL="${OPERATOR_INSTALL:-"yes"}"
-export IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-"Always"}"
+IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-"Always"}"
 
-ONLY="${ONLY:-"*"}"
-python3 "$CUR_DIR/../regression.py" --only="/regression/e2e.test_metrics_exporter/${ONLY}" --native
+common_install_pip_requirements
+common_export_test_env
+
+RUN_ALL_FLAG=$(common_convert_run_all)
+
+python3 "${COMMON_DIR}/../regression.py" \
+    --only="/regression/e2e.test_metrics_exporter/${ONLY}" \
+    ${RUN_ALL_FLAG} \
+    --parallel off \
+    -o short \
+    --trim-results on \
+    --debug \
+    --native

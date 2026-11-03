@@ -33,6 +33,8 @@ func (c *Creator) stsSetupApplication(statefulSet *apps.StatefulSet, host *api.H
 	c.stsSetupAppContainer(statefulSet, host)
 	// Setup dedicated log container
 	c.stsSetupLogContainer(statefulSet, host)
+	// Setup backup sidecar container
+	c.stsSetupBackupContainer(statefulSet, host)
 	// Setup additional host alias(es)
 	c.stsSetupHostAliases(statefulSet, host)
 }
@@ -192,6 +194,18 @@ func (c *Creator) stsSetupLogContainer(statefulSet *apps.StatefulSet, host *api.
 	}
 }
 
+// stsSetupBackupContainer is a unification wrapper.
+// Ensures backup sidecar container is in place, if required
+func (c *Creator) stsSetupBackupContainer(statefulSet *apps.StatefulSet, host *api.Host) {
+	c.cm.EnsureBackupContainer(statefulSet, host)
+}
+
+// stsSetupBackupContainerStorage is a unification wrapper.
+// Runs after storage setup, so the backup sidecar gets every volume the app container has been given
+func (c *Creator) stsSetupBackupContainerStorage(statefulSet *apps.StatefulSet, host *api.Host) {
+	c.cm.EnsureBackupContainerVolumeMounts(statefulSet, host)
+}
+
 // stsGetAppContainer is a unification wrapper
 func (c *Creator) stsGetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return c.cm.GetAppContainer(statefulSet)
@@ -211,6 +225,11 @@ func (c *Creator) stsEnsureAppContainerNamedPortsSpecified(statefulSet *apps.Sta
 	// Walk over all assigned ports of the host and ensure each port in container
 	host.WalkSpecifiedPorts(
 		func(name string, port *types.Int32, protocol core.Protocol) bool {
+			// Suppress the plaintext Keeper ZK client port when the host opts out of insecure exposure;
+			// mirrors appendHostExposedContainerPorts so a user-supplied podTemplate cannot reintroduce it.
+			if (name == api.KpDefaultZKPortName) && !host.IsInsecure() {
+				return false
+			}
 			k8s.ContainerEnsurePortByName(container, name, port.Value())
 			// Do not abort, continue iterating
 			return false

@@ -16,15 +16,21 @@ package chk
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// errServiceTypeChanged marks the one update failure a recreate resolves: Kubernetes rejects a
+// change of Service type in place, so the object has to be replaced.
+var errServiceTypeChanged = errors.New("service type changed")
 
 // reconcileService reconciles core.Service
 func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, service, prevService *core.Service) error {
@@ -38,6 +44,25 @@ func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, s
 		// We have the Service - try to update it
 		w.a.V(1).M(cr).F().Info("Service found: %s. Will try to update", util.NamespaceNameString(service))
 		err = w.updateService(ctx, cr, curService, service, prevService)
+	}
+
+	// Recreate is for the two situations a recreate actually fixes: the Service is genuinely
+	// absent, or its type changed and Kubernetes will not mutate that in place. Any other error -
+	// a read that was Forbidden or spent its retry budget, an update that hit a Conflict - says
+	// nothing about whether the Service is healthy, so surface it and let the next pass re-read.
+	//
+	// Falling through calls delete-then-create. While the error persists the delete is a no-op,
+	// because deleteServiceIfExists reads first and treats its own failure as "nothing to
+	// delete"; what does the damage is an error that clears between those two reads, dropping
+	// the Service's endpoints and, for a non-headless one, its address.
+	if (err != nil) && !apiErrors.IsNotFound(err) && !errors.Is(err, errServiceTypeChanged) {
+		w.a.WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(cr).
+			WithError(cr).
+			M(cr).F().
+			Error("Reconcile Service: %s failed, leaving it alone. err: %v",
+				util.NamespaceNameString(service), err)
+		return err
 	}
 
 	if err != nil {
@@ -78,10 +103,10 @@ func (w *worker) updateService(
 	prevService *core.Service,
 ) error {
 	if curService.Spec.Type != targetService.Spec.Type {
-		return fmt.Errorf(
-			"just recreate the service in case of service type change '%s'=>'%s'",
-			curService.Spec.Type, targetService.Spec.Type,
-		)
+		// Sentinel, not a bare string: reconcileService must tell this apart from a transient
+		// update failure, because only this one is resolved by deleting and recreating.
+		return fmt.Errorf("%w: '%s'=>'%s'",
+			errServiceTypeChanged, curService.Spec.Type, targetService.Spec.Type)
 	}
 
 	// Updating a Service is a complicated business
@@ -91,15 +116,19 @@ func (w *worker) updateService(
 	// spec.resourceVersion is required in order to update an object
 	newService.ResourceVersion = curService.ResourceVersion
 
-	//
-	// Migrate ClusterIP to the new service
-	//
-	// spec.clusterIP field is immutable, need to use already assigned value
-	// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
-	// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
-	// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
-	// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
-	newService.Spec.ClusterIP = curService.Spec.ClusterIP
+	if newService.Spec.ClusterIP == core.ClusterIPNone {
+		// In case if new service has no ClusterIP requested, we'll keep it unassigned.
+		// Otherwise we need to migrate IP address assigned earlier to new service in order to reuse it
+		log.V(1).Info("switch service %s to IP-less mode. ClusterIP=None", util.NamespacedName(newService))
+	} else {
+		// Migrate assigned IP value - ClusterIP - to the new service
+		// spec.clusterIP field is immutable, need to use already assigned value
+		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+		// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
+		// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
+		newService.Spec.ClusterIP = curService.Spec.ClusterIP
+	}
 
 	//
 	// Migrate existing ports to the new service for NodePort and LoadBalancer services
@@ -114,9 +143,13 @@ func (w *worker) updateService(
 	// No changes in service type is allowed.
 	// Already exposed port details can not be changed.
 
-	serviceTypeIsNodePort := (curService.Spec.Type == core.ServiceTypeNodePort) && (newService.Spec.Type == core.ServiceTypeNodePort)
-	serviceTypeIsLoadBalancer := (curService.Spec.Type == core.ServiceTypeLoadBalancer) && (newService.Spec.Type == core.ServiceTypeLoadBalancer)
-	if serviceTypeIsNodePort || serviceTypeIsLoadBalancer {
+	// Service type of new and cur service is the same.
+	// In case it is not the same service has to be just recreated.
+	// So we can check for one type only - let's check for type of new service
+	typeIsNodePort := newService.Spec.Type == core.ServiceTypeNodePort
+	typeIsLoadBalancer := newService.Spec.Type == core.ServiceTypeLoadBalancer
+	if typeIsNodePort || typeIsLoadBalancer {
+		// Migrate cur ports to new service
 		for i := range newService.Spec.Ports {
 			newPort := &newService.Spec.Ports[i]
 			for j := range curService.Spec.Ports {
@@ -172,7 +205,7 @@ func (w *worker) updateService(
 			M(cr).F().
 			Info("Update Service success: %s", util.NamespaceNameString(newService))
 	} else {
-		w.a.M(cr).F().Error("Update Service fail: %s failed with error: %v", util.NamespaceNameString(newService))
+		w.a.M(cr).F().Error("Update Service fail: %s failed with error: %v", util.NamespaceNameString(newService), err)
 	}
 
 	return err

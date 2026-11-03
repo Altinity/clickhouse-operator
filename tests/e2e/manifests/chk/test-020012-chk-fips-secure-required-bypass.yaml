@@ -1,0 +1,16 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-020012-fips-secure-bypass
+spec:
+  # Under FIPS strict hardening, a CHK that does not declare cluster.secure=yes
+  # must be rejected. The normalizer's rejectFIPSInsecureKeeperCluster gate
+  # fires because cluster.Secure is nil (predicate `!IsTrue()` catches both
+  # nil and explicit-false). CHK lands in status=Aborted with reason
+  # FIPSValidationFailed, parallel to test_020009 (which exercises the
+  # spec-level security bypass branch).
+  configuration:
+    clusters:
+      - name: "keeper"
+        layout:
+          replicasCount: 1

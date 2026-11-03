@@ -15,10 +15,10 @@ spec:
               replicas:
                 - name: replica0-0
                   settings:
-                    display_name: replica0
+                    default_replica_name: myreplica0
                 - name: replica0-1
                   settings:
-                    display_name: replica1
+                    default_replica_name: myreplica1
             - name: shard1
               replicas:
                 - name: replica1-0

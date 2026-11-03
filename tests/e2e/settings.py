@@ -38,7 +38,6 @@ operator_version = (
 )
 operator_namespace = os.getenv("OPERATOR_NAMESPACE") if "OPERATOR_NAMESPACE" in os.environ else test_namespace
 operator_install = os.getenv("OPERATOR_INSTALL") if "OPERATOR_INSTALL" in os.environ else "yes"
-minio_namespace = os.getenv("MINIO_NAMESPACE") if "MINIO_NAMESPACE" in os.environ else "minio"
 operator_docker_repo = (
     os.getenv("OPERATOR_DOCKER_REPO") if "OPERATOR_DOCKER_REPO" in os.environ else "altinity/clickhouse-operator"
 )
@@ -57,20 +56,10 @@ clickhouse_template = (
     os.getenv("CLICKHOUSE_TEMPLATE")
     if "CLICKHOUSE_TEMPLATE" in os.environ else
     "manifests/chit/tpl-clickhouse-stable.yaml"
-    # "manifests/chit/tpl-clickhouse-19.17.yaml"
-    # "manifests/chit/tpl-clickhouse-20.3.yaml"
-    # "manifests/chit/tpl-clickhouse-20.8.yaml"
-    # "manifests/chit/tpl-clickhouse-21.3.yaml"
-    # "manifests/chit/tpl-clickhouse-21.8.yaml"
-    # "manifests/chit/tpl-clickhouse-22.3.yaml"
-    # "manifests/chit/tpl-clickhouse-22.8.yaml"
     # "manifests/chit/tpl-clickhouse-23.3.yaml"
     # "manifests/chit/tpl-clickhouse-23.8.yaml"
 )
-clickhouse_template_old = "manifests/chit/tpl-clickhouse-23.3.yaml"
-
 clickhouse_version = get_ch_version(clickhouse_template)
-clickhouse_version_old = get_ch_version(clickhouse_template_old)
 
 keeper_type = os.getenv("KEEPER_TYPE") if "KEEPER_TYPE" in os.environ else "zookeeper" # zookeeper | clickhouse_keeper
 
@@ -78,6 +67,6 @@ prometheus_namespace = "prometheus"
 prometheus_operator_version = "0.78.1"
 prometheus_scrape_interval = 5
 
-minio_version = "latest"
+no_cleanup = os.environ.get("NO_CLEANUP", "").lower() in ("1", "true", "yes")
 
 step_by_step = True if "STEP" in os.environ else False

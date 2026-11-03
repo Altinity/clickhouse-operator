@@ -203,6 +203,10 @@ func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 	}
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
+		if host.GetCluster().GetBackup().IsEnabled() {
+			template = template.DeepCopy()
+			serviceSpecEnsureBackupPort(&template.Spec)
+		}
 		return creator.CreateServiceFromTemplate(
 			template,
 			host.GetRuntime().GetAddress().GetNamespace(),
@@ -234,6 +238,9 @@ func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 		},
 	}
 	creator.SvcAppendSpecifiedPorts(svc, host)
+	if host.GetCluster().GetBackup().IsEnabled() {
+		serviceSpecEnsureBackupPort(&svc.Spec)
+	}
 	m.labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }

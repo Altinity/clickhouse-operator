@@ -24,7 +24,8 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:25.3"
+              image: "clickhouse/clickhouse-keeper:26.8"
+          serviceAccountName: test-020000-chk-sa
     volumeClaimTemplates:
       - name: default
         spec:

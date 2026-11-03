@@ -32,6 +32,12 @@ type Metrics struct {
 	// CHIReconcilesAborted is a number (counter) of explicitly aborted CHI reconciles.
 	// This counter does not includes reconciles that we not completed due to external reasons, such as operator restart
 	CHIReconcilesAborted metric.Int64Counter
+	// CHIAutoRecoveriesTriggered is a number (counter) of auto-recovery reconcile triggers fired
+	// for Aborted CHIs when a recovery signal arrives (e.g. a pod became Ready).
+	CHIAutoRecoveriesTriggered metric.Int64Counter
+	// CHIKeeperUpdatesSkipped is a number (counter) of CHI reconciles skipped after a referenced
+	// CHK reconcile completed, because the resolved zookeeper endpoint list did not change.
+	CHIKeeperUpdatesSkipped metric.Int64Counter
 	// CHIReconcilesTimings is a histogram of durations of successfully completed CHI reconciles
 	CHIReconcilesTimings metric.Float64Histogram
 	// CHI is a number (counter) of available CHIs
@@ -70,6 +76,16 @@ func createMetrics() *Metrics {
 	m.CHIReconcilesAborted, _ = operator.Meter().Int64Counter(
 		"clickhouse_operator_chi_reconciles_aborted",
 		metric.WithDescription("number of CHI reconciles aborted"),
+		metric.WithUnit("items"),
+	)
+	m.CHIAutoRecoveriesTriggered, _ = operator.Meter().Int64Counter(
+		"clickhouse_operator_chi_auto_recoveries_triggered",
+		metric.WithDescription("number of CHI auto-recovery reconcile triggers (e.g. pod became Ready while CHI was Aborted)"),
+		metric.WithUnit("items"),
+	)
+	m.CHIKeeperUpdatesSkipped, _ = operator.Meter().Int64Counter(
+		"clickhouse_operator_chi_keeper_updates_skipped",
+		metric.WithDescription("number of CHI reconciles skipped after a referenced CHK reconcile completed because zookeeper endpoints did not change"),
 		metric.WithUnit("items"),
 	)
 	m.CHIReconcilesTimings, _ = operator.Meter().Float64Histogram(
@@ -145,6 +161,8 @@ func chiInitZeroValues(ctx context.Context, src labelsSource) {
 	ensureMetrics().CHIReconcilesStarted.Add(ctx, 0, labels(src))
 	ensureMetrics().CHIReconcilesCompleted.Add(ctx, 0, labels(src))
 	ensureMetrics().CHIReconcilesAborted.Add(ctx, 0, labels(src))
+	ensureMetrics().CHIAutoRecoveriesTriggered.Add(ctx, 0, labels(src))
+	ensureMetrics().CHIKeeperUpdatesSkipped.Add(ctx, 0, labels(src))
 
 	ensureMetrics().HostReconcilesStarted.Add(ctx, 0, labels(src))
 	ensureMetrics().HostReconcilesCompleted.Add(ctx, 0, labels(src))
@@ -160,6 +178,12 @@ func chiReconcilesCompleted(ctx context.Context, src labelsSource) {
 }
 func chiReconcilesAborted(ctx context.Context, src labelsSource) {
 	ensureMetrics().CHIReconcilesAborted.Add(ctx, 1, labels(src))
+}
+func chiAutoRecoveriesTriggered(ctx context.Context, src labelsSource) {
+	ensureMetrics().CHIAutoRecoveriesTriggered.Add(ctx, 1, labels(src))
+}
+func chiKeeperUpdatesSkipped(ctx context.Context, src labelsSource) {
+	ensureMetrics().CHIKeeperUpdatesSkipped.Add(ctx, 1, labels(src))
 }
 func chiReconcilesTimings(ctx context.Context, src labelsSource, seconds float64) {
 	ensureMetrics().CHIReconcilesTimings.Record(ctx, seconds, labels(src))

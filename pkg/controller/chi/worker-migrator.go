@@ -16,12 +16,16 @@ package chi
 
 import (
 	"context"
+	"fmt"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type migrateTableOptions struct {
@@ -86,7 +90,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrat
 			Info(
 				"Need to drop replica on host %d to shard %d in cluster %s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-		w.dropReplica(ctx, host, NewDropReplicaOptions().SetForceDropUponStorageLoss())
+		w.dropZKReplica(ctx, host, NewDropReplicaOptions().SetForceDropUponStorageLoss())
 	}
 
 	w.a.V(1).
@@ -104,6 +108,21 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrat
 			M(host).F().
 			Error("ERROR add tables failed on shard/host:%d/%d cluster:%s err:%v",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName, err)
+		// Do NOT fall through to the success announcement or PushHostTablesCreated. That listing is
+		// persisted on the CR and feeds HasData(), which makes shouldMigrateTables() skip the host,
+		// so recording tables-created after a FAILED migration does not merely hide the failure - it
+		// makes it permanent across operator restarts. Status is left untouched here: the
+		// post-restart re-migration caller swallows this error, so writing status would poison the
+		// CR from a path that is allowed to fail.
+		return migrateTablesFailure(host, err)
+	}
+
+	// HostCreateTables reports success on a done context having run zero DDL, and the reconcile
+	// context is cancelled on any re-enqueue of the same CR - a routine event. Announcing success
+	// and recording the host on that path is the same defect as swallowing the error: the listing
+	// feeds HasData(), so a host that was never actually migrated would never be migrated again.
+	if util.IsContextDone(ctx) {
+		return nil
 	}
 
 	w.a.V(1).
@@ -116,6 +135,22 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts *migrat
 	host.GetCR().IEnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
 
 	return nil
+}
+
+// migrateTablesFailure wraps a table-creation failure in the sentinel reconcileHostMain propagates.
+// Losing the wrap is the silent regression: reconcileHostMain forwards only the two CRUD sentinels
+// and logs anything else as a Warning before carrying on to a Completed CR.
+//
+// Deferred rather than Abort on purpose. Both end the CR non-Completed (reconcile() coerces any
+// error to ErrCRUDAbort before markReconcileCompletedUnsuccessfully), but Abort unwinds the shard
+// walk on the first bad host, so one un-creatable object - a Dictionary with a missing source, an
+// MV over a dropped table - would halt every remaining shard mid-upgrade. Deferred is what the
+// shard walk already understands: siblings in the cluster keep reconciling and the deferral
+// surfaces once at the end of the pass. WalkTillError still stops at the first failing cluster.
+//
+// Separate func so the wrap is reachable from a test without a live schemer.
+func migrateTablesFailure(host *api.Host, err error) error {
+	return fmt.Errorf("%w: add tables failed on host %s: %w", common.ErrCRUDDeferred, host.GetName(), err)
 }
 
 func (w *worker) setHasData(host *api.Host) {
@@ -157,17 +192,22 @@ func (w *worker) ensureClusterSchemer(host *api.Host) *schemer.ClusterSchemer {
 	if w == nil {
 		return nil
 	}
-	// Make base cluster connection params
+	// Make base cluster connection params from CHOP-config defaults, then
+	// overlay the per-cluster security.clickhouse.tls fields populated by the
+	// normalizer (3-level inheritance: CHOP-config → CHI → cluster). Without
+	// the overlay the cluster-level Verify/MinVersion/ServerName/RootCA
+	// wouldn't reach the dial — CHOP-config values would silently win.
 	clusterConnectionParams := clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config())
+	clusterConnectionParams.OverlayClusterSecurityTLS(host.GetCluster().GetSecurity().GetClickHouse().GetTLS())
 	// Adjust base cluster connection params with per-host props
 	switch clusterConnectionParams.Scheme {
 	case api.ChSchemeAuto:
 		switch {
 		case host.HTTPPort.HasValue():
-			clusterConnectionParams.Scheme = "http"
+			clusterConnectionParams.Scheme = api.ChSchemeHTTP
 			clusterConnectionParams.Port = host.HTTPPort.IntValue()
 		case host.HTTPSPort.HasValue():
-			clusterConnectionParams.Scheme = "https"
+			clusterConnectionParams.Scheme = api.ChSchemeHTTPS
 			clusterConnectionParams.Port = host.HTTPSPort.IntValue()
 		}
 	case api.ChSchemeHTTP:
@@ -175,7 +215,6 @@ func (w *worker) ensureClusterSchemer(host *api.Host) *schemer.ClusterSchemer {
 	case api.ChSchemeHTTPS:
 		clusterConnectionParams.Port = host.HTTPSPort.IntValue()
 	}
-	w.schemer = schemer.NewClusterSchemer(clusterConnectionParams, host.Runtime.Version)
-
-	return w.schemer
+	// Each call gets its own schemer. Shard reconcile runs several of these at once.
+	return schemer.NewClusterSchemer(clusterConnectionParams, host.Runtime.Version)
 }

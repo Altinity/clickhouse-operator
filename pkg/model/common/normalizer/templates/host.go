@@ -37,6 +37,8 @@ func NormalizeHostTemplate(template *api.HostTemplate) {
 	// Normalize PortDistribution
 	for i := range template.PortDistribution {
 		portDistribution := &template.PortDistribution[i]
+		// Fold any accepted casing to the canonical const before validating.
+		portDistribution.Type = deployment.NormalizePortDistributionType(portDistribution.Type)
 		switch portDistribution.Type {
 		case
 			deployment.PortDistributionUnspecified,

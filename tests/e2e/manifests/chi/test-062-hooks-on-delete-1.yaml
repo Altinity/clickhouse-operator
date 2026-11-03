@@ -1,0 +1,31 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-062-hooks
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  useTemplates:
+    - name: clickhouse-version
+  reconcile:
+    host:
+      hooks:
+        # Pre hook scoped to HostDelete. Fires only when the host is being torn down
+        # (downsize). The pod is still up at that point, so SQL runs against the
+        # dying host directly.
+        # failurePolicy: Ignore — even if the drain query fails, we still want the
+        # host removal to proceed (otherwise a broken host would block downsize).
+        pre:
+          - sql:
+              queries:
+                - "SELECT 'host_ondelete_hook_marker'"
+            events:
+              - HostDelete
+            failurePolicy: Ignore
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 2
+          replicasCount: 1

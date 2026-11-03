@@ -34,6 +34,25 @@ type ConnectionParams struct {
 	KeyFile  string
 	CaFile   string
 	AuthFile string
+
+	// MinTLSVersion floors the TLS handshake at this protocol version.
+	// "1.2"|"1.3"|"" — empty preserves Go's default (1.2 today). Used only when
+	// TLS is active (CertFile + KeyFile set).
+	MinTLSVersion string
+
+	// InsecureSkipVerify, when true, disables peer-certificate and hostname
+	// verification on the ZK TLS dial. False (default) preserves the existing
+	// strict-verify behavior (the ZK client always provides RootCAs + ServerName).
+	// Set to true only when the cluster's security.zookeeper.verify is None.
+	InsecureSkipVerify bool
+
+	// RejectDigestAuth, when true, refuses to invoke zk.AddAuth with the
+	// "digest" scheme. The ZooKeeper digest scheme uses SHA-1 password
+	// hashing inside the vendored go-zookeeper library — under FIPS-compatible
+	// mode the operator must not exercise that path. Set true when chopconf
+	// security.policy=Enforced. Per the operator's FIPS scope specification
+	// (§2 line 46 / §3 step 3).
+	RejectDigestAuth bool
 }
 
 func BuildConnectionParams(_params ...*ConnectionParams) *ConnectionParams {

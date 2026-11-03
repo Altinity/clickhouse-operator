@@ -1,0 +1,27 @@
+# test_010086_1
+#
+# The fix for manifests/chi/test-086-1-pairing.yaml: the CHI's container is named like the
+# template's, the name 0.27 deployed the folded container under, so the two merge into one and the
+# pods keep their container as it is.
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-086-1-pairing
+spec:
+  useTemplates:
+    - name: test-086-1-pairing-tpl
+  defaults:
+    templates:
+      podTemplate: default
+  configuration:
+    clusters:
+      - name: single
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: altinity/clickhouse-server:25.8.28.10001.altinitystable

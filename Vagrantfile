@@ -249,8 +249,9 @@ EOF
     go mod download -x
     go mod tidy
     go mod vendor
-    time docker buildx build -f dockerfile/operator/Dockerfile --platform=linux/amd64 --output=type=image,name=$COMPANY_REPO/clickhouse-operator:$OPERATOR_RELEASE .
-    time docker buildx build -f dockerfile/metrics-exporter/Dockerfile --platform=linux/amd64 --output=type=image,name=$COMPANY_REPO/metrics-exporter:$OPERATOR_RELEASE .
+    export GOFIPS140=${GOFIPS140:-v1.0.0}
+    time docker buildx build -f dockerfile/operator/Dockerfile --platform=linux/amd64 --build-arg GOFIPS140=${GOFIPS140} --output=type=image,name=$COMPANY_REPO/clickhouse-operator:$OPERATOR_RELEASE .
+    time docker buildx build -f dockerfile/metrics-exporter/Dockerfile --platform=linux/amd64 --build-arg GOFIPS140=${GOFIPS140} --output=type=image,name=$COMPANY_REPO/metrics-exporter:$OPERATOR_RELEASE .
 
 
     # install clickhouse-operator

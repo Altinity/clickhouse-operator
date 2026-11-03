@@ -8,19 +8,9 @@ SRC_ROOT="$(realpath "${CUR_DIR}/../..")"
 
 # 0.9.3
 VERSION=$(cd "${SRC_ROOT}"; cat release)
-PREVIOUS_VERSION="${PREVIOUS_VERSION}"
-
-if [[ -z "${PREVIOUS_VERSION}" ]]; then
-    echo "PREVIOUS_VERSION is not specified. Unable to proceed."
-    echo "Abort."
-    exit 1
-fi
-
-echo "PREVIOUS_VERSION: ${PREVIOUS_VERSION}"
+echo "=================================================================================="
 echo "VERSION: ${VERSION}"
-echo "!!! IMPORTANT !!!"
-echo "Please, ensure PREVIOUS_VERSION=$PREVIOUS_VERSION is what is needed"
-read -n 1 -r -s -p $'Press enter to continue...\n'
+echo "=================================================================================="
 
 OPERATORHUB_DIR="${SRC_ROOT}/deploy/operatorhub"
 MANIFESTS_DIR="${OPERATORHUB_DIR}/${VERSION}"
@@ -67,19 +57,32 @@ rm "${RBAC_ROLE_RULES_FILE}"
 # Insert examples into CVV file
 EXAMPLES_FILE="qwe.yaml"
 F1="${SRC_ROOT}/docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml"
-F2="${SRC_ROOT}/docs/chi-examples/50-CHIT-10-useTemplates-and-use-templates-with-selector.yaml"
+F2="${SRC_ROOT}/docs/chi-examples/50-CHIT-02-manual-template-with-selector.yaml"
 F3="${SRC_ROOT}/docs/chi-examples/70-chop-config.yaml"
-yq -n -I=2 -o=json ".[0] = load(\"${F1}\") | .[1] = load(\"${F2}\") | .[2] = load(\"${F3}\")" > "${EXAMPLES_FILE}"
+F4="${SRC_ROOT}/docs/chk-examples/01-simple-1.yaml"
+F5="${SRC_ROOT}/docs/chb-examples/02-backup-once.yaml"
+F6="${SRC_ROOT}/docs/chb-examples/04-backup-schedule.yaml"
+F7="${SRC_ROOT}/docs/chb-examples/06-restore.yaml"
+yq -n -I=2 -o=json ".[0] = load(\"${F1}\") | .[1] = load(\"${F2}\") | .[2] = load(\"${F3}\") | .[3] = load(\"${F4}\") | .[4] = load(\"${F5}\") | .[5] = load(\"${F6}\") | .[6] = load(\"${F7}\")" > "${EXAMPLES_FILE}"
 yq -i ".metadata.annotations.alm-examples = strload(\"${EXAMPLES_FILE}\")" "${CVV_FILE_TEMPLATE}"
 rm "${EXAMPLES_FILE}"
 
 cat "${CVV_FILE_TEMPLATE}" | \
   OPERATOR_VERSION="${VERSION}" \
   OPERATOR_RELEASE_DATE=$(date +'%Y-%m-%dT%H:%M:%SZ') \
-  PREVIOUS_OPERATOR_VERSION="${PREVIOUS_VERSION}" \
   envsubst > "${CVV_FILE}"
 
 rm "${CVV_FILE_TEMPLATE}"
+
+# Inject spec.skips from releases file (versions that may not be in the IIB from-index)
+SKIPS_FILE="skips.yaml"
+grep -v '^$' "${SRC_ROOT}/releases" | while IFS= read -r v; do
+    echo "- clickhouse-operator.v${v}"
+done > "${SKIPS_FILE}"
+if [[ -s "${SKIPS_FILE}" ]]; then
+    yq -i ".spec.skips = load(\"${SKIPS_FILE}\")" "${CVV_FILE}"
+fi
+rm "${SKIPS_FILE}"
 
 #$CHIT.crd.yaml
 #$CONF.crd.yaml
@@ -88,6 +91,9 @@ CHI="clickhouseinstallations.clickhouse.altinity.com"
 CHIT="clickhouseinstallationtemplates.clickhouse.altinity.com"
 CONF="clickhouseoperatorconfigurations.clickhouse.altinity.com"
 CHK="clickhousekeeperinstallations.clickhouse-keeper.altinity.com"
+CHB="clickhousebackups.clickhouse.altinity.com"
+CHBS="clickhousebackupschedules.clickhouse.altinity.com"
+CHR="clickhouserestores.clickhouse.altinity.com"
 
 # Build partial .yaml manifest(s)
 MANIFEST_PRINT_CRD="yes" \
@@ -120,6 +126,16 @@ MANIFEST_PRINT_RBAC_NAMESPACED="no" \
 MANIFEST_PRINT_DEPLOYMENT="no" \
 MANIFEST_PRINT_SERVICE_METRICS="no" \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" | yq "select(.metadata.name == \"${CHK}\")" > "${MANIFESTS_DIR}/${CHK}.crd.yaml"
+
+# Backup CRDs: ClickHouseBackup, ClickHouseBackupSchedule, ClickHouseRestore
+for CRD in "${CHB}" "${CHBS}" "${CHR}"; do
+    MANIFEST_PRINT_CRD="yes" \
+    MANIFEST_PRINT_RBAC_CLUSTERED="no" \
+    MANIFEST_PRINT_RBAC_NAMESPACED="no" \
+    MANIFEST_PRINT_DEPLOYMENT="no" \
+    MANIFEST_PRINT_SERVICE_METRICS="no" \
+    "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" | yq "select(.metadata.name == \"${CRD}\")" > "${MANIFESTS_DIR}/${CRD}.crd.yaml"
+done
 
 # TODO
 # Package file not used any more?
