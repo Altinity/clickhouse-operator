@@ -24,7 +24,8 @@ version.
 
 Two independent evidence streams are published for every release tag.
 
-**Side-channel artifact bundle.** Every push of a `MAJOR.MINOR.PATCH` tag
+**Side-channel artifact bundle.** Every push of a `MAJOR.MINOR.PATCH`
+version branch, and every published GitHub Release tagged `release-*`,
 runs `.github/workflows/build_branch.yaml`, which uploads a GitHub
 Actions artifact named `release-evidence-<tag>` and also attaches the
 files inside it to the matching GitHub Release page. For each of the two
@@ -178,13 +179,13 @@ go version -m /tmp/clickhouse-operator | grep -E 'GOFIPS140|vcs\.|build\s+-tags'
 Expected (relevant lines only):
 
 ```
-build   GOFIPS140=v1.0.0
+build   GOFIPS140=v1.0.0-c2097c7c
 build   -trimpath=true
 build   -buildvcs=true
 build   vcs.revision=<commit sha>
 ```
 
-The `GOFIPS140=v1.0.0` line is the canonical proof that the binary was
+The `GOFIPS140` line is the canonical proof that the binary was
 linked against the Go FIPS 140-3 cryptographic module. Its absence in a
 shipped image is a release failure.
 

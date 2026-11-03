@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - "[0-9]+.[0-9]+.[0-9]+"
+  release:
+    types:
+      - published
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,6 +18,11 @@ permissions:
 jobs:
   build_version:
     name: Build branch
+    # Version-branch pushes always build. A published GitHub Release only
+    # rebuilds when the tag matches the project's release-* convention
+    # (e.g. release-0.27.4), so a random/other-product release does not
+    # re-push operator images.
+    if: ${{ github.event_name != 'release' || startsWith(github.event.release.tag_name, 'release-') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout project
@@ -71,17 +80,28 @@ jobs:
       - name: Upload release evidence artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-evidence-${{ github.ref_name }}
+          name: release-evidence-${{ github.event.release.tag_name || github.ref_name }}
           path: release-evidence/
           retention-days: 365
       - name: Attach evidence to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
-          echo "Attempting to attach release-evidence artifacts to GH Release ${{ github.ref_name }}"
-          if gh release view ${{ github.ref_name }} >/dev/null 2>&1; then
-            gh release upload ${{ github.ref_name }} release-evidence/*.{digest.txt,sbom.spdx.json,manifest.json,metadata.json} --clobber
-          else
-            echo "no release object for tag ${{ github.ref_name }} yet; skipping upload"
+          CHO_RELEASE=$(cat release)
+          TAG=""
+          # Prefer the tag that published this run; otherwise the project
+          # convention is release-<version> (not the 0.27.4 version branch).
+          for candidate in "${EVENT_RELEASE_TAG}" "release-${CHO_RELEASE}" "${CHO_RELEASE}"; do
+            if [ -n "${candidate}" ] && gh release view "${candidate}" >/dev/null 2>&1; then
+              TAG="${candidate}"
+              break
+            fi
+          done
+          if [ -z "${TAG}" ]; then
+            echo "no GitHub Release for ${CHO_RELEASE} yet; skipping upload"
+            exit 0
           fi
+          echo "Attaching release-evidence to GH Release ${TAG}"
+          gh release upload "${TAG}" release-evidence/*.{digest.txt,sbom.spdx.json,manifest.json,metadata.json} --clobber

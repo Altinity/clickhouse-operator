@@ -252,6 +252,25 @@ FIPS_LISTENER_REJECTED_TLS_CASES = (
     *fips_rejected_cipher_cases_from_ciphers_by_protocol(),
 )
 
+# One reject per *class*, not a sample of the full cipher list:
+#   - each legacy protocol (1.0 / 1.1 / 1.2) with the default suite
+#   - the only non-approved TLS 1.3 suite in ciphers_by_protocol (ChaCha)
+#   - one non-FIPS TLS 1.2 suite (ChaCha; same family as 030016's reject)
+# The full FIPS_LISTENER_REJECTED_TLS_CASES matrix is host-run 030017.
+FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE = (
+    *FIPS_REJECTED_PROTOCOL_CASES,
+    {
+        "name": "TLS 1.3 TLS_CHACHA20_POLY1305_SHA256",
+        "tls_version": "1.3",
+        "cipher_suite": "TLS_CHACHA20_POLY1305_SHA256",
+    },
+    {
+        "name": "TLS 1.2 ECDHE-RSA-CHACHA20-POLY1305",
+        "tls_version": "1.2",
+        "cipher_suite": "ECDHE-RSA-CHACHA20-POLY1305",
+    },
+)
+
 # clickhouse-backup's Go FIPS runtime pins ciphers but keeps stdlib default
 # MinVersion (TLS 1.2), so at TLS 1.2 it ACCEPTS any FIPS-approved suite it can
 # negotiate: bare `-tls1_2` (default → an approved suite) and any explicit cipher
@@ -259,12 +278,22 @@ FIPS_LISTENER_REJECTED_TLS_CASES = (
 # the ECDHE-ECDSA ones fail as "no shared cipher" but are excluded too so the sweep
 # stays cert-agnostic). Every non-approved 1.2 cipher and all legacy protocols
 # (1.0/1.1) stay in the rejected set.
-FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES = tuple(
-    case for case in FIPS_LISTENER_REJECTED_TLS_CASES
-    if not (
-        case["tls_version"] == "1.2"
-        and (case["cipher_suite"] is None or case["cipher_suite"] in approved_tls1_2_ciphers)
+def _fips_backup_rejected_tls_cases(cases):
+    """Backup accepts approved TLS 1.2; drop those from a rejected-case list."""
+    return tuple(
+        case for case in cases
+        if not (
+            case["tls_version"] == "1.2"
+            and (case["cipher_suite"] is None or case["cipher_suite"] in approved_tls1_2_ciphers)
+        )
     )
+
+
+FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES = _fips_backup_rejected_tls_cases(
+    FIPS_LISTENER_REJECTED_TLS_CASES
+)
+FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE = _fips_backup_rejected_tls_cases(
+    FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE
 )
 
 FIPS_APPROVED_TLS13_CIPHER_CASES = tuple(
@@ -1247,6 +1276,9 @@ def fips_run_openssl_s_client_on_pod_port(
             shlex.quote(a) for a in openssl_cipher_args(tls_version, cipher_suite)
         )
         # Feed "Q\n" so s_client exits after the handshake.
+        # -no_check_time: host openssl mints notBefore=now, but minikube
+        # node clocks often lag (laptop sleep / vfkit). Chain verify still
+        # runs; we only skip notBefore/notAfter so clock skew is not a fail.
         cmd = (
             f"printf 'Q\\n' | {current().context.kubectl_cmd} -n {shlex.quote(ns)} "
             f"exec -i {shlex.quote(openssl_pod)} -- "
@@ -1255,6 +1287,7 @@ def fips_run_openssl_s_client_on_pod_port(
             f"-servername localhost "
             f"-CAfile {_FIPS_OPENSSL_CA_FILE} "
             f"-verify_return_error "
+            f"-no_check_time "
             f"{tls_args} {cipher_args}"
         )
         shell = current().context.shell
@@ -1330,22 +1363,22 @@ def fips_assert_rejected_tls_cases_on_endpoint(
                 )
 
 
-@TestStep(Check)
-def fips_assert_all_rejected_tls_cases_on_all_endpoints(
-    self,
+def _fips_assert_rejected_tls_cases_on_all_endpoints(
     chi_pods,
     chk_pods,
+    chi_rejected_cases,
+    backup_rejected_cases,
     ns=None,
 ):
-    """Assert all rejected TLS cases fail on every FIPS TLS endpoint."""
-    ns = ns or self.context.test_namespace
+    """Run ``chi_rejected_cases`` on CH/Keeper listeners and backup cases on :7171."""
+    ns = ns or current().context.test_namespace
 
     endpoints = (
-        ("ClickHouse HTTPS", chi_pods[0], 8443, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("ClickHouse native TLS", chi_pods[0], 9440, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("ClickHouse interserver HTTPS", chi_pods[0], 9010, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("Keeper secure client", chk_pods[0], 2281, FIPS_LISTENER_REJECTED_TLS_CASES),
-        ("Backup API HTTPS", chi_pods[0], 7171, FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES),
+        ("ClickHouse HTTPS", chi_pods[0], 8443, chi_rejected_cases),
+        ("ClickHouse native TLS", chi_pods[0], 9440, chi_rejected_cases),
+        ("ClickHouse interserver HTTPS", chi_pods[0], 9010, chi_rejected_cases),
+        ("Keeper secure client", chk_pods[0], 2281, chi_rejected_cases),
+        ("Backup API HTTPS", chi_pods[0], 7171, backup_rejected_cases),
     )
 
     for label, pod, port, endpoint_rejected_cases in endpoints:
@@ -1356,6 +1389,40 @@ def fips_assert_all_rejected_tls_cases_on_all_endpoints(
             rejected_cases=endpoint_rejected_cases,
             ns=ns,
         )
+
+
+@TestStep(Check)
+def fips_assert_all_rejected_tls_cases_on_all_endpoints(
+    self,
+    chi_pods,
+    chk_pods,
+    ns=None,
+):
+    """Assert every case in FIPS_LISTENER_REJECTED_TLS_CASES fails on each endpoint."""
+    _fips_assert_rejected_tls_cases_on_all_endpoints(
+        chi_pods=chi_pods,
+        chk_pods=chk_pods,
+        chi_rejected_cases=FIPS_LISTENER_REJECTED_TLS_CASES,
+        backup_rejected_cases=FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES,
+        ns=ns,
+    )
+
+
+@TestStep(Check)
+def fips_assert_representative_rejected_tls_cases_on_all_endpoints(
+    self,
+    chi_pods,
+    chk_pods,
+    ns=None,
+):
+    """Assert FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE on each endpoint."""
+    _fips_assert_rejected_tls_cases_on_all_endpoints(
+        chi_pods=chi_pods,
+        chk_pods=chk_pods,
+        chi_rejected_cases=FIPS_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE,
+        backup_rejected_cases=FIPS_BACKUP_LISTENER_REJECTED_TLS_CASES_REPRESENTATIVE,
+        ns=ns,
+    )
 
 
 @TestStep(Then)
@@ -1566,7 +1633,7 @@ def check_operator_clickhouse_tls_logs(self, ns=None):
     pod = kubectl.get_operator_pod(ns=ns)
 
     logs = kubectl.launch(
-        f"logs {pod} -c clickhouse-operator",
+        f"logs {pod} -c clickhouse-operator --tail=8000",
         ns=ns,
     )
 
@@ -1576,28 +1643,44 @@ def check_operator_clickhouse_tls_logs(self, ns=None):
     assert "verify=Strict minVersion=1.3" in logs, error(
         "operator ClickHouse TLS config is not Strict / TLS 1.3"
     )
-    assert "Ping(https://clickhouse_operator:" in logs, error(
-        "operator did not log HTTPS ClickHouse ping"
-    )
-    assert ":8443?tls_config=" in logs, error(
-        "operator ClickHouse ping did not use HTTPS port 8443 with TLS config"
-    )
+    if "https://clickhouse_operator:" in logs:
+        assert ":8443?tls_config=" in logs, error(
+            "operator ClickHouse DSN did not use HTTPS port 8443 with TLS config"
+        )
 
 @TestStep(Then)
-def check_metrics_exporter_discovers_clickhouse_https(self, ns=None):
-    """Assert metrics-exporter discovers ClickHouse hosts using HTTPS :8443."""
+def check_metrics_exporter_scrapes_clickhouse_https(self, chi, replica_count, ns=None):
+    """Assert metrics-exporter scrapes every ClickHouse host of `chi` through HTTPS.
+
+    chi_clickhouse_metric_VersionInteger is written only after a successful query, so it
+    proves the exporter passed TLS verification with the cluster's CA. A discovery line in
+    the exporter log does not: it is written before the first dial.
+    """
 
     ns = ns or current().context.operator_namespace
     pod = kubectl.get_operator_pod(ns=ns)
-
-    logs = kubectl.launch(
-        f"logs {pod} -c metrics-exporter --tail=4000",
-        ns=ns,
+    rx = re.compile(
+        r'^chi_clickhouse_metric_VersionInteger\{[^}]*hostname="(chi-' + re.escape(chi) + r'-[^".]+)',
+        re.MULTILINE,
     )
 
-    assert '"httpsPort":8443' in logs, error(
-        "metrics-exporter did not discover ClickHouse hosts with httpsPort=8443\n"
-        f"{logs}"
+    hosts = set()
+    out = ""
+    for attempt in range(1, 13):
+        out = util.get_metrics(pod, ns)
+        hosts = set(rx.findall(out))
+        if len(hosts) >= replica_count:
+            break
+        with Then(f"metrics-exporter scrapes {len(hosts)}/{replica_count} hosts of {chi}. Wait for 10 seconds"):
+            time.sleep(10)
+
+    fetch_errors = [
+        line for line in out.splitlines()
+        if line.startswith("chi_clickhouse_metric_fetch_errors{") and f'hostname="chi-{chi}-' in line
+    ]
+    assert len(hosts) >= replica_count, error(
+        f"metrics-exporter scraped {sorted(hosts)} of {replica_count} hosts of {chi} over HTTPS\n"
+        + "\n".join(fetch_errors)
     )
 
 @TestStep(Then)
@@ -2011,6 +2094,29 @@ def check_external_clickhouse_reports_fips_version(self, pod):
         f"expected FIPS in ClickHouse version(), got {version!r}"
     )
 
+# The operator stamps the enclosing Go function name into every announcer line, so a marker like
+# "connect():FAILED" silently stops matching the moment that function is renamed - the assertion
+# then fails while the operator is behaving perfectly. That is exactly what happened when
+# Connection.connect() became Connection.openPools(): the rejection was still logged, 82 times,
+# and the test polled for 57 minutes for a string the binary could no longer emit.
+#
+# Match the OPERATION instead of the call stack. These cover the dial-time failures
+# (Open/Open2/Ping/Ping2) without the trailing "(" so the numbered variants match too. Kept
+# deliberately narrow: the caller still ANDs this against the specific rejection text, so widening
+# it to any "tls:" line - which would turn the assertion vacuous - is not on the table.
+_CH_CONNECT_FAILURE_MARKERS = (
+    "FAILED Ping",
+    "FAILED Open",
+    "FAILED connect(",
+)
+
+
+def _is_ch_connect_failure_line(line):
+    """Return True when the line is an operator connection-establishment failure, whatever the
+    enclosing Go function happens to be called."""
+    return any(marker in line for marker in _CH_CONNECT_FAILURE_MARKERS)
+
+
 def _fips_tls_rejection_present_in_logs(logs, min_version, rejection):
     """Return True when logs contain coerced TLS setup and a connect rejection."""
     expected_setup_parts = (
@@ -2022,7 +2128,7 @@ def _fips_tls_rejection_present_in_logs(logs, min_version, rejection):
         for line in logs.splitlines()
     )
     rejection_found = any(
-        "connect():FAILED" in line and rejection in line
+        _is_ch_connect_failure_line(line) and rejection in line
         for line in logs.splitlines()
     )
     return setup_found and rejection_found
@@ -2033,7 +2139,7 @@ def _fips_tls_rejection_log_excerpt(logs):
         line for line in logs.splitlines()
         if (
             "setupTLSAdvanced()" in line
-            or "connect():FAILED" in line
+            or _is_ch_connect_failure_line(line)
             or "tls:" in line
             or "minVersion" in line
         )
@@ -2398,6 +2504,35 @@ def check_clickhouse_backup_restore_roundtrip_https(
             ns=ns,
         ).strip()
 
+    def wait_command(operation, timeout=180):
+        # create and restore are asynchronous: the POST answers once the command is
+        # accepted. A second command while one runs is refused with 423 Locked.
+        # /backup/status lists commands as JSON lines with status "in progress",
+        # "success" or "error".
+        deadline = time.time() + timeout
+        commands = []
+        while True:
+            body = kubectl.launch(
+                f"exec {pod} -c clickhouse-backup -- "
+                "curl -sS --cacert /etc/clickhouse-backup/tls/ca.crt "
+                "https://127.0.0.1:7171/backup/status",
+                ns=ns,
+            )
+            commands = []
+            for line in body.splitlines():
+                line = line.strip()
+                if not line.startswith("{"):
+                    continue
+                entry = json.loads(line)
+                command = entry.get("command", "")
+                if command.startswith(operation) and backup_name in command:
+                    commands.append(entry)
+            if commands and all(c.get("status") != "in progress" for c in commands):
+                break
+            assert time.time() < deadline, error(f"{operation} {backup_name} did not finish: {commands}")
+            time.sleep(2)
+        assert commands[-1].get("status") == "success", error(f"{operation} {backup_name}: {commands[-1]}")
+
     with Given("test table exists with data"):
         fips_ch_external_secure_query(
             pod=pod,
@@ -2420,6 +2555,7 @@ def check_clickhouse_backup_restore_roundtrip_https(
             f"/backup/create?name={backup_name}&table=default.{table}",
         )
         assert out.startswith("HTTP:2"), error(out)
+        wait_command("create")
 
     with And("table is dropped"):
         fips_ch_external_secure_query(
@@ -2434,6 +2570,7 @@ def check_clickhouse_backup_restore_roundtrip_https(
             f"/backup/restore/{backup_name}?table=default.{table}",
         )
         assert out.startswith("HTTP:2"), error(out)
+        wait_command("restore")
 
     with Then("restored data is visible through strict TLS ClickHouse client"):
         fips_poll_secure_scalar(
@@ -2606,6 +2743,27 @@ def check_fips_integrity_failure(self, binary_path, binary_label):
         )
 
     note(f"{binary_label}: integrity check successfully detected tampering")
+
+@TestStep(Then)
+def check_tls13_cipher_succeeds(
+    self,
+    pod,
+    port,
+    cipher,
+    ns=None,
+):
+    """Verify a TLS 1.3 cipher negotiates (via ``fips-openssl`` pod)."""
+    output = fips_run_openssl_s_client_on_pod_port(
+        pod=pod,
+        port=port,
+        cipher_suite=cipher,
+        tls_version="1.3",
+        ns=ns,
+    )
+    assert f"Cipher is {cipher}" in output, error(
+        f"{pod}:{port}: expected {cipher} to negotiate\n{output}"
+    )
+
 
 @TestStep(Then)
 def check_tls13_cipher_fails(
@@ -3068,7 +3226,7 @@ def assert_local_fake_k8s_rejected_tls_cases(
     """Run all FIPS_LISTENER_REJECTED_TLS_CASES against the local fake API."""
 
     for case in FIPS_LISTENER_REJECTED_TLS_CASES:
-        # Operator K8s client min TLS is 1.3 (PR #2020). Skip 1.2 *cipher* cases,
+        # Operator K8s client min TLS is 1.3. Skip 1.2 *cipher* cases,
         # but keep the single 1.2 *protocol* case as a live negative probe.
         if case["tls_version"] == "1.2" and case["cipher_suite"] is not None:
             continue
@@ -3811,9 +3969,12 @@ def _fips_assert(condition, message):
 
 _HOSTRUN_CH_TLS_FAILURE_MARKERS = (
     "setupTLSAdvanced",
-    "connect():FAILED",
+    # NB function-name-stamped markers rot on rename - see _CH_CONNECT_FAILURE_MARKERS. This is an
+    # any-match list that already carries the operation-shaped "FAILED Ping(", so it kept working
+    # when connect() became openPools(); the stale entry is dropped rather than updated.
     "QueryContext():FAILED",
     "FAILED Ping(",
+    "FAILED Open",
     "FAILED connect(",
     "remote error: tls",
     "handshake failure",

@@ -128,6 +128,7 @@ type ICluster interface {
 	GetSecure() *types.StringBool
 	GetSecret() *ClusterSecret
 	GetSecurity() *ClusterSecurity
+	GetBackup() *ClusterBackup
 	GetPDBManaged() *types.StringBool
 	GetPDBMaxUnavailable() *types.Int32
 

@@ -149,6 +149,29 @@ func (w *worker) isPodStarted(ctx context.Context, host *api.Host) bool {
 	return false
 }
 
+// isPodTerminating reports whether the pod has been asked to go away.
+//
+// Deleting a pod only stamps deletionTimestamp: the phase stays Running, and kubelet keeps the
+// readiness probe running even though it stops liveness and startup. A ClickHouse that is wedged
+// before it closes its HTTP port therefore keeps answering /ping and keeps reporting Ready for as
+// long as it is stuck - and on an unreachable node the last reported status persists forever. Any
+// predicate that counts such a host as a live peer will happily disrupt its last healthy sibling.
+func (w *worker) isPodTerminating(ctx context.Context, host *api.Host) bool {
+	pod, err := w.c.kube.Pod().Get(ctx, host)
+	if err != nil {
+		return false
+	}
+	return podIsTerminating(pod)
+}
+
+// podIsTerminating is the pure post-fetch decision used by isPodTerminating.
+func podIsTerminating(pod *core.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	return !pod.GetDeletionTimestamp().IsZero()
+}
+
 func (w *worker) isPodRunning(ctx context.Context, host *api.Host) bool {
 	if pod, err := w.c.kube.Pod().Get(ctx, host); err == nil {
 		return k8s.PodPhaseIsRunning(pod)
@@ -173,10 +196,21 @@ func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) 
 	if host.IsStopped() || host.IsTroubleshoot() {
 		return true
 	}
-	return w.c != nil && w.c.kube != nil &&
-		w.isPodRunning(ctx, host) &&
-		w.isPodReady(ctx, host) &&
-		!w.isPodCrushed(ctx, host)
+	if w.c == nil || w.c.kube == nil {
+		return false
+	}
+	// One fetch, four pure reads. Pod().Get is a live API call, and this predicate runs per peer
+	// across the shard walk, so asking four times cost four round trips per host - and let the
+	// four answers come from four different versions of the pod, which is exactly the kind of
+	// inconsistency a health verdict must not be built on.
+	pod, err := w.c.kube.Pod().Get(ctx, host)
+	if err != nil {
+		return false
+	}
+	return k8s.PodPhaseIsRunning(pod) &&
+		!k8s.PodHasNotReadyContainers(pod) &&
+		!podIsTerminating(pod) &&
+		!k8s.PodHasCrushedContainers(pod)
 }
 
 func (w *worker) hasUnhealthyHosts(ctx context.Context, cr *api.ClickHouseInstallation) bool {

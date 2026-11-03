@@ -93,15 +93,24 @@ Expected output includes:
 
 ### Manual step-by-step
 
+Run from the repository root. The image follows go.mod's Go version, and the build links the FIPS
+module the images ship, both taken from the build config the image builds use:
+
+```bash
+source dev/go_build_config.sh
+GO_IMAGE="golang:${GO_VERSION}-alpine"
+```
+
 ### 1) Build the wrapper binary
 
 Operator:
 
 ```bash
 docker run --rm \
+  -e GOFIPS140="${GOFIPS140}" \
   -v "$PWD:/work" \
   -w /work \
-  golang:1.26-alpine \
+  "${GO_IMAGE}" \
   sh -lc 'export PATH=$PATH:/usr/local/go/bin && CGO_ENABLED=0 go build -tags acvp_wrapper -o clickhouse-operator ./cmd/operator && ln -sf clickhouse-operator clickhouse-operator-acvp'
 ```
 
@@ -109,9 +118,10 @@ Metrics exporter:
 
 ```bash
 docker run --rm \
+  -e GOFIPS140="${GOFIPS140}" \
   -v "$PWD:/work" \
   -w /work \
-  golang:1.26-alpine \
+  "${GO_IMAGE}" \
   sh -lc 'export PATH=$PATH:/usr/local/go/bin && CGO_ENABLED=0 go build -tags acvp_wrapper -o metrics-exporter ./cmd/metrics_exporter && ln -sf metrics-exporter metrics-exporter-acvp'
 ```
 
@@ -132,7 +142,7 @@ git -C /tmp/acvp-testdata checkout d893de8b8b1c
 docker run --rm \
   -v /tmp/boringssl:/src \
   -w /src \
-  golang:1.26-alpine \
+  "${GO_IMAGE}" \
   sh -lc 'export PATH=$PATH:/usr/local/go/bin && go build -o /src/acvptool-pinned ./util/fipstools/acvp/acvptool'
 ```
 
@@ -146,7 +156,7 @@ docker run --rm \
   -v /tmp/boringssl:/tmp/boringssl:ro \
   -v /tmp/acvp-testdata:/tmp/acvp-testdata:rw \
   -w /tmp/acvp-testdata \
-  golang:1.26-alpine \
+  "${GO_IMAGE}" \
   sh -lc 'export PATH=$PATH:/usr/local/go/bin && go run /tmp/boringssl/util/fipstools/acvp/acvptool/test/check_expected.go -tool /tmp/boringssl/acvptool-pinned -module-wrappers go:/work/clickhouse-operator-acvp -tests /work/pkg/util/fips/acvp/acvp_test_fips140v1.26.public.config.json'
 ```
 

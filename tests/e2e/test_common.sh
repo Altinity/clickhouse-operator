@@ -46,11 +46,10 @@ NO_CLEANUP="${NO_CLEANUP:-""}"
 # NOTE: Keep this list in sync with images referenced from:
 #   - tests/e2e/manifests/**/*.yaml                   (test-specific manifests)
 #   - tests/e2e/manifests/chit/tpl-clickhouse-stable.yaml   (default CLICKHOUSE_TEMPLATE)
-#   - tests/e2e/manifests/chit/tpl-clickhouse-23.3.yaml     (clickhouse_template_old)
 #   - tests/e2e/manifests/chk/*.yaml                  (keeper tests, incl. FIPS)
 # Intentionally EXCLUDED from preload (verified — do not re-add):
 #   - Meant-to-fail / decoy images (preloading them would defeat the test that rejects them):
-#       clickhouse/clickhouse-server:24.3-broken / :24.822     (rollback tests)
+#       clickhouse/clickhouse-server:26.3-broken               (rollback / ImagePullBackOff tests)
 #       altinity/clickhouse-server:*.altinityfips-decoy        (test-030008-runtime-decoy)
 #       clickhouse/clickhouse-keeper:latest                    (test-020010 non-FIPS rejection)
 # Audit coverage (every default-suite image is listed below):
@@ -59,37 +58,43 @@ NO_CLEANUP="${NO_CLEANUP:-""}"
 
 # Single canonical preload list shared by ALL suites (operator, metrics, keeper).
 # One list, not per-suite lists: a per-suite list silently drifts from the manifests
-# another suite uses (e.g. the metrics suite once omitted server:24.3/24.8 that
+# another suite uses (e.g. the metrics suite once omitted server:25.8/26.3 that
 # test-017-multi-version needs, cold-pulling them on every fresh minikube and timing
 # out). Preloading the full set everywhere is cheap — common_preload_images runs in
 # parallel and skips images already present — and removes that whole class of flake.
 PRELOAD_IMAGES_ALL=(
     # ClickHouse server versions used in manifests and templates
-    "clickhouse/clickhouse-server:23.3"        # clickhouse_template_old + older-version compat tests
-    "clickhouse/clickhouse-server:23.8"
-    "clickhouse/clickhouse-server:24.3"        # also base for 24.3-broken rollback tests; test-017-multi-version (metrics)
-    "clickhouse/clickhouse-server:24.8"        # test-017-multi-version (metrics)
+    "clickhouse/clickhouse-server:24.8"        # opt-in tpl-clickhouse-24.8.yaml; test_010042_2
     "clickhouse/clickhouse-server:25.3"
-    "clickhouse/clickhouse-server:25.8"
+    "clickhouse/clickhouse-server:25.8"        # test-017-multi-version; test_010083_1 from-image; test_010042_2
     "clickhouse/clickhouse-server:26.3"
     "clickhouse/clickhouse-server:latest"
     # Altinity builds (default stable template + FIPS)
-    "altinity/clickhouse-server:25.8.16.10001.altinitystable"  # default clickhouse_template
-    "altinity/clickhouse-server:25.8.16.10002.altinitystable"  # test_010035 auto-recovery upgrade target (manifests/chi/test-035-auto-recovery-2.yaml)
+    "altinity/clickhouse-server:25.8.28.10001.altinitystable"  # upgrade-from (test_010006 / _2 / test_010032)
+    "altinity/clickhouse-server:26.3.33.10001.altinitystable"  # default clickhouse_template
     "altinity/clickhouse-server:25.3.8.30001.altinityfips"     # FIPS CHI (e.g. manifests/chk/test-020008-chi-fips.yaml)
     # ClickHouse Keeper versions
-    "clickhouse/clickhouse-keeper:25.3"
-    "clickhouse/clickhouse-keeper:25.8"
-    "clickhouse/clickhouse-keeper:latest-alpine"  # test_clickhouse_keeper_rescale (deploy/clickhouse-keeper/clickhouse-keeper-manually/...-for-test-only.yaml)
+    "clickhouse/clickhouse-keeper:25.8"  # upgrade-from (test_020003) and interrupted-roll start (test_020003_3)
+    "clickhouse/clickhouse-keeper:26.8"  # default keeper image in tests
     "altinity/clickhouse-keeper:25.3.8.30001.altinityfips"
     # Zookeeper
     "docker.io/zookeeper:3.8.4"
     # Misc
     "registry.access.redhat.com/ubi8/ubi-minimal:latest"
-    "nginx:latest"
     "altinity/clickhouse-backup:stable"
     "altinity/clickhouse-backup:latest-fips"  # FIPS backup sidecar (manifests/chit/test-030003-backup-template.yaml)
+    "altinity/clickhouse-backup:2.8.1"        # default operator-managed backup sidecar and Job image (test_010087, test_010088)
+    "pgsty/minio:RELEASE.2026-08-04T00-00-00Z" # backup storage of the backup scenarios (manifests/minio/test-010087-minio.yaml)
     "alpine/openssl:3.3.3"
+    # Previous-release operator + exporter, installed by the upgrade-path scenarios
+    # (test_010009_1/_2 default to 0.27.0, test_010011_5 to 0.27.3). Without these the
+    # upgrade tests are the only scenarios that pull from the registry DURING the run,
+    # so a transient minikube DNS failure wedges them at "operator is installed" until
+    # the scenario times out - a registry outage becomes a red suite.
+    "altinity/clickhouse-operator:0.27.0"
+    "altinity/metrics-exporter:0.27.0"
+    "altinity/clickhouse-operator:0.27.3"
+    "altinity/metrics-exporter:0.27.3"
 )
 
 # =============================================================================

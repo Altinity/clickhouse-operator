@@ -27,6 +27,7 @@ func TestNormalizePodDistributionType(t *testing.T) {
 	require.Equal(t, PodDistributionClickHouseAntiAffinity, NormalizePodDistributionType("ClickHouseAntiAffinity"))
 	require.Equal(t, PodDistributionCircularReplication, NormalizePodDistributionType("CIRCULARREPLICATION"))
 	require.Equal(t, PodDistributionMaxNumberPerNode, NormalizePodDistributionType("maxnumberpernode"))
+	require.Equal(t, "OnePerHost", NormalizePodDistributionType("OnePerHost"))
 	require.Equal(t, "bogus", NormalizePodDistributionType("bogus"))
 	require.Equal(t, "", NormalizePodDistributionType(""))
 }

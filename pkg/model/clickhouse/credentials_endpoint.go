@@ -18,6 +18,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/url"
 	"strconv"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -186,7 +187,10 @@ func (c *EndpointCredentials) formatUsernamePassword(username, password string) 
 	return fmt.Sprintf(dsnUsernamePasswordPairPattern, username, password)
 }
 
-// makeUsernamePassword makes "username:password" pair for connection
+// makeUsernamePassword makes "username:password" pair for connection.
+// Username and password are percent-encoded, since the driver parses the DSN as a URL
+// and reserved characters such as '#', '@', '/' or '%' would otherwise break the parse
+// or end up altered.
 func (c *EndpointCredentials) makeUsernamePassword(hidden bool) string {
 	// In case of hidden username+password pair we'd just return replacement
 	if hidden {
@@ -195,10 +199,16 @@ func (c *EndpointCredentials) makeUsernamePassword(hidden bool) string {
 		if c.password != "" {
 			pwd = passwordReplacer
 		}
-		return c.formatUsernamePassword(c.username, pwd)
+		return c.formatUsernamePassword(escapeUserinfo(c.username), pwd)
 	}
 
-	return c.formatUsernamePassword(c.username, c.password)
+	return c.formatUsernamePassword(escapeUserinfo(c.username), escapeUserinfo(c.password))
+}
+
+// escapeUserinfo percent-encodes a username or password for the userinfo part of a URL
+func escapeUserinfo(s string) string {
+	// url.User escapes ':' as well, which is what we need for both username and password
+	return url.User(s).String()
 }
 
 // makeDSN makes ClickHouse DSN

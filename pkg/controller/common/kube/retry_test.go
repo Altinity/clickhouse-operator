@@ -151,3 +151,145 @@ func TestGetWithRetry(t *testing.T) {
 		}
 	})
 }
+
+// ownerRefPending is the error OwnerReferencesPermissionEnforcement returns right after the
+// owner's CRD is created (https://github.com/Altinity/clickhouse-operator/issues/2094).
+func ownerRefPending() error {
+	return apiErrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "y", errors.New(
+		"cannot set blockOwnerDeletion in this case because cannot find RESTMapping for APIVersion "+
+			"clickhouse.altinity.com/v1 Kind ClickHouseInstallation: no matches for kind"))
+}
+
+func TestCreateWithRetry(t *testing.T) {
+	orig := createRetryBackoff
+	createRetryBackoff = wait.Backoff{Duration: time.Millisecond, Factor: 2.0, Cap: 4 * time.Millisecond, Steps: 3}
+	defer func() { createRetryBackoff = orig }()
+	gr := schema.GroupResource{Resource: "configmaps"}
+
+	tests := []struct {
+		name      string
+		errs      []error // returned by successive calls; nil once exhausted
+		wantCalls int
+		wantErr   func(error) bool
+	}{
+		{"owner-ref admission pending, then accepted", []error{ownerRefPending(), ownerRefPending()}, 3, nil},
+		{"transient is not retried", []error{connRefused()}, 1, IsTransientAPIError},
+		{"service unavailable is not retried", []error{apiErrors.NewServiceUnavailable("down")}, 1, apiErrors.IsServiceUnavailable},
+		{"other forbidden is terminal", []error{apiErrors.NewForbidden(gr, "y", errors.New("RBAC"))}, 1, apiErrors.IsForbidden},
+		{"already exists is terminal", []error{apiErrors.NewAlreadyExists(gr, "y")}, 1, apiErrors.IsAlreadyExists},
+		{"gives up after Steps+1 attempts", []error{ownerRefPending(), ownerRefPending(), ownerRefPending(), ownerRefPending(), ownerRefPending()}, 4, IsOwnerRefAdmissionPending},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			_, err := CreateWithRetry(context.Background(), func() (int, error) {
+				calls++
+				if calls <= len(tt.errs) {
+					return 0, tt.errs[calls-1]
+				}
+				return 1, nil
+			})
+			if calls != tt.wantCalls {
+				t.Fatalf("calls=%d, want %d", calls, tt.wantCalls)
+			}
+			if (tt.wantErr == nil) != (err == nil) || (tt.wantErr != nil && !tt.wantErr(err)) {
+				t.Fatalf("unexpected err: %v", err)
+			}
+		})
+	}
+
+	t.Run("keeps retrying after the back-off hits Cap", func(t *testing.T) {
+		// wait.Backoff zeroes Steps once Duration passes Cap; retryOn must count attempts itself.
+		createRetryBackoff = wait.Backoff{Duration: time.Millisecond, Factor: 2.0, Cap: 2 * time.Millisecond, Steps: 5}
+		calls := 0
+		_, _ = CreateWithRetry(context.Background(), func() (int, error) {
+			calls++
+			return 0, ownerRefPending()
+		})
+		if calls != 6 {
+			t.Fatalf("calls=%d, want 6", calls)
+		}
+	})
+
+	t.Run("cancelled ctx stops retrying", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		calls := 0
+		_, err := CreateWithRetry(ctx, func() (int, error) {
+			calls++
+			return 0, ownerRefPending()
+		})
+		if calls != 1 || !IsOwnerRefAdmissionPending(err) {
+			t.Fatalf("calls=%d err=%v, want 1/owner-ref pending", calls, err)
+		}
+	})
+}
+
+func TestIsOwnerRefAdmissionPending(t *testing.T) {
+	gr := schema.GroupResource{Resource: "configmaps"}
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"owner-ref admission pending", ownerRefPending(), true},
+		{"plain forbidden", apiErrors.NewForbidden(gr, "y", errors.New("RBAC")), false},
+		{"forbidden mentioning only RESTMapping", apiErrors.NewForbidden(gr, "y", errors.New("webhook: cannot find RESTMapping")), false},
+		{"other blockOwnerDeletion rejection", apiErrors.NewForbidden(gr, "y", errors.New(
+			"cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on")), false},
+		{"not forbidden", apiErrors.NewInternalError(errors.New("cannot set blockOwnerDeletion: cannot find RESTMapping")), false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsOwnerRefAdmissionPending(tc.err); got != tc.want {
+				t.Fatalf("IsOwnerRefAdmissionPending(%v) = %v, want %v", tc.err, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestCreateRetryBackoffBudget pins the production schedule: #2094 needed up to ~25s, and a
+// CHK ConfigMap took 6 tries, so the total wait must stay well above that.
+func TestCreateRetryBackoffBudget(t *testing.T) {
+	b := createRetryBackoff
+	b.Jitter = 0
+	var total time.Duration
+	for i := 0; i < createRetryBackoff.Steps; i++ {
+		total += b.Step()
+	}
+	if total < 60*time.Second {
+		t.Fatalf("create retry budget = %s, want >= 60s", total)
+	}
+}
+
+func TestUpdateWithRetry(t *testing.T) {
+	orig := createRetryBackoff
+	createRetryBackoff = wait.Backoff{Duration: time.Millisecond, Factor: 2.0, Cap: 4 * time.Millisecond, Steps: 3}
+	defer func() { createRetryBackoff = orig }()
+
+	t.Run("owner-ref admission pending, then accepted", func(t *testing.T) {
+		calls := 0
+		_, err := UpdateWithRetry(context.Background(), func() (int, error) {
+			calls++
+			if calls < 3 {
+				return 0, ownerRefPending()
+			}
+			return 1, nil
+		})
+		if err != nil || calls != 3 {
+			t.Fatalf("err=%v calls=%d, want nil/3", err, calls)
+		}
+	})
+
+	t.Run("conflict is not retried", func(t *testing.T) {
+		calls := 0
+		_, err := UpdateWithRetry(context.Background(), func() (int, error) {
+			calls++
+			return 0, apiErrors.NewConflict(schema.GroupResource{Resource: "statefulsets"}, "y", errors.New("x"))
+		})
+		if !apiErrors.IsConflict(err) || calls != 1 {
+			t.Fatalf("err=%v calls=%d, want Conflict/1", err, calls)
+		}
+	})
+}

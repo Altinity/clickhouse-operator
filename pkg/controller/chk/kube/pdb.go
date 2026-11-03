@@ -27,23 +27,27 @@ import (
 
 type PDB struct {
 	kubeClient client.Client
+	// apiReader reads live; see NewAdapter on why every by-name Get here bypasses the cache.
+	apiReader client.Reader
 }
 
-func NewPDB(kubeClient client.Client) *PDB {
+func NewPDB(kubeClient client.Client, apiReader client.Reader) *PDB {
 	return &PDB{
 		kubeClient: kubeClient,
+		apiReader:  apiReader,
 	}
 }
 
 func (c *PDB) Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	err := c.kubeClient.Create(ctx, pdb)
-	return pdb, err
+	return commonKube.CreateWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
+		return pdb, c.kubeClient.Create(ctx, pdb)
+	})
 }
 
 func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error) {
 	return commonKube.GetWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
 		pdb := &policy.PodDisruptionBudget{}
-		err := c.kubeClient.Get(ctx, types.NamespacedName{
+		err := c.apiReader.Get(ctx, types.NamespacedName{
 			Namespace: namespace,
 			Name:      name,
 		}, pdb)
@@ -55,8 +59,9 @@ func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisru
 }
 
 func (c *PDB) Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	err := c.kubeClient.Update(ctx, pdb)
-	return pdb, err
+	return commonKube.UpdateWithRetry(ctx, func() (*policy.PodDisruptionBudget, error) {
+		return pdb, c.kubeClient.Update(ctx, pdb)
+	})
 }
 
 func (c *PDB) Delete(ctx context.Context, namespace, name string) error {

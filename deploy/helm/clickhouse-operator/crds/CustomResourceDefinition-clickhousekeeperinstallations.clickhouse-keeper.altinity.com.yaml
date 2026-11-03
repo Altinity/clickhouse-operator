@@ -1,13 +1,13 @@
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.27.4
+# OPERATOR_VERSION=0.28.0
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.27.4
+    clickhouse-keeper.altinity.com/chop: 0.28.0
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -762,16 +762,6 @@ spec:
                                 # nullable: true
                                 items:
                                   type: string
-                          distribution:
-                            type: string
-                            description: "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
-                            enum:
-                              # both humped and all-lowercase accepted
-                              - ""
-                              - "Unspecified"
-                              - "unspecified"
-                              - "OnePerHost"
-                              - "oneperhost"
                           podDistribution:
                             type: array
                             description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"

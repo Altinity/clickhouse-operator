@@ -15,12 +15,16 @@
 package chi
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 // TestPodIsSustainedNotReady covers the pure post-fetch decision used by
@@ -198,4 +202,112 @@ func TestPodIsInKubeletFailureMode(t *testing.T) {
 			require.Equal(t, tc.expected, podIsInKubeletFailureMode(tc.pod))
 		})
 	}
+}
+
+// TestPodIsTerminating covers the pure post-fetch decision used by isPodTerminating.
+//
+// The case that matters is the third one. Deleting a pod stamps deletionTimestamp and nothing
+// else: the phase stays Running and kubelet keeps the readiness probe going, so a wedged
+// ClickHouse still answering /ping reports Ready throughout. Without this predicate such a host
+// counts as its shard's healthy peer and the operator will disrupt its last serving sibling.
+func TestPodIsTerminating(t *testing.T) {
+	deleting := meta.NewTime(time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC))
+
+	tests := []struct {
+		name     string
+		pod      *core.Pod
+		expected bool
+	}{
+		{
+			name:     "nil pod — nothing to be terminating",
+			pod:      nil,
+			expected: false,
+		},
+		{
+			name:     "live pod — no deletion timestamp",
+			pod:      &core.Pod{},
+			expected: false,
+		},
+		{
+			name: "terminating pod still Running and Ready — the wedged-shutdown case",
+			pod: &core.Pod{
+				ObjectMeta: meta.ObjectMeta{DeletionTimestamp: &deleting},
+				Status: core.PodStatus{
+					Phase:      core.PodRunning,
+					Conditions: []core.PodCondition{{Type: core.PodReady, Status: core.ConditionTrue}},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, podIsTerminating(tt.pod))
+		})
+	}
+}
+
+// statusFakePod serves one fixed pod to every Pod().Get. isHostHealthyForReconcile fetches once
+// and reads the result four ways, so a single fixture drives the whole conjunction.
+type statusFakePod struct {
+	interfaces.IKubePod
+	pod *core.Pod
+}
+
+func (f *statusFakePod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
+	return f.pod, nil
+}
+
+// statusFakeKube exposes Pod() only. IKube is embedded as a nil interface, so reaching any other
+// accessor panics - a guard that the predicate under test consults nothing else.
+type statusFakeKube struct {
+	interfaces.IKube
+	pod interfaces.IKubePod
+}
+
+func (k *statusFakeKube) Pod() interfaces.IKubePod { return k.pod }
+
+// newHealthyPodWorker wires a worker whose Pod().Get always answers with pod, plus the host it is
+// asked about. The host needs a CR because IsStopped/IsTroubleshoot dereference it.
+func newHealthyPodWorker(pod *core.Pod) (*worker, *api.Host) {
+	host := &api.Host{Name: "h0"}
+	host.Runtime.SetCR(&api.ClickHouseInstallation{})
+	w := &worker{c: &Controller{kube: &statusFakeKube{pod: &statusFakePod{pod: pod}}}}
+	return w, host
+}
+
+// TestIsHostHealthyForReconcileTreatsTerminatingPodAsUnhealthy pins the WIRING, not just the
+// predicate. isHostHealthyForReconcile is what shard-safety consults before disrupting a host's
+// sibling, and a terminating pod keeps reporting Running and Ready for as long as its ClickHouse
+// stays wedged - deleting a pod only stamps deletionTimestamp, and kubelet keeps the readiness
+// probe running even though it stops liveness and startup. Without the terminating conjunct the
+// operator counts such a host as its shard's healthy peer and takes down the last serving replica.
+//
+// The live-pod case is the control: same fixture, same phase, same ready containers, only the
+// deletionTimestamp differs - so the terminating case's false cannot come from anywhere else.
+func TestIsHostHealthyForReconcileTreatsTerminatingPodAsUnhealthy(t *testing.T) {
+	deleting := meta.NewTime(time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC))
+
+	// Running, single container Ready, not crashing - healthy by every other predicate.
+	newPod := func(deletionTimestamp *meta.Time) *core.Pod {
+		return &core.Pod{
+			ObjectMeta: meta.ObjectMeta{DeletionTimestamp: deletionTimestamp},
+			Status: core.PodStatus{
+				Phase:             core.PodRunning,
+				ContainerStatuses: []core.ContainerStatus{{Ready: true}},
+			},
+		}
+	}
+
+	t.Run("live pod is healthy - the control", func(t *testing.T) {
+		w, host := newHealthyPodWorker(newPod(nil))
+		require.True(t, w.isHostHealthyForReconcile(context.Background(), host))
+	})
+
+	t.Run("terminating pod is NOT a healthy peer", func(t *testing.T) {
+		w, host := newHealthyPodWorker(newPod(&deleting))
+		require.False(t, w.isHostHealthyForReconcile(context.Background(), host),
+			"a pod with deletionTimestamp must never count as a shard's healthy peer")
+	})
 }
