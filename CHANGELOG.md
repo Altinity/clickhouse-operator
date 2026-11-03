@@ -28,13 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Adding a volume mount now triggers a StatefulSet rollout before restarting ClickHouse**, preventing startup failures when adding disks to existing installations on ClickHouse 26.7 and later. by [@lizardoluis](https://github.com/lizardoluis) in [#2122](https://github.com/Altinity/clickhouse-operator/pull/2122). Fixes [#2121](https://github.com/Altinity/clickhouse-operator/issues/2121)
 
-* **ClickHouse credentials containing URL-reserved characters no longer break operator or metrics-exporter connections.** Usernames and passwords are now percent-encoded in connection URLs. by [@mraj602](https://github.com/mraj602) in [#2123](https://github.com/Altinity/clickhouse-operator/pull/2123). Addresses [#1822](https://github.com/Altinity/clickhouse-operator/issues/1822)
+* **ClickHouse credentials containing URL-reserved characters no longer break operator or metrics-exporter connections.** Usernames and passwords are now percent-encoded in connection URLs. by [@mraj602](https://github.com/mraj602) in [#2123](https://github.com/Altinity/clickhouse-operator/pull/2123). Fixes [#1822](https://github.com/Altinity/clickhouse-operator/issues/1822)
 
 * **Fixed incorrect function names in logs from Go generic functions.** by [@matthewhudsonedb](https://github.com/matthewhudsonedb) in [#2102](https://github.com/Altinity/clickhouse-operator/pull/2102). Fixes [#2101](https://github.com/Altinity/clickhouse-operator/issues/2101)
 
 * **Metrics exporter now respects cluster-specific ClickHouse TLS settings**, including custom CAs and certificate verification. by [@Slach](https://github.com/Slach) in [#2113](https://github.com/Altinity/clickhouse-operator/pull/2113)
 
-* **Kubernetes resource creation and updates now retry transient owner-reference admission failures**, fixing installation failures immediately after CRD creation, particularly on OpenShift. by [@matthewhudsonedb](https://github.com/matthewhudsonedb) in [#2103](https://github.com/Altinity/clickhouse-operator/pull/2103). Addresses [#2094](https://github.com/Altinity/clickhouse-operator/issues/2094)
+* **Kubernetes resource creation and updates now retry transient owner-reference admission failures**, fixing installation failures immediately after CRD creation, particularly on OpenShift. by [@matthewhudsonedb](https://github.com/matthewhudsonedb) in [#2103](https://github.com/Altinity/clickhouse-operator/pull/2103). Fixes [#2094](https://github.com/Altinity/clickhouse-operator/issues/2094)
 
 * **Malformed boolean-like configuration values no longer interrupt reconciliation** of other resources. by [@sunsingerus](https://github.com/sunsingerus)
 
