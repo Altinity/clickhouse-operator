@@ -21,6 +21,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -777,8 +778,39 @@ func hostRequiresStatefulSetRollout(host *api.Host) bool {
 		if !apiequality.Semantic.DeepEqual(curContainers[i].Env, desiredContainers[i].Env) {
 			return true
 		}
+		// A software restart brings the SAME pod back without a newly added volume, while the
+		// config already refers to it, so ClickHouse may fail to start.
+		if !sameVolumeMounts(curContainers[i].VolumeMounts, desiredContainers[i].VolumeMounts) {
+			return true
+		}
 	}
 	return false
+}
+
+// sameVolumeMounts compares mounts as a set of the fields we set, so apiserver defaults
+// and ordering do not count as a change.
+func sameVolumeMounts(cur, desired []core.VolumeMount) bool {
+	type key struct {
+		name, path, subPath string
+		readOnly            bool
+	}
+	keys := func(mounts []core.VolumeMount) map[key]struct{} {
+		set := make(map[key]struct{}, len(mounts))
+		for _, m := range mounts {
+			set[key{m.Name, m.MountPath, m.SubPath, m.ReadOnly}] = struct{}{}
+		}
+		return set
+	}
+	curSet, desiredSet := keys(cur), keys(desired)
+	if len(curSet) != len(desiredSet) {
+		return false
+	}
+	for k := range desiredSet {
+		if _, ok := curSet[k]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
