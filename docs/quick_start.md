@@ -342,11 +342,17 @@ spec:
         - "dbname1"
         - "dbname2"
         - "dbname3"
-      # reference to namespace/name/field in the secret with plain password
-      testpwduser1/k8s_secret_password: dev/clickhouse-credentials/testpwduser1
-      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password
-      testpwduser2/k8s_secret_password_sha256_hex: clickhouse-credentials/testpwduser2
-      testpwduser3/k8s_secret_password_double_sha1_hex: clickhouse-credentials/testpwduser3
+      # reference a secret in the same namespace as the CHI - see docs/security_hardening.md
+      testpwduser1/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: testpwduser1
+      testpwduser2/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: testpwduser2
       # admin use has 'password_sha256_hex' so actual password value is not published
       admin/password_sha256_hex: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
       admin/networks/ip: "127.0.0.1/32"

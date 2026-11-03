@@ -365,8 +365,28 @@ func (s *ClusterSchemer) sqlActiveQueriesNum() string {
 	return `SELECT count() FROM system.processes`
 }
 
+// sqlClusterDoesNotExistErrorCount counts CLUSTER_DOESNT_EXIST occurrences on a host.
+// Non-zero means a cluster-dependent object (Distributed / DICTIONARY / refreshable MV) hit a
+// terminal async startup-load failure because the host booted before its remote_servers was
+// complete - i.e. the issue #2013 condition. A host with no cluster-dependent objects (or one that
+// loaded them cleanly) reports 0.
+func (s *ClusterSchemer) sqlClusterDoesNotExistErrorCount() string {
+	return `SELECT sum(value) FROM system.errors WHERE name = 'CLUSTER_DOESNT_EXIST'`
+}
+
 func (s *ClusterSchemer) sqlVersion() string {
 	return `SELECT version()`
+}
+
+// sqlSettingsChangeableWithoutRestartColumn is 1 when system.server_settings has
+// changeable_without_restart. Asking system.columns avoids a failing query
+func (s *ClusterSchemer) sqlSettingsChangeableWithoutRestartColumn() string {
+	return `SELECT count() FROM system.columns WHERE database = 'system' AND table = 'server_settings' AND name = 'changeable_without_restart'`
+}
+
+// sqlSettingsChangeableWithoutRestart lists server settings ClickHouse applies without a restart.
+func (s *ClusterSchemer) sqlSettingsChangeableWithoutRestart() string {
+	return `SELECT name FROM system.server_settings WHERE changeable_without_restart = 'Yes'`
 }
 
 func (s *ClusterSchemer) sqlHostInCluster(cluster string) string {

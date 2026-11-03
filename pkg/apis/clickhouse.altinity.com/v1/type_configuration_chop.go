@@ -115,6 +115,10 @@ const (
 	// Used in case no other specified in config
 	defaultReconcileCHIsThreadsNumber = 1
 
+	// defaultReconcileCHKsThreadsNumber specifies default number of CHK controller threads running concurrently.
+	// Used in case no other specified in config
+	defaultReconcileCHKsThreadsNumber = 1
+
 	// defaultReconcileShardsThreadsNumber specifies the default number of threads usable for concurrent shard reconciliation
 	// within a single cluster reconciliation. Defaults to 1, which means strictly sequential shard reconciliation.
 	defaultReconcileShardsThreadsNumber = 1
@@ -136,6 +140,12 @@ const (
 
 	// defaultTerminationGracePeriod specifies default value for TerminationGracePeriod
 	defaultTerminationGracePeriod = 30
+	// defaultBackupStoragePath and defaultBackupStorageObjectDiskPath specify default values for Backup.StoragePath and
+	// Backup.StorageObjectDiskPath. The namespace and the installation keep its backups apart from those of every other
+	// installation of the Kubernetes cluster on a shared storage, the cluster and the shard keep those of its
+	// shards apart
+	defaultBackupStoragePath           = "backup/{namespace}/{installation}/{cluster}/{shard}"
+	defaultBackupStorageObjectDiskPath = "object_disks/{namespace}/{installation}/{cluster}/{shard}"
 	// defaultRevisionHistoryLimit specifies default value for RevisionHistoryLimit
 	defaultRevisionHistoryLimit = 10
 )
@@ -671,6 +681,7 @@ type OperatorConfigReconcileRecoveryCompletedScope struct {
 
 type OperatorConfigReconcileRuntime struct {
 	ReconcileCHIsThreadsNumber           int `json:"reconcileCHIsThreadsNumber"           yaml:"reconcileCHIsThreadsNumber"`
+	ReconcileCHKsThreadsNumber           int `json:"reconcileCHKsThreadsNumber"           yaml:"reconcileCHKsThreadsNumber"`
 	ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
 	ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
 
@@ -699,9 +710,9 @@ func (rh ReconcileHost) Normalize() ReconcileHost {
 	return rh
 }
 
-func (rh ReconcileHost) MergeFrom(from ReconcileHost) ReconcileHost {
-	rh.Wait = rh.Wait.MergeFrom(from.Wait)
-	rh.Drop = rh.Drop.MergeFrom(from.Drop)
+func (rh ReconcileHost) MergeFrom(from ReconcileHost, _type MergeType) ReconcileHost {
+	rh.Wait = rh.Wait.MergeFrom(from.Wait, _type)
+	rh.Drop = rh.Drop.MergeFrom(from.Drop, _type)
 	rh.Hooks = rh.Hooks.MergeFrom(from.Hooks)
 	return rh
 }
@@ -733,12 +744,12 @@ func (wait ReconcileHostWait) Normalize() ReconcileHostWait {
 	return wait
 }
 
-func (wait ReconcileHostWait) MergeFrom(from ReconcileHostWait) ReconcileHostWait {
-	wait.Exclude = wait.Exclude.MergeFrom(from.Exclude)
-	wait.Queries = wait.Queries.MergeFrom(from.Queries)
-	wait.Include = wait.Include.MergeFrom(from.Include)
-	wait.Replicas = wait.Replicas.MergeFrom(from.Replicas)
-	wait.Probes = wait.Probes.MergeFrom(from.Probes)
+func (wait ReconcileHostWait) MergeFrom(from ReconcileHostWait, _type MergeType) ReconcileHostWait {
+	wait.Exclude = MergeScalar(wait.Exclude, from.Exclude, _type)
+	wait.Queries = MergeScalar(wait.Queries, from.Queries, _type)
+	wait.Include = MergeScalar(wait.Include, from.Include, _type)
+	wait.Replicas = wait.Replicas.MergeFrom(from.Replicas, _type)
+	wait.Probes = wait.Probes.MergeFrom(from.Probes, _type)
 
 	return wait
 }
@@ -756,8 +767,8 @@ func (drop ReconcileHostDrop) Normalize() ReconcileHostDrop {
 	return drop
 }
 
-func (drop ReconcileHostDrop) MergeFrom(from ReconcileHostDrop) ReconcileHostDrop {
-	drop.Replicas = drop.Replicas.MergeFrom(from.Replicas)
+func (drop ReconcileHostDrop) MergeFrom(from ReconcileHostDrop, _type MergeType) ReconcileHostDrop {
+	drop.Replicas = drop.Replicas.MergeFrom(from.Replicas, _type)
 
 	return drop
 }
@@ -823,30 +834,48 @@ func (health *ReconcileHostWaitReplicasSyncHealth) Normalize() *ReconcileHostWai
 	return health
 }
 
-func (syncConfig *ReconcileHostWaitReplicasSync) MergeFrom(from *ReconcileHostWaitReplicasSync) *ReconcileHostWaitReplicasSync {
+func (syncConfig *ReconcileHostWaitReplicasSync) MergeFrom(from *ReconcileHostWaitReplicasSync, _type MergeType) *ReconcileHostWaitReplicasSync {
 	if from == nil {
+		// Nothing to merge from, keep original value
 		return syncConfig
 	}
+
+	// From now on we have `from` specified
+
 	if syncConfig == nil {
-		syncConfig = &ReconcileHostWaitReplicasSync{}
+		// Recipient is not specified, just use `from` value
+		return from
 	}
-	syncConfig.Enabled = syncConfig.Enabled.MergeFrom(from.Enabled)
-	syncConfig.Mode = syncConfig.Mode.MergeFrom(from.Mode)
-	syncConfig.Timeout = syncConfig.Timeout.MergeFrom(from.Timeout)
-	syncConfig.OnTimeout = syncConfig.OnTimeout.MergeFrom(from.OnTimeout)
-	syncConfig.Health = syncConfig.Health.MergeFrom(from.Health)
+
+	// Both recipient and `from` are specified, need to walk over fields
+
+	syncConfig.Enabled = MergeScalar(syncConfig.Enabled, from.Enabled, _type)
+	syncConfig.Mode = MergeScalar(syncConfig.Mode, from.Mode, _type)
+	syncConfig.Timeout = MergeScalar(syncConfig.Timeout, from.Timeout, _type)
+	syncConfig.OnTimeout = MergeScalar(syncConfig.OnTimeout, from.OnTimeout, _type)
+	syncConfig.Health = syncConfig.Health.MergeFrom(from.Health, _type)
+
 	return syncConfig
 }
 
-func (health *ReconcileHostWaitReplicasSyncHealth) MergeFrom(from *ReconcileHostWaitReplicasSyncHealth) *ReconcileHostWaitReplicasSyncHealth {
+func (health *ReconcileHostWaitReplicasSyncHealth) MergeFrom(from *ReconcileHostWaitReplicasSyncHealth, _type MergeType) *ReconcileHostWaitReplicasSyncHealth {
 	if from == nil {
+		// Nothing to merge from, keep original value
 		return health
 	}
+
+	// From now on we have `from` specified
+
 	if health == nil {
-		health = &ReconcileHostWaitReplicasSyncHealth{}
+		// Recipient is not specified, just use `from` value
+		return from
 	}
-	health.PollInterval = health.PollInterval.MergeFrom(from.PollInterval)
-	health.SuccessThreshold = health.SuccessThreshold.MergeFrom(from.SuccessThreshold)
+
+	// Both recipient and `from` are specified, need to walk over fields
+
+	health.PollInterval = MergeScalar(health.PollInterval, from.PollInterval, _type)
+	health.SuccessThreshold = MergeScalar(health.SuccessThreshold, from.SuccessThreshold, _type)
+
 	return health
 }
 
@@ -889,7 +918,7 @@ func (syncConfig *ReconcileHostWaitReplicasSync) GetSuccessThreshold() int {
 	return syncConfig.Health.SuccessThreshold.IntValue()
 }
 
-func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas) *ReconcileHostWaitReplicas {
+func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas, _type MergeType) *ReconcileHostWaitReplicas {
 	if from == nil {
 		// Nothing to merge from, keep original value
 		return r
@@ -904,10 +933,10 @@ func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas) *
 
 	// Both recipient and `from` are specified, need to walk over fields
 
-	r.All = r.All.MergeFrom(from.All)
-	r.New = r.New.MergeFrom(from.New)
-	r.Delay = r.Delay.MergeFrom(from.Delay)
-	r.Sync = r.Sync.MergeFrom(from.Sync)
+	r.All = MergeScalar(r.All, from.All, _type)
+	r.New = MergeScalar(r.New, from.New, _type)
+	r.Delay = MergeScalar(r.Delay, from.Delay, _type)
+	r.Sync = r.Sync.MergeFrom(from.Sync, _type)
 
 	return r
 }
@@ -931,7 +960,7 @@ func (p *ReconcileHostWaitProbes) GetReadiness() *types.StringBool {
 	return p.Readiness
 }
 
-func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *ReconcileHostWaitProbes {
+func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes, _type MergeType) *ReconcileHostWaitProbes {
 	if from == nil {
 		// Nothing to merge from, keep original value
 		return p
@@ -946,8 +975,8 @@ func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *Reco
 
 	// Both recipient and `from` are specified, need to walk over fields
 
-	p.Startup = p.Startup.MergeFrom(from.Startup)
-	p.Readiness = p.Readiness.MergeFrom(from.Readiness)
+	p.Startup = MergeScalar(p.Startup, from.Startup, _type)
+	p.Readiness = MergeScalar(p.Readiness, from.Readiness, _type)
 
 	return p
 }
@@ -958,7 +987,7 @@ type ReconcileHostDropReplicas struct {
 	Active       *types.StringBool `json:"active,omitempty"       yaml:"active,omitempty"`
 }
 
-func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas) *ReconcileHostDropReplicas {
+func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas, _type MergeType) *ReconcileHostDropReplicas {
 	if from == nil {
 		// Nothing to merge from, keep original value
 		return r
@@ -973,9 +1002,9 @@ func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas) *
 
 	// Both recipient and `from` are specified, need to walk over fields
 
-	r.OnDelete = r.OnDelete.MergeFrom(from.OnDelete)
-	r.OnLostVolume = r.OnLostVolume.MergeFrom(from.OnLostVolume)
-	r.Active = r.Active.MergeFrom(from.Active)
+	r.OnDelete = MergeScalar(r.OnDelete, from.OnDelete, _type)
+	r.OnLostVolume = MergeScalar(r.OnLostVolume, from.OnLostVolume, _type)
+	r.Active = MergeScalar(r.Active, from.Active, _type)
 
 	return r
 }
@@ -1027,6 +1056,18 @@ type ConfigCRSource struct {
 	Name      string
 }
 
+// OperatorConfigBackup sets the defaults of operator-managed backup
+type OperatorConfigBackup struct {
+	// StoragePath and StorageObjectDiskPath are where in its storage the clickhouse-backup sidecar of a host keeps the
+	// backups it makes, and their data on object disks, when the settings of the storage of its cluster set no path of
+	// their own. Each is a template that clickhouse-backup expands with the ClickHouse macros of the host - {namespace},
+	// {installation}, {cluster}, {shard} and {replica} - and the backup Jobs alike. The sidecar takes them as arguments
+	// of its command: changing either rolls the pods of every backup-enabled cluster, and leaves the backups made under
+	// the old paths where they are.
+	StoragePath           string `json:"storagePath"           yaml:"storagePath"`
+	StorageObjectDiskPath string `json:"storageObjectDiskPath" yaml:"storageObjectDiskPath"`
+}
+
 // OperatorConfig specifies operator config
 type OperatorConfig struct {
 	Runtime    OperatorConfigRuntime    `json:"runtime"    yaml:"runtime"`
@@ -1045,7 +1086,9 @@ type OperatorConfig struct {
 	// Target-scoped sub-structs (ClickHouse/Zookeeper/Kubernetes) serve as
 	// defaults inherited into CHIs and clusters via MergeFrom (3-level
 	// inheritance); IPC and FIPS are operator-only.
-	Security    OperatorConfigSecurity `json:"security" yaml:"security"`
+	Security OperatorConfigSecurity `json:"security" yaml:"security"`
+	// Backup sets the defaults of operator-managed backup
+	Backup      OperatorConfigBackup `json:"backup" yaml:"backup"`
 	StatefulSet struct {
 		// Revision history limit
 		RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`
@@ -1530,6 +1573,9 @@ func (c *OperatorConfig) normalizeSectionReconcileRuntime() {
 	if c.Reconcile.Runtime.ReconcileCHIsThreadsNumber == 0 {
 		c.Reconcile.Runtime.ReconcileCHIsThreadsNumber = defaultReconcileCHIsThreadsNumber
 	}
+	if c.Reconcile.Runtime.ReconcileCHKsThreadsNumber == 0 {
+		c.Reconcile.Runtime.ReconcileCHKsThreadsNumber = defaultReconcileCHKsThreadsNumber
+	}
 	if c.Reconcile.Runtime.ReconcileShardsThreadsNumber == 0 {
 		c.Reconcile.Runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
 	}
@@ -1562,6 +1608,15 @@ func (c *OperatorConfig) normalizeSectionPod() {
 	}
 }
 
+func (c *OperatorConfig) normalizeSectionBackup() {
+	if c.Backup.StoragePath == "" {
+		c.Backup.StoragePath = defaultBackupStoragePath
+	}
+	if c.Backup.StorageObjectDiskPath == "" {
+		c.Backup.StorageObjectDiskPath = defaultBackupStorageObjectDiskPath
+	}
+}
+
 // normalize() makes fully-and-correctly filled OperatorConfig
 func (c *OperatorConfig) normalize() {
 	c.move()
@@ -1581,6 +1636,7 @@ func (c *OperatorConfig) normalize() {
 	c.normalizeSectionLabel()
 	c.normalizeSectionStatefulSet()
 	c.normalizeSectionPod()
+	c.normalizeSectionBackup()
 	// FIPS coercion runs LAST so it overrides any user-specified per-component
 	// values for the knobs it tightens. Field-level overrides are logged.
 	c.applyEnforcedHardening()
@@ -1661,6 +1717,20 @@ func (c *OperatorConfig) RequiresStrictK8sTLS() bool {
 		c.Security.GetKubernetes().GetTLS().GetVerify() == TLSVerifyStrict
 }
 
+// ResolveK8sTLSMinVersion returns the K8s-API TLS floor for GetClientset. Under
+// hardened posture (policy=Enforced or fips.enforced) returns TLSMinVersion13;
+// otherwise security.kubernetes.tls.minVersion. Callable on raw file-based config
+// before applyEnforcedHardening runs. Empty = Go stdlib default.
+func (c *OperatorConfig) ResolveK8sTLSMinVersion() TLSMinVersion {
+	if c == nil {
+		return TLSMinVersion("")
+	}
+	if c.Security.RequiresHardening() {
+		return TLSMinVersion13
+	}
+	return c.Security.GetKubernetes().GetTLS().GetMinVersion()
+}
+
 // coerceTypedString one-way coerces a *types.String-valued config field (TLSVerify,
 // TLSMinVersion, IPCMode — all type aliases of types.String) to the FIPS-strict
 // target value and logs the change. Caller passes the address of the struct field
@@ -1696,11 +1766,17 @@ func (c *OperatorConfig) applyEnvVarParams() {
 		c.Watch.Namespaces.Include = types.NewStrings([]string{ns})
 	}
 
-	if nss := os.Getenv(deployment.WATCH_NAMESPACES); len(nss) > 0 {
-		// We have WATCH_NAMESPACES explicitly specified
-		if namespaces := c.splitNamespaces(nss); len(namespaces) > 0 {
-			c.Watch.Namespaces.Include = types.NewStrings(namespaces)
+	// LookupEnv, not Getenv+len: OLM's AllNamespaces mode sets WATCH_NAMESPACES to an empty
+	// string (present-but-empty), which must mean watch-all - distinct from a non-OLM deploy
+	// that leaves it unset. Present-and-empty is coerced to the watch-all pattern so it does
+	// not fall through to applyDefaultWatchNamespace()'s own-namespace inference. Supersedes
+	// the singular WATCH_NAMESPACE above.
+	if nss, ok := os.LookupEnv(deployment.WATCH_NAMESPACES); ok {
+		namespaces := c.splitNamespaces(nss)
+		if len(namespaces) == 0 {
+			namespaces = []string{".*"}
 		}
+		c.Watch.Namespaces.Include = types.NewStrings(namespaces)
 	}
 
 	if nss := os.Getenv(deployment.WATCH_NAMESPACES_EXCLUDE); len(nss) > 0 {
@@ -2045,7 +2121,7 @@ func (c *OperatorConfig) move() {
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
 	if c.CHScheme != "" {
-		c.ClickHouse.Access.Password = c.CHScheme
+		c.ClickHouse.Access.Scheme = c.CHScheme
 	}
 	if c.CHUsername != "" {
 		c.ClickHouse.Access.Username = c.CHUsername

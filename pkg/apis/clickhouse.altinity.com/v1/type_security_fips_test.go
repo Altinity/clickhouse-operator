@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -49,6 +50,36 @@ func TestSecurity_GetFIPS_IsEnforced_NilSafe(t *testing.T) {
 	// FIPS.Enforced explicitly true — true. This is the one cell that triggers
 	// the FIPS-runtime gate in cmd/.../app/fips_gate.go.
 	require.True(t, (&OperatorConfigSecurity{FIPS: &OperatorConfigSecurityFIPS{Enforced: types.NewStringBool(true)}}).GetFIPS().IsEnforced())
+}
+
+// TestResolveK8sTLSMinVersion verifies hardened posture forces TLS 1.3 and that
+// explicit security.kubernetes.tls.minVersion is honored when not hardened.
+func TestResolveK8sTLSMinVersion(t *testing.T) {
+	require.Equal(t, TLSMinVersion(""), (*OperatorConfig)(nil).ResolveK8sTLSMinVersion())
+	require.Equal(t, TLSMinVersion(""), (&OperatorConfig{}).ResolveK8sTLSMinVersion())
+
+	explicit12 := &OperatorConfig{}
+	explicit12.Security.Kubernetes = &ClusterSecurityKubernetes{
+		TLS: &ClusterSecurityKubernetesTLS{MinVersion: types.NewString(string(TLSMinVersion12))},
+	}
+	require.Equal(t, TLSMinVersion12, explicit12.ResolveK8sTLSMinVersion())
+
+	explicit13 := &OperatorConfig{}
+	explicit13.Security.Kubernetes = &ClusterSecurityKubernetes{
+		TLS: &ClusterSecurityKubernetesTLS{MinVersion: types.NewString(string(TLSMinVersion13))},
+	}
+	require.Equal(t, TLSMinVersion13, explicit13.ResolveK8sTLSMinVersion())
+
+	enforcedOver12 := &OperatorConfig{}
+	enforcedOver12.Security.Policy = types.NewString(string(SecurityPolicyEnforced))
+	enforcedOver12.Security.Kubernetes = &ClusterSecurityKubernetes{
+		TLS: &ClusterSecurityKubernetesTLS{MinVersion: types.NewString(string(TLSMinVersion12))},
+	}
+	require.Equal(t, TLSMinVersion13, enforcedOver12.ResolveK8sTLSMinVersion())
+
+	fipsForced := &OperatorConfig{}
+	fipsForced.Security.FIPS = &OperatorConfigSecurityFIPS{Enforced: types.NewStringBool(true)}
+	require.Equal(t, TLSMinVersion13, fipsForced.ResolveK8sTLSMinVersion())
 }
 
 // TestSecurity_RequiresHardening_NilSafe verifies the union accessor used to
@@ -324,4 +355,27 @@ func TestStatusReasonFIPSValidationFailed(t *testing.T) {
 	require.True(t, strings.HasPrefix(s.Errors[0], "[FIPSValidationFailed] "),
 		"reason tag must be at the START of the error (auto-recovery skip prefix-matches): got %q", s.Errors[0])
 	require.Contains(t, s.Errors[0], "ZooKeeper")
+}
+
+// The FIPS switch fails closed: a value of security.fips.enforced that is no boolean - a mistyped word, or a value
+// of another JSON type, which the configuration decodes as written - is refused rather than read as off, which
+// would run the binary without the FIPS module the configuration means to ask for.
+func TestOperatorConfigSecurityFIPSValidate(t *testing.T) {
+	for value, valid := range map[string]bool{
+		`true`: true, `false`: true, `"yes"`: true, `1`: true, `0`: true, `""`: true, `null`: true,
+		`"ture"`: false, `1.5`: false, `[true]`: false, `{"on": true}`: false,
+	} {
+		t.Run(value, func(t *testing.T) {
+			security := &OperatorConfigSecurity{}
+			require.NoError(t, json.Unmarshal([]byte(`{"fips": {"enforced": `+value+`}}`), security))
+			err := security.GetFIPS().Validate()
+			if valid {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, ErrInvalidFIPSEnforced)
+			require.False(t, security.GetFIPS().IsEnforced())
+		})
+	}
+	require.NoError(t, (*OperatorConfigSecurityFIPS)(nil).Validate())
 }

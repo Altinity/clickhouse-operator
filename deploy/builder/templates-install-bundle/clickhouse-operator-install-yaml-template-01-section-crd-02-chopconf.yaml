@@ -275,15 +275,27 @@ spec:
                           items:
                             type: string
                           description: |
-                            List of regexps to match ClickHouse metrics to exclude from export.
+                            List of regexps to match ClickHouse metrics to exclude from collection/export.
                             Regexps match internal metric names before Prometheus normalization and prefixing.
+                keeper:
+                  type: object
+                  description: |
+                    Keeper-side counterparts of the `clickhouse` section - config-file paths and the
+                    default Keeper user/network settings the operator generates for
+                    ClickHouseKeeperInstallation resources.
+                    Declared preserve-unknown-fields rather than fully modelled: without this the API
+                    server PRUNES the whole section from a ClickHouseOperatorConfiguration CR and the
+                    operator silently falls back to built-in defaults. The ConfigMap path was never
+                    affected. Modelling the leaves properly would also buy validation - see the
+                    coverage test in pkg/apis/clickhouse.altinity.com/v1.
+                  x-kubernetes-preserve-unknown-fields: true
                 security:
                   type: object
                   description: |
                     Per-component security toggles for outbound connections the operator establishes:
                     ClickHouse-client TLS (clickhouse.tls.verify, clickhouse.tls.minVersion, clickhouse.tls.serverName, clickhouse.tls.rootCA, clickhouse.tls.rootCASecretRef),
                     ZooKeeper/Keeper-client TLS (zookeeper.tls.verify, zookeeper.tls.minVersion),
-                    Kubernetes-client startup gate (kubernetes.tls.verify=Strict refuses an insecure kubeconfig; kubernetes.tls.minVersion is declared for shape uniformity but not yet enforced on the K8s API transport),
+                    Kubernetes-client TLS (kubernetes.tls.verify=Strict refuses an insecure kubeconfig at startup; kubernetes.tls.minVersion floors the K8s API client transport, coerced to 1.3 under FIPS/Enforced),
                     operator↔metrics-exporter IPC channel hardening (ipc.mode, ipc.bindHost, ipc.tokenPath).
                     Operator-wide master switch (security.policy): Permissive (default) preserves 0.27.0
                     behavior; Enforced coerces all per-component knobs above to their Strict positions
@@ -339,6 +351,11 @@ spec:
                           minimum: 1
                           maximum: 65535
                           description: "How many goroutines will be used to reconcile CHIs in parallel, 10 by default"
+                        reconcileCHKsThreadsNumber:
+                          type: integer
+                          minimum: 1
+                          maximum: 65535
+                          description: "How many goroutines will be used to reconcile CHKs in parallel, 1 by default"
                         reconcileShardsThreadsNumber:
                           type: integer
                           minimum: 1
@@ -442,6 +459,37 @@ spec:
                                 delay:
                                   type: integer
                                   description: "replication max absolute delay to consider replica is not delayed"
+                                sync:
+                                  type: object
+                                  description: "Replicated-host sync gate. Blocks rolling host reconcile until a recreated replicated host catches up to a bounded replication baseline"
+                                  properties:
+                                    enabled:
+                                      <<: *TypeStringBool
+                                      description: "Whether the operator should run the replicated-host sync gate. Disabled by default"
+                                    mode:
+                                      type: string
+                                      description: "Sync mode. Only `lightweight` (SYSTEM SYNC REPLICA ... LIGHTWEIGHT) is supported"
+                                      enum:
+                                        - "lightweight"
+                                    timeout:
+                                      type: integer
+                                      description: "Whole-gate timeout in seconds, 0 means unbounded"
+                                    onTimeout:
+                                      type: string
+                                      description: "What to do on gate deadline: `abort` stops reconcile, `proceed` advances without writing the caught-up marker"
+                                      enum:
+                                        - "abort"
+                                        - "proceed"
+                                    health:
+                                      type: object
+                                      description: "Stable-health window checked after sync"
+                                      properties:
+                                        pollInterval:
+                                          type: integer
+                                          description: "Seconds between post-sync health checks"
+                                        successThreshold:
+                                          type: integer
+                                          description: "Consecutive healthy checks required after sync before the caught-up marker is written"
                             probes:
                               type: object
                               description: "What probes the operator should wait during host launch procedure"
@@ -525,6 +573,65 @@ spec:
                                       - "allhosts"
                                       - "AllShards"
                                       - "allshards"
+                                  events:
+                                    type: array
+                                    minItems: 1
+                                    description: |
+                                      Reconcile lifecycle events that trigger this hook. Required, must be non-empty.
+                                      The hook is skipped on any reconcile whose classifier does not emit at least one
+                                      of the listed events. Supported values:
+                                        Any               - wildcard match: fires on every hook-evaluation point,
+                                                            including the pre-delete sweep on the dying host
+                                        HostCreate        - first reconcile that creates a host (no ancestor); best
+                                                            paired with POST hooks because PRE hooks on first creation
+                                                            are skipped (no live pod yet)
+                                        HostUpdate        - reconcile that has prior state for the host; catch-all
+                                                            for ongoing reconciles
+                                        HostStart         - host transitions from stopped to running
+                                        HostStop          - host is being stopped (current spec marks it stopped)
+                                        HostConfigRestart - in-place software restart for a configuration change
+                                        HostRollout       - pod-template change forces a StatefulSet rollout
+                                        HostShutdown      - aggregate: fires whenever the pod is going down for any
+                                                            reason (Stop, ConfigRestart, Rollout, or Delete)
+                                        HostDelete        - host is being removed from the cluster (downsize); fires
+                                                            on the dying host before tear-down. Always emitted
+                                                            alongside HostShutdown.
+                                    items:
+                                      type: string
+                                      # Both PascalCase and all-lowercase forms are accepted; the
+                                      # runtime comparison is case-insensitive (strings.EqualFold).
+                                      enum:
+                                        - "Any"
+                                        - "any"
+                                        - "HostCreate"
+                                        - "hostcreate"
+                                        - "HostDelete"
+                                        - "hostdelete"
+                                        - "HostUpdate"
+                                        - "hostupdate"
+                                        - "HostStart"
+                                        - "hoststart"
+                                        - "HostStop"
+                                        - "hoststop"
+                                        - "HostConfigRestart"
+                                        - "hostconfigrestart"
+                                        - "HostRollout"
+                                        - "hostrollout"
+                                        - "HostShutdown"
+                                        - "hostshutdown"
+                                  failurePolicy:
+                                    type: string
+                                    description: |
+                                      Controls what happens when this hook returns an error.
+                                      Fail (default): error propagates — pre-hook aborts reconcile / host deletion.
+                                      Ignore: error is logged and the reconcile continues.
+                                    # Both PascalCase and all-lowercase forms are accepted; the
+                                    # runtime normalizes via strings.EqualFold (Fail == fail).
+                                    enum:
+                                      - "Fail"
+                                      - "fail"
+                                      - "Ignore"
+                                      - "ignore"
                             post:
                               type: array
                               description: "actions to execute after host reconcile"
@@ -706,6 +813,24 @@ spec:
                       description: |
                         Optional duration in seconds the pod needs to terminate gracefully. 
                         Look details in `pod.spec.terminationGracePeriodSeconds`
+                backup:
+                  type: object
+                  description: "EXPERIMENTAL. Defaults of operator-managed backup, see docs/backup.md"
+                  properties:
+                    storagePath:
+                      type: string
+                      description: |
+                        Where in its storage the clickhouse-backup sidecar of a host keeps its backups when the settings of that
+                        storage set no path. A template clickhouse-backup expands with the macros of the host: {namespace},
+                        {installation}, {cluster}, {shard}, {replica}. Default: backup/{namespace}/{installation}/{cluster}/{shard}.
+                        Changing it rolls the pods of every backup-enabled cluster and leaves the backups made under the old path
+                        where they are
+                    storageObjectDiskPath:
+                      type: string
+                      description: |
+                        Where in its storage the clickhouse-backup sidecar of a host keeps the object disk data of its backups when
+                        the settings of that storage set no object disk path. A template like storagePath.
+                        Default: object_disks/{namespace}/{installation}/{cluster}/{shard}
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"

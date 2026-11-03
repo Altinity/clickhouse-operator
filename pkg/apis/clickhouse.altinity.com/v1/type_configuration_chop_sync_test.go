@@ -48,7 +48,7 @@ func TestReconcileHostWaitReplicasSyncNormalizeRejectsInvalid(t *testing.T) {
 func TestReconcileHostWaitReplicasSyncMergeFromPrefersLocal(t *testing.T) {
 	localSyncConfig := (&ReconcileHostWaitReplicasSync{Enabled: types.NewStringBool(true)}).Normalize()
 	parentSyncConfig := (&ReconcileHostWaitReplicasSync{Enabled: types.NewStringBool(false), Timeout: types.NewInt32(30)}).Normalize()
-	mergedSyncConfig := localSyncConfig.MergeFrom(parentSyncConfig)
+	mergedSyncConfig := localSyncConfig.MergeFrom(parentSyncConfig, MergeTypeFillEmptyValues)
 	if !mergedSyncConfig.IsEnabled() {
 		t.Fatalf("merge must prefer local enabled=true")
 	}

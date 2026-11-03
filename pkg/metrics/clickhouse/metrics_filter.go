@@ -24,10 +24,17 @@ package clickhouse
 // be added there without touching this file.
 //
 // Nil-safe by contract: implementations must return false from IsExcluded when
-// the receiver is nil so callers can pass a typed-nil filter as a no-op. The
-// consumer (CHIPrometheusWriter) additionally guards a raw-nil interface value
-// at the call site, so a writer constructed via struct literal without setting
-// metricsFilter is also safe (no panic, no exclusions).
+// the receiver is nil so callers can pass a typed-nil filter as a no-op. A raw-nil
+// interface value is handled by the package-level IsExcluded helper below — see it
+// for the shared call-site guard.
 type MetricsFilter interface {
 	IsExcluded(name string) bool
+}
+
+// IsExcluded is a nil-safe wrapper over MetricsFilter: a raw-nil interface value
+// is treated as a no-op filter (excludes nothing). Both filter call sites — the
+// fetch-side row scan and the writer-side emission — funnel through this so the
+// nil-guard contract lives in one place instead of being duplicated per call site.
+func IsExcluded(filter MetricsFilter, name string) bool {
+	return (filter != nil) && filter.IsExcluded(name)
 }

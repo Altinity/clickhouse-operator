@@ -101,6 +101,16 @@ func (c *CHOp) SetupLog() {
 		updated = true
 		_ = flag.Set("v", c.Config().Logger.V)
 	}
+	if c.Config().Logger.VModule != "" {
+		c.logUpdate("vmodule", c.Config().Logger.VModule)
+		updated = true
+		_ = flag.Set("vmodule", c.Config().Logger.VModule)
+	}
+	if c.Config().Logger.LogBacktraceAt != "" {
+		c.logUpdate("log_backtrace_at", c.Config().Logger.LogBacktraceAt)
+		updated = true
+		_ = flag.Set("log_backtrace_at", c.Config().Logger.LogBacktraceAt)
+	}
 
 	if updated {
 		log.V(1).Info("Additional log options applied")

@@ -18,4 +18,6 @@ for YAML in "${ALL_YAML[@]}"; do
     yq eval -e --inplace 'del(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.additionalPrinterColumns[].jsonPath)' "${YAML}"
     yq eval -e --inplace '(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.validation ) = .spec.versions[0].schema' "${YAML}"
     yq eval -e --inplace 'del(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.versions)' "${YAML}"
+    # CEL validation rules need Kubernetes 1.25 or later, which the v1beta1 bundle does not target
+    yq eval -e --inplace 'del(.. | select(tag == "!!map") | ."x-kubernetes-validations")' "${YAML}"
 done

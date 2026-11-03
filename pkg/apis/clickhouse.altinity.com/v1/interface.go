@@ -129,6 +129,7 @@ type ICluster interface {
 	GetSecure() *types.StringBool
 	GetSecret() *ClusterSecret
 	GetSecurity() *ClusterSecurity
+	GetBackup() *ClusterBackup
 	GetPDBManaged() *types.StringBool
 	GetPDBMaxUnavailable() *types.Int32
 
@@ -136,6 +137,7 @@ type ICluster interface {
 	WalkHosts(func(host *Host) error) []error
 
 	HostsCount() int
+	IsSingleNode() bool
 
 	FindShard(needle interface{}) IShard
 	FindHost(needleShard interface{}, needleHost interface{}) *Host

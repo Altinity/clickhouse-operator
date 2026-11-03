@@ -20,12 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
-
-// The labeler reads the global operator config (chop.Config()) during construction.
-func init() { chop.New(nil, nil, "") }
 
 // TestServiceTierLabelValues guards the Service-tier label-value mapping (issue #1982). The
 // client Service tier MUST resolve to a concrete, distinct value: a missing entry in the

@@ -87,6 +87,19 @@ case "${WHAT}" in
         ;;
 esac
 
+# Dual-cluster opt-in: route the operator suite to the two-cluster orchestrator
+# (PARALLEL pool on one minikube, NO_PARALLEL set on another, merged into one
+# table). Only the operator suite is split; acvp/metrics stay single-cluster, so
+# DUAL_CLUSTER is most useful with WHAT=operator. Default (unset) is unchanged.
+if [[ "${DUAL_CLUSTER:-}" == "yes" ]]; then
+    for i in "${!LOCAL_SCRIPTS[@]}"; do
+        if [[ "${LOCAL_SCRIPTS[$i]}" == "run_tests_operator_local.sh" ]]; then
+            LOCAL_SCRIPTS[$i]="run_tests_operator_dual.sh"
+        fi
+    done
+    echo "DUAL_CLUSTER=yes -> operator suite uses run_tests_operator_dual.sh"
+fi
+
 # Only wait for confirmation when running interactively (stdin is a terminal)
 if [ -t 0 ]; then
     TIMEOUT=30

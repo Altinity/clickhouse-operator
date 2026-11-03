@@ -15,6 +15,9 @@
 package v1
 
 import (
+	"errors"
+	"fmt"
+
 	core "k8s.io/api/core/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -63,10 +66,8 @@ type ClusterSecurityKubernetes struct {
 }
 
 // ClusterSecurityKubernetesTLS holds knobs for the operator's outbound
-// Kubernetes API client. The k8s client-go respects whatever's in the
-// kubeconfig; the operator never builds the kubeconfig's tls.Config itself,
-// so these knobs are evaluated as a LOAD-TIME GATE — the operator refuses
-// to start with a kubeconfig that doesn't meet the requested posture.
+// Kubernetes API client. Verify is a load-time gate against the kubeconfig's
+// Insecure flag; MinVersion is applied to the client transport by GetClientset.
 type ClusterSecurityKubernetesTLS struct {
 	// Verify gates startup against the kubeconfig's TLSClientConfig.Insecure
 	// field. Valid values are TLSVerifyStrict and TLSVerifyNone.
@@ -77,12 +78,8 @@ type ClusterSecurityKubernetesTLS struct {
 	// override the kubeconfig; it only refuses to load an insecure one.
 	Verify *types.String `json:"verify,omitempty"     yaml:"verify,omitempty"`
 	// MinVersion floors TLS at the named protocol version. Valid values are
-	// TLSMinVersion12 and TLSMinVersion13. Nil = Go stdlib default.
-	//
-	// Declared for shape symmetry with ClickHouse/Zookeeper and coerced under
-	// FIPS, but not yet enforced on the operator's K8s API transport — a future
-	// enhancement will wire it into rest.Config when the operator wraps the
-	// kubeconfig with stricter TLS settings.
+	// TLSMinVersion12 and TLSMinVersion13. Nil = Go stdlib default. Coerced to
+	// 1.3 under FIPS/Enforced; applied on the K8s API transport by GetClientset.
 	MinVersion *types.String `json:"minVersion,omitempty" yaml:"minVersion,omitempty"`
 }
 
@@ -420,8 +417,7 @@ func (t *ClusterSecurityKubernetesTLS) GetVerify() TLSVerify {
 }
 
 // GetMinVersion returns the resolved TLSMinVersion for the operator's K8s client.
-// Nil-safe; returns empty value when unset. Declared for shape consistency and
-// FIPS coercion uniformity — not yet wired into the K8s API transport.
+// Nil-safe; returns empty value when unset.
 func (t *ClusterSecurityKubernetesTLS) GetMinVersion() TLSMinVersion {
 	if (t == nil) || (t.MinVersion == nil) || !t.MinVersion.HasValue() {
 		return TLSMinVersion("")
@@ -560,6 +556,20 @@ func (s *OperatorConfigSecurity) GetFIPS() *OperatorConfigSecurityFIPS {
 		return nil
 	}
 	return s.FIPS
+}
+
+// ErrInvalidFIPSEnforced is returned when security.fips.enforced holds a value that is no boolean.
+var ErrInvalidFIPSEnforced = errors.New("FIPS: chopconf security.fips.enforced is not a boolean")
+
+// Validate refuses an enforced value that is no boolean, nil-safe. Read as off, such a value would run the binary
+// without the FIPS module the configuration means to ask for: neither the configuration file nor the CRD schema of
+// the configuration restricts the value of an on/off field, so the gate fails closed instead. An empty value counts
+// as unset.
+func (f *OperatorConfigSecurityFIPS) Validate() error {
+	if (f == nil) || (f.Enforced.String() == "") || f.Enforced.IsValid() {
+		return nil
+	}
+	return fmt.Errorf("%w: %q — set security.fips.enforced=true or security.fips.enforced=false", ErrInvalidFIPSEnforced, f.Enforced.String())
 }
 
 // IsEnforced reports whether security.fips.enforced=true is configured.

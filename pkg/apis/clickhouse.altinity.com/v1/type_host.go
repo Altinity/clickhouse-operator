@@ -179,12 +179,12 @@ func (host *Host) InheritSettingsFrom(sources ...any) {
 		case IShard:
 			shard := typed
 			if shard.HasSettings() {
-				host.Settings = host.Settings.MergeFrom(shard.GetSettings())
+				host.Settings = host.Settings.MergeFrom(shard.GetSettings(), MergeTypeFillEmptyValues)
 			}
 		case IReplica:
 			replica := typed
 			if replica.HasSettings() {
-				host.Settings = host.Settings.MergeFrom(replica.GetSettings())
+				host.Settings = host.Settings.MergeFrom(replica.GetSettings(), MergeTypeFillEmptyValues)
 			}
 		}
 	}
@@ -200,12 +200,12 @@ func (host *Host) InheritFilesFrom(sources ...any) {
 		case IShard:
 			shard := typed
 			if shard.HasFiles() {
-				host.Files = host.Files.MergeFrom(shard.GetFiles())
+				host.Files = host.Files.MergeFrom(shard.GetFiles(), MergeTypeFillEmptyValues)
 			}
 		case IReplica:
 			replica := typed
 			if replica.HasFiles() {
-				host.Files = host.Files.MergeFrom(replica.GetFiles())
+				host.Files = host.Files.MergeFrom(replica.GetFiles(), MergeTypeFillEmptyValues)
 			}
 		}
 	}
@@ -292,6 +292,16 @@ func (host *Host) GetPodTemplate() (*PodTemplate, bool) {
 		return nil, false
 	}
 	name := host.GetTemplates().GetPodTemplate()
+	return host.GetCR().GetPodTemplate(name)
+}
+
+// GetBackupPodTemplate gets the pod template the clickhouse-backup sidecar of the host is built on, which the backup
+// of its cluster names
+func (host *Host) GetBackupPodTemplate() (*PodTemplate, bool) {
+	name := host.GetCluster().GetBackup().GetPodTemplate().Value()
+	if name == "" {
+		return nil, false
+	}
 	return host.GetCR().GetPodTemplate(name)
 }
 
@@ -763,7 +773,7 @@ func (host *Host) ShouldIncludeIntoCluster() bool {
 	switch {
 	case host.IsStopped():
 		return false
-	case host.GetCluster().HostsCount() < 2:
+	case host.GetCluster().IsSingleNode():
 		return false
 	default:
 		return true

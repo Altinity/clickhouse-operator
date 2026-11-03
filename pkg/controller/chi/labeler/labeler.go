@@ -111,8 +111,7 @@ func (l *Labeler) LabelMyObjectsTree(ctx context.Context) error {
 	// Put labels on the Deployment
 	err = l.labelDeployment(ctx, replicaSet)
 	if err != nil {
-		fmt.Errorf("%w %s err: %v", ErrUnableToLabelDeployment, util.NamespacedName(replicaSet), err)
-		return err
+		return fmt.Errorf("%w %s err: %v", ErrUnableToLabelDeployment, util.NamespacedName(replicaSet), err)
 	}
 
 	return nil
