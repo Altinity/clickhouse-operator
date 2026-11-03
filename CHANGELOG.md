@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* **ClickHouse credentials containing URL-reserved characters no longer break operator or metrics-exporter connections.** Usernames and passwords are now percent-encoded in connection URLs. by [@mraj602](https://github.com/mraj602) in [#2123](https://github.com/Altinity/clickhouse-operator/pull/2123). Addresses [#1822](https://github.com/Altinity/clickhouse-operator/issues/1822)
+
 * **Fixed incorrect function names in logs from Go generic functions.** by [@matthewhudsonedb](https://github.com/matthewhudsonedb) in [#2102](https://github.com/Altinity/clickhouse-operator/pull/2102). Fixes [#2101](https://github.com/Altinity/clickhouse-operator/issues/2101)
 
 * **Metrics exporter now respects cluster-specific ClickHouse TLS settings**, including custom CAs and certificate verification. by [@Slach](https://github.com/Slach) in [#2113](https://github.com/Altinity/clickhouse-operator/pull/2113)
@@ -38,11 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Fixed configuration inheritance and merging:** installations no longer share mutable clusters from templates, and service ports and host settings merge correctly. by [@sunsingerus](https://github.com/sunsingerus)
 
-* **A Helm chart upgrade with unchanged configuration no longer restarts the operator.**
-  The `checksum/*` pod annotations hashed the whole rendered ConfigMap, `helm.sh/chart` label included, and the pod template carried `helm.sh/chart` and `app.kubernetes.io/version`, so every chart version bump rolled the operator Deployment even with `image.tag` pinned.
-  The checksums now hash only the ConfigMap `data`, and the operator pod no longer carries those two labels; they stay on the Deployment and the other objects, and `commonLabels`, `podLabels` and `app.kubernetes.io/managed-by` still reach the pod.
-  The upgrade that lands this restarts the operator once, as all nine checksums are recomputed; ClickHouse clusters are unaffected.
-  by [@DrFaust92](https://github.com/DrFaust92) in [#2079](https://github.com/Altinity/clickhouse-operator/pull/2079)
+* **Helm chart upgrades with unchanged configuration no longer restart the operator.** ConfigMap checksums now exclude chart metadata, and version labels no longer trigger pod recreation. The first upgrade to this version still restarts the operator once; ClickHouse clusters are unaffected. by [@DrFaust92](https://github.com/DrFaust92) in [#2079](https://github.com/Altinity/clickhouse-operator/pull/2079)
 
 ### Security
 
