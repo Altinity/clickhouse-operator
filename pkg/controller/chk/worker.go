@@ -44,6 +44,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// FinalizerName specifies name of the finalizer to be used with CHK
+const FinalizerName = "finalizer.clickhousekeeperinstallation.altinity.com"
+
 // worker represents worker thread which runs reconcile tasks
 type worker struct {
 	c *Controller
@@ -53,19 +56,41 @@ type worker struct {
 	task          *common.Task
 	stsReconciler *statefulset.Reconciler
 
+	// countReadyEnsembleMembersFn overrides live Ready counting (tests only).
+	countReadyEnsembleMembersFn func(ctx context.Context, cr api.ICustomResource) int
+
+	// quorumDisruptPollOverride / quorumDisruptWaitOverride override pacing in
+	// ensureQuorumSafeToDisruptHost (tests only). Zero means use defaults.
+	quorumDisruptPollOverride time.Duration
+	quorumDisruptWaitOverride time.Duration
+
+	// reconcileHostFn overrides per-host reconcile (tests only), so the shard host loop -
+	// recovery-first ordering and abort-on-error - can be exercised without a live StatefulSet
+	// reconciler and the whole kube surface behind it.
+	reconcileHostFn func(ctx context.Context, host *api.Host) error
+
+	// publishRaftFn overrides raft ConfigMap publication (tests only).
+	publishRaftFn func(ctx context.Context, host *api.Host) error
+
+	// quorumWaitSpent is the wait the Raft disrupt gate has already burned in THIS pass. The
+	// budget is per pass, not per host: a permanently unhealthy peer would otherwise cost the
+	// full timeout on every remaining host, and with ReconcileCHKsThreadsNumber defaulting to 1
+	// that single worker stops reconciling every other CHK for the duration. Reset by newTask.
+	// Unsynchronized on purpose - see getReconcileShardsWorkersNum on why hosts are serial.
+	quorumWaitSpent time.Duration
+
 	start time.Time
 }
 
 // newWorker
 func (c *Controller) newWorker() *worker {
 	start := time.Now()
-	//kind := "ClickHouseKeeperInstallation"
-	//generateName := "chop-chk-"
-	//component := componentName
+	kind := "ClickHouseKeeperInstallation"
+	generateName := "chop-chk-"
+	component := componentName
 
 	announcer := a.NewAnnouncer(
-		//common.NewEventEmitter(c.kube.Event(), kind, generateName, component),
-		nil,
+		a.NewEventEmitter(c.kube.Event(), kind, generateName, component),
 		c.kube.CR(),
 	)
 
@@ -108,6 +133,10 @@ func (w *worker) buildCreator(cr *apiChk.ClickHouseKeeperInstallation) *commonCr
 }
 
 func (w *worker) newTask(new, old *apiChk.ClickHouseKeeperInstallation) {
+	// A new pass gets a fresh Raft-gate wait budget. Reset here rather than relying on the
+	// worker being per-request, so a pooled or reused worker cannot inherit a spent budget and
+	// silently stop waiting for peers that are merely slow.
+	w.quorumWaitSpent = 0
 	w.task = common.NewTask(w.buildCreator(new), w.buildCreator(old))
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
@@ -117,7 +146,7 @@ func (w *worker) newTask(new, old *apiChk.ClickHouseKeeperInstallation) {
 		labeler.New(new),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
 		w.c.kube,
-		statefulset.NewDefaultFallback(),
+		newChkStatefulSetFallback(),
 	)
 }
 
@@ -152,7 +181,7 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
 		return true
 
-	case model.IsConfigurationChangeRequiresReboot(host):
+	case model.IsConfigurationChangeRequiresReboot(host, nil):
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 
@@ -166,21 +195,96 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 	}
 }
 
-func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, ap api.IActionPlan) {
+// ensureFinalizer installs the operator finalizer on the CR if not already present.
+// Returns true if the finalizer was just installed (triggering a re-reconcile).
+func (w *worker) ensureFinalizer(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) bool {
+	if util.IsContextDone(ctx) {
+		return false
+	}
+
+	// Don't add finalizer if deletion is already in progress
+	if !chk.GetDeletionTimestamp().IsZero() {
+		return false
+	}
+
+	// Finalizer can already be listed, do nothing in this case
+	if util.InArray(FinalizerName, chk.GetFinalizers()) {
+		w.a.V(2).M(chk).F().Info("finalizer already installed")
+		return false
+	}
+
+	// No finalizer found - need to install it
+
+	if err := w.c.installFinalizer(ctx, chk); err != nil {
+		w.a.V(1).M(chk).F().Error("unable to install finalizer. err: %v", err)
+		return false
+	}
+
+	w.a.V(3).M(chk).F().Info("finalizer installed")
+	return true
+}
+
+// finalizeCR re-derives the CR from the API server and persists the outcome. It reports whether
+// its own normalize refused the spec, so a caller that announces success can stay consistent with
+// the status actually written. CHI mirror: pkg/controller/chi/worker.go.
+func (w *worker) finalizeCR(
+	ctx context.Context,
+	obj meta.Object,
+	updateStatusOpts types.UpdateStatusOptions,
+) (aborted bool, err error) {
+	cr, err := w.buildCRFromObj(ctx, obj)
+	if err != nil {
+		log.V(1).Error("Unable to finalize CR: %s err: %v", util.NamespacedName(obj), err)
+		return false, err
+	}
+
+	// The verdict of the normalize just performed by buildCRFromObj. Checked before the
+	// completion bookkeeping runs: ReconcileComplete() overwrites Status unconditionally, so a
+	// check placed after it could never observe an abort.
+	if cr.EnsureStatus().GetStatus() == api.StatusAborted {
+		// Skip the completion bookkeeping: it advances the ancestor to the spec just refused,
+		// which would publish Completed for a spec the operator rejected and leave the next
+		// action plan diffing against a spec that was never applied.
+		w.a.V(1).M(cr).F().Info("CR normalize aborted - persist the abort, skip completion bookkeeping")
+		return true, w.c.updateCRObjectStatus(ctx, cr, updateStatusOpts)
+	}
+
+	return false, w.persistReconcileCompleted(ctx, cr)
+}
+
+// persistReconcileCompleted stamps the completion bookkeeping onto cr and writes it. The status
+// write is reported rather than discarded: a completion the operator failed to persist must not
+// be announced as one.
+func (w *worker) persistReconcileCompleted(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
+	cr.SetAncestor(cr.GetTarget())
+	cr.SetTarget(nil)
+	cr.EnsureStatus().ReconcileComplete()
+	return w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
+		CopyStatusOptions: types.CopyStatusOptions{
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupWholeStatus: true,
+			},
+		},
+	})
+}
+
+func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
-		return
+		return ctx.Err()
 	}
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
-	cr.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
-	_ = w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
+	cr.EnsureStatus().ReconcileStart(cr.EnsureRuntime().ActionPlan)
+	if err := w.c.updateCRObjectStatus(ctx, cr, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
 				FieldGroupMain: true,
 			},
 		},
-	})
+	}); err != nil {
+		return err
+	}
 
 	w.a.V(1).
 		WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileStarted).
@@ -188,44 +292,43 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *apiChk.ClickHouseKe
 		WithActions(cr).
 		M(cr).F().
 		Info("reconcile started, task id: %s", cr.GetSpecT().GetTaskID())
-	w.a.V(2).M(cr).F().Info("action plan\n%s\n", ap.String())
+	w.a.V(2).M(cr).F().Info("action plan\n%s\n", cr.EnsureRuntime().ActionPlan.String())
+	return nil
 }
 
-func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstallation) {
+func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", _cr.GetName())
-		return
+		return ctx.Err()
 	}
 
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
-	// Update CHI object
-	if chi, err := w.createCRFromObjectMeta(_cr, true, commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()); err == nil {
-		w.a.V(1).M(chi).Info("updating endpoints for CR-2 %s", chi.Name)
-		ips := w.c.getPodsIPs(ctx, chi)
-		w.a.V(1).M(chi).Info("IPs of the CR-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := commonNormalizer.NewOptions[apiChk.ClickHouseKeeperInstallation]()
-		opts.DefaultUserAdditionalIPs = ips
-		if chi, err := w.createCRFromObjectMeta(_cr, true, opts); err == nil {
-			w.a.V(1).M(chi).Info("Update users IPS-2")
-			chi.SetAncestor(chi.GetTarget())
-			chi.SetTarget(nil)
-			chi.EnsureStatus().ReconcileComplete()
-			// TODO unify with update endpoints
-			w.newTask(chi, chi.GetAncestorT())
-			//w.reconcileConfigMapCommonUsers(ctx, chi)
-			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
-				CopyStatusOptions: types.CopyStatusOptions{
-					CopyStatusFieldGroup: types.CopyStatusFieldGroup{
-						FieldGroupWholeStatus: true,
-					},
+	// Update CR object
+	aborted, err := w.finalizeCR(
+		ctx,
+		_cr,
+		types.UpdateStatusOptions{
+			CopyStatusOptions: types.CopyStatusOptions{
+				CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+					FieldGroupWholeStatus: true,
 				},
-			})
-		} else {
-			w.a.M(_cr).F().Error("internal unable to find CR by %v err: %v", _cr.GetLabels(), err)
-		}
-	} else {
-		w.a.M(_cr).F().Error("external unable to find CR by %v err %v", _cr.GetLabels(), err)
+			},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if aborted {
+		// finalizeCR's own re-normalize refused the spec, so it persisted Aborted and skipped the
+		// completion bookkeeping. Announcing success here would contradict the status just written.
+		w.a.V(1).
+			WithEvent(_cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
+			WithAction(_cr).
+			M(_cr).F().
+			Warning("reconcile not marked completed - spec refused on finalize, task id: %s", _cr.GetSpecT().GetTaskID())
+		return nil
 	}
 
 	w.a.V(1).
@@ -234,6 +337,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 		WithActions(_cr).
 		M(_cr).F().
 		Info("reconcile completed successfully, task id: %s", _cr.GetSpecT().GetTaskID())
+	return nil
 }
 
 func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, err error) {
@@ -264,14 +368,14 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *a
 		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", cr.GetSpecT().GetTaskID())
 }
 
-func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, ap api.IActionPlan) {
+func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", cr.GetName())
 		return
 	}
 
 	existingObjects := w.c.discovery(ctx, cr)
-	ap.WalkAdded(
+	cr.EnsureRuntime().ActionPlan.WalkAdded(
 		// Walk over added clusters
 		func(cluster api.ICluster) {
 			w.a.V(1).M(cr).Info("Walking over AP added clusters. Cluster: %s", cluster.GetName())
@@ -324,7 +428,7 @@ func (w *worker) setHostStatusesPreliminary(ctx context.Context, cr *apiChk.Clic
 		},
 	)
 
-	ap.WalkModified(
+	cr.EnsureRuntime().ActionPlan.WalkModified(
 		func(cluster api.ICluster) {
 			w.a.V(1).M(cr).Info("Walking over AP modified clusters. Cluster: %s", cluster.GetName())
 		},
@@ -375,19 +479,19 @@ func (w *worker) logHosts(cr api.ICustomResource) {
 	})
 }
 
-func (w *worker) createTemplatedCR(_chk *apiChk.ClickHouseKeeperInstallation, _opts ...*commonNormalizer.Options[apiChk.ClickHouseKeeperInstallation]) *apiChk.ClickHouseKeeperInstallation {
-	l := w.a.V(1).M(_chk).F()
+func (w *worker) createTemplatedCR(_cr *apiChk.ClickHouseKeeperInstallation, _opts ...*commonNormalizer.Options[apiChk.ClickHouseKeeperInstallation]) *apiChk.ClickHouseKeeperInstallation {
+	l := w.a.V(1).M(_cr).F()
 
-	if _chk.HasAncestor() {
-		l.Info("CR has an ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(_chk))
+	if _cr.HasAncestor() {
+		l.Info("CR has an ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(_cr))
 	} else {
-		l.Info("CR has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(_chk))
+		l.Info("CR has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(_cr))
 	}
 
-	chk := w.createTemplated(_chk, _opts...)
-	chk.SetAncestor(w.createTemplated(_chk.GetAncestorT()))
+	cr := w.createTemplated(_cr, _opts...)
+	cr.SetAncestor(w.createTemplated(_cr.GetAncestorT()))
 
-	return chk
+	return cr
 }
 
 func (w *worker) createTemplated(c *apiChk.ClickHouseKeeperInstallation, _opts ...*commonNormalizer.Options[apiChk.ClickHouseKeeperInstallation]) *apiChk.ClickHouseKeeperInstallation {
@@ -395,19 +499,20 @@ func (w *worker) createTemplated(c *apiChk.ClickHouseKeeperInstallation, _opts .
 	if len(_opts) > 0 {
 		opts = _opts[0]
 	}
-	chk, _ := w.normalizer.CreateTemplated(c, opts)
-	return chk
+	cr, _ := w.normalizer.CreateTemplated(c, opts)
+	return cr
 }
 
 // getRaftGeneratorOptions build base set of RaftOptions
 func (w *worker) getRaftGeneratorOptions() *commonConfig.HostSelector {
-	// Raft specifies to exclude:
-	// 1. all newly added hosts
-	// 2. all explicitly excluded hosts
+	// Hosts tagged exclude are omitted from raft_configuration. 1→N / 2→3
+	// scale-up marks not-yet-created members that way so the published XML
+	// lists at most one extra server while the previous join is still coming up
+	// (see stageUncommittedScaleUpHosts). Zero-value status (not
+	// ObjectStatusUnknown) so the selector matches the exclude tag only —
+	// NewReconcileAttributes() would also match every host still at status unknown.
 	return commonConfig.NewHostSelector().ExcludeReconcileAttributes(
-		types.NewReconcileAttributes(),
-		//SetAdd().
-		//SetExclude(),
+		(&types.ReconcileAttributes{}).SetExclude(),
 	)
 }
 
@@ -416,26 +521,4 @@ func (w *worker) options() *config.FilesGeneratorOptions {
 	opts := w.getRaftGeneratorOptions()
 	w.a.Info("RaftOptions: %s", opts)
 	return config.NewFilesGeneratorOptions().SetRaftOptions(opts)
-}
-
-// createCRFromObjectMeta
-func (w *worker) createCRFromObjectMeta(
-	meta meta.Object,
-	isCHI bool,
-	options *commonNormalizer.Options[apiChk.ClickHouseKeeperInstallation],
-) (*apiChk.ClickHouseKeeperInstallation, error) {
-	w.a.V(3).M(meta).S().P()
-	defer w.a.V(3).M(meta).E().P()
-
-	chi, err := w.c.GetCHIByObjectMeta(meta, isCHI)
-	if err != nil {
-		return nil, err
-	}
-
-	chi, err = w.normalizer.CreateTemplated(chi, options)
-	if err != nil {
-		return nil, err
-	}
-
-	return chi, nil
 }

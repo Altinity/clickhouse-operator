@@ -1,0 +1,44 @@
+# Reconcile hooks: Kafka consumer-group rebalance prevention
+#
+# Problem: During rolling restarts, Kafka engine tables trigger consumer-group
+# rebalances on each host restart, causing message duplication and lag spikes.
+#
+# Solution: Host-level pre/post hooks gated on HostShutdown detach Kafka tables
+# before each host is taken down and re-attach them after each host comes back.
+# The trigger is per-host (one host at a time during a rolling restart) but the
+# action is cluster-wide via ON CLUSTER, so it's idempotent across the rolling
+# sequence — DETACH IF EXISTS no-ops on subsequent hosts.
+#
+# Why host-level (not cluster-level): the trigger we care about is HostShutdown
+# (any individual host going down). Cluster-level hooks listen to cluster
+# lifecycle events (ClusterCreate / ClusterReconcile / ClusterDelete) — there is
+# no "any host shutdown" cluster event.
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "hooks-kafka"
+spec:
+  reconcile:
+    host:
+      hooks:
+        pre:
+          - sql:
+              queries:
+                - "DETACH TABLE IF EXISTS db.kafka_events ON CLUSTER '{cluster}' PERMANENTLY"
+                - "DETACH TABLE IF EXISTS db.kafka_clicks ON CLUSTER '{cluster}' PERMANENTLY"
+            events:
+              - HostShutdown
+        post:
+          - sql:
+              queries:
+                - "ATTACH TABLE db.kafka_events ON CLUSTER '{cluster}'"
+                - "ATTACH TABLE db.kafka_clicks ON CLUSTER '{cluster}'"
+            events:
+              - HostShutdown
+  configuration:
+    clusters:
+      - name: "main"
+        layout:
+          shardsCount: 2
+          replicasCount: 2

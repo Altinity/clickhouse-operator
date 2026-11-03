@@ -41,9 +41,10 @@ const (
 
 // CHIPrometheusWriter specifies writer to prometheus
 type CHIPrometheusWriter struct {
-	out  chan<- prometheus.Metric
-	chi  *metrics.WatchedCR
-	host *metrics.WatchedHost
+	out           chan<- prometheus.Metric
+	chi           *metrics.WatchedCR
+	host          *metrics.WatchedHost
+	metricsFilter MetricsFilter
 }
 
 // NewCHIPrometheusWriter creates new CHI prometheus writer
@@ -51,11 +52,13 @@ func NewCHIPrometheusWriter(
 	out chan<- prometheus.Metric,
 	chi *metrics.WatchedCR,
 	host *metrics.WatchedHost,
+	metricsFilter MetricsFilter,
 ) *CHIPrometheusWriter {
 	return &CHIPrometheusWriter{
-		out:  out,
-		chi:  chi,
-		host: host,
+		out:           out,
+		chi:           chi,
+		host:          host,
+		metricsFilter: metricsFilter,
 	}
 }
 
@@ -236,7 +239,11 @@ func (w *CHIPrometheusWriter) WriteOKFetch(fetchType string) {
 
 func (w *CHIPrometheusWriter) appendHostLabel(labels map[string]string) map[string]string {
 	return util.MergeStringMapsOverwrite(labels, map[string]string{
-		"hostname": w.host.Hostname,
+		// Strip the trailing dot. WatchedHost.Hostname carries the FQDN with a trailing
+		// dot (intentional ndots:5 bypass on the connection path — see pkg/util/fqdn.go).
+		// The dot must NOT leak into Prometheus labels: it breaks string-equality matchers
+		// in Grafana panels / alert rules across deployments that don't preserve it.
+		"hostname": util.NormalizeFQDN(w.host.Hostname),
 	})
 }
 
@@ -256,6 +263,14 @@ func (w *CHIPrometheusWriter) writeSingleMetricToPrometheus(
 	value string,
 	metricLabels map[string]string,
 ) {
+	// Writer-side filter is authoritative for metric names synthesized outside the
+	// metrics scan (table parts, mutations, disks, replicas) — these never reach
+	// appendMetricRow. Names that do flow through the scan are already filtered
+	// fetch-side; re-checking here is idempotent. See appendMetricRow.
+	if IsExcluded(w.metricsFilter, name) {
+		return
+	}
+
 	// Prepare metrics labels
 	labelNames, labelValues := w.prepareLabels(metricLabels)
 	// Prepare metrics value

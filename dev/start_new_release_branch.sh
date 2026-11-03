@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Start new release branch
 
@@ -68,6 +69,11 @@ esac
 read -p "Press enter to start new release"
 echo "Starting new release: ${NEW_RELEASE}"
 
+# Pull latest master
+git checkout master
+git pull
+git pull altinity master
+
 # Create release branch
 git branch "${NEW_RELEASE}"
 git checkout "${NEW_RELEASE}"
@@ -86,4 +92,18 @@ cat "${SRC_ROOT}/release"
 head -n3 "${SRC_ROOT}/releases"
 
 echo "git status:"
-git status
+git -C "${SRC_ROOT}" status
+
+(cd "${SRC_ROOT}" && go mod vendor)
+(cd "${SRC_ROOT}" && ./dev/go_build_all.sh)
+git -C "${SRC_ROOT}" add deploy/operator/
+git -C "${SRC_ROOT}" commit -m "env: manifests"
+git -C "${SRC_ROOT}" add deploy/helm/
+git -C "${SRC_ROOT}" commit -m "env: helm chart"
+
+# Push new branch to altinity
+git push altinity
+
+# Repository status
+echo "git status:"
+git -C "${SRC_ROOT}" status

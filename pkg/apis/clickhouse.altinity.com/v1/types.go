@@ -39,8 +39,8 @@ type ClickHouseInstallation struct {
 	meta.TypeMeta   `json:",inline"            yaml:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	Spec   ChiSpec `json:"spec"               yaml:"spec"`
-	Status *Status `json:"status,omitempty"   yaml:"status,omitempty"`
+	Spec   ChiSpec `json:"spec"             yaml:"spec"`
+	Status *Status `json:"status,omitempty" yaml:"status,omitempty"`
 
 	runtime             *ClickHouseInstallationRuntime `json:"-" yaml:"-"`
 	statusCreatorMutex  sync.Mutex                     `json:"-" yaml:"-"`
@@ -71,20 +71,6 @@ func (runtime *ClickHouseInstallationRuntime) LockCommonConfig() {
 
 func (runtime *ClickHouseInstallationRuntime) UnlockCommonConfig() {
 	runtime.commonConfigMutex.Unlock()
-}
-
-func (runtime *ClickHouseInstallationRuntime) HasReferenceSoftwareVersion() bool {
-	if runtime == nil {
-		return false
-	}
-	return runtime.MinVersion != nil
-}
-
-func (runtime *ClickHouseInstallationRuntime) GetReferenceSoftwareVersion() *swversion.SoftWareVersion {
-	if runtime.HasReferenceSoftwareVersion() {
-		return runtime.MinVersion
-	}
-	return nil
 }
 
 // +genclient

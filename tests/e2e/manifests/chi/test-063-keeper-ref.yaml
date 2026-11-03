@@ -1,0 +1,16 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-063-keeper-ref
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    zookeeper:
+      keeper:
+        name: test-063-chk
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 2

@@ -24,6 +24,12 @@ The Altinity Kubernetes Operator for ClickHouse creates, configures and manages 
 - ClickHouse cluster scaling including automatic schema propagation
 - ClickHouse version upgrades
 - Exporting ClickHouse metrics to Prometheus
+- FIPS 140-3 compatible operator + metrics-exporter images
+  (`GOFIPS140=v1.0.0`, `GODEBUG=fips140=on` by default) — see
+  [Security Hardening][security_hardening] for the FIPS scope, prerequisites,
+  and opt-in strict mode. An optional ACVP responder (NIST cryptographic
+  validation protocol) is available via `-tags acvp_wrapper` builds; see
+  [`pkg/util/fips/acvp/README.md`](./pkg/util/fips/acvp/README.md).
 
 ## Community
 
@@ -34,7 +40,7 @@ The Altinity Kubernetes Operator for ClickHouse is a community effort sponsored 
 
 ## Requirements
 
- * Kubernetes 1.19+
+ * Kubernetes 1.25+
  * ClickHouse 21.11+. For older ClickHouse versions use operator 0.23.7 or earlier.
  
 ## Documentation
@@ -48,6 +54,7 @@ The Altinity Kubernetes Operator for ClickHouse is a community effort sponsored 
    * [Setting up Zookeeper][zookeeper_setup]
  * [Persistent Storage Configuration][storage_configuration]
  * [Security Hardening][security_hardening]
+ * [FIPS configuration][fips_setup]
  * [ClickHouse Installation Custom Resource specification][crd_explained]
  
 **Maintenance tasks**
@@ -71,11 +78,12 @@ The Altinity Kubernetes Operator for ClickHouse is a community effort sponsored 
  
 ## License
 
-Copyright (c) 2019-2025, Altinity Inc and/or its affiliates. All rights reserved.
+Copyright (c) 2019-2026, Altinity Inc and/or its affiliates.
 
-Altinity Kubernetes Operator for ClickHouse is licensed under the Apache License 2.0.
+Altinity Kubernetes Operator for ClickHouse is licensed under the Apache License, Version 2.0.
+See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
 
-See [LICENSE](./LICENSE) for more details.
+Third-party Go dependency attributions are listed in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
 ## Commercial Support
 
@@ -110,3 +118,5 @@ services related to ClickHouse and analytic applications on Kubernetes.
 [devspace_manual]: ./docs/devspace.md
 [all_docs_list]: ./docs/README.md
 [security_hardening]: ./docs/security_hardening.md
+[security_hardening_fips]: ./docs/security_hardening_fips.md
+[fips_setup]: ./docs/fips_setup.md

@@ -7,7 +7,7 @@ spec:
     - name: clickhouse-version
   defaults:
     templates:
-      podTemplate: pod-distribution
+      podTemplate: default
 
   configuration:
     zookeeper:
@@ -21,15 +21,12 @@ spec:
           replicasCount: 2
   templates:
     podTemplates:
-      - name: pod-distribution
+      - name: default
         # podDistribution:
         #  - scope: ClickHouseInstallation
         #    type: ClickHouseAntiAffinity
         spec:
           hostNetwork: true
           dnsPolicy: ClusterFirstWithHostNet
-          containers:
-            - name: clickhouse-pod
-              image: altinity/clickhouse-server:25.3.6.10034.altinitystable
 
 

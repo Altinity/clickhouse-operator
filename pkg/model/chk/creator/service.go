@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
@@ -71,7 +72,7 @@ func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...an
 		var host *chi.Host
 		if len(params) > 0 {
 			host = params[0].(*chi.Host)
-			return []*core.Service{m.createServiceHost(host)}
+			return m.createServiceHost(host)
 		}
 	}
 	panic("unknown service type")
@@ -85,7 +86,15 @@ func (m *ServiceManager) SetTagger(tagger interfaces.ITagger) {
 	m.tagger = tagger
 }
 
-// createServiceCR creates new core.Service for specified CR
+// createServiceCR creates new core.Service for specified CR.
+//
+// NOTE: user-supplied ServiceTemplate (spec.templates.serviceTemplate*) bypasses
+// the plaintext-port suppression that cluster.insecure=no normally enforces on
+// the default Service. If a user pairs `cluster.insecure: no` with a template
+// that still declares the legacy zk:2181 port, the Service will advertise that
+// port even though the Keeper process binds no plaintext listener — clients
+// will route to a dead endpoint. Users opting into TLS-only mode must keep
+// their templates aligned with their cluster.insecure/secure settings.
 func (m *ServiceManager) createServiceCR() []*core.Service {
 	if m.cr.IsZero() {
 		return nil
@@ -122,28 +131,95 @@ func (m *ServiceManager) createServiceCR() []*core.Service {
 		},
 		Spec: core.ServiceSpec{
 			ClusterIP: TemplateDefaultsServiceClusterIP,
-			Ports: []core.ServicePort{
-				{
-					Name:       chi.KpDefaultZKPortName,
-					Protocol:   core.ProtocolTCP,
-					Port:       chi.KpDefaultZKPortNumber,
-					TargetPort: intstr.FromString(chi.KpDefaultZKPortName),
-				},
-				{
-					Name:       chi.KpDefaultRaftPortName,
-					Protocol:   core.ProtocolTCP,
-					Port:       chi.KpDefaultRaftPortNumber,
-					TargetPort: intstr.FromString(chi.KpDefaultRaftPortName),
-				},
-			},
-			Selector: m.tagger.Selector(interfaces.SelectorCRScopeReady),
-			Type:     core.ServiceTypeClusterIP,
+			Ports:     buildZKServicePorts(crExposesInsecureZK(m.cr), crExposesSecureZK(m.cr)),
+			Selector:  m.tagger.Selector(interfaces.SelectorCRScopeReady),
+			Type:      core.ServiceTypeClusterIP,
 			// ExternalTrafficPolicy: core.ServiceExternalTrafficPolicyTypeLocal, // For core.ServiceTypeLoadBalancer only
 		},
 	}
 	m.labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 
 	return []*core.Service{svc}
+}
+
+// buildZKServicePorts is a pure helper that constructs the ZK + Raft port
+// list for the CR-scope Service. When any host exposes the secure (TLS) ZK
+// port, the zk-secure:2281 port is appended alongside the plaintext zk:2181.
+// Raft is always present. Order is stable: insecure → secure → raft.
+func buildZKServicePorts(insecure, secure bool) []core.ServicePort {
+	ports := make([]core.ServicePort, 0, 3)
+	if insecure {
+		ports = append(ports, core.ServicePort{
+			Name:       chi.KpDefaultZKPortName,
+			Protocol:   core.ProtocolTCP,
+			Port:       chi.KpDefaultZKPortNumber,
+			TargetPort: intstr.FromString(chi.KpDefaultZKPortName),
+		})
+	}
+	if secure {
+		ports = append(ports, core.ServicePort{
+			Name:       chi.KpDefaultZKSecurePortName,
+			Protocol:   core.ProtocolTCP,
+			Port:       chi.KpDefaultZKSecurePortNumber,
+			TargetPort: intstr.FromString(chi.KpDefaultZKSecurePortName),
+		})
+	}
+	ports = append(ports, core.ServicePort{
+		Name:       chi.KpDefaultRaftPortName,
+		Protocol:   core.ProtocolTCP,
+		Port:       chi.KpDefaultRaftPortNumber,
+		TargetPort: intstr.FromString(chi.KpDefaultRaftPortName),
+	})
+	return ports
+}
+
+// crExposesInsecureZK reports whether any host in the CR opts into publishing
+// the plaintext Keeper client port (zk:2181) on Kubernetes Services and on
+// StatefulSet container ports. A host opts in implicitly via the default
+// (host.IsInsecure() returns true unless cluster.insecure or host.insecure is
+// explicitly "no"). A CR with no hosts returns true so legacy/empty CRs are
+// byte-identical at the Service layer.
+//
+// When the host opts out the K8s-level exposure is dropped AND the per-host
+// XML overlay emits <tcp_port remove="1"/> so the Keeper process binds no
+// plaintext listener at all (loopback included). The liveness probe falls
+// back to pgrep because upstream 4LW does not work over the secure port.
+func crExposesInsecureZK(cr chi.ICustomResource) bool {
+	if cr == nil {
+		return true
+	}
+	exposed := false
+	hasHosts := false
+	cr.WalkHosts(func(h *chi.Host) error {
+		hasHosts = true
+		if (h != nil) && h.IsInsecure() && h.ZKPort.HasValue() {
+			exposed = true
+		}
+		return nil
+	})
+	if !hasHosts {
+		return true
+	}
+	return exposed
+}
+
+// crExposesSecureZK reports whether any host in the CR has the secure (TLS)
+// ZK port set. Returns false when no host is secure-configured — keeps the
+// emitted Service byte-identical to legacy behavior for non-adopters.
+// Asymmetric with crExposesInsecureZK: a CR with no hosts returns false
+// here (secure is opt-in) but true there (insecure is the legacy default).
+func crExposesSecureZK(cr chi.ICustomResource) bool {
+	if cr == nil {
+		return false
+	}
+	exposed := false
+	cr.WalkHosts(func(h *chi.Host) error {
+		if (h != nil) && h.ZKPortSecure.HasValue() {
+			exposed = true
+		}
+		return nil
+	})
+	return exposed
 }
 
 // createServiceCluster creates new core.Service for specified Cluster
@@ -196,33 +272,59 @@ func (m *ServiceManager) createServiceShard(shard chi.IShard) *core.Service {
 	return nil
 }
 
-// createServiceHost creates new core.Service for specified host
-func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
+// createServiceHost builds the per-host (replica-level) Services for a Keeper host.
+//
+// When the user supplies a replicaServiceTemplate it is honored as-is (single Service) — the
+// user is in full control and back-compat is preserved.
+//
+// Otherwise two operator-managed headless Services are emitted (issue #1982):
+//   - peer   : intra-keeper Raft + StatefulSet pod DNS. publishNotReadyAddresses=true so Raft
+//     peers can reach each other BEFORE pods are Ready and bootstrap quorum. Keeps the existing
+//     NameStatefulSetService name + LabelServiceHost label → byte-identical to the pre-split
+//     layout, no pod re-roll, and the Raft <hostname>/STS serviceName binding is unchanged.
+//   - client : ClickHouse-facing. publishNotReadyAddresses=false so DNS only resolves Ready
+//     Keeper nodes; raft port omitted. The keeper-ref resolver selects this tier via
+//     LabelServiceHostClient so clients never connect to a not-yet-Ready Keeper.
+func (m *ServiceManager) createServiceHost(host *chi.Host) []*core.Service {
 	if host.IsZero() {
 		return nil
 	}
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return creator.CreateServiceFromTemplate(
-			template,
-			host.GetRuntime().GetAddress().GetNamespace(),
-			m.namer.Name(interfaces.NameStatefulSetService, host),
-			m.tagger.Label(interfaces.LabelServiceHost, host),
-			m.tagger.Annotate(interfaces.AnnotateServiceHost, host),
-			m.tagger.Selector(interfaces.SelectorHostScope, host),
-			m.or.CreateOwnerReferences(m.cr),
-			m.macro.Scope(host),
-			m.labeler,
-		)
+		return []*core.Service{
+			creator.CreateServiceFromTemplate(
+				template,
+				host.GetRuntime().GetAddress().GetNamespace(),
+				m.namer.Name(interfaces.NameStatefulSetService, host),
+				m.tagger.Label(interfaces.LabelServiceHost, host),
+				m.tagger.Annotate(interfaces.AnnotateServiceHost, host),
+				m.tagger.Selector(interfaces.SelectorHostScope, host),
+				m.or.CreateOwnerReferences(m.cr),
+				m.macro.Scope(host),
+				m.labeler,
+			),
+		}
 	}
 
-	// Create default Service
-	// We do not have .templates.ServiceTemplate specified or it is incorrect
+	// No user template - emit the two default per-host Services.
+	peer := m.buildDefaultHostService(host,
+		m.namer.Name(interfaces.NameStatefulSetService, host), interfaces.LabelServiceHost,
+		true /* publishNotReady */, true /* includeRaftPort */)
+	client := m.buildDefaultHostService(host,
+		m.namer.Name(interfaces.NameStatefulSetServiceClient, host), interfaces.LabelServiceHostClient,
+		false /* publishNotReady */, false /* includeRaftPort */)
+	return []*core.Service{peer, client}
+}
+
+// buildDefaultHostService builds one operator-managed headless per-host Service. publishNotReady
+// toggles ServiceSpec.PublishNotReadyAddresses; includeRaftPort keeps the Raft port (peer) or
+// drops it (client, which only needs the ZK client ports).
+func (m *ServiceManager) buildDefaultHostService(host *chi.Host, name string, label interfaces.LabelType, publishNotReady, includeRaftPort bool) *core.Service {
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            m.namer.Name(interfaces.NameStatefulSetService, host),
+			Name:            name,
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          m.macro.Scope(host).Map(m.tagger.Label(interfaces.LabelServiceHost, host)),
+			Labels:          m.macro.Scope(host).Map(m.tagger.Label(label, host)),
 			Annotations:     m.macro.Scope(host).Map(m.tagger.Annotate(interfaces.AnnotateServiceHost, host)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
@@ -230,10 +332,54 @@ func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 			Selector:                 m.tagger.Selector(interfaces.SelectorHostScope, host),
 			ClusterIP:                TemplateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
-			PublishNotReadyAddresses: true,
+			PublishNotReadyAddresses: publishNotReady,
 		},
 	}
-	creator.SvcAppendSpecifiedPorts(svc, host)
+	appendHostExposedPorts(svc, host, includeRaftPort)
 	m.labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
+}
+
+// appendHostExposedPorts walks the host's specified ports and emits them onto
+// the per-host Service, with one CHK-local rule: the plaintext zk port is
+// suppressed when the host opts out (`host.IsInsecure() == false`). The
+// matching per-host XML overlay emits <tcp_port remove="1"/> so the Keeper
+// process binds no plaintext listener at all; liveness probe falls back to
+// pgrep. Other ports (zk-secure, raft) flow through unchanged.
+func appendHostExposedPorts(svc *core.Service, host *chi.Host, includeRaftPort bool) {
+	host.WalkSpecifiedPorts(func(name string, port *types.Int32, protocol core.Protocol) bool {
+		if (name == chi.KpDefaultZKPortName) && !host.IsInsecure() {
+			return false
+		}
+		// The client-facing Service omits the Raft port — clients only use the ZK client ports.
+		if (name == chi.KpDefaultRaftPortName) && !includeRaftPort {
+			return false
+		}
+		svc.Spec.Ports = append(svc.Spec.Ports, core.ServicePort{
+			Name:       name,
+			Protocol:   protocol,
+			Port:       port.Value(),
+			TargetPort: intstr.FromInt(port.IntValue()),
+		})
+		return false
+	})
+}
+
+// appendHostExposedContainerPorts mirrors appendHostExposedPorts but emits onto
+// a Container's port list (StatefulSet pod template). Suppresses the plaintext
+// zk containerPort when the host opts out of insecure exposure; the per-host
+// XML overlay correspondingly emits <tcp_port remove="1"/> so the Keeper
+// process binds no plaintext listener.
+func appendHostExposedContainerPorts(container *core.Container, host *chi.Host) {
+	host.WalkSpecifiedPorts(func(name string, port *types.Int32, protocol core.Protocol) bool {
+		if (name == chi.KpDefaultZKPortName) && !host.IsInsecure() {
+			return false
+		}
+		container.Ports = append(container.Ports, core.ContainerPort{
+			Name:          name,
+			ContainerPort: port.Value(),
+			Protocol:      protocol,
+		})
+		return false
+	})
 }

@@ -1,0 +1,70 @@
+# EXPERIMENTAL: operator-managed backup, see docs/backup.md
+#
+# A one-off backup of the "backup-demo" ClickHouseInstallation
+# (docs/chb-examples/01-chi-with-backup.yaml) due once at a later time: before a maintenance window,
+# say. Until then it stays Pending, its Validated condition False with the reason
+# WaitingForScheduledTime and the time in UTC; spec.scheduledTime can still be changed, or the
+# backup deleted. At that time it is validated against the installation as it is then, runs as any
+# one-off backup does, and is named after that time: backup-demo-later-<Unix time>, here
+# backup-demo-later-1792454400.
+#
+# A backup that cannot start then - the operator is down, the installation reconciles, another
+# backup or restore of a cluster runs - starts as soon as it can, unless
+# spec.startingDeadlineSeconds has passed: the backup, or the cluster whose Job is not created by
+# then, fails with StartingDeadlineExceeded, telling what it waited for. Keep a deadline of a minute
+# or more: the operator checks a second after the backup is due. A backup kept in git and applied
+# after its spec.scheduledTime runs at once unless its deadline has passed.
+#
+# For recurring backups, use a schedule (04); for the backup a schedule makes, at a later time, add
+# spec.scheduleRef in place of spec.clickHouseInstallation, the backup options and spec.backupName
+# (05).
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackup"
+metadata:
+  name: backup-demo-later
+spec:
+  clickHouseInstallation: backup-demo
+
+  # Only this cluster (cannot be changed later); left out, every backup-enabled cluster of the
+  # installation.
+  # cluster: main
+
+  # The name of the backup in the storage, the same on every cluster: a restore, or an incremental
+  # backup through its spec.diffFromRemote, refers to the backup by this name.
+  # Left empty, the operator generates it from its metadata.name and the Unix time the backup is due
+  # (its creation, or spec.scheduledTime), here backup-demo-later-1792454400, and shows it in
+  # status.backupName. Creating this resource again later makes another backup only with neither
+  # spec.backupName nor spec.scheduledTime; otherwise that run fails before changing anything, as a
+  # backup of that name is in the storage already. An explicit name holds letters, digits, "_", "-"
+  # and "." (starting with a letter or digit, no "..", at most 128 characters) and must not end like
+  # the backups of a schedule, -YYYYMMDD-HHMMSS: the retention of a schedule whose prefix it carries
+  # would take it for one of its own and delete it.
+  # backupName: before-maintenance
+
+  # Run the backup at this later time rather than when it is created, for instance before a
+  # maintenance window: an RFC 3339 time with its offset, or Z for UTC. Until then the backup stays
+  # Pending, its Validated condition False with the reason WaitingForScheduledTime, and the time can
+  # still be changed, or the backup deleted. At that time it is validated against the installation
+  # as it is then, and runs as any backup does. A time already past starts the backup at once,
+  # unless spec.startingDeadlineSeconds has passed too: keep one on a backup kept in git, which may
+  # be created again later.
+  scheduledTime: "2026-10-20T02:00:00+02:00"
+
+  # How many seconds after it is due (its creation, or spec.scheduledTime) the backup may still
+  # start. It starts on a cluster when the operator creates the cluster's Job, which waits, for
+  # instance, until the installation has completed its reconcile and no other backup or restore runs
+  # on the cluster. Past the deadline, a backup still not validated (an invalid spec, say) fails, as
+  # does each cluster whose Job is not created yet, with the reason StartingDeadlineExceeded and
+  # what it waited for; clusters already running finish. Unset, the backup waits as long as it
+  # takes. The operator checks a second after the backup is due, so keep it a minute or more. How
+  # long a Job may run once started is spec.activeDeadlineSeconds: the backup's own, or with
+  # spec.scheduleRef the schedule's.
+  startingDeadlineSeconds: 3600
+
+  # Check that the backup can be read back. Once it has completed on every cluster, a second Job
+  # per cluster downloads it from the storage on the first replica of each shard, checks that
+  # clickhouse-backup lists the download as complete, and deletes it again, touching no table.
+  # The data disk needs room for one copy of the backup meanwhile, and with AllReplicas the copies
+  # of the other replicas are not downloaded. The outcome is the Verified condition, Verified or
+  # VerificationFailed; a backup that failed on any cluster is not verified. Off by default.
+  verify: true

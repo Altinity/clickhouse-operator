@@ -1,0 +1,45 @@
+# Reconcile hooks: Per-host replication queue management
+#
+# Problem: When a host restarts during reconcile, its replication queue
+# may accumulate entries and distributed sends may fail.
+#
+# Solution: Host-level hooks pause replication and distributed sends
+# before each host is reconciled, and resume them after. These hooks
+# run on every host individually (not once per cluster).
+#
+# Host hooks are defined at CHI level (spec.reconcile.host.hooks) and
+# automatically inherited by all clusters.
+#
+# `events:` scopes the pause to only fire when this host is actually about
+# to go down (HostShutdown = Stop OR ConfigRestart OR Rollout). The
+# resume hook fires on every regular reconcile (HostUpdate) so the
+# replication queues come back even if the operator restarted mid-cycle.
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "hooks-replication"
+spec:
+  reconcile:
+    host:
+      hooks:
+        pre:
+          - sql:
+              queries:
+                - "SYSTEM STOP REPLICATION QUEUES"
+                - "SYSTEM STOP DISTRIBUTED SENDS"
+            events:
+              - HostShutdown
+        post:
+          - sql:
+              queries:
+                - "SYSTEM START REPLICATION QUEUES"
+                - "SYSTEM START DISTRIBUTED SENDS"
+            events:
+              - HostUpdate
+  configuration:
+    clusters:
+      - name: "main"
+        layout:
+          shardsCount: 3
+          replicasCount: 2

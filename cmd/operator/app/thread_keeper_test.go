@@ -3,11 +3,16 @@ package app
 import (
 	"testing"
 
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
+
+// keeperPredicate intentionally does NOT pre-filter on Spec.Suspend (mirrors the
+// behavior of pkg/controller/chi/ShouldEnqueue). The CHK reconciler handles suspend
+// itself; pre-filtering at the informer level would prevent the reconciler from
+// observing suspend-driven state transitions.
 
 func Test_keeperPredicateCreate(t *testing.T) {
 	tests := []struct {
@@ -16,23 +21,23 @@ func Test_keeperPredicateCreate(t *testing.T) {
 		evt  event.CreateEvent
 	}{
 		{
-			name: "skips create when suspended",
-			want: false,
-			evt: event.CreateEvent{
-				Object: &api.ClickHouseKeeperInstallation{
-					Spec: api.ChkSpec{
-						Suspend: types.NewStringBool(true),
-					},
-				},
-			},
-		},
-		{
-			name: "queues create when not suspended",
+			name: "queues create for a non-suspended CHK",
 			want: true,
 			evt: event.CreateEvent{
 				Object: &api.ClickHouseKeeperInstallation{
 					Spec: api.ChkSpec{
 						Suspend: types.NewStringBool(false),
+					},
+				},
+			},
+		},
+		{
+			name: "queues create even when suspended (reconciler handles suspend)",
+			want: true,
+			evt: event.CreateEvent{
+				Object: &api.ClickHouseKeeperInstallation{
+					Spec: api.ChkSpec{
+						Suspend: types.NewStringBool(true),
 					},
 				},
 			},
@@ -55,23 +60,23 @@ func Test_keeperPredicateUpdate(t *testing.T) {
 		evt  event.UpdateEvent
 	}{
 		{
-			name: "skips update when suspended",
-			want: false,
-			evt: event.UpdateEvent{
-				ObjectNew: &api.ClickHouseKeeperInstallation{
-					Spec: api.ChkSpec{
-						Suspend: types.NewStringBool(true),
-					},
-				},
-			},
-		},
-		{
-			name: "queues update when not suspended",
+			name: "queues update for a non-suspended CHK",
 			want: true,
 			evt: event.UpdateEvent{
 				ObjectNew: &api.ClickHouseKeeperInstallation{
 					Spec: api.ChkSpec{
 						Suspend: types.NewStringBool(false),
+					},
+				},
+			},
+		},
+		{
+			name: "queues update even when suspended (reconciler handles suspend)",
+			want: true,
+			evt: event.UpdateEvent{
+				ObjectNew: &api.ClickHouseKeeperInstallation{
+					Spec: api.ChkSpec{
+						Suspend: types.NewStringBool(true),
 					},
 				},
 			},

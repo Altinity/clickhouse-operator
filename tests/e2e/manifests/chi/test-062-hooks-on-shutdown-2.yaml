@@ -1,0 +1,35 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-062-hooks
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  useTemplates:
+    - name: clickhouse-version
+  reconcile:
+    host:
+      hooks:
+        pre:
+          - sql:
+              queries:
+                - "SELECT 'host_onshutdown_hook_marker'"
+            events:
+              - HostShutdown
+  configuration:
+    # Adding a server-level setting forces a software restart on the existing host
+    # (shouldForceRestartHost → true via IsConfigurationChangeRequiresReboot). That
+    # triggers HostConfigRestart → HostShutdown → the events:[HostShutdown] hook fires.
+    #
+    # IMPORTANT: pick a setting that's NOT in the operator's hot-reload exception
+    # list (see the configurationRestartPolicy rules in config/config.yaml) and
+    # not changeable_without_restart = Yes in system.server_settings. test_062
+    # checks the latter before applying this manifest.
+    settings:
+      max_connections: 1024
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1

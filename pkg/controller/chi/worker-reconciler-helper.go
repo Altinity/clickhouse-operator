@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"errors"
 	"math"
 	"sync"
 
@@ -23,7 +24,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) *swversion.SoftWareVersion {
@@ -70,8 +70,8 @@ func (w *worker) isHostSoftwareAbleToRespond(ctx context.Context, host *api.Host
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shards reconcile
 func (w *worker) getReconcileShardsWorkersNum(cluster *api.Cluster, opts *common.ReconcileShardsAndHostsOptions) int {
-	availableWorkers := float64(cluster.Reconcile.Runtime.ReconcileShardsThreadsNumber)
-	maxConcurrencyPercent := float64(cluster.Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
+	availableWorkers := float64(cluster.GetReconcile().Runtime.ReconcileShardsThreadsNumber)
+	maxConcurrencyPercent := float64(cluster.GetReconcile().Runtime.ReconcileShardsMaxConcurrencyPercent)
 	_100Percent := float64(100)
 	shardsNum := float64(len(cluster.Layout.Shards))
 
@@ -126,6 +126,9 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 
 	// Launch workers
 	var err error
+	// Tracked apart from err: a deferral is a routine outcome, and last-writer-wins would let
+	// one silently overwrite a real shard failure.
+	var deferred bool
 	var errLock sync.Mutex
 	for i := 0; i < workersNum; i++ {
 		wg.Add(1)
@@ -135,7 +138,11 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 				w.a.V(1).Info("Starting shard index: %d on worker", rq.index)
 				if e := w.reconcileShardWithHosts(ctx, rq.shard); e != nil {
 					errLock.Lock()
-					err = e
+					if errors.Is(e, common.ErrCRUDDeferred) {
+						deferred = true
+					} else {
+						err = e
+					}
 					errLock.Unlock()
 				}
 			}
@@ -145,43 +152,11 @@ func (w *worker) runConcurrently(ctx context.Context, workersNum int, startShard
 	w.a.V(1).Info("Starting to wait shards from index: %d on workers.", startShardIndex)
 	wg.Wait()
 	w.a.V(1).Info("Finished to wait shards from index: %d on workers.", startShardIndex)
-	return err
-}
-
-func (w *worker) runConcurrentlyInBatches(ctx context.Context, workersNum int, start int, shards []*api.ChiShard) error {
-	for startShardIndex := 0; startShardIndex < len(shards); startShardIndex += workersNum {
-		endShardIndex := util.IncTopped(startShardIndex, workersNum, len(shards))
-		concurrentlyProcessedShards := shards[startShardIndex:endShardIndex]
-		w.a.V(1).Info("Starting shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
-
-		// Processing error protected with mutex
-		var err error
-		var errLock sync.Mutex
-
-		wg := sync.WaitGroup{}
-		wg.Add(len(concurrentlyProcessedShards))
-		// Launch shard concurrent processing
-		for j := range concurrentlyProcessedShards {
-			shard := concurrentlyProcessedShards[j]
-			w.a.V(1).Info("Starting shard on worker. Shard index: %d", start+startShardIndex+j)
-			go func() {
-				defer wg.Done()
-				w.a.V(1).Info("Starting shard on goroutine. Shard index: %d", start+startShardIndex+j)
-				if e := w.reconcileShardWithHosts(ctx, shard); e != nil {
-					errLock.Lock()
-					err = e
-					errLock.Unlock()
-				}
-				w.a.V(1).Info("Finished shard on goroutine. Shard index: %d", start+startShardIndex+j)
-			}()
-		}
-		w.a.V(1).Info("Starting to wait shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
-		wg.Wait()
-		w.a.V(1).Info("Finished to wait shards from index: %d on workers. Shards indexes [%d:%d)", start+startShardIndex, start+startShardIndex, start+endShardIndex)
-		if err != nil {
-			w.a.V(1).Warning("Skipping rest of shards due to an error: %v", err)
-			return err
-		}
+	if err != nil {
+		return err
+	}
+	if deferred {
+		return common.ErrCRUDDeferred
 	}
 	return nil
 }
@@ -197,6 +172,30 @@ func (w *worker) hostPVCsDataLossDetectedOptions(host *api.Host) (*statefulset.R
 
 	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
 	migrateTableOpts := NewMigrateTableOptions().SetForceMigrate().SetForceDropReplicaUponStorageLoss()
+	return stsReconcileOpts, migrateTableOpts
+}
+
+// hostPVCsDataVolumeAddedDetectedOptions is the response to a volume being ADDED to a host that
+// already has data.
+//
+// Two things are needed, and only two:
+//  1. Re-create the StatefulSet so the new mount takes effect.
+//  2. Force a table migration afterwards. Re-creating the pod wipes every non-persistent object the
+//     operator had migrated onto it - notably Engine=Memory databases and views, which live in RAM,
+//     are not ZK-replicated, and have nothing to restore them. HostCreateTables issues
+//     CREATE ... IF NOT EXISTS, so persistent objects are untouched. Dropping this step is what
+//     broke test_010036 ("checking view in Memory engine exists"): the view never came back.
+//
+// What must NOT happen is SetForceDropReplicaUponStorageLoss. Nothing was lost, so tearing the ZK
+// replica down and rebuilding it is destructive busywork - that is the whole point of splitting this
+// path away from hostPVCsDataLossDetectedOptions.
+func (w *worker) hostPVCsDataVolumeAddedDetectedOptions(host *api.Host) (*statefulset.ReconcileOptions, *migrateTableOptions) {
+	w.a.V(1).
+		M(host).F().
+		Info("Volume added to host: %s. Will recreate StatefulSet and re-migrate tables, without replica drop", host.GetName())
+
+	stsReconcileOpts := statefulset.NewReconcileStatefulSetOptions().SetForceRecreate()
+	migrateTableOpts := NewMigrateTableOptions().SetForceMigrate()
 	return stsReconcileOpts, migrateTableOpts
 }
 

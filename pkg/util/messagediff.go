@@ -64,14 +64,12 @@ func PrintPath(path *messagediff.Path, defaultPath string) (res string) {
 }
 
 func PrintTrimmedValue(value any) string {
-	valueFull := fmt.Sprintf("%s", Dump(value))
-	ln := len(valueFull)
-	if (0 < ln) && (ln < 300) {
-		return valueFull
-	} else {
-		valueShort := fmt.Sprintf("%+v", value)
-		return valueShort
+	const maxLen = 256
+	str := Dump(value)
+	if len(str) <= maxLen {
+		return str
 	}
+	return str[:maxLen] + "...(value truncated for brevity)"
 }
 
 // MessageDiffItemString stringifies one map[*messagediff.Path]interface{} item

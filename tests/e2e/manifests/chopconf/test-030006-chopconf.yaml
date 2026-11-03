@@ -1,0 +1,24 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-030006-chopconf"
+spec:
+  logger:
+    v: "2"
+  security:
+    clickhouse:
+      tls:
+        verify: None
+        minVersion: "1.2"
+    zookeeper:
+      tls:
+        verify: None
+        minVersion: "1.2"
+    kubernetes:
+      tls:
+        verify: None
+        minVersion: "1.2"
+    ipc:
+      mode: Plain
+    fips:
+      enforced: "true"

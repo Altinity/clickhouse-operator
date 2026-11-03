@@ -65,21 +65,11 @@ EOF
 }
 
 # Iterate recursively over files in "${TEMPLATES_DIR}" and render them
-find "${TEMPLATES_DIR}" -type f -printf '%P\n' | while read -r relative_file_name
-do
-    # Source
-    # Full path to source file
-    src_file_path=$(realpath "${TEMPLATES_DIR}/${relative_file_name}")
-    relative_dir_name=$(dirname "${relative_file_name}")
-
-    # Destination
-    dst_dir="${CONFIG_DIR}/${relative_dir_name}"
-    #echo "relative_file_name: ${relative_file_name}"
-    #echo "relative_dir_name: ${relative_dir_name}"
-    #echo "create dst dir: ${dst_dir}"
-    mkdir -p "${dst_dir}"
-
-    dst_file_path="${CONFIG_DIR}/${relative_file_name}"
+find "${TEMPLATES_DIR}" -type f | while IFS= read -r fullpath; do
+    # Mirror tree: templates root -> CONFIG_DIR (same relative paths)
+    src_file_path=$(realpath "${fullpath}")
+    dst_file_path="${CONFIG_DIR}/${fullpath#"${TEMPLATES_DIR}/"}"    
+    mkdir -p "$(dirname "${dst_file_path}")"
     #echo "render ${dst_file_path}"
     #echo "from   ${src_file_path}"
     render_file "${src_file_path}" "${dst_file_path}"

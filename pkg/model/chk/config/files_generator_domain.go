@@ -30,6 +30,10 @@ func NewFilesGeneratorDomain(configGenerator *Generator) *FilesGeneratorDomain {
 
 func (c *FilesGeneratorDomain) CreateConfigFilesGroupCommon(configSections map[string]string, options *FilesGeneratorOptions) {
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configRaft), c.configGenerator.getRaftConfig(options.GetRaftOptions()))
+	// Plaintext-port removal must live in the common dir (keeper_config.d) to
+	// win the merge against the static <tcp_port> shipped there; see
+	// Generator.getPlaintextListenerRemoval.
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configListenersCommon), c.configGenerator.getPlaintextListenerRemoval())
 }
 
 func (c *FilesGeneratorDomain) CreateConfigFilesGroupUsers(configSections map[string]string) {
@@ -37,4 +41,5 @@ func (c *FilesGeneratorDomain) CreateConfigFilesGroupUsers(configSections map[st
 
 func (c *FilesGeneratorDomain) CreateConfigFilesGroupHost(configSections map[string]string, options *FilesGeneratorOptions) {
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configServerId), c.configGenerator.getHostServerId(options.GetHost()))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configListeners), c.configGenerator.getHostListenersOverride(options.GetHost()))
 }

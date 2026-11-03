@@ -1,0 +1,10 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+metadata:
+  name: test-036-1-on-lost-volume-no
+spec:
+  reconcile:
+    host:
+      drop:
+        replicas:
+          onLostVolume: "no"

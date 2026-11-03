@@ -22,20 +22,26 @@ func NormalizeVolumeClaimTemplate(template *api.VolumeClaimTemplate) {
 	// Skip for now
 
 	// StorageManagement
-	normalizeStorageManagement(&template.StorageManagement)
+	NormalizeStorageManagement(&template.StorageManagement)
 
 	// Check Spec
 	// Skip for now
 }
 
-// normalizeStorageManagement normalizes StorageManagement
-func normalizeStorageManagement(storage *api.StorageManagement) {
-	// Check PVCProvisioner
+// NormalizeStorageManagement normalizes StorageManagement: it folds the letter-casing
+// of PVCProvisioner / PVCReclaimPolicy to their canonical consts (so both humped and
+// all-lowercase CRD inputs are accepted), then resets any unrecognized value to
+// Unspecified. Exported so callers normalizing a bare StorageManagement (e.g.
+// spec.defaults.storageManagement) reuse the same folding+validation.
+func NormalizeStorageManagement(storage *api.StorageManagement) {
+	// PVCProvisioner — fold casing to canonical, then validate.
+	storage.PVCProvisioner = storage.PVCProvisioner.Normalize()
 	if !storage.PVCProvisioner.IsValid() {
 		storage.PVCProvisioner = api.PVCProvisionerUnspecified
 	}
 
-	// Check PVCReclaimPolicy
+	// PVCReclaimPolicy — fold casing to canonical, then validate.
+	storage.PVCReclaimPolicy = storage.PVCReclaimPolicy.Normalize()
 	if !storage.PVCReclaimPolicy.IsValid() {
 		storage.PVCReclaimPolicy = api.PVCReclaimPolicyUnspecified
 	}

@@ -15,6 +15,8 @@
 package namer
 
 import (
+	"fmt"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -81,6 +83,9 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	case interfaces.NameStatefulSetService:
 		host := params[0].(*api.Host)
 		return n.createStatefulSetServiceName(host)
+	case interfaces.NameStatefulSetServiceClient:
+		host := params[0].(*api.Host)
+		return n.createStatefulSetServiceClientName(host)
 	case interfaces.NamePodHostname:
 		host := params[0].(*api.Host)
 		return n.createPodHostname(host)
@@ -98,12 +103,25 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 		return n.createClusterPDBName(cluster)
 
 	default:
+		// Delegate any type not handled above to the common namer, whose Name()
+		// has no default case and panics on an unspecified type. That is the
+		// single fail-loud guard, so an unknown type cannot sneak through to a
+		// silent zero-value return here.
 		return n.commonNamer.Name(what, params...)
 	}
-
-	panic("unknown name type")
 }
 
 func (n *Namer) Names(what interfaces.NameType, params ...any) []string {
 	return nil
+}
+
+// ServiceFQDN builds a FQDN for a given service name and namespace,
+// respecting the optional namespaceDomainPattern (e.g., from CHI spec).
+// Use this when you already have a service name and just need the domain suffix applied.
+func (n *Namer) ServiceFQDN(serviceName, namespace string, namespaceDomainPattern *types.String) string {
+	pattern := patternServiceFQDN
+	if namespaceDomainPattern.HasValue() {
+		pattern = "%s." + namespaceDomainPattern.Value()
+	}
+	return fmt.Sprintf(pattern, serviceName, namespace)
 }

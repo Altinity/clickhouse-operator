@@ -300,11 +300,15 @@ func (s *Settings) SetScalarsFromMap(m map[string]string) *Settings {
 	return s
 }
 
-// Keys gets keys of the settings
+// Keys gets keys of the settings in alphabetical order
 func (s *Settings) Keys() (keys []string) {
 	s.WalkKeys(func(key string, setting *Setting) {
 		keys = append(keys, key)
 	})
+
+	// Sort keys to ensure deterministic ordering for Kubernetes manifest stability.
+	// Consistent ordering prevents unnecessary resource updates during reconciliation.
+	sort.Strings(keys)
 	return keys
 }
 
@@ -440,19 +444,29 @@ func (s *Settings) GetZKPort() *types.Int32 {
 	return s.getInt32Ptr("keeper_server/tcp_port")
 }
 
+// GetZKPortSecure gets Zookeeper secure (TLS) port from settings
+func (s *Settings) GetZKPortSecure() *types.Int32 {
+	return s.getInt32Ptr("keeper_server/tcp_port_secure")
+}
+
 // GetRaftPort gets Raft port from settings
 func (s *Settings) GetRaftPort() *types.Int32 {
 	return s.getInt32Ptr("keeper_server/raft_configuration/server/port")
 }
 
-// MergeFrom merges into `dst` non-empty new-key-values from `from` in case no such `key` already in `src`
-func (s *Settings) MergeFrom(from *Settings) *Settings {
+// MergeFrom merges `from` into the receiver: override replaces a key the receiver already has, fill-empty keeps it
+func (s *Settings) MergeFrom(from *Settings, _type MergeType) *Settings {
 	if from.Len() == 0 {
 		return s
 	}
 
+	s = s.Ensure()
+	set := s.SetIfNotExists
+	if _type == MergeTypeOverrideByNonEmptyValues {
+		set = s.Set
+	}
 	from.Walk(func(key string, setting *Setting) {
-		s = s.Ensure().SetIfNotExists(key, setting.Clone())
+		set(key, setting.Clone())
 	})
 
 	return s
@@ -583,6 +597,7 @@ func (s *Settings) AsSortedSliceOfStrings() []string {
 	return res
 }
 
+// +k8s:deepcopy-gen=false
 type SettingsNormalizerOptions struct {
 	Replacers []*util.Replacer
 }

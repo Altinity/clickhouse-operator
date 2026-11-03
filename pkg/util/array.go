@@ -203,3 +203,62 @@ func SlicesIntersect[T comparable](a, b []T) (intersection []T) {
 	}
 	return intersection
 }
+
+// SliceContainsAny reports whether haystack contains at least one of the needles.
+// Generic variant of "is any of these in that slice"; uses == for element equality
+// (constraint: comparable). For non-comparable element types or custom equality,
+// loop with your own predicate at the call site.
+//
+// Variadic for ergonomic call sites: SliceContainsAny(events, A, B, C).
+// Empty needles → false (nothing to find).
+func SliceContainsAny[T comparable](haystack []T, needles ...T) bool {
+	for _, n := range needles {
+		for _, h := range haystack {
+			if h == n {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// SlicesEqualAsSet reports whether two slices describe the same multiset of
+// elements — same length, same elements with same multiplicities, ANY order.
+// Uses == for element equality (constraint: comparable). For element types that
+// need a custom equality predicate, use SlicesEqualAsSetFunc.
+//
+// O(n*m). Fine for the small lists this is intended for (zookeeper nodes,
+// hook event lists). For larger sets prefer a multiset-map approach at the
+// call site.
+//
+// Nil and empty are equivalent (both have length 0).
+func SlicesEqualAsSet[T comparable](a, b []T) bool {
+	return SlicesEqualAsSetFunc(a, b, func(x, y T) bool { return x == y })
+}
+
+// SlicesEqualAsSetFunc is the closure-driven variant of SlicesEqualAsSet for
+// non-comparable element types or types with custom equality semantics
+// (e.g. structs that expose an Equal method).
+func SlicesEqualAsSetFunc[T any](a, b []T, equal func(x, y T) bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	matched := make([]bool, len(b))
+	for _, ae := range a {
+		found := false
+		for j, be := range b {
+			if matched[j] {
+				continue
+			}
+			if equal(ae, be) {
+				matched[j] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}

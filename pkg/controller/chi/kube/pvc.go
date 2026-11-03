@@ -23,6 +23,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 )
@@ -43,8 +44,9 @@ func (c *PVC) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*cor
 }
 
 func (c *PVC) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
-	ctx = k8sCtx(ctx)
-	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, controller.NewGetOptions())
+	return commonKube.GetWithRetry(ctx, func() (*core.PersistentVolumeClaim, error) {
+		return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(k8sCtx(ctx), name, controller.NewGetOptions())
+	})
 }
 
 func (c *PVC) Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
