@@ -35,57 +35,97 @@ const (
 		WHERE is_session_expired
 	`
 
+	// Columns: metric, value, description, type, key. The key is the label value of a key-value
+	// asynchronous metric (a CPU core, a block device, a network interface...) and is empty otherwise.
 	queryMetricsSQLTemplate = `
     	SELECT
         	concat('metric.', metric) AS metric,
         	toString(value)           AS value,
         	''                        AS description,
-        	'gauge'                   AS type
+        	'gauge'                   AS type,
+        	''                        AS key
     	FROM %s
 	    UNION ALL
-    	SELECT
-        	concat('metric.', metric) AS metric,
-        	toString(value)           AS value,
-        	''                        AS description,
-        	'gauge'                   AS type
-    	FROM system.asynchronous_metrics
+%s
 	    UNION ALL
 	    SELECT
 	        concat('event.', event)   AS metric,
 	        toString(value)           AS value,
 	        ''                        AS description,
-	        'counter'                 AS type
+	        'counter'                 AS type,
+               '' AS key
 	    FROM system.events
 	    UNION ALL
 	    SELECT
 	        'metric.MemoryDictionaryBytesAllocated'  AS metric,
 	        toString(sum(bytes_allocated))           AS value,
 	        'Memory size allocated for dictionaries' AS description,
-	        'gauge'                                  AS type
+	        'gauge'                                  AS type,
+               '' AS key
 	    FROM system.dictionaries
 	    UNION ALL
 	    SELECT
             'metric.LongestRunningQuery' AS metric,
             toString(max(elapsed))       AS value,
             'Longest running query time' AS description,
-            'gauge'                      AS type
+            'gauge'                      AS type,
+               '' AS key
 	    FROM system.processes
 		UNION ALL
 		SELECT
             'metric.ChangedSettingsHash'                  AS metric,
             toString(groupBitXor(cityHash64(name,value))) AS value,
             'Control sum for changed settings'            AS description,
-            'gauge'                                       AS type
+            'gauge'                                       AS type,
+               '' AS key
 		FROM system.settings WHERE changed
 		UNION ALL
 		SELECT
 		    concat('metric.SystemErrors_',name) AS metric,
 		    toString(sum(value))                AS value,
 		    'Error counter from system.errors'  AS description,
-			'counter'                           AS type
+			'counter'                           AS type,
+               '' AS key
 		FROM system.errors
         GROUP BY name
 	`
+	queryAsyncMetricsLegacySQL = `
+	    SELECT
+	        concat('metric.', metric) AS metric,
+	        toString(value)           AS value,
+	        ''                        AS description,
+	        'gauge'                   AS type,
+	        ''                        AS key
+	    FROM system.asynchronous_metrics`
+
+	// ClickHouse 26.8+ publishes the per CPU core, block device, network interface and similar metrics
+	// as a single key-value metric: its metric and value columns hold only a NaN placeholder and the
+	// values are in the key_values map. Scalar metrics, and the numbered legacy ones published by
+	// asynchronous_metrics_key_values_mode = legacy_names|both, have an empty map.
+	queryAsyncMetricsKeyValuesSQL = `
+	    SELECT
+	        concat('metric.', metric) AS metric,
+	        toString(value)           AS value,
+	        ''                        AS description,
+	        'gauge'                   AS type,
+	        ''                        AS key
+	    FROM system.asynchronous_metrics
+	    WHERE empty(key_values)
+	    UNION ALL
+	    SELECT
+	        concat('metric.', metric) AS metric,
+	        toString(kv.2)            AS value,
+	        ''                        AS description,
+	        'gauge'                   AS type,
+	        kv.1                      AS key
+	    FROM system.asynchronous_metrics
+	    ARRAY JOIN key_values AS kv`
+
+	queryAsyncMetricsHasKeyValuesSQL = `
+	    SELECT count()
+	    FROM system.columns
+	    WHERE database = 'system' AND table = 'asynchronous_metrics' AND name = 'key_values'`
+
 	querySystemPartsSQL = `
 		SELECT
 			database,
@@ -178,8 +218,30 @@ func (f *MetricsFetcher) buildMetricsTableSource() string {
 // buildMetricsSQL renders the metrics-fetch SQL by substituting the table-source
 // clause into queryMetricsSQLTemplate. Symmetric with buildMetricsTableSource:
 // one helper picks WHICH tables to read, this one assembles the full query.
-func (f *MetricsFetcher) buildMetricsSQL() string {
-	return fmt.Sprintf(queryMetricsSQLTemplate, f.buildMetricsTableSource())
+func (f *MetricsFetcher) buildMetricsSQL(hasKeyValues bool) string {
+	asyncMetricsSQL := queryAsyncMetricsLegacySQL
+	if hasKeyValues {
+		asyncMetricsSQL = queryAsyncMetricsKeyValuesSQL
+	}
+	return fmt.Sprintf(queryMetricsSQLTemplate, f.buildMetricsTableSource(), asyncMetricsSQL)
+}
+
+// hasAsyncMetricsKeyValues tells whether system.asynchronous_metrics has the key_values column (ClickHouse 26.8+).
+// A failed probe falls back to the query that works on every version.
+func (f *MetricsFetcher) hasAsyncMetricsKeyValues(ctx context.Context) bool {
+	found := false
+	_, err := f.clickHouseQueryScanRows(
+		ctx,
+		queryAsyncMetricsHasKeyValuesSQL,
+		func(rows *sql.Rows, _ *Table) error {
+			var count int
+			if err := rows.Scan(&count); err == nil {
+				found = count > 0
+			}
+			return nil
+		},
+	)
+	return err == nil && found
 }
 
 // getClickHouseQueryMetrics requests metrics data from ClickHouse.
@@ -189,11 +251,11 @@ func (f *MetricsFetcher) buildMetricsSQL() string {
 func (f *MetricsFetcher) getClickHouseQueryMetrics(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
 		ctx,
-		f.buildMetricsSQL(),
+		f.buildMetricsSQL(f.hasAsyncMetricsKeyValues(ctx)),
 		func(rows *sql.Rows, data *Table) error {
-			var metric, value, description, _type string
-			if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
-				f.appendMetricRow(data, metric, value, description, _type)
+			var metric, value, description, _type, key string
+			if err := rows.Scan(&metric, &value, &description, &_type, &key); err == nil {
+				f.appendMetricRow(data, metric, value, description, _type, key)
 			}
 			return nil
 		},
@@ -207,11 +269,21 @@ func (f *MetricsFetcher) getClickHouseQueryMetrics(ctx context.Context) (Table, 
 // other query paths (parts, mutations, disks, replicas) never reach this scan, so the
 // writer-side filter stays authoritative for those; where both paths see a name the
 // filter is identical, so re-checking writer-side is idempotent.
-func (f *MetricsFetcher) appendMetricRow(data *Table, metric, value, description, _type string) {
-	if IsExcluded(f.metricsFilter, metric) {
+func (f *MetricsFetcher) appendMetricRow(data *Table, metric, value, description, _type, key string) {
+	if IsExcluded(f.metricsFilter, metric) || isKeyExcluded(f.metricsFilter, metric, key) {
 		return
 	}
-	*data = append(*data, []string{metric, value, description, _type})
+	*data = append(*data, []string{metric, value, description, _type, key})
+}
+
+// isKeyExcluded tells whether the filter excludes a key-value metric element by the name that
+// ClickHouse before 26.8 gave it (OSUserTimeCPU3, CPUFrequencyMHz_0), so the exclusion regexps
+// written for those names, including the default one for the per CPU metrics, keep working.
+func isKeyExcluded(filter MetricsFilter, metric, key string) bool {
+	if key == "" {
+		return false
+	}
+	return IsExcluded(filter, metric+key) || IsExcluded(filter, metric+"_"+key)
 }
 
 // getClickHouseSystemParts requests data sizes from ClickHouse

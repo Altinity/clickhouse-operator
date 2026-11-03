@@ -5766,7 +5766,12 @@ def test_010051(self):
         clickhouse.query(chi, "CREATE TABLE test (a String) Engine = MergeTree ORDER BY a PARTITION BY a")
         clickhouse.query(chi, "INSERT INTO test SELECT 'This is a test'");
 
-    cpu_metric_pattern = r"^chi_clickhouse_metric_(OS.*CPU[0-9]+|CPUFrequencyMHz_[0-9]+)\{"
+    # ClickHouse 26.8+ publishes the per CPU metrics as one metric with a "key" label, older versions
+    # append the core number to the name.
+    cpu_metric_pattern = (
+        r"^chi_clickhouse_metric_(OS.*CPU[0-9]+|CPUFrequencyMHz_[0-9]+)\{"
+        r'|^chi_clickhouse_metric_(OS.*CPU|CPUFrequencyMHz)\{[^}]*key="[0-9]+"'
+    )
     version_metric_pattern = r"^chi_clickhouse_metric_VersionInteger.*"
     table_in_metric_pattern = r"^chi_clickhouse_table_partitions.*"
     table_ex_metric_pattern = r"^chi_clickhouse_table_parts_bytes_uncompressed.*"
