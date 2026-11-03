@@ -83,6 +83,8 @@ PRELOAD_IMAGES_ALL=(
     "registry.access.redhat.com/ubi8/ubi-minimal:latest"
     "altinity/clickhouse-backup:stable"
     "altinity/clickhouse-backup:latest-fips"  # FIPS backup sidecar (manifests/chit/test-030003-backup-template.yaml)
+    "altinity/clickhouse-backup:2.8.1"        # default operator-managed backup sidecar and Job image (test_010087, test_010088)
+    "pgsty/minio:RELEASE.2026-08-04T00-00-00Z" # backup storage of the backup scenarios (manifests/minio/test-010087-minio.yaml)
     "alpine/openssl:3.3.3"
     # Previous-release operator + exporter, installed by the upgrade-path scenarios
     # (test_010009_1/_2 default to 0.27.0, test_010011_5 to 0.27.3). Without these the

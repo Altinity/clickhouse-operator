@@ -59,6 +59,23 @@ func MergeScalar[T HasValuer](to, from T, _type MergeType) T {
 	}
 }
 
+// MergePointer resolves one nil-able struct according to merge direction, nil meaning "not set". The struct is
+// taken whole, never merged field by field.
+func MergePointer[T any](to, from *T, _type MergeType) *T {
+	switch _type {
+	case MergeTypeOverrideByNonEmptyValues:
+		if from != nil {
+			return from
+		}
+		return to
+	default:
+		if to != nil {
+			return to
+		}
+		return from
+	}
+}
+
 // MergeValue resolves one plain value (string, int, ...) according to merge direction, zero value meaning "not set"
 func MergeValue[T comparable](to, from T, _type MergeType) T {
 	var empty T
@@ -74,6 +91,30 @@ func MergeValue[T comparable](to, from T, _type MergeType) T {
 		}
 		return from
 	}
+}
+
+// mergeByName merges the named elements of from into to, in place: same-named ones are merged, the rest appended
+func mergeByName[T any, PT interface {
+	*T
+	GetName() string
+	DeepCopy() *T
+	MergeFrom(*T, MergeType) *T
+}](to, from []T, _type MergeType) []T {
+	for i := range from {
+		name := PT(&from[i]).GetName()
+		merged := false
+		for j := range to {
+			if PT(&to[j]).GetName() == name {
+				PT(&to[j]).MergeFrom(&from[i], _type)
+				merged = true
+				break
+			}
+		}
+		if !merged {
+			to = append(to, *PT(&from[i]).DeepCopy())
+		}
+	}
+	return to
 }
 
 // MergoOptions is the only mapping from merge direction onto mergo behaviour

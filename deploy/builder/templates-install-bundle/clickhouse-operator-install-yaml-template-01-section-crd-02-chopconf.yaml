@@ -782,6 +782,24 @@ spec:
                       description: |
                         Optional duration in seconds the pod needs to terminate gracefully. 
                         Look details in `pod.spec.terminationGracePeriodSeconds`
+                backup:
+                  type: object
+                  description: "EXPERIMENTAL. Defaults of operator-managed backup, see docs/backup.md"
+                  properties:
+                    storagePath:
+                      type: string
+                      description: |
+                        Where in its storage the clickhouse-backup sidecar of a host keeps its backups when the settings of that
+                        storage set no path. A template clickhouse-backup expands with the macros of the host: {namespace},
+                        {installation}, {cluster}, {shard}, {replica}. Default: backup/{namespace}/{installation}/{cluster}/{shard}.
+                        Changing it rolls the pods of every backup-enabled cluster and leaves the backups made under the old path
+                        where they are
+                    storageObjectDiskPath:
+                      type: string
+                      description: |
+                        Where in its storage the clickhouse-backup sidecar of a host keeps the object disk data of its backups when
+                        the settings of that storage set no object disk path. A template like storagePath.
+                        Default: object_disks/{namespace}/{installation}/{cluster}/{shard}
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"

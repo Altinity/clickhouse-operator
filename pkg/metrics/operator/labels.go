@@ -18,6 +18,16 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// Labels that identify the installation an operator metric is about.
+const (
+	// LabelCHI is the name of the installation.
+	LabelCHI = "chi"
+	// LabelNamespace is the namespace of the installation.
+	LabelNamespace = "namespace"
+	// LabelCluster is the name of a cluster of the installation, for a metric about one.
+	LabelCluster = "cluster"
+)
+
 func GetLabelsFromSource(src labelsSource) (labels map[string]string) {
 	return util.MergeStringMapsOverwrite(
 		util.MergeStringMapsOverwrite(
@@ -30,8 +40,8 @@ func GetLabelsFromSource(src labelsSource) (labels map[string]string) {
 
 func getLabelsFromName(src labelsSource) map[string]string {
 	return map[string]string{
-		"chi":       src.GetName(),
-		"namespace": src.GetNamespace(),
+		LabelCHI:       src.GetName(),
+		LabelNamespace: src.GetNamespace(),
 	}
 }
 

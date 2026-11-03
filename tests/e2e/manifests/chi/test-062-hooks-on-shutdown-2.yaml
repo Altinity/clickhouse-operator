@@ -23,12 +23,11 @@ spec:
     # triggers HostConfigRestart → HostShutdown → the events:[HostShutdown] hook fires.
     #
     # IMPORTANT: pick a setting that's NOT in the operator's hot-reload exception
-    # list (see pkg/model/chop_config.go's configurationRestartPolicy rules — e.g.
-    # max_concurrent_queries is explicitly "no restart needed"). mark_cache_size
-    # is a server-level cache size, not in the exception list, so it triggers
-    # restart.
+    # list (see the configurationRestartPolicy rules in config/config.yaml) and
+    # not changeable_without_restart = Yes in system.server_settings. test_062
+    # checks the latter before applying this manifest.
     settings:
-      mark_cache_size: "10000000"
+      max_connections: 1024
     clusters:
       - name: default
         layout:

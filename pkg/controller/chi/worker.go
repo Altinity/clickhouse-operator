@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -37,14 +38,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
-	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -58,12 +58,15 @@ type worker struct {
 	a a.Announcer
 
 	//queue workqueue.RateLimitingInterface
-	queue   queue.PriorityQueue
-	schemer *schemer.ClusterSchemer
+	queue queue.PriorityQueue
 
 	normalizer    *normalizer.Normalizer
 	task          *common.Task
 	stsReconciler *statefulset.Reconciler
+
+	// reloadability remembers, per host, which server settings ClickHouse applies
+	// without a restart. A reconcile replaces it. The restart policy is not cached.
+	reloadability *reconcileReloadability
 
 	start time.Time
 }
@@ -87,8 +90,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		c: c,
 		a: announcer,
 
-		queue:   q,
-		schemer: nil,
+		queue: q,
 
 		normalizer: normalizer.New(func(namespace, name string) (*core.Secret, error) {
 			return c.kube.Secret().Get(context.TODO(), &core.Secret{
@@ -136,6 +138,8 @@ func (w *worker) buildCreator(cr *api.ClickHouseInstallation) *commonCreator.Cre
 }
 
 func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
+	// Host objects from the previous pass must not answer this one.
+	w.reloadability = &reconcileReloadability{}
 	w.task = common.NewTask(w.buildCreator(new), w.buildCreator(old))
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
@@ -149,7 +153,9 @@ func (w *worker) newTask(new, old *api.ClickHouseInstallation) {
 	)
 }
 
-// shouldForceRestartHost checks whether cluster requires hosts restart
+// shouldForceRestartHost checks whether cluster requires hosts restart.
+// Which server settings are changeable without a restart is asked once per host
+// per reconcile; a failed query is asked again on the next call.
 func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) bool {
 	switch {
 	case host.HasAncestor() && host.GetAncestor().IsStopped():
@@ -182,28 +188,14 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("Image change detected - deferring restart to STS rollout. Host: %s", host.GetName())
 		return false
 
-	// Recovery is ahead of the password shortcut. A Secret update must not leave
-	// a crashed or persistently unhealthy Pod in place.
-	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host):
-		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
-		return true
-
-	case chop.Config().ShouldRecoverCompletedOnPodNotReady() &&
-		w.isPodSustainedNotReady(ctx, host, chop.Config().CompletedOnPodNotReadyThreshold()):
-		// Closes the gap where Completed CHIs with a sustained-NotReady host
-		// were left stuck indefinitely.
-		threshold := chop.Config().CompletedOnPodNotReadyThreshold()
-		w.a.V(1).M(host).F().
-			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonHostStuckNotReady).
-			Info("Host pod has been Ready=False past threshold %s — force restart. Host: %s",
-				threshold, host.GetName())
-		return true
-
-	case passwordOnlyRefresh(ctx, host):
+	case passwordOnlyRefresh(ctx, host) && !w.hostNeedsRecoveryRestart(ctx, host):
 		// The default restart policy is RollingUpdate, so a reconcile that exists
 		// only to refresh a password would otherwise software-restart every host.
 		// The Pod template names the managed users Secret and does not carry its
 		// bytes; ClickHouse reloads users.d when that Secret is updated.
+		// Recovery is not shortcut: a Secret update must not leave a crashed or
+		// persistently unhealthy Pod in place, so such a host falls through to the
+		// recovery cases below.
 		// A CHI spec change in the same pass is not this case: it falls through
 		// to the restart checks below. Turning hotReload on is itself a spec
 		// change and still rolls Pods once to install the projected volume.
@@ -214,14 +206,44 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
 		return true
 
-	case model.IsConfigurationChangeRequiresReboot(host):
+	case w.configurationChangeRequiresReboot(ctx, host, w.reconcileReloadability()):
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
+		return true
+
+	case w.isHostUnableToStart(ctx, host):
+		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
+		return true
+
+	case w.isHostStuckNotReady(ctx, host):
+		// Closes the gap where Completed CHIs with a sustained-NotReady host
+		// were left stuck indefinitely.
+		threshold := chop.Config().CompletedOnPodNotReadyThreshold()
+		w.a.V(1).M(host).F().
+			WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonHostStuckNotReady).
+			Info("Host pod has been Ready=False past threshold %s — force restart. Host: %s",
+				threshold, host.GetName())
 		return true
 
 	default:
 		w.a.V(1).M(host).F().Info("Host force restart is not required. Host: %s", host.GetName())
 		return false
 	}
+}
+
+// isHostUnableToStart reports a host of unknown version whose Pod has crashed containers.
+func (w *worker) isHostUnableToStart(ctx context.Context, host *api.Host) bool {
+	return host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host)
+}
+
+// isHostStuckNotReady reports a host whose Pod has been NotReady past the recovery threshold.
+func (w *worker) isHostStuckNotReady(ctx context.Context, host *api.Host) bool {
+	return chop.Config().ShouldRecoverCompletedOnPodNotReady() &&
+		w.isPodSustainedNotReady(ctx, host, chop.Config().CompletedOnPodNotReadyThreshold())
+}
+
+// hostNeedsRecoveryRestart reports a host that must be restarted to recover, whatever else is pending.
+func (w *worker) hostNeedsRecoveryRestart(ctx context.Context, host *api.Host) bool {
+	return w.isHostUnableToStart(ctx, host) || w.isHostStuckNotReady(ctx, host)
 }
 
 // passwordOnlyRefresh reports a Secret-triggered reconcile whose CHI has no other
@@ -239,17 +261,104 @@ func passwordOnlyRefresh(ctx context.Context, host *api.Host) bool {
 	return plan == nil || !plan.HasActionsToDo()
 }
 
+// settingsChangeableWithoutRestartTimeout bounds one host's changeable_without_restart query.
+// A host that does not answer in time is left to configurationRestartPolicy.
+const settingsChangeableWithoutRestartTimeout = 10 * time.Second
+
+// hostReloadability is one host's answer for this reconcile.
+// Only an answer is remembered. A failed query is retried on the next check,
+// so a pod that was briefly unreachable does not decide the whole reconcile.
+type hostReloadability struct {
+	mu       sync.Mutex
+	done     bool
+	settings model.SettingsChangeableWithoutRestart
+}
+
+// reconcileReloadability keeps hostReloadability for the hosts of one reconcile.
+type reconcileReloadability struct {
+	hosts sync.Map // map[*api.Host]*hostReloadability
+}
+
+// get returns the server settings this host applies without a restart.
+// The query runs only when server settings changed, and only until it gets an answer.
+func (c *reconcileReloadability) get(ctx context.Context, w *worker, host *api.Host) model.SettingsChangeableWithoutRestart {
+	value, _ := c.hosts.LoadOrStore(host, &hostReloadability{})
+	entry := value.(*hostReloadability)
+
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	if entry.done {
+		return entry.settings
+	}
+	if !model.IsServerSettingsChanged(host) {
+		entry.done = true
+		return nil
+	}
+	settings, ok := w.settingsChangeableWithoutRestart(ctx, host)
+	if ok {
+		entry.settings = settings
+		entry.done = true
+	}
+	return settings
+}
+
+// reconcileReloadability returns this reconcile's cache. newTask sets it before any host is
+// reconciled. Without a task the answer is not cached, and w.reloadability is not written,
+// because shard goroutines call this concurrently.
+func (w *worker) reconcileReloadability() *reconcileReloadability {
+	if w.reloadability == nil {
+		return &reconcileReloadability{}
+	}
+	return w.reloadability
+}
+
+// configurationChangeRequiresReboot reports whether a configuration change requires a restart.
+// cache supplies the settings ClickHouse applies without a restart. The restart policy
+// is then applied to the host.
+func (w *worker) configurationChangeRequiresReboot(ctx context.Context, host *api.Host, cache *reconcileReloadability) bool {
+	settings := cache.get(ctx, w, host)
+	return model.IsConfigurationChangeRequiresReboot(host, settings)
+}
+
+// settingsChangeableWithoutRestart asks this host which server settings it applies without a restart.
+// ok is false when there is no answer: a cancelled context or a failed query. Older ClickHouse without
+// changeable_without_restart is an answer: an empty set. Both leave the decision to
+// configurationRestartPolicy. The column is checked first, so that settings query is not sent
+// to a server that would reject it.
+func (w *worker) settingsChangeableWithoutRestart(ctx context.Context, host *api.Host) (settings model.SettingsChangeableWithoutRestart, ok bool) {
+	if util.IsContextDone(ctx) || host == nil {
+		return nil, false
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, settingsChangeableWithoutRestartTimeout)
+	defer cancel()
+	names, supported, err := w.ensureClusterSchemer(host).HostSettingsChangeableWithoutRestart(ctx, host)
+	switch {
+	case err != nil:
+		w.a.V(1).M(host).F().Info("system.server_settings.changeable_without_restart query failed, configurationRestartPolicy applies. Host: %s err: %v", host.GetName(), err)
+		return nil, false
+	case util.IsContextDone(ctx):
+		w.a.V(1).M(host).F().Info("system.server_settings.changeable_without_restart query got no answer, configurationRestartPolicy applies. Host: %s", host.GetName())
+		return nil, false
+	case !supported:
+		w.a.V(1).M(host).F().Info("system.server_settings has no changeable_without_restart column, configurationRestartPolicy applies. Host: %s", host.GetName())
+		return nil, true
+	}
+	w.a.V(1).M(host).F().Info("system.server_settings.changeable_without_restart = Yes lists %d settings. Host: %s", len(names), host.GetName())
+	return model.NewSettingsChangeableWithoutRestart(names), true
+}
+
 // isImageChangeRequested reports whether the ClickHouse container image differs between
 // the current and desired StatefulSets, i.e. a version upgrade/downgrade is in progress.
 func (w *worker) isImageChangeRequested(host *api.Host) bool {
 	if host.Runtime.CurStatefulSet == nil || host.Runtime.DesiredStatefulSet == nil {
 		return false
 	}
-	curContainer, ok := k8s.StatefulSetContainerGet(host.Runtime.CurStatefulSet, config.ClickHouseContainerName, 0)
+	curContainer, ok := chiCreator.StatefulSetContainerGetClickHouse(host.Runtime.CurStatefulSet)
 	if !ok {
 		return false
 	}
-	desiredContainer, ok := k8s.StatefulSetContainerGet(host.Runtime.DesiredStatefulSet, config.ClickHouseContainerName, 0)
+	desiredContainer, ok := chiCreator.StatefulSetContainerGetClickHouse(host.Runtime.DesiredStatefulSet)
 	if !ok {
 		return false
 	}

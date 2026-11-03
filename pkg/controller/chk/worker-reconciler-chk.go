@@ -121,8 +121,13 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	}
 	w.prepareMonitoring(new)
 	w.setHostStatusesPreliminary(ctx, new)
-
-	if err := w.reconcile(ctx, new); err != nil {
+	// Staging and reconcile share one failure path. An early return here would
+	// leave the CHK InProgress after markReconcileStart.
+	err := w.stageUncommittedScaleUpHosts(ctx, new)
+	if err == nil {
+		err = w.reconcile(ctx, new)
+	}
+	if err != nil {
 		if errors.Is(err, common.ErrCRUDDeferred) {
 			w.a.V(1).M(new).F().Info("Reconcile deferred — waiting for Raft quorum headroom")
 			new.EnsureStatus().PushError(fmt.Sprintf(
@@ -712,6 +717,16 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		log.V(1).Info("Reconcile is aborted. Host: %s ", host.GetName())
 		return nil
 	}
+	// Before the test seam: an interrupted 1→N retry never reaches STS reconcile
+	// for the previous joiner's Ready wait (ObjectStatusSame returns first).
+	// The next missing joiner has to be postponed here, while the loop continues
+	// so existing members can still roll.
+	if err := w.deferUnreadyStagedAdmit(ctx, host); err != nil {
+		if errors.Is(err, errSkipStagedAdmit) {
+			return nil
+		}
+		return err
+	}
 	// Below the ctx check on purpose: a cancelled reconcile must short-circuit identically
 	// whether or not the seam is armed, or the host loop becomes un-modellable under shutdown.
 	if w.reconcileHostFn != nil {
@@ -776,13 +791,29 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 // reconcileHostPrepare reconciles specified ClickHouse host
 func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error {
+	if host.GetReconcileAttributes().IsExclude() {
+		// Stay out of raft_configuration until immediately before STS create.
+		// Publishing here would leave the server in XML if ConfigMapHost / PVC
+		// abort before the StatefulSet exists.
+		w.a.V(1).
+			M(host).F().
+			Info("Skip raft include in prepare; host is staged. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return nil
+	}
+
 	w.a.V(1).
 		M(host).F().
 		Info("Include host into cluster. Host/shard/cluster: %d/%d/%s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	w.includeHostIntoRaftCluster(ctx, host)
-
+	// Steady state. A transient ConfigMap conflict must not abort the pass;
+	// the next reconcile republishes. Staged admission checks this error itself.
+	if err := w.includeHostIntoRaftCluster(ctx, host); err != nil {
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Prepare - unable to publish raft_configuration, continuing. Host: %s Err: %v", host.GetName(), err)
+	}
 	return nil
 }
 
@@ -843,10 +874,27 @@ func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
 			Warning("Reconcile Host Main - unable to reconcile Service. Host: %s Err: %v", host.GetName(), err)
 	}
 
+	// Admit this host into raft_configuration before creating its StatefulSet,
+	// so the new pod starts with itself already in the published membership.
+	// Remaining staged hosts stay excluded.
+	admitted, admitErr := w.publishStagedAdmit(ctx, host)
+	if admitErr != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host Main - unable to publish host into raft_configuration. Host: %s Err: %v", host.GetName(), admitErr)
+		return admitErr
+	}
+
 	// Snapshot the ensemble and reconcile the StatefulSet against that same snapshot.
 	snap, err := w.reconcileHostStatefulSetWithEnsembleSnapshot(ctx, host, stsReconcileOpts)
 	if err != nil {
 		metrics.HostReconcilesErrors(ctx, host.GetCR())
+		// Publication already cleared exclude. Put the host back and republish
+		// so a 1+1 scale-up does not keep a 2-of-2 quorum with no Pod.
+		if admitted {
+			w.rollbackStagedRaftAdmit(ctx, host)
+		}
 		return err
 	}
 
@@ -917,8 +965,13 @@ func (w *worker) reconcileHostMainDomain(ctx context.Context, host *api.Host, sn
 		return nil
 	}
 
+	// Staged 1→N joins are serialized by deferUnreadyStagedAdmit, not by this sleep.
+	if hostIsStagedScaleUpJoin(host) {
+		return w.verifyHostEnsembleMembership(ctx, host)
+	}
+
 	if !snap.rolling {
-		// Bootstrap / resume-from-stopped / recovery: peers start together;
+		// Fresh bootstrap / resume-from-stopped / recovery: peers start together;
 		// legacy pacing wait (Ready wait was skipped on STS).
 		util.WaitContextDoneOrTimeout(ctx, 7*time.Second)
 		return nil

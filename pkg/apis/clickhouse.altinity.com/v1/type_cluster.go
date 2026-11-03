@@ -30,6 +30,7 @@ type Cluster struct {
 	Secure            *types.StringBool `json:"secure,omitempty"            yaml:"secure,omitempty"`
 	Secret            *ClusterSecret    `json:"secret,omitempty"            yaml:"secret,omitempty"`
 	Security          *ClusterSecurity  `json:"security,omitempty"          yaml:"security,omitempty"`
+	Backup            *ClusterBackup    `json:"backup,omitempty"            yaml:"backup,omitempty"`
 	PDBManaged        *types.StringBool `json:"pdbManaged,omitempty"        yaml:"pdbManaged,omitempty"`
 	PDBMaxUnavailable *types.Int32      `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
 	Reconcile         *ClusterReconcile `json:"reconcile,omitempty"         yaml:"reconcile,omitempty"`
@@ -240,6 +241,23 @@ func (cluster *Cluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 
 		return false
 	})
+}
+
+// GetBackup returns the cluster-level Backup block, nil-safe.
+func (c *Cluster) GetBackup() *ClusterBackup {
+	if c == nil {
+		return nil
+	}
+	return c.Backup
+}
+
+// InheritClusterBackupFrom inherits backup settings from the CHI spec into this cluster.
+// Fills only empty fields, so cluster-level overrides win over CHI-level.
+func (cluster *Cluster) InheritClusterBackupFrom(chi *ClickHouseInstallation) {
+	if chi == nil {
+		return
+	}
+	cluster.Backup = cluster.Backup.MergeFrom(chi.Spec.GetBackup(), MergeTypeFillEmptyValues)
 }
 
 // InheritClusterSecurityFrom inherits security knobs from the CHI spec into this

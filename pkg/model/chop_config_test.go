@@ -117,7 +117,7 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperEndpointsOnly(t *testing.T
 	if oldZK.Equals(newZK) {
 		t.Fatal("expected ZooKeeper configuration to change")
 	}
-	if got := IsConfigurationChangeRequiresReboot(host); got {
+	if got := IsConfigurationChangeRequiresReboot(host, nil); got {
 		t.Fatalf("restart required = true, want false for ZooKeeper-only change")
 	}
 }
@@ -135,7 +135,7 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperAndRestartRequiredSetting(
 	})
 	host := hostWithZKAndSettings(oldZK, newZK, oldSettings, newSettings)
 
-	if got := IsConfigurationChangeRequiresReboot(host); !got {
+	if got := IsConfigurationChangeRequiresReboot(host, nil); !got {
 		t.Fatalf("restart required = false, want true when ZooKeeper change is combined with a restart-required setting")
 	}
 }
@@ -150,7 +150,7 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperPolicyYesStillRestarts(t *
 		nil,
 	)
 
-	if got := IsConfigurationChangeRequiresReboot(host); !got {
+	if got := IsConfigurationChangeRequiresReboot(host, nil); !got {
 		t.Fatalf("restart required = false, want true when operator policy zookeeper/* is yes")
 	}
 }
@@ -167,7 +167,7 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperUnchangedNeverRestarts(t *
 	applyRestartPolicy(t, true)
 
 	host := hostWithZKAndSettings(zkConfig("zk-0", "zk-1"), zkConfig("zk-0", "zk-1"), nil, nil)
-	if IsConfigurationChangeRequiresReboot(host) {
+	if IsConfigurationChangeRequiresReboot(host, nil) {
 		t.Fatal("an unchanged ZooKeeper config is not a change and must never restart")
 	}
 }
@@ -204,7 +204,7 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperLastMatchingRuleWins(t *te
 	}
 
 	host := hostWithZKAndSettings(zkConfig("zk-0"), zkConfig("zk-1"), nil, nil)
-	if !IsConfigurationChangeRequiresReboot(host) {
+	if !IsConfigurationChangeRequiresReboot(host, nil) {
 		t.Fatal("the later rule set says yes and must win over the earlier no")
 	}
 }
@@ -224,21 +224,21 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperEnableDisableAlwaysRestart
 
 	t.Run("enabling zookeeper restarts", func(t *testing.T) {
 		host := hostWithZKAndSettings(nil, zkConfig("zk-0"), nil, nil)
-		if !IsConfigurationChangeRequiresReboot(host) {
+		if !IsConfigurationChangeRequiresReboot(host, nil) {
 			t.Fatal("adding zookeeper to a live cluster must restart: it introduces <distributed_ddl>")
 		}
 	})
 
 	t.Run("disabling zookeeper restarts", func(t *testing.T) {
 		host := hostWithZKAndSettings(zkConfig("zk-0"), nil, nil, nil)
-		if !IsConfigurationChangeRequiresReboot(host) {
+		if !IsConfigurationChangeRequiresReboot(host, nil) {
 			t.Fatal("removing zookeeper must restart: it drops <distributed_ddl> and leaves a stale session")
 		}
 	})
 
 	t.Run("an empty-to-empty change is still no change", func(t *testing.T) {
 		host := hostWithZKAndSettings(nil, api.NewZookeeperConfig(), nil, nil)
-		if IsConfigurationChangeRequiresReboot(host) {
+		if IsConfigurationChangeRequiresReboot(host, nil) {
 			t.Fatal("nil and a zero-value config are both empty - nothing changed, nothing to restart")
 		}
 	})
@@ -252,15 +252,197 @@ func TestIsConfigurationChangeRequiresReboot_ZookeeperEnableDisableAlwaysRestart
 		applyRestartPolicy(t, true)
 
 		host := hostWithZKAndSettings(nil, api.NewZookeeperConfig(), nil, nil)
-		if IsConfigurationChangeRequiresReboot(host) {
+		if IsConfigurationChangeRequiresReboot(host, nil) {
 			t.Fatal("both sides describe no ZooKeeper: restarting would be a no-op restart")
 		}
 	})
 
 	t.Run("endpoint edit between two non-empty configs still honours the policy", func(t *testing.T) {
 		host := hostWithZKAndSettings(zkConfig("zk-0"), zkConfig("zk-1"), nil, nil)
-		if IsConfigurationChangeRequiresReboot(host) {
+		if IsConfigurationChangeRequiresReboot(host, nil) {
 			t.Fatal("the transition guard must not swallow the policy for ordinary endpoint edits")
 		}
 	})
+}
+
+func settingChange(name, from, to string) *api.Host {
+	return hostWithZKAndSettings(
+		nil, nil,
+		api.NewSettings().SetScalarsFromMap(map[string]string{name: from}),
+		api.NewSettings().SetScalarsFromMap(map[string]string{name: to}),
+	)
+}
+
+// TestSettingsChangeableWithoutRestartSkipRestartPolicy pins that a setting ClickHouse lists as
+// changeable_without_restart = Yes skips configurationRestartPolicy. A setting that is not
+// listed uses the policy.
+func TestSettingsChangeableWithoutRestartSkipRestartPolicy(t *testing.T) {
+	t.Run("a setting changeable without restart does not restart when the policy would", func(t *testing.T) {
+		// applyRestartPolicy sets settings/*: yes, which would restart this edit on its own.
+		applyRestartPolicy(t, false)
+		host := settingChange("max_concurrent_queries", "10", "20")
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries"})
+		if IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("a setting changeable without restart must not restart")
+		}
+	})
+
+	t.Run("a policy rule of no does not restart", func(t *testing.T) {
+		cfg := chop.Config()
+		prev := cfg.ClickHouse.ConfigRestartPolicy
+		t.Cleanup(func() { cfg.ClickHouse.ConfigRestartPolicy = prev })
+		cfg.ClickHouse.ConfigRestartPolicy = api.OperatorConfigRestartPolicy{
+			Rules: []api.OperatorConfigRestartPolicyRule{{
+				Version: "*",
+				Rules: []api.OperatorConfigRestartPolicyRuleSet{
+					{types.Matchable("settings/*"): yes()},
+					{types.Matchable("settings/dictionaries_config"): no()},
+				},
+			}},
+		}
+		host := settingChange("dictionaries_config", "config.d/dict_*.xml", "config.d/dic*.xml")
+		if IsConfigurationChangeRequiresReboot(host, nil) {
+			t.Fatal("a policy rule of no must not restart")
+		}
+	})
+
+	t.Run("a setting that is not changeable without restart restarts when the policy says restart", func(t *testing.T) {
+		applyRestartPolicy(t, false)
+		host := settingChange("max_thread_pool_size", "10000", "20000")
+		if !IsConfigurationChangeRequiresReboot(host, nil) {
+			t.Fatal("a setting that is not changeable without restart follows a policy rule of yes")
+		}
+	})
+
+	t.Run("a setting the query does not list follows the policy", func(t *testing.T) {
+		applyRestartPolicy(t, false)
+		host := settingChange("max_concurrent_queries", "10", "20")
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"other_setting"})
+		if !IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("an unlisted setting falls through to configurationRestartPolicy")
+		}
+	})
+
+	t.Run("an exact policy rule of yes beats changeable without restart", func(t *testing.T) {
+		cfg := chop.Config()
+		prev := cfg.ClickHouse.ConfigRestartPolicy
+		t.Cleanup(func() { cfg.ClickHouse.ConfigRestartPolicy = prev })
+		cfg.ClickHouse.ConfigRestartPolicy = api.OperatorConfigRestartPolicy{
+			Rules: []api.OperatorConfigRestartPolicyRule{{
+				Version: "*",
+				Rules: []api.OperatorConfigRestartPolicyRuleSet{
+					{types.Matchable("settings/*"): yes()},
+					{types.Matchable("settings/max_concurrent_queries"): yes()},
+				},
+			}},
+		}
+		host := settingChange("max_concurrent_queries", "10", "20")
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries"})
+		if !IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("a rule naming this setting with yes is the user's explicit choice to restart")
+		}
+	})
+
+	t.Run("a later wildcard rule of yes does not beat changeable without restart", func(t *testing.T) {
+		cfg := chop.Config()
+		prev := cfg.ClickHouse.ConfigRestartPolicy
+		t.Cleanup(func() { cfg.ClickHouse.ConfigRestartPolicy = prev })
+		cfg.ClickHouse.ConfigRestartPolicy = api.OperatorConfigRestartPolicy{
+			Rules: []api.OperatorConfigRestartPolicyRule{{
+				Version: "*",
+				Rules: []api.OperatorConfigRestartPolicyRuleSet{
+					{types.Matchable("settings/max_concurrent_queries"): yes()},
+					{types.Matchable("settings/max_*"): yes()},
+				},
+			}},
+		}
+		host := settingChange("max_concurrent_queries", "10", "20")
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries"})
+		if IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("only the latest matching rule counts, and a wildcard does not name the setting")
+		}
+	})
+
+	t.Run("a mixed change restarts for the setting that is not changeable without restart", func(t *testing.T) {
+		applyRestartPolicy(t, false)
+		host := hostWithZKAndSettings(
+			nil, nil,
+			api.NewSettings().SetScalarsFromMap(map[string]string{"max_concurrent_queries": "10", "max_thread_pool_size": "10000"}),
+			api.NewSettings().SetScalarsFromMap(map[string]string{"max_concurrent_queries": "20", "max_thread_pool_size": "20000"}),
+		)
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries"})
+		if !IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("max_thread_pool_size is not changeable without restart and must still restart")
+		}
+	})
+
+	t.Run("a removed setting changeable without restart does not restart", func(t *testing.T) {
+		applyRestartPolicy(t, false)
+		host := hostWithZKAndSettings(
+			nil, nil,
+			api.NewSettings().SetScalarsFromMap(map[string]string{"max_concurrent_queries": "10"}),
+			api.NewSettings(),
+		)
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries"})
+		if IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("removing a setting changeable without restart reloads its default")
+		}
+	})
+
+	t.Run("a nested server setting is matched by its dotted name", func(t *testing.T) {
+		applyRestartPolicy(t, false)
+		host := settingChange("logger/level", "information", "trace")
+		changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"logger.level"})
+		if IsConfigurationChangeRequiresReboot(host, changeableWithoutRestart) {
+			t.Fatal("settings/logger/level is server setting logger.level")
+		}
+	})
+}
+
+func TestIsServerSettingsChanged(t *testing.T) {
+	t.Run("unchanged", func(t *testing.T) {
+		host := hostWithZKAndSettings(nil, nil, nil, nil)
+		if IsServerSettingsChanged(host) {
+			t.Fatal("unchanged settings must not be reported as changed")
+		}
+	})
+
+	t.Run("global setting", func(t *testing.T) {
+		host := settingChange("max_concurrent_queries", "10", "20")
+		if !IsServerSettingsChanged(host) {
+			t.Fatal("a global server setting edit must be reported as changed")
+		}
+	})
+
+	t.Run("local setting", func(t *testing.T) {
+		host := hostWithZKAndSettings(nil, nil, nil, nil)
+		host.GetAncestor().Settings = api.NewSettings().SetScalarsFromMap(map[string]string{"max_thread_pool_size": "1000"})
+		host.Settings = api.NewSettings().SetScalarsFromMap(map[string]string{"max_thread_pool_size": "2000"})
+		if !IsServerSettingsChanged(host) {
+			t.Fatal("a local server setting edit must be reported as changed")
+		}
+	})
+
+	t.Run("zookeeper only", func(t *testing.T) {
+		host := hostWithZKAndSettings(nil, zkConfig("zk-0"), nil, nil)
+		if IsServerSettingsChanged(host) {
+			t.Fatal("a ZooKeeper edit is not a server setting change")
+		}
+	})
+}
+
+func TestNewSettingsChangeableWithoutRestart(t *testing.T) {
+	changeableWithoutRestart := NewSettingsChangeableWithoutRestart([]string{"max_concurrent_queries", ""})
+	if !changeableWithoutRestart.Contains("max_concurrent_queries") {
+		t.Fatal("a listed name is changeable without a restart")
+	}
+	if changeableWithoutRestart.Contains("") {
+		t.Fatal("an empty name is not a setting")
+	}
+	if changeableWithoutRestart.Contains("other") {
+		t.Fatal("an unlisted name is not changeable without a restart")
+	}
+	if (SettingsChangeableWithoutRestart(nil)).Contains("max_concurrent_queries") {
+		t.Fatal("an empty set leaves every setting to configurationRestartPolicy")
+	}
 }

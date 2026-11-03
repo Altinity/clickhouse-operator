@@ -1649,20 +1649,38 @@ def check_operator_clickhouse_tls_logs(self, ns=None):
         )
 
 @TestStep(Then)
-def check_metrics_exporter_discovers_clickhouse_https(self, ns=None):
-    """Assert metrics-exporter discovers ClickHouse hosts using HTTPS :8443."""
+def check_metrics_exporter_scrapes_clickhouse_https(self, chi, replica_count, ns=None):
+    """Assert metrics-exporter scrapes every ClickHouse host of `chi` through HTTPS.
+
+    chi_clickhouse_metric_VersionInteger is written only after a successful query, so it
+    proves the exporter passed TLS verification with the cluster's CA. A discovery line in
+    the exporter log does not: it is written before the first dial.
+    """
 
     ns = ns or current().context.operator_namespace
     pod = kubectl.get_operator_pod(ns=ns)
-
-    logs = kubectl.launch(
-        f"logs {pod} -c metrics-exporter --tail=4000",
-        ns=ns,
+    rx = re.compile(
+        r'^chi_clickhouse_metric_VersionInteger\{[^}]*hostname="(chi-' + re.escape(chi) + r'-[^".]+)',
+        re.MULTILINE,
     )
 
-    assert '"httpsPort":8443' in logs, error(
-        "metrics-exporter did not discover ClickHouse hosts with httpsPort=8443\n"
-        f"{logs}"
+    hosts = set()
+    out = ""
+    for attempt in range(1, 13):
+        out = util.get_metrics(pod, ns)
+        hosts = set(rx.findall(out))
+        if len(hosts) >= replica_count:
+            break
+        with Then(f"metrics-exporter scrapes {len(hosts)}/{replica_count} hosts of {chi}. Wait for 10 seconds"):
+            time.sleep(10)
+
+    fetch_errors = [
+        line for line in out.splitlines()
+        if line.startswith("chi_clickhouse_metric_fetch_errors{") and f'hostname="chi-{chi}-' in line
+    ]
+    assert len(hosts) >= replica_count, error(
+        f"metrics-exporter scraped {sorted(hosts)} of {replica_count} hosts of {chi} over HTTPS\n"
+        + "\n".join(fetch_errors)
     )
 
 @TestStep(Then)
@@ -2486,6 +2504,35 @@ def check_clickhouse_backup_restore_roundtrip_https(
             ns=ns,
         ).strip()
 
+    def wait_command(operation, timeout=180):
+        # create and restore are asynchronous: the POST answers once the command is
+        # accepted. A second command while one runs is refused with 423 Locked.
+        # /backup/status lists commands as JSON lines with status "in progress",
+        # "success" or "error".
+        deadline = time.time() + timeout
+        commands = []
+        while True:
+            body = kubectl.launch(
+                f"exec {pod} -c clickhouse-backup -- "
+                "curl -sS --cacert /etc/clickhouse-backup/tls/ca.crt "
+                "https://127.0.0.1:7171/backup/status",
+                ns=ns,
+            )
+            commands = []
+            for line in body.splitlines():
+                line = line.strip()
+                if not line.startswith("{"):
+                    continue
+                entry = json.loads(line)
+                command = entry.get("command", "")
+                if command.startswith(operation) and backup_name in command:
+                    commands.append(entry)
+            if commands and all(c.get("status") != "in progress" for c in commands):
+                break
+            assert time.time() < deadline, error(f"{operation} {backup_name} did not finish: {commands}")
+            time.sleep(2)
+        assert commands[-1].get("status") == "success", error(f"{operation} {backup_name}: {commands[-1]}")
+
     with Given("test table exists with data"):
         fips_ch_external_secure_query(
             pod=pod,
@@ -2508,6 +2555,7 @@ def check_clickhouse_backup_restore_roundtrip_https(
             f"/backup/create?name={backup_name}&table=default.{table}",
         )
         assert out.startswith("HTTP:2"), error(out)
+        wait_command("create")
 
     with And("table is dropped"):
         fips_ch_external_secure_query(
@@ -2522,6 +2570,7 @@ def check_clickhouse_backup_restore_roundtrip_https(
             f"/backup/restore/{backup_name}?table=default.{table}",
         )
         assert out.startswith("HTTP:2"), error(out)
+        wait_command("restore")
 
     with Then("restored data is visible through strict TLS ClickHouse client"):
         fips_poll_secure_scalar(

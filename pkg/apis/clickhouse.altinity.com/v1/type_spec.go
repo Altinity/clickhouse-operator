@@ -34,6 +34,7 @@ type ChiSpec struct {
 	Templates              *Templates        `json:"templates,omitempty"              yaml:"templates,omitempty"`
 	UseTemplates           []*TemplateRef    `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
 	Security               *ClusterSecurity  `json:"security,omitempty"               yaml:"security,omitempty"`
+	Backup                 *ClusterBackup    `json:"backup,omitempty"                 yaml:"backup,omitempty"`
 }
 
 // HasTaskID checks whether task id is specified
@@ -116,6 +117,14 @@ func (spec *ChiSpec) GetSecurity() *ClusterSecurity {
 	return spec.Security
 }
 
+// GetBackup returns the spec-level Backup block, nil-safe.
+func (spec *ChiSpec) GetBackup() *ClusterBackup {
+	if spec == nil {
+		return nil
+	}
+	return spec.Backup
+}
+
 // MergeFrom merges from spec
 func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	if from == nil {
@@ -151,4 +160,5 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		spec.Security.ClickHouse = spec.Security.ClickHouse.MergeFrom(fromSecurity.GetClickHouse(), _type)
 		spec.Security.Zookeeper = spec.Security.Zookeeper.MergeFrom(fromSecurity.GetZookeeper(), _type)
 	}
+	spec.Backup = spec.Backup.MergeFrom(from.GetBackup(), _type)
 }

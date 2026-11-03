@@ -199,30 +199,6 @@ func mergeTemplate[T any, PT interface {
 	}
 }
 
-// mergeNamedTemplates pairs templates by name: same-named templates are merged, the rest are appended
-func mergeNamedTemplates[T any, PT interface {
-	*T
-	GetName() string
-	DeepCopy() *T
-	MergeFrom(*T, MergeType) *T
-}](to, from []T, _type MergeType) []T {
-	for i := range from {
-		name := PT(&from[i]).GetName()
-		merged := false
-		for j := range to {
-			if PT(&to[j]).GetName() == name {
-				PT(&to[j]).MergeFrom(&from[i], _type)
-				merged = true
-				break
-			}
-		}
-		if !merged {
-			to = append(to, *PT(&from[i]).DeepCopy())
-		}
-	}
-	return to
-}
-
 // NewTemplates creates new Templates object
 func NewTemplates() *Templates {
 	return new(Templates)
@@ -294,10 +270,10 @@ func (templates *Templates) MergeFrom(_from any, _type MergeType) *Templates {
 
 	// Merge sections
 
-	templates.HostTemplates = mergeNamedTemplates(templates.HostTemplates, from.HostTemplates, _type)
-	templates.PodTemplates = mergeNamedTemplates(templates.PodTemplates, from.PodTemplates, _type)
-	templates.VolumeClaimTemplates = mergeNamedTemplates(templates.VolumeClaimTemplates, from.VolumeClaimTemplates, _type)
-	templates.ServiceTemplates = mergeNamedTemplates(templates.ServiceTemplates, from.ServiceTemplates, _type)
+	templates.HostTemplates = mergeByName(templates.HostTemplates, from.HostTemplates, _type)
+	templates.PodTemplates = mergeByName(templates.PodTemplates, from.PodTemplates, _type)
+	templates.VolumeClaimTemplates = mergeByName(templates.VolumeClaimTemplates, from.VolumeClaimTemplates, _type)
+	templates.ServiceTemplates = mergeByName(templates.ServiceTemplates, from.ServiceTemplates, _type)
 
 	return templates
 }
