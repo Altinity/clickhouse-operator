@@ -62,20 +62,38 @@ func (m *ProbeManager) createDefaultStartupProbe(_ *api.Host) *core.Probe {
 }
 
 // createDefaultLivenessProbe returns default liveness probe.
-// Uses the ruok/imok 4LW handshake against the keeper's TCP client port to detect
-// not just process existence but actual responsiveness — a hung keeper (Raft thread
-// blocked, IO stalled) passes pgrep but fails ruok, which is the case liveness must
-// catch. ruok itself is quorum-independent (returns "imok" the moment the listener
-// is up, no Raft state check), so the probe will not cause cascading restarts during
-// leader election or cluster formation.
+// Uses the ruok/imok 4LW handshake against the keeper's plaintext TCP client
+// port to detect not just process existence but actual responsiveness — a
+// hung keeper (Raft thread blocked, IO stalled) passes pgrep but fails ruok,
+// which is the case liveness must catch. ruok itself is quorum-independent
+// (returns "imok" the moment the listener is up, no Raft state check), so the
+// probe will not cause cascading restarts during leader election or cluster
+// formation.
 //
-// Implemented via bash /dev/tcp redirection — the canonical repo idiom (see
-// deploy/clickhouse-keeper/clickhouse-keeper-manually/*.yaml). Avoids depending on
-// `nc` which is not always present in the keeper image. Requires bash; alpine-based
-// images that ship only BusyBox `ash` would need a fallback.
+// Implemented via bash /dev/tcp redirection — the canonical repo idiom.
+// Avoids depending on `nc` which is not always present in the keeper image.
 //
-// Readiness (Raft quorum) is covered by the separate readiness probe.
+// 4LW falls back to pgrep when the host opts out of the plaintext port
+// (host.IsInsecure() == false): upstream Keeper does not serve 4LW commands
+// over `tcp_port_secure`, so bash /dev/tcp would have nothing to talk to.
+// pgrep loses the "hung-but-running" detection but keeps the probe from
+// CrashLoopBackOff'ing every secure-only Keeper. Readiness (HTTP /ready on
+// 9182) still catches quorum-level failures, and the dedicated startup probe
+// already uses pgrep, so this degrades gracefully.
 func (m *ProbeManager) createDefaultLivenessProbe(host *api.Host) *core.Probe {
+	if !host.IsInsecure() {
+		return &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				Exec: &core.ExecAction{
+					Command: []string{"pgrep", "-f", "clickhouse-keeper"},
+				},
+			},
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       5,
+			TimeoutSeconds:      3,
+			FailureThreshold:    12,
+		}
+	}
 	port := host.ZKPort.Normalize(api.KpDefaultZKPortNumber).Value()
 	cmd := fmt.Sprintf(
 		`OK=$(exec 3<>/dev/tcp/127.0.0.1/%d; printf "ruok" >&3; IFS=; tee <&3; exec 3<&-); [ "$OK" = "imok" ]`,

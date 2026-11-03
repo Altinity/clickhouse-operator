@@ -1,0 +1,19 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-069-template-overlay
+spec:
+  useTemplates:
+    - name: test-069-security-template
+  configuration:
+    clusters:
+      - name: override
+        # Cluster overrides verify to None; minVersion=1.3 is inherited from the
+        # template (which feeds CHI spec.security via ChiSpec.MergeFrom).
+        security:
+          clickhouse:
+            tls:
+              verify: None
+        layout:
+          shardsCount: 1
+          replicasCount: 1

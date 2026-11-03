@@ -1,0 +1,25 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-075-fips
+spec:
+  defaults:
+    templates:
+      podTemplate: fips
+  configuration:
+    clusters:
+      - name: c1
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    podTemplates:
+      # Container name MUST be exactly "clickhouse" — the FIPS admission gate
+      # only inspects containers matching the canonical name; "clickhouse-pod"
+      # (used elsewhere in this suite) would fall through to the operator
+      # default image and trigger a violation under Required policy.
+      - name: fips
+        spec:
+          containers:
+            - name: clickhouse
+              image: altinity/clickhouse-server:25.3.8.30001.altinityfips

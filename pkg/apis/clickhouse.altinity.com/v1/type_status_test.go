@@ -79,6 +79,36 @@ var copyTestStatusFrom = &Status{
 	HostsWithTablesCreated: []string{"host-a-1", "host-a-2"},
 }
 
+func TestCopyFromUsedTemplates(t *testing.T) {
+	t.Run("does not copy through inheritable status", func(t *testing.T) {
+		opts := prepareOptions(types.CopyStatusOptions{
+			CopyStatusFieldGroup: types.CopyStatusFieldGroup{
+				FieldGroupInheritable: true,
+			},
+		})
+
+		require.False(t, opts.Copy.UsedTemplates)
+	})
+
+	t.Run("replaces with empty source list", func(t *testing.T) {
+		status := &Status{
+			UsedTemplates: []*TemplateRef{
+				{Name: "old-template"},
+			},
+		}
+
+		status.CopyFrom(&Status{}, types.CopyStatusOptions{
+			CopyStatusField: types.CopyStatusField{
+				Copy: types.Status{
+					UsedTemplates: true,
+				},
+			},
+		})
+
+		require.Empty(t, status.UsedTemplates)
+	})
+}
+
 // NB: These tests mostly exist to exercise synchronization and detect regressions related to them via the
 // Golang race detector. See: https://go.dev/blog/race-detector
 // In short, add -race to the go test flags when running this.

@@ -16,6 +16,7 @@ package chk
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -30,10 +31,15 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// raftQuorumDeferredRequeueAfter is the fixed retry interval when reconcile
+// returns ErrCRUDDeferred (Raft quorum headroom not available yet).
+const raftQuorumDeferredRequeueAfter = 5 * time.Second
 
 // Controller reconciles a ClickHouseKeeper object
 type Controller struct {
@@ -50,11 +56,21 @@ type Controller struct {
 	//pvcDeleter *volume.PVCDeleter
 }
 
-func (c *Controller) new() {
-	c.namer = managers.NewNameManager(managers.NameManagerTypeKeeper)
-	c.kube = kube.NewAdapter(c.Client, c.APIReader, c.namer)
-	//labeler:                 NewLabeler(kube),
-	//pvcDeleter :=              volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeKeeper))
+// NewController creates a CHK Controller with its request-independent collaborators
+// (name manager, kube adapter) initialized once, at construction. controller-runtime
+// reuses a single Controller across all MaxConcurrentReconciles goroutines, so these
+// fields must NOT be (re)assigned per-Reconcile — doing so is a data race once
+// reconcileCHKsThreadsNumber > 1. The CHI controller initializes the same way.
+func NewController(c client.Client, apiReader client.Reader, scheme *apiMachinery.Scheme, extClient apiExtensions.Interface) *Controller {
+	namer := managers.NewNameManager(managers.NameManagerTypeKeeper)
+	return &Controller{
+		Client:    c,
+		APIReader: apiReader,
+		Scheme:    scheme,
+		ExtClient: extClient,
+		namer:     namer,
+		kube:      kube.NewAdapter(c, apiReader, namer),
+	}
 }
 
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -85,7 +101,6 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	c.new()
 	w := c.newWorker()
 
 	if w.ensureFinalizer(ctx, new) {
@@ -103,9 +118,30 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	w.reconcileCR(context.TODO(), nil, new)
+	return c.reconcileResult(new, w.reconcileCR(ctx, nil, new))
+}
 
-	return ctrl.Result{}, nil
+// reconcileResult maps the outcome of reconcileCR onto a controller-runtime result.
+//
+// ErrCRUDDeferred is an intentional postponement, not a failure, so it must not be
+// returned as an error: controller-runtime would apply exponential backoff to a wait
+// that is expected to clear within seconds. Match with errors.Is - the reconciler
+// wraps the sentinel with host context on its way up.
+func (c *Controller) reconcileResult(cr *apiChk.ClickHouseKeeperInstallation, err error) (ctrl.Result, error) {
+	switch {
+	case err == nil:
+		return ctrl.Result{}, nil
+	case errors.Is(err, common.ErrCRUDDeferred):
+		// Soft defer: quorum headroom not available yet. Status already
+		// records [RaftQuorumUnsafe]; retry on a fixed interval instead of
+		// error backoff.
+		log.V(1).M(cr).F().Info(
+			"Raft quorum defer — requeue in %s", raftQuorumDeferredRequeueAfter,
+		)
+		return ctrl.Result{RequeueAfter: raftQuorumDeferredRequeueAfter}, nil
+	default:
+		return ctrl.Result{}, err
+	}
 }
 
 // installFinalizer adds the operator finalizer to the CHK CR.
@@ -160,11 +196,10 @@ func (c *Controller) poll(ctx context.Context, cr api.ICustomResource, f func(c 
 
 			// Go to next poll cycle, retry
 
-			if util.IsContextDone(ctx) {
+			if util.WaitContextDoneOrTimeout(ctx, 15*time.Second) {
 				log.V(1).Info("Poll is aborted before retry. CR: %s", cr.GetName())
 				return
 			}
-			time.Sleep(15 * time.Second)
 			continue
 		}
 
@@ -172,11 +207,10 @@ func (c *Controller) poll(ctx context.Context, cr api.ICustomResource, f func(c 
 
 		if f(chk, err) {
 			// Function says to continue polling
-			if util.IsContextDone(ctx) {
+			if util.WaitContextDoneOrTimeout(ctx, 15*time.Second) {
 				log.V(1).Info("Poll is aborted after polling fn. CR: %s", cr.GetName())
 				return
 			}
-			time.Sleep(15 * time.Second)
 		} else {
 			// Function says to stop polling
 			return

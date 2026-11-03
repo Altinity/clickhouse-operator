@@ -15,9 +15,12 @@
 package clickhouse
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 )
 
 // stubMetricsFilter excludes any metric whose name appears in the set.
@@ -48,5 +51,30 @@ func TestPrometheusWriterSkipsExcludedMetric(t *testing.T) {
 
 	if len(out) != 0 {
 		t.Fatal("expected excluded metric not to be written")
+	}
+}
+
+// TestAppendHostLabelStripsTrailingDot asserts that the trailing dot present on
+// WatchedHost.Hostname (intentional FQDN form used on the DNS resolution path)
+// does NOT leak into the Prometheus "hostname" label value — trailing dots
+// break string-equality matchers in Grafana panels and alert rules.
+func TestAppendHostLabelStripsTrailingDot(t *testing.T) {
+	cases := []struct {
+		in  string
+		out string
+	}{
+		{"chi-x-cluster-0-0.ns.svc.cluster.local.", "chi-x-cluster-0-0.ns.svc.cluster.local"},
+		{"chi-x-cluster-0-0.ns.svc.cluster.local", "chi-x-cluster-0-0.ns.svc.cluster.local"},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		w := &CHIPrometheusWriter{host: &metrics.WatchedHost{Hostname: tc.in}}
+		got := w.appendHostLabel(nil)["hostname"]
+		if got != tc.out {
+			t.Fatalf("appendHostLabel(%q) hostname = %q, want %q", tc.in, got, tc.out)
+		}
+		if strings.HasSuffix(got, ".") {
+			t.Fatalf("hostname label %q has trailing dot", got)
+		}
 	}
 }

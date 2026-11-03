@@ -1,0 +1,9 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "clickhouse-operator-fips-strict"
+spec:
+  security:
+    policy: Enforced
+    fips:
+      enforced: "true"

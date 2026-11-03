@@ -63,24 +63,32 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api
 		return nil, nil, nil
 	}
 
+	// Exclude self from schema-discovery endpoints. The host being bootstrapped
+	// may be a freshly-recovered replica with empty system.databases/tables;
+	// QueryAny walks endpoints sequentially and returns the FIRST successful
+	// response — including an empty one. Asking self first short-circuits the
+	// fanout (clusterAllReplicas with skip_unavailable_shards=1) and the
+	// schemer silently skips CREATE. Peers hold the truth.
+	peers := s.Names(interfaces.NameFQDNs, host, api.Cluster{}, true)
+
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			s.Names(interfaces.NameFQDNs, host, api.Cluster{}, false),
+			peers,
 			s.sqlCreateDatabaseReplicated(host.Runtime.Address.ClusterName),
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
 		s.QueryUnzipAndApplyUUIDs(
 			ctx,
-			s.Names(interfaces.NameFQDNs, host, api.Cluster{}, false),
+			peers,
 			s.sqlCreateTableReplicated(host.Runtime.Address.ClusterName),
 		),
 	)
 	functionNames, createFunctionSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			s.Names(interfaces.NameFQDNs, host, api.Cluster{}, false),
+			peers,
 			s.sqlCreateFunction(host.Runtime.Address.ClusterName),
 		),
 	)

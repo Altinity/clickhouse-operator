@@ -115,11 +115,19 @@ func (c *Controller) resolveKeeperByService(ctx context.Context, namespace, name
 }
 
 // resolveKeeperByReplicas resolves using per-host services (one node per replica).
-// CHK host services are discovered by CHK labeler's LabelCRName and LabelService/LabelServiceValueHost labels.
+//
+// A CHK host exposes a ready-only client Service (LabelServiceValueHostClient,
+// publishNotReadyAddresses=false) alongside the peer/Raft Service (LabelServiceValueHost,
+// publishNotReadyAddresses=true). ClickHouse clients must resolve only Ready Keeper nodes, so
+// the client tier is selected first. The peer tier is the fallback for CHK clusters that predate
+// the split (single host Service) or use a user-supplied replicaServiceTemplate.
 func (c *Controller) resolveKeeperByReplicas(ctx context.Context, namespace, name string, domainPattern *types.String) (api.ZookeeperNodes, error) {
-	// Discover CHK host services by label selector
-	opts := chkHostServiceListOptions(name, namespace)
-	services, err := c.kubeClient.CoreV1().Services(namespace).List(ctx, opts)
+	// Prefer the ready-only client services
+	services, err := c.kubeClient.CoreV1().Services(namespace).List(ctx, chkClientServiceListOptions(name, namespace))
+	if (err == nil) && (len(services.Items) == 0) {
+		// No client-tier services - fall back to the peer/host services (pre-split / templated CRs)
+		services, err = c.kubeClient.CoreV1().Services(namespace).List(ctx, chkHostServiceListOptions(name, namespace))
+	}
 
 	// Handle errors and empty list
 	switch {
@@ -156,12 +164,23 @@ func chkListOptions(name, namespace string) meta.ListOptions {
 	})
 }
 
-// chkHostServiceListOptions builds meta.ListOptions to select CHK per-host services.
+// chkHostServiceListOptions builds meta.ListOptions to select CHK per-host peer/Raft services.
 func chkHostServiceListOptions(name, namespace string) meta.ListOptions {
 	chk := chkApi.NewClickHouseKeeperInstallation(name, namespace)
 	l := chkLabeler.New(chk)
 	return controller.NewListOptions(map[string]string{
 		l.Get(commonLabeler.LabelCRName):  name,
 		l.Get(commonLabeler.LabelService): l.Get(commonLabeler.LabelServiceValueHost),
+	})
+}
+
+// chkClientServiceListOptions builds meta.ListOptions to select CHK per-host client-facing
+// services (publishNotReadyAddresses=false), the tier ClickHouse clients should resolve.
+func chkClientServiceListOptions(name, namespace string) meta.ListOptions {
+	chk := chkApi.NewClickHouseKeeperInstallation(name, namespace)
+	l := chkLabeler.New(chk)
+	return controller.NewListOptions(map[string]string{
+		l.Get(commonLabeler.LabelCRName):  name,
+		l.Get(commonLabeler.LabelService): l.Get(commonLabeler.LabelServiceValueHostClient),
 	})
 }

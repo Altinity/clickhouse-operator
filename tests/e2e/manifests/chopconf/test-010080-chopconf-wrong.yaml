@@ -1,0 +1,18 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-010080-chopconf-wrong"
+spec:
+  clickhouse:
+    access:
+      scheme: https
+      port: 8443
+      # Negative control: an unrelated CA that did NOT issue the server cert.
+      # With verify:Strict the operator -> ClickHouse handshake must fail.
+      rootCASecretRef:
+        name: test-010080-wrong-ca
+        key: ca.crt
+  security:
+    clickhouse:
+      tls:
+        verify: Strict

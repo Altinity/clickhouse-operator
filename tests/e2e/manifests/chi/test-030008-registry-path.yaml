@@ -1,0 +1,23 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-030008-registry-path
+spec:
+  defaults:
+    templates:
+      podTemplate: registry-fips
+  configuration:
+    clusters:
+      - name: c1
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    podTemplates:
+      # Registry hostname contains "fips" but the image tag does not.
+      # SHALL NOT satisfy FIPS tag detection.
+      - name: registry-fips
+        spec:
+          containers:
+            - name: clickhouse
+              image: fips.example.com/clickhouse-server:25.3.8.30001.altinitystable

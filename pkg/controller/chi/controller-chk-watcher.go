@@ -83,7 +83,9 @@ func (c *Controller) StartCHKWatcher(ctx context.Context) {
 // isKeeperWatchEnabled checks if the CHK watch is configured.
 func (c *Controller) isKeeperWatchEnabled() bool {
 	policy := chop.Config().Reconcile.Coordination.Keeper.OnKeeperResourceUpdate
-	return policy.HasValue() && policy.Value() == api.KeeperOnResourceUpdateReconcile
+	// EqualFoldString: the CRD accepts both "Reconcile" and "reconcile"; the chopconf value
+	// is not re-folded after load, so compare case-insensitively here.
+	return policy.HasValue() && policy.EqualFoldString(api.KeeperOnResourceUpdateReconcile)
 }
 
 // onCHKUpdate handles CHK update events. Triggers CHI reconcile only when CHK transitions to Completed.
@@ -132,12 +134,16 @@ func getUnstructuredStatus(obj *unstructured.Unstructured) string {
 // would miss such CHIs, so we list across the operator's watch scope (same namespace the
 // CHK informer runs in — cluster-wide for NamespaceAll, or a single namespace otherwise).
 func (c *Controller) enqueueDependentCHIs(chkNamespace, chkName string) {
-	ctx := context.Background()
+	// Bound the worst-case under API-server slowness. The watcher is informer-
+	// driven and has no shutdown context plumbed through, so we cap here rather
+	// than blocking the informer goroutine indefinitely on a hung List/Get.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	// We'll fetch all CHIs in the namespace the operator watches with the informer.
 	// The informer may watch namespaces that are not watched by the operator - regexp may play this trick.
 	// So we need to fetch all CHIs, even those that may be located in namespaces not watched by the operator.
-	// We'll filter them out later.
+	// Filtered below via IsNamespaceWatched before enqueueing.
 	watchNs := chop.Config().GetInformerNamespace()
 	chiList, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(watchNs).List(
 		ctx,
@@ -151,6 +157,14 @@ func (c *Controller) enqueueDependentCHIs(chkNamespace, chkName string) {
 	// Iterate over all CHIs and filter out those that do not reference the given CHK.
 	for i := range chiList.Items {
 		chi := &chiList.Items[i]
+
+		// Filter out CHIs in namespaces the operator doesn't actually watch.
+		// The List above may surface namespaces beyond the watch scope when
+		// the watch is regexp-driven; the normal informer path applies
+		// IsNamespaceWatched at ShouldEnqueue time, and we must mirror that.
+		if !chop.Config().IsNamespaceWatched(chi.Namespace) {
+			continue
+		}
 
 		// First step - check if the CHI references the given CHK.
 		if !chiReferencesKeeper(chi, chkName, chkNamespace) {

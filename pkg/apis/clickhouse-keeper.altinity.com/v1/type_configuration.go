@@ -83,8 +83,8 @@ func (c *Configuration) MergeFrom(from *Configuration, _type apiChi.MergeType) *
 
 	c = c.Ensure()
 
-	c.Settings = c.Settings.MergeFrom(from.Settings)
-	c.Files = c.Files.MergeFrom(from.Files)
+	c.Settings = c.Settings.MergeFrom(from.Settings, _type)
+	c.Files = c.Files.MergeFrom(from.Files, _type)
 
 	// TODO merge clusters
 	// Copy Clusters for now

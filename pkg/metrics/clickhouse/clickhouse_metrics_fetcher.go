@@ -142,16 +142,20 @@ const (
 type MetricsFetcher struct {
 	connectionParams *clickhouse.EndpointConnectionParams
 	tablesRegexp     string
+	// Used to filter system-metric names while fetching metrics. Nil means keep all.
+	metricsFilter MetricsFilter
 }
 
 // NewMetricsFetcher creates new clickhouse fetcher object
 func NewMetricsFetcher(
 	endpointConnectionParams *clickhouse.EndpointConnectionParams,
 	tablesRegexp string,
+	metricsFilter MetricsFilter,
 ) *MetricsFetcher {
 	return &MetricsFetcher{
 		connectionParams: endpointConnectionParams,
 		tablesRegexp:     tablesRegexp,
+		metricsFilter:    metricsFilter,
 	}
 }
 
@@ -179,11 +183,9 @@ func (f *MetricsFetcher) buildMetricsSQL() string {
 }
 
 // getClickHouseQueryMetrics requests metrics data from ClickHouse.
-// Exclusion of "noisy" metrics is enforced solely by the writer-side filter
-// (see CHIPrometheusWriter.metricsFilter). A SQL-side filter was tried and
-// dropped: wrapping the UNION-ALL chain in `FROM (...) WHERE NOT (...)` left
-// the metrics query returning zero rows across restart-then-scrape windows;
-// the writer-side filter is sufficient and avoids that fragility.
+// Excluded names are dropped during row scan so they never enter the in-memory buffer.
+// SQL-side filtering was tried and abandoned: wrapping the UNION-ALL in
+// `FROM (...) WHERE NOT (...)` caused zero rows on restart-then-scrape windows.
 func (f *MetricsFetcher) getClickHouseQueryMetrics(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
 		ctx,
@@ -191,11 +193,25 @@ func (f *MetricsFetcher) getClickHouseQueryMetrics(ctx context.Context) (Table, 
 		func(rows *sql.Rows, data *Table) error {
 			var metric, value, description, _type string
 			if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
-				*data = append(*data, []string{metric, value, description, _type})
+				f.appendMetricRow(data, metric, value, description, _type)
 			}
 			return nil
 		},
 	)
+}
+
+// appendMetricRow adds a scanned system-metrics row to the buffer, dropping excluded
+// names first. This is a memory pre-filter on the highest-cardinality fetch path (the
+// system.metrics/asynchronous_metrics UNION, whose per-CPU OS series scale with core
+// count) so excluded rows never enter the in-memory Table. Names synthesized by the
+// other query paths (parts, mutations, disks, replicas) never reach this scan, so the
+// writer-side filter stays authoritative for those; where both paths see a name the
+// filter is identical, so re-checking writer-side is idempotent.
+func (f *MetricsFetcher) appendMetricRow(data *Table, metric, value, description, _type string) {
+	if IsExcluded(f.metricsFilter, metric) {
+		return
+	}
+	*data = append(*data, []string{metric, value, description, _type})
 }
 
 // getClickHouseSystemParts requests data sizes from ClickHouse

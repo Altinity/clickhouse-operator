@@ -46,22 +46,29 @@ const (
 	// a referenced ClickHouseKeeper to become ready during CHI reconcile.
 	defaultKeeperReadyTimeout = 120
 
+	// Consts below use the canonical humped form; the CRD also accepts all-lowercase and
+	// the accessors compare case-insensitively (EqualFold).
+
 	// KeeperOnResourceUpdateNone means do nothing when referenced CHK changes (default).
-	KeeperOnResourceUpdateNone = "none"
+	KeeperOnResourceUpdateNone = "None"
 	// KeeperOnResourceUpdateReconcile means trigger CHI reconcile when referenced CHK changes.
-	KeeperOnResourceUpdateReconcile = "reconcile"
+	KeeperOnResourceUpdateReconcile = "Reconcile"
 
 	// OnConfigurationChangeNone means ignore ClickHouseOperatorConfiguration changes (default).
-	OnConfigurationChangeNone = "none"
+	OnConfigurationChangeNone = "None"
 	// OnConfigurationChangeIgnore is an alias for OnConfigurationChangeNone.
-	OnConfigurationChangeIgnore = "ignore"
+	OnConfigurationChangeIgnore = "Ignore"
 	// OnConfigurationChangeRestart means exit the process so the pod restarts with the new config.
-	OnConfigurationChangeRestart = "restart"
+	OnConfigurationChangeRestart = "Restart"
 
-	// RecoveryActionNone means do nothing, CHI stays Aborted.
-	RecoveryActionNone = "none"
+	// RecoveryActionNone means do nothing, CHI stays in its current state.
+	RecoveryActionNone = "None"
 	// RecoveryActionRetry means re-enqueue CHI for reconcile (default).
-	RecoveryActionRetry = "retry"
+	RecoveryActionRetry = "Retry"
+
+	// defaultCompletedOnPodNotReadyThreshold is the minimum time a pod must remain in
+	// Ready=False before the operator considers the host stuck and re-enqueues a reconcile
+	defaultCompletedOnPodNotReadyThreshold = 5 * time.Minute
 
 	// Default values for ClickHouse user configuration
 	// 1. user/profile
@@ -79,8 +86,9 @@ const (
 	ChSchemeHTTP = "http"
 	// ChSchemeHTTPS specifies HTTPS access scheme
 	ChSchemeHTTPS = "https"
-	// ChSchemeAuto specifies that operator has to decide itself should https or http be used
-	ChSchemeAuto = "auto"
+	// ChSchemeAuto specifies that operator has to decide itself should https or http be used.
+	// Humped canonical form; the normalizer folds any casing (auto/Auto) to this.
+	ChSchemeAuto = "Auto"
 
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
@@ -107,6 +115,10 @@ const (
 	// Used in case no other specified in config
 	defaultReconcileCHIsThreadsNumber = 1
 
+	// defaultReconcileCHKsThreadsNumber specifies default number of CHK controller threads running concurrently.
+	// Used in case no other specified in config
+	defaultReconcileCHKsThreadsNumber = 1
+
 	// defaultReconcileShardsThreadsNumber specifies the default number of threads usable for concurrent shard reconciliation
 	// within a single cluster reconciliation. Defaults to 1, which means strictly sequential shard reconciliation.
 	defaultReconcileShardsThreadsNumber = 1
@@ -128,6 +140,12 @@ const (
 
 	// defaultTerminationGracePeriod specifies default value for TerminationGracePeriod
 	defaultTerminationGracePeriod = 30
+	// defaultBackupStoragePath and defaultBackupStorageObjectDiskPath specify default values for Backup.StoragePath and
+	// Backup.StorageObjectDiskPath. The namespace and the installation keep its backups apart from those of every other
+	// installation of the Kubernetes cluster on a shared storage, the cluster and the shard keep those of its
+	// shards apart
+	defaultBackupStoragePath           = "backup/{namespace}/{installation}/{cluster}/{shard}"
+	defaultBackupStorageObjectDiskPath = "object_disks/{namespace}/{installation}/{cluster}/{shard}"
 	// defaultRevisionHistoryLimit specifies default value for RevisionHistoryLimit
 	defaultRevisionHistoryLimit = 10
 )
@@ -138,44 +156,77 @@ const (
 	PasswordReplacer = "***"
 )
 
+// StatefulSet failure-action consts use the canonical humped form; the CRD also accepts
+// all-lowercase and the normalizer folds any casing to these via util.FoldEnum.
 const (
 	// What to do in case StatefulSet can't reach new Generation - abort CHI reconcile
-	OnStatefulSetCreateFailureActionAbort = "abort"
+	OnStatefulSetCreateFailureActionAbort = "Abort"
 
 	// What to do in case StatefulSet can't reach new Generation - delete newly created problematic StatefulSet
-	OnStatefulSetCreateFailureActionDelete = "delete"
+	OnStatefulSetCreateFailureActionDelete = "Delete"
 
 	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
-	OnStatefulSetCreateFailureActionIgnore = "ignore"
+	OnStatefulSetCreateFailureActionIgnore = "Ignore"
 )
 
 const (
 	// What to do in case StatefulSet can't reach new Generation - abort CHI reconcile
-	OnStatefulSetUpdateFailureActionAbort = "abort"
+	OnStatefulSetUpdateFailureActionAbort = "Abort"
 
 	// What to do in case StatefulSet can't reach new Generation - delete Pod and rollback StatefulSet to previous Generation
 	// Pod would be recreated by StatefulSet based on rollback-ed configuration
-	OnStatefulSetUpdateFailureActionRollback = "rollback"
+	OnStatefulSetUpdateFailureActionRollback = "Rollback"
 
 	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
-	OnStatefulSetUpdateFailureActionIgnore = "ignore"
+	OnStatefulSetUpdateFailureActionIgnore = "Ignore"
 )
 
 const (
 	// What to do in case StatefulSet needs to be recreated due to PVC data loss or missing volumes
 	// Abort - Loss: abort CHI reconcile
-	OnStatefulSetRecreateOnDataLossActionAbort = "abort"
+	OnStatefulSetRecreateOnDataLossActionAbort = "Abort"
 
 	// Recreate - Loss: proceed and recreate StatefulSet
-	OnStatefulSetRecreateOnDataLossActionRecreate = "recreate"
+	OnStatefulSetRecreateOnDataLossActionRecreate = "Recreate"
 
 	// What to do in case StatefulSet needs to be recreated due to update failure or StatefulSet not ready
 	// Abort - Failure: abort CHI reconcile
-	OnStatefulSetRecreateOnUpdateFailureActionAbort = "abort"
+	OnStatefulSetRecreateOnUpdateFailureActionAbort = "Abort"
 
 	// Recreate - Failure: proceed and recreate StatefulSet
-	OnStatefulSetRecreateOnUpdateFailureActionRecreate = "recreate"
+	OnStatefulSetRecreateOnUpdateFailureActionRecreate = "Recreate"
 )
+
+// Canonical (humped) candidate lists for the StatefulSet failure-action enums. OnDataLoss and
+// OnUpdateFailure share the Abort/Recreate set. The Normalize* helpers fold any accepted casing
+// to the canonical const; an unrecognized value passes through so the caller's default applies.
+var (
+	onStatefulSetCreateFailureActions = []string{
+		OnStatefulSetCreateFailureActionAbort, OnStatefulSetCreateFailureActionDelete, OnStatefulSetCreateFailureActionIgnore,
+	}
+	onStatefulSetUpdateFailureActions = []string{
+		OnStatefulSetUpdateFailureActionAbort, OnStatefulSetUpdateFailureActionRollback, OnStatefulSetUpdateFailureActionIgnore,
+	}
+	onStatefulSetRecreateActions = []string{
+		OnStatefulSetRecreateOnDataLossActionAbort, OnStatefulSetRecreateOnDataLossActionRecreate,
+	}
+)
+
+// NormalizeOnStatefulSetCreateFailureAction folds any accepted casing to its canonical const.
+func NormalizeOnStatefulSetCreateFailureAction(value string) string {
+	return util.FoldEnum(value, onStatefulSetCreateFailureActions...)
+}
+
+// NormalizeOnStatefulSetUpdateFailureAction folds any accepted casing to its canonical const.
+func NormalizeOnStatefulSetUpdateFailureAction(value string) string {
+	return util.FoldEnum(value, onStatefulSetUpdateFailureActions...)
+}
+
+// NormalizeOnStatefulSetRecreateAction folds any accepted casing to its canonical const
+// (used for both onDataLoss and onUpdateFailure, which share the Abort/Recreate set).
+func NormalizeOnStatefulSetRecreateAction(value string) string {
+	return util.FoldEnum(value, onStatefulSetRecreateActions...)
+}
 
 const (
 	defaultMaxReplicationDelay = 10
@@ -379,6 +430,15 @@ type OperatorConfigClickHouse struct {
 		Username string `json:"username,omitempty" yaml:"username,omitempty"`
 		Password string `json:"password,omitempty" yaml:"password,omitempty"`
 		RootCA   string `json:"rootCA,omitempty"   yaml:"rootCA,omitempty"`
+		// RootCASecretRef sources the RootCA PEM from a Secret in the operator's pod
+		// namespace (inline RootCA wins; empty Name = unused; Key defaults ca.crt then
+		// tls.crt). Mirrors security.clickhouse.tls.rootCASecretRef. Value struct, not
+		// *core.SecretKeySelector: Access is anonymous, where a heap-bearing pointer
+		// field would break deepcopy generation.
+		RootCASecretRef struct {
+			Name string `json:"name,omitempty" yaml:"name,omitempty"`
+			Key  string `json:"key,omitempty"  yaml:"key,omitempty"`
+		} `json:"rootCASecretRef,omitempty" yaml:"rootCASecretRef,omitempty"`
 
 		// Location of k8s Secret with username and password to be used by the operator to connect to ClickHouse instances
 		// Can be used instead of explicitly specified (above) username and password
@@ -563,21 +623,23 @@ type OperatorConfigReconcile struct {
 }
 
 // OperatorConfigReconcileRecovery specifies auto-recovery behavior for reconcile.
-// Event→action mappings are scoped by the CHI state we recover FROM (under .From).
+// Event→action mappings are scoped by the CHI status they apply to (under .OnStatus).
 // Global policy knobs (future: retries, backoff, cooldown, enabled) sit as flat peers
-// of .From at this level. Multi-scope design anticipates future states beyond Aborted
+// of .OnStatus at this level. Multi-scope design anticipates future states beyond Aborted
 // (e.g. Failed, Broken).
 type OperatorConfigReconcileRecovery struct {
-	// From maps the CHI state we recover from (e.g. aborted) to event→action mappings.
-	From OperatorConfigReconcileRecoveryFrom `json:"from,omitempty" yaml:"from,omitempty"`
+	// OnStatus maps a CHI status (e.g. aborted, completed) to event→action mappings
+	// that apply while the CHI is in that status.
+	OnStatus OperatorConfigReconcileRecoveryOnStatus `json:"onStatus,omitempty" yaml:"onStatus,omitempty"`
 }
 
-// OperatorConfigReconcileRecoveryFrom groups recovery-event mappings by the CHI state
-// being recovered from. Each sub-field is a scope whose keys are on<Event> recovery
-// triggers.
-type OperatorConfigReconcileRecoveryFrom struct {
-	// Aborted scope — recovery from Status=Aborted.
+// OperatorConfigReconcileRecoveryOnStatus groups recovery-event mappings by the CHI status
+// they apply to. Each sub-field is a scope whose keys are on<Event> recovery triggers.
+type OperatorConfigReconcileRecoveryOnStatus struct {
+	// Aborted scope — recovery while Status=Aborted.
 	Aborted OperatorConfigReconcileRecoveryScope `json:"aborted,omitempty" yaml:"aborted,omitempty"`
+	// Completed scope — recovery while Status=Completed when a child pod regresses to Ready=False
+	Completed OperatorConfigReconcileRecoveryCompletedScope `json:"completed,omitempty" yaml:"completed,omitempty"`
 	// Future: Failed, Broken, etc.
 }
 
@@ -592,8 +654,26 @@ type OperatorConfigReconcileRecoveryScope struct {
 	// Future: OnKeeperReady, OnOperatorRestart.
 }
 
+// OperatorConfigReconcileRecoveryCompletedScope holds the event→action mappings for the
+// Completed scope.
+type OperatorConfigReconcileRecoveryCompletedScope struct {
+	// OnPodNotReady controls reaction when a pod belonging to a Completed CHI flips
+	// Ready=True → Ready=False and stays NotReady for at least OnPodNotReadyThreshold.
+	// OFF by default (opt-in), unlike the Aborted scope's OnPodReady — force-recreating a
+	// Completed CHI's pod is destructive (can interrupt replica recovery; single-replica downtime):
+	//   nil / "none" (default) — do nothing, host stays Ready=False until external action
+	//   "retry"                — re-enqueue CHI for reconcile so shouldForceRestartHost
+	//                            can decide whether to restart the host
+	OnPodNotReady *types.String `json:"onPodNotReady,omitempty" yaml:"onPodNotReady,omitempty"`
+	// OnPodNotReadyThreshold is the minimum duration a pod must remain in Ready=False
+	// before this scope fires. Accepts any time.ParseDuration string (default "5m"
+	// when unset, empty, or unparseable).
+	OnPodNotReadyThreshold *types.String `json:"onPodNotReadyThreshold,omitempty" yaml:"onPodNotReadyThreshold,omitempty"`
+}
+
 type OperatorConfigReconcileRuntime struct {
 	ReconcileCHIsThreadsNumber           int `json:"reconcileCHIsThreadsNumber"           yaml:"reconcileCHIsThreadsNumber"`
+	ReconcileCHKsThreadsNumber           int `json:"reconcileCHKsThreadsNumber"           yaml:"reconcileCHKsThreadsNumber"`
 	ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
 	ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
 
@@ -622,9 +702,9 @@ func (rh ReconcileHost) Normalize() ReconcileHost {
 	return rh
 }
 
-func (rh ReconcileHost) MergeFrom(from ReconcileHost) ReconcileHost {
-	rh.Wait = rh.Wait.MergeFrom(from.Wait)
-	rh.Drop = rh.Drop.MergeFrom(from.Drop)
+func (rh ReconcileHost) MergeFrom(from ReconcileHost, _type MergeType) ReconcileHost {
+	rh.Wait = rh.Wait.MergeFrom(from.Wait, _type)
+	rh.Drop = rh.Drop.MergeFrom(from.Drop, _type)
 	rh.Hooks = rh.Hooks.MergeFrom(from.Hooks)
 	return rh
 }
@@ -655,12 +735,12 @@ func (wait ReconcileHostWait) Normalize() ReconcileHostWait {
 	return wait
 }
 
-func (wait ReconcileHostWait) MergeFrom(from ReconcileHostWait) ReconcileHostWait {
-	wait.Exclude = wait.Exclude.MergeFrom(from.Exclude)
-	wait.Queries = wait.Queries.MergeFrom(from.Queries)
-	wait.Include = wait.Include.MergeFrom(from.Include)
-	wait.Replicas = wait.Replicas.MergeFrom(from.Replicas)
-	wait.Probes = wait.Probes.MergeFrom(from.Probes)
+func (wait ReconcileHostWait) MergeFrom(from ReconcileHostWait, _type MergeType) ReconcileHostWait {
+	wait.Exclude = MergeScalar(wait.Exclude, from.Exclude, _type)
+	wait.Queries = MergeScalar(wait.Queries, from.Queries, _type)
+	wait.Include = MergeScalar(wait.Include, from.Include, _type)
+	wait.Replicas = wait.Replicas.MergeFrom(from.Replicas, _type)
+	wait.Probes = wait.Probes.MergeFrom(from.Probes, _type)
 
 	return wait
 }
@@ -678,8 +758,8 @@ func (drop ReconcileHostDrop) Normalize() ReconcileHostDrop {
 	return drop
 }
 
-func (drop ReconcileHostDrop) MergeFrom(from ReconcileHostDrop) ReconcileHostDrop {
-	drop.Replicas = drop.Replicas.MergeFrom(from.Replicas)
+func (drop ReconcileHostDrop) MergeFrom(from ReconcileHostDrop, _type MergeType) ReconcileHostDrop {
+	drop.Replicas = drop.Replicas.MergeFrom(from.Replicas, _type)
 
 	return drop
 }
@@ -690,7 +770,7 @@ type ReconcileHostWaitReplicas struct {
 	Delay *types.Int32      `json:"delay,omitempty" yaml:"delay,omitempty"`
 }
 
-func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas) *ReconcileHostWaitReplicas {
+func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas, _type MergeType) *ReconcileHostWaitReplicas {
 	if from == nil {
 		// Nothing to merge from, keep original value
 		return r
@@ -705,9 +785,9 @@ func (r *ReconcileHostWaitReplicas) MergeFrom(from *ReconcileHostWaitReplicas) *
 
 	// Both recipient and `from` are specified, need to walk over fields
 
-	r.All = r.All.MergeFrom(from.All)
-	r.New = r.New.MergeFrom(from.New)
-	r.Delay = r.Delay.MergeFrom(from.Delay)
+	r.All = MergeScalar(r.All, from.All, _type)
+	r.New = MergeScalar(r.New, from.New, _type)
+	r.Delay = MergeScalar(r.Delay, from.Delay, _type)
 
 	return r
 }
@@ -731,7 +811,7 @@ func (p *ReconcileHostWaitProbes) GetReadiness() *types.StringBool {
 	return p.Readiness
 }
 
-func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *ReconcileHostWaitProbes {
+func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes, _type MergeType) *ReconcileHostWaitProbes {
 	if from == nil {
 		// Nothing to merge from, keep original value
 		return p
@@ -746,8 +826,8 @@ func (p *ReconcileHostWaitProbes) MergeFrom(from *ReconcileHostWaitProbes) *Reco
 
 	// Both recipient and `from` are specified, need to walk over fields
 
-	p.Startup = p.Startup.MergeFrom(from.Startup)
-	p.Readiness = p.Readiness.MergeFrom(from.Readiness)
+	p.Startup = MergeScalar(p.Startup, from.Startup, _type)
+	p.Readiness = MergeScalar(p.Readiness, from.Readiness, _type)
 
 	return p
 }
@@ -758,7 +838,7 @@ type ReconcileHostDropReplicas struct {
 	Active       *types.StringBool `json:"active,omitempty"       yaml:"active,omitempty"`
 }
 
-func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas) *ReconcileHostDropReplicas {
+func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas, _type MergeType) *ReconcileHostDropReplicas {
 	if from == nil {
 		// Nothing to merge from, keep original value
 		return r
@@ -773,9 +853,9 @@ func (r *ReconcileHostDropReplicas) MergeFrom(from *ReconcileHostDropReplicas) *
 
 	// Both recipient and `from` are specified, need to walk over fields
 
-	r.OnDelete = r.OnDelete.MergeFrom(from.OnDelete)
-	r.OnLostVolume = r.OnLostVolume.MergeFrom(from.OnLostVolume)
-	r.Active = r.Active.MergeFrom(from.Active)
+	r.OnDelete = MergeScalar(r.OnDelete, from.OnDelete, _type)
+	r.OnLostVolume = MergeScalar(r.OnLostVolume, from.OnLostVolume, _type)
+	r.Active = MergeScalar(r.Active, from.Active, _type)
 
 	return r
 }
@@ -827,18 +907,39 @@ type ConfigCRSource struct {
 	Name      string
 }
 
+// OperatorConfigBackup sets the defaults of operator-managed backup
+type OperatorConfigBackup struct {
+	// StoragePath and StorageObjectDiskPath are where in its storage the clickhouse-backup sidecar of a host keeps the
+	// backups it makes, and their data on object disks, when the settings of the storage of its cluster set no path of
+	// their own. Each is a template that clickhouse-backup expands with the ClickHouse macros of the host - {namespace},
+	// {installation}, {cluster}, {shard} and {replica} - and the backup Jobs alike. The sidecar takes them as arguments
+	// of its command: changing either rolls the pods of every backup-enabled cluster, and leaves the backups made under
+	// the old paths where they are.
+	StoragePath           string `json:"storagePath"           yaml:"storagePath"`
+	StorageObjectDiskPath string `json:"storageObjectDiskPath" yaml:"storageObjectDiskPath"`
+}
+
 // OperatorConfig specifies operator config
 type OperatorConfig struct {
-	Runtime     OperatorConfigRuntime    `json:"runtime"    yaml:"runtime"`
-	Watch       OperatorConfigWatch      `json:"watch"      yaml:"watch"`
-	ClickHouse  OperatorConfigClickHouse `json:"clickhouse" yaml:"clickhouse"`
-	Keeper      OperatorConfigKeeper     `json:"keeper"     yaml:"keeper"`
-	Template    OperatorConfigTemplate   `json:"template"   yaml:"template"`
-	Reconcile   OperatorConfigReconcile  `json:"reconcile"  yaml:"reconcile"`
-	Annotation  OperatorConfigAnnotation `json:"annotation" yaml:"annotation"`
-	Label       OperatorConfigLabel      `json:"label"      yaml:"label"`
-	Metrics     OperatorConfigMetrics    `json:"metrics"    yaml:"metrics"`
-	Status      OperatorConfigStatus     `json:"status"     yaml:"status"`
+	Runtime    OperatorConfigRuntime    `json:"runtime"    yaml:"runtime"`
+	Watch      OperatorConfigWatch      `json:"watch"      yaml:"watch"`
+	ClickHouse OperatorConfigClickHouse `json:"clickhouse" yaml:"clickhouse"`
+	Keeper     OperatorConfigKeeper     `json:"keeper"     yaml:"keeper"`
+	Template   OperatorConfigTemplate   `json:"template"   yaml:"template"`
+	Reconcile  OperatorConfigReconcile  `json:"reconcile"  yaml:"reconcile"`
+	Annotation OperatorConfigAnnotation `json:"annotation" yaml:"annotation"`
+	Label      OperatorConfigLabel      `json:"label"      yaml:"label"`
+	Metrics    OperatorConfigMetrics    `json:"metrics"    yaml:"metrics"`
+	Status     OperatorConfigStatus     `json:"status"     yaml:"status"`
+	// Security groups operator-wide security toggles: ClickHouse-client TLS,
+	// ZooKeeper-client TLS, Kubernetes-client reject-insecure, the IPC channel
+	// (operator↔exporter) hardening, and the operator-wide FIPS master switch.
+	// Target-scoped sub-structs (ClickHouse/Zookeeper/Kubernetes) serve as
+	// defaults inherited into CHIs and clusters via MergeFrom (3-level
+	// inheritance); IPC and FIPS are operator-only.
+	Security OperatorConfigSecurity `json:"security" yaml:"security"`
+	// Backup sets the defaults of operator-managed backup
+	Backup      OperatorConfigBackup `json:"backup" yaml:"backup"`
 	StatefulSet struct {
 		// Revision history limit
 		RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`
@@ -1182,22 +1283,27 @@ func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
 		c.Reconcile.StatefulSet.Update.PollInterval = defaultStatefulSetUpdatePollInterval
 	}
 
-	// Default action on Create/Update failure - to keep system in previous state
+	// Default action on Create/Update failure - to keep system in previous state.
+	// Fold any accepted casing to the canonical const first, then default if empty.
 
 	// Default Create Failure action - delete
+	c.Reconcile.StatefulSet.Create.OnFailure = NormalizeOnStatefulSetCreateFailureAction(c.Reconcile.StatefulSet.Create.OnFailure)
 	if c.Reconcile.StatefulSet.Create.OnFailure == "" {
 		c.Reconcile.StatefulSet.Create.OnFailure = OnStatefulSetCreateFailureActionDelete
 	}
 
 	// Default Updated Failure action - revert
+	c.Reconcile.StatefulSet.Update.OnFailure = NormalizeOnStatefulSetUpdateFailureAction(c.Reconcile.StatefulSet.Update.OnFailure)
 	if c.Reconcile.StatefulSet.Update.OnFailure == "" {
 		c.Reconcile.StatefulSet.Update.OnFailure = OnStatefulSetUpdateFailureActionRollback
 	}
 
 	// Default Recreate actions - recreate
+	c.Reconcile.StatefulSet.Recreate.OnDataLoss = NormalizeOnStatefulSetRecreateAction(c.Reconcile.StatefulSet.Recreate.OnDataLoss)
 	if c.Reconcile.StatefulSet.Recreate.OnDataLoss == "" {
 		c.Reconcile.StatefulSet.Recreate.OnDataLoss = OnStatefulSetRecreateOnDataLossActionRecreate
 	}
+	c.Reconcile.StatefulSet.Recreate.OnUpdateFailure = NormalizeOnStatefulSetRecreateAction(c.Reconcile.StatefulSet.Recreate.OnUpdateFailure)
 	if c.Reconcile.StatefulSet.Recreate.OnUpdateFailure == "" {
 		c.Reconcile.StatefulSet.Recreate.OnUpdateFailure = OnStatefulSetRecreateOnUpdateFailureActionRecreate
 	}
@@ -1234,7 +1340,9 @@ func (c *OperatorConfig) normalizeSectionClickHouseAccess() {
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
-	switch strings.ToLower(c.ClickHouse.Access.Scheme) {
+	// Fold any accepted casing (http/HTTP, https/HTTPS, auto/Auto) to the canonical const,
+	// falling back to the default scheme for unrecognized values.
+	switch util.FoldEnum(c.ClickHouse.Access.Scheme, ChSchemeHTTP, ChSchemeHTTPS, ChSchemeAuto) {
 	case ChSchemeHTTP:
 		c.ClickHouse.Access.Scheme = ChSchemeHTTP
 	case ChSchemeHTTPS:
@@ -1316,6 +1424,9 @@ func (c *OperatorConfig) normalizeSectionReconcileRuntime() {
 	if c.Reconcile.Runtime.ReconcileCHIsThreadsNumber == 0 {
 		c.Reconcile.Runtime.ReconcileCHIsThreadsNumber = defaultReconcileCHIsThreadsNumber
 	}
+	if c.Reconcile.Runtime.ReconcileCHKsThreadsNumber == 0 {
+		c.Reconcile.Runtime.ReconcileCHKsThreadsNumber = defaultReconcileCHKsThreadsNumber
+	}
 	if c.Reconcile.Runtime.ReconcileShardsThreadsNumber == 0 {
 		c.Reconcile.Runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
 	}
@@ -1348,6 +1459,15 @@ func (c *OperatorConfig) normalizeSectionPod() {
 	}
 }
 
+func (c *OperatorConfig) normalizeSectionBackup() {
+	if c.Backup.StoragePath == "" {
+		c.Backup.StoragePath = defaultBackupStoragePath
+	}
+	if c.Backup.StorageObjectDiskPath == "" {
+		c.Backup.StorageObjectDiskPath = defaultBackupStorageObjectDiskPath
+	}
+}
+
 // normalize() makes fully-and-correctly filled OperatorConfig
 func (c *OperatorConfig) normalize() {
 	c.move()
@@ -1367,6 +1487,127 @@ func (c *OperatorConfig) normalize() {
 	c.normalizeSectionLabel()
 	c.normalizeSectionStatefulSet()
 	c.normalizeSectionPod()
+	c.normalizeSectionBackup()
+	// FIPS coercion runs LAST so it overrides any user-specified per-component
+	// values for the knobs it tightens. Field-level overrides are logged.
+	c.applyEnforcedHardening()
+}
+
+// applyEnforcedHardening coerces transport/IPC knobs to their Strict
+// positions when EITHER security.policy=Enforced OR security.fips.enforced=true.
+// The FIPS cryptographic-module runtime gate (GOFIPS140 + crypto/fips140)
+// is handled separately in cmd/.../app/fips_gate.go and fires only on
+// fips.enforced=true.
+func (c *OperatorConfig) applyEnforcedHardening() {
+	if !c.Security.RequiresHardening() {
+		return
+	}
+	s := &c.Security
+	if s.ClickHouse == nil {
+		s.ClickHouse = &ClusterSecurityClickHouse{}
+	}
+	if s.ClickHouse.TLS == nil {
+		s.ClickHouse.TLS = &ClusterSecurityClickHouseTLS{}
+	}
+	coerceTypedString(&s.ClickHouse.TLS.Verify, TLSVerifyStrict, "security.clickhouse.tls.verify")
+	coerceTypedString(&s.ClickHouse.TLS.MinVersion, TLSMinVersion13, "security.clickhouse.tls.minVersion")
+	if s.Zookeeper == nil {
+		s.Zookeeper = &ClusterSecurityZookeeper{}
+	}
+	if s.Zookeeper.TLS == nil {
+		s.Zookeeper.TLS = &ClusterSecurityZookeeperTLS{}
+	}
+	coerceTypedString(&s.Zookeeper.TLS.Verify, TLSVerifyStrict, "security.zookeeper.tls.verify")
+	coerceTypedString(&s.Zookeeper.TLS.MinVersion, TLSMinVersion13, "security.zookeeper.tls.minVersion")
+	if s.Kubernetes == nil {
+		s.Kubernetes = &ClusterSecurityKubernetes{}
+	}
+	if s.Kubernetes.TLS == nil {
+		s.Kubernetes.TLS = &ClusterSecurityKubernetesTLS{}
+	}
+	coerceTypedString(&s.Kubernetes.TLS.Verify, TLSVerifyStrict, "security.kubernetes.tls.verify")
+	coerceTypedString(&s.Kubernetes.TLS.MinVersion, TLSMinVersion13, "security.kubernetes.tls.minVersion")
+	if s.IPC == nil {
+		s.IPC = &OperatorConfigSecurityIPC{}
+	}
+	coerceTypedString(&s.IPC.Mode, IPCModeSecure, "security.ipc.mode")
+
+	// Reject plain HTTP access to ClickHouse under FIPS-compatible mode
+	// (per the operator's FIPS scope specification, §2 line 36). `auto`
+	// (default) and `https` pass
+	// through unchanged — only an explicit `http` is coerced so a FIPS
+	// posture cannot silently fall back to unencrypted ClickHouse traffic.
+	// `auto` is preserved because the operator's per-host scheme resolution
+	// still chooses `https` when a TLS port is configured; coercing `auto`
+	// would also force HTTPS where no TLS port exists, breaking back-compat.
+	if strings.EqualFold(c.ClickHouse.Access.Scheme, ChSchemeHTTP) {
+		logFIPSCoercion("clickhouse.access.scheme", c.ClickHouse.Access.Scheme, ChSchemeHTTPS)
+		c.ClickHouse.Access.Scheme = ChSchemeHTTPS
+	}
+}
+
+// IsZero reports whether the Security struct has any populated sub-block.
+func (s *OperatorConfigSecurity) IsZero() bool {
+	if s == nil {
+		return true
+	}
+	return (s.ClickHouse == nil) && (s.Zookeeper == nil) && (s.Kubernetes == nil) && (s.IPC == nil) && (s.Policy == nil) && (s.Images == nil) && (s.FIPS == nil)
+}
+
+// RequiresStrictK8sTLS reports whether the operator's resolved security posture
+// demands strict TLS verification on the Kubernetes-API client. True when ANY of:
+// security.kubernetes.tls.verify is Strict, security.policy is Enforced, or
+// security.fips.enforced is true — the latter two one-way coerce verify to
+// Strict via applyEnforcedHardening, so the predicate MUST fire even before
+// that coercion has run. Callable on raw file-based config before normalize.
+func (c *OperatorConfig) RequiresStrictK8sTLS() bool {
+	if c == nil {
+		return false
+	}
+	return c.Security.RequiresHardening() ||
+		c.Security.GetKubernetes().GetTLS().GetVerify() == TLSVerifyStrict
+}
+
+// ResolveK8sTLSMinVersion returns the K8s-API TLS floor for GetClientset. Under
+// hardened posture (policy=Enforced or fips.enforced) returns TLSMinVersion13;
+// otherwise security.kubernetes.tls.minVersion. Callable on raw file-based config
+// before applyEnforcedHardening runs. Empty = Go stdlib default.
+func (c *OperatorConfig) ResolveK8sTLSMinVersion() TLSMinVersion {
+	if c == nil {
+		return TLSMinVersion("")
+	}
+	if c.Security.RequiresHardening() {
+		return TLSMinVersion13
+	}
+	return c.Security.GetKubernetes().GetTLS().GetMinVersion()
+}
+
+// coerceTypedString one-way coerces a *types.String-valued config field (TLSVerify,
+// TLSMinVersion, IPCMode — all type aliases of types.String) to the FIPS-strict
+// target value and logs the change. Caller passes the address of the struct field
+// so the helper can mutate it in place; the path string is the human-readable
+// dotted-key for the audit log. Comparison is case-insensitive to match the
+// normalize* helpers in type_tls.go (so a user-written `verify: strict` is treated
+// as already-Strict and is not re-stamped). Replaces seven near-identical
+// per-field coerce helpers with one entry point, since all callsites collapse to
+// "mutate this *types.String field if it differs from a typed constant target".
+func coerceTypedString(field **types.String, target types.String, path string) {
+	prev := ""
+	if (*field) != nil && (*field).HasValue() {
+		prev = (*field).Value()
+	}
+	if strings.EqualFold(prev, string(target)) {
+		return
+	}
+	*field = types.NewString(string(target))
+	logFIPSCoercion(path, prev, string(target))
+}
+
+func logFIPSCoercion(path, before, after string) {
+	if before == "" {
+		before = "(unset)"
+	}
+	log.V(1).Infof("FIPS strict: coerced %s: %s → %s", path, before, after)
 }
 
 // applyEnvVarParams applies ENV VARS over config
@@ -1376,11 +1617,17 @@ func (c *OperatorConfig) applyEnvVarParams() {
 		c.Watch.Namespaces.Include = types.NewStrings([]string{ns})
 	}
 
-	if nss := os.Getenv(deployment.WATCH_NAMESPACES); len(nss) > 0 {
-		// We have WATCH_NAMESPACES explicitly specified
-		if namespaces := c.splitNamespaces(nss); len(namespaces) > 0 {
-			c.Watch.Namespaces.Include = types.NewStrings(namespaces)
+	// LookupEnv, not Getenv+len: OLM's AllNamespaces mode sets WATCH_NAMESPACES to an empty
+	// string (present-but-empty), which must mean watch-all - distinct from a non-OLM deploy
+	// that leaves it unset. Present-and-empty is coerced to the watch-all pattern so it does
+	// not fall through to applyDefaultWatchNamespace()'s own-namespace inference. Supersedes
+	// the singular WATCH_NAMESPACE above.
+	if nss, ok := os.LookupEnv(deployment.WATCH_NAMESPACES); ok {
+		namespaces := c.splitNamespaces(nss)
+		if len(namespaces) == 0 {
+			namespaces = []string{".*"}
 		}
+		c.Watch.Namespaces.Include = types.NewStrings(namespaces)
 	}
 
 	if nss := os.Getenv(deployment.WATCH_NAMESPACES_EXCLUDE); len(nss) > 0 {
@@ -1506,19 +1753,46 @@ func (c *OperatorConfig) copyWithHiddenCredentials() *OperatorConfig {
 // RestartOnOperatorConfigurationChange reports whether the operator process should exit when
 // ClickHouseOperatorConfiguration changes (so the pod restarts).
 func (c *OperatorConfig) RestartOnOperatorConfigurationChange() bool {
-	return strings.ToLower(c.Watch.Configuration.OnChange.String()) == OnConfigurationChangeRestart
+	return c.Watch.Configuration.OnChange.EqualFoldString(OnConfigurationChangeRestart)
 }
 
 // ShouldRecoverAbortedOnPodReady reports whether the operator should re-enqueue a CHI
 // reconcile when a pod belonging to an Aborted CHI transitions to Ready. Default is to retry.
-// Backed by reconcile.recovery.from.aborted.onPodReady config key.
+// Backed by reconcile.recovery.onStatus.aborted.onPodReady config key.
 func (c *OperatorConfig) ShouldRecoverAbortedOnPodReady() bool {
-	value := strings.ToLower(c.Reconcile.Recovery.From.Aborted.OnPodReady.String())
-	if value == "" {
+	onPodReady := c.Reconcile.Recovery.OnStatus.Aborted.OnPodReady
+	if onPodReady.Value() == "" {
 		// Default behavior — retry
 		return true
 	}
-	return value == RecoveryActionRetry
+	return onPodReady.EqualFoldString(RecoveryActionRetry)
+}
+
+// ShouldRecoverCompletedOnPodNotReady reports whether the operator should re-enqueue a
+// CHI reconcile when a pod belonging to a Completed CHI flips to Ready=False and stays
+// there for longer than CompletedOnPodNotReadyThreshold. Default is OFF: force-recreating
+// a Completed CHI's pod is destructive (it can interrupt a replica's in-progress recovery
+// and means hard downtime for a single-replica shard), so this is opt-in — only an explicit
+// onPodNotReady: retry enables it. Unlike the Aborted scope, which retries by default.
+// Backed by reconcile.recovery.onStatus.completed.onPodNotReady config key.
+func (c *OperatorConfig) ShouldRecoverCompletedOnPodNotReady() bool {
+	return c.Reconcile.Recovery.OnStatus.Completed.OnPodNotReady.EqualFoldString(RecoveryActionRetry)
+}
+
+// CompletedOnPodNotReadyThreshold returns the minimum duration a pod must remain in
+// Ready=False before the Completed recovery scope fires. Falls back to the package
+// default (5m) if the config value is unset, empty, or unparseable.
+// Backed by reconcile.recovery.onStatus.completed.onPodNotReadyThreshold config key.
+func (c *OperatorConfig) CompletedOnPodNotReadyThreshold() time.Duration {
+	raw := strings.TrimSpace(c.Reconcile.Recovery.OnStatus.Completed.OnPodNotReadyThreshold.String())
+	if raw == "" {
+		return defaultCompletedOnPodNotReadyThreshold
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return defaultCompletedOnPodNotReadyThreshold
+	}
+	return d
 }
 
 // IsNamespaceWatched returns whether specified namespace is in a list of watched
@@ -1698,7 +1972,7 @@ func (c *OperatorConfig) move() {
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
 	if c.CHScheme != "" {
-		c.ClickHouse.Access.Password = c.CHScheme
+		c.ClickHouse.Access.Scheme = c.CHScheme
 	}
 	if c.CHUsername != "" {
 		c.ClickHouse.Access.Username = c.CHUsername

@@ -1,0 +1,38 @@
+{{- if (and .Values.serviceMonitor.enabled (.Values.serviceMonitor.keeperMetrics).enabled) }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ printf "%s-keeper-metrics" (include "altinity-clickhouse-operator.fullname" .) }}
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
+  labels:
+    {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+    {{- if .Values.serviceMonitor.additionalLabels }}
+    {{- toYaml .Values.serviceMonitor.additionalLabels | nindent 4 }}
+    {{- end }}
+  annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
+spec:
+  endpoints:
+      # Keeper serves Prometheus itself, so this scrapes the Keeper pods rather than the operator's
+      # metrics-exporter. The operator publishes only zk/zk-secure/raft ports, so the CHK must both
+      # enable the endpoint via `prometheus/*` settings and name the port in a serviceTemplate.
+    - port: {{ .Values.serviceMonitor.keeperMetrics.port | default "prometheus" | quote }}
+      {{- with .Values.serviceMonitor.keeperMetrics.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.keeperMetrics.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.keeperMetrics.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.keeperMetrics.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  namespaceSelector:
+    {{- toYaml .Values.serviceMonitor.keeperMetrics.namespaceSelector | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- toYaml .Values.serviceMonitor.keeperMetrics.selector | nindent 6 }}
+{{- end }}

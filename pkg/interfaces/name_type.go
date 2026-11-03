@@ -33,6 +33,7 @@ const (
 	NameInstanceHostname             NameType = "NameInstanceHostname"
 	NameStatefulSet                  NameType = "NameStatefulSet"
 	NameStatefulSetService           NameType = "NameStatefulSetService"
+	NameStatefulSetServiceClient     NameType = "NameStatefulSetServiceClient"
 	NamePodHostname                  NameType = "NamePodHostname"
 	NameFQDN                         NameType = "NameFQDN"
 	NameFQDNs                        NameType = "NameFQDNs"
@@ -40,5 +41,6 @@ const (
 	NamePod                          NameType = "NamePod"
 	NamePVCNameByVolumeClaimTemplate NameType = "NamePVCNameByVolumeClaimTemplate"
 	NameClusterAutoSecret            NameType = "NameClusterAutoSecret"
+	NameBackupAutoSecret             NameType = "NameBackupAutoSecret"
 	NameClusterPDB                   NameType = "NameClusterPDB"
 )

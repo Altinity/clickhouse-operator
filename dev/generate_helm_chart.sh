@@ -59,7 +59,9 @@ function main() {
   # process grafana dashboards
   readonly prom_ds='{"current":{"selected":false,"text":"","value":""},"hide":0,"includeAll":false,"multi":false,"name":"ds_prometheus","options":[],"query":"prometheus","queryValue":"","refresh":1,"regex":"","skipUrlSync":false,"type":"datasource"}'
   readonly files_dir="${chart_path}/files"
-  rm -f "${files_dir}/*"
+  # Glob must be UNQUOTED to expand; quoting the `*` treats it as a literal
+  # filename and leaves stale dashboards from a previous regen on disk.
+  rm -f "${files_dir}"/*
   for dashboard in "${dashboards_path}"/*.json; do
     local dashboard_name
     dashboard_name=$(basename "${dashboard}")
@@ -203,7 +205,7 @@ function update_deployment_resource() {
   a_data="${annotations}" yq e -i '.podAnnotations |= env(a_data)' "${values_yaml}"
   yq e -i '.spec.template.metadata.annotations = {}' "${file}"
 
-  yq e -i '.spec.template.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}"' "${file}"
+  yq e -i '.spec.template.metadata.labels |= "{{ include \"altinity-clickhouse-operator.podTemplateLabels\" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}"' "${file}"
   yq e -i '.spec.template.metadata.annotations += {"{{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations | nindent 8 }}{{ end }}": null}' "${file}"
   yq e -i '.spec.template.spec.imagePullSecrets |= "{{ toYaml .Values.imagePullSecrets | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.serviceAccountName |= "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}"' "${file}"
@@ -214,14 +216,21 @@ function update_deployment_resource() {
   yq e -i '.spec.template.spec.securityContext |= "{{ toYaml .Values.podSecurityContext | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.topologySpreadConstraints |= "{{ toYaml .Values.topologySpreadConstraints | nindent 8 }}"' "${file}"
 
-  for cm in $(yq e '.spec.template.spec.volumes[].configMap.name' "${file}"); do
+  # Iterate only over volumes that actually use a configMap source. The plain
+  # `.volumes[].configMap.name` form yields a literal `null` for non-configMap
+  # volumes (e.g. emptyDir for the IPC token share); processing that `null`
+  # downstream produces a malformed volume entry with both source kinds set
+  # and a checksum annotation referencing a non-existent ConfigMap-null.yaml.
+  for cm in $(yq e '.spec.template.spec.volumes[] | select(.configMap != null) | .configMap.name' "${file}"); do
     local prefix='{{ include \"altinity-clickhouse-operator.fullname\" . }}'
     local newCm="${cm/etc-clickhouse-operator/$prefix}"
     newCm="${newCm/etc-keeper-operator/${prefix}-keeper}"
-    yq e -i '(.spec.template.spec.volumes[].configMap.name | select(. == "'"${cm}"'") | .) |= "'"${newCm}"'"' "${file}"
+    # Filter at the volume level so `|=` does not auto-create `.configMap.name`
+    # on non-configMap volumes (e.g. emptyDir for the IPC token share).
+    yq e -i '(.spec.template.spec.volumes[] | select(.configMap != null) | .configMap.name | select(. == "'"${cm}"'")) |= "'"${newCm}"'"' "${file}"
     local cmName="${cm/etc-clickhouse-operator-/}"
     cmName="${cmName/etc-keeper-operator-/keeper-}"
-    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include (print $.Template.BasePath \"/generated/ConfigMap-'"${cm}"'.yaml\") . | sha256sum }}"}' "${file}"
+    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include \"altinity-clickhouse-operator.configMapContentHash\" (dict \"ctx\" . \"name\" \"/generated/ConfigMap-'"${cm}"'.yaml\") }}"}' "${file}"
   done
   
   yq e -i '.spec.template.spec.containers[0].name |= "{{ .Chart.Name }}"' "${file}"
@@ -262,6 +271,17 @@ function update_configmap_resource() {
   local data
   data=$(yq e '.data' "${file}")
   
+  local name_suffix="${name/etc-clickhouse-operator-/}"
+  local name_suffix="${name_suffix/etc-keeper-operator-/keeper-}"
+  local camel_cased_name
+  camel_cased_name=$(to_camel_case "${name_suffix}")
+
+  # The operator config ConfigMap gets special handling: fullname substitution,
+  # config.yaml block-scalar → map conversion (so the configmap-files helper can
+  # patch the nested watch.namespaces.include), and the configmap-files helper
+  # (which wires in the top-level watchNamespaces value). Every other ConfigMap
+  # uses the generic configmap-data helper.
+  local data_helper
   if [ "${name}" = "etc-clickhouse-operator-files" ]; then
     local search='name: "clickhouse-operator"'
     local replace="name: '{{ include \"altinity-clickhouse-operator.fullname\" . }}'"
@@ -270,18 +290,17 @@ function update_configmap_resource() {
     search='config.yaml: |'
     replace='config.yaml:'
     data=${data/"${search}"/"${replace}"}
-  fi
 
-  local name_suffix="${name/etc-clickhouse-operator-/}"
-  local name_suffix="${name_suffix/etc-keeper-operator-/keeper-}"
-  local camel_cased_name
-  camel_cased_name=$(to_camel_case "${name_suffix}")
+    data_helper='{{ include "altinity-clickhouse-operator.configmap-files" (list . .Values.configs.files .Values.watchNamespaces) | nindent 2 }}'
+  else
+    data_helper='{{ include "altinity-clickhouse-operator.configmap-data" (list . .Values.configs.'"${camel_cased_name}"') | nindent 2 }}'
+  fi
 
   yq e -i '.metadata.name |= "{{ printf \"%s-'"${name_suffix}"'\" (include \"altinity-clickhouse-operator.fullname\" .) }}"' "${file}"
   yq e -i '.metadata.namespace |= "{{ include \"altinity-clickhouse-operator.namespace\" . }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
   yq e -i '.metadata.annotations |= "{{ include \"altinity-clickhouse-operator.annotations\" . | nindent 4 }}"' "${file}"
-  yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${camel_cased_name}"') | nindent 2 }}"' "${file}"
+  data_helper="${data_helper}" yq e -i '.data |= strenv(data_helper)' "${file}"
 
   if [ -z "${data}" ]; then
     yq e -i '.configs.'"${camel_cased_name}"' |= null' "${values_yaml}"

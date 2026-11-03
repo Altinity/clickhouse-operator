@@ -5,6 +5,12 @@ on:
     branches:
       - master
 
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+  attestations: write
+
 jobs:
   build_master:
     name: Build master
@@ -22,9 +28,48 @@ jobs:
           DOCKER_USER: ${{ secrets.DOCKER_USER }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
         run: |
+          set -euo pipefail
           export CHO_RELEASE=latest
           export GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
+          export GOFIPS140=v1.0.0
+          # GODEBUG_FIPS140 selects the runtime FIPS enforcement level baked
+          # into the image's ENV GODEBUG. Accepted values:
+          #   off   — module not active (shipped default; preserves pre-0.27.1
+          #           runtime behavior on the GOFIPS140-linked binary)
+          #   on    — module active; TLS/cipher/sig filtering; non-FIPS calls
+          #           outside TLS still allowed
+          #   only  — strict; non-FIPS primitive calls panic at call time
+          #   debug — same as on + per-call stderr logging
+          # Override at runtime via Pod env without rebuilding.
+          export GODEBUG_FIPS140=off
 
           echo "${DOCKER_PASS}" | docker login -u $DOCKER_USER --password-stdin docker.io
-          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/operator/Dockerfile         --build-arg GO_VERSION=${GO_VERSION} -t docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE} --pull --push .
-          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/metrics-exporter/Dockerfile --build-arg GO_VERSION=${GO_VERSION} -t docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE}    --pull --push .
+          echo "Building operator image with SBOM + provenance + metadata capture"
+          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/operator/Dockerfile         --build-arg GO_VERSION=${GO_VERSION} --build-arg GOFIPS140=${GOFIPS140} --build-arg GODEBUG_FIPS140=${GODEBUG_FIPS140} -t docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE} --sbom=true --provenance=mode=max --metadata-file operator-build-metadata.json          --pull --push .
+          echo "Building metrics-exporter image with SBOM + provenance + metadata capture"
+          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/metrics-exporter/Dockerfile --build-arg GO_VERSION=${GO_VERSION} --build-arg GOFIPS140=${GOFIPS140} --build-arg GODEBUG_FIPS140=${GODEBUG_FIPS140} -t docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE}    --sbom=true --provenance=mode=max --metadata-file metrics-exporter-build-metadata.json --pull --push .
+      - name: Install syft (SBOM tool) if missing
+        run: |
+          set -euo pipefail
+          if ! command -v syft >/dev/null 2>&1; then
+            echo "syft not pre-installed on runner; installing to /usr/local/bin"
+            curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          fi
+          syft --version
+      - name: Capture release evidence
+        env:
+          DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
+        run: |
+          set -euo pipefail
+          export CHO_RELEASE=latest
+          echo "Collecting build metadata + digest + SBOM + provenance into release-evidence/"
+          mkdir -p release-evidence
+          cp operator-build-metadata.json metrics-exporter-build-metadata.json release-evidence/
+          ./dev/release_evidence.sh docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE} release-evidence/
+          ./dev/release_evidence.sh docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE} release-evidence/
+      - name: Upload release evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-master-${{ github.sha }}
+          path: release-evidence/
+          retention-days: 30

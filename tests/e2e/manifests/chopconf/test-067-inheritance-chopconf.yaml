@@ -1,0 +1,13 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-067-inheritance-chopconf"
+spec:
+  security:
+    clickhouse:
+      tls:
+        # Operator-wide default. CHI-level Strict overrides this in the test
+        # manifest, then cluster-level None overrides the CHI's verify but
+        # leaves minVersion inherited.
+        verify: None
+        minVersion: "1.2"

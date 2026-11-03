@@ -5,4 +5,7 @@ metadata:
 spec:
   clickhouse:
     metrics:
-      excludeRegexp: []
+      excludeRegexp:
+        - "^table_parts$"
+        - "^table_parts_bytes_uncompressed$"
+        - "^table_parts_rows$"

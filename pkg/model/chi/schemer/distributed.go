@@ -53,24 +53,27 @@ func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *ap
 		return nil, nil, nil
 	}
 
+	// Exclude self — see the matching comment in getReplicatedObjectsSQLs.
+	peers := s.Names(interfaces.NameFQDNs, host, api.Cluster{}, true)
+
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			s.Names(interfaces.NameFQDNs, host, api.Cluster{}, false),
+			peers,
 			s.sqlCreateDatabaseDistributed(host.Runtime.Address.ClusterName),
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
 		s.QueryUnzipAndApplyUUIDs(
 			ctx,
-			s.Names(interfaces.NameFQDNs, host, api.Cluster{}, false),
+			peers,
 			s.sqlCreateTableDistributed(host.Runtime.Address.ClusterName),
 		),
 	)
 	functionNames, createFunctionSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			s.Names(interfaces.NameFQDNs, host, api.Cluster{}, false),
+			peers,
 			s.sqlCreateFunction(host.Runtime.Address.ClusterName),
 		),
 	)

@@ -87,7 +87,8 @@ func (q *QueryResult) UnzipColumnsAsStrings(columns ...*[]string) error {
 			*columns[i] = append(*columns[i], row[i])
 		}
 	}
-	return nil
+	// A stream that broke midway must not pass for a complete result
+	return q.Rows.Err()
 }
 
 // Int fetches one int from the query result

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 #
 # build_hub_releases.sh — Publishes the operator to OperatorHub.io and OpenShift community catalogs.
 #
@@ -41,7 +42,10 @@ source "${CUR_DIR}/go_build_config.sh"
 # (the OLM upgrade chain — tells OLM which version this one replaces).
 # ==================================================================================
 
-if [[ -z "${PREVIOUS_VERSION}" ]]; then
+# PREVIOUS_VERSION is an optional env override; under `set -u` we must use
+# the `:-` default-empty form to allow the unset case (the script then
+# auto-detects from the releases file below).
+if [[ -z "${PREVIOUS_VERSION:-}" ]]; then
     echo "PREVIOUS_VERSION is not explicitly specified"
     echo "Trying to figure out PREVIOUS_VERSION from releases"
     PREVIOUS_VERSION=$(head -n1 "${SRC_ROOT}/releases")
@@ -201,7 +205,11 @@ function commit_destination_repo() {
     local VERSION="$2"
 
     git -C "${REPO_ROOT}" add "operators/clickhouse/${VERSION}" || { echo "  [ERROR] git add failed in ${REPO_ROOT}"; return 1; }
-    git -C "${REPO_ROOT}" add "operators/clickhouse/ci.yaml" || true  # no-error if already staged / unchanged
+    # `|| true` is intentional under `set -e`: ci.yaml may already be tracked
+    # and unchanged on a re-run, or absent if upstream removed it — both are
+    # tolerable for this informational re-stage. The main version-dir add
+    # above is the load-bearing one and is NOT tolerated to fail.
+    git -C "${REPO_ROOT}" add "operators/clickhouse/ci.yaml" || true
     git -C "${REPO_ROOT}" commit -s -m "operator clickhouse (${VERSION})" || { echo "  [ERROR] git commit failed in ${REPO_ROOT}"; return 1; }
     git -C "${REPO_ROOT}" push --force || { echo "  [ERROR] git push failed in ${REPO_ROOT}"; return 1; }
 

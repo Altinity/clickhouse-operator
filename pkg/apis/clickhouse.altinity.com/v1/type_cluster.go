@@ -29,6 +29,8 @@ type Cluster struct {
 	Insecure          *types.StringBool `json:"insecure,omitempty"          yaml:"insecure,omitempty"`
 	Secure            *types.StringBool `json:"secure,omitempty"            yaml:"secure,omitempty"`
 	Secret            *ClusterSecret    `json:"secret,omitempty"            yaml:"secret,omitempty"`
+	Security          *ClusterSecurity  `json:"security,omitempty"          yaml:"security,omitempty"`
+	Backup            *ClusterBackup    `json:"backup,omitempty"            yaml:"backup,omitempty"`
 	PDBManaged        *types.StringBool `json:"pdbManaged,omitempty"        yaml:"pdbManaged,omitempty"`
 	PDBMaxUnavailable *types.Int32      `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
 	Reconcile         *ClusterReconcile `json:"reconcile,omitempty"         yaml:"reconcile,omitempty"`
@@ -138,7 +140,18 @@ func (cluster *Cluster) GetSecure() *types.StringBool {
 
 // GetSecret is a getter
 func (c *Cluster) GetSecret() *ClusterSecret {
+	if c == nil {
+		return nil
+	}
 	return c.Secret
+}
+
+// GetSecurity returns the cluster-level Security block, nil-safe.
+func (c *Cluster) GetSecurity() *ClusterSecurity {
+	if c == nil {
+		return nil
+	}
+	return c.Security
 }
 
 // GetPDBManaged is a getter
@@ -208,7 +221,7 @@ func (cluster *Cluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 	if parentZk == nil {
 		return
 	}
-	cluster.Zookeeper = cluster.Zookeeper.MergeFrom(parentZk, MergeTypeFillEmptyValues)
+	cluster.Zookeeper = cluster.Zookeeper.InheritFrom(parentZk)
 }
 
 // InheritFilesFrom inherits files from CR
@@ -230,6 +243,42 @@ func (cluster *Cluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 	})
 }
 
+// GetBackup returns the cluster-level Backup block, nil-safe.
+func (c *Cluster) GetBackup() *ClusterBackup {
+	if c == nil {
+		return nil
+	}
+	return c.Backup
+}
+
+// InheritClusterBackupFrom inherits backup settings from the CHI spec into this cluster.
+// Fills only empty fields, so cluster-level overrides win over CHI-level.
+func (cluster *Cluster) InheritClusterBackupFrom(chi *ClickHouseInstallation) {
+	if chi == nil {
+		return
+	}
+	cluster.Backup = cluster.Backup.MergeFrom(chi.Spec.GetBackup(), MergeTypeFillEmptyValues)
+}
+
+// InheritClusterSecurityFrom inherits security knobs from the CHI spec into this
+// cluster. Fills only empty fields, so cluster-level overrides win over CHI-level.
+// Pattern mirrors InheritClusterReconcileFrom; the full 3-level inheritance
+// (CHOP-config → CHI → cluster) is completed in normalizeClusterSecurity.
+func (cluster *Cluster) InheritClusterSecurityFrom(chi *ClickHouseInstallation) {
+	if chi == nil {
+		return
+	}
+	specSecurity := chi.Spec.GetSecurity()
+	if specSecurity == nil {
+		return
+	}
+	if cluster.Security == nil {
+		cluster.Security = &ClusterSecurity{}
+	}
+	cluster.Security.ClickHouse = cluster.Security.ClickHouse.MergeFrom(specSecurity.GetClickHouse(), MergeTypeFillEmptyValues)
+	cluster.Security.Zookeeper = cluster.Security.Zookeeper.MergeFrom(specSecurity.GetZookeeper(), MergeTypeFillEmptyValues)
+}
+
 // InheritClusterReconcileFrom inherits reconcile runtime from CHI
 func (cluster *Cluster) InheritClusterReconcileFrom(chi *ClickHouseInstallation) {
 	if chi.Spec.Reconcile == nil {
@@ -237,8 +286,8 @@ func (cluster *Cluster) InheritClusterReconcileFrom(chi *ClickHouseInstallation)
 	}
 	reconcile := cluster.GetReconcile()
 	reconcile.Runtime = reconcile.Runtime.MergeFrom(chi.Spec.Reconcile.Runtime, MergeTypeFillEmptyValues)
-	reconcile.StatefulSet = reconcile.StatefulSet.MergeFrom(chi.Spec.Reconcile.StatefulSet)
-	reconcile.Host = reconcile.Host.MergeFrom(chi.Spec.Reconcile.Host)
+	reconcile.StatefulSet = reconcile.StatefulSet.MergeFrom(chi.Spec.Reconcile.StatefulSet, MergeTypeFillEmptyValues)
+	reconcile.Host = reconcile.Host.MergeFrom(chi.Spec.Reconcile.Host, MergeTypeFillEmptyValues)
 	// Inherit CHI-level cluster hooks into this cluster's reconcile.hooks. The merge
 	// is dedup'd (see mergeHookActions) so re-running normalization is idempotent.
 	reconcile.Hooks = reconcile.Hooks.MergeFrom(chi.Spec.Reconcile.Cluster.GetHooks())
@@ -430,6 +479,12 @@ func (cluster *Cluster) HostsCount() int {
 		return nil
 	})
 	return count
+}
+
+// IsSingleNode reports whether the cluster has fewer than two hosts (i.e. no replication/sharding
+// peers). remote_servers on such a cluster references only localhost, which always resolves.
+func (cluster *Cluster) IsSingleNode() bool {
+	return cluster.HostsCount() < 2
 }
 
 func (cluster *Cluster) IsZero() bool {

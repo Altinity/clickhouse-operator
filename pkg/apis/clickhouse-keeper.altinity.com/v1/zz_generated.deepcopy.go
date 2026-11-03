@@ -328,6 +328,11 @@ func (in *ChkSpec) DeepCopyInto(out *ChkSpec) {
 		*out = new(clickhousealtinitycomv1.Templates)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Security != nil {
+		in, out := &in.Security, &out.Security
+		*out = new(clickhousealtinitycomv1.ClusterSecurity)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -478,6 +483,21 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 		in, out := &in.Reconcile, &out.Reconcile
 		*out = new(clickhousealtinitycomv1.ClusterReconcile)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.Security != nil {
+		in, out := &in.Security, &out.Security
+		*out = new(clickhousealtinitycomv1.ClusterSecurity)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Insecure != nil {
+		in, out := &in.Insecure, &out.Insecure
+		*out = new(types.StringBool)
+		**out = **in
+	}
+	if in.Secure != nil {
+		in, out := &in.Secure, &out.Secure
+		*out = new(types.StringBool)
+		**out = **in
 	}
 	if in.Layout != nil {
 		in, out := &in.Layout, &out.Layout

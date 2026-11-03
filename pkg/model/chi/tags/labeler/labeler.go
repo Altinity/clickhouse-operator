@@ -44,11 +44,16 @@ func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]str
 		return l.labelConfigMapCRStorage()
 	case interfaces.LabelConfigMapHost:
 		return l.labelConfigMapHost(params...)
+	case interfaces.LabelSecretBackup:
+		return l.GetCRScope()
 
 	default:
+		// Delegate any type not handled above to the base labeler, whose Label()
+		// has no default case and panics on an unspecified type. That is the
+		// single fail-loud guard, so an unknown type cannot sneak through to a
+		// silent zero-value return here.
 		return l.Labeler.Label(what, params...)
 	}
-	panic("unknown label type")
 }
 
 // Selector

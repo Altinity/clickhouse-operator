@@ -49,6 +49,7 @@ type HostPorts struct {
 	HTTPSPort           *types.Int32 `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
 	InterserverHTTPPort *types.Int32 `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
 	ZKPort              *types.Int32 `json:"zkPort,omitempty"              yaml:"zkPort,omitempty"`
+	ZKPortSecure        *types.Int32 `json:"zkPortSecure,omitempty"        yaml:"zkPortSecure,omitempty"`
 	RaftPort            *types.Int32 `json:"raftPort,omitempty"            yaml:"raftPort,omitempty"`
 }
 
@@ -177,12 +178,12 @@ func (host *Host) InheritSettingsFrom(sources ...any) {
 		case IShard:
 			shard := typed
 			if shard.HasSettings() {
-				host.Settings = host.Settings.MergeFrom(shard.GetSettings())
+				host.Settings = host.Settings.MergeFrom(shard.GetSettings(), MergeTypeFillEmptyValues)
 			}
 		case IReplica:
 			replica := typed
 			if replica.HasSettings() {
-				host.Settings = host.Settings.MergeFrom(replica.GetSettings())
+				host.Settings = host.Settings.MergeFrom(replica.GetSettings(), MergeTypeFillEmptyValues)
 			}
 		}
 	}
@@ -198,12 +199,12 @@ func (host *Host) InheritFilesFrom(sources ...any) {
 		case IShard:
 			shard := typed
 			if shard.HasFiles() {
-				host.Files = host.Files.MergeFrom(shard.GetFiles())
+				host.Files = host.Files.MergeFrom(shard.GetFiles(), MergeTypeFillEmptyValues)
 			}
 		case IReplica:
 			replica := typed
 			if replica.HasFiles() {
-				host.Files = host.Files.MergeFrom(replica.GetFiles())
+				host.Files = host.Files.MergeFrom(replica.GetFiles(), MergeTypeFillEmptyValues)
 			}
 		}
 	}
@@ -264,6 +265,9 @@ func (host *Host) MergeFrom(from *Host) {
 	if !host.ZKPort.HasValue() {
 		host.ZKPort.MergeFrom(from.ZKPort)
 	}
+	if !host.ZKPortSecure.HasValue() {
+		host.ZKPortSecure.MergeFrom(from.ZKPortSecure)
+	}
 	if !host.RaftPort.HasValue() {
 		host.RaftPort.MergeFrom(from.RaftPort)
 	}
@@ -287,6 +291,16 @@ func (host *Host) GetPodTemplate() (*PodTemplate, bool) {
 		return nil, false
 	}
 	name := host.GetTemplates().GetPodTemplate()
+	return host.GetCR().GetPodTemplate(name)
+}
+
+// GetBackupPodTemplate gets the pod template the clickhouse-backup sidecar of the host is built on, which the backup
+// of its cluster names
+func (host *Host) GetBackupPodTemplate() (*PodTemplate, bool) {
+	name := host.GetCluster().GetBackup().GetPodTemplate().Value()
+	if name == "" {
+		return nil, false
+	}
 	return host.GetCR().GetPodTemplate(name)
 }
 
@@ -665,6 +679,9 @@ func (host *Host) WalkPorts(f func(name string, port *types.Int32, protocol core
 	if f(KpDefaultZKPortName, host.ZKPort, core.ProtocolTCP) {
 		return
 	}
+	if f(KpDefaultZKSecurePortName, host.ZKPortSecure, core.ProtocolTCP) {
+		return
+	}
 	if f(KpDefaultRaftPortName, host.RaftPort, core.ProtocolTCP) {
 		return
 	}
@@ -741,7 +758,7 @@ func (host *Host) ShouldIncludeIntoCluster() bool {
 	switch {
 	case host.IsStopped():
 		return false
-	case host.GetCluster().HostsCount() < 2:
+	case host.GetCluster().IsSingleNode():
 		return false
 	default:
 		return true

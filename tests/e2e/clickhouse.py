@@ -19,12 +19,16 @@ def query(
     pod="",
     container="clickhouse-pod",
 ):
-    pod_names = kubectl.get_pod_names(chi_name, ns)
-    pod_name = pod_names[0]
-    for p in pod_names:
-        if host in p or p == pod:
-            pod_name = p
-            break
+    # An explicit pod wins: a host name is a prefix of its own pod's name, so matching by host first
+    # would run a client meant for another pod inside the host's pod
+    pod_name = pod
+    if not pod_name:
+        pod_names = kubectl.get_pod_names(chi_name, ns)
+        pod_name = pod_names[0]
+        for p in pod_names:
+            if host in p:
+                pod_name = p
+                break
 
     pwd_str = "" if pwd == "" else f"--password={pwd}"
     user_str = "" if user == "" else f"--user={user}"
