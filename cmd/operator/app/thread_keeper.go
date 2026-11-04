@@ -111,7 +111,7 @@ func newKeeperCacheOptions(log logr.Logger, cacheNamespaces []string) cache.Opti
 func newKeeperInitializer() func(context.Context) error {
 	// Build the apiextensions client for CRD deletion checks during CHK cleanup.
 	// Uses the same kubeConfigFile/masterURL package vars as the CHI thread.
-	_, extClient, _, _ := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
+	_, extClient, _, _, _ := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
 
 	return func(ctx context.Context) error {
 		return initKeeper(ctx, extClient)
@@ -167,25 +167,24 @@ func initKeeper(ctx context.Context, extClient *apiextensions.Clientset) error {
 
 	maxConcurrentReconciles := chop.Config().Reconcile.Runtime.ReconcileCHKsThreadsNumber
 	logger.Info("init keeper - CHK controller concurrency", "maxConcurrentReconciles", maxConcurrentReconciles)
+	chkController := controller.NewController(
+		manager.GetClient(),
+		manager.GetAPIReader(),
+		manager.GetScheme(),
+		extClient,
+	)
 
 	err = ctrlRuntime.
 		NewControllerManagedBy(manager).
 		For(
 			&api.ClickHouseKeeperInstallation{},
-			builder.WithPredicates(keeperPredicate()),
+			builder.WithPredicates(keeperPredicate(chkController.CancelReconcile)),
 		).
 		Owns(&apps.StatefulSet{}).
 		WithOptions(ctrlController.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
-		Complete(
-			controller.NewController(
-				manager.GetClient(),
-				manager.GetAPIReader(),
-				manager.GetScheme(),
-				extClient,
-			),
-		)
+		Complete(chkController)
 	if err != nil {
 		// Building the controller resolves the scheme and records watches; it issues no API calls,
 		// so like the scheme registration above this can only be a programming fault.
@@ -206,7 +205,7 @@ func runKeeper(ctx context.Context) error {
 	return nil
 }
 
-func keeperPredicate() predicate.Funcs {
+func keeperPredicate(cancelReconcile func(namespace, name string)) predicate.Funcs {
 	return predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			new, ok := e.Object.(*api.ClickHouseKeeperInstallation)
@@ -230,6 +229,10 @@ func keeperPredicate() predicate.Funcs {
 			}
 
 			if !controller.ShouldEnqueue(new) {
+				old, oldOK := e.ObjectOld.(*api.ClickHouseKeeperInstallation)
+				if oldOK && controller.ShouldEnqueue(old) && cancelReconcile != nil {
+					cancelReconcile(new.GetNamespace(), new.GetName())
+				}
 				return false
 			}
 

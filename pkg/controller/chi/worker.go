@@ -21,6 +21,7 @@ import (
 	"time"
 
 	core "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/queue"
@@ -32,6 +33,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
@@ -188,6 +190,20 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("Image change detected - deferring restart to STS rollout. Host: %s", host.GetName())
 		return false
 
+	case passwordOnlyRefresh(ctx, host) && !w.hostNeedsRecoveryRestart(ctx, host):
+		// The default restart policy is RollingUpdate, so a reconcile that exists
+		// only to refresh a password would otherwise software-restart every host.
+		// The Pod template names the managed users Secret and does not carry its
+		// bytes; ClickHouse reloads users.d when that Secret is updated.
+		// Recovery is not shortcut: a Secret update must not leave a crashed or
+		// persistently unhealthy Pod in place, so such a host falls through to the
+		// recovery cases below.
+		// A CHI spec change in the same pass is not this case: it falls through
+		// to the restart checks below. Turning hotReload on is itself a spec
+		// change and still rolls Pods once to install the projected volume.
+		w.a.V(1).M(host).F().Info("Password Secret refresh does not require host restart. Host: %s", host.GetName())
+		return false
+
 	case host.GetCR().IsRollingUpdate():
 		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
 		return true
@@ -196,12 +212,11 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 
-	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host):
+	case w.isHostUnableToStart(ctx, host):
 		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
 		return true
 
-	case chop.Config().ShouldRecoverCompletedOnPodNotReady() &&
-		w.isPodSustainedNotReady(ctx, host, chop.Config().CompletedOnPodNotReadyThreshold()):
+	case w.isHostStuckNotReady(ctx, host):
 		// Closes the gap where Completed CHIs with a sustained-NotReady host
 		// were left stuck indefinitely.
 		threshold := chop.Config().CompletedOnPodNotReadyThreshold()
@@ -215,6 +230,37 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("Host force restart is not required. Host: %s", host.GetName())
 		return false
 	}
+}
+
+// isHostUnableToStart reports a host of unknown version whose Pod has crashed containers.
+func (w *worker) isHostUnableToStart(ctx context.Context, host *api.Host) bool {
+	return host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host)
+}
+
+// isHostStuckNotReady reports a host whose Pod has been NotReady past the recovery threshold.
+func (w *worker) isHostStuckNotReady(ctx context.Context, host *api.Host) bool {
+	return chop.Config().ShouldRecoverCompletedOnPodNotReady() &&
+		w.isPodSustainedNotReady(ctx, host, chop.Config().CompletedOnPodNotReadyThreshold())
+}
+
+// hostNeedsRecoveryRestart reports a host that must be restarted to recover, whatever else is pending.
+func (w *worker) hostNeedsRecoveryRestart(ctx context.Context, host *api.Host) bool {
+	return w.isHostUnableToStart(ctx, host) || w.isHostStuckNotReady(ctx, host)
+}
+
+// passwordOnlyRefresh reports a Secret-triggered reconcile whose CHI has no other
+// pending changes. The action plan is the spec diff against the last completed
+// generation. A nil plan means this pass recorded no spec change.
+func passwordOnlyRefresh(ctx context.Context, host *api.Host) bool {
+	if !passwordSecretReconcile(ctx) {
+		return false
+	}
+	cr, ok := host.GetCR().(*api.ClickHouseInstallation)
+	if !ok || cr == nil {
+		return true
+	}
+	plan := cr.EnsureRuntime().ActionPlan
+	return plan == nil || !plan.HasActionsToDo()
 }
 
 // settingsChangeableWithoutRestartTimeout bounds one host's changeable_without_restart query.
@@ -369,19 +415,25 @@ func (w *worker) updateEndpoints(ctx context.Context, m meta.Object) error {
 	return nil
 }
 
-// finalizeCR re-derives the CR from the API server, lets the caller stamp its outcome via f, and
-// persists the result. It reports whether its own normalize refused the spec, so a caller that
-// announces success can stay consistent with the status actually written.
+type finalizeOutcome uint8
+
+const (
+	finalizeSkipped finalizeOutcome = iota
+	finalizeCompleted
+	finalizeAborted
+)
+
+// finalizeCR re-derives the CR, persists its outcome, and reports whether it completed.
 func (w *worker) finalizeCR(
 	ctx context.Context,
 	obj meta.Object,
 	updateStatusOpts types.UpdateStatusOptions,
 	f func(*api.ClickHouseInstallation),
-) (aborted bool, err error) {
+) (outcome finalizeOutcome, err error) {
 	raw, err := w.c.GetCR(obj)
 	if err != nil {
 		log.V(1).Error("Unable to finalize CR: %s err: %v", util.NamespacedName(obj), err)
-		return false, err
+		return finalizeSkipped, err
 	}
 
 	// Re-check ownership on the RAW live CR before the status/configmap writes — the shard
@@ -390,7 +442,7 @@ func (w *worker) finalizeCR(
 	// label, making this guard disagree with the enqueue-time guards that see raw labels.
 	if !ownsCR(raw) {
 		log.V(1).Info("CR no longer matches this operator's watch scope, skip finalize: %s", util.NamespacedName(obj))
-		return false, nil
+		return finalizeSkipped, nil
 	}
 
 	chi := w.buildCR(ctx, raw)
@@ -406,7 +458,7 @@ func (w *worker) finalizeCR(
 	// here would publish config built from a spec the operator has refused - e.g. a user whose
 	// credential source was rejected and who therefore fell through to
 	// ClickHouse.Config.User.Default.Password.
-	aborted = chi.EnsureStatus().GetStatus() == api.StatusAborted
+	aborted := chi.EnsureStatus().GetStatus() == api.StatusAborted
 
 	if aborted {
 		// Skip f as well as the config map. finalizeReconcileAndMarkCompleted's f calls
@@ -418,15 +470,108 @@ func (w *worker) finalizeCR(
 		// pushes it itself (type_status.go), so a caller polling that list alone cannot tell an
 		// abort from a success either way. status.status is the field that distinguishes them.
 		w.a.V(1).M(chi).F().Info("CR normalize aborted - persist the abort, skip completion bookkeeping and users config map")
-	} else {
-		if f != nil {
-			f(chi)
+	} else if usersErr := w.reconcileConfigMapCommonUsers(ctx, chi); usersErr != nil {
+		// f calls ReconcileComplete(). A credential that cannot be rendered must not
+		// be reported as a completed reconcile, and the users ConfigMap is not written
+		// when rendering returns first.
+		w.a.V(1).M(chi).F().Error("users configuration was not published: %v", usersErr)
+		switch {
+		case errors.Is(usersErr, normalizer.ErrHotReloadCredentialRejected):
+			chi.EnsureStatus().ReconcileAbortWithReason(api.StatusReasonHotReloadRejected, usersErr.Error())
+		case errors.Is(usersErr, normalizer.ErrHotReloadSecretUnresolved):
+			chi.EnsureStatus().ReconcileAbortWithReason(api.StatusReasonHotReloadSecretUnresolved, usersErr.Error())
+		default:
+			chi.EnsureStatus().ReconcileAbort()
 		}
-		_ = w.reconcileConfigMapCommonUsers(ctx, chi)
+		aborted = true
+		err = usersErr
+	} else if f != nil {
+		f(chi)
 	}
-	_ = w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
+	if statusErr := w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts); err == nil {
+		err = statusErr
+	}
 
-	return aborted, nil
+	if aborted {
+		return finalizeAborted, err
+	}
+	return finalizeCompleted, err
+}
+
+func (w *worker) unwatchCHI(ctx context.Context, old, new *api.ClickHouseInstallation) error {
+	observed := old
+	if observed == nil {
+		observed = new
+	}
+	cleanup := func() {
+		w.c.deleteWatch(observed)
+		metrics.CRUnregister(ctx, observed)
+	}
+
+	current, err := w.getHandoffCHI(ctx, new)
+	if err != nil {
+		if apiErrors.IsNotFound(err) && !util.IsContextDone(ctx) {
+			cleanup()
+			return nil
+		}
+		if util.IsContextDone(ctx) {
+			return nil
+		}
+		return err
+	}
+	if ownsCR(current) || util.IsContextDone(ctx) {
+		return nil
+	}
+	cleanup()
+	return nil
+}
+
+func (w *worker) watchCHI(ctx context.Context, old, new *api.ClickHouseInstallation) error {
+	current, err := w.getHandoffCHI(ctx, new)
+	if err != nil {
+		if apiErrors.IsNotFound(err) || util.IsContextDone(ctx) {
+			return nil
+		}
+		return err
+	}
+	live := current.(*api.ClickHouseInstallation)
+	if !ownsCR(live) || util.IsContextDone(ctx) {
+		return nil
+	}
+	w.c.restoreWatch(live)
+	if util.IsContextDone(ctx) {
+		return nil
+	}
+	return w.updateCHI(ctx, old, live)
+}
+
+const (
+	handoffReadRetryInitial = 100 * time.Millisecond
+	handoffReadRetryMax     = 30 * time.Second
+)
+
+func (w *worker) getHandoffCHI(ctx context.Context, cr *api.ClickHouseInstallation) (api.ICustomResource, error) {
+	backoff := handoffReadRetryInitial
+	for {
+		current, err := w.c.kube.CR().Get(ctx, cr.GetNamespace(), cr.GetName())
+		if err == nil || apiErrors.IsNotFound(err) {
+			return current, err
+		}
+		if !commonKube.IsTransientAPIError(err) {
+			return nil, err
+		}
+		if util.IsContextDone(ctx) {
+			return nil, ctx.Err()
+		}
+		log.V(1).Warning("unable to read CHI for watch handoff %s/%s, retrying in %s: %v", cr.GetNamespace(), cr.GetName(), backoff, err)
+		if util.WaitContextDoneOrTimeout(ctx, backoff) {
+			return nil, ctx.Err()
+		}
+		backoff *= 2
+		if backoff > handoffReadRetryMax {
+			backoff = handoffReadRetryMax
+		}
+	}
 }
 
 // updateCHI sync CHI which was already created earlier
@@ -520,16 +665,16 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInsta
 	w.a.V(2).M(cr).F().Info("action plan\n%s\n", cr.EnsureRuntime().ActionPlan.String())
 }
 
-func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api.ClickHouseInstallation) {
+func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", _cr.GetName())
-		return
+		return false
 	}
 
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CR object
-	aborted, _ := w.finalizeCR(
+	outcome, err := w.finalizeCR(
 		ctx,
 		_cr,
 		types.UpdateStatusOptions{
@@ -545,8 +690,15 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 			c.EnsureStatus().ReconcileComplete()
 		},
 	)
+	if err != nil {
+		w.a.V(1).M(_cr).F().Error("unable to finalize reconcile: %v", err)
+		return false
+	}
 
-	if aborted {
+	switch outcome {
+	case finalizeSkipped:
+		return false
+	case finalizeAborted:
 		// finalizeCR's own re-normalize refused the spec, so it persisted Aborted and skipped the
 		// completion bookkeeping. Announcing success here would contradict the status just written
 		// and hand dashboards a ReconcileCompleted event for a spec the operator rejected.
@@ -555,7 +707,8 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 			WithAction(_cr).
 			M(_cr).F().
 			Warning("reconcile not marked completed - spec refused on finalize, task id: %s", _cr.GetSpecT().GetTaskID())
-		return
+		metrics.CRReconcilesAborted(ctx, _cr)
+		return false
 	}
 
 	w.a.V(1).
@@ -564,6 +717,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 		WithActions(_cr).
 		M(_cr).F().
 		Info("reconcile completed successfully, task id: %s", _cr.GetSpecT().GetTaskID())
+	return true
 }
 
 func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *api.ClickHouseInstallation, err error) {

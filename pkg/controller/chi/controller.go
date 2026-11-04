@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -54,7 +55,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	ctrlLabeler "github.com/altinity/clickhouse-operator/pkg/controller/chi/labeler"
-	chiMetrics "github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	operatorMetrics "github.com/altinity/clickhouse-operator/pkg/metrics/operator"
@@ -78,7 +78,7 @@ type Controller struct {
 	chopClient    chopClientSet.Interface
 	dynamicClient dynamic.Interface
 
-	// chiLister resolves the owning CHI of child objects from the informer cache
+	// chiLister resolves CHIs for child ownership and source Secret updates.
 	chiLister chopListers.ClickHouseInstallationLister
 	// chiListerSynced reports whether the CHI informer cache has completed its initial sync;
 	// before that, a cache miss means "not synced yet", not "CHI does not exist"
@@ -86,6 +86,9 @@ type Controller struct {
 
 	// queues used to organize events queue processed by the operator
 	queues []queue.PriorityQueue
+	// watchOps retains the latest metrics-exporter update per CHI.
+	watchOpsMu sync.Mutex
+	watchOps   map[string]*watchOperation
 	// not used explicitly
 	recorder record.EventRecorder
 
@@ -93,6 +96,17 @@ type Controller struct {
 	ctrlLabeler *ctrlLabeler.Labeler
 	pvcDeleter  *volume.PVCDeleter
 }
+
+type watchOperation struct {
+	generation uint64
+	run        func() error
+	wake       chan struct{}
+}
+
+const (
+	watchOperationRetryInitial = 100 * time.Millisecond
+	watchOperationRetryMax     = 30 * time.Second
+)
 
 // NewController creates instance of Controller
 func NewController(
@@ -209,12 +223,15 @@ func (c *Controller) addEventHandlersCHI(
 			newChi := new.(*api.ClickHouseInstallation)
 			if !ShouldEnqueue(newChi) {
 				if isFlipAway(oldChi, newChi) {
-					// Drop local watch/exporter state and per-CR metrics only; cluster resources
-					// belong to the gaining operator and a flip must never be treated as a delete.
-					log.V(1).M(newChi).Info("CHI flipped out of this operator's shard, dropping local watch state")
-					c.deleteWatch(oldChi)
-					chiMetrics.CRUnregister(context.Background(), oldChi)
+					// Same-handle work cancels the active reconcile before dropping local state.
+					log.V(1).M(newChi).Info("CHI flipped out of this operator's shard, enqueue unwatch")
+					c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileUnwatch, oldChi, newChi))
 				}
+				return
+			}
+			if isFlipToward(oldChi, newChi) {
+				log.V(1).M(newChi).Info("CHI flipped into this operator's shard, enqueue watch")
+				c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileWatch, oldChi, newChi))
 				return
 			}
 			log.V(3).M(newChi).Info("chiInformer.UpdateFunc")
@@ -796,10 +813,13 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		variants := len(c.queues) - api.DefaultReconcileSystemThreadsNumber
 		index = api.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(handle, variants)
 		switch command.Cmd {
-		case cmd_queue.ReconcileAdd:
+		case cmd_queue.ReconcileAdd, cmd_queue.ReconcilePasswordSecret:
 			enqueue = prepareCHIAdd(command)
 		case cmd_queue.ReconcileUpdate:
 			enqueue = prepareCHIUpdate(command)
+		case cmd_queue.ReconcileUnwatch, cmd_queue.ReconcileWatch:
+			logCommand(command)
+			enqueue = true
 		}
 	case
 		*cmd_queue.ReconcileCHIT,
@@ -817,26 +837,131 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 	}
 }
 
+func (c *Controller) enqueueWatchOperation(chi *metrics.WatchedCR, op func() error) {
+	key := chi.IndexKey()
+	c.watchOpsMu.Lock()
+	if c.watchOps == nil {
+		c.watchOps = make(map[string]*watchOperation)
+	}
+	if current := c.watchOps[key]; current != nil {
+		current.generation++
+		current.run = op
+		select {
+		case current.wake <- struct{}{}:
+		default:
+		}
+		c.watchOpsMu.Unlock()
+		return
+	}
+	state := &watchOperation{
+		generation: 1,
+		run:        op,
+		wake:       make(chan struct{}, 1),
+	}
+	c.watchOps[key] = state
+	c.watchOpsMu.Unlock()
+
+	go c.runWatchOperations(key, state)
+}
+
+func (c *Controller) runWatchOperations(key string, state *watchOperation) {
+	backoff := watchOperationRetryInitial
+	for {
+		c.watchOpsMu.Lock()
+		if c.watchOps[key] != state {
+			c.watchOpsMu.Unlock()
+			return
+		}
+		generation, op := state.generation, state.run
+		c.watchOpsMu.Unlock()
+		select {
+		case <-state.wake:
+		default:
+		}
+
+		err := op()
+
+		c.watchOpsMu.Lock()
+		latest := c.watchOps[key] == state && state.generation == generation
+		if err == nil && latest {
+			delete(c.watchOps, key)
+			c.watchOpsMu.Unlock()
+			return
+		}
+		c.watchOpsMu.Unlock()
+		if !latest {
+			backoff = watchOperationRetryInitial
+			continue
+		}
+
+		timer := time.NewTimer(backoff)
+		select {
+		case <-timer.C:
+			backoff *= 2
+			if backoff > watchOperationRetryMax {
+				backoff = watchOperationRetryMax
+			}
+		case <-state.wake:
+			if !timer.Stop() {
+				<-timer.C
+			}
+			backoff = watchOperationRetryInitial
+		}
+	}
+}
+
 // updateWatch
 func (c *Controller) updateWatch(chi *api.ClickHouseInstallation) {
 	watched := metrics.NewWatchedCR(chi)
-	go c.updateWatchAsync(watched)
+	c.enqueueWatchOperation(watched, func() error {
+		return c.updateWatchSync(watched)
+	})
 }
 
 // allocateWatch
 func (c *Controller) allocateWatch(chi *api.ClickHouseInstallation) {
 	watched := metrics.NewWatchedCR(chi)
 	watched.Clusters = nil
-	go c.updateWatchAsync(watched)
+	c.enqueueWatchOperation(watched, func() error {
+		return c.updateWatchSync(watched)
+	})
 }
 
-// updateWatchAsync
-func (c *Controller) updateWatchAsync(chi *metrics.WatchedCR) {
-	if err := clickhouse.InformMetricsExporterAboutWatchedCHI(chi); err != nil {
+// restoreWatch transfers exporter ownership using completed topology and current labels.
+func (c *Controller) restoreWatch(chi *api.ClickHouseInstallation) {
+	if chi == nil || chi.IsStopped() {
+		return
+	}
+	watched := watchedCRForHandoff(chi)
+	c.enqueueWatchOperation(watched, func() error {
+		return c.updateWatchSync(watched)
+	})
+}
+
+func watchedCRForHandoff(chi *api.ClickHouseInstallation) *metrics.WatchedCR {
+	ancestor := chi.GetAncestorT()
+	if ancestor == nil {
+		return &metrics.WatchedCR{
+			Namespace:   chi.GetNamespace(),
+			Name:        chi.GetName(),
+			Labels:      chi.GetLabels(),
+			Annotations: chi.GetAnnotations(),
+		}
+	}
+	watched := metrics.NewWatchedCR(ancestor)
+	watched.Labels = chi.GetLabels()
+	watched.Annotations = chi.GetAnnotations()
+	return watched
+}
+
+func (c *Controller) updateWatchSync(chi *metrics.WatchedCR) error {
+	err := clickhouse.InformMetricsExporterAboutWatchedCHI(chi)
+	if err != nil {
 		log.V(1).F().Info("FAIL update watch (%s/%s): %q", chi.Namespace, chi.Name, err)
 	} else {
 		log.V(1).Info("OK update watch (%s/%s): %s", chi.Namespace, chi.Name, chi)
 	}
+	return err
 }
 
 // addHostWatch adds a single host to monitoring
@@ -870,16 +995,19 @@ func (c *Controller) addHostWatchAsync(req *clickhouse.HostRequest) {
 // deleteWatch
 func (c *Controller) deleteWatch(chi *api.ClickHouseInstallation) {
 	watched := metrics.NewWatchedCR(chi)
-	go c.deleteWatchAsync(watched)
+	c.enqueueWatchOperation(watched, func() error {
+		return c.deleteWatchSync(watched)
+	})
 }
 
-// deleteWatchAsync
-func (c *Controller) deleteWatchAsync(chi *metrics.WatchedCR) {
-	if err := clickhouse.InformMetricsExporterToDeleteWatchedCHI(chi); err != nil {
+func (c *Controller) deleteWatchSync(chi *metrics.WatchedCR) error {
+	err := clickhouse.InformMetricsExporterToDeleteWatchedCHI(chi)
+	if err != nil {
 		log.V(1).F().Info("FAIL delete watch (%s/%s): %q", chi.Namespace, chi.Name, err)
 	} else {
 		log.V(1).Info("OK delete watch (%s/%s)", chi.Namespace, chi.Name)
 	}
+	return err
 }
 
 // addChopConfig
@@ -1052,7 +1180,12 @@ func ownsCR(cr meta.Object) bool {
 
 // isFlipAway reports whether an update moves a CR out of this operator's shard.
 func isFlipAway(old, new *api.ClickHouseInstallation) bool {
-	return !ShouldEnqueue(new) && ShouldEnqueue(old)
+	return ownsCR(old) && !ownsCR(new)
+}
+
+// isFlipToward reports whether an update moves a CR into this operator's shard.
+func isFlipToward(old, new *api.ClickHouseInstallation) bool {
+	return !ownsCR(old) && ownsCR(new)
 }
 
 func ShouldEnqueue(cr *api.ClickHouseInstallation) bool {

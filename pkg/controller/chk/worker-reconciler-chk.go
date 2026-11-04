@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
@@ -127,6 +129,9 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		err = w.reconcile(ctx, new)
 	}
 	if err != nil {
+		if util.IsContextDone(ctx) {
+			return nil
+		}
 		if errors.Is(err, common.ErrCRUDDeferred) {
 			w.a.V(1).M(new).F().Info("Reconcile deferred — waiting for Raft quorum headroom")
 			new.EnsureStatus().PushError(fmt.Sprintf(
@@ -162,11 +167,27 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		return nil
 	}
 
-	w.clean(ctx, new)
+	cleaned, err := w.clean(ctx, new)
+	if err != nil {
+		return err
+	}
+	if !cleaned {
+		return nil
+	}
+	if util.IsContextDone(ctx) {
+		return nil
+	}
 	w.addToMonitoring(new)
 	w.waitForIPAddresses(ctx, new)
-	if err := w.finalizeReconcileAndMarkCompleted(ctx, new); err != nil {
+	if util.IsContextDone(ctx) {
+		return nil
+	}
+	finalized, err := w.finalizeReconcileAndMarkCompleted(ctx, new)
+	if err != nil {
 		return err
+	}
+	if !finalized {
+		return nil
 	}
 
 	metrics.CRReconcilesCompleted(ctx, new)
@@ -179,8 +200,8 @@ func (w *worker) buildCR(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstal
 	cr := w.createTemplatedCR(_cr)
 	w.newTask(cr, cr.GetAncestorT())
 	// fillCurSTS must be called before findMinMaxVersions to ensure deterministic
-	w.fillCurSTS(ctx, cr)
-	w.findMinMaxVersions(ctx, cr)
+	listed := w.fillCurSTS(ctx, cr)
+	w.findMinMaxVersions(ctx, cr, listed)
 	common.LogOldAndNew("norm stage 1:", cr.GetAncestorT(), cr)
 
 	templates := w.buildTemplates(cr)
@@ -194,8 +215,8 @@ func (w *worker) buildCR(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstal
 		cr = w.createTemplatedCR(_cr, opts)
 		w.newTask(cr, cr.GetAncestorT())
 		// fillCurSTS again because createTemplatedCR creates new host objects
-		w.fillCurSTS(ctx, cr)
-		w.findMinMaxVersions(ctx, cr)
+		listed = w.fillCurSTS(ctx, cr)
+		w.findMinMaxVersions(ctx, cr, listed)
 		common.LogOldAndNew("norm stage 2:", cr.GetAncestorT(), cr)
 	}
 
@@ -213,10 +234,10 @@ func (w *worker) buildTemplates(chi *apiChk.ClickHouseKeeperInstallation) (templ
 	return templates
 }
 
-func (w *worker) findMinMaxVersions(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+func (w *worker) findMinMaxVersions(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, listed map[string]*apps.StatefulSet) {
 	// Create artifacts
 	cr.WalkHosts(func(host *api.Host) error {
-		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+		w.stsReconciler.PrepareHostStatefulSetWithListedStatus(ctx, host, host.IsStopped(), listed)
 		version := w.getHostSoftwareVersion(ctx, host)
 		host.Runtime.Version = version
 		return nil
@@ -224,11 +245,27 @@ func (w *worker) findMinMaxVersions(ctx context.Context, cr *apiChk.ClickHouseKe
 	cr.FindMinMaxVersions()
 }
 
-func (w *worker) fillCurSTS(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {
+// fillCurSTS reads the CR's StatefulSets with one List from the API server (not the cache, see
+// kube.NewAdapter) and returns them by name. A host the List misses (e.g. its StatefulSet lost its
+// labels), or every host if the List fails, is read by name.
+func (w *worker) fillCurSTS(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) map[string]*apps.StatefulSet {
+	listed := map[string]*apps.StatefulSet{}
+	list := &apps.StatefulSetList{}
+	selector := client.MatchingLabels(getLabeler(cr).Selector(interfaces.SelectorCRScope))
+	if err := w.c.APIReader.List(ctx, list, client.InNamespace(cr.GetNamespace()), selector); err == nil {
+		for i := range list.Items {
+			listed[list.Items[i].Name] = &list.Items[i]
+		}
+	}
 	cr.WalkHosts(func(host *api.Host) error {
-		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+		if sts, found := listed[w.c.namer.Name(interfaces.NameStatefulSet, host)]; found {
+			host.Runtime.CurStatefulSet = sts
+		} else {
+			host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+		}
 		return nil
 	})
+	return listed
 }
 
 func (w *worker) logSWVersion(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) {

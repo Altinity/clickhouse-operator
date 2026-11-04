@@ -32,10 +32,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
+func (w *worker) clean(ctx context.Context, cr api.ICustomResource) (bool, error) {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile clean is aborted. CR: %s ", cr.GetName())
-		return
+		return false, nil
 	}
 
 	w.a.V(1).
@@ -47,9 +47,13 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	// Re-check ownership on live labels before the destructive purge; skipping is recoverable,
 	// deleting another shard's objects is not. No-op unless a selector is configured.
 	if chop.Config().HasWatchLabelSelector() {
-		if !w.c.ownsLiveCR(ctx, cr.GetNamespace(), cr.GetName()) {
+		owned, err := w.c.ownsLiveCR(ctx, cr.GetNamespace(), cr.GetName())
+		if err != nil {
+			return false, err
+		}
+		if !owned {
 			w.a.V(1).M(cr).F().Warning("skip purge: CR ownership not confirmed (flipped to another shard or lookup failed): %s/%s", cr.GetNamespace(), cr.GetName())
-			return
+			return false, nil
 		}
 	}
 
@@ -69,6 +73,7 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	}
 
 	//cr.EnsureStatus().SyncHostTablesCreated()
+	return true, nil
 }
 
 // purge
@@ -296,6 +301,9 @@ func (w *worker) deleteCHK(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 		}
 
 		_ = w.deleteCRProtocol(ctx, chk)
+	}
+	if util.IsContextDone(ctx) {
+		return true
 	}
 
 	// We need to uninstall finalizer in order to allow k8s to delete CR resource

@@ -1,15 +1,23 @@
 package chi
 
 import (
+	"context"
+	"errors"
+	"io"
 	"testing"
+	"time"
 
 	core "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	commonTypes "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/chop/choptest"
 	chopListers "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 const (
@@ -118,6 +126,241 @@ func Test_isFlipAway(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_isFlipToward(t *testing.T) {
+	setWatchLabelSelector(t, testShardKey+"=stg")
+	stg := newCHI("chi", map[string]string{testShardKey: "stg"})
+	logs := newCHI("chi", map[string]string{testShardKey: "logs"})
+
+	if !isFlipToward(logs, stg) {
+		t.Error("flip toward not detected")
+	}
+	if isFlipToward(stg, logs) || isFlipToward(stg, stg) {
+		t.Error("non-acquisition detected as flip toward")
+	}
+}
+
+func Test_unwatchCancelsActiveReconcile(t *testing.T) {
+	setWatchLabelSelector(t, testShardKey+"=stg")
+	stg := newCHI("chi", map[string]string{testShardKey: "stg"})
+	logs := newCHI("chi", map[string]string{testShardKey: "logs"})
+	c := &Controller{}
+	c.initQueues()
+	c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileAdd, nil, stg))
+
+	for _, q := range c.queues {
+		if q.Len() == 0 {
+			continue
+		}
+		item, ctx, ok := q.Get()
+		if !ok {
+			t.Fatal("failed to get queued reconcile")
+		}
+		c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileUnwatch, stg, logs))
+		select {
+		case <-ctx.Done():
+		default:
+			t.Fatal("unwatch did not cancel the active reconcile")
+		}
+		q.Done(item)
+
+		next, _, ok := q.Get()
+		if !ok {
+			t.Fatal("failed to get queued unwatch")
+		}
+		unwatch, ok := next.(*cmd_queue.ReconcileCHI)
+		if !ok || unwatch.Cmd != cmd_queue.ReconcileUnwatch {
+			t.Fatalf("next command = %#v, want unwatch", next)
+		}
+		q.Done(next)
+		return
+	}
+	t.Fatal("reconcile was not queued")
+}
+
+func Test_watchedCRForHandoffUsesCompletedTopologyAndCurrentLabels(t *testing.T) {
+	ancestor := newCHI("chi", map[string]string{testShardKey: "logs"})
+	ancestor.Spec.Configuration = &api.Configuration{
+		Clusters: []*api.Cluster{{
+			Name:   "completed-topology",
+			Layout: &api.ChiClusterLayout{},
+		}},
+	}
+	current := newCHI("chi", map[string]string{testShardKey: "stg"})
+	current.Annotations = map[string]string{"owner": "stg"}
+	current.SetAncestor(ancestor)
+
+	watched := watchedCRForHandoff(current)
+	if got := watched.Labels[testShardKey]; got != "stg" {
+		t.Errorf("watched shard label = %q, want stg", got)
+	}
+	if got := watched.Annotations["owner"]; got != "stg" {
+		t.Errorf("watched owner annotation = %q, want stg", got)
+	}
+	if len(watched.Clusters) != 1 || watched.Clusters[0].Name != "completed-topology" {
+		t.Errorf("watched clusters = %#v, want completed topology", watched.Clusters)
+	}
+
+	unreconciled := newCHI("new-chi", map[string]string{testShardKey: "stg"})
+	unreconciled.Spec.Configuration = ancestor.Spec.Configuration
+	if got := watchedCRForHandoff(unreconciled).Clusters; len(got) != 0 {
+		t.Errorf("unreconciled watched clusters = %#v, want empty allocation", got)
+	}
+}
+
+func Test_watchOperationsAreSerializedPerCHI(t *testing.T) {
+	c := &Controller{}
+	chi := newCHI("chi", map[string]string{testShardKey: "stg"})
+	watched := watchedCRForHandoff(chi)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	results := make(chan string, 2)
+
+	c.enqueueWatchOperation(watched, func() error {
+		close(started)
+		<-release
+		results <- "first"
+		return nil
+	})
+	<-started
+	c.enqueueWatchOperation(watched, func() error {
+		results <- "second"
+		return nil
+	})
+
+	select {
+	case got := <-results:
+		t.Fatalf("watch operation %q completed before first was released", got)
+	default:
+	}
+	close(release)
+	for _, want := range []string{"first", "second"} {
+		select {
+		case got := <-results:
+			if got != want {
+				t.Fatalf("watch operation = %q, want %q", got, want)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("timed out waiting for watch operation %q", want)
+		}
+	}
+}
+
+func Test_watchOperationRetriesFailure(t *testing.T) {
+	c := &Controller{}
+	watched := watchedCRForHandoff(newCHI("chi", map[string]string{testShardKey: "stg"}))
+	completed := make(chan struct{})
+	attempts := 0
+
+	c.enqueueWatchOperation(watched, func() error {
+		attempts++
+		if attempts == 1 {
+			return errors.New("temporary exporter failure")
+		}
+		close(completed)
+		return nil
+	})
+
+	select {
+	case <-completed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("watch operation was not retried")
+	}
+	if attempts != 2 {
+		t.Fatalf("watch operation attempts = %d, want 2", attempts)
+	}
+}
+
+type transientHandoffCR struct {
+	attempts int
+	cr       api.ICustomResource
+	firstErr error
+}
+
+func (f *transientHandoffCR) Get(context.Context, string, string) (api.ICustomResource, error) {
+	f.attempts++
+	if f.attempts == 1 {
+		return nil, f.firstErr
+	}
+	return f.cr, nil
+}
+
+func (f *transientHandoffCR) StatusUpdate(context.Context, api.ICustomResource, commonTypes.UpdateStatusOptions) error {
+	return nil
+}
+
+type handoffKube struct {
+	interfaces.IKube
+	cr interfaces.IKubeCR
+}
+
+func (k *handoffKube) CR() interfaces.IKubeCR {
+	return k.cr
+}
+
+func Test_handoffReadRetriesTransientFailure(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "service unavailable", err: apiErrors.NewServiceUnavailable("temporary API failure")},
+		{name: "unexpected EOF", err: io.ErrUnexpectedEOF},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stg := newCHI("chi", map[string]string{testShardKey: "stg"})
+			fakeCR := &transientHandoffCR{cr: stg, firstErr: tt.err}
+			w := &worker{c: &Controller{kube: &handoffKube{cr: fakeCR}}}
+
+			got, err := w.getHandoffCHI(context.Background(), stg)
+			if err != nil {
+				t.Fatalf("getHandoffCHI() returned error: %v", err)
+			}
+			if got.GetName() != stg.GetName() {
+				t.Fatalf("getHandoffCHI() returned %q, want %q", got.GetName(), stg.GetName())
+			}
+			if fakeCR.attempts != 2 {
+				t.Fatalf("getHandoffCHI() attempts = %d, want 2", fakeCR.attempts)
+			}
+		})
+	}
+}
+
+func Test_handoffReadDoesNotRetryTerminalFailure(t *testing.T) {
+	stg := newCHI("chi", map[string]string{testShardKey: "stg"})
+	fakeCR := &transientHandoffCR{
+		cr:       stg,
+		firstErr: apiErrors.NewUnauthorized("access denied"),
+	}
+	w := &worker{c: &Controller{kube: &handoffKube{cr: fakeCR}}}
+
+	if _, err := w.getHandoffCHI(context.Background(), stg); !apiErrors.IsUnauthorized(err) {
+		t.Fatalf("getHandoffCHI() error = %v, want Unauthorized", err)
+	}
+	if fakeCR.attempts != 1 {
+		t.Fatalf("getHandoffCHI() attempts = %d, want 1", fakeCR.attempts)
+	}
+}
+
+func Test_staleHandoffCommandsUseLiveOwnership(t *testing.T) {
+	setWatchLabelSelector(t, testShardKey+"=stg")
+	stg := newCHI("chi", map[string]string{testShardKey: "stg"})
+	logs := newCHI("chi", map[string]string{testShardKey: "logs"})
+
+	t.Run("stale unwatch", func(t *testing.T) {
+		w := &worker{c: &Controller{kube: &backupSecretOwnerFakeKube{crs: map[string]*api.ClickHouseInstallation{"chi": stg}}}}
+		if err := w.unwatchCHI(context.Background(), stg, logs); err != nil {
+			t.Fatalf("unwatchCHI() returned error: %v", err)
+		}
+	})
+
+	t.Run("stale watch", func(t *testing.T) {
+		w := &worker{c: &Controller{kube: &backupSecretOwnerFakeKube{crs: map[string]*api.ClickHouseInstallation{"chi": logs}}}}
+		if err := w.watchCHI(context.Background(), logs, stg); err != nil {
+			t.Fatalf("watchCHI() returned error: %v", err)
+		}
+	})
 }
 
 // newTestControllerWithCHIs builds a Controller whose CHI lister is backed by an in-memory

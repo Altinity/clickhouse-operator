@@ -40,7 +40,7 @@ func Test_keeperPredicateWithLabelSelector(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			setWatchLabelSelector(t, tt.selector)
-			predicate := keeperPredicate()
+			predicate := keeperPredicate(nil)
 			chk := newLabeledCHK(tt.labels)
 
 			if got := predicate.Create(event.CreateEvent{Object: chk}); got != tt.want {
@@ -61,14 +61,21 @@ func Test_keeperLabelFlipIsNotDelete(t *testing.T) {
 
 	t.Run("losing operator filters the flip update", func(t *testing.T) {
 		setWatchLabelSelector(t, "!"+testShardKey)
-		if keeperPredicate().Update(event.UpdateEvent{ObjectOld: oldCHK, ObjectNew: newCHK}) {
+		cancelled := false
+		predicate := keeperPredicate(func(namespace, name string) {
+			cancelled = namespace == "clickhouse" && name == "test-chk"
+		})
+		if predicate.Update(event.UpdateEvent{ObjectOld: oldCHK, ObjectNew: newCHK}) {
 			t.Error("operator losing a CHK on label flip must filter the update")
+		}
+		if !cancelled {
+			t.Error("operator losing a CHK on label flip did not cancel active work")
 		}
 	})
 
 	t.Run("gaining operator processes the flip update", func(t *testing.T) {
 		setWatchLabelSelector(t, testShardKey+"=stg")
-		if !keeperPredicate().Update(event.UpdateEvent{ObjectOld: oldCHK, ObjectNew: newCHK}) {
+		if !keeperPredicate(nil).Update(event.UpdateEvent{ObjectOld: oldCHK, ObjectNew: newCHK}) {
 			t.Error("operator gaining a CHK on label flip must process the update")
 		}
 	})

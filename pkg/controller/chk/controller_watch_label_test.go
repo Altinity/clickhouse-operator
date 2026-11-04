@@ -2,12 +2,14 @@ package chk
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiMachineryRuntime "k8s.io/apimachinery/pkg/runtime"
 	kubeTypes "k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
@@ -32,6 +34,37 @@ func newCHK(name string, labels map[string]string) *apiChk.ClickHouseKeeperInsta
 			Name:      name,
 			Labels:    labels,
 		},
+	}
+}
+
+type failingReader struct {
+	client.Reader
+	err error
+}
+
+func (r failingReader) Get(context.Context, client.ObjectKey, client.Object, ...client.GetOption) error {
+	return r.err
+}
+
+func TestCancelReconcile(t *testing.T) {
+	c := &Controller{}
+	key := kubeTypes.NamespacedName{Namespace: "clickhouse", Name: "test-chk"}
+
+	firstCtx, finishFirst := c.beginReconcile(context.Background(), key)
+	secondCtx, finishSecond := c.beginReconcile(context.Background(), key)
+	defer finishSecond()
+	select {
+	case <-firstCtx.Done():
+	default:
+		t.Fatal("replacement reconcile did not cancel previous work")
+	}
+
+	finishFirst()
+	c.CancelReconcile(key.Namespace, key.Name)
+	select {
+	case <-secondCtx.Done():
+	default:
+		t.Fatal("label flip did not cancel active reconcile")
 	}
 }
 
@@ -157,10 +190,26 @@ func Test_ownsLiveCR(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := c.ownsLiveCR(context.Background(), "clickhouse", tt.chk); got != tt.want {
+			got, err := c.ownsLiveCR(context.Background(), "clickhouse", tt.chk)
+			if err != nil {
+				t.Fatalf("ownsLiveCR(%s) returned error: %v", tt.chk, err)
+			}
+			if got != tt.want {
 				t.Errorf("ownsLiveCR(%s) = %v, want %v", tt.chk, got, tt.want)
 			}
 		})
+	}
+}
+
+func Test_ownsLiveCRPropagatesReadError(t *testing.T) {
+	sentinel := errors.New("temporary API failure")
+	c := &Controller{APIReader: failingReader{err: sentinel}}
+	owned, err := c.ownsLiveCR(context.Background(), "clickhouse", "test-chk")
+	if owned {
+		t.Error("ownsLiveCR() = true on read failure")
+	}
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("ownsLiveCR() error = %v, want %v", err, sentinel)
 	}
 }
 
@@ -178,12 +227,13 @@ func Test_finalizeCRLiveOwnershipGuard(t *testing.T) {
 	setWatchLabelSelector(t, testShardKey+"=stg")
 
 	tests := []struct {
-		name       string
-		liveLabels map[string]string
-		wantWrite  bool
+		name        string
+		liveLabels  map[string]string
+		wantWrite   bool
+		wantOutcome finalizeOutcome
 	}{
-		{"live labels flipped away: skip status write", map[string]string{testShardKey: "logs"}, false},
-		{"live labels still match: status write proceeds", map[string]string{testShardKey: "stg"}, true},
+		{"live labels flipped away: skip status write", map[string]string{testShardKey: "logs"}, false, finalizeSkipped},
+		{"live labels still match: status write proceeds", map[string]string{testShardKey: "stg"}, true, finalizeCompleted},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -197,9 +247,12 @@ func Test_finalizeCRLiveOwnershipGuard(t *testing.T) {
 			c := NewController(cachedClient, liveClient, scheme, nil)
 			w := c.newWorker()
 
-			_, err := w.finalizeCR(context.Background(), cachedCHK, commonTypes.UpdateStatusOptions{})
+			outcome, err := w.finalizeCR(context.Background(), cachedCHK, commonTypes.UpdateStatusOptions{})
 			if err != nil {
 				t.Fatalf("finalizeCR() returned error: %v, want nil", err)
+			}
+			if outcome != tt.wantOutcome {
+				t.Errorf("finalizeCR() outcome = %v, want %v", outcome, tt.wantOutcome)
 			}
 
 			// A proceeding finalize stamps Completed onto the status; a skipped one leaves it untouched.

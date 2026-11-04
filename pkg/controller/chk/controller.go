@@ -17,6 +17,7 @@ package chk
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -51,10 +52,16 @@ type Controller struct {
 	Scheme    *apiMachinery.Scheme
 	ExtClient apiExtensions.Interface
 
-	namer interfaces.INameManager
-	kube  interfaces.IKube
+	namer            interfaces.INameManager
+	kube             interfaces.IKube
+	activeMu         sync.Mutex
+	activeReconciles map[kubeTypes.NamespacedName]*activeReconcile
 	//labeler    *Labeler
 	//pvcDeleter *volume.PVCDeleter
+}
+
+type activeReconcile struct {
+	cancel context.CancelFunc
 }
 
 // NewController creates a CHK Controller with its request-independent collaborators
@@ -74,11 +81,49 @@ func NewController(c client.Client, apiReader client.Reader, scheme *apiMachiner
 	}
 }
 
+func (c *Controller) beginReconcile(parent context.Context, key kubeTypes.NamespacedName) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(parent)
+	active := &activeReconcile{cancel: cancel}
+
+	c.activeMu.Lock()
+	if c.activeReconciles == nil {
+		c.activeReconciles = make(map[kubeTypes.NamespacedName]*activeReconcile)
+	}
+	previous := c.activeReconciles[key]
+	c.activeReconciles[key] = active
+	c.activeMu.Unlock()
+	if previous != nil {
+		previous.cancel()
+	}
+
+	return ctx, func() {
+		cancel()
+		c.activeMu.Lock()
+		if c.activeReconciles[key] == active {
+			delete(c.activeReconciles, key)
+		}
+		c.activeMu.Unlock()
+	}
+}
+
+// CancelReconcile cancels active work after a CHK leaves this controller's watch scope.
+func (c *Controller) CancelReconcile(namespace, name string) {
+	key := kubeTypes.NamespacedName{Namespace: namespace, Name: name}
+	c.activeMu.Lock()
+	active := c.activeReconciles[key]
+	c.activeMu.Unlock()
+	if active != nil {
+		active.cancel()
+	}
+}
+
 func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return ctrl.Result{}, nil
 	}
+	ctx, finish := c.beginReconcile(ctx, req.NamespacedName)
+	defer finish()
 
 	// Guard: skip namespaces outside the configured watch list.
 	// keeperPredicate() filters direct CHK events, but reconcile requests triggered by owned
@@ -111,9 +156,15 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// The cached read above can lag a shard-label flip; confirm ownership on live state
 	// before any write (finalizer install, child-object reconcile, deletion protocol).
-	if chop.Config().HasWatchLabelSelector() && !c.ownsLiveCR(ctx, req.Namespace, req.Name) {
-		log.V(1).M(new).Info("skip reconcile, live CHK ownership not confirmed (shard label flipped?): %s/%s", req.Namespace, req.Name)
-		return ctrl.Result{}, nil
+	if chop.Config().HasWatchLabelSelector() {
+		owned, err := c.ownsLiveCR(ctx, req.Namespace, req.Name)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if !owned {
+			log.V(1).M(new).Info("skip reconcile, live CHK ownership not confirmed (shard label flipped?): %s/%s", req.Namespace, req.Name)
+			return ctrl.Result{}, nil
+		}
 	}
 
 	w := c.newWorker()
@@ -122,9 +173,15 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		// Finalizer just installed; controller-runtime will re-reconcile
 		return ctrl.Result{}, nil
 	}
+	if util.IsContextDone(ctx) {
+		return ctrl.Result{}, nil
+	}
 
 	if w.deleteCHK(ctx, new) {
 		// CHK is being deleted
+		return ctrl.Result{}, nil
+	}
+	if util.IsContextDone(ctx) {
 		return ctrl.Result{}, nil
 	}
 
@@ -235,14 +292,17 @@ func (c *Controller) poll(ctx context.Context, cr api.ICustomResource, f func(c 
 
 // ownsLiveCR re-checks watch scope against live (non-cached) CR state — the entry guard in
 // Reconcile reads the informer cache, which can miss a shard label flip mid-reconcile.
-// Lookup failure counts as not-owned: skipping is recoverable, purging another shard's objects is not.
-func (c *Controller) ownsLiveCR(ctx context.Context, namespace, name string) bool {
+// NotFound is not-owned; transient read failures are returned so reconciliation retries.
+func (c *Controller) ownsLiveCR(ctx context.Context, namespace, name string) (bool, error) {
 	live := &apiChk.ClickHouseKeeperInstallation{}
 	if err := c.APIReader.Get(ctx, kubeTypes.NamespacedName{Namespace: namespace, Name: name}, live); err != nil {
+		if apiErrors.IsNotFound(err) {
+			return false, nil
+		}
 		log.V(1).Warning("unable to confirm live CHK ownership %s/%s: %v", namespace, name, err)
-		return false
+		return false, err
 	}
-	return chop.Config().IsCRWatched(live.GetNamespace(), live.GetLabels())
+	return chop.Config().IsCRWatched(live.GetNamespace(), live.GetLabels()), nil
 }
 
 func ShouldEnqueue(cr *apiChk.ClickHouseKeeperInstallation) bool {

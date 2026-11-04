@@ -39,10 +39,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
+func (w *worker) clean(ctx context.Context, cr api.ICustomResource) bool {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile clean is aborted. CR: %s ", cr.GetName())
-		return
+		return false
 	}
 
 	w.a.V(1).
@@ -56,7 +56,7 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	if chop.Config().HasWatchLabelSelector() {
 		if live, err := w.c.kube.CR().Get(ctx, cr.GetNamespace(), cr.GetName()); (err != nil) || !ownsCR(live) {
 			w.a.V(1).M(cr).F().Warning("skip purge: CR ownership not confirmed (flipped to another shard or lookup failed): %s/%s err: %v", cr.GetNamespace(), cr.GetName(), err)
-			return
+			return false
 		}
 	}
 
@@ -75,10 +75,14 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	st := cr.(*api.ClickHouseInstallation).EnsureStatus()
 	st.SyncHostTablesCreated()
 	st.SyncHostsWithReplicaCaughtUp()
+	return true
 }
 
 // dropZKReplicas cleans Zookeeper for replicas that are properly deleted - via Action Plan
 func (w *worker) dropZKReplicas(ctx context.Context, cr *api.ClickHouseInstallation) {
+	if util.IsContextDone(ctx) {
+		return
+	}
 	// Iterate over Action Plan and drop all replicas that are properly removed as removed hosts
 	w.a.V(1).M(cr).F().S().Info("drop replicas based on AP")
 	cnt := 0
@@ -88,6 +92,9 @@ func (w *worker) dropZKReplicas(ctx context.Context, cr *api.ClickHouseInstallat
 		func(shard api.IShard) {
 		},
 		func(host *api.Host) {
+			if util.IsContextDone(ctx) {
+				return
+			}
 			_ = w.dropZKReplica(ctx, host, NewDropReplicaOptions().SetRegularDrop())
 			cnt++
 		},

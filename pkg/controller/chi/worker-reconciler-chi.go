@@ -20,11 +20,16 @@ import (
 	"fmt"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
@@ -35,7 +40,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
 
 // reconcileCR runs reconcile cycle for a Custom Resource
@@ -148,6 +152,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		operatorIPTheSame:               operatorIPTheSame,
 		backupSecretChanged:             backupSecretChanged,
 		hasHostNeedingStuckRecovery:     func() bool { return w.crHasHostNeedingStuckRecovery(ctx, new) },
+		passwordSecretChanged:           passwordSecretReconcile(ctx),
 	}); decision {
 	case gateReconcileWork:
 		w.a.M(new).F().Info("CR has reconcile work - continue reconcile")
@@ -155,6 +160,8 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
 	case gateOperatorIPChanged:
 		w.a.M(new).F().Info("Operator IP changed - continue reconcile to refresh clickhouse-operator user networks")
+	case gatePasswordSecretChanged:
+		w.a.M(new).F().Info("Referenced password Secret changed - continue reconcile to refresh users configuration")
 	case gateBackupSecretChanged:
 		w.a.M(new).F().Info("Backup Secret created or completed - continue reconcile to give the backup user its new password")
 	case gateStuckHostRecovery:
@@ -180,6 +187,9 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	w.setHostStatusesPreliminary(ctx, new)
 
 	if err := w.reconcile(ctx, new); err != nil {
+		if util.IsContextDone(ctx) {
+			return nil
+		}
 		if errors.Is(err, common.ErrCRUDDeferred) {
 			// A deferral is a postponement, not a failure. The host-level branch already recorded
 			// WHY; this records WHAT the skipped success block left behind, which is otherwise
@@ -209,11 +219,31 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		// up at this point — clean()'s purge is what tears them down — so SQL hooks can
 		// drain the dying hosts before they go away.
 		w.runHostPreDeleteHooksOnRemovedHosts(ctx, new)
+		if util.IsContextDone(ctx) {
+			log.V(1).Info("Reconcile is aborted after pre-delete hooks: %s", new.GetName())
+			return nil
+		}
 
-		w.clean(ctx, new)
+		if !w.clean(ctx, new) {
+			return nil
+		}
+		if util.IsContextDone(ctx) {
+			log.V(1).Info("Reconcile is aborted after cleanup: %s", new.GetName())
+			return nil
+		}
 		w.addToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
-		w.finalizeReconcileAndMarkCompleted(ctx, new)
+		if util.IsContextDone(ctx) {
+			log.V(1).Info("Reconcile is aborted after waiting for addresses: %s", new.GetName())
+			return nil
+		}
+		if !w.finalizeReconcileAndMarkCompleted(ctx, new) {
+			return nil
+		}
+		if util.IsContextDone(ctx) {
+			log.V(1).Info("Reconcile is aborted after finalize: %s", new.GetName())
+			return nil
+		}
 
 		w.dropZKReplicas(ctx, new)
 
@@ -242,8 +272,8 @@ func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *
 	// a different fingerprint than the one computed later during reconcileHostStatefulSet
 	// (where CurStatefulSet IS available). This hash mismatch can cause unnecessary STS
 	// updates that cascade into STS deletion via the recreate-on-update-failure path.
-	w.fillCurSTS(ctx, cr)
-	w.findMinMaxVersions(ctx, cr)
+	listed := w.fillCurSTS(ctx, cr)
+	w.findMinMaxVersions(ctx, cr, listed)
 	common.LogOldAndNew("norm stage 1:", cr.GetAncestorT(), cr)
 
 	templates := w.buildTemplates(cr)
@@ -257,8 +287,8 @@ func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *
 		cr = w.createTemplatedCR(_cr, opts)
 		w.newTask(cr, cr.GetAncestorT())
 		// fillCurSTS again because createTemplatedCR creates new host objects
-		w.fillCurSTS(ctx, cr)
-		w.findMinMaxVersions(ctx, cr)
+		listed = w.fillCurSTS(ctx, cr)
+		w.findMinMaxVersions(ctx, cr, listed)
 		common.LogOldAndNew("norm stage 2:", cr.GetAncestorT(), cr)
 	}
 
@@ -281,10 +311,10 @@ func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*a
 	return templates
 }
 
-func (w *worker) findMinMaxVersions(ctx context.Context, cr *api.ClickHouseInstallation) {
+func (w *worker) findMinMaxVersions(ctx context.Context, cr *api.ClickHouseInstallation, listed map[string]*apps.StatefulSet) {
 	// Create artifacts
 	cr.WalkHosts(func(host *api.Host) error {
-		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, host.IsStopped())
+		w.stsReconciler.PrepareHostStatefulSetWithListedStatus(ctx, host, host.IsStopped(), listed)
 		version := w.getHostSoftwareVersion(ctx, host)
 		host.Runtime.Version = version
 		return nil
@@ -292,11 +322,25 @@ func (w *worker) findMinMaxVersions(ctx context.Context, cr *api.ClickHouseInsta
 	cr.FindMinMaxVersions()
 }
 
-func (w *worker) fillCurSTS(ctx context.Context, cr *api.ClickHouseInstallation) {
+// fillCurSTS reads the CR's StatefulSets with one live List and returns them by name. A host the
+// List misses (e.g. its StatefulSet lost its labels), or every host if the List fails, is read by name.
+func (w *worker) fillCurSTS(ctx context.Context, cr *api.ClickHouseInstallation) map[string]*apps.StatefulSet {
+	listed := map[string]*apps.StatefulSet{}
+	opts := controller.NewListOptions(getLabeler(cr).Selector(interfaces.SelectorCRScope))
+	if list, err := w.c.kube.STS().List(ctx, cr.GetNamespace(), opts); err == nil {
+		for i := range list {
+			listed[list[i].Name] = &list[i]
+		}
+	}
 	cr.WalkHosts(func(host *api.Host) error {
-		host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+		if sts, found := listed[w.c.namer.Name(interfaces.NameStatefulSet, host)]; found {
+			host.Runtime.CurStatefulSet = sts
+		} else {
+			host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
+		}
 		return nil
 	})
+	return listed
 }
 
 func (w *worker) logSWVersion(ctx context.Context, cr *api.ClickHouseInstallation) {
@@ -373,9 +417,13 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 	}
 	cr.GetRuntime().UnlockCommonConfig()
 
-	// CR users ConfigMap - common for all hosts
+	// CR users ConfigMap - common for all hosts.
+	// The managed users Secret is regenerated here when hotReload is on. A failed
+	// render returns before either object is written, so the last valid users
+	// configuration stays mounted.
 	if err := w.reconcileConfigMapCommonUsers(ctx, cr); err != nil {
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
+		return err
 	}
 
 	return w.reconcileCRAuxObjectsPreliminaryDomain(ctx, cr)
@@ -459,6 +507,18 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHo
 
 	w.includeAllHostsIntoCluster(ctx, cr)
 	w.restartNewlyAddedHosts(ctx, cr)
+
+	// Host rollout has finished, so a Secret that hotReload no longer uses can
+	// be removed once the new Pods have dropped the projected volume. The
+	// preliminary pass keeps it while the previous Pods still mount it.
+	if !cr.GetRuntime().GetAttributes().GetHotReloadUsers() {
+		if delErr := w.deleteObsoleteHotReloadUsersSecret(ctx, cr); delErr != nil {
+			w.a.F().Error("failed to delete obsolete hot-reload users Secret. err: %v", delErr)
+			if err == nil {
+				err = delErr
+			}
+		}
+	}
 	return err
 }
 
@@ -607,6 +667,13 @@ func (w *worker) reconcileConfigMapCommon(
 // reconcileConfigMapCommonUsers reconciles all CHI's users ConfigMap
 // ConfigMap common for all users resources in CHI
 func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, cr api.ICustomResource) error {
+	if chi, ok := cr.(*api.ClickHouseInstallation); ok {
+		// Render failure returns here and leaves the previous Secret and ConfigMap in place.
+		if err := w.reconcileHotReloadUsersSecret(ctx, chi); err != nil {
+			return err
+		}
+	}
+
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommonUsers)
 	err := w.reconcileConfigMap(ctx, cr, configMapUsers)
@@ -750,8 +817,39 @@ func hostRequiresStatefulSetRollout(host *api.Host) bool {
 		if !apiequality.Semantic.DeepEqual(curContainers[i].Env, desiredContainers[i].Env) {
 			return true
 		}
+		// A software restart brings the SAME pod back without a newly added volume, while the
+		// config already refers to it, so ClickHouse may fail to start.
+		if !sameVolumeMounts(curContainers[i].VolumeMounts, desiredContainers[i].VolumeMounts) {
+			return true
+		}
 	}
 	return false
+}
+
+// sameVolumeMounts compares mounts as a set of the fields we set, so apiserver defaults
+// and ordering do not count as a change.
+func sameVolumeMounts(cur, desired []core.VolumeMount) bool {
+	type key struct {
+		name, path, subPath string
+		readOnly            bool
+	}
+	keys := func(mounts []core.VolumeMount) map[key]struct{} {
+		set := make(map[key]struct{}, len(mounts))
+		for _, m := range mounts {
+			set[key{m.Name, m.MountPath, m.SubPath, m.ReadOnly}] = struct{}{}
+		}
+		return set
+	}
+	curSet, desiredSet := keys(cur), keys(desired)
+	if len(curSet) != len(desiredSet) {
+		return false
+	}
+	for k := range desiredSet {
+		if _, ok := curSet[k]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (w *worker) hostForceRestart(ctx context.Context, host *api.Host, opts *statefulset.ReconcileOptions) error {
