@@ -188,6 +188,18 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 	return true
 }
 
+// clusterSchemer returns the schemer to run SQL through: the injected one, if any, otherwise
+// a fresh per-host schemer.
+func (w *worker) clusterSchemer(host *api.Host) schemer.ISchemer {
+	if w == nil {
+		return nil
+	}
+	if w.schemer != nil {
+		return w.schemer
+	}
+	return w.ensureClusterSchemer(host)
+}
+
 func (w *worker) ensureClusterSchemer(host *api.Host) *schemer.ClusterSchemer {
 	if w == nil {
 		return nil

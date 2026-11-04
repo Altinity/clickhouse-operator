@@ -42,6 +42,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
@@ -59,6 +60,11 @@ type worker struct {
 
 	//queue workqueue.RateLimitingInterface
 	queue queue.PriorityQueue
+
+	// schemer is a test seam: when set, clusterSchemer() returns it instead of building a
+	// per-host schemer. It is never assigned in production, so it holds no shared mutable
+	// state - shard reconcile must keep getting its own schemer per call (see ensureClusterSchemer).
+	schemer schemer.ISchemer
 
 	normalizer    *normalizer.Normalizer
 	task          *common.Task
