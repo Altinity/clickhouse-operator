@@ -27,6 +27,7 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
@@ -53,6 +54,7 @@ type fakeSTS struct {
 	getCalls            int
 	createCalls         int
 	validateCreateCalls int
+	callOrder           []string
 	updateCalls         int
 	deleteCalls         int
 
@@ -75,6 +77,7 @@ func (f *fakeSTS) Get(ctx context.Context, params ...any) (*apps.StatefulSet, er
 
 func (f *fakeSTS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	f.createCalls++
+	f.callOrder = append(f.callOrder, "create")
 	if f.createErr != nil {
 		return nil, f.createErr
 	}
@@ -83,6 +86,7 @@ func (f *fakeSTS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.Stat
 
 func (f *fakeSTS) ValidateCreate(ctx context.Context, sts *apps.StatefulSet) error {
 	f.validateCreateCalls++
+	f.callOrder = append(f.callOrder, "validate")
 	return f.validateCreateErr
 }
 
@@ -99,6 +103,7 @@ func (f *fakeSTS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.Stat
 
 func (f *fakeSTS) Delete(ctx context.Context, namespace, name string) error {
 	f.deleteCalls++
+	f.callOrder = append(f.callOrder, "delete")
 	f.lastDeleteNamespace = namespace
 	f.lastDeleteName = name
 	return f.deleteErr
@@ -333,6 +338,7 @@ func TestRecreateStatefulSet_HappyPath(t *testing.T) {
 	assert.Equal(t, 1, fake.validateCreateCalls, "desired StatefulSet must be dry-run validated before delete")
 	assert.Equal(t, 1, fake.deleteCalls, "delete should be invoked once")
 	assert.Equal(t, 1, fake.createCalls, "create should follow a successful delete")
+	assert.Equal(t, []string{"validate", "delete", "create"}, fake.callOrder)
 }
 
 // TestRecreateStatefulSet_DeleteFailsSkipsCreate — when the delete leg of
@@ -621,7 +627,13 @@ func (f *cancelOnGetSTS) Get(_ context.Context, _ ...any) (*apps.StatefulSet, er
 // TestRecreateStatefulSet_InvalidDesiredSkipsDelete: when the dry-run rejects the desired
 // StatefulSet, recreate returns the error and does not delete the existing one (#1420).
 func TestRecreateStatefulSet_InvalidDesiredSkipsDelete(t *testing.T) {
-	validateErr := errors.New(`StatefulSet is invalid: spec.template.labels: Invalid value: "/metrics"`)
+	validateErr := apiErrors.NewInvalid(
+		schema.GroupKind{Group: "apps", Kind: "StatefulSet"},
+		"chi-test-cluster-0-0",
+		field.ErrorList{
+			field.Invalid(field.NewPath("spec", "template", "metadata", "labels").Key("some_bad_label"), "/metrics", "invalid label value"),
+		},
+	)
 	fake := &fakeSTS{
 		getReturn:         stsWithReplicas(int32Ptr(3)),
 		validateCreateErr: validateErr,
@@ -634,7 +646,9 @@ func TestRecreateStatefulSet_InvalidDesiredSkipsDelete(t *testing.T) {
 	err := r.recreateStatefulSet(context.Background(), h, false /*register*/, NewReconcileStatefulSetOptions())
 
 	require.Error(t, err, "an invalid desired StatefulSet must fail the recreate")
-	assert.Equal(t, validateErr, err, "the dry-run validation error must propagate verbatim")
+	assert.ErrorIs(t, err, validateErr, "the typed dry-run validation error must propagate")
+	assert.True(t, apiErrors.IsInvalid(err), "error must remain a Kubernetes Invalid error")
+	assert.Equal(t, []string{"validate"}, fake.callOrder, "invalid preflight must be the last operation")
 	assert.Equal(t, 1, fake.validateCreateCalls, "ValidateCreate must run once, before any delete")
 	assert.Equal(t, 0, fake.deleteCalls, "the running StatefulSet must NOT be deleted when the desired spec is invalid")
 	assert.Equal(t, 0, fake.createCalls, "no create should be attempted when validation fails")
@@ -659,4 +673,25 @@ func TestRecreateStatefulSet_AlreadyExistsFromDryRunProceeds(t *testing.T) {
 	assert.Equal(t, 1, fake.validateCreateCalls, "ValidateCreate must run once")
 	assert.Equal(t, 1, fake.deleteCalls, "the existing StatefulSet must be deleted so the recreate proceeds")
 	assert.Equal(t, 1, fake.createCalls, "the desired StatefulSet must be created")
+	assert.Equal(t, []string{"validate", "delete", "create"}, fake.callOrder)
+}
+
+// TestRecreateStatefulSet_DryRunAPIErrorSkipsDelete ensures transient API
+// failures do not authorize deletion of an otherwise healthy StatefulSet.
+func TestRecreateStatefulSet_DryRunAPIErrorSkipsDelete(t *testing.T) {
+	validateErr := apiErrors.NewServiceUnavailable("API server unavailable")
+	fake := &fakeSTS{
+		getReturn:         stsWithReplicas(int32Ptr(1)),
+		validateCreateErr: validateErr,
+	}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	h := hostWithCR("ns", "test-chi")
+	h.Runtime.DesiredStatefulSet = stsWithReplicas(int32Ptr(1))
+
+	err := r.recreateStatefulSet(context.Background(), h, false /*register*/, NewReconcileStatefulSetOptions())
+
+	require.ErrorIs(t, err, validateErr)
+	assert.Equal(t, []string{"validate"}, fake.callOrder)
+	assert.Zero(t, fake.deleteCalls, "API-server errors must preserve the current StatefulSet")
+	assert.Zero(t, fake.createCalls)
 }
