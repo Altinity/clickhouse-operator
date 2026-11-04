@@ -22,6 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,14 +51,17 @@ func minimalCR(namespace, name string) *api.ClickHouseInstallation {
 // fakeSTS is a minimal IKubeSTS test double recording every call and returning
 // injected results so each test scenario can exercise a specific code path.
 type fakeSTS struct {
-	getCalls    int
-	createCalls int
-	updateCalls int
-	deleteCalls int
+	getCalls      int
+	createCalls   int
+	validateCalls int
+	updateCalls   int
+	deleteCalls   int
+	callOrder     []string
 
 	getReturn    *apps.StatefulSet
 	getErr       error
 	createErr    error
+	validateErr  error
 	updateErr    error
 	deleteErr    error
 	updateReturn *apps.StatefulSet
@@ -73,10 +77,17 @@ func (f *fakeSTS) Get(ctx context.Context, params ...any) (*apps.StatefulSet, er
 
 func (f *fakeSTS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	f.createCalls++
+	f.callOrder = append(f.callOrder, "create")
 	if f.createErr != nil {
 		return nil, f.createErr
 	}
 	return sts, nil
+}
+
+func (f *fakeSTS) ValidateCreate(ctx context.Context, sts *apps.StatefulSet) error {
+	f.validateCalls++
+	f.callOrder = append(f.callOrder, "validate")
+	return f.validateErr
 }
 
 func (f *fakeSTS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
@@ -92,6 +103,7 @@ func (f *fakeSTS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.Stat
 
 func (f *fakeSTS) Delete(ctx context.Context, namespace, name string) error {
 	f.deleteCalls++
+	f.callOrder = append(f.callOrder, "delete")
 	f.lastDeleteNamespace = namespace
 	f.lastDeleteName = name
 	return f.deleteErr
@@ -325,6 +337,62 @@ func TestRecreateStatefulSet_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, fake.deleteCalls, "delete should be invoked once")
 	assert.Equal(t, 1, fake.createCalls, "create should follow a successful delete")
+	assert.Equal(t, []string{"validate", "delete", "create"}, fake.callOrder)
+}
+
+// TestRecreateStatefulSet_PreflightInvalidPreservesHost models the exact issue #1420
+// invalid pod-template label. No operation that could disturb the host is reached.
+func TestRecreateStatefulSet_PreflightInvalidPreservesHost(t *testing.T) {
+	invalid := apiErrors.NewInvalid(
+		schema.GroupKind{Group: "apps", Kind: "StatefulSet"},
+		"chi-test-cluster-0-0",
+		field.ErrorList{field.Invalid(field.NewPath("spec", "template", "metadata", "labels").Key("bad"), "/metrics", "invalid label value")},
+	)
+	fake := &fakeSTS{getReturn: stsWithReplicas(int32Ptr(1)), validateErr: invalid}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	h := hostWithCR("ns", "test-chi")
+	h.Runtime.DesiredStatefulSet = stsWithReplicas(int32Ptr(1))
+
+	err := r.recreateStatefulSet(context.Background(), h, false, NewReconcileStatefulSetOptions())
+
+	require.ErrorIs(t, err, invalid)
+	require.True(t, apiErrors.IsInvalid(err))
+	assert.Equal(t, []string{"validate"}, fake.callOrder)
+	assert.Zero(t, fake.deleteCalls)
+	assert.Zero(t, fake.createCalls)
+	assert.Zero(t, fake.updateCalls)
+}
+
+// Existing names do not indicate an invalid spec: Kubernetes validates before
+// checking storage for conflicts, so dry-run create may return AlreadyExists.
+func TestRecreateStatefulSet_PreflightAlreadyExistsContinues(t *testing.T) {
+	fake := &fakeSTS{
+		getReturn: stsWithReplicas(int32Ptr(0)),
+		validateErr: apiErrors.NewAlreadyExists(stsResource, "chi-test-cluster-0-0"),
+	}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	h := hostWithCR("ns", "test-chi")
+	h.Runtime.DesiredStatefulSet = stsWithReplicas(int32Ptr(1))
+
+	err := r.recreateStatefulSet(context.Background(), h, false, NewReconcileStatefulSetOptions())
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"validate", "delete", "create"}, fake.callOrder)
+}
+
+// Even non-validation API errors must never authorize deletion. They can be
+// retried on a subsequent reconciliation once the API server is healthy.
+func TestRecreateStatefulSet_PreflightAPIErrorPreservesHost(t *testing.T) {
+	apiErr := apiErrors.NewServiceUnavailable("API server unavailable")
+	fake := &fakeSTS{getReturn: stsWithReplicas(int32Ptr(1)), validateErr: apiErr}
+	r := newReconciler(fake, "chi-test-cluster-0-0")
+	h := hostWithCR("ns", "test-chi")
+	h.Runtime.DesiredStatefulSet = stsWithReplicas(int32Ptr(1))
+
+	err := r.recreateStatefulSet(context.Background(), h, false, NewReconcileStatefulSetOptions())
+
+	require.ErrorIs(t, err, apiErr)
+	assert.Equal(t, []string{"validate"}, fake.callOrder)
 }
 
 // TestRecreateStatefulSet_DeleteFailsSkipsCreate — when the delete leg of

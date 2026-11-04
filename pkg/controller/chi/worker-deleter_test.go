@@ -54,6 +54,10 @@ func (f *deleteHostFakeSTS) Create(ctx context.Context, sts *apps.StatefulSet) (
 	panic("deleteHost must not create a StatefulSet when the StatefulSet Get failed")
 }
 
+func (f *deleteHostFakeSTS) ValidateCreate(ctx context.Context, sts *apps.StatefulSet) error {
+	panic("deleteHost must not validate a StatefulSet when Get failed")
+}
+
 func (f *deleteHostFakeSTS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	panic("deleteHost must not update a StatefulSet when the StatefulSet Get failed")
 }

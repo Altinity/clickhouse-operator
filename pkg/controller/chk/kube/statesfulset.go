@@ -109,6 +109,11 @@ func (c *STS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.Stateful
 	})
 }
 
+// ValidateCreate checks the desired StatefulSet using admission and API-server validation.
+func (c *STS) ValidateCreate(ctx context.Context, sts *apps.StatefulSet) error {
+	return c.kubeClient.Create(ctx, sts.DeepCopy(), client.DryRunAll)
+}
+
 func (c *STS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	log.V(3).M(sts).Info("Going to update STS: %s", util.NamespaceNameString(sts))
 	return commonKube.UpdateWithRetry(ctx, func() (*apps.StatefulSet, error) {

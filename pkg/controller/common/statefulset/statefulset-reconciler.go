@@ -230,6 +230,23 @@ func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, re
 	r.a.V(2).M(host).S().Info(util.NamespaceNameString(host.GetCR()))
 	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(host.GetCR()))
 
+	// Validate the desired replacement before deleting its existing StatefulSet.
+	// Kubernetes validates the object before checking whether its name is in use,
+	// so AlreadyExists is expected for a valid replacement. Any other error must
+	// preserve the running StatefulSet, including admission or API failures.
+	if err := r.sts.ValidateCreate(ctx, host.Runtime.DesiredStatefulSet); err != nil && !apiErrors.IsAlreadyExists(err) {
+		namespace := host.Runtime.Address.Namespace
+		name := r.namer.Name(interfaces.NameStatefulSet, host)
+		r.a.V(1).
+			WithEvent(host.GetCR(), a.EventActionUpdate, a.EventReasonUpdateFailed).
+			WithAction(host.GetCR()).
+			WithError(host.GetCR()).
+			M(host).F().
+			Warning("Recreate deferred: StatefulSet preflight create rejected %s/%s", namespace, name)
+		log.V(1).M(host).F().Error("StatefulSet preflight create rejected %s/%s: %v", namespace, name, err)
+		return err
+	}
+
 	if err := r.doDeleteStatefulSet(ctx, host); err != nil {
 		namespace := host.Runtime.Address.Namespace
 		name := r.namer.Name(interfaces.NameStatefulSet, host)
