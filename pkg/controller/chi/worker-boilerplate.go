@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -50,7 +51,8 @@ func (w *worker) run() {
 		//	return
 		//}
 
-		if err := w.processItem(ctx, item); err != nil {
+		err := w.processItem(ctx, item)
+		if err != nil {
 			// Item not processed
 			// this code cannot return an error and needs to indicate error has been ignored
 			utilRuntime.HandleError(err)
@@ -63,6 +65,41 @@ func (w *worker) run() {
 
 		// Remove item from processing set when processing completed
 		w.queue.Done(item)
+
+		w.handlePostReconcileRetry(item, err)
+	}
+}
+
+// handlePostReconcileRetry schedules delayed retries for failed reconciliations
+// (e.g. transient Keeper replica-cleanup failures) after releasing queue ownership.
+func (w *worker) handlePostReconcileRetry(item interface{}, err error) {
+	cmd, ok := item.(*cmd_queue.ReconcileCHI)
+	if !ok || cmd == nil {
+		return
+	}
+
+	cr := cmd.New
+	if cr == nil {
+		cr = cmd.Old
+	}
+	if cr == nil {
+		return
+	}
+
+	key := cr.Namespace + "/" + cr.Name
+
+	if err == nil {
+		if w != nil && w.c != nil && w.c.retryScheduler != nil {
+			w.c.retryScheduler.Reset(key)
+		}
+		return
+	}
+
+	// Only schedule retry for retryable replica drop failures, never on permanent errors, context cancellation, or deletion
+	if errors.Is(err, ErrZKReplicaDropRetryable) && !isCRDeleting(cr) && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		if w != nil && w.c != nil && w.c.retryScheduler != nil {
+			w.c.retryScheduler.Schedule(cr)
+		}
 	}
 }
 

@@ -16,6 +16,10 @@ package chi
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +40,7 @@ import (
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	goch "github.com/mailru/go-clickhouse/v2"
 )
 
 func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
@@ -68,21 +73,44 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 }
 
 // dropZKReplicas cleans Zookeeper for replicas that are properly deleted - via Action Plan
-func (w *worker) dropZKReplicas(ctx context.Context, cr *api.ClickHouseInstallation) {
+func (w *worker) dropZKReplicas(ctx context.Context, cr *api.ClickHouseInstallation) error {
 	// Iterate over Action Plan and drop all replicas that are properly removed as removed hosts
 	w.a.V(1).M(cr).F().S().Info("drop replicas based on AP")
-	cnt := 0
+	var succeeded, failed, skipped int
+	var firstErr error
 	cr.EnsureRuntime().ActionPlan.WalkRemoved(
 		func(cluster api.ICluster) {
 		},
 		func(shard api.IShard) {
 		},
 		func(host *api.Host) {
-			_ = w.dropZKReplica(ctx, host, NewDropReplicaOptions().SetRegularDrop())
-			cnt++
+			dropped, err := w.dropZKReplica(ctx, cr, host, NewDropReplicaOptions().SetRegularDrop())
+			if err != nil {
+				failed++
+				if firstErr == nil {
+					firstErr = err
+				}
+				w.a.V(1).M(cr).F().Warning("Failed to drop ZK replica %s: %v", host.GetName(), err)
+			} else if dropped {
+				succeeded++
+			} else {
+				skipped++
+			}
 		},
 	)
-	w.a.V(1).M(cr).F().E().Info("processed replicas: %d", cnt)
+	if failed > 0 {
+		w.a.WithEvent(cr, a.EventActionDelete, a.EventReasonDeleteFailed).
+			WithError(cr).
+			M(cr).F().
+			Error("Failed to drop %d ZK replica(s). Succeeded: %d, skipped: %d. Error: %v", failed, succeeded, skipped, firstErr)
+		w.a.V(1).M(cr).F().E().Error("drop replicas completed with errors. Succeeded: %d, failed: %d, skipped: %d", succeeded, failed, skipped)
+		if isRetryableReplicaDropError(firstErr) {
+			return fmt.Errorf("%w: failed to drop %d ZK replica(s): %w", ErrZKReplicaDropRetryable, failed, firstErr)
+		}
+		return fmt.Errorf("%w: failed to drop %d ZK replica(s): %w", ErrZKReplicaDropPermanent, failed, firstErr)
+	}
+	w.a.V(1).M(cr).F().E().Info("drop replicas completed. Succeeded: %d, failed: %d, skipped: %d", succeeded, failed, skipped)
+	return nil
 }
 
 // purge
@@ -350,9 +378,13 @@ func (w *worker) canDropReplica(ctx context.Context, hostToRunOn, hostToDrop *ap
 	case opt.RegularDrop():
 		w.a.V(1).F().Info("Regular drop replica. hostToDrop: %s", hostToDrop.GetName())
 		// Check whether drop replicas is allowed to the operator
-		if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.OnDelete.IsFalse() {
-			w.a.V(1).F().Info("Regular drop replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
-			return false
+		if cluster := hostToDrop.GetCluster(); cluster != nil {
+			if dropReplicas := cluster.GetReconcile().Host.Drop.Replicas; dropReplicas != nil {
+				if dropReplicas.OnDelete.IsFalse() {
+					w.a.V(1).F().Info("Regular drop replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+					return false
+				}
+			}
 		}
 
 		// In case host has volumes to retain - unable to drop replica
@@ -367,18 +399,20 @@ func (w *worker) canDropReplica(ctx context.Context, hostToRunOn, hostToDrop *ap
 	case opt.ForceDropUponStorageLoss():
 		w.a.V(1).F().Info("Force drop replica upon storage loss. hostToDrop: %s", hostToDrop.GetName())
 		// Check whether drop replicas on lost volume is allowed to the operator
-		if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.OnLostVolume.IsFalse() {
-			w.a.V(1).F().Info("Drop replicas on lost volume are prohibited. hostToDrop: %s", hostToDrop.GetName())
-			return false
-		}
-
-		// Active replica may have restriction to be deleted
-		if w.clusterSchemer(hostToRunOn).IsHostActiveReplica(ctx, hostToRunOn, hostToDrop) {
-			w.a.V(1).F().Info("Replica is an active one. Need ti check whether it can be dropped. hostToDrop: %s", hostToDrop.GetName())
-			// Check whether drop active replicas is allowed to the operator
-			if hostToDrop.GetCluster().GetReconcile().Host.Drop.Replicas.Active.IsFalse() {
-				w.a.V(1).F().Info("Active replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
-				return false
+		if cluster := hostToDrop.GetCluster(); cluster != nil {
+			if dropReplicas := cluster.GetReconcile().Host.Drop.Replicas; dropReplicas != nil {
+				if dropReplicas.OnLostVolume.IsFalse() {
+					w.a.V(1).F().Info("Drop replicas on lost volume are prohibited. hostToDrop: %s", hostToDrop.GetName())
+					return false
+				}
+				// Active replica may have restriction to be deleted
+				if w.ensureClusterSchemer(hostToRunOn).IsHostActiveReplica(ctx, hostToRunOn, hostToDrop) {
+					w.a.V(1).F().Info("Replica is an active one. Need ti check whether it can be dropped. hostToDrop: %s", hostToDrop.GetName())
+					if dropReplicas.Active.IsFalse() {
+						w.a.V(1).F().Info("Active replicas are prohibited to drop. hostToDrop: %s", hostToDrop.GetName())
+						return false
+					}
+				}
 			}
 		}
 		w.a.V(1).F().Info("Accepted force drop replica upon storage loss. hostToDrop: %s", hostToDrop.GetName())
@@ -393,6 +427,10 @@ func (w *worker) canDropReplica(ctx context.Context, hostToRunOn, hostToDrop *ap
 // Replica's state has to be kept in Zookeeper for retained volumes.
 // ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
 func (w *worker) hasHostVolumesToRetain(ctx context.Context, host *api.Host) (has bool) {
+	if w == nil || w.c == nil || w.c.kube == nil || w.c.kube.Storage() == nil {
+		w.a.V(1).F().Warning("Storage manager unavailable; assuming host %s has retained volumes to protect data", host.GetName())
+		return true
+	}
 	// Check whether among all PVCs host has reclaim policy "retain" specified
 	storage.NewStoragePVC(w.c.kube.Storage()).WalkDiscoveredPVCs(ctx, host, func(pvc *core.PersistentVolumeClaim) {
 		if chiLabeler.New(nil).GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {
@@ -462,18 +500,24 @@ func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 	return nil
 }
 
-const (
-	// maxDropReplicaRetries defines maximum attempts for SYSTEM DROP REPLICA on active replica errors (Code 305)
-	maxDropReplicaRetries = 6
+// ErrZKReplicaDropFailed signals that SYSTEM DROP REPLICA failed after exhausting retries.
+// ErrZKReplicaDropRetryable marks failures that should be retried with exponential backoff (e.g. Code 305).
+// ErrZKReplicaDropPermanent marks non-retryable failures (e.g. authentication errors, syntax errors).
+var (
+	ErrZKReplicaDropFailed    = errors.New("zk replica drop failed")
+	ErrZKReplicaDropRetryable = fmt.Errorf("%w: retryable", ErrZKReplicaDropFailed)
+	ErrZKReplicaDropPermanent = fmt.Errorf("%w: permanent", ErrZKReplicaDropFailed)
+)
 
-	// defaultRetryDelay specifies base backoff delay between retry attempts
+const (
+	// defaultRetryDelay specifies the initial backoff delay between retry attempts
 	defaultRetryDelay = 5 * time.Second
+
+	// maxRetryDelay caps the backoff delay between retry attempts
+	maxRetryDelay = 15 * time.Second
 
 	// defaultReplicaWaitTimeout is used when ZooKeeper session timeout is unconfigured
 	defaultReplicaWaitTimeout = 120 * time.Second
-
-	// defaultReplicaPollInterval is the frequency to check replica activity in ClickHouse
-	defaultReplicaPollInterval = 5 * time.Second
 
 	// replicaWaitGracePeriod gives ZooKeeper extra time after session expiration before giving up
 	replicaWaitGracePeriod = 30 * time.Second
@@ -484,116 +528,191 @@ func isReplicaActiveError(err error) bool {
 	if err == nil {
 		return false
 	}
+	var chErr *goch.Error
+	if errors.As(err, &chErr) && chErr != nil {
+		return chErr.Code == 305
+	}
 	s := err.Error()
-	return strings.Contains(s, "Code: 305") ||
-		strings.Contains(s, "because it's active") ||
-		strings.Contains(s, "Replica is active")
+	if strings.Contains(s, "Code: 305") {
+		return strings.Contains(s, "DB::Exception") ||
+			strings.Contains(s, "because it's active") ||
+			strings.Contains(s, "Replica is active") ||
+			strings.Contains(s, "TABLE_WAS_NOT_DROPPED")
+	}
+	return strings.Contains(s, "Replica is active") || strings.Contains(s, "because it's active")
 }
 
-// getCoordinatorHost finds an operational host to execute SYSTEM DROP REPLICA queries against.
-func (w *worker) getCoordinatorHost(hostToDrop *api.Host) *api.Host {
-	if hostToDrop == nil || !hostToDrop.HasCR() {
-		return nil
+// isRetryableReplicaDropError determines whether a replica cleanup error is transient/retryable
+// (e.g. Code 305 replica still active in Keeper, Keeper connection errors, network timeouts)
+// or permanent (e.g. authentication failed, syntax errors, permission denied, context cancellation).
+func isRetryableReplicaDropError(err error) bool {
+	if err == nil {
+		return false
 	}
-	if shard := hostToDrop.GetShard(); shard != nil {
-		if h := shard.FirstHost(); h != nil {
-			return h
-		}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
 	}
-	// Fallback: any alive host in the cluster if the target host's shard is unavailable
-	if cluster := hostToDrop.GetCluster(); cluster != nil {
-		var candidate *api.Host
-		cluster.WalkHosts(func(h *api.Host) error {
-			if candidate == nil {
-				candidate = h
+	if isReplicaActiveError(err) {
+		return true
+	}
+	var chErr *goch.Error
+	if errors.As(err, &chErr) && chErr != nil {
+		switch chErr.Code {
+		case 305: // REPLICA_IS_ACTIVE
+			return true
+		case 225, // NO_ZOOKEEPER
+			159, // TIMEOUT_EXCEEDED
+			209, // SOCKET_TIMEOUT
+			210: // NETWORK_ERROR
+			return true
+		case 999: // KEEPER_EXCEPTION
+			// Code 999 wraps underlying ZooKeeper/Keeper exceptions.
+			// Only transient coordination errors (connection loss, operation timeout, session expiration)
+			// qualify for retries. Permanent Keeper errors (ZNOAUTH, ZAUTHFAILED, ZINVALIDACL, ZBADARGUMENTS)
+			// must never be retried. Case-insensitive matching handles driver and server message formatting variations.
+			msg := strings.ToLower(chErr.Message)
+			if strings.Contains(msg, "not authenticated") ||
+				strings.Contains(msg, "authentication failed") ||
+				strings.Contains(msg, "invalid acl") ||
+				strings.Contains(msg, "bad arguments") {
+				return false
 			}
-			return nil
-		})
-		return candidate
+			if strings.Contains(msg, "connection loss") ||
+				strings.Contains(msg, "connection lost") ||
+				strings.Contains(msg, "operation timeout") ||
+				strings.Contains(msg, "operation timed out") ||
+				strings.Contains(msg, "session expired") ||
+				strings.Contains(msg, "session moved") ||
+				strings.Contains(msg, "connection refused") ||
+				strings.Contains(msg, "connection reset") {
+				return true
+			}
+			return false
+		case 192, // UNKNOWN_USER
+			493, // ACCESS_DENIED
+			515, // INCORRECT_ACCESS_ENTITY_DEFINITION
+			516, // AUTHENTICATION_FAILED
+			62,  // SYNTAX_ERROR
+			60,  // UNKNOWN_TABLE
+			81,  // UNKNOWN_DATABASE
+			47,  // UNKNOWN_IDENTIFIER
+			164: // READONLY
+			return false
+		default:
+			return false
+		}
 	}
-	return nil
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		if netErr.Timeout() {
+			return true
+		}
+		var opErr *net.OpError
+		if errors.As(err, &opErr) {
+			return true
+		}
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "DB::Exception") {
+		if strings.Contains(msg, "Code: 305") || strings.Contains(msg, "Code 305") ||
+			strings.Contains(msg, "Code: 225") || strings.Contains(msg, "Code 225") ||
+			strings.Contains(msg, "Code: 159") || strings.Contains(msg, "Code 159") ||
+			strings.Contains(msg, "Code: 209") || strings.Contains(msg, "Code 209") ||
+			strings.Contains(msg, "Code: 210") || strings.Contains(msg, "Code 210") {
+			return true
+		}
+		if strings.Contains(msg, "Code: 999") || strings.Contains(msg, "Code 999") {
+			lower := strings.ToLower(msg)
+			if strings.Contains(lower, "not authenticated") ||
+				strings.Contains(lower, "authentication failed") ||
+				strings.Contains(lower, "invalid acl") ||
+				strings.Contains(lower, "bad arguments") {
+				return false
+			}
+			if strings.Contains(lower, "connection loss") ||
+				strings.Contains(lower, "connection lost") ||
+				strings.Contains(lower, "operation timeout") ||
+				strings.Contains(lower, "operation timed out") ||
+				strings.Contains(lower, "session expired") ||
+				strings.Contains(lower, "session moved") ||
+				strings.Contains(lower, "connection refused") ||
+				strings.Contains(lower, "connection reset") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
-// waitHostReplicaInactive polls until ZooKeeper session expires and ClickHouse reports host inactive.
-func (w *worker) waitHostReplicaInactive(ctx context.Context, hostToRunOn, hostToDrop *api.Host, pollInterval, waitTimeout time.Duration) error {
-	if util.IsContextDone(ctx) {
-		return ctx.Err()
-	}
-
-	if hostToDrop == nil {
+// getCoordinatorHost finds an operational surviving host in the same shard to execute SYSTEM DROP REPLICA queries against.
+// In ClickHouse, SYSTEM DROP REPLICA resolves metadata against local replicated tables defined on the executing server.
+// Cross-shard execution is invalid because hosts in other shards do not define the target shard's tables.
+// Returns nil if no surviving coordinator exists in the shard (e.g. single-replica shard deletion or entire shard deletion).
+func (w *worker) getCoordinatorHost(cr *api.ClickHouseInstallation, hostToDrop *api.Host) *api.Host {
+	if hostToDrop == nil || !hostToDrop.HasCR() || cr == nil {
 		return nil
 	}
 
-	timeout := defaultReplicaWaitTimeout
-	if hostToDrop.HasCR() && hostToDrop.GetCluster() != nil {
-		if zk := hostToDrop.GetZookeeper(); zk != nil && zk.SessionTimeoutMs > 0 {
-			timeout = time.Duration(zk.SessionTimeoutMs)*time.Millisecond + replicaWaitGracePeriod
-		}
+	var targetShard api.IShard
+	if hostToDrop.Runtime.Address.ClusterName != "" && hostToDrop.Runtime.Address.ShardName != "" {
+		targetShard = cr.FindShard(hostToDrop.Runtime.Address.ClusterName, hostToDrop.Runtime.Address.ShardName)
+	} else if hostToDrop.GetShard() != nil && hostToDrop.GetShard().GetName() != "" && hostToDrop.GetCluster() != nil && hostToDrop.GetCluster().GetName() != "" {
+		targetShard = cr.FindShard(hostToDrop.GetCluster().GetName(), hostToDrop.GetShard().GetName())
+	} else {
+		targetShard = cr.FindShard(hostToDrop.Runtime.Address.ClusterIndex, hostToDrop.Runtime.Address.ShardIndex)
 	}
-	if waitTimeout > 0 {
-		timeout = waitTimeout
-	}
-
-	if pollInterval <= 0 {
-		pollInterval = defaultReplicaPollInterval
+	if targetShard == nil || targetShard.IsZero() {
+		return nil
 	}
 
-	w.a.V(2).M(hostToRunOn).F().Info("Wait for host %s to become inactive", hostToDrop.GetName())
-
-	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	schemer := w.clusterSchemer(hostToRunOn)
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	for {
-		if util.IsContextDone(timeoutCtx) {
-			return timeoutCtx.Err()
+	var candidate *api.Host
+	targetShard.WalkHosts(func(h *api.Host) error {
+		if candidate == nil && h != nil && h.GetName() != hostToDrop.GetName() {
+			candidate = h
 		}
-
-		if !schemer.IsHostActiveReplica(timeoutCtx, hostToRunOn, hostToDrop) {
-			w.a.V(2).M(hostToRunOn).F().Info("Host %s is inactive", hostToDrop.GetName())
-			return nil
-		}
-
-		select {
-		case <-timeoutCtx.Done():
-			return timeoutCtx.Err()
-		case <-ticker.C:
-		}
-	}
+		return nil
+	})
+	return candidate
 }
 
 // dropZKReplica drops replica's info from Zookeeper
-func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *dropReplicaOptions) error {
+func (w *worker) dropZKReplica(ctx context.Context, cr *api.ClickHouseInstallation, hostToDrop *api.Host, opts *dropReplicaOptions) (dropped bool, err error) {
 	if hostToDrop == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. Need host to drop.")
-		return nil
+		return false, errors.New("hostToDrop is nil")
 	}
 
 	if !hostToDrop.HasCR() {
 		w.a.V(1).F().Error("FAILED to drop replica. Host has no CR, hostToDrop: %s", hostToDrop.GetName())
-		return nil
+		return false, fmt.Errorf("host %s has no CR", hostToDrop.GetName())
 	}
 
-	// Sometimes host to drop is already unavailable, so let's run SQL statement of the first replica in the shard or cluster candidate
-	hostToRunOn := w.getCoordinatorHost(hostToDrop)
+	hostToRunOn := w.getCoordinatorHost(cr, hostToDrop)
 	if hostToRunOn == nil {
-		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn is nil, hostToDrop: %s", hostToDrop.GetName())
-		return nil
+		// Whole-shard or single-replica shard deletion: no surviving same-shard coordinator exists.
+		// In ClickHouse, standard SYSTEM DROP REPLICA requires local table definitions on the executing host.
+		// Because no same-shard host remains, this operation cannot execute via same-shard coordinator.
+		// This is structurally impossible, so we log and emit a non-blocking postponement event rather than failing reconciliation.
+		w.a.V(1).M(hostToDrop).F().Warning(
+			"Cannot drop ZK replica for host %s: whole shard %d is removed, no surviving same-shard coordinator exists. Shard metadata must be purged from ZooKeeper via cluster-level / ZK-path cleanup.",
+			hostToDrop.GetName(), hostToDrop.Runtime.Address.ShardIndex,
+		)
+		w.a.WithEvent(cr, a.EventActionDelete, a.EventReasonCleanupPostponed).
+			M(hostToDrop).F().
+			Warning("ZooKeeper metadata cleanup postponed for host %s (shard %d): no surviving same-shard coordinator",
+				hostToDrop.GetName(), hostToDrop.Runtime.Address.ShardIndex)
+		return false, nil
 	}
 
 	if !w.canDropReplica(ctx, hostToRunOn, hostToDrop, opts) {
-		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop: %s", hostToDrop.GetName())
-		return nil
+		w.a.V(1).M(hostToDrop).F().Info("Skipping drop replica on host: %s (prohibited or volumes retained)", hostToDrop.GetName())
+		return false, nil
 	}
 
-	if err := w.waitHostReplicaInactive(ctx, hostToRunOn, hostToDrop, 0, 0); err != nil {
-		w.a.V(2).M(hostToRunOn).F().Warning("Replica %s still active after wait: %v", hostToDrop.GetName(), err)
-	}
-
-	err := w.retryDropReplica(ctx, hostToRunOn, hostToDrop, 0)
+	err = w.retryDropReplica(ctx, hostToRunOn, hostToDrop)
 
 	if err == nil {
 		w.a.V(1).
@@ -601,46 +720,111 @@ func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *
 			WithAction(hostToRunOn.GetCR()).
 			M(hostToRunOn).F().
 			Info("Drop replica host: %s in cluster: %s", hostToDrop.GetName(), hostToDrop.Runtime.Address.ClusterName)
-	} else {
-		w.a.WithEvent(hostToRunOn.GetCR(), a.EventActionDelete, a.EventReasonDeleteFailed).
-			WithError(hostToRunOn.GetCR()).
-			M(hostToRunOn).F().
-			Error("FAILED to drop replica on host: %s with error: %v", hostToDrop.GetName(), err)
+		return true, nil
 	}
 
-	return err
+	w.a.WithEvent(hostToRunOn.GetCR(), a.EventActionDelete, a.EventReasonDeleteFailed).
+		WithError(hostToRunOn.GetCR()).
+		M(hostToRunOn).F().
+		Error("FAILED to drop replica on host: %s with error: %v", hostToDrop.GetName(), err)
+	return false, err
 }
 
-func (w *worker) retryDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host, baseDelay time.Duration) error {
+// retryDropReplica executes SYSTEM DROP REPLICA on hostToRunOn, retrying on ClickHouse Code 305
+// ("replica is active") with backoff until the ZooKeeper/Keeper session expires or timeout is reached.
+func (w *worker) retryDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host) error {
+	if util.IsContextDone(ctx) {
+		return ctx.Err()
+	}
+
 	schemer := w.clusterSchemer(hostToRunOn)
-	var err error
-
-	if baseDelay <= 0 {
-		baseDelay = defaultRetryDelay
+	if schemer == nil {
+		return errors.New("schemer is nil")
 	}
 
-	for try := 1; try <= maxDropReplicaRetries; try++ {
-		if util.IsContextDone(ctx) {
-			err = ctx.Err()
-			break
+	timeout := defaultReplicaWaitTimeout
+	if w != nil && w.dropReplicaTimeout > 0 {
+		timeout = w.dropReplicaTimeout
+	} else if hostToDrop.HasCR() {
+		var zk *api.ZookeeperConfig
+		if hostToDrop.GetCluster() != nil && hostToDrop.GetZookeeper() != nil {
+			zk = hostToDrop.GetZookeeper()
+		} else if chi, ok := hostToDrop.GetCR().(*api.ClickHouseInstallation); ok && chi != nil && chi.Spec.Configuration != nil {
+			zk = chi.Spec.Configuration.Zookeeper
+		}
+		if zk != nil && zk.SessionTimeoutMs > 0 {
+			// Protect against potential duration overflow
+			if zk.SessionTimeoutMs < int(time.Hour/time.Millisecond) {
+				timeout = time.Duration(zk.SessionTimeoutMs)*time.Millisecond + replicaWaitGracePeriod
+			}
+		}
+	}
+
+	baseDelay := defaultRetryDelay
+	if w != nil && w.dropReplicaDelay > 0 {
+		baseDelay = w.dropReplicaDelay
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	var (
+		err     error
+		attempt = 0
+		delay   = baseDelay
+	)
+
+	for {
+		attempt++
+		if util.IsContextDone(timeoutCtx) {
+			if timeoutCtx.Err() == context.Canceled {
+				return context.Canceled
+			}
+			if err != nil {
+				return fmt.Errorf("SYSTEM DROP REPLICA on %s for host %s (shard %d) timed out after %d attempts: %w",
+					hostToRunOn.GetName(), hostToDrop.GetName(), hostToDrop.Runtime.Address.ShardIndex, attempt-1, err)
+			}
+			return timeoutCtx.Err()
 		}
 
-		err = schemer.HostDropReplica(ctx, hostToRunOn, hostToDrop)
+		err = schemer.HostDropReplica(timeoutCtx, hostToRunOn, hostToDrop)
 		if err == nil {
-			break
+			if attempt > 1 {
+				w.a.V(1).M(hostToRunOn).F().Info("SYSTEM DROP REPLICA for host %s succeeded after %d attempts", hostToDrop.GetName(), attempt)
+			}
+			return nil
 		}
 
-		// Retry if replica is still active
-		if isReplicaActiveError(err) && try < maxDropReplicaRetries {
-			delay := time.Duration(try) * baseDelay
-			w.a.V(1).M(hostToRunOn).F().Warning("Retrying SYSTEM DROP REPLICA for host %s (attempt %d/%d), backoff %v: %v", hostToDrop.GetName(), try, maxDropReplicaRetries, delay, err)
-			util.WaitContextDoneOrTimeout(ctx, delay)
-		} else {
-			break
+		// Fail fast on non-305 errors (connection failure, authentication, syntax, etc.)
+		if !isReplicaActiveError(err) {
+			return fmt.Errorf("SYSTEM DROP REPLICA on %s for host %s (shard %d) failed with non-retryable error: %w",
+				hostToRunOn.GetName(), hostToDrop.GetName(), hostToDrop.Runtime.Address.ShardIndex, err)
+		}
+
+		if util.IsContextDone(timeoutCtx) {
+			if timeoutCtx.Err() == context.Canceled {
+				return context.Canceled
+			}
+			return fmt.Errorf("SYSTEM DROP REPLICA on %s for host %s (shard %d) timed out after %d attempts: %w",
+				hostToRunOn.GetName(), hostToDrop.GetName(), hostToDrop.Runtime.Address.ShardIndex, attempt, err)
+		}
+
+		w.a.V(1).M(hostToRunOn).F().Warning("Replica %s is still active in Keeper (attempt %d); retrying in %v: %v", hostToDrop.GetName(), attempt, delay, err)
+
+		util.WaitContextDoneOrTimeout(timeoutCtx, delay)
+		if util.IsContextDone(timeoutCtx) {
+			if timeoutCtx.Err() == context.Canceled {
+				return context.Canceled
+			}
+			return fmt.Errorf("SYSTEM DROP REPLICA on %s for host %s (shard %d) timed out after %d attempts: %w",
+				hostToRunOn.GetName(), hostToDrop.GetName(), hostToDrop.Runtime.Address.ShardIndex, attempt, err)
+		}
+
+		delay += baseDelay
+		if delay > maxRetryDelay {
+			delay = maxRetryDelay
 		}
 	}
-
-	return err
 }
 
 // deleteTables

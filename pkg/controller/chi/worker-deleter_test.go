@@ -17,6 +17,9 @@ package chi
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"net"
 	"testing"
 	"time"
 
@@ -28,9 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
+	goch "github.com/mailru/go-clickhouse/v2"
+	core "k8s.io/api/core/v1"
 )
 
 var deleteHostSTSResource = schema.GroupResource{Group: "apps", Resource: "statefulsets"}
@@ -216,19 +222,8 @@ func TestRemovedHostFQDNs(t *testing.T) {
 }
 
 type fakeSchemer struct {
-	isHostActiveReplicaFunc func(ctx context.Context, hostToRunOn, hostToCheck *api.Host) bool
-	hostDropReplicaFunc     func(ctx context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error
-
-	activeCalls int
-	dropCalls   int
-}
-
-func (f *fakeSchemer) IsHostActiveReplica(ctx context.Context, hostToRunOn, hostToCheck *api.Host) bool {
-	f.activeCalls++
-	if f.isHostActiveReplicaFunc != nil {
-		return f.isHostActiveReplicaFunc(ctx, hostToRunOn, hostToCheck)
-	}
-	return false
+	hostDropReplicaFunc func(ctx context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error
+	dropCalls           int
 }
 
 func (f *fakeSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host) error {
@@ -239,291 +234,913 @@ func (f *fakeSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDr
 	return nil
 }
 
-func (f *fakeSchemer) HostSyncTables(ctx context.Context, host *api.Host) error                       { return nil }
-func (f *fakeSchemer) HostCreateTables(ctx context.Context, host *api.Host) error                     { return nil }
-func (f *fakeSchemer) HostDropTables(ctx context.Context, host *api.Host) error                       { return nil }
-func (f *fakeSchemer) IsHostInCluster(ctx context.Context, host *api.Host) bool                       { return true }
-func (f *fakeSchemer) HostActiveQueriesNum(ctx context.Context, host *api.Host) (int, error)          { return 0, nil }
-func (f *fakeSchemer) HostClickHouseVersion(ctx context.Context, host *api.Host) (string, error)       { return "", nil }
-func (f *fakeSchemer) HostMaxReplicaDelay(ctx context.Context, host *api.Host) (int, error)           { return 0, nil }
-func (f *fakeSchemer) HostShutdown(ctx context.Context, host *api.Host) error                         { return nil }
-func (f *fakeSchemer) ExecHost(ctx context.Context, host *api.Host, SQLs []string, _opts ...*clickhouse.QueryOptions) error { return nil }
-func (f *fakeSchemer) ExecCluster(ctx context.Context, cluster *api.Cluster, SQLs []string, _opts ...*clickhouse.QueryOptions) error { return nil }
-func (f *fakeSchemer) HostClusterDoesNotExistErrorCount(ctx context.Context, host *api.Host) (int, error) { return 0, nil }
-
-func TestWaitHostReplicaInactive_NilHost(t *testing.T) {
-	w := &worker{}
-	err := w.waitHostReplicaInactive(context.Background(), &api.Host{}, nil, 0, 0)
-	assert.NoError(t, err)
+type fakeStoragePVC struct {
+	interfaces.IKubeStoragePVC
 }
 
-func TestWaitHostReplicaInactive_ContextDone(t *testing.T) {
-	w := &worker{}
-	hostToRunOn := &api.Host{}
-	hostToDrop := &api.Host{}
+func (f *fakeStoragePVC) ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error) {
+	return &core.PersistentVolumeClaimList{}, nil
+}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel context immediately
+type fakeKubeStorage struct {
+	interfaces.IKube
+	storage interfaces.IKubeStoragePVC
+}
 
-	err := w.waitHostReplicaInactive(ctx, hostToRunOn, hostToDrop, 1*time.Millisecond, 0)
-	assert.Equal(t, context.Canceled, err)
+func (k *fakeKubeStorage) Storage() interfaces.IKubeStoragePVC {
+	return k.storage
+}
+
+func newTestWorker(s schemer.ISchemer) *worker {
+	return &worker{
+		c: &Controller{
+			kube: &fakeKubeStorage{
+				storage: &fakeStoragePVC{},
+			},
+		},
+		schemer:            s,
+		dropReplicaDelay:   1 * time.Millisecond,
+		dropReplicaTimeout: 50 * time.Millisecond,
+	}
+}
+
+func createTestCHIWithTopology(clusterName string, shards [][]string) *api.ClickHouseInstallation {
+	cr := &api.ClickHouseInstallation{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "test-chi",
+			Namespace: "default",
+		},
+	}
+	var chiShards []*api.ChiShard
+	for sIdx, hosts := range shards {
+		shard := &api.ChiShard{
+			Name: fmt.Sprintf("shard-%d", sIdx),
+		}
+		for rIdx, hName := range hosts {
+			host := &api.Host{
+				Name: hName,
+			}
+			host.Runtime.Address.ClusterName = clusterName
+			host.Runtime.Address.ClusterIndex = 0
+			host.Runtime.Address.ShardName = shard.Name
+			host.Runtime.Address.ShardIndex = sIdx
+			host.Runtime.Address.ReplicaIndex = rIdx
+			host.Runtime.Address.HostName = hName
+			host.SetCR(cr)
+			shard.Hosts = append(shard.Hosts, host)
+		}
+		chiShards = append(chiShards, shard)
+	}
+	cluster := &api.Cluster{
+		Name: clusterName,
+		Layout: &api.ChiClusterLayout{
+			Shards: chiShards,
+		},
+	}
+	cluster.Runtime.CHI = cr
+	cr.Spec.Configuration = &api.Configuration{
+		Clusters: []*api.Cluster{cluster},
+	}
+	return cr
 }
 
 func TestIsReplicaActiveError(t *testing.T) {
-	err305 := errors.New("Code: 305, Can't drop replica chi-dev-0-1, because it's active")
+	// 1. Actual ClickHouse structured Code 305 error
+	struct305 := &goch.Error{Code: 305, Message: "Can't drop replica chi-dev-0-1, because it's active"}
+	assert.True(t, isReplicaActiveError(struct305), "structured 305 must match")
+
+	// 2. Wrapped Code 305 error
+	wrapped305 := fmt.Errorf("query execution failed: %w", struct305)
+	assert.True(t, isReplicaActiveError(wrapped305), "wrapped structured 305 must match")
+
+	// ClickHouse string error variants
+	err305 := errors.New("Code: 305, DB::Exception: Can't drop replica chi-dev-0-1, because it's active")
+	err305Dot := errors.New("Code: 305. DB::Exception: Replica chi-dev-0-1 is active. (TABLE_WAS_NOT_DROPPED)")
 	errTextVariant1 := errors.New("Can't drop replica chi-dev-0-1, because it's active")
 	errTextVariant2 := errors.New("DB::Exception: Replica is active")
-	errOther := errors.New("Code: 192, Unknown table")
-
 	assert.True(t, isReplicaActiveError(err305))
+	assert.True(t, isReplicaActiveError(err305Dot))
 	assert.True(t, isReplicaActiveError(errTextVariant1))
 	assert.True(t, isReplicaActiveError(errTextVariant2))
+
+	// 3. An unrelated error containing the substring "Code: 305"
+	unrelatedTextWith305 := errors.New("invalid configuration line 42: Code: 305 is not a valid parameter")
+	assert.False(t, isReplicaActiveError(unrelatedTextWith305), "unrelated error containing 'Code: 305' must NOT match")
+
+	// 4. An unrelated ClickHouse error code (structured and string)
+	struct192 := &goch.Error{Code: 192, Message: "Unknown table"}
+	assert.False(t, isReplicaActiveError(struct192), "structured 192 must not match")
+	errOther := errors.New("Code: 192, DB::Exception: Unknown table")
 	assert.False(t, isReplicaActiveError(errOther))
+
+	// Generic connection error
+	errConn := errors.New("dial tcp: connection refused")
+	assert.False(t, isReplicaActiveError(errConn))
+
+	// 5. Nil error
 	assert.False(t, isReplicaActiveError(nil))
+}
+
+func TestIsRetryableReplicaDropError(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       error
+		retryable bool
+	}{
+		// Nil error
+		{
+			name:      "nil error",
+			err:       nil,
+			retryable: false,
+		},
+		// Code 305: Replica is active (primary target of #1943)
+		{
+			name:      "structured ClickHouse 305 replica active",
+			err:       &goch.Error{Code: 305, Message: "Can't drop replica chi-0-1, because it's active"},
+			retryable: true,
+		},
+		{
+			name:      "wrapped ClickHouse 305 from retry timeout",
+			err:       fmt.Errorf("SYSTEM DROP REPLICA timed out: %w", &goch.Error{Code: 305, Message: "replica is active"}),
+			retryable: true,
+		},
+		{
+			name:      "string ClickHouse 305 with DB::Exception",
+			err:       errors.New("Code: 305, DB::Exception: Can't drop replica chi-0-1, because it's active"),
+			retryable: true,
+		},
+		// Transient Keeper / Cluster Error Codes
+		{
+			name:      "ClickHouse 999 KEEPER_EXCEPTION with Connection loss",
+			err:       &goch.Error{Code: 999, Message: "Coordination::Exception: Connection loss"},
+			retryable: true,
+		},
+		{
+			name:      "ClickHouse 999 KEEPER_EXCEPTION with Operation timeout",
+			err:       &goch.Error{Code: 999, Message: "Coordination::Exception: Operation timeout"},
+			retryable: true,
+		},
+		{
+			name:      "ClickHouse 999 KEEPER_EXCEPTION with Session expired",
+			err:       &goch.Error{Code: 999, Message: "Coordination::Exception: Session expired"},
+			retryable: true,
+		},
+		{
+			name:      "ClickHouse 999 KEEPER_EXCEPTION with lowercase connection loss",
+			err:       &goch.Error{Code: 999, Message: "coordination error: connection loss"},
+			retryable: true,
+		},
+		{
+			name:      "ClickHouse 999 KEEPER_EXCEPTION with operation timed out variation",
+			err:       &goch.Error{Code: 999, Message: "coordination error: operation timed out"},
+			retryable: true,
+		},
+		{
+			name:      "ClickHouse 999 KEEPER_EXCEPTION with session moved",
+			err:       &goch.Error{Code: 999, Message: "coordination exception: session moved"},
+			retryable: true,
+		},
+		{
+			name:      "ClickHouse 999 KEEPER_EXCEPTION with Not authenticated (permanent)",
+			err:       &goch.Error{Code: 999, Message: "Coordination::Exception: Not authenticated"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 999 KEEPER_EXCEPTION with lowercase not authenticated (permanent)",
+			err:       &goch.Error{Code: 999, Message: "coordination exception: not authenticated"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 999 KEEPER_EXCEPTION with Invalid ACL (permanent)",
+			err:       &goch.Error{Code: 999, Message: "Coordination::Exception: Invalid ACL"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 999 KEEPER_EXCEPTION with Bad arguments (permanent)",
+			err:       &goch.Error{Code: 999, Message: "Coordination::Exception: Bad arguments"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 999 KEEPER_EXCEPTION with Runtime inconsistency (permanent)",
+			err:       &goch.Error{Code: 999, Message: "Coordination::Exception: Runtime inconsistency"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 225 NO_ZOOKEEPER",
+			err:       &goch.Error{Code: 225, Message: "NO_ZOOKEEPER: ZooKeeper is not available"},
+			retryable: true,
+		},
+		{
+			name:      "ClickHouse 159 TIMEOUT_EXCEEDED",
+			err:       &goch.Error{Code: 159, Message: "TIMEOUT_EXCEEDED: Timeout waiting for ZooKeeper response"},
+			retryable: true,
+		},
+		{
+			name:      "ClickHouse 209 SOCKET_TIMEOUT",
+			err:       &goch.Error{Code: 209, Message: "SOCKET_TIMEOUT: Socket timeout reached"},
+			retryable: true,
+		},
+		{
+			name:      "ClickHouse 210 NETWORK_ERROR",
+			err:       &goch.Error{Code: 210, Message: "NETWORK_ERROR: Connection reset by peer"},
+			retryable: true,
+		},
+		// Network errors
+		{
+			name:      "transient net.Error timeout",
+			err:       &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("i/o timeout")},
+			retryable: true,
+		},
+		{
+			name:      "transient net.OpError connection reset",
+			err:       &net.OpError{Op: "read", Net: "tcp", Err: errors.New("connection reset by peer")},
+			retryable: true,
+		},
+		{
+			name:      "io.EOF",
+			err:       io.EOF,
+			retryable: true,
+		},
+		{
+			name:      "io.ErrUnexpectedEOF",
+			err:       io.ErrUnexpectedEOF,
+			retryable: true,
+		},
+		// Permanent errors - MUST NOT be retryable
+		{
+			name:      "ClickHouse 515 INCORRECT_ACCESS_ENTITY_DEFINITION",
+			err:       &goch.Error{Code: 515, Message: "INCORRECT_ACCESS_ENTITY_DEFINITION: malformed user definition"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 516 AUTHENTICATION_FAILED",
+			err:       &goch.Error{Code: 516, Message: "AUTHENTICATION_FAILED: password is incorrect"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 192 UNKNOWN_USER",
+			err:       &goch.Error{Code: 192, Message: "UNKNOWN_USER: user 'default' does not exist"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 62 SYNTAX_ERROR",
+			err:       &goch.Error{Code: 62, Message: "SYNTAX_ERROR: Syntax error near 'DROP'"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 493 ACCESS_DENIED",
+			err:       &goch.Error{Code: 493, Message: "ACCESS_DENIED: not enough privileges"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 60 UNKNOWN_TABLE",
+			err:       &goch.Error{Code: 60, Message: "UNKNOWN_TABLE: table does not exist"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 81 UNKNOWN_DATABASE",
+			err:       &goch.Error{Code: 81, Message: "UNKNOWN_DATABASE: database does not exist"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 47 UNKNOWN_IDENTIFIER",
+			err:       &goch.Error{Code: 47, Message: "UNKNOWN_IDENTIFIER: unknown identifier"},
+			retryable: false,
+		},
+		{
+			name:      "ClickHouse 164 READONLY",
+			err:       &goch.Error{Code: 164, Message: "READONLY: server is in read-only mode"},
+			retryable: false,
+		},
+		{
+			name:      "unknown ClickHouse error code 42",
+			err:       &goch.Error{Code: 42, Message: "UNKNOWN_ERROR: random error"},
+			retryable: false,
+		},
+		{
+			name:      "generic arbitrary SQL error",
+			err:       errors.New("invalid SQL: table corruption"),
+			retryable: false,
+		},
+		// Context cancellation & deadlines - MUST NOT be retryable
+		{
+			name:      "context.Canceled",
+			err:       context.Canceled,
+			retryable: false,
+		},
+		{
+			name:      "context.DeadlineExceeded",
+			err:       context.DeadlineExceeded,
+			retryable: false,
+		},
+		{
+			name:      "net.OpError wrapping context.Canceled",
+			err:       &net.OpError{Op: "dial", Net: "tcp", Err: context.Canceled},
+			retryable: false,
+		},
+		{
+			name:      "net.OpError wrapping context.DeadlineExceeded",
+			err:       &net.OpError{Op: "read", Net: "tcp", Err: context.DeadlineExceeded},
+			retryable: false,
+		},
+		{
+			name:      "wrapped ClickHouse error containing context.Canceled",
+			err:       fmt.Errorf("execute failed: %w", context.Canceled),
+			retryable: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isRetryableReplicaDropError(tt.err)
+			assert.Equal(t, tt.retryable, got, "case: %s", tt.name)
+		})
+	}
 }
 
 func TestGetCoordinatorHost(t *testing.T) {
 	w := &worker{}
-	assert.Nil(t, w.getCoordinatorHost(nil))
 
-	hostNoShard := &api.Host{}
-	assert.Nil(t, w.getCoordinatorHost(hostNoShard))
+	t.Run("nil hostToDrop returns nil", func(t *testing.T) {
+		assert.Nil(t, w.getCoordinatorHost(nil, nil))
+	})
+
+	t.Run("host without CR returns nil", func(t *testing.T) {
+		hostNoCR := &api.Host{Name: "orphan"}
+		assert.Nil(t, w.getCoordinatorHost(nil, hostNoCR))
+	})
+
+	t.Run("nil cr returns nil without panic", func(t *testing.T) {
+		oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1"}})
+		hostToDrop0 := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[0]
+		assert.Nil(t, w.getCoordinatorHost(nil, hostToDrop0))
+	})
+
+	t.Run("2-replica shard: deleting replica 1 chooses surviving replica 0", func(t *testing.T) {
+		oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1"}})
+		hostToDrop := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[1]
+
+		newCR := createTestCHIWithTopology("c1", [][]string{{"h0"}})
+
+		coord := w.getCoordinatorHost(newCR, hostToDrop)
+		require.NotNil(t, coord)
+		assert.Equal(t, "h0", coord.GetName())
+		assert.NotEqual(t, hostToDrop.GetName(), coord.GetName())
+	})
+
+	t.Run("2-replica shard: deleting replica 0 chooses surviving replica 1", func(t *testing.T) {
+		oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1"}})
+		hostToDrop := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[0]
+
+		newCR := createTestCHIWithTopology("c1", [][]string{{"h1"}})
+
+		coord := w.getCoordinatorHost(newCR, hostToDrop)
+		require.NotNil(t, coord)
+		assert.Equal(t, "h1", coord.GetName())
+		assert.NotEqual(t, hostToDrop.GetName(), coord.GetName())
+	})
+
+	t.Run("3-replica shard: deleting middle replica 1 chooses replica 0", func(t *testing.T) {
+		oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1", "h2"}})
+		hostToDrop := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[1]
+
+		newCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h2"}})
+
+		coord := w.getCoordinatorHost(newCR, hostToDrop)
+		require.NotNil(t, coord)
+		assert.Equal(t, "h0", coord.GetName())
+		assert.NotEqual(t, hostToDrop.GetName(), coord.GetName())
+	})
+
+	t.Run("3-replica shard: simultaneous deletion of h0 and h1 chooses surviving h2", func(t *testing.T) {
+		oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1", "h2"}})
+		hostToDrop0 := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[0]
+		hostToDrop1 := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[1]
+
+		newCR := createTestCHIWithTopology("c1", [][]string{{"h2"}})
+
+		coord0 := w.getCoordinatorHost(newCR, hostToDrop0)
+		require.NotNil(t, coord0)
+		assert.Equal(t, "h2", coord0.GetName())
+
+		coord1 := w.getCoordinatorHost(newCR, hostToDrop1)
+		require.NotNil(t, coord1)
+		assert.Equal(t, "h2", coord1.GetName())
+	})
+
+	t.Run("single-replica shard deletion returns nil (cannot self-coordinate)", func(t *testing.T) {
+		oldCR := createTestCHIWithTopology("c1", [][]string{{"h0"}})
+		hostToDrop := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[0]
+
+		newCR := createTestCHIWithTopology("c1", [][]string{})
+
+		coord := w.getCoordinatorHost(newCR, hostToDrop)
+		assert.Nil(t, coord, "single-replica shard deletion must return nil, never select hostToDrop")
+	})
+
+	t.Run("entire shard deletion returns nil without selecting dead hosts", func(t *testing.T) {
+		oldCR := createTestCHIWithTopology("c1", [][]string{{"h0-0", "h0-1"}, {"h1-0", "h1-1"}})
+		hostToDrop := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[1].Hosts[0]
+
+		newCR := createTestCHIWithTopology("c1", [][]string{{"h0-0", "h0-1"}})
+
+		coord := w.getCoordinatorHost(newCR, hostToDrop)
+		assert.Nil(t, coord, "whole shard deletion must return nil rather than executing against unrelated shard")
+	})
+
+	t.Run("typed-nil IShard (*ChiShard)(nil) returns nil safely via IsZero()", func(t *testing.T) {
+		oldCR := createTestCHIWithTopology("c1", [][]string{{"h0"}})
+		hostToDrop := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[0]
+		// newCR has no cluster or shard named "c1"
+		newCR := &api.ClickHouseInstallation{
+			Spec: api.ChiSpec{
+				Configuration: &api.Configuration{},
+			},
+		}
+		assert.Nil(t, w.getCoordinatorHost(newCR, hostToDrop))
+	})
 }
 
-func TestWaitHostReplicaInactive_ImmediateSuccess(t *testing.T) {
-	fake := &fakeSchemer{
-		isHostActiveReplicaFunc: func(ctx context.Context, hostToRunOn, hostToCheck *api.Host) bool {
-			return false
-		},
-	}
-	w := &worker{schemer: fake}
-	err := w.waitHostReplicaInactive(context.Background(), &api.Host{}, &api.Host{}, 1*time.Millisecond, 0)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, fake.activeCalls)
-}
+func TestRetryDropReplica(t *testing.T) {
+	hostToRunOn := &api.Host{Name: "coord"}
+	hostToDrop := &api.Host{Name: "victim"}
 
-func TestWaitHostReplicaInactive_PollingTransitions(t *testing.T) {
-	calls := 0
-	fake := &fakeSchemer{
-		isHostActiveReplicaFunc: func(ctx context.Context, hostToRunOn, hostToCheck *api.Host) bool {
-			calls++
-			return calls < 2 // Active on call 1, inactive on call 2
-		},
-	}
+	t.Run("immediate success takes 1 call without delay", func(t *testing.T) {
+		fake := &fakeSchemer{
+			hostDropReplicaFunc: func(ctx context.Context, runOn, drop *api.Host, calls int) error {
+				return nil
+			},
+		}
+		w := newTestWorker(fake)
+		err := w.retryDropReplica(context.Background(), hostToRunOn, hostToDrop)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, fake.dropCalls)
+	})
 
-	w := &worker{schemer: fake}
-	hostToRunOn := &api.Host{}
-	hostToDrop := &api.Host{}
+	t.Run("retries on Code 305 and succeeds on attempt 2", func(t *testing.T) {
+		fake := &fakeSchemer{
+			hostDropReplicaFunc: func(ctx context.Context, runOn, drop *api.Host, calls int) error {
+				if calls == 1 {
+					return errors.New("Code: 305, Can't drop replica, because it's active")
+				}
+				return nil
+			},
+		}
+		w := newTestWorker(fake)
+		err := w.retryDropReplica(context.Background(), hostToRunOn, hostToDrop)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, fake.dropCalls)
+	})
 
-	err := w.waitHostReplicaInactive(context.Background(), hostToRunOn, hostToDrop, 1*time.Millisecond, 0)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, fake.activeCalls)
-}
-
-func TestWaitHostReplicaInactive_ParentContextExpires(t *testing.T) {
-	fake := &fakeSchemer{
-		isHostActiveReplicaFunc: func(ctx context.Context, hostToRunOn, hostToCheck *api.Host) bool {
-			return true
-		},
-	}
-	w := &worker{schemer: fake}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-	defer cancel()
-
-	err := w.waitHostReplicaInactive(ctx, &api.Host{}, &api.Host{}, 1*time.Millisecond, 0)
-	assert.Error(t, err)
-	assert.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled))
-}
-
-func TestWaitHostReplicaInactive_InternalTimeout(t *testing.T) {
-	fake := &fakeSchemer{
-		isHostActiveReplicaFunc: func(ctx context.Context, hostToRunOn, hostToCheck *api.Host) bool {
-			return true
-		},
-	}
-	w := &worker{schemer: fake}
-
-	// Test waitHostReplicaInactive internal timeout branch directly by specifying 10ms waitTimeout
-	err := w.waitHostReplicaInactive(context.Background(), &api.Host{}, &api.Host{}, 1*time.Millisecond, 10*time.Millisecond)
-	assert.Error(t, err)
-	assert.True(t, errors.Is(err, context.DeadlineExceeded))
-}
-
-func TestWaitTimeoutProceedsToRetryAndSucceeds(t *testing.T) {
-	fake := &fakeSchemer{
-		isHostActiveReplicaFunc: func(ctx context.Context, hostToRunOn, hostToCheck *api.Host) bool {
-			return true // Always active during wait phase -> waitHostReplicaInactive times out
-		},
-		hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error {
-			if calls == 1 {
+	t.Run("exhausts timeout on persistent Code 305 and returns last error with context", func(t *testing.T) {
+		fake := &fakeSchemer{
+			hostDropReplicaFunc: func(ctx context.Context, runOn, drop *api.Host, calls int) error {
 				return errors.New("Code: 305, Can't drop replica, because it's active")
-			}
-			return nil // Succeeds on attempt 2
-		},
-	}
+			},
+		}
+		w := newTestWorker(fake)
+		w.dropReplicaTimeout = 10 * time.Millisecond
+		err := w.retryDropReplica(context.Background(), hostToRunOn, hostToDrop)
+		assert.Error(t, err)
+		assert.True(t, isReplicaActiveError(err))
+		assert.Contains(t, err.Error(), "timed out after")
+		assert.GreaterOrEqual(t, fake.dropCalls, 2)
+	})
 
-	w := &worker{schemer: fake}
-	hostToRunOn := &api.Host{}
-	hostToDrop := &api.Host{}
+	t.Run("non-305 error fails fast on attempt 1", func(t *testing.T) {
+		fake := &fakeSchemer{
+			hostDropReplicaFunc: func(ctx context.Context, runOn, drop *api.Host, calls int) error {
+				return errors.New("Code: 192, Unknown table")
+			},
+		}
+		w := newTestWorker(fake)
+		err := w.retryDropReplica(context.Background(), hostToRunOn, hostToDrop)
+		assert.Error(t, err)
+		assert.False(t, isReplicaActiveError(err))
+		assert.Contains(t, err.Error(), "failed with non-retryable error")
+		assert.Equal(t, 1, fake.dropCalls)
+	})
 
-	// Step 1: waitHostReplicaInactive times out after 10ms
-	errWait := w.waitHostReplicaInactive(context.Background(), hostToRunOn, hostToDrop, 1*time.Millisecond, 10*time.Millisecond)
-	assert.Error(t, errWait)
-	assert.True(t, errors.Is(errWait, context.DeadlineExceeded))
+	t.Run("pre-cancelled context aborts before any call", func(t *testing.T) {
+		fake := &fakeSchemer{}
+		w := newTestWorker(fake)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
 
-	// Step 2: retryDropReplica proceeds despite wait timeout and succeeds on attempt 2
-	errRetry := w.retryDropReplica(context.Background(), hostToRunOn, hostToDrop, 1*time.Millisecond)
-	assert.NoError(t, errRetry)
-	assert.Equal(t, 2, fake.dropCalls)
+		err := w.retryDropReplica(ctx, hostToRunOn, hostToDrop)
+		assert.Equal(t, context.Canceled, err)
+		assert.Equal(t, 0, fake.dropCalls)
+	})
+
+	t.Run("context cancelled mid-retry returns context.Canceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		fake := &fakeSchemer{
+			hostDropReplicaFunc: func(c context.Context, runOn, drop *api.Host, calls int) error {
+				cancel()
+				return errors.New("Code: 305, Can't drop replica, because it's active")
+			},
+		}
+		w := newTestWorker(fake)
+		w.dropReplicaDelay = 10 * time.Millisecond
+		w.dropReplicaTimeout = 100 * time.Millisecond
+		err := w.retryDropReplica(ctx, hostToRunOn, hostToDrop)
+		assert.Equal(t, context.Canceled, err)
+		assert.Equal(t, 1, fake.dropCalls)
+	})
+
+	t.Run("inherited ZooKeeper session timeout accounts for configured session timeout + grace period", func(t *testing.T) {
+		cr := &api.ClickHouseInstallation{
+			Spec: api.ChiSpec{
+				Configuration: &api.Configuration{
+					Zookeeper: &api.ZookeeperConfig{
+						SessionTimeoutMs: 20000,
+					},
+					Clusters: []*api.Cluster{
+						{
+							Name: "c1",
+							Layout: &api.ChiClusterLayout{
+								Shards: []*api.ChiShard{
+									{
+										Name: "s0",
+										Hosts: []*api.Host{
+											{Name: "h0"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		cluster := cr.Spec.Configuration.Clusters[0]
+		cluster.Runtime.CHI = cr
+		cluster.Zookeeper = &api.ZookeeperConfig{SessionTimeoutMs: 20000}
+		h := cluster.Layout.Shards[0].Hosts[0]
+		h.SetCR(cr)
+		h.Runtime.Address.ClusterName = "c1"
+
+		zk := h.GetZookeeper()
+		require.NotNil(t, zk)
+		assert.Equal(t, 20000, zk.SessionTimeoutMs)
+
+		expectedTimeout := 20*time.Second + replicaWaitGracePeriod
+		assert.Equal(t, 50*time.Second, expectedTimeout)
+	})
 }
 
-func TestDropZKReplica_NilGuards(t *testing.T) {
-	w := &worker{}
-	assert.Nil(t, w.dropZKReplica(context.Background(), nil, NewDropReplicaOptions()))
+func TestDropZKReplica(t *testing.T) {
+	w := newTestWorker(&fakeSchemer{})
 
-	hostToDropNoShard := &api.Host{}
-	assert.Nil(t, w.dropZKReplica(context.Background(), hostToDropNoShard, NewDropReplicaOptions()))
+	t.Run("nil hostToDrop returns error", func(t *testing.T) {
+		dropped, err := w.dropZKReplica(context.Background(), nil, nil, NewDropReplicaOptions())
+		assert.False(t, dropped)
+		assert.Error(t, err)
+	})
+
+	t.Run("host without CR returns error", func(t *testing.T) {
+		hostNoCR := &api.Host{Name: "orphan"}
+		dropped, err := w.dropZKReplica(context.Background(), nil, hostNoCR, NewDropReplicaOptions())
+		assert.False(t, dropped)
+		assert.Error(t, err)
+	})
+
+	t.Run("no coordinator host in shard returns dropped=false, err=nil (postponed, non-blocking)", func(t *testing.T) {
+		cr := createTestCHIWithTopology("c1", [][]string{{"single-host"}})
+		host := cr.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[0]
+
+		dropped, err := w.dropZKReplica(context.Background(), cr, host, NewDropReplicaOptions())
+		assert.False(t, dropped)
+		assert.NoError(t, err, "whole-shard / single-replica deletion must not return a fatal error that blocks reconciliation")
+	})
+
+	t.Run("prohibited drop (OnDelete is false) returns dropped=false, err=nil", func(t *testing.T) {
+		oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1"}})
+		newCR := createTestCHIWithTopology("c1", [][]string{{"h0"}})
+		hostToDrop := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[1]
+
+		oldCR.Spec.Configuration.Clusters[0].GetReconcile().Host.Drop.Replicas = &api.ReconcileHostDropReplicas{
+			OnDelete: types.NewStringBool(false),
+		}
+
+		dropped, err := w.dropZKReplica(context.Background(), newCR, hostToDrop, NewDropReplicaOptions().SetRegularDrop())
+		assert.False(t, dropped)
+		assert.NoError(t, err)
+	})
+
+	t.Run("successful drop returns dropped=true, err=nil", func(t *testing.T) {
+		oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1"}})
+		newCR := createTestCHIWithTopology("c1", [][]string{{"h0"}})
+		hostToDrop := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[1]
+
+		fake := &fakeSchemer{}
+		worker := newTestWorker(fake)
+
+		dropped, err := worker.dropZKReplica(context.Background(), newCR, hostToDrop, NewDropReplicaOptions().SetRegularDrop())
+		assert.True(t, dropped)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, fake.dropCalls)
+	})
 }
 
-func TestDropReplicaOptions(t *testing.T) {
-	opts := NewDropReplicaOptions()
-	assert.False(t, opts.RegularDrop())
-	assert.False(t, opts.ForceDropUponStorageLoss())
+func TestDropZKReplicas_Lifecycle_FailureAbortsReconcile(t *testing.T) {
+	// When a same-shard coordinator exists but drop fails, dropZKReplicas must return an error
+	// so that reconcileCHI aborts before finalizeReconcileAndMarkCompleted advances Ancestor.
+	oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1"}})
+	newCR := createTestCHIWithTopology("c1", [][]string{{"h0"}})
+	newCR.EnsureRuntime().ActionPlan = api.MakeActionPlan(oldCR, newCR)
 
-	opts.SetRegularDrop()
-	assert.True(t, opts.RegularDrop())
-
-	opts.SetForceDropUponStorageLoss()
-	assert.True(t, opts.ForceDropUponStorageLoss())
-
-	var nilOpts *dropReplicaOptions
-	assert.False(t, nilOpts.RegularDrop())
-	assert.False(t, nilOpts.ForceDropUponStorageLoss())
-	assert.Nil(t, nilOpts.SetRegularDrop())
-	assert.Nil(t, nilOpts.SetForceDropUponStorageLoss())
-
-	arr := NewDropReplicaOptionsArr(opts)
-	assert.Equal(t, opts, arr.First())
-
-	emptyArr := NewDropReplicaOptionsArr()
-	assert.Nil(t, emptyArr.First())
-}
-
-func TestRetryDropReplica_SuccessOnFirstTry(t *testing.T) {
 	fake := &fakeSchemer{
 		hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error {
+			return errors.New("dial tcp: connection refused")
+		},
+	}
+	w := newTestWorker(fake)
+
+	err := w.dropZKReplicas(context.Background(), newCR)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to drop 1 ZK replica(s)")
+	assert.True(t, errors.Is(err, ErrZKReplicaDropFailed))
+}
+
+func TestDropZKReplicas_RetryableVsPermanentError(t *testing.T) {
+	oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1"}})
+	newCR := createTestCHIWithTopology("c1", [][]string{{"h0"}})
+	newCR.EnsureRuntime().ActionPlan = api.MakeActionPlan(oldCR, newCR)
+
+	// Case 1: Retryable error (Code 305)
+	fakeRetryable := &fakeSchemer{
+		hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error {
+			return &goch.Error{Code: 305, Message: "replica is active"}
+		},
+	}
+	wRetryable := newTestWorker(fakeRetryable)
+	wRetryable.dropReplicaDelay = 1 * time.Millisecond
+	wRetryable.dropReplicaTimeout = 5 * time.Millisecond
+
+	errRetryable := wRetryable.dropZKReplicas(context.Background(), newCR)
+	require.Error(t, errRetryable)
+	assert.True(t, errors.Is(errRetryable, ErrZKReplicaDropFailed), "must wrap ErrZKReplicaDropFailed")
+	assert.True(t, errors.Is(errRetryable, ErrZKReplicaDropRetryable), "must wrap ErrZKReplicaDropRetryable")
+
+	// Case 2: Permanent error (Code 515 Authentication failed)
+	fakePermanent := &fakeSchemer{
+		hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error {
+			return &goch.Error{Code: 515, Message: "authentication failed"}
+		},
+	}
+	wPermanent := newTestWorker(fakePermanent)
+	wPermanent.dropReplicaDelay = 1 * time.Millisecond
+	wPermanent.dropReplicaTimeout = 5 * time.Millisecond
+
+	errPermanent := wPermanent.dropZKReplicas(context.Background(), newCR)
+	require.Error(t, errPermanent)
+	assert.True(t, errors.Is(errPermanent, ErrZKReplicaDropFailed), "must wrap ErrZKReplicaDropFailed")
+	assert.True(t, errors.Is(errPermanent, ErrZKReplicaDropPermanent), "must wrap ErrZKReplicaDropPermanent")
+	assert.False(t, errors.Is(errPermanent, ErrZKReplicaDropRetryable), "must NOT wrap ErrZKReplicaDropRetryable")
+}
+
+func TestDropZKReplicas_Lifecycle_WholeShardDoesNotAbortReconcile(t *testing.T) {
+	// When an entire shard is removed, no same-shard coordinator exists.
+	// dropZKReplicas must return nil so reconciliation completes rather than looping indefinitely.
+	oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1"}})
+	newCR := createTestCHIWithTopology("c1", [][]string{})
+	newCR.EnsureRuntime().ActionPlan = api.MakeActionPlan(oldCR, newCR)
+
+	fake := &fakeSchemer{}
+	w := newTestWorker(fake)
+
+	err := w.dropZKReplicas(context.Background(), newCR)
+	require.NoError(t, err, "Whole-shard deletion must not fail reconciliation")
+}
+
+func TestDropZKReplicas_Lifecycle_RecoveryOnNextReconcile(t *testing.T) {
+	// Demonstrates the recovery lifecycle across reconciliations:
+	// 1. Initial scale down from 2 to 1 replica (h1 removed).
+	// 2. Pass 1: Coordinator h0 is down (fails). Reconciliation aborts; Ancestor is NOT updated.
+	// 3. Pass 2: Coordinator h0 recovers. Ancestor still has h1. ActionPlan still includes h1 in WalkRemoved.
+	// 4. Pass 2 succeeds, replica is dropped, and reconciliation completes!
+	oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1"}})
+	newCR := createTestCHIWithTopology("c1", [][]string{{"h0"}})
+	newCR.SetAncestor(oldCR)
+
+	// Pass 1: Coordinator fails
+	pass1Fake := &fakeSchemer{
+		hostDropReplicaFunc: func(ctx context.Context, runOn, drop *api.Host, calls int) error {
+			return errors.New("dial tcp: connection refused")
+		},
+	}
+	w1 := newTestWorker(pass1Fake)
+	newCR.EnsureRuntime().ActionPlan = api.MakeActionPlan(newCR.GetAncestorT(), newCR)
+	err1 := w1.dropZKReplicas(context.Background(), newCR)
+	require.Error(t, err1)
+
+	// Ancestor was NOT updated because pass 1 aborted before finalize
+	require.Equal(t, oldCR, newCR.GetAncestorT(), "Ancestor must remain oldCR on failure")
+
+	// Pass 2: Coordinator recovers
+	pass2Fake := &fakeSchemer{
+		hostDropReplicaFunc: func(ctx context.Context, runOn, drop *api.Host, calls int) error {
 			return nil
 		},
 	}
-	w := &worker{schemer: fake}
-	err := w.retryDropReplica(context.Background(), &api.Host{}, &api.Host{}, 1*time.Millisecond)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, fake.dropCalls)
+	w2 := newTestWorker(pass2Fake)
+	// ActionPlan in pass 2 diffs against oldCR (which was preserved!)
+	newCR.EnsureRuntime().ActionPlan = api.MakeActionPlan(newCR.GetAncestorT(), newCR)
+	var removedHostsCount int
+	newCR.EnsureRuntime().ActionPlan.WalkRemoved(func(api.ICluster) {}, func(api.IShard) {}, func(*api.Host) {
+		removedHostsCount++
+	})
+	require.Equal(t, 1, removedHostsCount, "Removed host must still be present in ActionPlan")
+
+	err2 := w2.dropZKReplicas(context.Background(), newCR)
+	require.NoError(t, err2, "Pass 2 must succeed after coordinator recovers")
+	assert.Equal(t, 1, pass2Fake.dropCalls)
 }
 
-func TestRetryDropReplica_RetriesOn305ThenSucceeds(t *testing.T) {
+func TestDropZKReplicas_Lifecycle_ReplicaReaddedBeforeRetry(t *testing.T) {
+	// Demonstrates safe handling when user re-adds a replica before failed cleanup retried:
+	// 1. Initial scale down from 2 to 1 replica (h1 removed).
+	// 2. Pass 1: Drop fails (e.g. coordinator network blip). Reconcile aborts; Ancestor still has h1.
+	// 3. User updates CR to scale BACK UP to 2 replicas (h1 re-added) before pass 2 runs.
+	// 4. Pass 2: ActionPlan computes diff between Ancestor (h0, h1) and newCR (h0, h1).
+	//    Diff sees 0 removed hosts. dropZKReplicas performs 0 drops, avoiding accidental deletion
+	//    of the re-added replica's metadata!
+	oldCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1"}})
+	downscaledCR := createTestCHIWithTopology("c1", [][]string{{"h0"}})
+	downscaledCR.SetAncestor(oldCR)
+
+	// Pass 1: Coordinator fails during downscale
+	pass1Fake := &fakeSchemer{
+		hostDropReplicaFunc: func(ctx context.Context, runOn, drop *api.Host, calls int) error {
+			return errors.New("dial tcp: connection refused")
+		},
+	}
+	w1 := newTestWorker(pass1Fake)
+	downscaledCR.EnsureRuntime().ActionPlan = api.MakeActionPlan(downscaledCR.GetAncestorT(), downscaledCR)
+	err1 := w1.dropZKReplicas(context.Background(), downscaledCR)
+	require.Error(t, err1)
+
+	// Ancestor is preserved as oldCR
+	require.Equal(t, oldCR, downscaledCR.GetAncestorT())
+
+	// Now user scales back up: re-adds h1 before pass 2 runs
+	readdedCR := createTestCHIWithTopology("c1", [][]string{{"h0", "h1"}})
+	readdedCR.SetAncestor(downscaledCR.GetAncestorT()) // inherits preserved Ancestor
+
+	pass2Fake := &fakeSchemer{
+		hostDropReplicaFunc: func(ctx context.Context, runOn, drop *api.Host, calls int) error {
+			t.Fatalf("unexpected call to HostDropReplica: re-added replica must not be dropped!")
+			return nil
+		},
+	}
+	w2 := newTestWorker(pass2Fake)
+	readdedCR.EnsureRuntime().ActionPlan = api.MakeActionPlan(readdedCR.GetAncestorT(), readdedCR)
+
+	var removedHostsCount int
+	readdedCR.EnsureRuntime().ActionPlan.WalkRemoved(func(api.ICluster) {}, func(api.IShard) {}, func(*api.Host) {
+		removedHostsCount++
+	})
+	require.Equal(t, 0, removedHostsCount, "No hosts should be marked as removed after re-addition")
+
+	err2 := w2.dropZKReplicas(context.Background(), readdedCR)
+	require.NoError(t, err2)
+	assert.Equal(t, 0, pass2Fake.dropCalls, "HostDropReplica must not be called when replica is re-added")
+}
+
+func TestDropZKReplicas_Accounting(t *testing.T) {
+	t.Run("accurately accounts succeeded and failed drops", func(t *testing.T) {
+		oldCR := createTestCHIWithTopology("c1", [][]string{
+			{"h0", "h1", "h2"},
+		})
+		newCR := createTestCHIWithTopology("c1", [][]string{
+			{"h0"},
+		})
+		newCR.EnsureRuntime().ActionPlan = api.MakeActionPlan(oldCR, newCR)
+
+		fake := &fakeSchemer{
+			hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error {
+				if hostToDrop.GetName() == "h2" {
+					return errors.New("Code: 305, Can't drop replica, because it's active")
+				}
+				return nil
+			},
+		}
+
+		w := newTestWorker(fake)
+		err := w.dropZKReplicas(context.Background(), newCR)
+		require.Error(t, err)
+
+		assert.GreaterOrEqual(t, fake.dropCalls, 2)
+	})
+}
+
+func TestDropZKReplicas_WholeShardDeletion(t *testing.T) {
+	oldCR := createTestCHIWithTopology("c1", [][]string{
+		{"h0-0", "h0-1"},
+		{"h1-0", "h1-1"},
+	})
+	newCR := createTestCHIWithTopology("c1", [][]string{
+		{"h0-0", "h0-1"},
+	})
+	newCR.EnsureRuntime().ActionPlan = api.MakeActionPlan(oldCR, newCR)
+
+	fake := &fakeSchemer{}
+	w := newTestWorker(fake)
+
+	err := w.dropZKReplicas(context.Background(), newCR)
+	require.NoError(t, err, "Whole shard deletion must not return error to block reconcile")
+	assert.Equal(t, 0, fake.dropCalls, "Must never execute DROP REPLICA on unrelated shard 0")
+}
+
+func TestDropZKReplica_Regression_Issue1943(t *testing.T) {
+	// Replicate Issue #1943:
+	// A 2-replica shard scales down to 1 replica (replica 1 removed, replica 0 surviving).
+	// SYSTEM DROP REPLICA initially fails with Code 305 because Keeper session hasn't expired.
+	// After retrying, the replica becomes inactive and DROP REPLICA succeeds.
+	oldCR := createTestCHIWithTopology("c1", [][]string{{"chi-dev-bmch-0-0", "chi-dev-bmch-0-1"}})
+	hostToDrop := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[1]
+	survivingCR := createTestCHIWithTopology("c1", [][]string{{"chi-dev-bmch-0-0"}})
+
+	var executedOnHost string
 	fake := &fakeSchemer{
-		hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error {
+		hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hDrop *api.Host, calls int) error {
+			executedOnHost = hostToRunOn.GetName()
 			if calls == 1 {
-				return errors.New("Code: 305, Can't drop replica, because it's active")
+				return errors.New("Code: 305, Can't drop replica chi-dev-bmch-0-1, because it's active")
 			}
 			return nil
 		},
 	}
 
-	w := &worker{schemer: fake}
-	hostToRunOn := &api.Host{}
-	hostToDrop := &api.Host{}
-	ctx := context.Background()
+	w := newTestWorker(fake)
+	dropped, err := w.dropZKReplica(context.Background(), survivingCR, hostToDrop, NewDropReplicaOptions().SetRegularDrop())
 
-	err := w.retryDropReplica(ctx, hostToRunOn, hostToDrop, 1*time.Millisecond)
+	require.NoError(t, err)
+	assert.True(t, dropped)
+	assert.Equal(t, "chi-dev-bmch-0-0", executedOnHost, "SYSTEM DROP REPLICA must execute on surviving replica 0")
+	assert.Equal(t, 2, fake.dropCalls, "Must succeed on second attempt after retrying Code 305")
+}
 
-	assert.NoError(t, err)
+func TestDropZKReplica_Regression_Replica0Deleted(t *testing.T) {
+	// When replica 0 is deleted instead of replica 1, replica 1 must be chosen as coordinator.
+	oldCR := createTestCHIWithTopology("c1", [][]string{{"chi-dev-bmch-0-0", "chi-dev-bmch-0-1"}})
+	hostToDrop := oldCR.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[0]
+	survivingCR := createTestCHIWithTopology("c1", [][]string{{"chi-dev-bmch-0-1"}})
+
+	var executedOnHost string
+	fake := &fakeSchemer{
+		hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hDrop *api.Host, calls int) error {
+			executedOnHost = hostToRunOn.GetName()
+			if calls == 1 {
+				return errors.New("Code: 305, Can't drop replica chi-dev-bmch-0-0, because it's active")
+			}
+			return nil
+		},
+	}
+
+	w := newTestWorker(fake)
+	dropped, err := w.dropZKReplica(context.Background(), survivingCR, hostToDrop, NewDropReplicaOptions().SetRegularDrop())
+
+	require.NoError(t, err)
+	assert.True(t, dropped)
+	assert.Equal(t, "chi-dev-bmch-0-1", executedOnHost, "SYSTEM DROP REPLICA must execute on surviving replica 1")
 	assert.Equal(t, 2, fake.dropCalls)
 }
 
-func TestRetryDropReplica_ExhaustsRetriesReturnsLastError(t *testing.T) {
+func TestDropZKReplicas_ActionPlan_Issue1943(t *testing.T) {
+	// Replicate Issue #1943 through the full ActionPlan walk:
+	// A 2-replica shard scaled down to 1 replica (bmch-0-1 removed).
+	oldCR := createTestCHIWithTopology("c1", [][]string{{"chi-dev-bmch-0-0", "chi-dev-bmch-0-1"}})
+	newCR := createTestCHIWithTopology("c1", [][]string{{"chi-dev-bmch-0-0"}})
+	newCR.EnsureRuntime().ActionPlan = api.MakeActionPlan(oldCR, newCR)
+
+	var executedOnHost string
+	var droppedHost string
 	fake := &fakeSchemer{
-		hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error {
-			return errors.New("Code: 305, Can't drop replica, because it's active")
+		hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hDrop *api.Host, calls int) error {
+			executedOnHost = hostToRunOn.GetName()
+			droppedHost = hDrop.GetName()
+			return nil
 		},
 	}
 
-	w := &worker{schemer: fake}
-	hostToRunOn := &api.Host{}
-	hostToDrop := &api.Host{}
-	ctx := context.Background()
+	w := newTestWorker(fake)
+	err := w.dropZKReplicas(context.Background(), newCR)
+	require.NoError(t, err)
 
-	err := w.retryDropReplica(ctx, hostToRunOn, hostToDrop, 1*time.Millisecond)
-
-	assert.Error(t, err)
-	assert.True(t, isReplicaActiveError(err))
-	assert.Equal(t, 6, fake.dropCalls)
-}
-
-func TestRetryDropReplica_NonRetryableErrorFailsFast(t *testing.T) {
-	fake := &fakeSchemer{
-		hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error {
-			return errors.New("Code: 192, Unknown table")
-		},
-	}
-
-	w := &worker{schemer: fake}
-	hostToRunOn := &api.Host{}
-	hostToDrop := &api.Host{}
-	ctx := context.Background()
-
-	err := w.retryDropReplica(ctx, hostToRunOn, hostToDrop, 1*time.Millisecond)
-
-	assert.Error(t, err)
-	assert.False(t, isReplicaActiveError(err))
+	assert.Equal(t, "chi-dev-bmch-0-0", executedOnHost, "Action plan drop must execute on surviving replica 0")
+	assert.Equal(t, "chi-dev-bmch-0-1", droppedHost, "Action plan must target removed replica 1")
 	assert.Equal(t, 1, fake.dropCalls)
 }
 
-func TestRetryDropReplica_ContextCancelledMidRetry_ReturnsErrNotNil(t *testing.T) {
-	fake := &fakeSchemer{
-		hostDropReplicaFunc: func(ctx context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error {
-			return errors.New("Code: 305, Can't drop replica, because it's active")
+func TestHasHostVolumesToRetain_FailSafe(t *testing.T) {
+	h := &api.Host{Name: "victim"}
+	w := &worker{
+		c: &Controller{
+			kube: &fakeKubeStorage{storage: nil},
 		},
 	}
-
-	w := &worker{schemer: fake}
-	hostToRunOn := &api.Host{}
-	hostToDrop := &api.Host{}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel before loop
-
-	err := w.retryDropReplica(ctx, hostToRunOn, hostToDrop, 1*time.Millisecond)
-
-	assert.Error(t, err)
-	assert.Equal(t, context.Canceled, err)
-	assert.Equal(t, 0, fake.dropCalls)
-}
-
-func TestRetryDropReplica_ContextCancelledDuringRetries(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	fake := &fakeSchemer{
-		hostDropReplicaFunc: func(c context.Context, hostToRunOn, hostToDrop *api.Host, calls int) error {
-			cancel() // Cancel context during first retry attempt
-			return errors.New("Code: 305, Can't drop replica, because it's active")
-		},
-	}
-	w := &worker{schemer: fake}
-	err := w.retryDropReplica(ctx, &api.Host{}, &api.Host{}, 1*time.Millisecond)
-	assert.Error(t, err)
-	assert.Equal(t, context.Canceled, err)
-	assert.Equal(t, 1, fake.dropCalls)
-}
-
-func TestDefaultFallbackParameters(t *testing.T) {
-	w := &worker{schemer: &fakeSchemer{}}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately
-
-	err1 := w.waitHostReplicaInactive(ctx, &api.Host{}, &api.Host{}, 0, 0)
-	assert.Error(t, err1)
-
-	err2 := w.retryDropReplica(ctx, &api.Host{}, &api.Host{}, 0)
-	assert.Error(t, err2)
+	assert.True(t, w.hasHostVolumesToRetain(context.Background(), h),
+		"Missing storage manager must fail-safe to true to protect retained volumes")
 }

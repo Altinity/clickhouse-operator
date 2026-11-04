@@ -66,6 +66,11 @@ type worker struct {
 	// state - shard reconcile must keep getting its own schemer per call (see ensureClusterSchemer).
 	schemer schemer.ISchemer
 
+	// dropReplicaDelay and dropReplicaTimeout are test seams: when set (> 0), they override
+	// defaultRetryDelay and defaultReplicaWaitTimeout in retryDropReplica. Unset (0) in production.
+	dropReplicaDelay   time.Duration
+	dropReplicaTimeout time.Duration
+
 	normalizer    *normalizer.Normalizer
 	task          *common.Task
 	stsReconciler *statefulset.Reconciler
@@ -429,6 +434,10 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Update CHI is aborted. CR: %s ", new.GetName())
 		return nil
+	}
+
+	if new != nil && w != nil && w.c != nil && w.c.retryScheduler != nil {
+		w.c.retryScheduler.Cancel(new.Namespace + "/" + new.Name)
 	}
 
 	w.a.V(3).M(new).S().P()

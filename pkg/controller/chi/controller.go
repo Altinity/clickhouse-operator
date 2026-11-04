@@ -83,6 +83,8 @@ type Controller struct {
 	namer       interfaces.INameManager
 	ctrlLabeler *ctrlLabeler.Labeler
 	pvcDeleter  *volume.PVCDeleter
+
+	retryScheduler *reconcileRetryScheduler
 }
 
 // NewController creates instance of Controller
@@ -118,7 +120,7 @@ func NewController(
 	kube := chiKube.NewAdapter(kubeClient, chopClient, namer)
 
 	// Create Controller instance
-	controller := &Controller{
+	c := &Controller{
 		kubeClient:    kubeClient,
 		extClient:     extClient,
 		chopClient:    chopClient,
@@ -129,10 +131,23 @@ func NewController(
 		ctrlLabeler:   ctrlLabeler.New(kube),
 		pvcDeleter:    volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
 	}
-	controller.initQueues()
-	controller.addEventHandlers(chopConfigInformerFactory, chopInformerFactory, kubeInformerFactory)
+	c.retryScheduler = newReconcileRetryScheduler(
+		c.enqueueObject,
+		func(ctx context.Context, namespace, name string) (*api.ClickHouseInstallation, error) {
+			res, err := c.kube.CR().Get(ctx, namespace, name)
+			if err != nil || res == nil {
+				return nil, err
+			}
+			if chi, ok := res.(*api.ClickHouseInstallation); ok {
+				return chi, nil
+			}
+			return nil, fmt.Errorf("unexpected CR type: %T", res)
+		},
+	)
+	c.initQueues()
+	c.addEventHandlers(chopConfigInformerFactory, chopInformerFactory, kubeInformerFactory)
 
-	return controller
+	return c
 }
 
 // initQueues
@@ -635,6 +650,9 @@ func (c *Controller) isTrackedObject(meta meta.Object) bool {
 func (c *Controller) Run(ctx context.Context) {
 	defer utilRuntime.HandleCrash()
 	defer func() {
+		if c.retryScheduler != nil {
+			c.retryScheduler.Close()
+		}
 		for i := range c.queues {
 			//c.queues[i].ShutDown()
 			c.queues[i].Close()

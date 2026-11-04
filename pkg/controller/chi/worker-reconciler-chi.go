@@ -215,9 +215,18 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		w.clean(ctx, new)
 		w.addToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
-		w.finalizeReconcileAndMarkCompleted(ctx, new)
 
-		w.dropZKReplicas(ctx, new)
+		if err := w.dropZKReplicas(ctx, new); err != nil {
+			w.a.WithEvent(new, a.EventActionReconcile, a.EventReasonReconcileFailed).
+				WithError(new).
+				M(new).F().
+				Error("FAILED to reconcile CR %s, err: %v", util.NamespaceNameString(new), err)
+			w.markReconcileCompletedUnsuccessfully(ctx, new, common.ErrCRUDAbort)
+			metrics.CRReconcilesAborted(ctx, new)
+			return err
+		}
+
+		w.finalizeReconcileAndMarkCompleted(ctx, new)
 
 		metrics.CRReconcilesCompleted(ctx, new)
 		metrics.CRReconcilesTimings(ctx, new, time.Since(startTime).Seconds())
