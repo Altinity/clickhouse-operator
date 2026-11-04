@@ -35,28 +35,28 @@ import (
 func TestValidateCreateUsesDryRunRequest(t *testing.T) {
 	request := make(chan struct {
 		method string
-		path string
+		path   string
 		dryRun string
 	}, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		request <- struct {
 			method string
-			path string
+			path   string
 			dryRun string
 		}{
 			method: r.Method,
-			path: r.URL.Path,
+			path:   r.URL.Path,
 			dryRun: r.URL.Query().Get("dryRun"),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		_ = json.NewEncoder(w).Encode(&meta.Status{
 			TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"},
-			Status: meta.StatusFailure,
-			Reason: meta.StatusReasonInvalid,
-			Code: http.StatusUnprocessableEntity,
-			Message: "StatefulSet is invalid: spec.template.labels: Invalid value: \"/metrics\"",
-			Details: &meta.StatusDetails{Group: "apps", Kind: "StatefulSet", Name: "example"},
+			Status:   meta.StatusFailure,
+			Reason:   meta.StatusReasonInvalid,
+			Code:     http.StatusUnprocessableEntity,
+			Message:  "StatefulSet is invalid: spec.template.labels: Invalid value: \"/metrics\"",
+			Details:  &meta.StatusDetails{Group: "apps", Kind: "StatefulSet", Name: "example"},
 		})
 	}))
 	defer server.Close()

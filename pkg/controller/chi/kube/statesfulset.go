@@ -81,16 +81,16 @@ func (c *STS) Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.
 	})
 }
 
-// Update is an internal function, used in reconcileStatefulSet only
 // ValidateCreate invokes Kubernetes create validation without persisting the object.
 // The object may already exist, so the caller handles AlreadyExists as success.
 func (c *STS) ValidateCreate(ctx context.Context, sts *apps.StatefulSet) error {
 	opts := controller.NewCreateOptions()
 	opts.DryRun = []string{meta.DryRunAll}
-	_, err := c.kubeClient.AppsV1().StatefulSets(sts.Namespace).Create(k8sCtx(ctx), sts.DeepCopy(), opts)
+	_, err := c.kubeClient.AppsV1().StatefulSets(sts.Namespace).Create(ctx, sts.DeepCopy(), opts)
 	return err
 }
 
+// Update is an internal function, used in reconcileStatefulSet only
 func (c *STS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	return commonKube.UpdateWithRetry(ctx, func() (*apps.StatefulSet, error) {
 		return c.kubeClient.AppsV1().StatefulSets(sts.Namespace).Update(k8sCtx(ctx), sts, controller.NewUpdateOptions())

@@ -22,12 +22,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
@@ -367,7 +367,7 @@ func TestRecreateStatefulSet_PreflightInvalidPreservesHost(t *testing.T) {
 // checking storage for conflicts, so dry-run create may return AlreadyExists.
 func TestRecreateStatefulSet_PreflightAlreadyExistsContinues(t *testing.T) {
 	fake := &fakeSTS{
-		getReturn: stsWithReplicas(int32Ptr(0)),
+		getReturn:   stsWithReplicas(int32Ptr(0)),
 		validateErr: apiErrors.NewAlreadyExists(stsResource, "chi-test-cluster-0-0"),
 	}
 	r := newReconciler(fake, "chi-test-cluster-0-0")
