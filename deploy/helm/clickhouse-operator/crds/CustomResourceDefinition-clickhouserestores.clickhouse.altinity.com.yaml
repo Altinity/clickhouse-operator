@@ -112,10 +112,10 @@ spec:
                   # union, so we use x-kubernetes-preserve-unknown-fields: true.
                   x-kubernetes-preserve-unknown-fields: true
                 overwrite:
-                  !!merge <<: *TypeStringBool
+                  <<: *TypeStringBool
                   description: "Allow restoring over existing tables, which are dropped first. When false (default) the restore is refused if any target host already holds user tables"
                 validateTopology:
-                  !!merge <<: *TypeStringBool
+                  <<: *TypeStringBool
                   description: "When true (default) the restore is refused unless every target shard holds the backup, so a backup taken from a different layout is not half-applied"
                 tables:
                   type: string
@@ -123,7 +123,7 @@ spec:
                   maxLength: 1024
                   pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
                 rbac:
-                  !!merge <<: *TypeStringBool
+                  <<: *TypeStringBool
                   description: |
                     Also restore the users, roles, grants and other access entities the backup holds. They belong to the
                     whole installation, so only a restore with an empty cluster may set it. Needs ClickHouse 23.3 or later

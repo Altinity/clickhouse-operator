@@ -140,7 +140,7 @@ spec:
                     How late, counted from the time the backup is due, it may start on a cluster: a cluster whose Job is not
                     created by then fails, as does the backup when it is not validated by then. Unset waits as long as it takes
                 diffFromRemote:
-                  !!merge <<: *TypeBackupName
+                  <<: *TypeBackupName
                   description: "Existing backup to take this backup incrementally against (clickhouse-backup --diff-from-remote). The base backup must stay in the backup storage while this backup is kept"
                 verify: &TypeStringBool
                   description: "Run a verification Job after the backup that downloads it and checks it is restorable, without touching cluster data"
@@ -151,7 +151,7 @@ spec:
                   # union, so we use x-kubernetes-preserve-unknown-fields: true.
                   x-kubernetes-preserve-unknown-fields: true
                 schemaOnly:
-                  !!merge <<: *TypeStringBool
+                  <<: *TypeStringBool
                   description: "Back up table/database definitions only (no data)"
                 replicaSelection:
                   type: string
