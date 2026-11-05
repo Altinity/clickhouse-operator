@@ -86,6 +86,10 @@ operator:
   # operator.env -- additional environment variables for the clickhouse-operator container in deployment
   # possible format value `[{"name": "SAMPLE", "value": "text"}]`
   env: []
+  # operator.logVerbosity -- log verbosity level (glog `-v`) of the clickhouse-operator container.
+  # Rendered as `CHOP_LOGGER_V` env var, which overrides `logger.v` of the operator configuration for the clickhouse-operator only.
+  # Empty value keeps `logger.v` from the operator configuration.
+  logVerbosity: ""
   # operator.livenessProbe -- optional liveness probe for the clickhouse-operator container
   # check `kubectl explain pod.spec.containers.livenessProbe` for details
   # example:

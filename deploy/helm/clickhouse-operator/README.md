@@ -125,6 +125,7 @@ crdHook:
 | operator.image.repository | string | `"altinity/clickhouse-operator"` | image repository |
 | operator.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
 | operator.livenessProbe | string | `nil` | optional liveness probe for the clickhouse-operator container check `kubectl explain pod.spec.containers.livenessProbe` for details example:   httpGet:     path: /metrics     port: op-metrics   initialDelaySeconds: 10   periodSeconds: 10 |
+| operator.logVerbosity | string | `""` | log verbosity level (glog `-v`) of the clickhouse-operator container. Rendered as `CHOP_LOGGER_V` env var, which overrides `logger.v` of the operator configuration for the clickhouse-operator only. Empty value keeps `logger.v` from the operator configuration. |
 | operator.priorityClassName | string | "" | priority class name for the clickhouse-operator deployment, check `kubectl explain pod.spec.priorityClassName` for details |
 | operator.readinessProbe | string | `nil` | optional readiness probe for the clickhouse-operator container check `kubectl explain pod.spec.containers.readinessProbe` for details example:   httpGet:     path: /metrics     port: op-metrics   initialDelaySeconds: 5   periodSeconds: 5 |
 | operator.resources | object | `{}` | custom resource configuration, check `kubectl explain pod.spec.containers.resources` for details |

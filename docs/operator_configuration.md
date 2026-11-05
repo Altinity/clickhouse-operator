@@ -280,15 +280,21 @@ can use different logging options with the same configuration.
 | `log_backtrace_at` | `CHOP_LOGGER_LOG_BACKTRACE_AT` |
 
 For example, to make the metrics-exporter less verbose while keeping the operator at `v: "1"`,
-set `CHOP_LOGGER_V=0` in the `metrics-exporter` container. With the Helm chart:
+set `CHOP_LOGGER_V=0` in the `metrics-exporter` container. With the Helm chart, `operator.logVerbosity`
+and `metrics.logVerbosity` set `CHOP_LOGGER_V` for the corresponding container, other options can be
+set through `operator.env` and `metrics.env`:
 
 ```yaml
-metrics:
-  logVerbosity: 0
-  # or any other option, through metrics.env:
+operator:
+  logVerbosity: 3
   env:
     - name: CHOP_LOGGER_VMODULE
-      value: "metrics_exporter=2"
+      value: "worker*=5"
+metrics:
+  logVerbosity: 0
+  env:
+    - name: CHOP_LOGGER_VMODULE
+      value: "exporter=2"
 ```
 
 ## Backup
