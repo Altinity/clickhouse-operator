@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **EXPERIMENTAL: Operator-managed backup and restore.** Added `ClickHouseBackup`, `ClickHouseBackupSchedule`, and `ClickHouseRestore` resources using `clickhouse-backup`. Supports per-cluster backups and restores, scheduled backups, retention, configurable storage paths, and cross-installation restores. Enable with `spec.backup.enabled: "yes"`. See [backup documentation](docs/backup.md). by [@discostur](https://github.com/discostur) and [@sunsingerus](https://github.com/sunsingerus) in [#2015](https://github.com/Altinity/clickhouse-operator/pull/2015). Related [#1795](https://github.com/Altinity/clickhouse-operator/issues/1795), [#862](https://github.com/Altinity/clickhouse-operator/issues/862)
 
+* **Kubernetes API client QPS and burst can be set in the operator configuration** as `reconcile.runtime.k8sClientQPS` and `reconcile.runtime.k8sClientBurst`. The `OPERATOR_K8S_CLIENT_QPS_LIMIT` and `OPERATOR_K8S_CLIENT_BURST_LIMIT` env vars still override them. The operator now warns at startup when `reconcileShardsThreadsNumber` is above the client QPS. by [@shubhamkapoor01](https://github.com/shubhamkapoor01). Fixes [#2045](https://github.com/Altinity/clickhouse-operator/issues/2045)
+
 * **Volume downscale tool now supports StorageClass migration.** Set `NEW_STORAGE_CLASS` in `tools/volume_downscale.sh` to move a volume to another StorageClass at the same or a smaller size; the script also detects repeated volume attachment and mount failures. See [runbook](tools/volume_downscale.md). by [@lesandie](https://github.com/lesandie) in [#2125](https://github.com/Altinity/clickhouse-operator/pull/2125)
 
 ### Changed

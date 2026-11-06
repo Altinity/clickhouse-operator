@@ -7320,6 +7320,12 @@ data:
         # Max percentage of concurrent shard reconciles within one cluster in progress
         reconcileShardsMaxConcurrencyPercent: 50
     
+        # Kubernetes API client rate limit of the operator: requests per second and burst. Set both.
+        # 0 keeps the client-go defaults (5 and 10 per API group). Read from this file only, at startup.
+        # OPERATOR_K8S_CLIENT_QPS_LIMIT and OPERATOR_K8S_CLIENT_BURST_LIMIT env vars override them.
+        k8sClientQPS: 0
+        k8sClientBurst: 0
+    
       # Reconcile StatefulSet scenario
       statefulSet:
         # Create StatefulSet scenario
