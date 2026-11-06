@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* **Operator and metrics-exporter logging verbosity can now be configured independently.** Set `operator.logVerbosity` and `metrics.logVerbosity` in Helm, or use per-container `CHOP_LOGGER_*` environment variables to override shared logging settings. See [logging documentation](docs/operator_configuration.md#logging). by [@Slach](https://github.com/Slach) in [#2131](https://github.com/Altinity/clickhouse-operator/pull/2131). Fixes [#1793](https://github.com/Altinity/clickhouse-operator/issues/1793)
+
 * **Hot-reload ClickHouse user passwords from Kubernetes Secrets.** Set `valueFrom.hotReload: true` on `password`, `password_sha256_hex`, or `password_double_sha1_hex` to rotate credentials without restarting Pods. Enabling requires a one-time rollout; automatic Secret-change detection applies to references declared directly in the CHI. See [documentation](docs/security_hardening.md#rotating-user-passwords-without-pod-restarts).
 
   ```yaml
