@@ -56,6 +56,11 @@ var normalizeTimeAbortReasons = []string{
 // Controlled by reconcile.recovery.onStatus.aborted.onPodReady config option (default: retry).
 // The decision to re-enqueue is based on the CHI's Status alone, not on ActionPlan —
 // see shouldTriggerAutoRecovery for the rationale.
+//
+// Peer-safety during the recovery reconcile itself is enforced by
+// isHostHealthyForReconcile, which requires clickhouse.altinity.com/ready=yes so a
+// container-Ready but Service-excluded replica cannot authorize disruption of its
+// last eligible sibling (#2106).
 func (w *worker) recoverAbortedReconcileOnPodReady(ctx context.Context, oldPod, newPod *core.Pod) {
 	if !chop.Config().ShouldRecoverAbortedOnPodReady() {
 		return
