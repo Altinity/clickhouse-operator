@@ -43,6 +43,24 @@ func (c *Creator) CreateClusterSecret(cluster api.ICluster) *core.Secret {
 	}
 }
 
+// CreateHotReloadUsersSecret is the CHI-owned Secret that holds
+// chop-generated-hot-reload-users.xml. usersXML is the generated document;
+// callers must not log it.
+func (c *Creator) CreateHotReloadUsersSecret(filename, usersXML string) *core.Secret {
+	return &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace:       c.cr.GetNamespace(),
+			Name:            c.nm.Name(interfaces.NameSecretCommonUsers, c.cr),
+			Labels:          c.macro.Scope(c.cr).Map(c.tagger.Label(interfaces.LabelSecretUsers)),
+			OwnerReferences: c.or.CreateOwnerReferences(c.cr),
+		},
+		Data: map[string][]byte{
+			filename: []byte(usersXML),
+		},
+		Type: core.SecretTypeOpaque,
+	}
+}
+
 // CreateBackupSecret creates the Secret with the credentials of the operator-managed clickhouse-backup
 // sidecars: the ones of their REST API and the ones they connect to ClickHouse with
 func (c *Creator) CreateBackupSecret() *core.Secret {

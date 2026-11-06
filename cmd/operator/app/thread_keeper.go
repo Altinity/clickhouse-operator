@@ -111,7 +111,7 @@ func newKeeperCacheOptions(log logr.Logger, cacheNamespaces []string) cache.Opti
 func newKeeperInitializer() func(context.Context) error {
 	// Build the apiextensions client for CRD deletion checks during CHK cleanup.
 	// Uses the same kubeConfigFile/masterURL package vars as the CHI thread.
-	_, extClient, _, _ := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
+	_, extClient, _, _, _ := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
 
 	return func(ctx context.Context) error {
 		return initKeeper(ctx, extClient)

@@ -96,6 +96,31 @@ func TestHostRequiresStatefulSetRollout(t *testing.T) {
 		require.True(t, hostRequiresStatefulSetRollout(hostWith(cur, desired)))
 	})
 
+	t.Run("added volume mount → true (disk added to a running pod)", func(t *testing.T) {
+		cur := sts("a")
+		cur.Spec.Template.Spec.Containers[0].VolumeMounts = []core.VolumeMount{{Name: "default", MountPath: "/var/lib/clickhouse"}}
+		desired := sts("a")
+		desired.Spec.Template.Spec.Containers[0].VolumeMounts = []core.VolumeMount{
+			{Name: "default", MountPath: "/var/lib/clickhouse"},
+			{Name: "disk2", MountPath: "/var/lib/clickhouse2"},
+		}
+		require.True(t, hostRequiresStatefulSetRollout(hostWith(cur, desired)))
+	})
+
+	t.Run("same volume mounts in a different order → false", func(t *testing.T) {
+		cur := sts("a")
+		cur.Spec.Template.Spec.Containers[0].VolumeMounts = []core.VolumeMount{
+			{Name: "default", MountPath: "/var/lib/clickhouse"},
+			{Name: "disk2", MountPath: "/var/lib/clickhouse2"},
+		}
+		desired := sts("a")
+		desired.Spec.Template.Spec.Containers[0].VolumeMounts = []core.VolumeMount{
+			{Name: "disk2", MountPath: "/var/lib/clickhouse2"},
+			{Name: "default", MountPath: "/var/lib/clickhouse"},
+		}
+		require.False(t, hostRequiresStatefulSetRollout(hostWith(cur, desired)))
+	})
+
 	t.Run("different container count → true", func(t *testing.T) {
 		cur := sts("a")
 		desired := sts("a")
