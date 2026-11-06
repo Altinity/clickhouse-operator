@@ -26,6 +26,7 @@ import (
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -36,6 +37,75 @@ import (
 	chiNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 )
+
+func TestShouldDeleteUnreferencedSecret(t *testing.T) {
+	const (
+		name = "chi-demo-users"
+		uid  = k8stypes.UID("chi-uid")
+	)
+	owned := controlledSecret(name, "demo", uid)
+	owner := chiOwner("demo", uid)
+
+	projected := &core.Pod{
+		Spec: core.PodSpec{
+			Volumes: []core.Volume{{
+				Name: name,
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{{
+							Secret: &core.SecretProjection{
+								LocalObjectReference: core.LocalObjectReference{Name: name},
+							},
+						}},
+					},
+				},
+			}},
+		},
+	}
+	other := &core.Pod{
+		Spec: core.PodSpec{
+			Volumes: []core.Volume{{
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{SecretName: "other"},
+				},
+			}},
+		},
+	}
+
+	require.False(t, shouldDeleteUnreferencedSecret(owned, owner, []*core.Pod{projected}))
+	require.True(t, shouldDeleteUnreferencedSecret(owned, owner, []*core.Pod{other}))
+	require.True(t, shouldDeleteUnreferencedSecret(owned, owner, nil))
+	require.False(t, shouldDeleteUnreferencedSecret(owned, chiOwner("demo", ""), nil))
+	require.False(t, shouldDeleteUnreferencedSecret(owned, chiOwner("other-chi", k8stypes.UID("other-uid")), nil))
+	require.True(t, shouldDeleteUnreferencedSecret(owned, chiOwner("renamed", uid), nil))
+	require.False(t, shouldDeleteUnreferencedSecret(&core.Secret{ObjectMeta: meta.ObjectMeta{Name: name}}, owner, nil))
+
+	notController := controlledSecret(name, "demo", uid)
+	notController.OwnerReferences[0].Controller = nil
+	require.False(t, shouldDeleteUnreferencedSecret(notController, owner, nil))
+}
+
+func controlledSecret(name, ownerName string, uid k8stypes.UID) *core.Secret {
+	controller := true
+	return &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Name: name,
+			OwnerReferences: []meta.OwnerReference{{
+				Kind:       "ClickHouseInstallation",
+				Name:       ownerName,
+				UID:        uid,
+				Controller: &controller,
+			}},
+		},
+	}
+}
+
+func chiOwner(name string, uid k8stypes.UID) *api.ClickHouseInstallation {
+	cr := &api.ClickHouseInstallation{}
+	cr.Name = name
+	cr.UID = uid
+	return cr
+}
 
 // backupSecretFakeSecret keeps Secrets the way the API server does - StringData lands in Data - and panics
 // on delete: the backup Secret's values must survive every reconcile, so nothing may ever delete it.
