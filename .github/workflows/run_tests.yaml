@@ -78,12 +78,17 @@ jobs:
           test "$(docker info -f '{{.DockerRootDir}}')" = "/mnt/docker"
           df -h /mnt /
 
+      - uses: actions/setup-python@v5
+        id: setup-python
+        with:
+          python-version: '3.13'
+
       - name: Cache python
         uses: actions/cache@v4
         id: cache-python
         with:
           path: ~/venv/qa
-          key: python-${{ hashFiles('tests/image/requirements.txt') }}
+          key: python-${{ env.ImageOS }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('tests/image/requirements.txt') }}
 
       - name: Install python dependencies
         run: |
@@ -95,10 +100,11 @@ jobs:
 
       - name: Setup required Ubuntu packages
         run: |
-          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 8919F6BD2B48D754
-          echo "deb https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
-          sudo apt-get update
-          sudo apt-get install -y conntrack clickhouse-client
+          set -euxo pipefail
+          curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | sudo gpg --dearmor --yes -o /usr/share/keyrings/clickhouse-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=$(dpkg --print-architecture)] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
+          sudo apt update
+          sudo apt install -y conntrack clickhouse-client
 
       # test_010084 render-tests the Helm chart. The runner image happens to preinstall helm,
       # but declaring it keeps the suite from silently skipping that scenario if that changes.
