@@ -78,12 +78,17 @@ jobs:
           test "$(docker info -f '{{.DockerRootDir}}')" = "/mnt/docker"
           df -h /mnt /
 
+      - uses: actions/setup-python@v5
+        id: setup-python
+        with:
+          python-version: '3.13'
+
       - name: Cache python
         uses: actions/cache@v4
         id: cache-python
         with:
           path: ~/venv/qa
-          key: python-${{ env.ImageOS }}-${{ hashFiles('tests/image/requirements.txt') }}
+          key: python-${{ env.ImageOS }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('tests/image/requirements.txt') }}
 
       - name: Install python dependencies
         run: |
