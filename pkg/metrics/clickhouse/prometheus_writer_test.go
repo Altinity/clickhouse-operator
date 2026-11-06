@@ -54,14 +54,14 @@ func TestPrometheusWriterSkipsExcludedMetric(t *testing.T) {
 	}
 }
 
-// TestWriteMetricsAddsKeyLabel verifies a key-value metric is written with its key as a label,
-// so the per CPU core, block device and network interface series of ClickHouse 26.8+ stay distinct.
+// TestWriteMetricsAddsKeyLabel verifies a key-value metric without a pre 26.8 name is written
+// with its key as a label, so its series stay distinct.
 func TestWriteMetricsAddsKeyLabel(t *testing.T) {
 	out := make(chan prometheus.Metric, 2)
 	writer := &CHIPrometheusWriter{out: out, host: &metrics.WatchedHost{}}
 
 	writer.WriteMetrics([][]string{
-		{"metric.OSUserTimeCPU", "0.5", "", "gauge", "3"},
+		{"metric.SomeFamilyAddedLater", "0.5", "", "gauge", "3"},
 		{"metric.Query", "2", "", "gauge", ""},
 	})
 
@@ -69,10 +69,10 @@ func TestWriteMetricsAddsKeyLabel(t *testing.T) {
 		t.Fatalf("expected 2 metrics, got %d", len(out))
 	}
 	withKey, withoutKey := (<-out).Desc().String(), (<-out).Desc().String()
-	if !strings.Contains(withKey, ",key,") {
+	if !strings.Contains(withKey, "async_metric_key") {
 		t.Fatalf("expected the key label on a key-value metric, got %s", withKey)
 	}
-	if strings.Contains(withoutKey, ",key,") {
+	if strings.Contains(withoutKey, "async_metric_key") {
 		t.Fatalf("expected no key label on a scalar metric, got %s", withoutKey)
 	}
 }

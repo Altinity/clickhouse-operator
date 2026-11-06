@@ -42,6 +42,7 @@ type Exporter struct {
 	collectorTimeout time.Duration
 	registry         *CRRegistry
 	metricsFilter    MetricsFilter
+	asyncKeyValues   *asyncKeyValuesCache
 }
 
 // Type compatibility
@@ -63,6 +64,7 @@ func NewExporter(registry *CRRegistry, collectorTimeout time.Duration) *Exporter
 		registry:         registry,
 		collectorTimeout: collectorTimeout,
 		metricsFilter:    filters.NewRegexp(excludeRegexps),
+		asyncKeyValues:   newAsyncKeyValuesCache(),
 	}
 }
 
@@ -140,7 +142,7 @@ func (e *Exporter) newHostFetcher(cluster *metrics.WatchedCluster, host *metrics
 		clusterConnectionParams.NewEndpointConnectionParams(host.Hostname),
 		chop.Config().ClickHouse.Metrics.TablesRegexp,
 		e.metricsFilter,
-	)
+	).WithKeyValuesCache(e.asyncKeyValues, host.Hostname)
 }
 
 // DiscoveryWatchedCHIs discovers all ClickHouseInstallation objects available for monitoring and adds them to watched list
