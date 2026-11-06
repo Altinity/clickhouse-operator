@@ -67,7 +67,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /usr/local/bin/uv
 ENV UV_PYTHON_INSTALL_DIR=/opt/python VIRTUAL_ENV=/opt/venv PATH=/opt/venv/bin:$PATH
 COPY requirements.txt /home/master/requirements.txt
-RUN uv venv --python 3.13 /opt/venv \
+RUN uv venv --python 3.12 /opt/venv \
     && uv pip install -U -r /home/master/requirements.txt
 
 RUN set -x \
