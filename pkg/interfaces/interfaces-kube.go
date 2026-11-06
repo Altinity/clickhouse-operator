@@ -118,6 +118,9 @@ type IKubeService interface {
 type IKubeSTS interface {
 	Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 	Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error)
+	// ValidateCreate runs a server-side dry-run create and returns the API server's validation
+	// error (nil if the object would be accepted); nothing is persisted.
+	ValidateCreate(ctx context.Context, statefulSet *apps.StatefulSet) error
 	Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error)
 	// Delete removes the StatefulSet and MUST block until it is fully gone from the API server,
 	// i.e. until a subsequent Get returns IsNotFound. Implementations are expected to poll until
