@@ -14,9 +14,9 @@ CLICKHOUSE_IMAGE_LATEST=${CLICKHOUSE_IMAGE_LATEST:="clickhouse/clickhouse-server
 CLICKHOUSE_OPERATOR_TESTS_IMAGE=${CLICKHOUSE_OPERATOR_TESTS_IMAGE:="registry.gitlab.com/altinity-public/container-images/clickhouse-operator-test-runner:latest"}
 ZOOKEEPER_IMAGE=${ZOOKEEPER_IMAGE:="zookeeper:3.8.4"}
 
-K8S_VERSION=${K8S_VERSION:=1.28.5}
+K8S_VERSION=${K8S_VERSION:=1.36.5}
 MINIKUBE_PRELOADED_TARBALL="preloaded-images-k8s-v18-v${K8S_VERSION}-docker-overlay2-amd64.tar.lz4"
-MINIKUBE_KICBASE_IMAGE=${MINIKUBE_KICBASE_IMAGE:-"gcr.io/k8s-minikube/kicbase:v0.0.42"}
+MINIKUBE_KICBASE_IMAGE=${MINIKUBE_KICBASE_IMAGE:-"gcr.io/k8s-minikube/kicbase:v0.0.51"}
 MINIKUBE_STORAGE_IMAGE=${MINIKUBE_STORAGE_IMAGE:="gcr.io/k8s-minikube/storage-provisioner:v20210514"}
 
 PROMETHEUS_RELOADER_IMAGE=${PROMETHEUS_RELOADER_IMAGE:="quay.io/prometheus-operator/prometheus-config-reloader:v0.68.0"}
@@ -68,5 +68,5 @@ for item in  "${ALL_IMAGES[@]}"; do
 done
 
 echo "Build ${CLICKHOUSE_OPERATOR_TESTS_IMAGE}"
-docker buildx build --platform=linux/amd64 --progress=plain -f "${CUR_DIR}/Dockerfile" --output="type=image,name=${CLICKHOUSE_OPERATOR_TESTS_IMAGE}" "${CUR_DIR}" --push
+docker buildx build --platform=linux/amd64 --progress=plain --build-arg K8S_VERSION="${K8S_VERSION}" -f "${CUR_DIR}/Dockerfile" --output="type=image,name=${CLICKHOUSE_OPERATOR_TESTS_IMAGE}" "${CUR_DIR}" --push
 echo "All done"

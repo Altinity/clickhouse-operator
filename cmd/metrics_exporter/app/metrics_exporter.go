@@ -133,7 +133,7 @@ func Run() {
 	profiling.Start(ctx, profiling.ResolveAddress(pprofAddress, deployment.METRICS_EXPORTER_PPROF_ADDRESS), "metrics-exporter")
 
 	// Initialize k8s API clients
-	kubeClient, _, chopClient, _ := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
+	kubeClient, _, chopClient, _, _ := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
 
 	// Create operator instance
 	chop.New(kubeClient, chopClient, chopConfigFile)
