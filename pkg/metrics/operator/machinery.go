@@ -90,10 +90,16 @@ func newMeterProvider(reader metric.Reader) *metric.MeterProvider {
 }
 
 func StartMetricsExporter(endpoint, path string) {
+	// The registry the operator's collector is registered into and the one the
+	// scrape is served from. They coincide by default, which is what adds the
+	// client library's Go runtime and process collectors to every response.
+	registry := newMetricsRegistry(deployment.DefaultCollectorsDisabled())
+
 	// Prometheus exporter embeds a default OpenTelemetry Reader and implements prometheus.Collector,
 	// allowing it to be used as both a Reader and Collector.
 	//namespace, _ := chop.Get().ConfigManager.GetRuntimeParam(api.OPERATOR_POD_NAMESPACE)
 	exporter, err := prometheus.New(
+		prometheus.WithRegisterer(registry.registerer),
 		prometheus.WithoutUnits(),
 		//prometheus.WithoutTargetInfo(),
 		prometheus.WithoutCounterSuffixes(),
@@ -120,7 +126,25 @@ func StartMetricsExporter(endpoint, path string) {
 	meter = meterProvider.Meter("clickhouse-operator-meter", otelApi.WithInstrumentationVersion(version.Version))
 
 	// Start the prometheus HTTP server and pass the exporter Collector to it
-	serveMetrics(endpoint, path)
+	serveMetrics(endpoint, path, registry.gatherer)
+}
+
+// metricsRegistry pairs the registerer the operator's OTel exporter registers
+// into with the gatherer its scrape is served from. Both are the client
+// library's globals by default, so go_* and process_* are always present.
+// Disabling the default collectors swaps in a private registry holding only the
+// operator's own collector; target_info still follows the exporter.
+type metricsRegistry struct {
+	registerer prom.Registerer
+	gatherer   prom.Gatherer
+}
+
+func newMetricsRegistry(defaultCollectorsDisabled bool) metricsRegistry {
+	if defaultCollectorsDisabled {
+		registry := prom.NewRegistry()
+		return metricsRegistry{registerer: registry, gatherer: registry}
+	}
+	return metricsRegistry{registerer: prom.DefaultRegisterer, gatherer: prom.DefaultGatherer}
 }
 
 var meter otelApi.Meter
@@ -129,16 +153,20 @@ func Meter() otelApi.Meter {
 	return meter
 }
 
-func serveMetrics(addr, path string) {
-	fmt.Printf("start serving metrics at: %s%s\n", addr, path)
+func newMetricsHandler(gatherer prom.Gatherer) http.Handler {
 	// Use ContinueOnError so that a single untranslatable OTel metric (e.g. a metric
 	// with a name that cannot be mapped to a valid Prometheus name) does not cause an
 	// HTTP 500 for the entire scrape. As of otel/exporters/prometheus v0.61.0+ invalid
 	// metrics produce prometheus.NewInvalidMetric, which triggers HTTP 500 under the
 	// default HTTPErrorOnError. ContinueOnError logs the problem and keeps the scrape alive.
-	handler := promhttp.HandlerFor(prom.DefaultGatherer, promhttp.HandlerOpts{
+	return promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{
 		ErrorHandling: promhttp.ContinueOnError,
 	})
+}
+
+func serveMetrics(addr, path string, gatherer prom.Gatherer) {
+	fmt.Printf("start serving metrics at: %s%s\n", addr, path)
+	handler := newMetricsHandler(gatherer)
 	// Serve a private mux, NOT http.DefaultServeMux. controller-runtime (pulled in by
 	// the CHK controller) transitively imports net/http/pprof, whose init() registers
 	// /debug/pprof/* on DefaultServeMux. Binding DefaultServeMux here — ListenAndServe(

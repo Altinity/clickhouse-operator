@@ -25,6 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 )
 
@@ -156,6 +157,22 @@ func (s *RESTServer) decodeRequest(r *http.Request) (*RESTRequest, error) {
 	return req, nil
 }
 
+// newMetricsHandler registers the exporter and returns the handler that serves
+// its metrics. The default keeps the previous wiring: the global registry,
+// which already carries the Go runtime and process collectors, plus
+// promhttp.Handler(), which adds the promhttp_* handler metrics. With the
+// default collectors disabled the exporter goes into a private registry, so a
+// scrape carries the ClickHouse series and nothing else.
+func newMetricsHandler(exporter prometheus.Collector) http.Handler {
+	if deployment.DefaultCollectorsDisabled() {
+		registry := prometheus.NewRegistry()
+		registry.MustRegister(exporter)
+		return promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
+	}
+	prometheus.MustRegister(exporter)
+	return promhttp.Handler()
+}
+
 // StartMetricsREST starts Prometheus metrics exporter and REST API server
 func StartMetricsREST(
 	metricsAddress string,
@@ -171,7 +188,6 @@ func StartMetricsREST(
 
 	// Create and register Prometheus exporter
 	exporter := NewExporter(registry, collectorTimeout)
-	prometheus.MustRegister(exporter)
 
 	// Create REST server
 	restServer := NewRESTServer(registry)
@@ -194,7 +210,7 @@ func StartMetricsREST(
 	}
 
 	// Setup HTTP handlers
-	http.Handle(metricsPath, promhttp.Handler())
+	http.Handle(metricsPath, newMetricsHandler(exporter))
 	http.Handle(chiListPath, chiHandler)
 
 	// Start HTTP servers. Prometheus /metrics ALWAYS binds the original address
