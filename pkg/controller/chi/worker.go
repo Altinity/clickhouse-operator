@@ -188,6 +188,20 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("Image change detected - deferring restart to STS rollout. Host: %s", host.GetName())
 		return false
 
+	case passwordOnlyRefresh(ctx, host) && !w.hostNeedsRecoveryRestart(ctx, host):
+		// The default restart policy is RollingUpdate, so a reconcile that exists
+		// only to refresh a password would otherwise software-restart every host.
+		// The Pod template names the managed users Secret and does not carry its
+		// bytes; ClickHouse reloads users.d when that Secret is updated.
+		// Recovery is not shortcut: a Secret update must not leave a crashed or
+		// persistently unhealthy Pod in place, so such a host falls through to the
+		// recovery cases below.
+		// A CHI spec change in the same pass is not this case: it falls through
+		// to the restart checks below. Turning hotReload on is itself a spec
+		// change and still rolls Pods once to install the projected volume.
+		w.a.V(1).M(host).F().Info("Password Secret refresh does not require host restart. Host: %s", host.GetName())
+		return false
+
 	case host.GetCR().IsRollingUpdate():
 		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
 		return true
@@ -196,12 +210,11 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 
-	case host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host):
+	case w.isHostUnableToStart(ctx, host):
 		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
 		return true
 
-	case chop.Config().ShouldRecoverCompletedOnPodNotReady() &&
-		w.isPodSustainedNotReady(ctx, host, chop.Config().CompletedOnPodNotReadyThreshold()):
+	case w.isHostStuckNotReady(ctx, host):
 		// Closes the gap where Completed CHIs with a sustained-NotReady host
 		// were left stuck indefinitely.
 		threshold := chop.Config().CompletedOnPodNotReadyThreshold()
@@ -215,6 +228,37 @@ func (w *worker) shouldForceRestartHost(ctx context.Context, host *api.Host) boo
 		w.a.V(1).M(host).F().Info("Host force restart is not required. Host: %s", host.GetName())
 		return false
 	}
+}
+
+// isHostUnableToStart reports a host of unknown version whose Pod has crashed containers.
+func (w *worker) isHostUnableToStart(ctx context.Context, host *api.Host) bool {
+	return host.Runtime.Version.IsUnknown() && w.isPodCrushed(ctx, host)
+}
+
+// isHostStuckNotReady reports a host whose Pod has been NotReady past the recovery threshold.
+func (w *worker) isHostStuckNotReady(ctx context.Context, host *api.Host) bool {
+	return chop.Config().ShouldRecoverCompletedOnPodNotReady() &&
+		w.isPodSustainedNotReady(ctx, host, chop.Config().CompletedOnPodNotReadyThreshold())
+}
+
+// hostNeedsRecoveryRestart reports a host that must be restarted to recover, whatever else is pending.
+func (w *worker) hostNeedsRecoveryRestart(ctx context.Context, host *api.Host) bool {
+	return w.isHostUnableToStart(ctx, host) || w.isHostStuckNotReady(ctx, host)
+}
+
+// passwordOnlyRefresh reports a Secret-triggered reconcile whose CHI has no other
+// pending changes. The action plan is the spec diff against the last completed
+// generation. A nil plan means this pass recorded no spec change.
+func passwordOnlyRefresh(ctx context.Context, host *api.Host) bool {
+	if !passwordSecretReconcile(ctx) {
+		return false
+	}
+	cr, ok := host.GetCR().(*api.ClickHouseInstallation)
+	if !ok || cr == nil {
+		return true
+	}
+	plan := cr.EnsureRuntime().ActionPlan
+	return plan == nil || !plan.HasActionsToDo()
 }
 
 // settingsChangeableWithoutRestartTimeout bounds one host's changeable_without_restart query.
@@ -407,15 +451,27 @@ func (w *worker) finalizeCR(
 		// pushes it itself (type_status.go), so a caller polling that list alone cannot tell an
 		// abort from a success either way. status.status is the field that distinguishes them.
 		w.a.V(1).M(chi).F().Info("CR normalize aborted - persist the abort, skip completion bookkeeping and users config map")
-	} else {
-		if f != nil {
-			f(chi)
+	} else if usersErr := w.reconcileConfigMapCommonUsers(ctx, chi); usersErr != nil {
+		// f calls ReconcileComplete(). A credential that cannot be rendered must not
+		// be reported as a completed reconcile, and the users ConfigMap is not written
+		// when rendering returns first.
+		w.a.V(1).M(chi).F().Error("users configuration was not published: %v", usersErr)
+		switch {
+		case errors.Is(usersErr, normalizer.ErrHotReloadCredentialRejected):
+			chi.EnsureStatus().ReconcileAbortWithReason(api.StatusReasonHotReloadRejected, usersErr.Error())
+		case errors.Is(usersErr, normalizer.ErrHotReloadSecretUnresolved):
+			chi.EnsureStatus().ReconcileAbortWithReason(api.StatusReasonHotReloadSecretUnresolved, usersErr.Error())
+		default:
+			chi.EnsureStatus().ReconcileAbort()
 		}
-		_ = w.reconcileConfigMapCommonUsers(ctx, chi)
+		aborted = true
+		err = usersErr
+	} else if f != nil {
+		f(chi)
 	}
 	_ = w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
 
-	return aborted, nil
+	return aborted, err
 }
 
 // updateCHI sync CHI which was already created earlier
