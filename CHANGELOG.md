@@ -8,7 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* **Hot-reload ClickHouse user passwords from Kubernetes Secrets.** Set `valueFrom.hotReload: true` on `password`, `password_sha256_hex`, or `password_double_sha1_hex` to rotate credentials without restarting Pods. Enabling requires a one-time rollout; automatic Secret-change detection applies to references declared directly in the CHI. See [documentation](docs/security_hardening.md#rotating-user-passwords-without-pod-restarts).
+
+  ```yaml
+  users:
+    user1/password:
+      valueFrom:
+        secretKeyRef:
+          name: clickhouse-secret
+          key: pwduser1
+        hotReload: true
+  ```
+
+  by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2100](https://github.com/Altinity/clickhouse-operator/pull/2100). Fixes [#2092](https://github.com/Altinity/clickhouse-operator/issues/2092)
+
 * **EXPERIMENTAL: Operator-managed backup and restore.** Added `ClickHouseBackup`, `ClickHouseBackupSchedule`, and `ClickHouseRestore` resources using `clickhouse-backup`. Supports per-cluster backups and restores, scheduled backups, retention, configurable storage paths, and cross-installation restores. Enable with `spec.backup.enabled: "yes"`. See [backup documentation](docs/backup.md). by [@discostur](https://github.com/discostur) and [@sunsingerus](https://github.com/sunsingerus) in [#2015](https://github.com/Altinity/clickhouse-operator/pull/2015). Related [#1795](https://github.com/Altinity/clickhouse-operator/issues/1795), [#862](https://github.com/Altinity/clickhouse-operator/issues/862)
+
+* **Volume downscale tool now supports StorageClass migration.** Set `NEW_STORAGE_CLASS` in `tools/volume_downscale.sh` to move a volume to another StorageClass at the same or a smaller size; the script also detects repeated volume attachment and mount failures. See [runbook](tools/volume_downscale.md). by [@lesandie](https://github.com/lesandie) in [#2125](https://github.com/Altinity/clickhouse-operator/pull/2125)
 
 ### Changed
 
@@ -25,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Removed deprecated `OnePerHost` pod distribution configuration.** Use `podDistribution` with `ClickHouseAntiAffinity` instead. by [@Tyagiquamar](https://github.com/Tyagiquamar) in [#2083](https://github.com/Altinity/clickhouse-operator/pull/2083). Fixes [#1978](https://github.com/Altinity/clickhouse-operator/issues/1978)
 
 ### Fixed
+
+* **Invalid StatefulSet specifications no longer delete running StatefulSets during recreation.** The operator validates the desired StatefulSet with a server-side dry run before deleting the existing one, preserving ClickHouse and Keeper workloads on validation errors. by [@atsarevskiy](https://github.com/atsarevskiy) in [#2071](https://github.com/Altinity/clickhouse-operator/pull/2071). Fixes [#1420](https://github.com/Altinity/clickhouse-operator/issues/1420)
+
+* **Reduced StatefulSet API requests during ClickHouse and Keeper reconciliation.** StatefulSets are now listed once per build pass instead of fetched individually for each host, reducing API-server load and reconciliation latency on large installations. by [@shubhamkapoor01](https://github.com/shubhamkapoor01) in [#2134](https://github.com/Altinity/clickhouse-operator/pull/2134). Fixes [#2063](https://github.com/Altinity/clickhouse-operator/issues/2063)
 
 * **Adding a volume mount now triggers a StatefulSet rollout before restarting ClickHouse**, preventing startup failures when adding disks to existing installations on ClickHouse 26.7 and later. by [@lizardoluis](https://github.com/lizardoluis) in [#2122](https://github.com/Altinity/clickhouse-operator/pull/2122). Fixes [#2121](https://github.com/Altinity/clickhouse-operator/issues/2121)
 
