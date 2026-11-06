@@ -20,6 +20,7 @@ const (
 	NameConfigMapHost        NameType = "ConfigMapHost"
 	NameConfigMapCommon      NameType = "ConfigMapCommon"
 	NameConfigMapCommonUsers NameType = "NameConfigMapCommonUsers"
+	NameSecretCommonUsers    NameType = "NameSecretCommonUsers"
 )
 const (
 	NameCRService                    NameType = "NameCRService"
