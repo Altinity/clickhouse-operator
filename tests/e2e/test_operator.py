@@ -10011,7 +10011,7 @@ def test_010088(self):
 
 
 @TestScenario
-@Name("test_010089. Removing or inserting a replica not at the tail of shard replicas list")
+@Name("test_010089. Removing or inserting a replica or a shard not at the tail of the list")
 def test_010089(self):
     """Repro for https://github.com/Altinity/clickhouse-operator/issues/1545.
 
@@ -10021,6 +10021,13 @@ def test_010089(self):
     Inserting a replica into the middle of the list reported a wrong host as added.
     Hosts are matched by name now, so only the really removed replica is dropped, and only the really added one
     is treated as new.
+
+    Removing a shard in the middle of the list drops replicas of its tables by (Zoo)Keeper path, since no surviving
+    host has them, and its replicas of Replicated databases by the name of the removed shard.
+
+    Replicas are dropped before the reconcile is completed, and the removed hosts' PVCs are deleted while PVCs of the
+    surviving hosts are kept. The StatefulSet selector of a host defined in layout.shards[].replicas carries the
+    replica index, so the operator re-creates StatefulSets of the replicas shifted in the list - their PVCs keep data.
     """
     create_shell_namespace_clickhouse_template()
 
@@ -10029,48 +10036,117 @@ def test_010089(self):
     manifest_1 = "manifests/chi/test-010089-1.yaml"  # replicas 0-0, 0-1, 0-2
     manifest_2 = "manifests/chi/test-010089-2.yaml"  # replicas 0-1, 0-2 - the head replica 0-0 is removed
     manifest_3 = "manifests/chi/test-010089-3.yaml"  # replicas 0-1, 0-3, 0-2 - 0-3 is inserted in the middle
+    manifest_4 = "manifests/chi/test-010089-4.yaml"  # shards 0, 1, 2
+    manifest_5 = "manifests/chi/test-010089-5.yaml"  # shards 0, 2 - the middle shard 1 is removed
     chi = yaml_manifest.get_name(util.get_full_path(manifest_1))
     cluster = "default"
     table = "test_010089"
     zk_path = f"/clickhouse/{cluster}/tables/0/default/{table}"
 
-    def host(replica):
-        return f"chi-{chi}-{cluster}-{replica}"
+    def host(replica, chi_name=chi):
+        return f"chi-{chi_name}-{cluster}-{replica}"
 
-    def pod_start_time(replica):
-        return kubectl.get_field("pod", f"{host(replica)}-0", ".status.startTime")
+    def pod_start_time(replica, chi_name=chi):
+        return kubectl.get_field("pod", f"{host(replica, chi_name)}-0", ".status.startTime")
 
-    def replica_name(replica):
-        return clickhouse.query(chi, f"SELECT replica_name FROM system.replicas WHERE table = '{table}'", host=host(replica))
+    def pvc_uid(replica, chi_name=chi):
+        return kubectl.get_field("pvc", f"default-{host(replica, chi_name)}-0", ".metadata.uid")
 
-    def keeper_replicas(replica):
+    def check_pvcs(kept, removed, chi_name=chi):
+        for r, uid in kept.items():
+            with Then(f"PVC of the surviving host {host(r, chi_name)} is kept"):
+                assert pvc_uid(r, chi_name) == uid, error(f"PVC of {host(r, chi_name)} is re-created or deleted")
+        for r in removed:
+            with Then(f"PVC of the removed host {host(r, chi_name)} is deleted"):
+                for attempt in range(1, 10):
+                    if pvc_uid(r, chi_name) == "":
+                        break
+                    retry_sleep(attempt, 5)
+                assert pvc_uid(r, chi_name) == "", error(f"PVC of {host(r, chi_name)} is not deleted")
+
+    def replica_name(replica, chi_name=chi):
+        return clickhouse.query(
+            chi_name, f"SELECT replica_name FROM system.replicas WHERE table = '{table}'", host=host(replica, chi_name)
+        )
+
+    def keeper_children(path, replica, chi_name=chi):
         out = clickhouse.query(
-            chi,
-            f"SELECT name FROM system.zookeeper WHERE path = '{zk_path}/replicas' ORDER BY name",
-            host=host(replica),
+            chi_name,
+            f"SELECT name FROM system.zookeeper WHERE path = '{path}' ORDER BY name",
+            host=host(replica, chi_name),
         )
         return sorted(out.splitlines())
 
-    def drop_replica_statements(since):
+    def keeper_replicas(replica):
+        return keeper_children(f"{zk_path}/replicas", replica)
+
+    def drop_replica_statements(since, chi_name=chi):
+        # system.query_log is created by the first flush only
+        clickhouse.query(chi_name, "SYSTEM FLUSH LOGS ON CLUSTER 'all-sharded'", timeout=120)
         out = clickhouse.query(
-            chi,
+            chi_name,
             "SELECT DISTINCT query FROM cluster('all-sharded', system.query_log) "
-            f"WHERE user = 'clickhouse_operator' AND event_time >= '{since}' AND query ILIKE 'SYSTEM DROP REPLICA%'",
+            f"WHERE user = 'clickhouse_operator' AND event_time >= '{since}' AND type != 'QueryStart' "
+            "AND query ILIKE 'SYSTEM DROP %REPLICA%'",
         )
-        return out.splitlines()
+        # TSV output escapes quotes
+        return out.replace("\\'", "'").splitlines()
+
+    def query_log_drops(since, chi_name=chi):
+        return clickhouse.query_with_error(
+            chi_name,
+            "SELECT event_time, hostName(), user, type, substring(query, 1, 160), substring(exception, 1, 160) "
+            "FROM cluster('all-sharded', system.query_log) "
+            f"WHERE event_time >= '{since}' AND query ILIKE '%DROP%' ORDER BY event_time",
+        )
+
+    def endpoint_pods(replica):
+        # v1 Endpoints are deprecated, kubectl warns about them, so EndpointSlices are checked
+        slices = kubectl.get(
+            "endpointslices", "", label=f"-l kubernetes.io/service-name={host(replica)}", ok_to_fail=True
+        ) or {}
+        return sorted(
+            endpoint["targetRef"]["name"]
+            for endpoint_slice in slices.get("items") or []
+            for endpoint in endpoint_slice.get("endpoints") or []
+        )
+
+    def replicas_diagnostics(replicas):
+        out = ""
+        for r in replicas:
+            out += f"\n--- {host(r)}\n" + clickhouse.query_with_error(
+                chi,
+                f"SELECT database, name, engine FROM system.tables WHERE name = '{table}'; "
+                "SELECT replica_name, is_readonly, is_session_expired, total_replicas, active_replicas, zookeeper_exception "
+                f"FROM system.replicas WHERE table = '{table}'",
+                host=host(r),
+            )
+        paths = ", ".join(f"'{zk_path}/replicas/{name}'" for name in keeper_replicas(replicas[0]))
+        out += "\n--- (Zoo)Keeper replicas with is_active\n" + clickhouse.query_with_error(
+            chi,
+            f"SELECT path, name FROM system.zookeeper WHERE path IN ({paths}) AND name = 'is_active'",
+            host=host(replicas[0]),
+        )
+        return out
 
     def check_replicated_table(replicas, rows):
-        names = sorted(replica_name(r) for r in replicas)
+        expected = f"0\t{len(replicas)}\t{len(replicas)}"
         for r in replicas:
             with Then(f"{host(r)} has the table with all {rows} rows and sees exactly {len(replicas)} active replicas"):
+                out = ""
+                for attempt in range(1, 10):
+                    out = clickhouse.query_with_error(
+                        chi,
+                        f"SELECT is_readonly, total_replicas, active_replicas FROM system.replicas WHERE table = '{table}'",
+                        host=host(r),
+                    )
+                    if out == expected:
+                        break
+                    retry_sleep(attempt, 5)
+                assert out == expected, error(f"{out}\n{replicas_diagnostics(replicas)}")
                 clickhouse.query(chi, f"SYSTEM SYNC REPLICA {table}", host=host(r), timeout=120)
                 assert clickhouse.query(chi, f"SELECT count() FROM {table}", host=host(r)) == str(rows)
-                out = clickhouse.query(
-                    chi,
-                    f"SELECT is_readonly, total_replicas, active_replicas FROM system.replicas WHERE table = '{table}'",
-                    host=host(r),
-                )
-                assert out == f"0\t{len(replicas)}\t{len(replicas)}", error(out)
+        names = sorted(replica_name(r) for r in replicas)
         with Then(f"(Zoo)Keeper has exactly the replicas {names}"):
             assert keeper_replicas(replicas[0]) == names, error(keeper_replicas(replicas[0]))
         return names
@@ -10079,11 +10155,17 @@ def test_010089(self):
         kubectl.create_and_check(
             manifest=manifest_1,
             check={
-                "apply_templates": {current().context.clickhouse_template},
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                    "manifests/chit/tpl-persistent-volume-100Mi.yaml",
+                },
                 "pod_count": 3,
                 "do_not_delete": 1,
             },
         )
+        # CREATE ... ON CLUSTER is distributed to the hosts ClickHouse knows from remote_servers,
+        # which reach the pods some time after the reconcile completes
+        wait_for_cluster(chi, cluster, 1, 3, force_wait=True)
 
     with And("Replicated table with data"):
         clickhouse.query(
@@ -10100,6 +10182,7 @@ def test_010089(self):
         removed = replica_name("0-0")
         surviving = [replica_name("0-1"), replica_name("0-2")]
         start_times = {r: pod_start_time(r) for r in ["0-1", "0-2"]}
+        pvcs = {r: pvc_uid(r) for r in ["0-1", "0-2"]}
         query_log_start = clickhouse.query(chi, "SELECT now()", host=host("0-1"))
 
         kubectl.create_and_check(
@@ -10110,19 +10193,27 @@ def test_010089(self):
             },
         )
 
-        with Then("Pods of the surviving replicas 0-1 and 0-2 are not restarted"):
-            for r, t in start_times.items():
-                assert pod_start_time(r) == t, error(f"pod of {r} is restarted")
+        # Replicas are dropped before the reconcile is completed, so the statements are logged already
+        statements = drop_replica_statements(query_log_start)
+        restarted = [r for r, t in start_times.items() if pod_start_time(r) != t]
+        note(
+            "SYSTEM DROP REPLICA statements:\n" + "\n".join(statements) +
+            f"\n(Zoo)Keeper replicas: {keeper_replicas('0-1')}" +
+            f"\nRestarted pods: {restarted}"
+        )
 
         with Then(f"SYSTEM DROP REPLICA is run for the removed replica {removed} only"):
-            statements = drop_replica_statements(query_log_start)
-            print("\n".join(statements))
-            assert any(f"'{removed}'" in s for s in statements), error(statements)
+            assert f"SYSTEM DROP REPLICA '{removed}'" in statements, error(
+                f"removed replica {removed} is not dropped\n" + query_log_drops(query_log_start)
+            )
+            assert f"SYSTEM DROP DATABASE REPLICA '0|{removed}'" in statements, error(query_log_drops(query_log_start))
             for name in surviving:
-                assert not any(f"'{name}'" in s for s in statements), error(f"live replica {name} is dropped")
+                assert not any(f"{name}'" in s for s in statements), error(f"live replica {name} is dropped")
 
         with Then(f"The removed replica {removed} is gone from (Zoo)Keeper, and the surviving replicas are intact"):
             assert check_replicated_table(["0-1", "0-2"], 100) == sorted(surviving)
+
+        check_pvcs(pvcs, ["0-0"])
 
         with And("Surviving replicas accept inserts"):
             clickhouse.query(chi, f"INSERT INTO {table} SELECT number FROM numbers(100, 10)", host=host("0-2"))
@@ -10130,6 +10221,8 @@ def test_010089(self):
 
     with When("Replica 0-3 is inserted into the middle of the list"):
         start_times = {r: pod_start_time(r) for r in ["0-1", "0-2"]}
+        pvcs = {r: pvc_uid(r) for r in ["0-1", "0-2"]}
+        query_log_start = clickhouse.query(chi, "SELECT now()", host=host("0-1"))
 
         kubectl.create_and_check(
             manifest=manifest_3,
@@ -10138,10 +10231,31 @@ def test_010089(self):
                 "do_not_delete": 1,
             },
         )
+        note(f"Restarted pods: {[r for r, t in start_times.items() if pod_start_time(r) != t]}")
 
-        with Then("Pods of the existing replicas 0-1 and 0-2 are not restarted"):
-            for r, t in start_times.items():
-                assert pod_start_time(r) == t, error(f"pod of {r} is restarted")
+        with Then("No existing replica is dropped"):
+            # A new host has no PVC until its StatefulSet creates one, which the operator treats as a missed volume
+            # and drops the replica of the new host itself - a no-op, since it is not in (Zoo)Keeper yet
+            statements = drop_replica_statements(query_log_start)
+            note("SYSTEM DROP REPLICA statements:\n" + "\n".join(statements))
+            for r in ["0-1", "0-2"]:
+                assert not any(f"{host(r)}'" in s for s in statements), error("\n".join(statements))
+
+        with And("Replica 0-1 keeps its position in the list and is not restarted"):
+            assert pod_start_time("0-1") == start_times["0-1"]
+
+        with Then("Endpoints of every host Service consist of the pod of its own host only"):
+            # A replica label of a host is its position in the list, so while 0-2 is shifted from position 1
+            # to 2 its old pod matches the replica labels of 0-3 - the pod name label keeps them apart
+            for r in ["0-1", "0-3", "0-2"]:
+                selector = kubectl.get("service", host(r))["spec"]["selector"]
+                assert selector.get("statefulset.kubernetes.io/pod-name") == f"{host(r)}-0", error(selector)
+                for attempt in range(1, 10):
+                    pods = endpoint_pods(r)
+                    if pods == [f"{host(r)}-0"]:
+                        break
+                    retry_sleep(attempt, 5)
+                assert pods == [f"{host(r)}-0"], error(pods)
 
         with Then("The table is created on the new replica 0-3 and all replicas are in sync"):
             for attempt in range(1, 10):
@@ -10152,9 +10266,95 @@ def test_010089(self):
             assert exists == "1", error(f"table {table} is not created on {host('0-3')}")
             check_replicated_table(["0-1", "0-3", "0-2"], 110)
 
+        check_pvcs(pvcs, [])
+
         with And("New replica is added to status.hostsWithTablesCreated"):
             domain = current().context.test_namespace + ".svc.cluster.local"
             assert f"{host('0-3')}.{domain}" in kubectl.get("chi", chi)["status"]["hostsWithTablesCreated"]
+
+    with Then("CHI is deleted"):
+        kubectl.delete_chi(chi)
+
+    chi_s = yaml_manifest.get_name(util.get_full_path(manifest_4))
+    database = "test_010089_db"
+    db_zk_path = f"/clickhouse/{cluster}/databases/{database}"
+    table_zk_path = f"/clickhouse/{cluster}/tables/{{shard}}/default/{table}"
+
+    def shard_table_replicas(shard):
+        return keeper_children(f"{table_zk_path.format(shard=shard)}/replicas", "0-0", chi_s)
+
+    with Given("CHI with shards 0, 1, 2"):
+        kubectl.create_and_check(
+            manifest=manifest_4,
+            check={
+                "pod_count": 3,
+                "do_not_delete": 1,
+            },
+        )
+        wait_for_cluster(chi_s, cluster, 3, 1, force_wait=True)
+
+    with And("Replicated database and a replicated table with data in every shard"):
+        clickhouse.query(
+            chi_s,
+            f"CREATE DATABASE {database} ON CLUSTER '{{cluster}}' "
+            f"Engine = Replicated('{db_zk_path}', '{{shard}}', '{{replica}}')",
+            host=host("0-0", chi_s),
+            timeout=120,
+        )
+        clickhouse.query(
+            chi_s,
+            f"CREATE TABLE {table} ON CLUSTER '{{cluster}}' (a UInt32) "
+            f"Engine = ReplicatedMergeTree('/clickhouse/{{cluster}}/tables/{{shard}}/default/{table}', '{{replica}}') "
+            "ORDER BY a",
+            host=host("0-0", chi_s),
+            timeout=120,
+        )
+        for shard in ["0", "1", "2"]:
+            clickhouse.query(chi_s, f"INSERT INTO {table} SELECT number FROM numbers(10)", host=host(f"{shard}-0", chi_s))
+
+    with When("Shard 1 in the middle of the list is removed"):
+        removed = replica_name("1-0", chi_s)
+        start_times = {r: pod_start_time(r, chi_s) for r in ["0-0", "2-0"]}
+        pvcs = {r: pvc_uid(r, chi_s) for r in ["0-0", "2-0"]}
+        db_replicas = keeper_children(f"{db_zk_path}/replicas", "0-0", chi_s)
+        note(f"Replicated database replicas: {db_replicas}")
+        assert f"1|{removed}" in db_replicas, error(db_replicas)
+        query_log_start = clickhouse.query(chi_s, "SELECT now()", host=host("0-0", chi_s))
+
+        kubectl.create_and_check(
+            manifest=manifest_5,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+        statements = drop_replica_statements(query_log_start, chi_s)
+        note("SYSTEM DROP REPLICA statements:\n" + "\n".join(statements))
+
+        with Then(f"Replica {removed} of the table of the removed shard is dropped by (Zoo)Keeper path"):
+            path = table_zk_path.format(shard="1")
+            assert f"SYSTEM DROP REPLICA '{removed}' FROM ZKPATH '{path}'" in statements, error(
+                query_log_drops(query_log_start, chi_s)
+            )
+            assert shard_table_replicas("1") == [], error(shard_table_replicas("1"))
+
+        with And(f"Replica {removed} of the Replicated database is dropped by the name of the removed shard"):
+            assert f"SYSTEM DROP DATABASE REPLICA '1|{removed}'" in statements, error(
+                query_log_drops(query_log_start, chi_s)
+            )
+            db_replicas = keeper_children(f"{db_zk_path}/replicas", "0-0", chi_s)
+            assert db_replicas == [f"0|{replica_name('0-0', chi_s)}", f"2|{replica_name('2-0', chi_s)}"], error(
+                db_replicas
+            )
+
+        with And("Surviving shards keep their replicas, data and pods"):
+            for shard in ["0", "2"]:
+                assert shard_table_replicas(shard) == [replica_name(f"{shard}-0", chi_s)]
+                assert clickhouse.query(chi_s, f"SELECT count() FROM {table}", host=host(f"{shard}-0", chi_s)) == "10"
+                assert pod_start_time(f"{shard}-0", chi_s) == start_times[f"{shard}-0"]
+
+        check_pvcs(pvcs, ["1-0"], chi_s)
 
     with Finally("I clean up"):
         delete_test_namespace()

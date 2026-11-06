@@ -216,7 +216,7 @@ func TestRemovedHostFQDNs(t *testing.T) {
 // DROP REPLICA for a removed host must run on a host which survives in the new CR. The removed
 // host's own shard comes from the old CR and may hold only removed - already purged - hosts:
 // https://github.com/Altinity/clickhouse-operator/issues/1545
-func TestSurvivingShardHost(t *testing.T) {
+func TestSurvivingHost(t *testing.T) {
 	host := func(cluster, shard, name string) *api.Host {
 		h := &api.Host{Name: name}
 		h.Runtime.Address.ClusterName = cluster
@@ -233,13 +233,20 @@ func TestSurvivingShardHost(t *testing.T) {
 
 	t.Run("runs on a host of the same shard in the new CR", func(t *testing.T) {
 		cr := crWith(host("c", "1", "1-0-dedicated"), host("c", "0", "0-0-dedicated"))
-		got := survivingShardHost(cr, host("c", "0", "0-0"))
+		got := survivingHost(cr, host("c", "0", "0-0"))
 		require.NotNil(t, got)
 		require.Equal(t, "0-0-dedicated", got.GetName())
 	})
 
-	t.Run("no surviving host in the shard", func(t *testing.T) {
-		cr := crWith(host("c", "1", "1-0"), host("other", "0", "0-1"))
-		require.Nil(t, survivingShardHost(cr, host("c", "0", "0-0")))
+	t.Run("the shard is removed - runs on a host of another shard of the same cluster", func(t *testing.T) {
+		cr := crWith(host("other", "0", "0-0"), host("c", "2", "2-0"), host("c", "0", "0-0"))
+		got := survivingHost(cr, host("c", "1", "1-0"))
+		require.NotNil(t, got)
+		require.Equal(t, "2-0", got.GetName())
+	})
+
+	t.Run("no surviving host in the cluster", func(t *testing.T) {
+		cr := crWith(host("other", "0", "0-1"))
+		require.Nil(t, survivingHost(cr, host("c", "0", "0-0")))
 	})
 }

@@ -69,13 +69,61 @@ func (s *ClusterSchemer) IsHostActiveReplica(ctx context.Context, hostToRunOn, h
 	return active
 }
 
-// HostDropReplica calls SYSTEM DROP REPLICA
-func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host) error {
+// ZKReplica is a replica of a replicated table in (Zoo)Keeper
+type ZKReplica struct {
+	// Path is the table path in (Zoo)Keeper, as system.replicas.zookeeper_path reports it
+	Path string
+	// Name is the replica name of the table, as system.replicas.replica_name reports it
+	Name string
+}
+
+// HostZKReplicas lists (Zoo)Keeper replicas of replicated tables of the host
+func (s *ClusterSchemer) HostZKReplicas(ctx context.Context, host *api.Host) ([]ZKReplica, error) {
+	paths, names, err := s.QueryUnzip2Columns(ctx, s.Names(interfaces.NameFQDNs, host, api.Host{}, false), s.sqlZKReplicas())
+	if err != nil {
+		return nil, err
+	}
+	var replicas []ZKReplica
+	for i := range paths {
+		if i < len(names) {
+			replicas = append(replicas, ZKReplica{Path: paths[i], Name: names[i]})
+		}
+	}
+	return replicas, nil
+}
+
+// HostDropReplica calls SYSTEM DROP REPLICA for hostToDrop on hostToRunOn.
+// zkReplicas are replicas of hostToDrop collected while it was alive. Plain SYSTEM DROP REPLICA covers only tables
+// which hostToRunOn has itself, so a replica of a table hostToRunOn does not have - all tables of a removed shard,
+// when hostToRunOn is a host of another shard - is dropped by its (Zoo)Keeper path.
+func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host, zkReplicas []ZKReplica) error {
 	replica := s.Name(interfaces.NameInstanceHostname, hostToDrop)
-	shard := hostToRunOn.Runtime.Address.ShardIndex
-	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", replica, hostToRunOn.Runtime.Address.HostName)
-	return s.ExecHost(ctx, hostToRunOn, s.sqlDropReplica(shard, replica),
+	// Replicated databases register a replica as '{shard}|{replica}', and the {shard} macro is the shard name
+	// of the host to drop, not of the host the statement runs on
+	shard := hostToDrop.Runtime.Address.ShardName
+	var foreign []ZKReplica
+	if len(zkReplicas) > 0 {
+		// SYSTEM DROP REPLICA ... FROM ZKPATH refuses a path of a local table
+		local, _ := s.HostZKReplicas(ctx, hostToRunOn)
+		foreign = foreignZKReplicas(zkReplicas, local)
+	}
+	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v, by (Zoo)Keeper path: %v", replica, hostToRunOn.Runtime.Address.HostName, foreign)
+	return s.ExecHost(ctx, hostToRunOn, s.sqlDropReplica(shard, replica, foreign),
 		clickhouse.NewQueryOptions().SetRetry(false).SetLogQueries(true))
+}
+
+// foreignZKReplicas filters out replicas of tables which are local - have the same (Zoo)Keeper path
+func foreignZKReplicas(replicas, local []ZKReplica) (res []ZKReplica) {
+	localPaths := make(map[string]bool, len(local))
+	for _, r := range local {
+		localPaths[r.Path] = true
+	}
+	for _, r := range replicas {
+		if !localPaths[r.Path] {
+			res = append(res, r)
+		}
+	}
+	return res
 }
 
 // createTablesSQLs makes all SQL for migrating tables

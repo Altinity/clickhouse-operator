@@ -211,13 +211,16 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		// up at this point — clean()'s purge is what tears them down — so SQL hooks can
 		// drain the dying hosts before they go away.
 		w.runHostPreDeleteHooksOnRemovedHosts(ctx, new)
+		// (Zoo)Keeper paths of the removed replicas are known to the removed hosts only - list them while they are up
+		removed := w.collectRemovedReplicas(ctx, new)
 
 		w.clean(ctx, new)
 		w.addToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
+		// Drop replicas of the removed hosts before the reconcile is marked completed:
+		// a completed reconcile has to leave no replicas of the removed hosts in (Zoo)Keeper
+		w.dropZKReplicas(ctx, new, removed)
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
-
-		w.dropZKReplicas(ctx, new)
 
 		metrics.CRReconcilesCompleted(ctx, new)
 		metrics.CRReconcilesTimings(ctx, new, time.Since(startTime).Seconds())

@@ -5,6 +5,7 @@ metadata:
 spec:
   useTemplates:
     - name: clickhouse-version
+    - name: persistent-volume
   configuration:
     zookeeper:
       nodes:
