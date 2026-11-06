@@ -150,6 +150,10 @@ spec:
                   containerName: {{ .Chart.Name }}
                   resource: limits.memory
                   divisor: "1Mi"
+            {{- if .Values.operator.pprof.enabled }}
+            - name: OPERATOR_PPROF_ADDRESS
+              value: {{ .Values.operator.pprof.address | quote }}
+            {{- end }}
             {{ with .Values.operator.env }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 9999
@@ -240,6 +244,10 @@ spec:
                   containerName: {{ .Chart.Name }}
                   resource: limits.memory
                   divisor: "1Mi"
+            {{- if .Values.metrics.pprof.enabled }}
+            - name: METRICS_EXPORTER_PPROF_ADDRESS
+              value: {{ .Values.metrics.pprof.address | quote }}
+            {{- end }}
             {{ with .Values.metrics.env }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 8888

@@ -53,4 +53,9 @@ const (
 
 	// CHOP_CONFIG path to clickhouse operator configuration file
 	CHOP_CONFIG = "CHOP_CONFIG"
+
+	// OPERATOR_PPROF_ADDRESS enables pprof on the operator at the specified host:port. Overridden by -pprof-address
+	OPERATOR_PPROF_ADDRESS = "OPERATOR_PPROF_ADDRESS"
+	// METRICS_EXPORTER_PPROF_ADDRESS enables pprof on the metrics-exporter at the specified host:port. Overridden by -pprof-address
+	METRICS_EXPORTER_PPROF_ADDRESS = "METRICS_EXPORTER_PPROF_ADDRESS"
 )

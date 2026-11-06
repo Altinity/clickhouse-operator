@@ -144,11 +144,16 @@ func serveMetrics(addr, path string) {
 	// /debug/pprof/* on DefaultServeMux. Binding DefaultServeMux here — ListenAndServe(
 	// addr, nil) — would expose those pprof endpoints (CPU profile, heap, goroutine) on
 	// this public metrics port. A dedicated mux serves only the metrics handler.
-	mux := http.NewServeMux()
-	mux.Handle(path, handler)
-	err := http.ListenAndServe(addr, mux)
+	err := http.ListenAndServe(addr, newMetricsMux(path, handler))
 	if err != nil {
 		fmt.Printf("error serving http: %v", err)
 	}
 	fmt.Printf("end serving metrics at: %s%s\n", addr, path)
+}
+
+// newMetricsMux builds the private mux served on the operator metrics port
+func newMetricsMux(path string, handler http.Handler) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.Handle(path, handler)
+	return mux
 }

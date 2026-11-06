@@ -799,6 +799,19 @@
                     "description": "optional liveness probe for the metrics-exporter container, check `kubectl explain pod.spec.containers.livenessProbe` for details",
                     "type": ["object", "null"]
                 },
+                "pprof": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "description": "serve Go pprof from the metrics-exporter container on a separate listener (sets `METRICS_EXPORTER_PPROF_ADDRESS`)",
+                            "type": "boolean"
+                        },
+                        "address": {
+                            "description": "pprof listen address, keep it on loopback",
+                            "type": "string"
+                        }
+                    }
+                },
                 "readinessProbe": {
                     "description": "optional readiness probe for the metrics-exporter container, check `kubectl explain pod.spec.containers.readinessProbe` for details",
                     "type": ["object", "null"]
@@ -864,6 +877,19 @@
                         },
                         "tag": {
                             "description": "image tag (chart's appVersion value will be used if not set)",
+                            "type": "string"
+                        }
+                    }
+                },
+                "pprof": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "description": "serve Go pprof from the clickhouse-operator container on a separate listener (sets `OPERATOR_PPROF_ADDRESS`)",
+                            "type": "boolean"
+                        },
+                        "address": {
+                            "description": "pprof listen address, keep it on loopback",
                             "type": "string"
                         }
                     }
