@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Kubernetes API client QPS and burst can be set in the operator configuration** as `reconcile.runtime.k8sClientQPS` and `reconcile.runtime.k8sClientBurst`. The `OPERATOR_K8S_CLIENT_QPS_LIMIT` and `OPERATOR_K8S_CLIENT_BURST_LIMIT` env vars still override them. The operator now warns at startup when `reconcileShardsThreadsNumber` is above the client QPS. by [@shubhamkapoor01](https://github.com/shubhamkapoor01). Fixes [#2045](https://github.com/Altinity/clickhouse-operator/issues/2045)
 
+* **Volume downscale tool now supports StorageClass migration.** Set `NEW_STORAGE_CLASS` in `tools/volume_downscale.sh` to move a volume to another StorageClass at the same or a smaller size; the script also detects repeated volume attachment and mount failures. See [runbook](tools/volume_downscale.md). by [@lesandie](https://github.com/lesandie) in [#2125](https://github.com/Altinity/clickhouse-operator/pull/2125)
+
 ### Changed
 
 * **BACKWARD INCOMPATIBLE: Revised template precedence.** `ClickHouseInstallation` settings now override templates and operator defaults; later templates override earlier ones. Kubernetes resource lists merge by name or appropriate key. Existing installations may restart or recreate StatefulSets when effective configuration changes. See [upgrade notes](docs/operator_configuration.md#upgrading-from-027). by [@sunsingerus](https://github.com/sunsingerus)
@@ -41,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Removed deprecated `OnePerHost` pod distribution configuration.** Use `podDistribution` with `ClickHouseAntiAffinity` instead. by [@Tyagiquamar](https://github.com/Tyagiquamar) in [#2083](https://github.com/Altinity/clickhouse-operator/pull/2083). Fixes [#1978](https://github.com/Altinity/clickhouse-operator/issues/1978)
 
 ### Fixed
+
+* **Invalid StatefulSet specifications no longer delete running StatefulSets during recreation.** The operator validates the desired StatefulSet with a server-side dry run before deleting the existing one, preserving ClickHouse and Keeper workloads on validation errors. by [@atsarevskiy](https://github.com/atsarevskiy) in [#2071](https://github.com/Altinity/clickhouse-operator/pull/2071). Fixes [#1420](https://github.com/Altinity/clickhouse-operator/issues/1420)
 
 * **Reduced StatefulSet API requests during ClickHouse and Keeper reconciliation.** StatefulSets are now listed once per build pass instead of fetched individually for each host, reducing API-server load and reconciliation latency on large installations. by [@shubhamkapoor01](https://github.com/shubhamkapoor01) in [#2134](https://github.com/Altinity/clickhouse-operator/pull/2134). Fixes [#2063](https://github.com/Altinity/clickhouse-operator/issues/2063)
 
