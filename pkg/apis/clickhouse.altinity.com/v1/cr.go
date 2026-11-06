@@ -21,6 +21,26 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 )
 
+// getReplicasCount gets max replicas count of the shards of the first cluster
+// CircularReplication shortcut is expanded with this value, see normalizer
+// TODO need to support multi-cluster
+func getReplicasCount(cr ICustomResource) int {
+	replicasCount := 1
+	first := true
+	cr.WalkClusters(func(cluster ICluster) error {
+		if !first {
+			return nil
+		}
+		first = false
+		cluster.WalkShards(func(index int, shard IShard) error {
+			replicasCount = max(replicasCount, shard.HostsCount())
+			return nil
+		})
+		return nil
+	})
+	return replicasCount
+}
+
 // getMaxNumberOfPodsPerNode calculates the max number of Pods allowed per Node
 // Used for scope cycles calculation
 // TODO need to support multi-cluster
@@ -29,8 +49,13 @@ func getMaxNumberOfPodsPerNode(cr ICustomResource) int {
 	cr.WalkPodTemplates(func(template *PodTemplate) {
 		for i := range template.PodDistribution {
 			podDistribution := &template.PodDistribution[i]
-			if podDistribution.Type == deployment.PodDistributionMaxNumberPerNode {
+			// Pod templates are not normalized yet, so the type may be in any casing
+			switch deployment.NormalizePodDistributionType(podDistribution.Type) {
+			case deployment.PodDistributionMaxNumberPerNode:
 				maxNumberOfPodsPerNode = podDistribution.Number
+			case deployment.PodDistributionCircularReplication:
+				// Shortcut is not expanded yet, it is expanded into MaxNumberPerNode of replicas count
+				maxNumberOfPodsPerNode = getReplicasCount(cr)
 			}
 		}
 	})

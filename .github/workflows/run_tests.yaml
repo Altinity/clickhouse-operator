@@ -81,7 +81,13 @@ jobs:
       - uses: actions/setup-python@v5
         id: setup-python
         with:
-          python-version: '3.13'
+          # testflows 2.0.231215 is broken on python 3.13+: it uses removed private lzma._MODE_CLOSED,
+          # so live short output and `tfs transform` / `tfs document convert` fail, leaving only raw.log, e.g.
+          # https://github.com/Altinity/clickhouse-operator/actions/runs/42177835548/job/127760322225
+          #   File ".../testflows/_core/compress.py", line 135, in __init__
+          #     self._mode = lzma._MODE_CLOSED
+          #   AttributeError: module 'lzma' has no attribute '_MODE_CLOSED'
+          python-version: '3.12'
 
       - name: Cache python
         uses: actions/cache@v6
