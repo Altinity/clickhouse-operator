@@ -165,6 +165,9 @@ func (k *backupConfigSyncFakeKube) CR() interfaces.IKubeCR {
 	return &backupSecretOwnerFakeCR{crs: k.crs}
 }
 
+// testBackupUsername is the ClickHouse username the backup Secrets of the tests set: the operator has none of its own
+const testBackupUsername = "backup_user"
+
 // testBackupPassword is the ClickHouse password the user sets in the backup Secret of newBackupConfigSyncController
 const testBackupPassword = "set-by-user"
 

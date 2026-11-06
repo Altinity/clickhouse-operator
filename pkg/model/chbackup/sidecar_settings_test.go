@@ -648,3 +648,6 @@ func TestRestoreJobKnowsWhatDropsOnTheClusterNeed(t *testing.T) {
 func TestPathCheckKeysAreTheSettingsOfTheConfigFile(t *testing.T) {
 	require.ElementsMatch(t, PathCheckKeys, slices.Collect(maps.Keys(backupconfig.Settings)))
 }
+
+// testBackupUsername is the ClickHouse username the backup Secrets of the tests set: the operator has none of its own
+const testBackupUsername = "backup_user"

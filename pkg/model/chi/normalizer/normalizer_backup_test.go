@@ -1074,3 +1074,6 @@ func TestBackupUserNamedInvalidly(t *testing.T) {
 		})
 	}
 }
+
+// testBackupUsername is the ClickHouse username the backup Secrets of the tests set: the operator has none of its own
+const testBackupUsername = "backup_user"
