@@ -149,7 +149,7 @@ func newBackupCacheOptions(log logr.Logger, cacheNamespaces []string) cache.Opti
 // chop.GetClientset terminates the process when it cannot build a client, so it runs here, once,
 // outside the retry; initClickHouse has made the identical call by this point.
 func newBackupInitializer() func(context.Context) error {
-	kubeClient, _, chopClient, _ := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
+	kubeClient, _, chopClient, _, _ := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
 	cr := chiKube.NewCR(chopClient, kubeClient)
 	return func(ctx context.Context) error {
 		if !waitForBackupCRDs(ctx, kubeClient.Discovery(), backupCRDsPollInterval) {

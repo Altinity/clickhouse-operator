@@ -25,9 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           # go.mod is the single source of the build Go version.
           go-version-file: go.mod
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The e2e suite (notably test_010025's 100M-row insert + its replica) fills the
       # runner's small root partition (~14 GB): with the minikube docker driver the k8s
@@ -78,12 +78,17 @@ jobs:
           test "$(docker info -f '{{.DockerRootDir}}')" = "/mnt/docker"
           df -h /mnt /
 
+      - uses: actions/setup-python@v5
+        id: setup-python
+        with:
+          python-version: '3.13'
+
       - name: Cache python
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: cache-python
         with:
           path: ~/venv/qa
-          key: python-${{ hashFiles('tests/image/requirements.txt') }}
+          key: python-${{ env.ImageOS }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('tests/image/requirements.txt') }}
 
       - name: Install python dependencies
         run: |
@@ -95,14 +100,15 @@ jobs:
 
       - name: Setup required Ubuntu packages
         run: |
-          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 8919F6BD2B48D754
-          echo "deb https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
-          sudo apt-get update
-          sudo apt-get install -y conntrack clickhouse-client
+          set -euxo pipefail
+          curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | sudo gpg --dearmor --yes -o /usr/share/keyrings/clickhouse-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=$(dpkg --print-architecture)] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
+          sudo apt update
+          sudo apt install -y conntrack clickhouse-client
 
       # test_010084 render-tests the Helm chart. The runner image happens to preinstall helm,
       # but declaring it keeps the suite from silently skipping that scenario if that changes.
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: latest
 
@@ -202,7 +208,7 @@ jobs:
           echo "test_result=$test_result" >> $GITHUB_OUTPUT
           exit "$test_result"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: testflows-logs
           path: |
@@ -211,7 +217,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: testflows-report
           path: |
@@ -221,7 +227,7 @@ jobs:
 
       - name: Test Failed
         if: ${{ steps.run-tests.outputs.test_result != '0' }}
-        uses: actions/github-script@v3
+        uses: actions/github-script@v9
         with:
           script: |
             core.setFailed('Test suite has failures! Check test run status and logs.')
