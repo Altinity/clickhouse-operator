@@ -26,6 +26,7 @@ import (
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/dynamic"
 	kube "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	kuberest "k8s.io/client-go/rest"
 	kubeclientcmd "k8s.io/client-go/tools/clientcmd"
 
@@ -92,6 +93,7 @@ func GetClientset(kubeConfigFile, masterURL, chopConfigFile string) (
 	*apiextensions.Clientset,
 	*chopclientset.Clientset,
 	dynamic.Interface,
+	metadata.Interface,
 ) {
 	kubeConfig, err := getKubeConfig(kubeConfigFile, masterURL)
 	if err != nil {
@@ -148,7 +150,12 @@ func GetClientset(kubeConfigFile, masterURL, chopConfigFile string) (
 		log.F().Fatal("Unable to initialize kubernetes dynamic clientset: %s", err.Error())
 	}
 
-	return kubeClientset, apiextensionsClientset, chopClientset, dynamicClientset
+	metadataClient, err := metadata.NewForConfig(kubeConfig)
+	if err != nil {
+		log.F().Fatal("Unable to initialize kubernetes metadata client: %s", err.Error())
+	}
+
+	return kubeClientset, apiextensionsClientset, chopClientset, dynamicClientset, metadataClient
 }
 
 // resolveK8sTLSMinVersion reads the file-based chopconf and returns the effective
