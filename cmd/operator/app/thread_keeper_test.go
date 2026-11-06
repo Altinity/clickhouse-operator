@@ -45,7 +45,7 @@ func Test_keeperPredicateCreate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			predicate := keeperPredicate()
+			predicate := keeperPredicate(nil)
 			if got := predicate.Create(tt.evt); tt.want != got {
 				t.Errorf("keeperPredicate.Create() = %v, want %v", got, tt.want)
 			}
@@ -84,7 +84,7 @@ func Test_keeperPredicateUpdate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			predicate := keeperPredicate()
+			predicate := keeperPredicate(nil)
 			if got := predicate.Update(tt.evt); tt.want != got {
 				t.Errorf("keeperPredicate.Update() = %v, want %v", got, tt.want)
 			}
@@ -112,7 +112,7 @@ func Test_keeperPredicateDelete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			predicate := keeperPredicate()
+			predicate := keeperPredicate(nil)
 			if got := predicate.Delete(tt.evt); tt.want != got {
 				t.Errorf("keeperPredicate.Delete() = %v, want %v", got, tt.want)
 			}

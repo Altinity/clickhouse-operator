@@ -95,7 +95,7 @@ func (c *Controller) onPasswordSecret(secret meta.Object) {
 		return
 	}
 	for _, cr := range chis {
-		if chiReferencesHotReloadSecret(cr, name) {
+		if ShouldEnqueue(cr) && chiReferencesHotReloadSecret(cr, name) {
 			c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcilePasswordSecret, nil, cr))
 		}
 	}

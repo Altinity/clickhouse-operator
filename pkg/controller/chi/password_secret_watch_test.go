@@ -38,8 +38,8 @@ func TestPasswordSecretEventHandlersUseOnlyMetadata(t *testing.T) {
 	})
 	secret := &meta.PartialObjectMetadata{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: "ns",
-			Name: "passwords",
+			Namespace:       "ns",
+			Name:            "passwords",
 			ResourceVersion: "10",
 		},
 	}
@@ -83,6 +83,49 @@ func TestChiReferencesHotReloadSecret(t *testing.T) {
 	require.True(t, chiReferencesHotReloadSecret(cr, "clickhouse-passwords"))
 	require.False(t, chiReferencesHotReloadSecret(cr, "other"))
 	require.False(t, chiReferencesHotReloadSecret(cr, "missing"))
+}
+
+func TestPasswordSecretWatcherHonorsLabelSelector(t *testing.T) {
+	newHotReloadCHI := func(name, shard string) *api.ClickHouseInstallation {
+		cr := newCHI(name, map[string]string{testShardKey: shard})
+		cr.Spec.Configuration = api.NewConfiguration()
+		cr.Spec.Configuration.Users = api.NewSettings()
+		cr.Spec.Configuration.Users.Set("alice/password", api.NewSettingSource(&api.SettingSource{
+			ValueFrom: &types.DataSource{
+				SecretKeyRef: &core.SecretKeySelector{
+					LocalObjectReference: core.LocalObjectReference{Name: "clickhouse-passwords"},
+					Key:                  "alice_password",
+				},
+				HotReload: true,
+			},
+		}))
+		return cr
+	}
+
+	tests := []struct {
+		name     string
+		selector string
+		want     int
+	}{
+		{name: "no selector", want: 2},
+		{name: "matching shard", selector: testShardKey + "=stg", want: 1},
+		{name: "legacy shard", selector: "!" + testShardKey, want: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setWatchLabelSelector(t, tt.selector)
+			c := newTestControllerWithCHIs(t,
+				newHotReloadCHI("chi-stg", "stg"),
+				newHotReloadCHI("chi-logs", "logs"),
+			)
+			c.initQueues()
+			c.onPasswordSecret(&meta.PartialObjectMetadata{ObjectMeta: meta.ObjectMeta{
+				Namespace: "clickhouse",
+				Name:      "clickhouse-passwords",
+			}})
+			require.Equal(t, tt.want, queuedItems(c))
+		})
+	}
 }
 
 // A source Secret update does not change CHI generation. The watcher still

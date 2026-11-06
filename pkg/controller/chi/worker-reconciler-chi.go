@@ -23,7 +23,6 @@ import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -188,6 +187,9 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	w.setHostStatusesPreliminary(ctx, new)
 
 	if err := w.reconcile(ctx, new); err != nil {
+		if util.IsContextDone(ctx) {
+			return nil
+		}
 		if errors.Is(err, common.ErrCRUDDeferred) {
 			// A deferral is a postponement, not a failure. The host-level branch already recorded
 			// WHY; this records WHAT the skipped success block left behind, which is otherwise
@@ -217,11 +219,31 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 		// up at this point — clean()'s purge is what tears them down — so SQL hooks can
 		// drain the dying hosts before they go away.
 		w.runHostPreDeleteHooksOnRemovedHosts(ctx, new)
+		if util.IsContextDone(ctx) {
+			log.V(1).Info("Reconcile is aborted after pre-delete hooks: %s", new.GetName())
+			return nil
+		}
 
-		w.clean(ctx, new)
+		if !w.clean(ctx, new) {
+			return nil
+		}
+		if util.IsContextDone(ctx) {
+			log.V(1).Info("Reconcile is aborted after cleanup: %s", new.GetName())
+			return nil
+		}
 		w.addToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
-		w.finalizeReconcileAndMarkCompleted(ctx, new)
+		if util.IsContextDone(ctx) {
+			log.V(1).Info("Reconcile is aborted after waiting for addresses: %s", new.GetName())
+			return nil
+		}
+		if !w.finalizeReconcileAndMarkCompleted(ctx, new) {
+			return nil
+		}
+		if util.IsContextDone(ctx) {
+			log.V(1).Info("Reconcile is aborted after finalize: %s", new.GetName())
+			return nil
+		}
 
 		w.dropZKReplicas(ctx, new)
 
@@ -278,15 +300,6 @@ func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *
 	w.a.V(1).M(cr).Info(actionPlan.Log("buildCR"))
 
 	return cr
-}
-
-func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*api.ClickHouseInstallation, error) {
-	_cr, err := w.c.GetCR(obj)
-	if err != nil {
-		w.a.M(obj).F().Error("UNABLE-1 to find obj by labels: %v err: %v", obj.GetLabels(), err)
-		return nil, err
-	}
-	return w.buildCR(ctx, _cr), nil
 }
 
 func (w *worker) buildTemplates(chi *api.ClickHouseInstallation) (templates []*api.ClickHouseInstallation) {
