@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 var normalizedChiA = &ClickHouseInstallation{}
@@ -107,6 +108,21 @@ func TestCopyFromUsedTemplates(t *testing.T) {
 
 		require.Empty(t, status.UsedTemplates)
 	})
+}
+
+func TestRemoveHostReplicaCaughtUp(t *testing.T) {
+	const fqdn = "chi-x-default-0-0"
+	status := &Status{}
+	status.PushHostReplicaCaughtUp(fqdn)
+	status.PushHostReplicaCaughtUp("chi-x-default-0-1")
+
+	status.RemoveHostReplicaCaughtUp(fqdn)
+
+	for _, host := range status.GetHostsWithReplicaCaughtUp() {
+		if host == util.NormalizeFQDN(fqdn) {
+			t.Fatalf("host should have been removed: %v", status.GetHostsWithReplicaCaughtUp())
+		}
+	}
 }
 
 // NB: These tests mostly exist to exercise synchronization and detect regressions related to them via the

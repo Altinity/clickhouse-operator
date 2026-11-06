@@ -47,6 +47,7 @@ const (
 	EventReasonReconcileInProgress    = "ReconcileInProgress"
 	EventReasonReconcileCompleted     = "ReconcileCompleted"
 	EventReasonReconcileFailed        = "ReconcileFailed"
+	EventReasonReconcileProceed       = "ReconcileProceed"
 	EventReasonCreateStarted          = "CreateStarted"
 	EventReasonCreateInProgress       = "CreateInProgress"
 	EventReasonCreateCompleted        = "CreateCompleted"

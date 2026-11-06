@@ -4345,6 +4345,37 @@ spec:
                                 delay:
                                   type: integer
                                   description: "replication max absolute delay to consider replica is not delayed"
+                                sync:
+                                  type: object
+                                  description: "Replicated-host sync gate. Blocks rolling host reconcile until a recreated replicated host catches up to a bounded replication baseline"
+                                  properties:
+                                    enabled:
+                                      <<: *TypeStringBool
+                                      description: "Whether the operator should run the replicated-host sync gate. Disabled by default"
+                                    mode:
+                                      type: string
+                                      description: "Sync mode. Only `lightweight` (SYSTEM SYNC REPLICA ... LIGHTWEIGHT) is supported"
+                                      enum:
+                                        - "lightweight"
+                                    timeout:
+                                      type: integer
+                                      description: "Whole-gate timeout in seconds, 0 means unbounded"
+                                    onTimeout:
+                                      type: string
+                                      description: "What to do on gate deadline: `abort` stops reconcile, `proceed` advances without writing the caught-up marker"
+                                      enum:
+                                        - "abort"
+                                        - "proceed"
+                                    health:
+                                      type: object
+                                      description: "Stable-health window checked after sync"
+                                      properties:
+                                        pollInterval:
+                                          type: integer
+                                          description: "Seconds between post-sync health checks"
+                                        successThreshold:
+                                          type: integer
+                                          description: "Consecutive healthy checks required after sync before the caught-up marker is written"
                             probes:
                               type: object
                               description: "What probes the operator should wait during host launch procedure"
@@ -7380,6 +7411,16 @@ data:
             # a.k.a replication lag - calculated as "MAX(absolute_delay) FROM system.replicas"
             # is within this specified delay (in seconds)
             delay: 10
+            # Optional replicated-host catch-up gate before advancing to the next host.
+            # Disabled by default to preserve existing reconcile behavior.
+            sync:
+              enabled: "false"
+              mode: "lightweight"
+              timeout: 0
+              onTimeout: "abort"
+              health:
+                pollInterval: 10
+                successThreshold: 6
           probes:
             # Whether the operator during host launch procedure should wait for startup probe to succeed.
             # In case probe is unspecified wait is assumed to be completed successfully.

@@ -17,6 +17,8 @@ package schemer
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 
@@ -89,6 +91,113 @@ func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.Host) ([]st
 
 	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, s.Names(interfaces.NameFQDNs, host, api.Host{}, false), sql)
 	return names, sqlStatements, nil
+}
+
+func (s *ClusterSchemer) sqlReplicaHealth(column string) string {
+	return fmt.Sprintf("SELECT coalesce(max(%s),0) FROM system.replicas", column)
+}
+
+func (s *ClusterSchemer) sqlSyncReplicaLightweight(databaseName, tableName string) string {
+	return fmt.Sprintf(`SYSTEM SYNC REPLICA "%s"."%s" LIGHTWEIGHT`, quoteIdent(databaseName), quoteIdent(tableName))
+}
+
+func (s *ClusterSchemer) sqlSyncDatabaseReplica(databaseName string) string {
+	return fmt.Sprintf(`SYSTEM SYNC DATABASE REPLICA "%s"`, quoteIdent(databaseName))
+}
+
+func (s *ClusterSchemer) sqlWaitLoadingParts(databaseName, tableName string) string {
+	return fmt.Sprintf(`SYSTEM WAIT LOADING PARTS "%s"."%s"`, quoteIdent(databaseName), quoteIdent(tableName))
+}
+
+func (s *ClusterSchemer) sqlAsyncLoaderTableExists() string {
+	return "SELECT count() FROM system.tables WHERE database='system' AND name='asynchronous_loader'"
+}
+
+func (s *ClusterSchemer) sqlAsyncLoaderState() string {
+	return heredoc.Doc(`
+		SELECT
+			countIf(status = 'PENDING' OR is_executing = 1 OR is_ready = 1 OR is_blocked = 1),
+			countIf(status IN ('FAILED', 'CANCELED'))
+		FROM
+			system.asynchronous_loader
+		WHERE
+			startsWith(job, 'startup ') AND
+			(position(job, ' database ') > 0 OR position(job, ' table ') > 0)
+		`)
+}
+
+func (s *ClusterSchemer) sqlAsyncLoaderFailedDetails() string {
+	return heredoc.Doc(`
+		SELECT
+			concat(job, ': ', status, ifNull(concat(': ', exception), ''))
+		FROM
+			system.asynchronous_loader
+		WHERE
+			startsWith(job, 'startup ') AND
+			(position(job, ' database ') > 0 OR position(job, ' table ') > 0) AND
+			status IN ('FAILED', 'CANCELED')
+		LIMIT 1
+		`)
+}
+
+func (s *ClusterSchemer) sqlReplicatedObjects(cluster string) string {
+	return heredoc.Docf(`
+		SELECT
+			'database' AS object_type,
+			name AS database,
+			'' AS table_name
+		FROM
+		(
+			SELECT *
+			FROM clusterAllReplicas('%s', system.databases)
+			SETTINGS skip_unavailable_shards = 1
+		) databases
+		WHERE
+			name NOT IN (%s) AND
+			engine = 'Replicated'
+		UNION ALL
+		SELECT
+			'table' AS object_type,
+			database,
+			name AS table_name
+		FROM
+		(
+			SELECT *
+			FROM clusterAllReplicas('%s', system.tables)
+			SETTINGS skip_unavailable_shards = 1
+		) tables
+		WHERE
+			database NOT IN (%s) AND
+			engine LIKE 'Replicated%%'
+		`,
+		cluster,
+		ignoredDBs,
+		cluster,
+		ignoredDBs,
+	)
+}
+
+func sqlWithReceiveTimeout(sql string, remaining time.Duration) string {
+	seconds := receiveTimeoutSeconds(remaining)
+	return fmt.Sprintf("%s SETTINGS receive_timeout=%d", sql, seconds)
+}
+
+func receiveTimeoutSeconds(remaining time.Duration) int64 {
+	if remaining <= 0 {
+		return 1
+	}
+	seconds := int64(remaining / time.Second)
+	if remaining%time.Second != 0 {
+		seconds++
+	}
+	if seconds < 1 {
+		return 1
+	}
+	return seconds
+}
+
+func quoteIdent(identifier string) string {
+	return strings.ReplaceAll(identifier, `"`, `""`)
 }
 
 func (s *ClusterSchemer) sqlCreateDatabaseDistributed(cluster string) string {
