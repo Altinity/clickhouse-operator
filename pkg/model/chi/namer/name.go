@@ -34,6 +34,10 @@ func (n *Namer) createConfigMapNameCommonUsers(chi api.ICustomResource) string {
 	return n.macro.Scope(chi).Line(patterns.Get(patternConfigMapCommonUsersName))
 }
 
+func (n *Namer) createSecretNameCommonUsers(chi api.ICustomResource) string {
+	return n.macro.Scope(chi).Line(patterns.Get(patternSecretCommonUsersName))
+}
+
 // createConfigMapNameHost returns a name for a ConfigMap for replica's personal config
 func (n *Namer) createConfigMapNameHost(host *api.Host) string {
 	return n.macro.Scope(host).Line(patterns.Get(patternConfigMapHostName))
