@@ -23,7 +23,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # workflow_run defaults to the default branch, NOT the ref that built
           # the images upstream, so `cat release` could read the wrong file.
@@ -135,7 +135,7 @@ jobs:
 
       - name: Upload cosign evidence artifact
         if: ${{ steps.refs.outputs.images != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cosign-evidence-${{ github.event.workflow_run.head_branch || github.ref_name }}
           path: cosign-evidence/
