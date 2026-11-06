@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"bytes"
 	"context"
 
 	core "k8s.io/api/core/v1"
@@ -26,6 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -50,29 +52,56 @@ func (c *Controller) createSecret(ctx context.Context, secret *core.Secret) erro
 // which take their credentials from it, do not start. Enqueueing a CR cancels its reconcile in progress, so a CR
 // that deletes its backup Secret itself - being deleted, or reconciled with backup turned off - is left alone.
 func (c *Controller) enqueueBackupSecretOwner(secret *core.Secret) {
+	if cr := c.backupSecretOwner(secret); cr != nil {
+		log.V(1).M(cr).F().Info("Backup Secret %s deleted - reconcile to create it anew", util.NamespacedName(secret))
+		c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileAdd, nil, cr))
+	}
+}
+
+// enqueueBackupSecretRotation reconciles the CR whose backup Secret has been given other ClickHouse credentials.
+// ClickHouse takes the backup user from the users configuration, which only a reconcile writes, and the
+// configuration files of the sidecars take the new credentials from that reconcile alone, see
+// reconcileBackupConfigSecrets: without it the backup user and the sidecars keep the old ones until something else
+// reconciles the CR. The operator never writes the ClickHouse credentials, so any change of them is the user's:
+// setting them, changing them, or removing them.
+func (c *Controller) enqueueBackupSecretRotation(old, new *core.Secret) {
+	rotated := func(key string) bool {
+		return !bytes.Equal(old.Data[key], new.Data[key])
+	}
+	if !rotated(config.ClickHouseBackupSecretKeyClickHouseUsername) && !rotated(config.ClickHouseBackupSecretKeyClickHousePassword) {
+		return
+	}
+	if cr := c.backupSecretOwner(new); cr != nil {
+		log.V(1).M(cr).F().Info("Backup Secret %s has new ClickHouse credentials - reconcile to apply them", util.NamespacedName(new))
+		c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileAdd, nil, cr))
+	}
+}
+
+// backupSecretOwner returns the CR that controls the backup Secret and uses backup, nil when there is none: the
+// Secret is no backup Secret, its CR is gone, being deleted, or created anew since, or does not use backup
+func (c *Controller) backupSecretOwner(secret *core.Secret) *api.ClickHouseInstallation {
 	owner := meta.GetControllerOf(secret)
 	if (owner == nil) || (owner.Kind != api.ClickHouseInstallationCRDResourceKind) {
-		return
+		return nil
 	}
 	named := &api.ClickHouseInstallation{ObjectMeta: meta.ObjectMeta{Namespace: secret.GetNamespace(), Name: owner.Name}}
 	if secret.GetName() != c.namer.Name(interfaces.NameBackupAutoSecret, named) {
-		return
+		return nil
 	}
 
 	obj, err := c.kube.CR().Get(controller.NewContext(), secret.GetNamespace(), owner.Name)
 	switch {
 	case apiErrors.IsNotFound(err):
-		return
+		return nil
 	case err != nil:
-		log.V(1).M(secret).F().Warning("Unable to get the owner of deleted backup Secret %s err: %v", util.NamespacedName(secret), err)
-		return
+		log.V(1).M(secret).F().Warning("Unable to get the owner of backup Secret %s err: %v", util.NamespacedName(secret), err)
+		return nil
 	}
 	cr, ok := obj.(*api.ClickHouseInstallation)
 	if !ok || (cr == nil) || (cr.GetUID() != owner.UID) || !cr.GetDeletionTimestamp().IsZero() || !usesBackup(cr) || !ShouldEnqueue(cr) {
-		return
+		return nil
 	}
-	log.V(1).M(cr).F().Info("Backup Secret %s deleted - reconcile to create it anew", util.NamespacedName(secret))
-	c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileAdd, nil, cr))
+	return cr
 }
 
 // usesBackup reports whether backup is enabled in the normalized CR - which takes in the templates, which may enable

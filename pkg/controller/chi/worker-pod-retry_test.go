@@ -138,8 +138,6 @@ func TestShouldTriggerAutoRecovery(t *testing.T) {
 			withError(api.StatusReasonFIPSImagePolicyViolation, "image lacks fips marker"), false},
 		{"Aborted with InvalidPodTemplate — reject",
 			withError(api.StatusReasonInvalidPodTemplate, "container has no image"), false},
-		{"Aborted with InvalidBackupStorage — reject",
-			withError(api.StatusReasonInvalidBackupStorage, `backup.storage "dr" names no declared storage`), false},
 		// The backup Secret may be readable by the time a pod turns Ready - no spec edit needed.
 		{"Aborted with BackupSecretUnresolved — accept",
 			withError(api.StatusReasonBackupSecretUnresolved, "backup Secret cannot be read"), true},

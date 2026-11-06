@@ -117,6 +117,11 @@ func configGeneratorOptions(cr *api.ClickHouseInstallation) *config.GeneratorOpt
 }
 
 func (w *worker) buildCreator(cr *api.ClickHouseInstallation) *commonCreator.Creator {
+	return buildCreator(cr)
+}
+
+// buildCreator builds the creator of the objects of the CR
+func buildCreator(cr *api.ClickHouseInstallation) *commonCreator.Creator {
 	if cr == nil {
 		cr = &api.ClickHouseInstallation{}
 	}
