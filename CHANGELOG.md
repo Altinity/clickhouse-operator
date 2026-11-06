@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Volume downscale tool now supports StorageClass migration.** Set `NEW_STORAGE_CLASS` in `tools/volume_downscale.sh` to move a volume to another StorageClass at the same or a smaller size; the script also detects repeated volume attachment and mount failures. See [runbook](tools/volume_downscale.md). by [@lesandie](https://github.com/lesandie) in [#2125](https://github.com/Altinity/clickhouse-operator/pull/2125)
 
+* **The Helm chart now aggregates the operator's CRDs into the builtin `view`, `edit` and `admin` ClusterRoles.** `ClickHouseInstallationTemplate`, `ClickHouseOperatorConfiguration` and `ClickHouseKeeperInstallation` are readable by `view`; `edit` and `admin` can read and write all four operator kinds. `ClickHouseInstallation` is deliberately not readable by `view`, because the operator writes the normalized CR, including derived `password_sha256_hex` user hashes, into its status. Enabled by default, disable with `rbac.aggregate.enabled=false` (requires `rbac.create`).
+
 ### Changed
 
 * **BACKWARD INCOMPATIBLE: Revised template precedence.** `ClickHouseInstallation` settings now override templates and operator defaults; later templates override earlier ones. Kubernetes resource lists merge by name or appropriate key. Existing installations may restart or recreate StatefulSets when effective configuration changes. See [upgrade notes](docs/operator_configuration.md#upgrading-from-027). by [@sunsingerus](https://github.com/sunsingerus)
