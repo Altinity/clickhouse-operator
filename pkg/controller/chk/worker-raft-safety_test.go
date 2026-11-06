@@ -651,6 +651,11 @@ func (f *raftFakeSTS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.
 	return nil, errors.New("raftFakeSTS: Create must not be reached")
 }
 
+// ValidateCreate is a server-side dry-run: it writes nothing, so it is not counted as a mutation.
+func (f *raftFakeSTS) ValidateCreate(ctx context.Context, sts *apps.StatefulSet) error {
+	return nil
+}
+
 func (f *raftFakeSTS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
