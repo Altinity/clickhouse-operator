@@ -149,7 +149,7 @@ spec:
                     How many failed finished Jobs to keep, at least 1: the operator learns from the Job of a run why
                     it failed and the hosts it backed up. Defaults to 1
                 schemaOnly:
-                  !!merge <<: *TypeStringBool
+                  <<: *TypeStringBool
                   description: "Back up table/database definitions only (no data)"
                 replicaSelection:
                   type: string
