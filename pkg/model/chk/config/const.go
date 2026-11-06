@@ -82,3 +82,13 @@ const (
 	// Generator.getPlaintextListenerRemoval.
 	configListenersCommon = "common-listeners"
 )
+
+const (
+	// BootstrapRaftHostConfigKey is intentionally not an .xml file: Keeper must
+	// not load the host bootstrap Raft overlay from conf.d before the shared Raft
+	// configuration in keeper_config.d. The projected volume renames it to XML.
+	BootstrapRaftHostConfigKey = "chop-generated-bootstrap-raft.fragment"
+	// BootstrapRaftProjectedFile sorts after chop-generated-raft.xml, so the
+	// host-local replace="replace" applies last in keeper_config.d.
+	BootstrapRaftProjectedFile = "zz-chop-generated-bootstrap-raft.xml"
+)

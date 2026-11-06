@@ -19,13 +19,17 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/normalizer"
 )
 
 type fakeCRStatusWriter struct {
@@ -124,4 +128,46 @@ func TestMarkReconcileStartReturnsStatusUpdateError(t *testing.T) {
 	if got := cr.EnsureStatus().GetStatus(); got != api.StatusInProgress {
 		t.Fatalf("status = %q, want %q before persistence attempt", got, api.StatusInProgress)
 	}
+}
+
+func TestAbortStatusPersistenceIsRequiredBeforeTerminalAcknowledge(t *testing.T) {
+	cr := &apiChk.ClickHouseKeeperInstallation{
+		ObjectMeta: meta.ObjectMeta{Namespace: "test", Name: "keeper"},
+		Status: &apiChk.Status{
+			TaskID: "stalled-joiner",
+			Errors: []string{raftStagedJoinerStartupTimeoutStatusMarker + " image unavailable"},
+		},
+	}
+	statusWriter := &fakeCRStatusWriter{err: errors.New("status unavailable")}
+	w := newStatusTestWorker(statusWriter)
+
+	err := w.markReconcileCompletedUnsuccessfully(context.Background(), cr,
+		errors.Join(errRaftStagedJoinerStartupTimeout, errors.New("startup timeout"), common.ErrCRUDAbort))
+	require.ErrorIs(t, err, statusWriter.err,
+		"failed status persistence must be returned so controller-runtime can retry writing Aborted")
+	require.Equal(t, apiChk.StatusAborted, cr.Status.GetStatus())
+	require.Contains(t, cr.Status.GetErrors()[0], raftStagedJoinerStartupTimeoutStatusMarker)
+
+	statusWriter.err = nil
+	require.NoError(t, w.markReconcileCompletedUnsuccessfully(context.Background(), cr, common.ErrCRUDAbort))
+	require.Equal(t, apiChk.StatusAborted, cr.Status.GetStatus())
+	require.Same(t, cr, statusWriter.updated)
+}
+
+// Normalization copies the Kubernetes generation into status.normalized,
+// which is the durable last-attempt identity used by the terminal-abort guard.
+func TestNormalizedCHKPreservesAttemptedGenerationForTerminalAbort(t *testing.T) {
+	cr := chkWithHosts(1)
+	cr.SetGeneration(17)
+	cr.Status = &apiChk.Status{
+		Status: apiChk.StatusAborted,
+		Errors: []string{raftStagedJoinerStartupTimeoutStatusMarker + " test"},
+	}
+	w := &worker{normalizer: normalizer.New()}
+	normalized := w.createTemplated(cr)
+	require.Equal(t, int64(17), normalized.GetGeneration())
+	require.NotNil(t, normalized.GetTarget())
+	require.Equal(t, int64(17), normalized.GetTarget().GetGeneration())
+	require.NotEqual(t, apiChk.StatusAborted, normalized.Status.GetStatus(),
+		"a changed spec must not inherit an old terminal abort as a new normalization failure")
 }

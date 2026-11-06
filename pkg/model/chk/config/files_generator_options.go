@@ -21,8 +21,9 @@ import (
 
 // FilesGeneratorOptions specifies options for configuration files generator
 type FilesGeneratorOptions struct {
-	host        *api.Host
-	RaftOptions *config.HostSelector
+	host          *api.Host
+	RaftOptions   *config.HostSelector
+	BootstrapRaft bool
 }
 
 // defaultFilesGeneratorOptions creates new default options for files generator
@@ -33,6 +34,14 @@ func defaultFilesGeneratorOptions() *FilesGeneratorOptions {
 // NewFilesGeneratorOptions creates new options for configuration files generator
 func NewFilesGeneratorOptions() *FilesGeneratorOptions {
 	return &FilesGeneratorOptions{}
+}
+
+// SetBootstrapRaft enables a temporary per-host Raft configuration overlay.
+func (o *FilesGeneratorOptions) SetBootstrapRaft(enabled bool) *FilesGeneratorOptions {
+	if o != nil {
+		o.BootstrapRaft = enabled
+	}
+	return o
 }
 
 func (o *FilesGeneratorOptions) GetHost() *api.Host {

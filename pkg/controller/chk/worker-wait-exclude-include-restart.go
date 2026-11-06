@@ -21,7 +21,6 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -103,8 +102,8 @@ func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 }
 
 // includeHostIntoRaftCluster publishes the host into raft_configuration.
-// On ConfigMap failure a host that was excluded is excluded again, so the next
-// pass retries publication instead of creating a StatefulSet against stale XML.
+// On ConfigMap failure a host that was excluded is excluded again, so the
+// started joiner can retry publication without claiming membership succeeded.
 // A host that was not excluded stays that way: SetExclude here would drop an
 // existing voter from raft_configuration after a conflict.
 func (w *worker) includeHostIntoRaftCluster(ctx context.Context, host *api.Host) error {
@@ -124,47 +123,13 @@ func (w *worker) includeHostIntoRaftCluster(ctx context.Context, host *api.Host)
 	return err
 }
 
-// rollbackStagedRaftAdmit puts a host back out of raft_configuration after its
-// StatefulSet create failed, and republishes so the ConfigMap does not list a
-// server that has no Pod. A live StatefulSet stays published: rolling it back
-// and letting the next pass's preliminary ConfigMap put it back flaps membership.
-// Absence is stagedJoinerStatefulSet returning nil, the same NotFound staging uses.
-func (w *worker) rollbackStagedRaftAdmit(ctx context.Context, host *api.Host) {
-	sts, err := w.stagedJoinerStatefulSet(ctx, host)
-	if err != nil {
-		w.a.V(1).
-			M(host).F().
-			Warning("Reconcile Host Main - unable to tell whether %s still has a StatefulSet after admit failed: %v", host.GetName(), err)
-		return
-	}
-	if sts != nil {
-		w.a.WithEvent(host.GetCR(), a.EventActionReconcile, a.EventReasonReconcileInProgress).
-			WithAction(host.GetCR()).
-			M(host).F().
-			Info("Keep %s in raft_configuration; its StatefulSet exists", host.GetName())
-		return
-	}
-	host.GetCR().GetRuntime().LockCommonConfig()
-	host.GetReconcileAttributes().SetExclude()
-	err = w.publishRaftConfiguration(ctx, host)
-	host.GetCR().GetRuntime().UnlockCommonConfig()
-	if err != nil {
-		w.a.V(1).
-			M(host).F().
-			Warning("Reconcile Host Main - unable to drop host from raft_configuration after StatefulSet create failed. Host: %s Err: %v", host.GetName(), err)
-	}
-}
-
-// publishStagedAdmit publishes a host that is still excluded. admitted is false
-// when the host was not excluded, so a later error must not roll membership back.
-func (w *worker) publishStagedAdmit(ctx context.Context, host *api.Host) (admitted bool, err error) {
+// publishStagedAdmit publishes only after the joiner's Pod has Started.
+// There is no pre-create publication to roll back after failed startup.
+func (w *worker) publishStagedAdmit(ctx context.Context, host *api.Host) error {
 	if host == nil || !host.GetReconcileAttributes().IsExclude() {
-		return false, nil
+		return nil
 	}
-	if err := w.includeHostIntoRaftCluster(ctx, host); err != nil {
-		return false, err
-	}
-	return true, nil
+	return w.includeHostIntoRaftCluster(ctx, host)
 }
 
 // publishRaftConfiguration writes raft_configuration for the host's CR.

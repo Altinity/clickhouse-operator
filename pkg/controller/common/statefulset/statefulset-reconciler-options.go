@@ -15,9 +15,10 @@
 package statefulset
 
 type ReconcileOptions struct {
-	forceRecreate    bool
-	waitUntilStarted bool
-	waitUntilReady   bool
+	forceRecreate       bool
+	waitUntilStarted    bool
+	waitUntilReady      bool
+	waitStartedOnSame   bool
 }
 
 func NewReconcileStatefulSetOptions() *ReconcileOptions {
@@ -42,6 +43,23 @@ func (o *ReconcileOptions) WaitUntilStarted() bool {
 		return false
 	}
 	return o.waitUntilStarted
+}
+
+// SetWaitUntilStartedOnSame rechecks startup even for an existing, unchanged
+// StatefulSet. Used by CHK staged joins on a retry after an interrupted create:
+// the STS can be Same while its Pod never started (e.g. a broken image).
+// This is deliberately opt-in and does not impose a Ready wait on the joiner.
+func (o *ReconcileOptions) SetWaitUntilStartedOnSame() *ReconcileOptions {
+	o = o.Ensure()
+	o.waitStartedOnSame = true
+	return o
+}
+
+func (o *ReconcileOptions) WaitUntilStartedOnSame() bool {
+	if o == nil {
+		return false
+	}
+	return o.waitStartedOnSame
 }
 
 func (o *ReconcileOptions) SetWaitUntilReady() *ReconcileOptions {
