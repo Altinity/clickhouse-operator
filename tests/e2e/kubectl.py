@@ -246,7 +246,7 @@ _TRANSIENT_APISERVER_ERRORS = (
 _transient_max_retries = 5
 
 
-def launch(command, ok_to_fail=False, ns=None, timeout=600, shell=None):
+def launch(command, ok_to_fail=False, ns=None, timeout=600, shell=None, hard_timeout=False):
     # Build commanddef launch
 
     if ns is None:
@@ -268,6 +268,11 @@ def launch(command, ok_to_fail=False, ns=None, timeout=600, shell=None):
     # save command for debug purposes
     # command = cmd
     # print(f"run command: {cmd}")
+
+    # hard_timeout kills the process. The testflows shell timeout is not a deadline:
+    # output refreshes it, and a hung kubectl is left running.
+    if hard_timeout:
+        return run_host_cmd(cmd, timeout=30, ok_to_fail=ok_to_fail)
 
     # retry_transient: kubectl-only resilience (launch builds a kubectl command),
     # so a momentary apiserver blip is retried rather than hard-failing the test.
@@ -358,17 +363,34 @@ def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None, wait=True):
         )
 
 
-def force_clear_finalizers(kind, name, ns=None, shell=None):
-    """Remove a stuck CR's finalizers so the apiserver can reap it.
+# Finalizers the operator itself installs. force_clear_finalizers removes these
+# and leaves any other finalizer on the object.
+_OPERATOR_FINALIZERS = frozenset({
+    "finalizer.clickhouseinstallation.altinity.com",
+    "finalizer.clickhousekeeperinstallation.altinity.com",
+})
 
-    Used when the operator was killed or is mid-restart (e.g. chopconf
-    onChange=restart) and never removed the finalizer. Logs a WARNING so a
-    genuine operator-cleanup bug stays visible rather than being silently masked.
+
+def force_clear_finalizers(kind, name, ns=None, shell=None, hard_timeout=False):
+    """Remove the operator finalizers from a stuck CR so the apiserver can reap it.
+
+    Other finalizers stay. Used when the operator was killed or is mid-restart
+    (e.g. chopconf onChange=restart) and never removed its own finalizer. Logs a
+    WARNING so a genuine operator-cleanup bug stays visible rather than being
+    silently masked.
     """
-    print(f"WARNING: {kind}/{name} still present; force-clearing finalizers (operator may be killed/restarting)")
+    obj = get(kind, name, ns=ns, ok_to_fail=True, shell=shell, hard_timeout=hard_timeout) or {}
+    finalizers = (obj.get("metadata") or {}).get("finalizers") or []
+    if not isinstance(finalizers, list):
+        return
+    kept = [finalizer for finalizer in finalizers if finalizer not in _OPERATOR_FINALIZERS]
+    if kept == finalizers:
+        return
+    print(f"WARNING: {kind}/{name} still present; force-clearing operator finalizers (operator may be killed/restarting)")
+    patch = json.dumps({"metadata": {"finalizers": kept}}, separators=(",", ":"))
     launch(
-        f"patch {kind} {name} --type=merge -p '{{\"metadata\":{{\"finalizers\":null}}}}'",
-        ns=ns, ok_to_fail=True, shell=shell,
+        f"patch {kind} {name} --type=merge -p '{patch}'",
+        ns=ns, ok_to_fail=True, shell=shell, hard_timeout=hard_timeout,
     )
 
 
@@ -456,39 +478,50 @@ def delete_all_chk(ns=None):
 
 
 def delete_all(kind, ns=None):
-    crds = launch("get crds -o=custom-columns=name:.spec.names.shortNames[0]", ns=ns).splitlines()
+    crds = launch("get crds -o=custom-columns=name:.spec.names.shortNames[0]", ns=ns, hard_timeout=True).splitlines()
     if kind in crds:
         try:
-            to_delete = get(kind, "", ns=ns, ok_to_fail=True) or {}
+            to_delete = get(kind, "", ns=ns, ok_to_fail=True, hard_timeout=True) or {}
         except Exception:
             to_delete = {}
         if "items" in to_delete:
-            for i in to_delete["items"]:
-                name = i["metadata"]["name"]
-                # Initial delete. ok_to_fail: a stuck finalizer (operator killed
-                # OR mid-restart — e.g. chopconf onChange=restart in test_030008)
-                # makes `kubectl delete --timeout` exit non-zero; we recover via
-                # the force-clear loop below, so this must not raise here.
-                delete_kind(kind, name, ns=ns, ok_to_fail=True, wait=False)
-                # Stuck/re-attached finalizer recovery. The operator can RE-ATTACH
-                # a finalizer after a clear while it is restarting, so a single
-                # wait_object would race the restart and raise. Re-clear + re-delete
-                # up to max_retries until the CR is actually reaped. We WARN on each
-                # pass so a genuine operator-cleanup bug stays visible in the logs
-                # instead of being silently masked.
-                for attempt in range(1, max_retries):
-                    if get_count(kind, name=name, ns=ns) == 0:
-                        break
-                    force_clear_finalizers(kind, name, ns=ns)
-                    delete_kind(kind, name, ns=ns, ok_to_fail=True, wait=False)
-                    # Only sleep if another re-check follows; skip on the last
-                    # attempt so a genuinely-stuck CR hits the final wait_object
-                    # (the authoritative leak assertion) without an extra wait.
-                    if attempt < max_retries - 1:
-                        retry_sleep(attempt, 5, f"{kind}/{name} still terminating")
-                # Final assertion: if the CR survived every force-clear, this
-                # raises — surfacing a real cleanup leak rather than hiding it.
-                # wait_object(kind, name, ns=ns, count=0)
+            names = [i["metadata"]["name"] for i in to_delete["items"]]
+            # Request every delete before waiting, so one slow CR does not hold up the rest.
+            # --wait=false returns when the apiserver accepts the delete. hard_timeout kills
+            # a kubectl that never gets a response. Pods and other children are left for the
+            # namespace delete that follows.
+            for name in names:
+                launch(
+                    f"delete {kind} {name} --wait=false",
+                    ns=ns, ok_to_fail=True, hard_timeout=True,
+                )
+                # Strip the operator finalizer only after deletionTimestamp is set. A delete
+                # killed at the timeout may not have been accepted, and clearing the finalizer
+                # then lets the operator install it again. The second call retries a get that
+                # timed out and skipped the patch. Nothing waits between the two calls.
+                obj = get(kind, name, ns=ns, ok_to_fail=True, hard_timeout=True) or {}
+                if (obj.get("metadata") or {}).get("deletionTimestamp"):
+                    force_clear_finalizers(kind, name, ns=ns, hard_timeout=True)
+                    force_clear_finalizers(kind, name, ns=ns, hard_timeout=True)
+            # Wait until each CR is gone. An empty get is not proof: a killed kubectl produces
+            # no output. Only NotFound is. One retry_sleep covers whatever is still present.
+            # Leftovers are reported and do not stop namespace deletion.
+            pending = list(names)
+            for i in range(1, 5):
+                if not pending:
+                    break
+                still = []
+                for name in pending:
+                    out = launch(f"get {kind} {name}", ns=ns, ok_to_fail=True, hard_timeout=True) or ""
+                    if "NotFound" not in out:
+                        still.append(name)
+                pending = still
+                if pending:
+                    retry_sleep(i, 5, f"{kind} still present: {', '.join(pending)}")
+            if pending:
+                print(
+                    f"WARNING: {kind} still present after deleting and clearing operator finalizers: {', '.join(pending)}"
+                )
 
 
 def delete_all_keeper(ns=None):
@@ -585,8 +618,8 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
         delete_chi(chi_name, ns=ns, shell=shell)
 
 
-def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None):
-    out = launch(f"get {kind} {name} {label} -o json", ns=ns, ok_to_fail=ok_to_fail, shell=shell)
+def get(kind, name, label="", ns=None, ok_to_fail=False, shell=None, hard_timeout=False):
+    out = launch(f"get {kind} {name} {label} -o json", ns=ns, ok_to_fail=ok_to_fail, shell=shell, hard_timeout=hard_timeout)
     stripped = out.strip()
 
     if not stripped or stripped.startswith("Error"):
@@ -650,16 +683,20 @@ def delete_ns(ns = None, delete_chi=False, ok_to_fail=False, timeout=1000):
     if delete_chi:
         delete_all_chi(ns)
         delete_all_chk(ns)
+    # --wait=false returns once the apiserver accepts the delete. --now gives pods a
+    # one-second grace period. The loop below is what waits for the namespace to disappear.
     launch(
-        f"delete ns {ns} -v 5 --now --timeout={timeout}s",
+        f"delete ns {ns} --now --wait=false",
         ns=None,
         ok_to_fail=ok_to_fail,
         timeout=timeout,
     )
     for attempt in retries(timeout=300, delay=10):
         with attempt:
-            out = launch(f"get namespace {ns}", ok_to_fail=True)
-            assert "Error" in out
+            out = launch(f"get namespace {ns}", ok_to_fail=True) or ""
+            # NotFound means the namespace is gone. Any other error can be a transient
+            # apiserver failure while the namespace is still there.
+            assert "NotFound" in out, error(out)
 
 
 def get_count(kind, name="", label="", chi="", chk ="", ns=None, shell=None):
