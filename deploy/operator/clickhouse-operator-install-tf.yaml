@@ -1233,64 +1233,38 @@ spec:
                               Fields left empty are inherited from `chi.spec.backup`; set `enabled: "no"` to opt this cluster out.
                               When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
                               so turning it on or off rolls the cluster's Pods. Customize the sidecar through a container named
-                              clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the storage
-                              the cluster uses has a `secretRef`, or `podTemplate` is set: without either the sidecar would have no
-                              backup storage, so backup stays off and the operator warns.
+                              clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the cluster
+                              has a `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
+                              so backup stays off and the operator warns.
                               See docs/backup.md for details.
                             properties:
                               enabled:
                                 <<: *TypeStringBool
                                 description: |
                                   Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
-                                  the cluster. Takes effect only with a storage that has a `secretRef`, or `podTemplate` set, which name where the
-                                  sidecar takes its storage from: without either, backup stays off
+                                  the cluster. Takes effect only with `configSecretRef` or `podTemplate` set, which name where the sidecar takes
+                                  its storage from: without either, backup stays off
                               podTemplate:
                                 type: string
                                 description: |
                                   Pod template whose container named clickhouse-backup the sidecar is built on: what the container sets is kept,
                                   and the operator fills in only what it lacks. Only that container is taken, not the other containers, volumes
                                   or Pod settings of the template. Left empty, the operator builds the sidecar on its own
-                              storages:
-                                type: array
+                              configSecretRef:
+                                type: object
                                 description: |
-                                  Storages the backups may be kept in, each under a name of its own; one per level for now. A cluster takes
-                                  those of the installation along with its own, pairing them by name: a storage of its own that the installation
-                                  declares too takes what it leaves out from the installation's. Templates contribute theirs alike
-                                maxItems: 1
-                                x-kubernetes-list-type: map
-                                x-kubernetes-list-map-keys:
-                                  - name
-                                items:
-                                  type: object
-                                  required:
-                                    - name
-                                  properties:
-                                    name:
-                                      type: string
-                                      description: |
-                                        Name of the storage, which `storage` names: a DNS label of at most 45 characters
-                                      maxLength: 45
-                                      pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-                                    secretRef:
-                                      type: object
-                                      description: |
-                                        Secret in the installation's namespace whose keys are passed to the sidecar as environment variables,
-                                        configuring the storage, e.g. REMOTE_STORAGE, S3_BUCKET, S3_PATH, S3_ACCESS_KEY, S3_SECRET_KEY.
-                                        Without one, of its own or of the storage of the same name it pairs with, the storage is configured by the
-                                        container of the Pod template `podTemplate` names
-                                      properties:
-                                        name:
-                                          description: |
-                                            Name of the referent. More info:
-                                            https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          type: string
-                              storage:
-                                type: string
-                                description: |
-                                  Name of the storage of `storages` the sidecar keeps the backups in. Left out, it is the only storage the same
-                                  level declares, or else the one the level a cluster inherits from uses; required where a level declares
-                                  several. On a cluster that turns backup on, a name no level declares aborts the reconcile. An explicit ""
-                                  on a cluster leaves the cluster without a storage
+                                  Secret in the installation's namespace whose key `config.yml` holds the clickhouse-backup configuration
+                                  of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
+                                  s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
+                                  which follows a change of the Secret without a restart. A cluster that leaves it out takes the
+                                  installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Without one, the
+                                  storage is configured by the container of the Pod template `podTemplate` names
+                                properties:
+                                  name:
+                                    description: |
+                                      Name of the referent. More info:
+                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    type: string
                               recovery:
                                 type: object
                                 description: |
@@ -1918,8 +1892,8 @@ spec:
                     EXPERIMENTAL. Operator-managed backup defaults, applied to every cluster. Each cluster can override
                     them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
                     When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                    so turning it on or off rolls the cluster's Pods. Backup takes effect only where the storage a cluster
-                    uses has a `secretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
+                    so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has a
+                    `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
                     so backup stays off and the operator warns.
                     See docs/backup.md for details.
                 useTemplates:
@@ -3176,64 +3150,38 @@ spec:
                               Fields left empty are inherited from `chi.spec.backup`; set `enabled: "no"` to opt this cluster out.
                               When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
                               so turning it on or off rolls the cluster's Pods. Customize the sidecar through a container named
-                              clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the storage
-                              the cluster uses has a `secretRef`, or `podTemplate` is set: without either the sidecar would have no
-                              backup storage, so backup stays off and the operator warns.
+                              clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the cluster
+                              has a `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
+                              so backup stays off and the operator warns.
                               See docs/backup.md for details.
                             properties:
                               enabled:
                                 <<: *TypeStringBool
                                 description: |
                                   Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
-                                  the cluster. Takes effect only with a storage that has a `secretRef`, or `podTemplate` set, which name where the
-                                  sidecar takes its storage from: without either, backup stays off
+                                  the cluster. Takes effect only with `configSecretRef` or `podTemplate` set, which name where the sidecar takes
+                                  its storage from: without either, backup stays off
                               podTemplate:
                                 type: string
                                 description: |
                                   Pod template whose container named clickhouse-backup the sidecar is built on: what the container sets is kept,
                                   and the operator fills in only what it lacks. Only that container is taken, not the other containers, volumes
                                   or Pod settings of the template. Left empty, the operator builds the sidecar on its own
-                              storages:
-                                type: array
+                              configSecretRef:
+                                type: object
                                 description: |
-                                  Storages the backups may be kept in, each under a name of its own; one per level for now. A cluster takes
-                                  those of the installation along with its own, pairing them by name: a storage of its own that the installation
-                                  declares too takes what it leaves out from the installation's. Templates contribute theirs alike
-                                maxItems: 1
-                                x-kubernetes-list-type: map
-                                x-kubernetes-list-map-keys:
-                                  - name
-                                items:
-                                  type: object
-                                  required:
-                                    - name
-                                  properties:
-                                    name:
-                                      type: string
-                                      description: |
-                                        Name of the storage, which `storage` names: a DNS label of at most 45 characters
-                                      maxLength: 45
-                                      pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-                                    secretRef:
-                                      type: object
-                                      description: |
-                                        Secret in the installation's namespace whose keys are passed to the sidecar as environment variables,
-                                        configuring the storage, e.g. REMOTE_STORAGE, S3_BUCKET, S3_PATH, S3_ACCESS_KEY, S3_SECRET_KEY.
-                                        Without one, of its own or of the storage of the same name it pairs with, the storage is configured by the
-                                        container of the Pod template `podTemplate` names
-                                      properties:
-                                        name:
-                                          description: |
-                                            Name of the referent. More info:
-                                            https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          type: string
-                              storage:
-                                type: string
-                                description: |
-                                  Name of the storage of `storages` the sidecar keeps the backups in. Left out, it is the only storage the same
-                                  level declares, or else the one the level a cluster inherits from uses; required where a level declares
-                                  several. On a cluster that turns backup on, a name no level declares aborts the reconcile. An explicit ""
-                                  on a cluster leaves the cluster without a storage
+                                  Secret in the installation's namespace whose key `config.yml` holds the clickhouse-backup configuration
+                                  of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
+                                  s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
+                                  which follows a change of the Secret without a restart. A cluster that leaves it out takes the
+                                  installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Without one, the
+                                  storage is configured by the container of the Pod template `podTemplate` names
+                                properties:
+                                  name:
+                                    description: |
+                                      Name of the referent. More info:
+                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    type: string
                               recovery:
                                 type: object
                                 description: |
@@ -3861,8 +3809,8 @@ spec:
                     EXPERIMENTAL. Operator-managed backup defaults, applied to every cluster. Each cluster can override
                     them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
                     When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                    so turning it on or off rolls the cluster's Pods. Backup takes effect only where the storage a cluster
-                    uses has a `secretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
+                    so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has a
+                    `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
                     so backup stays off and the operator warns.
                     See docs/backup.md for details.
                 useTemplates:
@@ -5920,9 +5868,9 @@ spec:
                         description: "Hosts of the cluster the Job drives"
                         items:
                           type: string
-                      storage:
+                      configSecret:
                         type: string
-                        description: "Backup storage of the cluster the Job keeps the backup in, or reads it from, as the Job was built"
+                        description: "Secret of the clickhouse-backup configuration of the cluster the Job keeps the backup by, or reads it by, as the Job was built: the storage the backup lies in"
                       startTime:
                         type: string
                         format: date-time
@@ -6200,9 +6148,9 @@ spec:
                       cronJobName:
                         type: string
                         description: "Name of the CronJob that runs the schedule on the cluster"
-                      storage:
+                      configSecret:
                         type: string
-                        description: "Backup storage the runs of the cluster keep their backups in, as its CronJob was last built"
+                        description: "Secret of the clickhouse-backup configuration the runs of the cluster keep their backups by, as its CronJob was last built: for a cluster that lost its CronJob, the storage its unpruned backups lie in"
                       lastScheduleTime:
                         type: string
                         format: date-time
@@ -6471,9 +6419,9 @@ spec:
                         description: "Hosts of the cluster the Job drives"
                         items:
                           type: string
-                      storage:
+                      configSecret:
                         type: string
-                        description: "Backup storage of the cluster the Job reads the backup from, as the Job was built"
+                        description: "Secret of the clickhouse-backup configuration of the cluster the Job keeps the backup by, or reads it by, as the Job was built: the storage the backup lies in"
                       startTime:
                         type: string
                         format: date-time

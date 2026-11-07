@@ -5,6 +5,8 @@
 # Paths
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 PROJECT_ROOT="$(realpath "${CUR_DIR}/../..")"
+# realpath of a missing folder is empty on macOS, which would render configs into the root folder
+mkdir -p "${PROJECT_ROOT}/tmp"
 PROJECT_TEMP="$(realpath "${PROJECT_ROOT}/tmp")"
 
 # Relative and abs paths where templates live

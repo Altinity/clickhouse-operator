@@ -993,12 +993,19 @@ func (c *ScheduleController) applyCronJob(
 	version := desired.GetAnnotations()[model.AnnotationBackupObjectVersion]
 	_, recorded := suspendedAt(existing)
 	labeled := hasLabels(existing, desired.GetLabels()) && hasLabels(&existing.Spec.JobTemplate, desired.Spec.JobTemplate.GetLabels())
-	if (existing.GetAnnotations()[model.AnnotationBackupObjectVersion] == version) && (recorded == suspend) && labeled {
+	configSecret := model.ObjectConfigSecret(desired)
+	annotated := model.ObjectConfigSecret(existing) == configSecret
+	if (existing.GetAnnotations()[model.AnnotationBackupObjectVersion] == version) && (recorded == suspend) && labeled && annotated {
 		return existing, nil
 	}
 	updated := existing.DeepCopy()
 	updated.SetLabels(util.MergeStringMapsOverwrite(updated.GetLabels(), desired.GetLabels()))
 	meta.SetMetaDataAnnotation(&updated.ObjectMeta, model.AnnotationBackupObjectVersion, version)
+	if configSecret == "" {
+		delete(updated.Annotations, model.AnnotationBackupConfigSecret)
+	} else {
+		meta.SetMetaDataAnnotation(&updated.ObjectMeta, model.AnnotationBackupConfigSecret, configSecret)
+	}
 	updated.Spec = desired.Spec
 	switch {
 	case !suspend:
@@ -1064,7 +1071,7 @@ func suspendedAt(cronJob *batch.CronJob) (time.Time, bool) {
 // older.
 func (c *ScheduleController) syncStatus(chbs *api.ClickHouseBackupSchedule, cluster *api.ScheduleClusterStatus, cronJob *batch.CronJob) {
 	cluster.CronJobName = cronJob.GetName()
-	cluster.Storage = model.ObjectStorage(cronJob)
+	cluster.ConfigSecret = model.ObjectConfigSecret(cronJob)
 	cluster.LastScheduleTime = cronJob.Status.LastScheduleTime.DeepCopy()
 	if succeeded := cronJob.Status.LastSuccessfulTime; later(succeeded, cluster.LastSuccessfulTime) {
 		recordSuccess(cluster, *succeeded, "")

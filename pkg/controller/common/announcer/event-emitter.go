@@ -102,10 +102,21 @@ const (
 	EventReasonCleanupPostponed = "CleanupPostponed"
 
 	// EventReasonBackupStorageSecretMissing fires on every reconcile while the storage Secret of a
-	// backup-enabled cluster does not exist. The sidecars take it as optional and start without a
-	// storage, so every backup and restore of the cluster fails until the Secret is created and the
-	// sidecars restart to pick it up.
+	// backup-enabled cluster does not exist, or holds no configuration file or an empty one. The configuration
+	// file of the sidecars then names no storage, so every backup and restore of the cluster fails, or keeps the
+	// storage settings it had, until the Secret holds one, which the sidecars pick up without a restart.
 	EventReasonBackupStorageSecretMissing = "BackupStorageSecretMissing"
+
+	// EventReasonBackupStorageConfigInvalid fires on every reconcile while the storage Secret of a
+	// backup-enabled cluster holds a configuration file that is no YAML mapping of the sections of the
+	// configuration file of clickhouse-backup. The sidecars keep the configuration file they have until it is
+	// fixed.
+	EventReasonBackupStorageConfigInvalid = "BackupStorageConfigInvalid"
+
+	// EventReasonBackupCredentialsIncomplete fires on every reconcile while the backup Secret of a backup-enabled
+	// CR sets only one of CLICKHOUSE_USERNAME and CLICKHOUSE_PASSWORD. The operator creates the backup user only
+	// when both are set, so there is none, and the sidecars connect to ClickHouse with what is set alone.
+	EventReasonBackupCredentialsIncomplete = "BackupCredentialsIncomplete"
 
 	// EventReasonBackupNoStorage fires on every reconcile while a cluster turns backup on without the
 	// settings of a storage - neither a storage Secret nor a pod template of its sidecar. Its sidecar

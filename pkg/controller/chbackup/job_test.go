@@ -159,7 +159,7 @@ func otherOperation(t *testing.T) *batch.Job {
 
 // otherOperationOn returns the running Job of another operation on a cluster of the installation.
 func otherOperationOn(t *testing.T, cluster string) *batch.Job {
-	return jobOwnedBy(t, "other-restore-"+cluster, newRestoreCR("other"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "other", testCHI, cluster, testStorage))
+	return jobOwnedBy(t, "other-restore-"+cluster, newRestoreCR("other"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "other", testCHI, cluster))
 }
 
 // The creation of the Job of an operation on a cluster ends the same way for every operation: the Job
@@ -195,7 +195,7 @@ func TestStartJob(t *testing.T) {
 			job := &batch.Job{}
 			job.Name = "b1-main-backup"
 			job.Namespace = testNamespace
-			job.Labels = model.Labels(api.ClickHouseBackupCRDResourceKind, owner.GetName(), testCHI, "main", testStorage)
+			job.Labels = model.Labels(api.ClickHouseBackupCRDResourceKind, owner.GetName(), testCHI, "main")
 			gate := &startGate{check: func(context.Context) (*pending, error) { return tc.gate, nil }}
 
 			var waits []string

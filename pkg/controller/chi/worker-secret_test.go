@@ -36,6 +36,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	chiNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
 func TestShouldDeleteUnreferencedSecret(t *testing.T) {
@@ -133,7 +134,9 @@ func (f *backupSecretFakeSecret) Get(ctx context.Context, params ...any) (*core.
 func (f *backupSecretFakeSecret) Create(ctx context.Context, secret *core.Secret) (*core.Secret, error) {
 	f.creates++
 	stored := secret.DeepCopy()
-	stored.Data = make(map[string][]byte)
+	if stored.Data == nil {
+		stored.Data = make(map[string][]byte)
+	}
 	for key, value := range stored.StringData {
 		stored.Data[key] = []byte(value)
 	}
@@ -171,8 +174,8 @@ const testStorageSecret = "s3-credentials"
 // enabledBackup turns backup on with a storage Secret
 func enabledBackup() *api.ClusterBackup {
 	return &api.ClusterBackup{
-		Enabled:  types.NewStringBool(true),
-		Storages: []api.BackupStorage{{Name: "main", SecretRef: &core.LocalObjectReference{Name: testStorageSecret}}},
+		Enabled:         types.NewStringBool(true),
+		ConfigSecretRef: &core.LocalObjectReference{Name: testStorageSecret},
 	}
 }
 
@@ -192,7 +195,7 @@ func newBackupSecretCR(t *testing.T, backup *api.ClusterBackup) *api.ClickHouseI
 // generating fresh random values, on every call.
 func newBackupSecretWorker(fake *backupSecretFakeSecret, cr *api.ClickHouseInstallation) *worker {
 	w := &worker{
-		c: &Controller{kube: &backupSecretFakeKube{secret: fake}},
+		c: &Controller{kube: &backupSecretFakeKube{secret: fake}, namer: managers.NewNameManager(managers.NameManagerTypeClickHouse)},
 		a: a.NewAnnouncer(nil, nil),
 	}
 	w.task = common.NewTask(w.buildCreator(cr), w.buildCreator(nil))
@@ -218,13 +221,13 @@ func TestReconcileBackupSecretKeepsValues(t *testing.T) {
 	require.Equal(t, cr.GetName(), created.OwnerReferences[0].Name, "the Secret is owned by the installation")
 
 	data := created.Data
-	require.Equal(t, config.ClickHouseBackupUsername, string(data[config.ClickHouseBackupSecretKeyAPIUsername]))
-	require.Equal(t, config.ClickHouseBackupUsername, string(data[config.ClickHouseBackupSecretKeyClickHouseUsername]))
+	apiUsername := string(data[config.ClickHouseBackupSecretKeyAPIUsername])
 	apiPassword := string(data[config.ClickHouseBackupSecretKeyAPIPassword])
-	chPassword := string(data[config.ClickHouseBackupSecretKeyClickHousePassword])
+	require.GreaterOrEqual(t, len(apiUsername), 20)
 	require.GreaterOrEqual(t, len(apiPassword), 20)
-	require.GreaterOrEqual(t, len(chPassword), 20)
-	require.NotEqual(t, apiPassword, chPassword, "the two passwords must be independent")
+	require.NotEqual(t, apiUsername, apiPassword, "the username and the password must be independent")
+	require.NotContains(t, data, config.ClickHouseBackupSecretKeyClickHouseUsername, "the ClickHouse credentials are the user's to set")
+	require.NotContains(t, data, config.ClickHouseBackupSecretKeyClickHousePassword, "the ClickHouse credentials are the user's to set")
 	initial := maps.Clone(data)
 
 	// The next reconcile generates new candidate values, which must not replace the existing ones
@@ -235,16 +238,18 @@ func TestReconcileBackupSecretKeepsValues(t *testing.T) {
 	require.Equal(t, initial, fake.secrets[secretName].Data)
 	require.True(t, w.task.RegistryReconciled().HasSecret(created.GetObjectMeta()))
 
-	// A Secret missing a key, or holding it empty, gets just that key
+	// A Secret missing a key, or holding it empty, gets just that key; the ClickHouse credentials the user set, or
+	// left empty, stay as they are
 	delete(fake.secrets[secretName].Data, config.ClickHouseBackupSecretKeyAPIPassword)
 	fake.secrets[secretName].Data[config.ClickHouseBackupSecretKeyClickHouseUsername] = nil
+	fake.secrets[secretName].Data[config.ClickHouseBackupSecretKeyClickHousePassword] = []byte("set-by-user")
 	w = newBackupSecretWorker(fake, cr)
 	require.NoError(t, w.reconcileBackupSecret(ctx, cr))
 	require.Equal(t, 1, fake.updates)
 	repaired := fake.secrets[secretName].Data
 	require.NotEmpty(t, repaired[config.ClickHouseBackupSecretKeyAPIPassword])
-	require.Equal(t, config.ClickHouseBackupUsername, string(repaired[config.ClickHouseBackupSecretKeyClickHouseUsername]))
-	require.Equal(t, initial[config.ClickHouseBackupSecretKeyClickHousePassword], repaired[config.ClickHouseBackupSecretKeyClickHousePassword])
+	require.Empty(t, repaired[config.ClickHouseBackupSecretKeyClickHouseUsername])
+	require.Equal(t, "set-by-user", string(repaired[config.ClickHouseBackupSecretKeyClickHousePassword]))
 	require.Equal(t, initial[config.ClickHouseBackupSecretKeyAPIUsername], repaired[config.ClickHouseBackupSecretKeyAPIUsername])
 }
 
@@ -300,7 +305,7 @@ func TestPrepareBackupSecretNormalizesAnew(t *testing.T) {
 		return cr
 	}
 	backupUserHash := func(cr *api.ClickHouseInstallation) string {
-		return cr.GetSpecT().GetConfiguration().GetUsers().Get(config.ClickHouseBackupUsername + "/password_sha256_hex").String()
+		return cr.GetSpecT().GetConfiguration().GetUsers().Get(testBackupUsername + "/password_sha256_hex").String()
 	}
 	prepare := func(cr *api.ClickHouseInstallation, wantChanged bool) *api.ClickHouseInstallation {
 		w := newBackupSecretWorker(fake, cr)
@@ -309,20 +314,25 @@ func TestPrepareBackupSecretNormalizesAnew(t *testing.T) {
 		return prepared
 	}
 
-	// First reconcile: the Secret does not exist yet, so the CR comes without the backup user
+	// First reconcile: the Secret does not exist yet; the operator creates it without ClickHouse credentials, so
+	// the CR comes without the backup user still
 	cr := normalize()
 	require.Empty(t, backupUserHash(cr))
 	cr = prepare(cr, true)
 	require.Equal(t, 1, fake.creates)
 	require.Equal(t, 2, normalizations, "a CR normalized before the Secret existed must be normalized anew")
-	password := fake.secrets[secretName].Data[config.ClickHouseBackupSecretKeyClickHousePassword]
-	hash := sha256.Sum256(password)
-	require.Equal(t, hex.EncodeToString(hash[:]), backupUserHash(cr), "the backup user authenticates with the Secret's password")
+	require.Empty(t, backupUserHash(cr), "no ClickHouse credentials, no backup user")
+
+	// The user sets the ClickHouse credentials: the backup user authenticates with them
+	fake.secrets[secretName].Data[config.ClickHouseBackupSecretKeyClickHouseUsername] = []byte(testBackupUsername)
+	fake.secrets[secretName].Data[config.ClickHouseBackupSecretKeyClickHousePassword] = []byte("set-by-user")
+	hash := sha256.Sum256([]byte("set-by-user"))
 	initial := maps.Clone(fake.secrets[secretName].Data)
 
 	// Next reconcile: the Secret is complete, nothing is created and nothing is normalized anew
 	cr = normalize()
 	require.Same(t, cr, prepare(cr, false))
+	require.Equal(t, hex.EncodeToString(hash[:]), backupUserHash(cr), "the backup user authenticates with the Secret's password")
 	require.Equal(t, 3, normalizations)
 	require.Equal(t, 1, fake.creates)
 	require.Zero(t, fake.updates)
