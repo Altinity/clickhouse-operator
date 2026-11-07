@@ -182,3 +182,91 @@ func TestActionPlanDeepCopyIsRaceFree(t *testing.T) {
 	close(start)
 	wg.Wait()
 }
+
+// chiWithLayout builds a CHI out of cluster -> shard -> host names
+func chiWithLayout(layout map[string]map[string][]string) *ClickHouseInstallation {
+	cr := &ClickHouseInstallation{}
+	cr.Spec.Configuration = NewConfiguration()
+	for clusterName, shards := range layout {
+		cluster := &Cluster{Name: clusterName, Layout: &ChiClusterLayout{}}
+		for shardName, hosts := range shards {
+			shard := &ChiShard{Name: shardName}
+			for _, hostName := range hosts {
+				shard.Hosts = append(shard.Hosts, &Host{Name: hostName})
+			}
+			cluster.Layout.Shards = append(cluster.Layout.Shards, shard)
+		}
+		cr.Spec.Configuration.Clusters = append(cr.Spec.Configuration.Clusters, cluster)
+	}
+	return cr
+}
+
+type walked struct {
+	clusters, shards, hosts []string
+}
+
+func collect(walk func(func(ICluster), func(IShard), func(*Host))) (res walked) {
+	walk(
+		func(cluster ICluster) { res.clusters = append(res.clusters, cluster.GetName()) },
+		func(shard IShard) { res.shards = append(res.shards, shard.GetName()) },
+		func(host *Host) { res.hosts = append(res.hosts, host.GetName()) },
+	)
+	return res
+}
+
+// TestActionPlanWalkByName pins that added/removed items are matched by name, not by
+// position in the list - https://github.com/Altinity/clickhouse-operator/issues/1545
+func TestActionPlanWalkByName(t *testing.T) {
+	oneShard := func(hosts ...string) *ClickHouseInstallation {
+		return chiWithLayout(map[string]map[string][]string{"c": {"0": hosts}})
+	}
+
+	t.Run("removing head replicas removes them, not the tail ones", func(t *testing.T) {
+		plan := MakeActionPlan(
+			oneShard("0-0", "0-1", "0-2", "0-0-dedicated", "0-1-dedicated", "0-2-dedicated"),
+			oneShard("0-0-dedicated", "0-1-dedicated", "0-2-dedicated"),
+		)
+		require.Equal(t, walked{hosts: []string{"0-0", "0-1", "0-2"}}, collect(plan.WalkRemoved))
+		require.Equal(t, walked{}, collect(plan.WalkAdded))
+		require.Equal(t, 3, plan.GetRemovedHostsNum())
+	})
+
+	t.Run("removing tail replicas still works", func(t *testing.T) {
+		plan := MakeActionPlan(oneShard("0-0", "0-1", "0-2"), oneShard("0-0"))
+		require.Equal(t, walked{hosts: []string{"0-1", "0-2"}}, collect(plan.WalkRemoved))
+		require.Equal(t, walked{}, collect(plan.WalkAdded))
+	})
+
+	t.Run("removing a middle replica removes only it", func(t *testing.T) {
+		plan := MakeActionPlan(oneShard("0-0", "0-1", "0-2"), oneShard("0-0", "0-2"))
+		require.Equal(t, walked{hosts: []string{"0-1"}}, collect(plan.WalkRemoved))
+		require.Equal(t, walked{}, collect(plan.WalkAdded))
+	})
+
+	t.Run("inserting a replica in the middle adds only it", func(t *testing.T) {
+		plan := MakeActionPlan(oneShard("0-0", "0-2"), oneShard("0-0", "0-1", "0-2"))
+		require.Equal(t, walked{hosts: []string{"0-1"}}, collect(plan.WalkAdded))
+		require.Equal(t, walked{}, collect(plan.WalkRemoved))
+	})
+
+	t.Run("removed shard and cluster are reported as a whole", func(t *testing.T) {
+		plan := MakeActionPlan(
+			chiWithLayout(map[string]map[string][]string{
+				"a": {"0": {"0-0"}, "1": {"1-0", "1-1"}},
+				"b": {"0": {"0-0", "0-1"}},
+			}),
+			chiWithLayout(map[string]map[string][]string{
+				"a": {"0": {"0-0"}},
+			}),
+		)
+		require.Equal(t, walked{clusters: []string{"b"}, shards: []string{"1"}}, collect(plan.WalkRemoved))
+		require.Equal(t, walked{}, collect(plan.WalkAdded))
+		require.Equal(t, 4, plan.GetRemovedHostsNum())
+	})
+
+	t.Run("nothing changed means nothing walked", func(t *testing.T) {
+		plan := MakeActionPlan(oneShard("0-0", "0-1"), oneShard("0-0", "0-1"))
+		require.Equal(t, walked{}, collect(plan.WalkRemoved))
+		require.Equal(t, walked{}, collect(plan.WalkAdded))
+	})
+}
