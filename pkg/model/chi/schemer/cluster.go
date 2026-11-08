@@ -64,7 +64,7 @@ func (c *Cluster) queryUnzipColumns(ctx context.Context, hosts []string, sql str
 	// Fetch data from any of specified hosts
 	query, err := c.SetHosts(hosts).QueryAny(ctx, sql)
 	if err != nil {
-		return nil
+		return err
 	}
 	if query == nil {
 		return nil

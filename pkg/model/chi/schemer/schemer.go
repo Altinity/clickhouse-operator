@@ -17,6 +17,7 @@ package schemer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -87,14 +88,13 @@ func (s *ClusterSchemer) createTablesSQLs(
 	replicatedCreateSQLs []string,
 	distributedObjectNames []string,
 	distributedCreateSQLs []string,
+	err error,
 ) {
-	if names, sql, err := s.getReplicatedObjectsSQLs(ctx, host); err == nil {
-		replicatedObjectNames = names
-		replicatedCreateSQLs = sql
+	if replicatedObjectNames, replicatedCreateSQLs, err = s.getReplicatedObjectsSQLs(ctx, host); err != nil {
+		return nil, nil, nil, nil, err
 	}
-	if names, sql, err := s.getDistributedObjectsSQLs(ctx, host); err == nil {
-		distributedObjectNames = names
-		distributedCreateSQLs = sql
+	if distributedObjectNames, distributedCreateSQLs, err = s.getDistributedObjectsSQLs(ctx, host); err != nil {
+		return nil, nil, nil, nil, err
 	}
 	return
 }
@@ -112,7 +112,13 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.Host) e
 	replicatedObjectNames,
 		replicatedCreateSQLs,
 		distributedObjectNames,
-		distributedCreateSQLs := s.createTablesSQLs(ctx, host)
+		distributedCreateSQLs,
+		err := s.createTablesSQLs(ctx, host)
+	if err != nil {
+		// Without the peer schema there is nothing to create. Report it, so the host is not
+		// recorded as migrated and the migration is retried.
+		return fmt.Errorf("unable to read schema from peers of host %s: %w", host.Runtime.Address.HostName, err)
+	}
 
 	var err1 error
 	if len(replicatedCreateSQLs) > 0 {
@@ -216,7 +222,7 @@ func (s *ClusterSchemer) HostShutdown(ctx context.Context, host *api.Host) error
 		clickhouse.NewQueryOptions().SetRetry(false).SetLogQueries(true))
 }
 
-func debugCreateSQLs(names, sqls []string, err error) ([]string, []string) {
+func debugCreateSQLs(names, sqls []string, err error) ([]string, []string, error) {
 	if err != nil {
 		log.V(1).Warning("got error: %v", err)
 	}
@@ -228,5 +234,5 @@ func debugCreateSQLs(names, sqls []string, err error) ([]string, []string) {
 	for _, v := range sqls {
 		log.V(2).Info("sql: %s", v)
 	}
-	return names, sqls
+	return names, sqls, err
 }
