@@ -292,7 +292,7 @@ func (w *worker) runHostPreDeleteHooks(ctx context.Context, host *api.Host) erro
 // that don't map to any host in the completed spec are silently passed over —
 // there's no Host context to plug user-defined hooks into.
 //
-// Note: ActionPlan.WalkRemoved fires the most-specific callback for each diff entry —
+// Note: ActionPlan.WalkRemoved fires the most-specific callback for each removed item —
 // a removed shard fires shardFunc once with the shard, NOT hostFunc once per host
 // inside the shard. We expand each removed cluster/shard back into its constituent
 // hosts via WalkHosts so the per-host pre-delete hook still fires.

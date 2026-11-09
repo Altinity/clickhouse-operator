@@ -348,7 +348,7 @@ func (ap *ActionPlan) GetRemovedHostsNum() int {
 	return count
 }
 
-// WalkRemoved walk removed cluster items
+// WalkRemoved walk removed cluster items - items present in the old CR and absent in the new one
 func (ap *ActionPlan) WalkRemoved(
 	clusterFunc func(cluster ICluster),
 	shardFunc func(shard IShard),
@@ -357,38 +357,10 @@ func (ap *ActionPlan) WalkRemoved(
 	if ap == nil {
 		return
 	}
-	// TODO refactor to map[string]object handling, instead of slice
-	for path := range ap.specDiff.Removed {
-		switch ap.specDiff.Removed[path].(type) {
-		//case ChiCluster:
-		//	cluster := ap.specDiff.Removed[path].(api.ChiCluster)
-		//	clusterFunc(&cluster)
-		//case api.ChiShard:
-		//	shard := ap.specDiff.Removed[path].(api.ChiShard)
-		//	shardFunc(&shard)
-		//case api.Host:
-		//	host := ap.specDiff.Removed[path].(api.Host)
-		//	hostFunc(&host)
-		//case *api.ChiCluster:
-		//	cluster := ap.specDiff.Removed[path].(*api.ChiCluster)
-		//	clusterFunc(cluster)
-		case ICluster:
-			cluster := ap.specDiff.Removed[path].(ICluster)
-			clusterFunc(cluster)
-		//case *api.ChiShard:
-		//	shard := ap.specDiff.Removed[path].(*api.ChiShard)
-		//	shardFunc(shard)
-		case IShard:
-			shard := ap.specDiff.Removed[path].(IShard)
-			shardFunc(shard)
-		case *Host:
-			host := ap.specDiff.Removed[path].(*Host)
-			hostFunc(host)
-		}
-	}
+	walkMissing(ap.old, ap.new, clusterFunc, shardFunc, hostFunc)
 }
 
-// WalkAdded walk added cluster items
+// WalkAdded walk added cluster items - items present in the new CR and absent in the old one
 func (ap *ActionPlan) WalkAdded(
 	clusterFunc func(cluster ICluster),
 	shardFunc func(shard IShard),
@@ -397,35 +369,78 @@ func (ap *ActionPlan) WalkAdded(
 	if ap == nil {
 		return
 	}
-	// TODO refactor to map[string]object handling, instead of slice
-	for path := range ap.specDiff.Added {
-		switch ap.specDiff.Added[path].(type) {
-		//case api.ChiCluster:
-		//	cluster := ap.specDiff.Added[path].(api.ChiCluster)
-		//	clusterFunc(&cluster)
-		//case api.ChiShard:
-		//	shard := ap.specDiff.Added[path].(api.ChiShard)
-		//	shardFunc(&shard)
-		//case api.Host:
-		//	host := ap.specDiff.Added[path].(api.Host)
-		//	hostFunc(&host)
-		//case *api.ChiCluster:
-		//	cluster := ap.specDiff.Added[path].(*api.ChiCluster)
-		//	clusterFunc(cluster)
-		case ICluster:
-			cluster := ap.specDiff.Added[path].(ICluster)
-			clusterFunc(cluster)
-		//case *api.ChiShard:
-		//	shard := ap.specDiff.Added[path].(*api.ChiShard)
-		//	shardFunc(shard)
-		case IShard:
-			shard := ap.specDiff.Added[path].(IShard)
-			shardFunc(shard)
-		case *Host:
-			host := ap.specDiff.Added[path].(*Host)
-			hostFunc(host)
-		}
+	walkMissing(ap.new, ap.old, clusterFunc, shardFunc, hostFunc)
+}
+
+// walkMissing walks items of `from` which have no same-named counterpart in `to`.
+// Items are matched by name - cluster, then shard within the cluster, then host within the shard -
+// and not by slice position, as the spec diff does. Otherwise removing or inserting a replica
+// anywhere but at the tail of the list would shift identities and report wrong hosts.
+// The most specific missing item is reported: a missing shard is reported as a shard, not as its hosts.
+func walkMissing(
+	from, to ICustomResource,
+	clusterFunc func(cluster ICluster),
+	shardFunc func(shard IShard),
+	hostFunc func(host *Host),
+) {
+	if (from == nil) || (to == nil) {
+		return
 	}
+	from.WalkClusters(func(cluster ICluster) error {
+		toCluster := findClusterByName(to, cluster.GetName())
+		if toCluster == nil {
+			clusterFunc(cluster)
+			return nil
+		}
+		cluster.WalkShards(func(_ int, shard IShard) error {
+			toShard := findShardByName(toCluster, shard.GetName())
+			if toShard == nil {
+				shardFunc(shard)
+				return nil
+			}
+			shard.WalkHosts(func(host *Host) error {
+				if findHostByName(toShard, host.GetName()) == nil {
+					hostFunc(host)
+				}
+				return nil
+			})
+			return nil
+		})
+		return nil
+	})
+}
+
+// findClusterByName finds cluster by name. Returns untyped nil when not found.
+func findClusterByName(cr ICustomResource, name string) (res ICluster) {
+	cr.WalkClusters(func(cluster ICluster) error {
+		if (res == nil) && (cluster.GetName() == name) {
+			res = cluster
+		}
+		return nil
+	})
+	return res
+}
+
+// findShardByName finds shard by name. Returns untyped nil when not found.
+func findShardByName(cluster ICluster, name string) (res IShard) {
+	cluster.WalkShards(func(_ int, shard IShard) error {
+		if (res == nil) && (shard.GetName() == name) {
+			res = shard
+		}
+		return nil
+	})
+	return res
+}
+
+// findHostByName finds host by name
+func findHostByName(shard IShard, name string) (res *Host) {
+	shard.WalkHosts(func(host *Host) error {
+		if (res == nil) && (host.GetName() == name) {
+			res = host
+		}
+		return nil
+	})
+	return res
 }
 
 // WalkModified walk modified cluster items

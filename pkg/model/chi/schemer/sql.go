@@ -17,6 +17,7 @@ package schemer
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 
@@ -241,11 +242,24 @@ func (s *ClusterSchemer) sqlCreateFunction(cluster string) string {
 	)
 }
 
-func (s *ClusterSchemer) sqlDropReplica(shard int, replica string) []string {
-	return []string{
-		fmt.Sprintf("SYSTEM DROP REPLICA '%s'", replica),
-		fmt.Sprintf("SYSTEM DROP DATABASE REPLICA '%d|%s'", shard, replica),
+func (s *ClusterSchemer) sqlDropReplica(shard string, replica string, zkReplicas []ZKReplica) []string {
+	sqls := []string{
+		fmt.Sprintf("SYSTEM DROP REPLICA %s", quoteString(replica)),
+		fmt.Sprintf("SYSTEM DROP DATABASE REPLICA %s", quoteString(shard+"|"+replica)),
 	}
+	for _, r := range zkReplicas {
+		sqls = append(sqls, fmt.Sprintf("SYSTEM DROP REPLICA %s FROM ZKPATH %s", quoteString(r.Name), quoteString(r.Path)))
+	}
+	return sqls
+}
+
+func (s *ClusterSchemer) sqlZKReplicas() string {
+	return "SELECT DISTINCT zookeeper_path, replica_name FROM system.replicas"
+}
+
+// quoteString makes a string literal
+func quoteString(str string) string {
+	return "'" + strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(str) + "'"
 }
 
 func (s *ClusterSchemer) sqlIsReplicaActive(replica string) string {
