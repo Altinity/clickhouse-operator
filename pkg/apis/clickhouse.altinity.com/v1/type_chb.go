@@ -69,8 +69,9 @@ type OperationClusterStatus struct {
 	JobName string `json:"jobName,omitempty" yaml:"jobName,omitempty"`
 	// Hosts are the hosts of the cluster the Job drives.
 	Hosts []string `json:"hosts,omitempty" yaml:"hosts,omitempty"`
-	// Storage is the storage of the cluster the Job keeps the backup in, or reads it from, as the Job was built.
-	Storage string `json:"storage,omitempty" yaml:"storage,omitempty"`
+	// ConfigSecret is the Secret of the clickhouse-backup configuration of the cluster the Job keeps the backup by, or
+	// reads it by, as the Job was built: it tells the storage the backup lies in.
+	ConfigSecret string `json:"configSecret,omitempty" yaml:"configSecret,omitempty"`
 	// StartTime is when the Job of the cluster started.
 	StartTime *meta.Time `json:"startTime,omitempty" yaml:"startTime,omitempty"`
 	// CompletionTime is when the Job of the cluster finished.
@@ -124,7 +125,7 @@ const (
 	// BackupReasonBackupDisabled: backup is not enabled on the target cluster(s).
 	BackupReasonBackupDisabled = "BackupDisabled"
 	// BackupReasonNoBackupStorage: the target cluster(s) turn backup on without the settings of a
-	// storage, neither a storage with a secretRef nor podTemplate, which leaves their backup off.
+	// storage, neither configSecretRef nor podTemplate, which leaves their backup off.
 	BackupReasonNoBackupStorage = "NoBackupStorage"
 	// BackupReasonNoTargetHosts: the target resolves to no hosts.
 	BackupReasonNoTargetHosts = "NoTargetHosts"

@@ -133,7 +133,7 @@ func runOn(cluster *api.OperationClusterStatus, job *batch.Job) bool {
 	cluster.Phase = api.OperationPhaseRunning
 	cluster.JobName = job.GetName()
 	cluster.Hosts = model.JobHosts(job)
-	cluster.Storage = model.ObjectStorage(job)
+	cluster.ConfigSecret = model.ObjectConfigSecret(job)
 	if cluster.StartTime == nil {
 		start := jobStartTime(job)
 		cluster.StartTime = &start

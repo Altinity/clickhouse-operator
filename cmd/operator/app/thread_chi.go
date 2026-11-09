@@ -135,6 +135,9 @@ func initClickHouse(ctx context.Context) {
 	// Start CHK watcher (if enabled by config)
 	chiController.StartCHKWatcher(ctx)
 
+	// Keep the configuration files of the clickhouse-backup sidecars in step with their storage Secrets
+	chiController.StartBackupConfigSync(ctx)
+
 	// Start Informers
 	kubeInformerFactory.Start(ctx.Done())
 	chopInformerFactory.Start(ctx.Done())

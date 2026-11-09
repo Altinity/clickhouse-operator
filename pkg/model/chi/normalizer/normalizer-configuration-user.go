@@ -18,6 +18,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -50,56 +51,87 @@ const (
 // Superseded by valueFrom.secretKeyRef, which cannot name a namespace at all.
 const removedSecretRefFieldPrefix = "k8s_secret_"
 
-// ensureBackupUser sets up the user the clickhouse-backup sidecars connect to ClickHouse as. The operator owns
-// it: whatever the CR sets for it, its profile and quota aside, is dropped - another authentication method or
-// network would lock the sidecars out or let the user in from outside the pod.
+// ensureBackupUser sets up the user the clickhouse-backup sidecars connect to ClickHouse as, named and
+// authenticated as the backup Secret says, when it sets both a username and a password. Without them there is no
+// such user, and the sidecars connect as clickhouse-backup does by default. The operator owns the user: whatever the CR sets for it, its profile and quota
+// aside, is dropped - another authentication method or network would lock the sidecars out or let the user in from
+// outside the pod.
 //
-// Its password is read from the backup Secret here rather than passed through an env var: users are common for
-// all clusters, so the env var would go into every ClickHouse container of the CR, and enabling backup on one
-// cluster would restart every host. Set as plaintext, the password is replaced by its hash like any user's; it
-// is random, so the hash in the users ConfigMap gives nothing away. Until the Secret is there - the operator
-// creates it before it normalizes the CR for reconcile - the user is left out altogether.
+// Its credentials are read from the backup Secret here rather than passed through env vars: users are common for
+// all clusters, so the env vars would go into every ClickHouse container of the CR, and enabling backup on one
+// cluster would restart every host. Set as plaintext, the password is replaced by its hash like any user's.
 func (n *Normalizer) ensureBackupUser(users *api.Settings) {
-	password, ok := n.fetchBackupPassword()
-	user := api.NewSettingsUser(users, config.ClickHouseBackupUsername)
+	n.req.backupUsername = ""
+	username, password, ok := n.fetchBackupCredentials()
+	if !ok {
+		// No user to manage: the sidecar connects with whatever credentials the Secret has, if any
+		return
+	}
+	user := api.NewSettingsUser(users, username)
 	users.WalkKeysSafe(func(key string, _ *api.Setting) {
 		name, own := strings.CutPrefix(key, user.Name2Key(""))
-		keep := ok && ((name == userFieldProfile) || (name == userFieldQuota))
-		if own && !keep {
+		if own && (name != userFieldProfile) && (name != userFieldQuota) {
 			users.DeleteKey(key)
 		}
 	})
-	if !ok {
-		return
-	}
 
+	n.req.backupUsername = username
 	user.Set(userFieldPassword, api.NewSettingScalar(password))
 	user.Set(userFieldNetworksIP, api.NewSettingVector(slices.Clone(config.ClickHouseBackupUserNetworksIP)))
 }
 
-// fetchBackupPassword fetches the password of the backup user from the backup Secret, reporting whether there is
-// one. Only a Secret not there yet, or not filled in yet, leaves the user pending: the operator completes the
-// Secret and normalizes anew. A Secret that cannot be read for any other reason aborts the CR, as going on
-// without the user would lock every sidecar out.
-func (n *Normalizer) fetchBackupPassword() (string, bool) {
+// backupUsernameRegexp is what a username of the backup user may be: a name of an element of the users
+// configuration, which ClickHouse reads the users from
+var backupUsernameRegexp = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
+
+// fetchBackupCredentials fetches the username and the password of the backup user from the backup Secret,
+// reporting whether there are both: the operator manages the backup user only when the Secret sets both. A Secret
+// not there yet, or without either, leaves the user out. A Secret that cannot be read for any other reason, or
+// names a user the backup user must not be, aborts the CR, as going on without the user would lock every sidecar
+// out.
+func (n *Normalizer) fetchBackupCredentials() (username, password string, ok bool) {
 	if n.secretGet == nil {
-		return "", false
+		return "", "", false
 	}
 	namespace := n.req.GetTargetNamespace()
 	name := n.namer.Name(interfaces.NameBackupAutoSecret, n.req.GetTarget())
 	secret, err := n.secretGet(namespace, name)
 	switch {
 	case apiErrors.IsNotFound(err):
-		return "", false
+		return "", "", false
 	case err != nil:
 		n.req.GetTarget().EnsureStatus().ReconcileAbortWithReason(
 			api.StatusReasonBackupSecretUnresolved,
 			fmt.Sprintf("backup Secret %s/%s cannot be read: %v", namespace, name, err),
 		)
-		return "", false
+		return "", "", false
 	}
-	password := string(secret.Data[config.ClickHouseBackupSecretKeyClickHousePassword])
-	return password, password != ""
+	username = string(secret.Data[config.ClickHouseBackupSecretKeyClickHouseUsername])
+	password = string(secret.Data[config.ClickHouseBackupSecretKeyClickHousePassword])
+	if (username == "") || (password == "") {
+		return "", "", false
+	}
+	if problem := backupUsernameProblem(username); problem != "" {
+		n.req.GetTarget().EnsureStatus().ReconcileAbortWithReason(
+			api.StatusReasonBackupSecretUnresolved,
+			fmt.Sprintf("backup Secret %s/%s: %s %q %s", namespace, name, config.ClickHouseBackupSecretKeyClickHouseUsername, username, problem),
+		)
+		return "", "", false
+	}
+	return username, password, true
+}
+
+// backupUsernameProblem tells why the backup user cannot be named so, "" when it can
+func backupUsernameProblem(username string) string {
+	switch {
+	case !backupUsernameRegexp.MatchString(username):
+		return "is no valid username: letters, digits, '_', '.' and '-', not starting with a digit, '.' or '-'"
+	case username == defaultUsername:
+		return "names the default user"
+	case username == chop.Config().ClickHouse.Access.Username:
+		return "names the user of the operator"
+	}
+	return ""
 }
 
 func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
@@ -268,13 +300,12 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 		quota = ""
 		ips = []string{ip}
 		hostRegexp = ""
-	case config.ClickHouseBackupUsername:
+	case n.req.backupUsername:
 		// User the clickhouse-backup sidecars connect as - from inside the pod only, never from the default networks.
-		// Without operator-managed backup a user of this name is the installation's own.
-		if n.req.GetTarget().IsBackupEnabled() {
-			ips = slices.Clone(config.ClickHouseBackupUserNetworksIP)
-			hostRegexp = ""
-		}
+		// Without operator-managed backup, or without both credentials in the backup Secret, no user is, and a user
+		// of the name is the installation's own.
+		ips = slices.Clone(config.ClickHouseBackupUserNetworksIP)
+		hostRegexp = ""
 	}
 
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided

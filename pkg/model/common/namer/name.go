@@ -62,6 +62,18 @@ func createBackupAutoSecretName(cr api.ICustomResource) string {
 	)
 }
 
+// createBackupConfigSecretName creates name of the Secret with the configuration file the operator generates for
+// the clickhouse-backup sidecars of a cluster. Its suffix tells it apart from "{cr name}-{cluster name}-auto-secret"
+// and from "{cr name}-auto-backup-secret" alike.
+func createBackupConfigSecretName(cr api.ICustomResource, cluster string) string {
+	return fmt.Sprintf(
+		// "{cr name}-{cluster name}-backup-config"
+		"%s-%s-backup-config",
+		cr.GetName(),
+		cluster,
+	)
+}
+
 // createClusterAutoSecretName creates Secret name where auto-generated secret is kept
 func createClusterAutoSecretName(cluster api.ICluster) string {
 	if cluster.HasName() {

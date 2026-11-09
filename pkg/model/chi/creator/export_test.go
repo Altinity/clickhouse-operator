@@ -14,26 +14,18 @@
 
 package creator
 
-// The sidecar scripts and the probe's timing, for the external tests of the pod template, which cannot import
-// managers in-package
+// The sidecar script, for the external tests of the pod template, which cannot import managers in-package
 var (
-	BackupSidecarScript               = backupSidecarScript
-	BackupSidecarLivenessScript       = backupSidecarLivenessScript
-	BackupSidecarScriptSource         = backupSidecarScriptSource
-	BackupSidecarLivenessScriptSource = backupSidecarLivenessScriptSource
+	BackupSidecarScript       = backupSidecarScript
+	BackupSidecarScriptSource = backupSidecarScriptSource
 )
 
-const (
-	BackupLivenessAPITimeoutSeconds = backupLivenessAPITimeoutSeconds
-	BackupLivenessQuietSeconds      = backupLivenessQuietSeconds
-)
-
-// ShipBackupScripts makes the pod template carry the scripts of these sources, as it does the embedded ones, until
-// the returned function restores those
-func ShipBackupScripts(sidecar, liveness string) (restore func()) {
-	shippedSidecar, shippedLiveness := backupSidecarScript, backupSidecarLivenessScript
-	backupSidecarScript, backupSidecarLivenessScript = stripScriptComments(sidecar), stripScriptComments(liveness)
+// ShipBackupScript makes the pod template carry the script of this source, as it does the embedded one, until the
+// returned function restores that
+func ShipBackupScript(sidecar string) (restore func()) {
+	shipped := backupSidecarScript
+	backupSidecarScript = stripScriptComments(sidecar)
 	return func() {
-		backupSidecarScript, backupSidecarLivenessScript = shippedSidecar, shippedLiveness
+		backupSidecarScript = shipped
 	}
 }
