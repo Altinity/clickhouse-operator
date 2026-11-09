@@ -25,6 +25,8 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	commonlabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 // TestPodIsSustainedNotReady covers the pure post-fetch decision used by
@@ -289,10 +291,17 @@ func newHealthyPodWorker(pod *core.Pod) (*worker, *api.Host) {
 func TestIsHostHealthyForReconcileTreatsTerminatingPodAsUnhealthy(t *testing.T) {
 	deleting := meta.NewTime(time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC))
 
-	// Running, single container Ready, not crashing - healthy by every other predicate.
+	// Running, single container Ready, Service-eligible, not crashing - healthy by every predicate.
 	newPod := func(deletionTimestamp *meta.Time) *core.Pod {
+		cr := &api.ClickHouseInstallation{}
+		l := chiLabeler.New(cr)
 		return &core.Pod{
-			ObjectMeta: meta.ObjectMeta{DeletionTimestamp: deletionTimestamp},
+			ObjectMeta: meta.ObjectMeta{
+				DeletionTimestamp: deletionTimestamp,
+				Labels: map[string]string{
+					l.Get(commonlabeler.LabelReadyName): l.Get(commonlabeler.LabelReadyValueReady),
+				},
+			},
 			Status: core.PodStatus{
 				Phase:             core.PodRunning,
 				ContainerStatuses: []core.ContainerStatus{{Ready: true}},
@@ -309,5 +318,44 @@ func TestIsHostHealthyForReconcileTreatsTerminatingPodAsUnhealthy(t *testing.T) 
 		w, host := newHealthyPodWorker(newPod(&deleting))
 		require.False(t, w.isHostHealthyForReconcile(context.Background(), host),
 			"a pod with deletionTimestamp must never count as a shard's healthy peer")
+	})
+}
+
+// TestIsHostHealthyForReconcileRequiresOperatorReadyLabel pins #2106: a kubelet-Ready
+// pod that is still excluded from the chop-generated Service (ready=no) must not count
+// as a healthy peer for recovery ordering or disruption safety.
+func TestIsHostHealthyForReconcileRequiresOperatorReadyLabel(t *testing.T) {
+	cr := &api.ClickHouseInstallation{}
+	l := chiLabeler.New(cr)
+	readyName := l.Get(commonlabeler.LabelReadyName)
+
+	newPod := func(readyValue string) *core.Pod {
+		labels := map[string]string{}
+		if readyValue != "" {
+			labels[readyName] = readyValue
+		}
+		return &core.Pod{
+			ObjectMeta: meta.ObjectMeta{Labels: labels},
+			Status: core.PodStatus{
+				Phase:             core.PodRunning,
+				ContainerStatuses: []core.ContainerStatus{{Ready: true}},
+			},
+		}
+	}
+
+	t.Run("ready=yes is a healthy peer", func(t *testing.T) {
+		w, host := newHealthyPodWorker(newPod(l.Get(commonlabeler.LabelReadyValueReady)))
+		require.True(t, w.isHostHealthyForReconcile(context.Background(), host))
+	})
+
+	t.Run("ready=no is NOT a healthy peer", func(t *testing.T) {
+		w, host := newHealthyPodWorker(newPod(l.Get(commonlabeler.LabelReadyValueNotReady)))
+		require.False(t, w.isHostHealthyForReconcile(context.Background(), host),
+			"Service-excluded host must recover before peers may be disrupted")
+	})
+
+	t.Run("missing ready label is NOT a healthy peer", func(t *testing.T) {
+		w, host := newHealthyPodWorker(newPod(""))
+		require.False(t, w.isHostHealthyForReconcile(context.Background(), host))
 	})
 }
