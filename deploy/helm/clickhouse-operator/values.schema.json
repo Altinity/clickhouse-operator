@@ -477,6 +477,12 @@
                                         "runtime": {
                                             "type": "object",
                                             "properties": {
+                                                "k8sClientBurst": {
+                                                    "type": "integer"
+                                                },
+                                                "k8sClientQPS": {
+                                                    "type": "number"
+                                                },
                                                 "reconcileCHIsThreadsNumber": {
                                                     "type": "integer"
                                                 },
