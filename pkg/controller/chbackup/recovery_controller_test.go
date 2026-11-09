@@ -342,7 +342,7 @@ func TestRecoveryWarnsWhenItCannotStart(t *testing.T) {
 // has one.
 func TestRecoveryWaitsForStorage(t *testing.T) {
 	lacking := backupCluster("lacking", 1, true)
-	lacking.Backup.Storage = types.NewString("")
+	lacking.Backup.ConfigSecretRef = &core.LocalObjectReference{}
 	spec := withRecovery(installationSpec(backupCluster("hot", 2, true), lacking), recoveryBackup)
 	f := newRecoveryFixture(t, newFakeCR(installationFrom(t, spec, api.StatusCompleted)), nil, spec)
 

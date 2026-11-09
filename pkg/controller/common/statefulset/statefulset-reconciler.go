@@ -102,8 +102,8 @@ func (r *Reconciler) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
 // getStatefulSetStatus gets StatefulSet status
 func (r *Reconciler) getStatefulSetStatus(host *api.Host, listed map[string]*apps.StatefulSet) types.ObjectStatus {
 	new := host.Runtime.DesiredStatefulSet
-	r.a.V(2).M(new).S().Info(util.NamespaceNameString(new))
-	defer r.a.V(2).M(new).E().Info(util.NamespaceNameString(new))
+	r.a.V(2).M(new).S().Info("%s", util.NamespaceNameString(new))
+	defer r.a.V(2).M(new).E().Info("%s", util.NamespaceNameString(new))
 
 	r.a.V(2).M(new).Info("host sts preamble: ancestor: %t cnt: %d added: %d",
 		host.HasAncestor(),
@@ -156,8 +156,8 @@ func (r *Reconciler) ReconcileStatefulSet(
 
 	newStatefulSet := host.Runtime.DesiredStatefulSet
 
-	r.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet))
-	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet))
+	r.a.V(2).M(host).S().Info("%s", util.NamespaceNameString(newStatefulSet))
+	defer r.a.V(2).M(host).E().Info("%s", util.NamespaceNameString(newStatefulSet))
 
 	if host.GetReconcileAttributes().GetStatus().Is(types.ObjectStatusSame) {
 		r.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
@@ -227,8 +227,8 @@ func (r *Reconciler) recreateStatefulSet(ctx context.Context, host *api.Host, re
 		return nil
 	}
 
-	r.a.V(2).M(host).S().Info(util.NamespaceNameString(host.GetCR()))
-	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(host.GetCR()))
+	r.a.V(2).M(host).S().Info("%s", util.NamespaceNameString(host.GetCR()))
+	defer r.a.V(2).M(host).E().Info("%s", util.NamespaceNameString(host.GetCR()))
 
 	// Recreate deletes the existing StatefulSet before creating the desired one, so a desired spec
 	// the API server rejects would leave the host with no StatefulSet (#1420). Dry-run the desired
@@ -305,8 +305,8 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 
 	r.copyKubectlAnnotationsBeforeUpdate(curStatefulSet, newStatefulSet)
 
-	r.a.V(2).M(host).S().Info(newStatefulSet.Name)
-	defer r.a.V(2).M(host).E().Info(newStatefulSet.Name)
+	r.a.V(2).M(host).S().Info("%s", newStatefulSet.Name)
+	defer r.a.V(2).M(host).E().Info("%s", newStatefulSet.Name)
 
 	namespace := newStatefulSet.Namespace
 	name := newStatefulSet.Name
@@ -405,8 +405,8 @@ func (r *Reconciler) shouldAbortOrContinueUpdateStatefulSet(action error, host *
 func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, register bool, opts *ReconcileOptions) error {
 	statefulSet := host.Runtime.DesiredStatefulSet
 
-	r.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
-	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
+	r.a.V(2).M(host).S().Info("%s", util.NamespaceNameString(statefulSet.GetObjectMeta()))
+	defer r.a.V(2).M(host).E().Info("%s", util.NamespaceNameString(statefulSet.GetObjectMeta()))
 
 	r.a.V(1).
 		WithEvent(host.GetCR(), a.EventActionCreate, a.EventReasonCreateStarted).

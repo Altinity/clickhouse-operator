@@ -334,8 +334,8 @@ func TestFinishedBackupReportsTheClustersOfTheNormalizedInstallation(t *testing.
 	chb.Status.Clusters = []api.OperationClusterStatus{{Name: "hot", Phase: api.OperationPhaseCompleted, CompletionTime: &at}}
 	spec := installationSpec(&api.Cluster{Name: "hot", Layout: &api.ChiClusterLayout{ShardsCount: 1, ReplicasCount: 1}})
 	spec.Spec.Backup = &api.ClusterBackup{
-		Enabled:  types.NewStringBool(true),
-		Storages: []api.BackupStorage{{Name: testStorage, SecretRef: &core.LocalObjectReference{Name: testStorageSecret}}},
+		Enabled:         types.NewStringBool(true),
+		ConfigSecretRef: &core.LocalObjectReference{Name: testStorageSecret},
 	}
 
 	series := captureLastSuccesses(t)

@@ -32,8 +32,8 @@ import (
 
 // reconcileSecret reconciles core.Secret
 func (w *worker) reconcileSecret(ctx context.Context, cr api.ICustomResource, secret *core.Secret) error {
-	w.a.V(2).M(cr).S().Info(secret.Name)
-	defer w.a.V(2).M(cr).E().Info(secret.Name)
+	w.a.V(2).M(cr).S().Info("%s", secret.Name)
+	defer w.a.V(2).M(cr).E().Info("%s", secret.Name)
 
 	// Check whether this object already exists
 	if _, err := w.c.getSecret(ctx, secret); err == nil {
@@ -76,8 +76,9 @@ func (w *worker) createSecret(ctx context.Context, cr api.ICustomResource, secre
 }
 
 // prepareBackupSecret makes sure the backup Secret of a backup-enabled CR is complete before the CR is
-// normalized for reconcile, as the normalizer takes the backup user's password from it. A CR normalized
-// before the Secret was complete lacks that user, so it is normalized anew, and reported as changed. Whether
+// normalized for reconcile, as the normalizer reads the backup user's credentials from it. A CR normalized
+// before the Secret was complete is normalized anew, and reported as changed, so that the reconcile goes on to
+// give the sidecars the new REST API credentials. Whether
 // backup is enabled is told by the normalized CR, as backup may come from a template. A suspended CR is not
 // reconciled, so its Secret is left as it is: new values would reach the sidecars, but not the users config.
 // An error is left to reconcileBackupSecret, which fails the reconcile on it.

@@ -477,6 +477,12 @@
                                         "runtime": {
                                             "type": "object",
                                             "properties": {
+                                                "k8sClientBurst": {
+                                                    "type": "integer"
+                                                },
+                                                "k8sClientQPS": {
+                                                    "type": "number"
+                                                },
                                                 "reconcileCHIsThreadsNumber": {
                                                     "type": "integer"
                                                 },
@@ -801,6 +807,10 @@
                     "description": "additional environment variables for the deployment of metrics-exporter containers possible format value `[{\"name\": \"SAMPLE\", \"value\": \"text\"}]`",
                     "type": "array"
                 },
+                "logVerbosity": {
+                    "description": "log verbosity level (glog `-v`) of the metrics-exporter container, rendered as `CHOP_LOGGER_V` env var. Empty value keeps `logger.v` from the operator configuration",
+                    "type": ["string", "integer", "null"]
+                },
                 "livenessProbe": {
                     "description": "optional liveness probe for the metrics-exporter container, check `kubectl explain pod.spec.containers.livenessProbe` for details",
                     "type": ["object", "null"]
@@ -852,6 +862,10 @@
                 "env": {
                     "description": "additional environment variables for the clickhouse-operator container in deployment possible format value `[{\"name\": \"SAMPLE\", \"value\": \"text\"}]`",
                     "type": "array"
+                },
+                "logVerbosity": {
+                    "description": "log verbosity level (glog `-v`) of the clickhouse-operator container, rendered as `CHOP_LOGGER_V` env var. Empty value keeps `logger.v` from the operator configuration",
+                    "type": ["string", "integer", "null"]
                 },
                 "livenessProbe": {
                     "description": "optional liveness probe for the clickhouse-operator container, check `kubectl explain pod.spec.containers.livenessProbe` for details",

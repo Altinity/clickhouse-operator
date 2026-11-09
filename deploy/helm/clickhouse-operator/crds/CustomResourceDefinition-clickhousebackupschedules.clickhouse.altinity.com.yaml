@@ -149,7 +149,7 @@ spec:
                     How many failed finished Jobs to keep, at least 1: the operator learns from the Job of a run why
                     it failed and the hosts it backed up. Defaults to 1
                 schemaOnly:
-                  !!merge <<: *TypeStringBool
+                  <<: *TypeStringBool
                   description: "Back up table/database definitions only (no data)"
                 replicaSelection:
                   type: string
@@ -225,9 +225,9 @@ spec:
                       cronJobName:
                         type: string
                         description: "Name of the CronJob that runs the schedule on the cluster"
-                      storage:
+                      configSecret:
                         type: string
-                        description: "Backup storage the runs of the cluster keep their backups in, as its CronJob was last built"
+                        description: "Secret of the clickhouse-backup configuration the runs of the cluster keep their backups by, as its CronJob was last built: for a cluster that lost its CronJob, the storage its unpruned backups lie in"
                       lastScheduleTime:
                         type: string
                         format: date-time

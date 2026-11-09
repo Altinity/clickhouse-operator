@@ -65,7 +65,6 @@ _SPEC_EDIT_ABORT_REASONS = (
     "FIPSImagePolicyViolation",
     "RemovedSecretRefSyntax",
     "InvalidPodTemplate",
-    "InvalidBackupStorage",
 )
 
 

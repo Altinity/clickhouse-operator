@@ -95,6 +95,9 @@ type Controller struct {
 	namer       interfaces.INameManager
 	ctrlLabeler *ctrlLabeler.Labeler
 	pvcDeleter  *volume.PVCDeleter
+
+	// backupConfigProblems is what is wrong with the backup configuration Secrets as last warned about
+	backupConfigProblems backupConfigProblems
 }
 
 type watchOperation struct {
@@ -583,6 +586,17 @@ func (c *Controller) addEventHandlersSecret(
 	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) {
 	kubeInformerFactory.Core().V1().Secrets().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(old, new interface{}) {
+			oldSecret, ok := old.(*core.Secret)
+			if !ok {
+				return
+			}
+			newSecret, ok := new.(*core.Secret)
+			if !ok || !c.isTrackedObject(&newSecret.ObjectMeta) {
+				return
+			}
+			c.enqueueBackupSecretRotation(oldSecret, newSecret)
+		},
 		DeleteFunc: deleteHandler("secretInformer.DeleteFunc", func(secret *core.Secret) {
 			if !c.isTrackedObject(&secret.ObjectMeta) {
 				return

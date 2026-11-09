@@ -106,11 +106,11 @@ func TestRestoreRunsToCompletion(t *testing.T) {
 	startRestore(t, c, controller, "r1")
 	got := getRestore(t, c, "r1")
 	require.Equal(t, "r1-main-restore", got.Status.Clusters[0].JobName)
-	require.Equal(t, testStorage, got.Status.Clusters[0].Storage, "the storage the Job reads the backup from")
+	require.Equal(t, testStorageSecret, got.Status.Clusters[0].ConfigSecret, "the Secret of the storage the Job reads the backup from")
 	job := &batch.Job{}
 	require.NoError(t, c.Get(context.Background(), key("r1-main-restore"), job))
 	require.True(t, meta.IsControlledBy(job, got))
-	require.Equal(t, model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main", testStorage), job.Labels)
+	require.Equal(t, model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main"), job.Labels)
 
 	cr.set(installation(t, api.StatusInProgress, backupCluster("main", 2, true)))
 	finishJob(t, c, "r1-main-restore", batch.JobComplete, "")
@@ -401,7 +401,7 @@ func TestRestoreDeadlineExceeded(t *testing.T) {
 func TestRestoreNeverAdoptsAStaleJob(t *testing.T) {
 	predecessor := newRestoreCR("r1")
 	predecessor.UID = "predecessor-uid"
-	stale := jobOwnedBy(t, "r1-main-restore", predecessor, model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main", testStorage))
+	stale := jobOwnedBy(t, "r1-main-restore", predecessor, model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main"))
 	c := newClient(t, nil, newRestoreCR("r1"), stale)
 	controller := NewRestoreController(c, c, c.Scheme(), newFakeCR(readyInstallation(t)))
 
@@ -415,7 +415,7 @@ func TestRestoreNeverAdoptsAStaleJob(t *testing.T) {
 // installation, scheduled backups included.
 func TestRestoreWaitsForAnotherOperationOnTheInstallation(t *testing.T) {
 	scheduled := jobOwnedBy(t, "nightly-main-backup-123", newScheduleCR("nightly"),
-		model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, "nightly", testCHI, "main", testStorage))
+		model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, "nightly", testCHI, "main"))
 	c := newClient(t, nil, newRestoreCR("r1"), scheduled)
 	controller := NewRestoreController(c, c, c.Scheme(), newFakeCR(readyInstallation(t)))
 	validateRestore(t, c, controller, "r1")

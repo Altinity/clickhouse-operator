@@ -691,6 +691,11 @@ type OperatorConfigReconcileRuntime struct {
 	ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
 	ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
 
+	// K8s API client rate limit. Read from the config file only, before the client is built.
+	// 0 keeps the client-go defaults. The OPERATOR_K8S_CLIENT_*_LIMIT env vars win when set.
+	K8sClientQPS   float32 `json:"k8sClientQPS"   yaml:"k8sClientQPS"`
+	K8sClientBurst int     `json:"k8sClientBurst" yaml:"k8sClientBurst"`
+
 	// DEPRECATED, is replaced with reconcileCHIsThreadsNumber
 	ThreadsNumber int `json:"threadsNumber" yaml:"threadsNumber"`
 }

@@ -75,6 +75,7 @@ func initClickHouse(ctx context.Context) {
 	chop.New(kubeClient, chopClient, chopConfigFile)
 	log.V(1).F().Info("Config parsed:")
 	log.Info("\n" + chop.Config().String(true))
+	chop.WarnIfK8sClientQPSTooLow(kubeClient, chop.Config())
 
 	// Validate the runtime FIPS posture against chopconf security.policy.
 	// Fatals when chopconf requires FIPS but the binary/runtime can't deliver.
@@ -133,6 +134,9 @@ func initClickHouse(ctx context.Context) {
 
 	// Start CHK watcher (if enabled by config)
 	chiController.StartCHKWatcher(ctx)
+
+	// Keep the configuration files of the clickhouse-backup sidecars in step with their storage Secrets
+	chiController.StartBackupConfigSync(ctx)
 
 	// Start Informers
 	kubeInformerFactory.Start(ctx.Done())

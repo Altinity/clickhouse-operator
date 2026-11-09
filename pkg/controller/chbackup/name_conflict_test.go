@@ -101,7 +101,7 @@ func TestBackupVerificationConcludesOnAJobNameAnotherBackupHolds(t *testing.T) {
 	chb.Spec.Cluster = "m-x"
 	chb.Spec.Verify = types.NewStringBool(true)
 	other := newBackupCR("b-m")
-	foreign := jobOwnedBy(t, model.VerifyJobName(chb, "m-x"), other, model.Labels(api.ClickHouseBackupCRDResourceKind, "b-m", testCHI, "x", testStorage))
+	foreign := jobOwnedBy(t, model.VerifyJobName(chb, "m-x"), other, model.Labels(api.ClickHouseBackupCRDResourceKind, "b-m", testCHI, "x"))
 	cr := newFakeCR(installation(t, api.StatusCompleted, backupCluster("m-x", 1, true), backupCluster("x", 1, true)))
 	f := newBackupFixture(t, cr, nil, chb, other, foreign)
 
@@ -196,7 +196,7 @@ func TestScheduleWaitsOutAStaleCronJobOnItsClusterOnly(t *testing.T) {
 	stale := &batch.CronJob{}
 	stale.Name = "s1-hot-backup"
 	stale.Namespace = testNamespace
-	stale.Labels = model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, "s1", testCHI, "hot", testStorage)
+	stale.Labels = model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, "s1", testCHI, "hot")
 	stale.Spec.Schedule = "* * * * *"
 	require.NoError(t, ctrl.SetControllerReference(predecessor, stale, newScheme(t)))
 	f := newScheduleFixture(t, newFakeCR(twoClusters(t, api.StatusCompleted)), nil, newScheduleCR("s1"), stale)
@@ -301,7 +301,7 @@ func TestBackupTellsAJobThatGoesAwayFromOneThatStays(t *testing.T) {
 			foreign := &batch.Job{}
 			foreign.Name = "a-b-c-backup"
 			foreign.Namespace = testNamespace
-			foreign.Labels = model.Labels(api.ClickHouseBackupCRDResourceKind, "a-b", testCHI, "c", testStorage)
+			foreign.Labels = model.Labels(api.ClickHouseBackupCRDResourceKind, "a-b", testCHI, "c")
 			if tc.controller != nil {
 				require.NoError(t, ctrl.SetControllerReference(tc.controller, foreign, newScheme(t)))
 			}
@@ -352,7 +352,7 @@ func TestBackupTellsAJobOfAControllerItCannotRead(t *testing.T) {
 			foreign := &batch.Job{}
 			foreign.Name = "a-b-c-backup"
 			foreign.Namespace = testNamespace
-			foreign.Labels = model.Labels(api.ClickHouseBackupCRDResourceKind, "a-b", testCHI, "c", testStorage)
+			foreign.Labels = model.Labels(api.ClickHouseBackupCRDResourceKind, "a-b", testCHI, "c")
 			require.NoError(t, ctrl.SetControllerReference(newBackupCR("a-b"), foreign, newScheme(t)))
 			unreadable := &interceptor.Funcs{Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 				if _, controller := obj.(*meta.PartialObjectMetadata); controller {
@@ -546,7 +546,7 @@ func TestScheduleTellsTheClusterOfACronJobWhoseClusterLabelChanged(t *testing.T)
 // rather than wait for good, and runs on the cluster once it is gone.
 func TestScheduleTellsToDeleteACronJobNoResourceControls(t *testing.T) {
 	for name, labels := range map[string]map[string]string{
-		"stamped as the schedule stamps its own": model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, "s1", testCHI, "hot", testStorage),
+		"stamped as the schedule stamps its own": model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, "s1", testCHI, "hot"),
 		"made by hand":                           nil,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -631,7 +631,7 @@ func TestLongNamedScheduleWaitsOutItsPredecessor(t *testing.T) {
 	stale := &batch.CronJob{}
 	stale.Name = model.CronJobName(predecessor, "hot")
 	stale.Namespace = testNamespace
-	stale.Labels = model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, name, testCHI, "hot", testStorage)
+	stale.Labels = model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, name, testCHI, "hot")
 	stale.Spec.Schedule = "* * * * *"
 	require.NoError(t, ctrl.SetControllerReference(predecessor, stale, newScheme(t)))
 	f := newScheduleFixture(t, newFakeCR(twoClusters(t, api.StatusCompleted)), nil, newScheduleCR(name), stale)

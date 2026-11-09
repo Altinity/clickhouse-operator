@@ -32,11 +32,9 @@ metadata:
 spec:
   backup:
     enabled: "yes"
-    # The storage the backups are kept in, configured by the Secret of 01-chi-with-backup.yaml
-    storages:
-      - name: main
-        secretRef:
-          name: backup-demo-storage
+    # The clickhouse-backup configuration of the sidecar, kept in the Secret of 01-chi-with-backup.yaml
+    configSecretRef:
+      name: backup-demo-storage
     recovery:
       # The backup to restore, e.g. LAST-BACKUP of kubectl get chbs -o wide; check that it still
       # exists on every cluster, or name each cluster's own backup, see docs/backup.md.

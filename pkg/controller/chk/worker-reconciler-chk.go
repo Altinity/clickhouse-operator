@@ -225,7 +225,7 @@ func (w *worker) buildCR(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstal
 	actionPlan := api.MakeActionPlan(cr.GetAncestorT(), cr)
 	cr.EnsureRuntime().ActionPlan = actionPlan
 	cr.EnsureStatus().SetActionPlan(actionPlan)
-	w.a.V(1).M(cr).Info(actionPlan.Log("buildCR"))
+	w.a.V(1).M(cr).Info("%s", actionPlan.Log("buildCR"))
 
 	return cr
 }

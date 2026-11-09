@@ -6897,10 +6897,13 @@ def test_010064(self):
     # satisfy the not-restarted asserts below without ever having read a timestamp. A missing
     # pod raises IndexError inside the helper instead, which fails loudly on its own.
     assert start_time != "", error("could not read the ClickHouse container start time")
-    connected_time = ""
+    # Compare the session id, not connected_time: ClickHouse computes connected_time at
+    # query time as now() - session uptime, both in whole seconds, so it jitters by 1s
+    # within the same session.
+    client_id = ""
     with And("CHI is connected to Keeper"):
-        connected_time = clickhouse.query(chi, "SELECT connected_time from system.zookeeper_connection")
-        assert connected_time != ""
+        client_id = clickhouse.query(chi, "SELECT client_id from system.zookeeper_connection")
+        assert client_id != ""
 
     with When("Trigger CHK reconcile by patching taskID"):
         kubectl.force_chk_reconcile(chk, "keeper-watch-test")
@@ -6913,8 +6916,8 @@ def test_010064(self):
             assert new_start_time == start_time, error("CHI has been restarted")
 
         with Then("CHI does not reconnect to Keeper"):
-            new_connected_time = clickhouse.query(chi, "SELECT connected_time from system.zookeeper_connection")
-            assert new_connected_time == connected_time, error("ClickHouse reconnected to Keeper")
+            new_client_id = clickhouse.query(chi, "SELECT client_id from system.zookeeper_connection")
+            assert new_client_id == client_id, error("ClickHouse reconnected to Keeper")
 
     with When("Rescale Keeper to 3 nodes"):
         kubectl.create_and_check(
@@ -8621,9 +8624,10 @@ backup_name_prefix_immutable_message = "backupNamePrefix can be set once and is 
 backup_sidecar = "clickhouse-backup"
 backup_api_port = 7171
 backup_api_port_name = "backup-api"
-backup_user = "clickhouse_backup"
-backup_auto_secret_keys = ("API_USERNAME", "API_PASSWORD", "CLICKHOUSE_USERNAME", "CLICKHOUSE_PASSWORD")
-# Sidecar settings the operator pins whatever the storage Secret or the sidecar's base container says,
+# The ClickHouse user the test sets in the backup Secret: the operator generates no ClickHouse credentials
+backup_user = "backup_user"
+backup_auto_secret_keys = ("API_USERNAME", "API_PASSWORD")
+# Sidecar settings the operator pins whatever the storage settings or the sidecar's base container say,
 # mirrored from newBackupEnvVars of pkg/model/chi/creator/backup.go: the REST API on port 7171 over plain HTTP, as
 # the Jobs call it, no schema restore ON CLUSTER but where a Job asks for it, one operation at a time, access objects
 # loaded once restored, and no restore into databases or tables other than the backup's, which the guard of a Job
@@ -8637,8 +8641,12 @@ backup_pinned_env = {
     "RESTORE_DATABASE_MAPPING": "",
     "RESTORE_TABLE_MAPPING": "",
 }
-# REST API credentials the operator pins to its own Secret, which the Jobs read
-backup_pinned_secret_env = ("API_USERNAME", "API_PASSWORD")
+# Settings the configuration file of the sidecar holds, which no env var of the sidecar may override
+backup_config_file_env = ("API_USERNAME", "API_PASSWORD", "CLICKHOUSE_USERNAME", "CLICKHOUSE_PASSWORD", "CLICKHOUSE_BACKUP_CONFIG")
+# The volume of the configuration file of the sidecar, ClickHouseBackupConfigVolumeName of
+# pkg/model/chi/config/const.go, and where it is mounted
+backup_config_volume = "clickhouse-backup-config"
+backup_config_dir = "/etc/clickhouse-backup"
 # The exit code of a Job that failed before it changed anything, UnchangedExitCode of pkg/model/chbackup/script.go.
 backup_unchanged_exit_code = 3
 # The engine of the replicated tables of the scenarios: one replication group per installation, cluster and shard.
@@ -8654,6 +8662,31 @@ def backup_unset(value):
 def backup_auto_secret(chi):
     """The Secret the operator keeps the sidecar credentials of an installation in."""
     return f"{chi}-auto-backup-secret"
+
+
+def backup_config_secret(chi, cluster):
+    """The Secret the operator generates the configuration file of the sidecars of a cluster in."""
+    return f"{chi}-{cluster}-backup-config"
+
+
+def backup_secret_data(name):
+    secret = kubectl.get("secret", name, ok_to_fail=True) or {}
+    return {key: base64.b64decode(value).decode() for key, value in (secret.get("data") or {}).items()}
+
+
+def wait_backup_config_setting(chi, clusters, name, expected, timeout=300):
+    """Waits for the configuration file Secret of every cluster to hold the setting the storage Secret changed to,
+    which the operator follows within a minute."""
+    with Then(f"The configuration files of clusters {clusters} set {name} to {expected!r}"):
+        for cluster in clusters:
+            value = None
+            deadline = time.time() + timeout
+            while time.time() < deadline:
+                value = backup_secret_data(backup_config_secret(chi, cluster)).get(name)
+                if value == expected:
+                    break
+                time.sleep(10)
+            assert value == expected, error(f"{backup_config_secret(chi, cluster)}: {name} is {value!r}, expected {expected!r}")
 
 
 def backup_auto_secret_data(chi):
@@ -8700,8 +8733,8 @@ def backup_remote_names(pod_name, auth):
 
 
 def backup_check_pinned_env(chi, pod_name):
-    """Checks that the sidecar of pod_name runs with the settings the operator pins. Each is set, so that no
-    Secret the sidecar takes its environment from can set it; kubelet takes the last of two of one name."""
+    """Checks that the sidecar of pod_name runs with the settings the operator pins. Each is set, as an env var
+    takes precedence over the configuration file, and none of the settings the file holds is."""
     containers = {c["name"]: c for c in kubectl.get_pod_spec(chi, pod_name)["containers"]}
     env = {item["name"]: item for item in containers[backup_sidecar].get("env") or []}
     for name, value in backup_pinned_env.items():
@@ -8709,11 +8742,8 @@ def backup_check_pinned_env(chi, pod_name):
         assert (item is not None) and ("valueFrom" not in item) and ((item.get("value") or "") == value), error(
             f"{pod_name}: sidecar env {name} is {item}, expected the value {value!r}"
         )
-    for name in backup_pinned_secret_env:
-        ref = ((env.get(name) or {}).get("valueFrom") or {}).get("secretKeyRef") or {}
-        assert (ref.get("name") == backup_auto_secret(chi)) and (ref.get("key") == name), error(
-            f"{pod_name}: sidecar env {name} is {env.get(name)}, expected key {name} of Secret {backup_auto_secret(chi)}"
-        )
+    for name in backup_config_file_env:
+        assert name not in env, error(f"{pod_name}: sidecar env {name} is {env.get(name)}, over the configuration file")
 
 
 def backup_status(kind, name):
@@ -8868,7 +8898,7 @@ def test_010087(self):
     Secret says, and the Jobs reach every sidecar.
 
     The backup-enabled clusters differ in shape - hot has two shards of one replica holding different row
-    counts, cold one shard of two replicas - and share one storage Secret whose S3_PATH carries the
+    counts, cold one shard of two replicas - and share one storage Secret whose s3.path carries the
     {cluster} and {shard} macros, so every shard of every cluster writes to a path of its own. A verified
     backup of the whole installation runs one backup Job and one verify Job per cluster, under one backup
     name, and reports every cluster.
@@ -8956,7 +8986,7 @@ def test_010087(self):
     assert (
         (hot_spec["cluster"] == hot) and (hot_spec.get("overwrite") is True) and (hot_spec.get("tables") == restored_tables)
     ), error(f"{restore_hot_manifest} must restore cluster {hot} with overwrite, the tables matching {restored_tables}")
-    # S3_PATH of the storage Secret without its {cluster} macro: shard 0 of both clusters would share it.
+    # s3.path of the storage Secret without its {cluster} macro: shard 0 of both clusters would share it.
     shared_path = "backup/{shard}"
 
     # Rows per (cluster, shard), different everywhere, so a restore that swaps or merges shards cannot match.
@@ -9100,7 +9130,7 @@ def test_010087(self):
         create_shell_namespace_clickhouse_template()
 
         with Given("The storage Secret and an S3 store in the test namespace"):
-            # Applied before the CHI, so the sidecars start with it rather than restart for it minutes later.
+            # Applied before the CHI, so that the first configuration files of the sidecars name the storage.
             kubectl.apply(util.get_full_path(storage_manifest))
             kubectl.apply(util.get_full_path(minio_manifest))
 
@@ -9129,8 +9159,15 @@ def test_010087(self):
                 assert backup_sidecar in containers, error(f"{name} has no {backup_sidecar} sidecar: {sorted(containers)}")
                 ports = {p.get("name"): p.get("containerPort") for p in containers[backup_sidecar].get("ports") or []}
                 assert ports.get(backup_api_port_name) == backup_api_port, error(f"{name}: sidecar ports {ports}")
-                env_from = [(e.get("secretRef") or {}).get("name") for e in containers[backup_sidecar].get("envFrom") or []]
-                assert storage_secret in env_from, error(f"{name}: sidecar envFrom {env_from} lacks {storage_secret}")
+                assert not containers[backup_sidecar].get("envFrom"), error(f"{name}: sidecar takes env vars from envFrom")
+                volumes = {v["name"]: v for v in kubectl.get_pod_spec(chi, name).get("volumes") or []}
+                config_secret = ((volumes.get(backup_config_volume) or {}).get("secret") or {}).get("secretName")
+                assert config_secret == backup_config_secret(chi, cluster), error(
+                    f"{name}: the configuration file volume is {volumes.get(backup_config_volume)}"
+                )
+                mounts = {m["mountPath"]: m["name"] for m in containers[backup_sidecar].get("volumeMounts") or []}
+                assert mounts.get(backup_config_dir) == backup_config_volume, error(f"{name}: sidecar mounts {mounts}")
+                assert not containers[backup_sidecar].get("livenessProbe"), error(f"{name}: the sidecar has a liveness probe")
             name = pod(disabled_cluster, 0, 0)
             containers = [c["name"] for c in kubectl.get_pod_spec(chi, name)["containers"]]
             assert backup_sidecar not in containers, error(f"{name} runs {backup_sidecar} although its cluster opted out: {containers}")
@@ -9153,18 +9190,66 @@ def test_010087(self):
             data = backup_auto_secret_data(chi)
             for key in backup_auto_secret_keys:
                 assert data.get(key), error(f"{backup_auto_secret(chi)} has no {key}: {sorted(data)}")
-            assert data["CLICKHOUSE_USERNAME"] == backup_user, error(
-                f"{backup_auto_secret(chi)}: CLICKHOUSE_USERNAME is {data['CLICKHOUSE_USERNAME']}, expected {backup_user}"
-            )
+            for key in ("CLICKHOUSE_USERNAME", "CLICKHOUSE_PASSWORD"):
+                assert key not in data, error(f"{backup_auto_secret(chi)}: the operator generated {key}")
             owners = [(o.get("kind"), o.get("name")) for o in secret["metadata"].get("ownerReferences") or []]
             assert ("ClickHouseInstallation", chi) in owners, error(f"{backup_auto_secret(chi)} owners: {owners}")
             api_auth = (data["API_USERNAME"], data["API_PASSWORD"])
 
+        with And("The operator generates the configuration file of the sidecars of every backup-enabled cluster, owned by the CHI"):
+            for cluster in backup_clusters:
+                name = backup_config_secret(chi, cluster)
+                secret = kubectl.get("secret", name)
+                owners = [(o.get("kind"), o.get("name")) for o in secret["metadata"].get("ownerReferences") or []]
+                assert ("ClickHouseInstallation", chi) in owners, error(f"{name} owners: {owners}")
+                config_data = backup_secret_data(name)
+                config_file = yaml.safe_load(config_data["config.yml"])
+                assert config_file["api"]["password"] == data["API_PASSWORD"], error(f"{name}: not the API credentials")
+                clickhouse_section = config_file.get("clickhouse") or {}
+                assert not clickhouse_section.get("username") and not clickhouse_section.get("password"), error(
+                    f"{name}: ClickHouse credentials nobody set: {sorted(clickhouse_section)}"
+                )
+                assert config_file["general"]["disable_environment_override"] is False, error(
+                    f"{name}: the env vars the operator pins would not take precedence"
+                )
+                assert config_data.get("REMOTE_STORAGE") == "s3", error(f"{name}: settings {sorted(config_data)}")
+
+        with And("Without ClickHouse credentials, every sidecar reaches ClickHouse with the defaults of clickhouse-backup"):
+            for cluster, shard, replica in enabled_hosts:
+                name = pod(cluster, shard, replica)
+                for attempt in retries(timeout=120, delay=5):
+                    with attempt:
+                        code, body = backup_api_get(name, "/backup/tables", api_auth)
+                        assert code == "200", error(f"{name}: /backup/tables answered {code}: {body}")
+
+        backup_password = f"backup-{os.urandom(8).hex()}"
+        with When(f"The ClickHouse username and password are set in {backup_auto_secret(chi)}"):
+            kubectl.launch(
+                f"patch secret {backup_auto_secret(chi)} --type merge "
+                f"-p '{{\"stringData\":{{\"CLICKHOUSE_USERNAME\":\"{backup_user}\",\"CLICKHOUSE_PASSWORD\":\"{backup_password}\"}}}}'"
+            )
+
+        with Then("The operator reconciles the CHI: the configuration files take the ClickHouse credentials"):
+            for cluster in backup_clusters:
+                name = backup_config_secret(chi, cluster)
+                for attempt in retries(timeout=300, delay=10):
+                    with attempt:
+                        config_file = yaml.safe_load(backup_secret_data(name)["config.yml"])
+                        clickhouse_section = config_file.get("clickhouse") or {}
+                        assert clickhouse_section.get("username") == backup_user, error(
+                            f"{name}: ClickHouse username {clickhouse_section.get('username')}"
+                        )
+                        assert clickhouse_section.get("password") == backup_password, error(
+                            f"{name}: not the ClickHouse password set"
+                        )
+
         with And(f"ClickHouse user {backup_user} logs in from its own pod only, not from another pod"):
             name = pod(hot, 0, 0)
-            password = shlex.quote(data["CLICKHOUSE_PASSWORD"])
-            out = clickhouse.query_with_error(chi, "SELECT 1", user=backup_user, pwd=password, pod=name)
-            assert out == "1", error(f"{backup_user} cannot log in over loopback: {out}")
+            password = shlex.quote(backup_password)
+            for attempt in retries(timeout=300, delay=10):
+                with attempt:
+                    out = clickhouse.query_with_error(chi, "SELECT 1", user=backup_user, pwd=password, pod=name)
+                    assert out == "1", error(f"{backup_user} cannot log in over loopback: {out}")
             # ClickHouse counts every address of its own pod as local for a user whose networks list a
             # loopback address, so a client in that pod gets in through the host Service as well. The
             # refusal shows from another pod, through the same Service.
@@ -9258,6 +9343,8 @@ def test_010087(self):
                 assert entry.get("reason") == "Verified", error(f"{backup}: cluster {cluster} {entry}")
                 listed = entry.get("hosts") or []
                 assert listed and all(f"-{cluster}-" in item for item in listed), error(f"{backup}: cluster {cluster} {entry}")
+                # The Secret of the configuration the cluster keeps its backups by: where they lie.
+                assert entry.get("configSecret") == storage_secret, error(f"{backup}: cluster {cluster} {entry}")
             labelled = {
                 job["metadata"]["name"]: (job["metadata"].get("labels") or {}).get(backup_label_cluster)
                 for job in backup_jobs(f"-l {backup_label_cr_name}={backup}")
@@ -9278,6 +9365,75 @@ def test_010087(self):
             for cluster, shard, replica in enabled_hosts:
                 names = backup_remote_names(pod(cluster, shard, replica), api_auth)
                 assert backup_name in names, error(f"{cluster} shard {shard} replica {replica}: remote backups {names}")
+
+        with When(f"The REST API password is changed in place in {backup_auto_secret(chi)}"):
+            rotated = (api_auth[0], f"rotated-{os.urandom(8).hex()}")
+            kubectl.launch(
+                f"patch secret {backup_auto_secret(chi)} --type merge "
+                f"-p '{{\"stringData\":{{\"API_PASSWORD\":\"{rotated[1]}\"}}}}'"
+            )
+
+        with Then("Every sidecar restarts its server with the new password, without a restart of the pod, and refuses the old one"):
+            restarts = {}
+            for cluster, shard, replica in enabled_hosts:
+                name = pod(cluster, shard, replica)
+                restarts[name] = kubectl.get("pod", name)["status"]["containerStatuses"]
+            for cluster, shard, replica in enabled_hosts:
+                name = pod(cluster, shard, replica)
+                for attempt in retries(timeout=300, delay=10):
+                    with attempt:
+                        code, body = backup_api_get(name, "/backup/status", rotated)
+                        assert code == "200", error(f"{name}: /backup/status with the new password answered {code}: {body}")
+                code, body = backup_api_get(name, "/backup/status", api_auth)
+                assert code == "401", error(f"{name}: /backup/status with the old password answered {code}: {body}")
+                counts = {c["name"]: c.get("restartCount") for c in kubectl.get("pod", name)["status"]["containerStatuses"]}
+                before = {c["name"]: c.get("restartCount") for c in restarts[name]}
+                assert counts == before, error(f"{name}: containers restarted {before} -> {counts}")
+            api_auth = rotated
+
+        rotated_user = "backup_rotated"
+        rotated_password = f"rotated-{os.urandom(8).hex()}"
+        with When(f"The ClickHouse username and password are changed in place in {backup_auto_secret(chi)}"):
+            kubectl.launch(
+                f"patch secret {backup_auto_secret(chi)} --type merge "
+                f"-p '{{\"stringData\":{{\"CLICKHOUSE_USERNAME\":\"{rotated_user}\",\"CLICKHOUSE_PASSWORD\":\"{rotated_password}\"}}}}'"
+            )
+
+        with Then("The operator reconciles the CHI: the configuration files take the new ClickHouse credentials"):
+            for cluster in backup_clusters:
+                name = backup_config_secret(chi, cluster)
+                for attempt in retries(timeout=300, delay=10):
+                    with attempt:
+                        config_file = yaml.safe_load(backup_secret_data(name)["config.yml"])
+                        assert config_file["clickhouse"]["username"] == rotated_user, error(
+                            f"{name}: ClickHouse username {config_file['clickhouse']['username']}"
+                        )
+                        assert config_file["clickhouse"]["password"] == rotated_password, error(
+                            f"{name}: not the new ClickHouse password"
+                        )
+
+        with And(f"ClickHouse lets {rotated_user} in with the new password, and {backup_user} no longer"):
+            name = pod(hot, 0, 0)
+            for attempt in retries(timeout=300, delay=10):
+                with attempt:
+                    out = clickhouse.query_with_error(
+                        chi, "SELECT 1", user=rotated_user, pwd=shlex.quote(rotated_password), pod=name
+                    )
+                    assert out == "1", error(f"{rotated_user} cannot log in: {out}")
+            for attempt in retries(timeout=300, delay=10):
+                with attempt:
+                    out = clickhouse.query_with_error(
+                        chi, "SELECT 1", user=backup_user, pwd=shlex.quote(backup_password), pod=name
+                    )
+                    assert "AUTHENTICATION_FAILED" in out, error(f"{backup_user} still logs in: {out}")
+
+        with And("Every sidecar reaches ClickHouse with the new credentials"):
+            for cluster, shard, replica in enabled_hosts:
+                name = pod(cluster, shard, replica)
+                for attempt in retries(timeout=300, delay=10):
+                    with attempt:
+                        code, body = backup_api_get(name, "/backup/tables", api_auth)
+                        assert code == "200", error(f"{name}: /backup/tables answered {code}: {body}")
 
         with When(f"A schedule of the whole installation, running every minute and keeping {keep_last} backup, is created"):
             kubectl.apply(util.get_full_path(schedule_manifest))
@@ -9468,7 +9624,7 @@ def test_010087(self):
                 query("SYSTEM FLUSH LOGS", cluster, shard, replica)
                 out = query(
                     "SELECT countIf(query ILIKE 'DROP %'), countIf(query ILIKE '% ON CLUSTER %') FROM system.query_log "
-                    f"WHERE (user = '{backup_user}') AND (event_time >= '{hot_restore_start}')",
+                    f"WHERE (user = '{rotated_user}') AND (event_time >= '{hot_restore_start}')",
                     cluster,
                     shard,
                     replica,
@@ -9476,9 +9632,9 @@ def test_010087(self):
                 counts = out.split()
                 assert len(counts) == 2, error(f"{hot} shard {shard}: cannot read the query log: {out}")
                 drops, on_cluster_queries = counts
-                assert int(drops) > 0, error(f"{hot} shard {shard}: the query log shows no drop by {backup_user} since {hot_restore_start}")
+                assert int(drops) > 0, error(f"{hot} shard {shard}: the query log shows no drop by {rotated_user} since {hot_restore_start}")
                 assert on_cluster_queries == "0", error(
-                    f"{hot} shard {shard}: {backup_user} ran {on_cluster_queries} queries ON CLUSTER since {hot_restore_start}"
+                    f"{hot} shard {shard}: {rotated_user} ran {on_cluster_queries} queries ON CLUSTER since {hot_restore_start}"
                 )
 
         with And(f"Every shard of the {hot} cluster holds the rows of its backup once, and none it replaced; the {cold} cluster was left alone"):
@@ -9612,9 +9768,16 @@ def test_010087(self):
                     )
 
         with When("The storage path loses its {cluster} macro, and the whole installation is backed up"):
-            # Only the Jobs read the Secret anew here. The sidecars restart for the change once their liveness
-            # probe has seen it for minutes, long after the Jobs refused the backup.
-            backup_patch("secret", storage_secret, {"stringData": {"S3_PATH": shared_path}})
+            # The operator regenerates the configuration files of the sidecars within a minute, without restarting
+            # them; the Jobs take the path from the configuration file Secret of each cluster.
+            # Applied from a file: the whole configuration on a command line is longer than the shell takes.
+            def share_path(data):
+                storage_config = yaml.safe_load(data["stringData"]["config.yml"])
+                storage_config["s3"]["path"] = shared_path
+                data["stringData"]["config.yml"] = yaml.safe_dump(storage_config, default_flow_style=False)
+
+            backup_apply_edited(storage_manifest, share_path)
+            wait_backup_config_setting(chi, backup_clusters, "S3_PATH", shared_path)
             kubectl.apply(util.get_full_path(shared_path_backup_manifest))
 
         wait_backup_phase(backup_kind, shared_path_backup, "Failed")

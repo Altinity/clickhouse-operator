@@ -17,11 +17,13 @@ package chop
 import (
 	"flag"
 	"fmt"
+	"os"
 
 	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 )
 
@@ -78,38 +80,35 @@ func (c *CHOp) GetRuntimeParam(name string) (string, bool) {
 	return c.ConfigManager.GetRuntimeParam(name)
 }
 
-// SetupLog sets up logging options
+// SetupLog sets up logging options.
+// Each option is taken from the logger section of the config file, overridden by its CHOP_LOGGER_* env var when set.
 func (c *CHOp) SetupLog() {
+	logger := c.Config().Logger
+	options := []struct {
+		flag   string
+		value  string
+		envVar string
+	}{
+		{"logtostderr", logger.LogToStderr, deployment.CHOP_LOGGER_LOGTOSTDERR},
+		{"alsologtostderr", logger.AlsoLogToStderr, deployment.CHOP_LOGGER_ALSOLOGTOSTDERR},
+		{"stderrthreshold", logger.StderrThreshold, deployment.CHOP_LOGGER_STDERRTHRESHOLD},
+		{"v", logger.V, deployment.CHOP_LOGGER_V},
+		{"vmodule", logger.VModule, deployment.CHOP_LOGGER_VMODULE},
+		{"log_backtrace_at", logger.LogBacktraceAt, deployment.CHOP_LOGGER_LOG_BACKTRACE_AT},
+	}
+
 	updated := false
-	if c.Config().Logger.LogToStderr != "" {
-		c.logUpdate("logtostderr", c.Config().Logger.LogToStderr)
+	for _, option := range options {
+		value := option.value
+		if env := os.Getenv(option.envVar); env != "" {
+			value = env
+		}
+		if value == "" {
+			continue
+		}
+		c.logUpdate(option.flag, value)
 		updated = true
-		_ = flag.Set("logtostderr", c.Config().Logger.LogToStderr)
-	}
-	if c.Config().Logger.AlsoLogToStderr != "" {
-		c.logUpdate("alsologtostderr", c.Config().Logger.AlsoLogToStderr)
-		updated = true
-		_ = flag.Set("alsologtostderr", c.Config().Logger.AlsoLogToStderr)
-	}
-	if c.Config().Logger.StderrThreshold != "" {
-		c.logUpdate("stderrthreshold", c.Config().Logger.StderrThreshold)
-		updated = true
-		_ = flag.Set("stderrthreshold", c.Config().Logger.StderrThreshold)
-	}
-	if c.Config().Logger.V != "" {
-		c.logUpdate("v", c.Config().Logger.V)
-		updated = true
-		_ = flag.Set("v", c.Config().Logger.V)
-	}
-	if c.Config().Logger.VModule != "" {
-		c.logUpdate("vmodule", c.Config().Logger.VModule)
-		updated = true
-		_ = flag.Set("vmodule", c.Config().Logger.VModule)
-	}
-	if c.Config().Logger.LogBacktraceAt != "" {
-		c.logUpdate("log_backtrace_at", c.Config().Logger.LogBacktraceAt)
-		updated = true
-		_ = flag.Set("log_backtrace_at", c.Config().Logger.LogBacktraceAt)
+		_ = flag.Set(option.flag, value)
 	}
 
 	if updated {

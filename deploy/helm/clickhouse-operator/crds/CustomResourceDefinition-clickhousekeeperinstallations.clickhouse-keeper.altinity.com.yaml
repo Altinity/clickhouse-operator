@@ -286,7 +286,7 @@ spec:
                   # union, so we use x-kubernetes-preserve-unknown-fields: true.
                   x-kubernetes-preserve-unknown-fields: true
                 suspend:
-                  !!merge <<: *TypeStringBool
+                  <<: *TypeStringBool
                   description: |
                     Suspend reconciliation of resources managed by a ClickHouse Keeper.
                     Works as the following:
@@ -351,13 +351,13 @@ spec:
                                 - "delete"
                             pvc:
                               type: string
-                              !!merge <<: *TypeObjectsCleanup
+                              <<: *TypeObjectsCleanup
                               description: "Behavior policy for unknown PVC, `Delete` by default"
                             configMap:
-                              !!merge <<: *TypeObjectsCleanup
+                              <<: *TypeObjectsCleanup
                               description: "Behavior policy for unknown ConfigMap, `Delete` by default"
                             service:
-                              !!merge <<: *TypeObjectsCleanup
+                              <<: *TypeObjectsCleanup
                               description: "Behavior policy for unknown Service, `Delete` by default"
                         reconcileFailedObjects:
                           type: object
@@ -367,16 +367,16 @@ spec:
                           # nullable: true
                           properties:
                             statefulSet:
-                              !!merge <<: *TypeObjectsCleanup
+                              <<: *TypeObjectsCleanup
                               description: "Behavior policy for failed StatefulSet, `Retain` by default"
                             pvc:
-                              !!merge <<: *TypeObjectsCleanup
+                              <<: *TypeObjectsCleanup
                               description: "Behavior policy for failed PVC, `Retain` by default"
                             configMap:
-                              !!merge <<: *TypeObjectsCleanup
+                              <<: *TypeObjectsCleanup
                               description: "Behavior policy for failed ConfigMap, `Retain` by default"
                             service:
-                              !!merge <<: *TypeObjectsCleanup
+                              <<: *TypeObjectsCleanup
                               description: "Behavior policy for failed Service, `Retain` by default"
                 defaults:
                   type: object
@@ -386,7 +386,7 @@ spec:
                   # nullable: true
                   properties:
                     replicasUseFQDN:
-                      !!merge <<: *TypeStringBool
+                      <<: *TypeStringBool
                       description: |
                         define should replicas be specified by FQDN in `<host></host>`.
                         In case of "no" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup
@@ -498,23 +498,23 @@ spec:
                             maxLength: 15
                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                           settings:
-                            !!merge <<: *TypeSettings
+                            <<: *TypeSettings
                             description: |
                               optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` only in one cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
                               override top-level `chi.spec.configuration.settings`
                               More details: https://clickhouse.tech/docs/en/operations/settings/settings/
                           files:
-                            !!merge <<: *TypeFiles
+                            <<: *TypeFiles
                             description: |
                               optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                               override top-level `chi.spec.configuration.files`
                           templates:
-                            !!merge <<: *TypeTemplateNames
+                            <<: *TypeTemplateNames
                             description: |
                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
                               override top-level `chi.spec.configuration.templates`
                           pdbManaged:
-                            !!merge <<: *TypeStringBool
+                            <<: *TypeStringBool
                             description: |
                               Specifies whether the Pod Disruption Budget (PDB) should be managed.
                               During the next installation, if PDB management is enabled, the operator will
@@ -538,7 +538,7 @@ spec:
                               with chi.spec.configuration.clusters[].security. See docs/security_hardening.md.
                             x-kubernetes-preserve-unknown-fields: true
                           insecure:
-                            !!merge <<: *TypeStringBool
+                            <<: *TypeStringBool
                             description: |
                               optional, controls exposure of the plaintext Keeper
                               client port (zk:2181). Defaults to "yes" (legacy
@@ -555,7 +555,7 @@ spec:
                               `insecure: no` is set without `secure: yes` (no
                               client port would be emitted).
                           secure:
-                            !!merge <<: *TypeStringBool
+                            <<: *TypeStringBool
                             description: |
                               optional, open secure (TLS) Keeper client ports for this cluster.
                               Translates into <secure>1</secure> in Raft server entries so peer
@@ -589,18 +589,18 @@ spec:
                                       maxLength: 15
                                       pattern: "^[a-zA-Z0-9-]{0,15}$"
                                     settings:
-                                      !!merge <<: *TypeSettings
+                                      <<: *TypeSettings
                                       description: |
                                         optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                         override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and will ignore if shard-level `chi.spec.configuration.clusters.layout.shards` present
                                         More details: https://clickhouse.tech/docs/en/operations/settings/settings/
                                     files:
-                                      !!merge <<: *TypeFiles
+                                      <<: *TypeFiles
                                       description: |
                                         optional, allows define content of any setting file inside each `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                         override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents
                                     templates:
-                                      !!merge <<: *TypeTemplateNames
+                                      <<: *TypeTemplateNames
                                       description: |
                                         optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                         override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`
@@ -637,18 +637,18 @@ spec:
                                             minimum: 1
                                             maximum: 65535
                                           settings:
-                                            !!merge <<: *TypeSettings
+                                            <<: *TypeSettings
                                             description: |
                                               optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                               override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and replica-level `chi.spec.configuration.clusters.layout.replicas.settings`
                                               More details: https://clickhouse.tech/docs/en/operations/settings/settings/
                                           files:
-                                            !!merge <<: *TypeFiles
+                                            <<: *TypeFiles
                                             description: |
                                               optional, allows define content of any setting file inside each `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                               override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents
                                           templates:
-                                            !!merge <<: *TypeTemplateNames
+                                            <<: *TypeTemplateNames
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
@@ -719,16 +719,16 @@ spec:
                                 minimum: 1
                                 maximum: 65535
                               settings:
-                                !!merge <<: *TypeSettings
+                                <<: *TypeSettings
                                 description: |
                                   optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                   More details: https://clickhouse.tech/docs/en/operations/settings/settings/
                               files:
-                                !!merge <<: *TypeFiles
+                                <<: *TypeFiles
                                 description: |
                                   optional, allows define content of any setting file inside each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                               templates:
-                                !!merge <<: *TypeTemplateNames
+                                <<: *TypeTemplateNames
                                 description: "be careful, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
                     podTemplates:
                       type: array

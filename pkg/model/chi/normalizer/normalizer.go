@@ -161,8 +161,6 @@ func (n *Normalizer) ensureSubject(subj *chi.ClickHouseInstallation) *chi.ClickH
 func (n *Normalizer) normalizeTarget() (*chi.ClickHouseInstallation, error) {
 	n.normalizeSpec()
 	n.finalize()
-	// A backup storage that cannot be resolved tells nothing about the pod templates, which are checked all the same
-	n.rejectInvalidBackupStorages()
 	// The FIPS image policy reads the images of the pod templates. One error at a time keeps the cause in front: an
 	// image read from an invalid pod template need not be the image a container would run
 	invalidHostTemplates, invalidBackupTemplates := n.rejectInvalidPodTemplates()
@@ -825,7 +823,8 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chi.Settings, scope any)
 	// Ensure and normalize target user settings
 	users = users.Ensure().Normalize(n.settingsNormalizerOptions(replacerUsers, scope, clickhouseOperatorUserMacroReplacer()))
 
-	// Users are common for all clusters, thus the backup user exists as soon as any cluster has backup enabled.
+	// Users are common for all clusters, thus the backup user exists as soon as any cluster has backup enabled and
+	// the backup Secret sets its username and password.
 	// Added once keys are normalized, so no spelling of its keys in the CR can survive next to the operator's.
 	if n.req.GetTarget().IsBackupEnabled() {
 		n.ensureBackupUser(users)
@@ -1325,9 +1324,6 @@ const (
 	// backupPodTemplateField is the backup field naming the pod template the clickhouse-backup sidecar is built on
 	backupPodTemplateField = "backup.podTemplate"
 
-	// backupStorageField is the backup field naming the storage the clickhouse-backup sidecar keeps the backups in
-	backupStorageField = "backup.storage"
-
 	// backupPodTemplateVolumeHint is how to fix the pod template a backup names rejected for a volume its
 	// clickhouse-backup container uses that only that pod template declares.
 	backupPodTemplateVolumeHint = "the sidecar takes the container alone, not the volumes of its pod template: " +
@@ -1346,42 +1342,6 @@ const (
 	clickHouseBinary           = "clickhouse"
 	clickHouseServerCommand    = "server"
 )
-
-// rejectInvalidBackupStorages aborts the CR when a cluster that turns backup on uses a storage that neither it nor
-// the installation declares, or declares several without naming the one it uses: its sidecar would take no storage,
-// or another one than meant. Runs ahead of any write, so the StatefulSets stay as they are. It reports the first
-// such cluster only.
-func (n *Normalizer) rejectInvalidBackupStorages() {
-	target := n.req.GetTarget()
-	if target == nil {
-		return
-	}
-	aborted := false
-	target.WalkClusters(func(cluster chi.ICluster) error {
-		backup := cluster.GetBackup()
-		if aborted || !backup.IsRequested() {
-			return nil
-		}
-		if _, err := backup.ResolveStorage(); err != nil {
-			field := backupStorageField
-			if storage := backup.GetStorage().Value(); storage != "" {
-				field += " " + strconv.Quote(storage)
-			}
-			declared := "none"
-			if storages := backup.GetStorages(); len(storages) > 0 {
-				names := make([]string, 0, len(storages))
-				for _, storage := range storages {
-					names = append(names, strconv.Quote(storage.Name))
-				}
-				declared = strings.Join(names, ", ")
-			}
-			target.EnsureStatus().ReconcileAbortWithReason(chi.StatusReasonInvalidBackupStorage,
-				fmt.Sprintf("backup of cluster %q, its own or inherited: %s %v (declared: %s)", cluster.GetName(), field, err, declared))
-			aborted = true
-		}
-		return nil
-	})
-}
 
 // rejectInvalidPodTemplates aborts the CR when a host's resolved pod template cannot run: a
 // container without a name or an image, two containers of one name, a clickhouse-backup container
