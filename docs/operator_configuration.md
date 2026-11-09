@@ -250,6 +250,53 @@ spec:
 
 See [Keeper Reference](keeper_reference.md) for details on how CHI references CHK resources.
 
+## Logging
+
+The `logger:` block sets [glog](https://github.com/golang/glog) options. It is applied by both the
+operator and the metrics-exporter, since both read the same configuration.
+
+```yaml
+logger:
+  logtostderr: "true"
+  alsologtostderr: "false"
+  v: "1"
+  stderrthreshold: ""
+  vmodule: ""
+  log_backtrace_at: ""
+```
+
+Each option can be overridden by an environment variable of the container, which takes precedence
+over the configuration value. An empty or unset variable keeps the configuration value. Since the
+variable is read by the process of the container it is set for, the operator and the metrics-exporter
+can use different logging options with the same configuration.
+
+| Setting | Environment variable |
+|---|---|
+| `logtostderr` | `CHOP_LOGGER_LOGTOSTDERR` |
+| `alsologtostderr` | `CHOP_LOGGER_ALSOLOGTOSTDERR` |
+| `stderrthreshold` | `CHOP_LOGGER_STDERRTHRESHOLD` |
+| `v` | `CHOP_LOGGER_V` |
+| `vmodule` | `CHOP_LOGGER_VMODULE` |
+| `log_backtrace_at` | `CHOP_LOGGER_LOG_BACKTRACE_AT` |
+
+For example, to make the metrics-exporter less verbose while keeping the operator at `v: "1"`,
+set `CHOP_LOGGER_V=0` in the `metrics-exporter` container. With the Helm chart, `operator.logVerbosity`
+and `metrics.logVerbosity` set `CHOP_LOGGER_V` for the corresponding container, other options can be
+set through `operator.env` and `metrics.env`:
+
+```yaml
+operator:
+  logVerbosity: 3
+  env:
+    - name: CHOP_LOGGER_VMODULE
+      value: "worker*=5"
+metrics:
+  logVerbosity: 0
+  env:
+    - name: CHOP_LOGGER_VMODULE
+      value: "exporter=2"
+```
+
 ## Backup
 
 EXPERIMENTAL. The `backup:` block sets the defaults of operator-managed backup: where in its storage

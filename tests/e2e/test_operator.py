@@ -6897,10 +6897,13 @@ def test_010064(self):
     # satisfy the not-restarted asserts below without ever having read a timestamp. A missing
     # pod raises IndexError inside the helper instead, which fails loudly on its own.
     assert start_time != "", error("could not read the ClickHouse container start time")
-    connected_time = ""
+    # Compare the session id, not connected_time: ClickHouse computes connected_time at
+    # query time as now() - session uptime, both in whole seconds, so it jitters by 1s
+    # within the same session.
+    client_id = ""
     with And("CHI is connected to Keeper"):
-        connected_time = clickhouse.query(chi, "SELECT connected_time from system.zookeeper_connection")
-        assert connected_time != ""
+        client_id = clickhouse.query(chi, "SELECT client_id from system.zookeeper_connection")
+        assert client_id != ""
 
     with When("Trigger CHK reconcile by patching taskID"):
         kubectl.force_chk_reconcile(chk, "keeper-watch-test")
@@ -6913,8 +6916,8 @@ def test_010064(self):
             assert new_start_time == start_time, error("CHI has been restarted")
 
         with Then("CHI does not reconnect to Keeper"):
-            new_connected_time = clickhouse.query(chi, "SELECT connected_time from system.zookeeper_connection")
-            assert new_connected_time == connected_time, error("ClickHouse reconnected to Keeper")
+            new_client_id = clickhouse.query(chi, "SELECT client_id from system.zookeeper_connection")
+            assert new_client_id == client_id, error("ClickHouse reconnected to Keeper")
 
     with When("Rescale Keeper to 3 nodes"):
         kubectl.create_and_check(
