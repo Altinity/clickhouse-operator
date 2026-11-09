@@ -22,7 +22,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -130,6 +129,9 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		err = w.reconcile(ctx, new)
 	}
 	if err != nil {
+		if util.IsContextDone(ctx) {
+			return nil
+		}
 		if errors.Is(err, common.ErrCRUDDeferred) {
 			w.a.V(1).M(new).F().Info("Reconcile deferred — waiting for Raft quorum headroom")
 			new.EnsureStatus().PushError(fmt.Sprintf(
@@ -165,11 +167,27 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		return nil
 	}
 
-	w.clean(ctx, new)
+	cleaned, err := w.clean(ctx, new)
+	if err != nil {
+		return err
+	}
+	if !cleaned {
+		return nil
+	}
+	if util.IsContextDone(ctx) {
+		return nil
+	}
 	w.addToMonitoring(new)
 	w.waitForIPAddresses(ctx, new)
-	if err := w.finalizeReconcileAndMarkCompleted(ctx, new); err != nil {
+	if util.IsContextDone(ctx) {
+		return nil
+	}
+	finalized, err := w.finalizeReconcileAndMarkCompleted(ctx, new)
+	if err != nil {
 		return err
+	}
+	if !finalized {
+		return nil
 	}
 
 	metrics.CRReconcilesCompleted(ctx, new)
@@ -210,15 +228,6 @@ func (w *worker) buildCR(ctx context.Context, _cr *apiChk.ClickHouseKeeperInstal
 	w.a.V(1).M(cr).Info("%s", actionPlan.Log("buildCR"))
 
 	return cr
-}
-
-func (w *worker) buildCRFromObj(ctx context.Context, obj meta.Object) (*apiChk.ClickHouseKeeperInstallation, error) {
-	_cr, err := w.c.GetCR(obj)
-	if err != nil {
-		w.a.M(obj).F().Error("UNABLE-1 to find obj by labels: %v err: %v", obj.GetLabels(), err)
-		return nil, err
-	}
-	return w.buildCR(ctx, _cr), nil
 }
 
 func (w *worker) buildTemplates(chi *apiChk.ClickHouseKeeperInstallation) (templates []*apiChk.ClickHouseKeeperInstallation) {

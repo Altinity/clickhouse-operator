@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
@@ -30,6 +31,8 @@ import (
 // chiRESTPort is the operator-side REST port (matches StartMetricsREST's bind).
 // Hardcoded to 8888 because the listener also lives in this package.
 const chiRESTPort = 8888
+
+const ipcRequestTimeout = 5 * time.Second
 
 // ipcURL caches the resolved Secure-mode loopback URL across calls (the URL is
 // fixed by chopconf at startup, so once-resolved is safe). Token is cached
@@ -41,6 +44,8 @@ var (
 
 	ipcTokenMu    sync.Mutex
 	ipcTokenCache string
+
+	ipcHTTPClient = &http.Client{Timeout: ipcRequestTimeout}
 )
 
 // resolveIPCURL builds the operator-REST URL for the local sidecar call. In
@@ -106,8 +111,7 @@ func makeRESTCall(restReq *RESTRequest, method string) error {
 }
 
 func doRequest(req *http.Request) ([]byte, error) {
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := ipcHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
