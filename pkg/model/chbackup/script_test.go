@@ -4822,7 +4822,9 @@ func TestJobScriptPostsEvents(t *testing.T) {
 	s := newSidecarStub(t, map[string]*stubHost{"h0": {}, "h1": {}})
 	code, out := s.runScript(k.script, withEnv(k.env, map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1"}))
 	require.Zero(t, code, out)
-	require.Equal(t, []string{"OrchestratorBackupStarted", "OrchestratorHostStepSucceeded", "OrchestratorHostStepSucceeded",
+	require.Equal(t, []string{"OrchestratorBackupStarted",
+		"OrchestratorCommand", "OrchestratorCommandFinished", "OrchestratorHostStepSucceeded",
+		"OrchestratorCommand", "OrchestratorCommandFinished", "OrchestratorHostStepSucceeded",
 		"OrchestratorBackupCompleted"}, k.reasons(), out)
 	require.Equal(t, "Normal", k.events[0]["type"])
 	require.Equal(t, "b1", k.events[0]["involvedObject"].(map[string]any)["name"])
@@ -4831,16 +4833,120 @@ func TestJobScriptPostsEvents(t *testing.T) {
 	s = newSidecarStub(t, map[string]*stubHost{"h0": {failOp: map[string]string{"create_remote": "disk full"}}})
 	code, out = s.runScript(k.script, withEnv(k.env, map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0"}))
 	require.Equal(t, 1, code, out)
-	require.Equal(t, []string{"OrchestratorBackupStarted", "OrchestratorHostFailed", "OrchestratorBackupFailed"}, k.reasons(), out)
-	require.Equal(t, "Warning", k.events[2]["type"])
-	require.Contains(t, k.events[2]["message"], "disk full")
+	require.Equal(t, []string{"OrchestratorBackupStarted", "OrchestratorCommand", "OrchestratorCommandFinished",
+		"OrchestratorHostFailed", "OrchestratorBackupFailed"}, k.reasons(), out)
+	require.Equal(t, "Warning", k.events[4]["type"])
+	require.Contains(t, k.events[4]["message"], "disk full")
 
 	k = newKubeStub(t, http.StatusCreated)
 	s = newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200102000000", "")}}})
 	code, out = s.runScript(k.script, withEnv(k.env, scheduledEnv("h0", dailyKeeping(1), "2020-01-03T00:00:00Z")))
 	require.Zero(t, code, out)
-	require.Equal(t, 2, slices.Index(k.reasons(), "OrchestratorBackupCompleted"))
-	require.Equal(t, []string{"OrchestratorRetentionDeleted", "OrchestratorRetentionDeleted"}, k.reasons()[3:], out)
+	require.Equal(t, 4, slices.Index(k.reasons(), "OrchestratorBackupCompleted"))
+	require.Equal(t, []string{"OrchestratorCommand", "OrchestratorRetentionDeleted", "OrchestratorCommand", "OrchestratorRetentionDeleted"},
+		k.reasons()[5:], out)
+	require.Equal(t, []string{
+		"h0: create_remote: POST h0:7171/backup/create_remote?name=daily-20200103000000",
+		"h0: delete remote daily-20200102000000: POST h0:7171/backup/delete/remote/daily-20200102000000",
+		"h0: delete remote daily-20200101000000: POST h0:7171/backup/delete/remote/daily-20200101000000",
+	}, k.messages("OrchestratorCommand"), out)
+}
+
+func (k *kubeStub) messages(reason string) []string {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	var messages []string
+	for _, event := range k.events {
+		if event["reason"] == reason {
+			messages = append(messages, event["message"].(string))
+		}
+	}
+	return messages
+}
+
+// Every request that starts or changes something shows in an Event as it is sent: the method, the host and port, the
+// path and the query string as curl encodes it, the command of the actions endpoint; and once the operation ends, the
+// command the sidecar tells it ran. No Event shows the credentials of the API.
+func TestJobScriptPostsTheCommandsItRuns(t *testing.T) {
+	k := newKubeStub(t, http.StatusCreated)
+	s := newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("base", "")}}})
+	code, out := s.runScript(k.script, withEnv(k.env, map[string]string{envOperation: operationBackup, envBackupName: "bk-1",
+		envBackupHosts: "h0", envTables: "db.t*,x?y", envPartitions: "('a b'),2026", envDiffFromRemote: "base"}))
+	require.Zero(t, code, out)
+	// The query string is as curl encodes it, which tells the values apart however its version spells the escapes
+	commands := k.messages("OrchestratorCommand")
+	require.Len(t, commands, 1, out)
+	sent, found := strings.CutPrefix(commands[0], "h0: create_remote: POST ")
+	require.True(t, found, commands[0])
+	request, err := url.Parse("http://" + sent)
+	require.NoError(t, err)
+	require.Equal(t, "h0:7171", request.Host)
+	require.Equal(t, "/backup/create_remote", request.Path)
+	require.Equal(t, "name=bk-1&table=db.t*,x?y&partitions=('a b'),2026&diff-from-remote=base", func() string {
+		var pairs []string
+		for _, pair := range strings.Split(request.RawQuery, "&") {
+			key, value, _ := strings.Cut(pair, "=")
+			value, err := url.QueryUnescape(value)
+			require.NoError(t, err)
+			pairs = append(pairs, key+"="+value)
+		}
+		return strings.Join(pairs, "&")
+	}())
+	require.Equal(t, []string{
+		`h0: create_remote bk-1 (operation op-1) ended with status success: create_remote --tables="db.t*,x?y" bk-1`,
+	}, k.messages("OrchestratorCommandFinished"), out)
+
+	k = newKubeStub(t, http.StatusCreated)
+	s = newSidecarStub(t, map[string]*stubHost{"s0": {remote: []stubBackup{remote("bk-1", "")}}, "d1": {remote: []stubBackup{remote("bk-1", "")}}})
+	code, out = s.runScript(k.script, withEnv(k.env, restoreEnv(map[string]string{envTables: "db.*"})))
+	require.Zero(t, code, out)
+	require.NotEmpty(t, k.messages("OrchestratorCommand"), out)
+	require.NotEmpty(t, k.messages("OrchestratorCommandFinished"), out)
+	for _, event := range k.events {
+		message := event["message"].(string)
+		require.NotContains(t, message, scriptTestPassword)
+		require.NotContains(t, message, "Authorization")
+		require.NotContains(t, message, "Basic ")
+	}
+
+	// A command of the actions endpoint shows with its body
+	s = newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("bk-1", "")}}})
+	out = sourcedOutput(t, map[string]string{"http_proxy": s.server.URL, envAPIPort: scriptTestAPIPort,
+		envAPIUsername: scriptTestUser, envAPIPassword: scriptTestPassword, envPollInterval: "0.01"}, `
+		event() { printf 'EVENT %s %s\n' "$2" "$3"; }
+		log() { :; }
+		API_PORT=${API_PORT} POLL_INTERVAL=${POLL_INTERVAL}
+		AUTH=$(printf '%s:%s' "${API_USERNAME}" "${API_PASSWORD}" | base64 | tr -d '\n')
+		submit h0 download /backup/actions --data-binary '{"command":"download --schema bk-1"}'`)
+	require.Equal(t, `EVENT OrchestratorCommand h0: download: POST h0:7171/backup/actions {"command":"download --schema bk-1"}`+"\n", out)
+}
+
+// An Event message is cut to the bytes the Kubernetes API takes, never inside a character.
+func TestJobScriptCutsEventMessages(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		max   int
+		want  string
+	}{
+		{"abc", 3, "abc"},
+		{"abcd", 3, "abc"},
+		{"aü", 2, "a"},
+		{"aü", 3, "aü"},
+		{"a✓", 3, "a"},
+		{"ab✓", 3, "ab"},
+		{"a😀", 4, "a"},
+		{"a😀", 5, "a😀"},
+		{"üü", 3, "ü"},
+	} {
+		out := sourcedOutput(t, map[string]string{"VALUE": tc.value, "MAX": strconv.Itoa(tc.max), "LANG": "C.UTF-8"},
+			`truncate_bytes "${VALUE}" "${MAX}"; printf '%s' "${REPLY}"`)
+		require.Equal(t, tc.want, out, "%q %d", tc.value, tc.max)
+	}
+	out := sourcedOutput(t, withEnv(eventTestEnv(), map[string]string{"MESSAGE": strings.Repeat("ü", 600), "LANG": "C.UTF-8"}),
+		`event_body Normal OrchestratorCommand "${MESSAGE}" 2026-01-02T03:04:05Z; printf '%s' "${REPLY}"`)
+	var event map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &event), out)
+	require.Equal(t, strings.Repeat("ü", 512), event["message"])
 }
 
 // An Event that cannot be posted never fails the run, nor holds it: after a few failures in a row none is tried; and a

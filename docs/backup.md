@@ -1351,6 +1351,22 @@ Kubernetes Events of its steps (reasons starting with `Orchestrator`, source com
 namespace than the operator's the operator keeps a ServiceAccount of that name there, with a Role that
 grants only what the script needs. An Event that cannot be posted never fails the operation.
 
+Every request the script sends to a `clickhouse-backup` API that starts or changes something -
+`create_remote`, `download`, `restore`, `delete`, a command of the `actions` endpoint - shows as it is
+sent in a Normal event `OrchestratorCommand`: the method, the host and port, the path and the query
+string as `curl` URL-encodes it, and for the `actions` endpoint its JSON body with the command, for
+example
+
+```
+chi-demo-main-0-0: create_remote: POST chi-demo-main-0-0:7171/backup/create_remote?name=nightly-20260101000000&diff-from-remote=nightly-20251231000000
+chi-demo-main-0-0: restore schema: POST chi-demo-main-0-0:7171/backup/actions {"command":"restore --schema --rm --env=S3_PATH=... nightly-20260101000000"}
+```
+
+When an operation ends, `OrchestratorCommandFinished` tells its operation id, its status and the
+command `clickhouse-backup` reports it ran. The API credentials travel in a header and never show in
+an event; a message longer than the 1024 bytes an event takes is cut. The polling requests (status,
+lists of backups, actions) show in none.
+
 ### Backup modes
 
 `backup.mode` chooses how the Jobs reach `clickhouse-backup` on a cluster:

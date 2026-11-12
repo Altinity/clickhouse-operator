@@ -8481,10 +8481,37 @@ data:
     	REPLY=${out}${value}
     }
     
+    # truncate_bytes VALUE MAX sets REPLY to VALUE cut to at most MAX bytes, whatever the locale, without the bytes of a
+    # UTF-8 character the cut splits: what is left is valid UTF-8 when VALUE is
+    truncate_bytes() {
+    	local LC_ALL=C value=$1 max=$2 i n
+    	if ((${#value} <= max)); then
+    		REPLY=${value}
+    		return 0
+    	fi
+    	value=${value:0:max}
+    	for ((i = 1; i <= 4 && i <= ${#value}; i++)); do
+    		printf -v n '%d' "'${value: -i:1}"
+    		# A byte that continues a character: the character starts before it
+    		if ((n >= 0x80 && n < 0xc0)); then
+    			continue
+    		fi
+    		# The first byte of a character of 2, 3 or 4 bytes, of which only i are left
+    		if ((n >= 0xf0 && i < 4 || n >= 0xe0 && i < 3 || n >= 0xc0 && i < 2)); then
+    			value=${value:0:${#value}-i}
+    		fi
+    		break
+    	done
+    	REPLY=${value}
+    }
+    
     # event_body TYPE REASON MESSAGE TIME sets REPLY to the core/v1 Event of TYPE (Normal or Warning) with REASON and MESSAGE
-    # on the object EVENT_OBJECT_* names, in POD_NAMESPACE, at TIME (RFC 3339)
+    # on the object EVENT_OBJECT_* names, in POD_NAMESPACE, at TIME (RFC 3339). A MESSAGE longer than the Kubernetes API
+    # takes is cut to EVENT_MESSAGE_MAX_LENGTH bytes
     event_body() {
-    	local type=$1 reason=$2 message=${3:0:${EVENT_MESSAGE_MAX_LENGTH}} at=$4 field value body= name=${EVENT_OBJECT_NAME:-}
+    	local type=$1 reason=$2 message at=$4 field value body= name=${EVENT_OBJECT_NAME:-}
+    	truncate_bytes "$3" "${EVENT_MESSAGE_MAX_LENGTH}"
+    	message=${REPLY}
     	local -a fields=(
     		generate_name "${name:0:200}." namespace "${POD_NAMESPACE:-}"
     		api_version "${EVENT_OBJECT_API_VERSION:-}" kind "${EVENT_OBJECT_KIND:-}" name "${name}" uid "${EVENT_OBJECT_UID:-}"
@@ -8620,24 +8647,30 @@ data:
     	done
     }
     
-    # request METHOD HOST PATH [CURL_ARGS...] performs one API call and sets HTTP_CODE, HTTP_BODY, CURL_EXIT and
-    # CURL_CONNECTED, empty when the connection was never established
+    # request METHOD HOST PATH [CURL_ARGS...] performs one API call and sets HTTP_CODE, HTTP_BODY, CURL_EXIT,
+    # CURL_CONNECTED, empty when the connection was never established, and REQUEST_URL to the URL curl requested, the query
+    # string of -G as it encoded it, without the scheme. The credentials are in a header, never in the URL
     request() {
-    	local method=$1 host=$2 path=$3 out last
+    	local method=$1 host=$2 path=$3 out last connect code url
     	shift 3
     	HTTP_CODE=000
     	CURL_EXIT=0
     	CURL_CONNECTED=1
+    	REQUEST_URL="${host}:${API_PORT}${path}"
     	# The credentials travel on stdin so they never show up in the process list
     	out=$(printf 'Authorization: Basic %s\n' "${AUTH}" |
     		curl -sS -X "${method}" -H @- --connect-timeout 10 --max-time "${REQUEST_TIMEOUT}" \
-    			-w '\n%{time_connect} %{http_code}' "$@" "http://${host}:${API_PORT}${path}" 2>&1) || CURL_EXIT=$?
+    			-w '\n%{time_connect} %{http_code} %{url_effective}' "$@" "http://${host}:${API_PORT}${path}" 2>&1) || CURL_EXIT=$?
     	# What -w writes is always the last line, also when curl fails
     	HTTP_BODY=${out%$'\n'*}
     	last=${out##*$'\n'}
+    	read -r connect code url <<<"${last}"
+    	if [[ ${url} == http://* ]]; then
+    		REQUEST_URL=${url#http://}
+    	fi
     	if ((CURL_EXIT == 0)); then
-    		HTTP_CODE=${last##* }
-    	elif [[ ${last%% *} =~ ^0+([.]0+)?$ ]]; then
+    		HTTP_CODE=${code}
+    	elif [[ ${connect} =~ ^0+([.]0+)?$ ]]; then
     		CURL_CONNECTED=
     	fi
     }
@@ -8720,8 +8753,38 @@ data:
     	fi
     }
     
+    # command_event HOST WHAT NOTE [CURL_ARGS...] posts the Event OrchestratorCommand of the request the last call POSTed to
+    # HOST for WHAT: its method, and its host, port, path and query string as curl sent them, with the body of a command of
+    # the actions endpoint, and NOTE when it may have been accepted without an answer telling so. The credentials travel in
+    # a header, which no Event shows
+    command_event() {
+    	local host=$1 what=$2 note=$3 message body=
+    	shift 3
+    	while (($# > 0)); do
+    		if [[ $1 == --data-binary && $# -gt 1 ]]; then
+    			body=" $2"
+    			shift
+    		fi
+    		shift
+    	done
+    	message="${host}: ${what}: POST ${REQUEST_URL}${body}${note:+ (${note})}"
+    	log "${message}"
+    	event Normal OrchestratorCommand "${message}"
+    }
+    
+    # finished_event HOST WHAT ID STATUS posts the Event OrchestratorCommandFinished of the operation ID that has just ended
+    # with STATUS on HOST, with the command the sidecar tells it ran, which HTTP_BODY, its status, holds
+    finished_event() {
+    	local command
+    	json_get command "${HTTP_BODY}"
+    	command=${REPLY//\\\"/\"}
+    	command=${command//\\\\/\\}
+    	event Normal OrchestratorCommandFinished "$1: $2 (operation $3) ended with status ${4:-unknown}${command:+: ${command}}"
+    }
+    
     # submit HOST WHAT PATH [CURL_ARGS...] POSTs a request once the sidecar is idle, queueing while it is busy: HTTP 423, or
-    # the error the actions endpoint answers a locked sidecar's request with. Neither is accepted, so resubmitting is safe
+    # the error the actions endpoint answers a locked sidecar's request with. Neither is accepted, so resubmitting is safe.
+    # A request the sidecar may have accepted shows in an Event, as command_event tells it
     submit() {
     	local host=$1 what=$2
     	shift 2
@@ -8734,6 +8797,7 @@ data:
     			# A request that reached the sidecar may have been accepted, only one never sent was not
     			if ! unreachable POST; then
     				changed
+    				command_event "${host}" "${what}" "sent, no answer: curl exit ${CURL_EXIT}" "$@"
     			fi
     			warn "${host}: ${what} request failed: ${HTTP_BODY}"
     			return 1
@@ -8741,12 +8805,14 @@ data:
     		if proxy_failed; then
     			# The proxy may have passed the request on
     			changed
+    			command_event "${host}" "${what}" "sent, a proxy answered HTTP ${HTTP_CODE}" "$@"
     			warn "${host}: ${what} failed (HTTP ${HTTP_CODE}): $(error_of)"
     			return 1
     		fi
     		case ${HTTP_CODE} in
     		2??)
     			changed
+    			command_event "${host}" "${what}" "" "$@"
     			return 0
     			;;
     		409 | 423) log "${host}: sidecar busy, queueing ${what}" ;;
@@ -8939,6 +9005,9 @@ data:
     			return 1
     		fi
     		status=$(json_field status "${HTTP_BODY}")
+    		if [[ -n ${status} && ${status} != "in progress" ]]; then
+    			finished_event "${host}" "${what} ${name}" "${id}" "${status}"
+    		fi
     		case ${status} in
     		"in progress") ;;
     		success)
