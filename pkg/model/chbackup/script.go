@@ -115,8 +115,8 @@ const (
 	envMaxTableSizeToDrop = "MAX_TABLE_SIZE_TO_DROP"
 	// envValidateTopology requires the backup in the storage of every restored host, "true" or "false"
 	envValidateTopology = "VALIDATE_TOPOLOGY"
-	// envRestoreRBAC restores the access entities of the backup on every schema host once its schema and
-	// data are restored, "true" or "false"
+	// envRestoreRBAC restores the access entities of the backup on every schema host with its schema, before the
+	// data, "true" or "false"
 	envRestoreRBAC = "RESTORE_RBAC"
 	// envRBACNotRestoredMessage is the termination message the script leaves when the restore it made
 	// succeeded and did not restore the access entities the backup holds on any host

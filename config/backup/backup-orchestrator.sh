@@ -2752,7 +2752,8 @@ drop_source_copies() {
 # restore_command STEP sets STEP_ARGS to the arguments of run_op, or of run_action, that run the step STEP of the
 # restore of the backup: download, the backup with the data, every file of it already on the disks of the host
 # hard-linked rather than downloaded again; download_schema, the backup without the data; schema, which drops the tables
-# of the backup first; schema_on_cluster, which drops and creates them ON CLUSTER; data; or rbac, the access entities.
+# of the backup first, and restores the access entities too when RESTORE_RBAC_WITH_SCHEMA is set; schema_on_cluster,
+# which drops and creates them ON CLUSTER; or data.
 # Each restores from the copy the download made. RESTORE_KIND tells which: op, a typed request with query parameters,
 # or action, the command of the actions endpoint with the flags ACTION_ENV, as a typed request takes no setting in
 # place of those of the sidecar, such as the storage paths of another installation
@@ -2773,18 +2774,19 @@ restore_command() {
 	schema)
 		params=(schema= rm=)
 		flags=(restore --schema --rm)
+		# As the Altinity Cloud Manager restores them, the access entities come with the schema, before the data
+		if [[ -n ${RESTORE_RBAC_WITH_SCHEMA} ]]; then
+			params+=(rbac=)
+			flags+=(--rbac)
+		fi
 		;;
 	schema_on_cluster) flags=(restore --schema --rm "--env=RESTORE_SCHEMA_ON_CLUSTER=${CLUSTER}") ;;
 	data)
 		params=(data=)
 		flags=(restore --data)
 		;;
-	rbac)
-		params=(rbac-only=)
-		flags=(restore --rbac-only)
-		;;
 	esac
-	if [[ -n ${TABLES:-} && $1 != rbac ]]; then
+	if [[ -n ${TABLES:-} ]]; then
 		params+=("table=${TABLES}")
 		flags+=("--tables=${TABLES}")
 	fi
@@ -3106,7 +3108,9 @@ do_restore() {
 		fi
 	fi
 	# Every replica restores the schema on its own, dropping what it has of the backup first: a table that has come
-	# through the replication of a Replicated database would fail its CREATE
+	# through the replication of a Replicated database would fail its CREATE. Access entities are stored apart on every
+	# host, and a backup holds those of the replica it was made on: they come with the schema of every replica
+	RESTORE_RBAC_WITH_SCHEMA=${restore_rbac}
 	for host in "${schema_hosts[@]}"; do
 		if ! restore_step "${host}" "restore schema" schema; then
 			fail "schema restore of ${BACKUP_NAME} failed on ${host}"
@@ -3118,14 +3122,6 @@ do_restore() {
 		if ! run_all "${RESTORE_KIND}" "${data_hosts[*]}" "" "restore data" "${BACKUP_NAME}" "${STEP_ARGS[@]}"; then
 			fail_all "data restore of ${BACKUP_NAME}"
 		fi
-	fi
-	# Access entities are stored apart on every host, and a backup holds those of the replica it was made on
-	if [[ -n ${restore_rbac} ]]; then
-		for host in "${schema_hosts[@]}"; do
-			if ! restore_step "${host}" "restore rbac" rbac; then
-				fail "access entity restore of ${BACKUP_NAME} failed on ${host}"
-			fi
-		done
 	fi
 	# Drop the copies the restore downloaded, they would otherwise double the disk usage
 	for host in "${used[@]}"; do
@@ -3180,6 +3176,8 @@ STEP_ARGS=()
 RESTORE_KIND=op
 ACTION_ENV=
 DATA_DOWNLOADS=
+# RESTORE_RBAC_WITH_SCHEMA is set when the schema restore of every replica restores the access entities too
+RESTORE_RBAC_WITH_SCHEMA=
 
 main() {
 	# Retention keeps its sets in associative arrays, which bash handles under set -u from 4.4 on

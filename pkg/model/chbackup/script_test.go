@@ -3475,9 +3475,11 @@ func TestJobScriptRestoresAccessEntitiesOnEveryReplica(t *testing.T) {
 	require.Equal(t, []string{
 		"a0 download hardlink_exists_files= table=db1.*", "a1 download schema= table=db1.*",
 		"b0 download hardlink_exists_files= table=db1.*", "b1 download schema= table=db1.*",
-		"a0 rm= schema= table=db1.*", "a1 rm= schema= table=db1.*", "b0 rm= schema= table=db1.*", "b1 rm= schema= table=db1.*",
+		// The access entities come with the schema of every replica, before the data, as the Altinity Cloud Manager
+		// restores them
+		"a0 rbac= rm= schema= table=db1.*", "a1 rbac= rm= schema= table=db1.*", "b0 rbac= rm= schema= table=db1.*",
+		"b1 rbac= rm= schema= table=db1.*",
 		"a0 data= table=db1.*", "b0 data= table=db1.*",
-		"a0 rbac-only=", "a1 rbac-only=", "b0 rbac-only=", "b1 rbac-only=",
 	}, s.restoreSteps())
 	_, err := os.Stat(path)
 	require.True(t, os.IsNotExist(err), "a restore of the access entities tells nothing:\n%s", out)
@@ -3553,14 +3555,6 @@ func TestJobScriptStopsWhenASidecarRestartsBetweenSteps(t *testing.T) {
 			after: 2,
 			env:   map[string]string{envOverwrite: "true"},
 			steps: append(slices.Clone(downloads), "a0 restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main bk-1"),
-		},
-		"before the restore of access entities": {
-			host:  "a1",
-			after: 2,
-			env:   map[string]string{envRestoreRBAC: "true"},
-			steps: append(slices.Clone(downloads),
-				"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=", "a0 data=", "b0 data=", "a0 rbac-only=",
-			),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -4081,9 +4075,8 @@ func TestJobScriptRestoresFromTheStoragePathsOfAnotherInstallation(t *testing.T)
 			path: testSourcePath, objectDiskPath: testSourceObjectDiskPath,
 			steps: []string{
 				"s0 download --hardlink-exists-files --tables=db1.*", "d1 download --hardlink-exists-files --tables=db1.*",
-				"s0 restore --schema --rm --tables=db1.*",
+				"s0 restore --schema --rm --rbac --tables=db1.*",
 				"s0 restore --data --tables=db1.*", "d1 restore --data --tables=db1.*",
-				"s0 restore --rbac-only",
 			},
 		},
 	} {

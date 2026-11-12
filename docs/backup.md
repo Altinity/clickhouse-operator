@@ -1138,8 +1138,8 @@ file of it already on their disks (`--hardlink-exists-files`) instead of downloa
 others the schema alone. A host short of disk space fails the restore here, before anything is
 dropped, and the copies the others downloaded are deleted again; a host that already holds a local
 copy of the backup restores from that one. Then the schema is restored on every replica, each from
-the copy of its shard, one after another, then the data on one replica of each shard, all at once,
-then the access entities; replication copies `Replicated*` tables to the other replicas. Each step
+the copy of its shard, one after another - with the access entities, when the restore restores
+them - then the data on one replica of each shard, all at once; replication copies `Replicated*` tables to the other replicas. Each step
 restores from the downloaded copy (`POST /backup/restore`), which is deleted once the restore is
 done. A restore that reads the backup of [another CHI](#storage-paths) runs the same steps as
 commands of the `actions` endpoint (`download`, then `restore`), with the storage paths of that CHI. The schema is restored replica by replica, not `ON CLUSTER`, to keep every table as the
@@ -1265,8 +1265,9 @@ steps then run as such commands (`download`, `restore`) rather than typed reques
 
 A backup holds the access entities created with SQL - users, roles, grants, row policies, quotas
 and settings profiles - which `clickhouse-backup` backs up by default. `rbac: true` restores them
-too, after the schema and the data, on every host of the CHI, and ClickHouse reloads them live with
-`SYSTEM RELOAD USERS`. `rbac` needs an empty `cluster`, as access entities belong to the whole CHI,
+too, with the schema of every host of the CHI (`restore --schema --rm --rbac`), before the data, as
+ACM restores them - existing access entities of the same names are replaced - and ClickHouse
+reloads them live with `SYSTEM RELOAD USERS`. `rbac` needs an empty `cluster`, as access entities belong to the whole CHI,
 the more so in a `replicated` user directory, which every cluster using its Keeper path shares.
 [Recovery](#recover-a-new-chi-from-a-backup) always restores them. A restore of access entities
 holds the schedules, backups and verifications of every cluster of the CHI until it has finished,
