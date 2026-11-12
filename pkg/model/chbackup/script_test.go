@@ -1849,7 +1849,7 @@ func TestJobScriptRestore(t *testing.T) {
 	actions := s.matching(http.MethodPost, "/backup/actions")
 	require.Equal(t, "restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER="+restoreTestCluster+" bk-1", actions[0].command)
 	require.Equal(t, []string{
-		"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=", "a0 data=", "b0 data=",
+		"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=", "a0 data= hardlink_exists_files=", "b0 data= hardlink_exists_files=",
 	}, s.restoreSteps()[1:])
 }
 
@@ -2539,7 +2539,7 @@ func TestJobScriptRestoresTheSchemaOnEveryReplica(t *testing.T) {
 	require.Zero(t, code, out)
 	require.Equal(t, []string{
 		"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=",
-		"a0 data=", "b0 data=",
+		"a0 data= hardlink_exists_files=", "b0 data= hardlink_exists_files=",
 	}, s.restoreSteps())
 }
 
@@ -2557,7 +2557,7 @@ func TestJobScriptOverwriteDropsTheBackupOnClusterFirst(t *testing.T) {
 		"a0 restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main --tables=db1.*,db2.t? bk-1",
 		"a0 rm= schema= table=db1.*,db2.t?", "a1 rm= schema= table=db1.*,db2.t?",
 		"b0 rm= schema= table=db1.*,db2.t?", "b1 rm= schema= table=db1.*,db2.t?",
-		"a0 data= table=db1.*,db2.t?", "b0 data= table=db1.*,db2.t?",
+		"a0 data= hardlink_exists_files= table=db1.*,db2.t?", "b0 data= hardlink_exists_files= table=db1.*,db2.t?",
 	}, s.restoreSteps())
 	require.Contains(t, out, "a0: restore_remote schema on cluster main bk-1 succeeded")
 }
@@ -3168,7 +3168,7 @@ func TestJobScriptRestoresAccessEntitiesOnEveryReplica(t *testing.T) {
 	require.Zero(t, code, out)
 	require.Equal(t, []string{
 		"a0 rm= schema= table=db1.*", "a1 rm= schema= table=db1.*", "b0 rm= schema= table=db1.*", "b1 rm= schema= table=db1.*",
-		"a0 data= table=db1.*", "b0 data= table=db1.*",
+		"a0 data= hardlink_exists_files= table=db1.*", "b0 data= hardlink_exists_files= table=db1.*",
 		"a0 rbac-only=", "a1 rbac-only=", "b0 rbac-only=", "b1 rbac-only=",
 	}, s.restoreSteps())
 	_, err := os.Stat(path)
@@ -3236,7 +3236,7 @@ func TestJobScriptStopsWhenASidecarRestartsBetweenSteps(t *testing.T) {
 			host: "a1",
 			env:  map[string]string{envRestoreRBAC: "true"},
 			steps: []string{
-				"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=", "a0 data=", "b0 data=", "a0 rbac-only=",
+				"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=", "a0 data= hardlink_exists_files=", "b0 data= hardlink_exists_files=", "a0 rbac-only=",
 			},
 		},
 	} {
@@ -3753,7 +3753,7 @@ func TestJobScriptRestoresFromTheStoragePathsOfAnotherInstallation(t *testing.T)
 			path: testSourcePath, objectDiskPath: testSourceObjectDiskPath,
 			steps: []string{
 				"s0 restore_remote --schema --rm --tables=db1.*",
-				"s0 restore_remote --data --tables=db1.*", "d1 restore_remote --data --tables=db1.*",
+				"s0 restore_remote --data --hardlink-exists-files --tables=db1.*", "d1 restore_remote --data --hardlink-exists-files --tables=db1.*",
 				"s0 restore_remote --rbac-only",
 			},
 		},
@@ -3777,7 +3777,7 @@ func TestJobScriptRestoresFromTheStoragePathsOfAnotherInstallation(t *testing.T)
 			steps := tc.steps
 			if steps == nil {
 				steps = []string{
-					"s0 restore_remote --schema --rm --tables=db1.t1", "s0 restore_remote --data --tables=db1.t1", "d1 restore_remote --data --tables=db1.t1",
+					"s0 restore_remote --schema --rm --tables=db1.t1", "s0 restore_remote --data --hardlink-exists-files --tables=db1.t1", "d1 restore_remote --data --hardlink-exists-files --tables=db1.t1",
 				}
 			}
 			calls := []string{
@@ -3855,7 +3855,7 @@ func TestJobScriptDropsOnClusterFromTheStoragePathsOfAnotherInstallation(t *test
 		"a0 restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main" + flags + " bk-1",
 		"a0 restore_remote --schema --rm" + flags + " bk-1", "a1 restore_remote --schema --rm" + flags + " bk-1",
 		"b0 restore_remote --schema --rm" + flags + " bk-1", "b1 restore_remote --schema --rm" + flags + " bk-1",
-		"a0 restore_remote --data" + flags + " bk-1", "b0 restore_remote --data" + flags + " bk-1",
+		"a0 restore_remote --data --hardlink-exists-files" + flags + " bk-1", "b0 restore_remote --data --hardlink-exists-files" + flags + " bk-1",
 	}, s.restoreSteps())
 	var listed []string
 	for _, c := range s.matching(http.MethodGet, "/backup/tables") {
@@ -4105,7 +4105,7 @@ func TestJobScriptRestoresFromItsOwnPathsWhenTheyTellNoOtherInstallation(t *test
 			}
 			require.Contains(t, out, tc.warned)
 			require.Empty(t, s.matching(http.MethodPost, "/backup/actions"))
-			require.Equal(t, []string{"s0 rm= schema=", "s0 data=", "d1 data="}, s.restoreSteps())
+			require.Equal(t, []string{"s0 rm= schema=", "s0 data= hardlink_exists_files=", "d1 data= hardlink_exists_files="}, s.restoreSteps())
 			require.Len(t, s.matching(http.MethodGet, "/backup/list/remote"), 2)
 		})
 	}

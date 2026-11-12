@@ -2616,8 +2616,8 @@ do_restore() {
 	done
 	if [[ -n ${restore_data} ]]; then
 		for host in "${data_hosts[@]}"; do
-			if ! restore_step "${host}" "restore_remote data" "--data${TABLES:+ --tables=${TABLES}}" \
-				--data-urlencode "data=" "${table_params[@]}"; then
+			if ! restore_step "${host}" "restore_remote data" "--data --hardlink-exists-files${TABLES:+ --tables=${TABLES}}" \
+				--data-urlencode "data=" --data-urlencode "hardlink_exists_files=" "${table_params[@]}"; then
 				fail "data restore of ${BACKUP_NAME} failed on ${host}"
 			fi
 		done
