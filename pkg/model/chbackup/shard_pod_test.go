@@ -202,6 +202,8 @@ func TestShardPodServesTheRESTAPI(t *testing.T) {
 	require.Equal(t, "0.0.0.0:7171", vars[config.ClickHouseBackupEnvAPIListen])
 	require.Equal(t, "chi-demo-main-0-0", vars[config.ClickHouseBackupEnvClickHouseHost], "ClickHouse is reached through the host Service")
 	require.Equal(t, "", vars[config.ClickHouseBackupEnvRestoreSchemaOnCluster])
+	require.Equal(t, "sql:SYSTEM RELOAD USERS; sql:SYSTEM RELOAD CONFIG", vars[config.ClickHouseBackupEnvClickHouseRestartCommand],
+		"restored access entities and configuration are reloaded as by the sidecar")
 	require.NotContains(t, vars, config.ClickHouseBackupSecretKeyAPIUsername, "the credentials are in the configuration file")
 	require.Equal(t, "0", vars[config.ClickHouseBackupEnvBackupsToKeepRemote], "retention is the orchestrator's alone")
 	require.Equal(t, "true", vars[config.ClickHouseBackupEnvRebaseDuringDelete])

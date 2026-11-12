@@ -178,11 +178,12 @@ const (
 	// backup once it is uploaded. Its default keeps every local copy, and these fill up the data disk.
 	ClickHouseBackupBackupsToKeepLocalDeleteAfterUpload = "-1"
 
-	// ClickHouseBackupRestartCommandReloadUsers is what clickhouse-backup runs once it has restored access
-	// objects, so that ClickHouse loads them. Its default restarts the server through systemctl, which a sidecar
-	// does not have: the command fails, clickhouse-backup ignores the failure, and the restored users, roles and
-	// grants stay unloaded. Reloading them needs ClickHouse 23.3 or later, and no restart.
-	ClickHouseBackupRestartCommandReloadUsers = "sql:SYSTEM RELOAD USERS"
+	// ClickHouseBackupRestartCommandReload is what clickhouse-backup runs, one command after the other, once it has
+	// restored access objects or configuration files, so that ClickHouse loads them, as the Altinity Cloud Manager
+	// has it. Its default restarts the server through systemctl, which a sidecar does not have: the command fails,
+	// clickhouse-backup ignores the failure, and the restored users, roles and grants stay unloaded. Reloading them
+	// needs ClickHouse 23.3 or later, and no restart.
+	ClickHouseBackupRestartCommandReload = "sql:SYSTEM RELOAD USERS; sql:SYSTEM RELOAD CONFIG"
 
 	// ClickHouseBackupClickHouseHost is where the sidecar reaches ClickHouse - both share the pod's network namespace
 	ClickHouseBackupClickHouseHost = "localhost"

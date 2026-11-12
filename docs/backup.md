@@ -275,8 +275,9 @@ For every Pod of a cluster with backup enabled, the operator adds a container na
   backup: the [overwrite guard](#restore-safety) checks those names, and a mapping would make the
   restore drop and replace other tables than the ones it checked.
 * **Access entities reloaded live.** `CLICKHOUSE_RESTART_COMMAND` is set to
-  `sql:SYSTEM RELOAD USERS`, so ClickHouse picks up restored users, roles and grants without a
-  restart; the `clickhouse-backup` default, `systemctl restart clickhouse-server`, cannot work in a
+  `sql:SYSTEM RELOAD USERS; sql:SYSTEM RELOAD CONFIG`, as ACM sets it, so ClickHouse picks up
+  restored users, roles and grants, and configuration, without a restart, in the sidecar and in
+  the backup Pods of `mode: pod` alike; the `clickhouse-backup` default, `systemctl restart clickhouse-server`, cannot work in a
   sidecar. See [Access entities](#access-entities).
 * **One operation at a time.** `API_ALLOW_PARALLEL` is set to `false`, so a sidecar runs one
   backup or restore command at a time and refuses another meanwhile, which the Jobs wait out.

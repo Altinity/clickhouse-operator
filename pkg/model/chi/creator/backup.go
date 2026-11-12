@@ -337,7 +337,7 @@ func newBackupEnvVars(host *chi.Host) []core.EnvVar {
 		},
 		{
 			Name:  config.ClickHouseBackupEnvClickHouseRestartCommand,
-			Value: config.ClickHouseBackupRestartCommandReloadUsers,
+			Value: config.ClickHouseBackupRestartCommandReload,
 		},
 		// Set, and empty, so that nothing else sets them, see backupPinnedEnvVarNames
 		{
