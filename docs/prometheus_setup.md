@@ -29,6 +29,28 @@ So, what we need in general, is to point Prometheus to gather data from:
 http://<service/clickhouse-operator-metrics>:8888/metrics
 ```
 
+### Disabling the default Go, process and promhttp collectors
+
+Both metrics endpoints expose the Prometheus Go client library's default
+collectors: `go_*` and `process_*` on the operator and the exporter, plus
+`promhttp_*` on the exporter. Set `OPERATOR_METRICS_DISABLE_DEFAULT_COLLECTORS`
+to `true` to serve only the component's own metrics. The variable is read by
+each process, so set it on both containers to opt both endpoints out:
+
+```yaml
+operator:
+  env:
+    - name: OPERATOR_METRICS_DISABLE_DEFAULT_COLLECTORS
+      value: "true"
+metrics:
+  env:
+    - name: OPERATOR_METRICS_DISABLE_DEFAULT_COLLECTORS
+      value: "true"
+```
+
+Unset, or any value `strconv.ParseBool` rejects, keeps the current behaviour
+with the default collectors exposed.
+
 ## Setup Prometheus and integrate it with clickhouse-operator
 In case we do not have Prometheus available, we can setup it directly into k8s and integrate with `clickhouse-operator` 
 
