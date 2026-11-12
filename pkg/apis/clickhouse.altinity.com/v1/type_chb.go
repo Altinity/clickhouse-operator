@@ -258,6 +258,13 @@ var (
 	scheduledBackupNameRegexp = regexp.MustCompile(`-[0-9]{14}$`)
 	// backupPartitionRegexp bounds one clickhouse-backup --partitions id.
 	backupPartitionRegexp = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
+	// backupEngineRegexp bounds a table engine a restore leaves out. Mirrored by the CRD schema patterns.
+	backupEngineRegexp = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,127}$`)
+	// backupDatabaseRegexp bounds a database of the database mapping of a restore: no ":" or ",", which separate the
+	// pairs of the mapping, nor anything a command line would split. Mirrored by the CRD schema patterns.
+	backupDatabaseRegexp = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_-]{0,127}$`)
+	// restoreSystemDatabases are the databases a database mapping must not name, as the restore never touches them
+	restoreSystemDatabases = map[string]bool{"system": true, "information_schema": true, "_temporary_and_external_tables": true}
 	// backupSourceRegexp bounds the installation and the namespace a restore reads the backup of: the values of the
 	// {installation} and {namespace} macros of the storage paths there, which a Job puts into the command line of
 	// clickhouse-backup actions. Mirrored by the CRD schema patterns.

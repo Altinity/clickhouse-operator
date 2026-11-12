@@ -1280,6 +1280,23 @@ func (in *ClickHouseRestoreSpec) DeepCopyInto(out *ClickHouseRestoreSpec) {
 		*out = new(types.StringBool)
 		**out = **in
 	}
+	if in.Partitions != nil {
+		in, out := &in.Partitions, &out.Partitions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.SkipTableEngines != nil {
+		in, out := &in.SkipTableEngines, &out.SkipTableEngines
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.DatabaseMapping != nil {
+		in, out := &in.DatabaseMapping, &out.DatabaseMapping
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.RBAC != nil {
 		in, out := &in.RBAC, &out.RBAC
 		*out = new(types.StringBool)

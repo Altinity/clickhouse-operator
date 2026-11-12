@@ -133,6 +133,33 @@ spec:
                   description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated, restricting the schema and the data restored. Empty restores every table"
                   maxLength: 1024
                   pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                partitions:
+                  type: array
+                  description: "Optional partition ids the data restored is restricted to (clickhouse-backup --partitions), downloaded and attached; the schema is restored as without it"
+                  nullable: true
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z0-9_-]{1,128}$"
+                skipTables:
+                  type: string
+                  description: "Optional clickhouse-backup table pattern, e.g. db.tmp* or logs.*, comma-separated, of the tables the restore leaves out, on top of the system databases (CLICKHOUSE_SKIP_TABLES)"
+                  maxLength: 1024
+                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                skipTableEngines:
+                  type: array
+                  description: "Optional table engines, e.g. Kafka, whose tables the restore leaves out (CLICKHOUSE_SKIP_TABLE_ENGINES)"
+                  nullable: true
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+                databaseMapping:
+                  type: object
+                  description: |
+                    Optional mapping of the databases of the backup, the keys, to the databases the restore restores their tables into,
+                    the values (clickhouse-backup --restore-database-mapping). The overwrite guard checks the databases restored into
+                  additionalProperties:
+                    type: string
+                    pattern: "^[A-Za-z0-9_][A-Za-z0-9_-]{0,127}$"
                 rbac:
                   <<: *TypeStringBool
                   description: |

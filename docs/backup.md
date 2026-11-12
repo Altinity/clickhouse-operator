@@ -1105,6 +1105,10 @@ spec:
 | `sourceNamespace`        | the restored CHI's | Namespace of the CHI that made the backup, when another and the paths hold `{namespace}`. Immutable.                                      |
 | `schemaOnly`             | `false`            | Restore table and database definitions only, no data.                                                                                     |
 | `tables`                 | all                | Restore only the matching tables: a `clickhouse-backup` pattern as for a backup, e.g. `db.table`, `db.*`, comma-separated.                |
+| `partitions`             | all                | Restore the data of only these partition ids (`--partitions`), e.g. `["202601", "202602"]`; the schema is restored as without it. See [Restore filters](#restore-filters). |
+| `skipTables`             | none               | Leave out the matching tables: a `clickhouse-backup` pattern, as `tables` (`CLICKHOUSE_SKIP_TABLES`).                                    |
+| `skipTableEngines`       | none               | Leave out the tables of these engines, e.g. `["Kafka", "RabbitMQ"]` (`CLICKHOUSE_SKIP_TABLE_ENGINES`).                                    |
+| `databaseMapping`        | none               | Restore the tables of a database of the backup into another one: `{source: target}` (`--restore-database-mapping`).                      |
 | `rbac`                   | `false`            | Also restore the [access entities](#access-entities) of the backup. Only with an empty `cluster`.                                         |
 | `overwrite`              | `false`            | Allow restoring over existing tables, which are dropped first. See [Restore safety](#restore-safety).                                     |
 | `validateTopology`       | `true`             | Refuse the restore unless every target shard holds the backup, and, from another CHI, a backup named as its base at the own paths.        |
@@ -1200,6 +1204,51 @@ source's - a path built from the table's UUID, a path without `{installation}`, 
 resolve the same in both, as for a CHI of the same name in another namespace - joins the source's
 replication instead of becoming an independent copy, and a `TRUNCATE`, `ALTER DELETE` or
 `DROP PARTITION` on the copy then reaches the source.
+
+### Restore filters
+
+As the restore of the Altinity Cloud Manager, a `ClickHouseRestore` can narrow what it restores
+beyond `tables`:
+
+```yaml
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseRestore"
+metadata:
+  name: backup-demo-restore-events
+spec:
+  clickHouseInstallation: backup-demo-restored
+  backupName: default-backup-demo-nightly-20261003023000
+  tables: "analytics.*"
+  # The data of two months only
+  partitions: ["202609", "202610"]
+  # Neither the scratch tables nor the queue consumers
+  skipTables: "analytics.tmp_*"
+  skipTableEngines: ["Kafka"]
+  # Into a database of another name, next to the live one
+  databaseMapping:
+    analytics: analytics_restored
+```
+
+* `partitions` narrows the download and the data restore to those partition ids (`--partitions`),
+  and the data restore attaches their parts without checking the replicas first
+  (`CLICKHOUSE_CHECK_REPLICAS_BEFORE_ATTACH=0`), as ACM does. The schema step runs as without it: with
+  `overwrite: true` it drops and recreates the restored tables, which then hold those partitions
+  alone. An id is letters, digits, `_` and `-`, the form `system.parts` shows as `partition_id`.
+* `skipTables` and `skipTableEngines` leave tables out of every step, through `CLICKHOUSE_SKIP_TABLES`
+  - on top of the system databases `clickhouse-backup` leaves out anyway - and
+  `CLICKHOUSE_SKIP_TABLE_ENGINES`. The overwrite guard still counts the tables they leave out.
+* `databaseMapping` restores the schema and the data of each database it names into the database it
+  maps it to (`--restore-database-mapping`), which overrides the empty `RESTORE_DATABASE_MAPPING` the
+  sidecar pins. The overwrite guard, and the checks of an overwrite, look at the databases restored
+  into: a table of `analytics_restored` that the restore would replace refuses it, a table of
+  `analytics`, which it leaves alone, does not. A database may be mapped once, not to itself, not to a
+  database another one is mapped to or that is mapped itself, and not to or from a system database.
+
+Every value becomes a single token of a `clickhouse-backup` command, so each is checked strictly -
+the patterns as `tables`, engines and databases of letters, digits, `_` (and `-` for databases) - and
+a restore that fails the check ends `Aborted`. `skipTables`, `skipTableEngines` and `partitions` set
+`clickhouse-backup` settings of the restore, which only commands of the `actions` endpoint take: the
+steps then run as such commands (`download`, `restore`) rather than typed requests.
 
 ### Access entities
 

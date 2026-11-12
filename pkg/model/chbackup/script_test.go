@@ -960,7 +960,8 @@ func TestJobScriptReadsDeclaredEnv(t *testing.T) {
 		envVerifyHosts, envSchemaHosts, envDataHosts, envGuardHosts, envOverwrite, envValidateTopology,
 		envRestoreRBAC, envRBACNotRestoredMessage, envUnchangedExitCode, envReplicated, envMaxTableSizeToDrop,
 		envPathClusters, envPathSelf, envPathInstallation, envPathNamespace, envPathReplicaSelection,
-		envDefaultPath, envDefaultObjectDiskPath, envSourceInstallation, envSourceNamespace,
+		envDefaultPath, envDefaultObjectDiskPath, envSourceInstallation, envSourceNamespace, envSkipTables, envSkipTableEngines,
+		envDatabaseMapping,
 	} {
 		require.Regexp(t, regexp.MustCompile(`\$\{!?`+name+`\b|\b(parse_hosts|is_true|check_name|default_path "\$\{index\}") `+name+`\b`), orchestratorScript, name)
 	}
@@ -3174,6 +3175,20 @@ func TestJobScriptRefusesRestoreValuesThatAreNoToken(t *testing.T) {
 		"tables with a newline":    {envTables: "db1.*\n--rbac"},
 		"tables with a bracket":    {envTables: "db1.[a-z]"},
 		"tables too long":          {envTables: strings.Repeat("t", 1025)},
+		"partitions with a blank":  {envPartitions: "2026 --rbac"},
+		"partitions with a quote":  {envPartitions: "('a')"},
+		"an empty partition":       {envPartitions: "2026,,2027"},
+		"skipped tables of a flag": {envSkipTables: "-db.*"},
+		"skipped tables too long":  {envSkipTables: strings.Repeat("t", 1025)},
+		"an engine with a blank":   {envSkipTableEngines: "Kafka --rbac"},
+		"an engine with a digit":   {envSkipTableEngines: "1Kafka"},
+		"a mapping with a blank":   {envDatabaseMapping: "a:b --rbac"},
+		"a mapping without target": {envDatabaseMapping: "a:"},
+		"a mapping of a dot":       {envDatabaseMapping: "a.b:c"},
+		"a mapping to itself":      {envDatabaseMapping: "a:a"},
+		"a mapping of one twice":   {envDatabaseMapping: "a:b,a:c"},
+		"a mapping to one twice":   {envDatabaseMapping: "a:c,b:c"},
+		"a chain of mappings":      {envDatabaseMapping: "a:b,b:c"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s := newSidecarStub(t, restoreHosts())
@@ -3182,6 +3197,78 @@ func TestJobScriptRefusesRestoreValuesThatAreNoToken(t *testing.T) {
 			require.Equal(t, 3, code, out)
 			require.Contains(t, out, "ERROR:")
 			require.Zero(t, s.countCalls())
+		})
+	}
+}
+
+// A restore narrowed as the Altinity Cloud Manager narrows one - partitions of the data, tables and table engines left
+// out - sets clickhouse-backup settings of its own, which a typed request takes none of: every step runs as a command of
+// the actions endpoint, the download and the data restore with the partitions, every command with the --env flags of
+// the tables and engines left out, on top of the system databases clickhouse-backup leaves out by default, and, as the
+// Altinity Cloud Manager restores partitions, without the check of the replicas before the parts are attached. A
+// database mapping restores the schema and the data into other databases.
+func TestJobScriptRestoresWithTheFiltersOfTheAltinityCloudManager(t *testing.T) {
+	s := newSidecarStub(t, restoreHosts())
+	code, out := s.run(restoreEnv(map[string]string{
+		envTables: "db1.*", envPartitions: "202601,202602", envSkipTables: "db1.tmp*", envSkipTableEngines: "Kafka,RabbitMQ",
+		envDatabaseMapping: "db1:db2",
+	}))
+	require.Zero(t, code, out)
+	env := " --env=CLICKHOUSE_SKIP_TABLES=system.*,INFORMATION_SCHEMA.*,information_schema.*,_temporary_and_external_tables.*,db1.tmp*" +
+		" --env=CLICKHOUSE_SKIP_TABLE_ENGINES=Kafka,RabbitMQ --env=CLICKHOUSE_CHECK_REPLICAS_BEFORE_ATTACH=0 bk-1"
+	require.Equal(t, []string{
+		"s0 download --hardlink-exists-files --tables=db1.* --partitions=202601,202602" + env,
+		"d1 download --hardlink-exists-files --tables=db1.* --partitions=202601,202602" + env,
+		"s0 restore --schema --rm --tables=db1.* --restore-database-mapping=db1:db2" + env,
+		"s0 restore --data --tables=db1.* --partitions=202601,202602 --restore-database-mapping=db1:db2" + env,
+		"d1 restore --data --tables=db1.* --partitions=202601,202602 --restore-database-mapping=db1:db2" + env,
+	}, s.restoreSteps())
+	for _, host := range []string{"s0", "d1"} {
+		require.Empty(t, s.hosts[host].local, "the downloaded copies are dropped")
+	}
+
+	// A database mapping alone takes no setting: typed requests
+	s = newSidecarStub(t, restoreHosts())
+	code, out = s.run(restoreEnv(map[string]string{envDatabaseMapping: "db1:db2,db3:db4"}))
+	require.Zero(t, code, out)
+	require.Equal(t, []string{
+		"s0 download hardlink_exists_files=", "d1 download hardlink_exists_files=",
+		"s0 restore_database_mapping=db1:db2,db3:db4 rm= schema=",
+		"s0 data= restore_database_mapping=db1:db2,db3:db4", "d1 data= restore_database_mapping=db1:db2,db3:db4",
+	}, s.restoreSteps())
+}
+
+// The overwrite guard looks where a database mapping restores the tables: a table of the database the backup's is
+// restored into refuses the restore, one of the database of the backup, which the restore leaves alone, does not.
+func TestJobScriptRestoreGuardChecksTheMappedDatabases(t *testing.T) {
+	for name, tc := range map[string]struct {
+		tables  string
+		live    string
+		refused bool
+	}{
+		"a table of the database restored into":              {tables: "db1.t1", live: "db2.t1", refused: true},
+		"the table of the backup in its own database":        {tables: "db1.t1", live: "db1.t1"},
+		"any table of the database restored into as a whole": {tables: "db1.*", live: "db2.other", refused: true},
+		"a table of another database":                        {tables: "db1.*", live: "db3.t1"},
+		"any table without a pattern, but the mapped source": {live: "db1.t1"},
+		"any table without a pattern":                        {live: "db3.t1", refused: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			hosts := restoreHosts()
+			for _, host := range hosts {
+				host.backupTables = []string{"db1.t1"}
+			}
+			hosts["d1"].tables = []string{tc.live}
+			s := newSidecarStub(t, hosts)
+			code, out := s.run(restoreEnv(map[string]string{envTables: tc.tables, envDatabaseMapping: "db1:db2",
+				envUnchangedExitCode: "3"}))
+			if tc.refused {
+				require.Equal(t, 3, code, out)
+				require.Contains(t, out, "refusing to restore over existing tables (d1:"+tc.live+")")
+				require.Empty(t, s.matching(http.MethodPost, "/"))
+				return
+			}
+			require.Zero(t, code, out)
 		})
 	}
 }
@@ -3350,8 +3437,8 @@ func TestJobScriptStopsWhenASidecarRestartsBetweenSteps(t *testing.T) {
 		// after is the number of steps the host runs before its sidecar restarts, 1 when unset
 		after     int
 		unchanged bool
-		env   map[string]string
-		steps []string
+		env       map[string]string
+		steps     []string
 	}{
 		// The downloads change nothing
 		"after its download": {

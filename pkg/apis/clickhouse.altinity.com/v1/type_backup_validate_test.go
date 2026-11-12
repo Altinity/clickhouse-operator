@@ -294,3 +294,47 @@ func TestActiveDeadlineSeconds(t *testing.T) {
 	require.Equal(t, defaultBackupActiveDeadlineSeconds, (*BackupOptions)(nil).GetActiveDeadlineSeconds())
 	require.Equal(t, defaultBackupActiveDeadlineSeconds, (*ClickHouseRestoreSpec)(nil).GetActiveDeadlineSeconds())
 }
+
+// The filters of a restore, as the Altinity Cloud Manager has them, become single tokens of clickhouse-backup commands:
+// partition ids, a table pattern, table engines, and a mapping of databases, each strictly bounded.
+func TestValidateRestoreFilters(t *testing.T) {
+	restore := func(set func(*ClickHouseRestoreSpec)) error {
+		spec := &ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000"}
+		set(spec)
+		return spec.Validate()
+	}
+	for name, tc := range map[string]struct {
+		set   func(*ClickHouseRestoreSpec)
+		valid bool
+	}{
+		"partitions":                     {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{"202601", "all"} }, true},
+		"a partition with a quote":       {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{"'a'"} }, false},
+		"an empty partition":             {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{""} }, false},
+		"tables left out":                {func(s *ClickHouseRestoreSpec) { s.SkipTables = "db.tmp*,logs.*" }, true},
+		"tables left out reading a flag": {func(s *ClickHouseRestoreSpec) { s.SkipTables = "--rbac" }, false},
+		"engines left out":               {func(s *ClickHouseRestoreSpec) { s.SkipTableEngines = []string{"Kafka", "RabbitMQ"} }, true},
+		"an engine with a blank":         {func(s *ClickHouseRestoreSpec) { s.SkipTableEngines = []string{"Kafka x"} }, false},
+		"an engine with a comma":         {func(s *ClickHouseRestoreSpec) { s.SkipTableEngines = []string{"Kafka,Null"} }, false},
+		"a database mapping": {func(s *ClickHouseRestoreSpec) {
+			s.DatabaseMapping = map[string]string{"db1": "db1_restored", "db2": "db-2"}
+		}, true},
+		"a mapping to itself":         {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"db1": "db1"} }, false},
+		"a mapping of two to one":     {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"a": "c", "b": "c"} }, false},
+		"a chain of mappings":         {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"a": "b", "b": "c"} }, false},
+		"a mapping with a colon":      {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"a:b": "c"} }, false},
+		"a mapping with a comma":      {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"a": "b,c:d"} }, false},
+		"a mapping into system":       {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"a": "system"} }, false},
+		"a mapping of the system one": {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"INFORMATION_SCHEMA": "a"} }, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := restore(tc.set)
+			if tc.valid {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, ErrInvalidBackupSpec)
+		})
+	}
+	require.Equal(t, "a:b,c:d", (&ClickHouseRestoreSpec{DatabaseMapping: map[string]string{"c": "d", "a": "b"}}).GetDatabaseMapping())
+	require.Equal(t, "", (*ClickHouseRestoreSpec)(nil).GetDatabaseMapping())
+}

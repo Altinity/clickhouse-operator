@@ -17,6 +17,16 @@ NUMBER_RE='^[0-9]+$'
 TABLES_RE='^[A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*$'
 # The longest table pattern the API accepts
 TABLES_MAX_LENGTH=1024
+# The partition ids of a restore, the table engines and the database mapping, "source:target" pairs, it takes: every
+# value a single token of a command, as the API validates them. Their lengths are checked apart, as TABLES_MAX_LENGTH
+PARTITIONS_RE='^[A-Za-z0-9_-]+(,[A-Za-z0-9_-]+)*$'
+ENGINES_RE='^[A-Za-z][A-Za-z0-9_]*(,[A-Za-z][A-Za-z0-9_]*)*$'
+DATABASE_MAPPING_RE='^[A-Za-z0-9_][A-Za-z0-9_-]*:[A-Za-z0-9_][A-Za-z0-9_-]*(,[A-Za-z0-9_][A-Za-z0-9_-]*:[A-Za-z0-9_][A-Za-z0-9_-]*)*$'
+FILTER_MAX_LENGTH=16384
+# The tables clickhouse-backup leaves out by default, which CLICKHOUSE_SKIP_TABLES replaces: a restore that leaves out
+# tables of its own keeps them
+DEFAULT_SKIP_TABLES='system.*,INFORMATION_SCHEMA.*,information_schema.*,_temporary_and_external_tables.*'
+
 # The index of a cluster in the environment of the storage path check
 INDEX_RE='^(0|[1-9][0-9]{0,3})$'
 # The name, and the namespace, of the installation a restore reads the backup of: a Kubernetes name. Its length is
@@ -2056,6 +2066,20 @@ do_verify() {
 	event Normal OrchestratorVerifyCompleted "backup ${BACKUP_NAME} verified on ${#verify_hosts[@]} host(s)"
 }
 
+# restored_db DATABASE sets REPLY to the database of the backup the restore restores into the live DATABASE: the one
+# DATABASE_MAPPING maps to it, else DATABASE itself, unless the mapping maps that elsewhere, which returns 1, as the
+# restore then touches nothing of DATABASE
+restored_db() {
+	REPLY=${DB_SOURCE["$1"]:-}
+	if [[ -n ${REPLY} ]]; then
+		return 0
+	fi
+	if [[ -n ${DB_TARGET["$1"]:-} ]]; then
+		return 1
+	fi
+	REPLY=$1
+}
+
 # db_dropped DATABASE reports whether the schema restore drops DATABASE as a whole, with every table it holds, those
 # made after the backup too: with rm it drops every database of the backup when no table pattern narrows it, and with
 # one each that a pattern names as "<database>.*", or that a pattern matches with the dot that ends the name of a
@@ -2196,14 +2220,17 @@ live_tables() {
 
 # dropped_tables fills LIVE_DROPPED with whether the schema restore drops each table live_tables found: one of the
 # backup that the table pattern matches, BACKUP_TABLES, any of a database that it drops as a whole, and the inner table
-# of a materialized view it drops, which goes with the view
+# of a materialized view it drops, which goes with the view - each in the database the restore restores it into
 dropped_tables() {
 	local i
 	local -A inner=()
 	LIVE_DROPPED=()
 	for i in "${!LIVE_TABLES[@]}"; do
 		LIVE_DROPPED[i]=
-		if [[ -n ${BACKUP_TABLES["${LIVE_DBS[i]}.${LIVE_TABLES[i]}"]:-} ]] || drops_database "${LIVE_DBS[i]}"; then
+		if ! restored_db "${LIVE_DBS[i]}"; then
+			continue
+		fi
+		if [[ -n ${BACKUP_TABLES["${REPLY}.${LIVE_TABLES[i]}"]:-} ]] || drops_database "${REPLY}"; then
 			LIVE_DROPPED[i]=1
 			inner["${LIVE_HOSTS[i]} ${LIVE_DBS[i]}..inner.${LIVE_TABLES[i]}"]=1
 			if [[ -n ${LIVE_UUIDS[i]} ]]; then
@@ -2220,7 +2247,7 @@ dropped_tables() {
 
 # guard_tables SOURCES HOST... refuses a restore that would drop a user table of any HOST: one of the backup the table
 # pattern matches in the storage of any of the space-separated hosts SOURCES, which the schema restore drops and
-# recreates, or one of a database it drops as a whole. Without a pattern, or when a table of the backup or of a HOST
+# recreates, or one of a database it drops as a whole - in the database DATABASE_MAPPING restores it into. Without a pattern, or when a table of the backup or of a HOST
 # does not read as one, that is every user table: the guard fails closed
 guard_tables() {
 	local host i
@@ -2238,8 +2265,12 @@ guard_tables() {
 		backup_tables "${sources[@]}"
 	fi
 	for i in "${!LIVE_TABLES[@]}"; do
-		if [[ -z ${TABLES:-} || -n ${BACKUP_TABLES_UNREADABLE} || -n ${BACKUP_TABLES["${LIVE_DBS[i]}.${LIVE_TABLES[i]}"]:-} ]] ||
-			db_dropped "${LIVE_DBS[i]}"; then
+		# A database the mapping restores elsewhere is left alone, one it restores into holds the tables of its source
+		if ! restored_db "${LIVE_DBS[i]}"; then
+			continue
+		fi
+		if [[ -z ${TABLES:-} || -n ${BACKUP_TABLES_UNREADABLE} || -n ${BACKUP_TABLES["${REPLY}.${LIVE_TABLES[i]}"]:-} ]] ||
+			db_dropped "${REPLY}"; then
 			found+=("${LIVE_HOSTS[i]}:${LIVE_DBS[i]}.${LIVE_TABLES[i]}")
 		fi
 	done
@@ -2344,7 +2375,7 @@ refuse_database_drops() {
 			backup_tables "${sources[@]}"
 			sources=()
 		fi
-		if drops_database "${key#* }"; then
+		if restored_db "${key#* }" && drops_database "${REPLY}"; then
 			found+=("${larger[${key}]}")
 			if [[ -n ${uncertain[${key}]} ]]; then
 				stop="that is, or may be, larger than"
@@ -2662,6 +2693,15 @@ restore_command() {
 		params+=("table=${TABLES}")
 		flags+=("--tables=${TABLES}")
 	fi
+	# The partitions narrow the data, which the download of the schema alone holds none of
+	if [[ -n ${PARTITIONS:-} && ($1 == download || $1 == data) ]]; then
+		params+=("partitions=${PARTITIONS}")
+		flags+=("--partitions=${PARTITIONS}")
+	fi
+	if [[ -n ${DATABASE_MAPPING:-} && ($1 == schema || $1 == schema_on_cluster || $1 == data) ]]; then
+		params+=("restore_database_mapping=${DATABASE_MAPPING}")
+		flags+=("--restore-database-mapping=${DATABASE_MAPPING}")
+	fi
 	if [[ ${RESTORE_KIND} == action || $1 == schema_on_cluster ]]; then
 		command="${flags[*]}${ACTION_ENV:+ ${ACTION_ENV}} ${BACKUP_NAME}"
 		STEP_ARGS=("${command}")
@@ -2681,6 +2721,57 @@ restore_step() {
 		kind=action
 	fi
 	"run_${kind}" "$1" "$2" "${BACKUP_NAME}" "${STEP_ARGS[@]}"
+}
+
+# check_filter VAR_NAME REGEX MAX_LENGTH WHAT fails unless the env var VAR_NAME is unset, empty, or a value of at most
+# MAX_LENGTH characters that REGEX matches, as a valid WHAT is
+check_filter() {
+	local value=${!1:-}
+	if [[ -n ${value} ]] && [[ ! ${value} =~ $2 ]] || ((${#value} > $3)); then
+		die "$1 is not a valid $4"
+	fi
+}
+
+# check_restore_filters fails unless the partitions, the tables and engines left out and the database mapping of a
+# restore are each empty or a single token of a command, as the API validates them, and fills DB_SOURCE and DB_TARGET
+# from the mapping: the source of every target database, and the target of every source database
+check_restore_filters() {
+	local pair
+	local -a pairs
+	check_filter PARTITIONS "${PARTITIONS_RE}" "${FILTER_MAX_LENGTH}" "list of partition ids"
+	check_filter SKIP_TABLES "${TABLES_RE}" "${TABLES_MAX_LENGTH}" "table pattern"
+	check_filter SKIP_TABLE_ENGINES "${ENGINES_RE}" "${FILTER_MAX_LENGTH}" "list of table engines"
+	check_filter DATABASE_MAPPING "${DATABASE_MAPPING_RE}" "${FILTER_MAX_LENGTH}" "database mapping"
+	declare -gA DB_SOURCE=() DB_TARGET=()
+	IFS=, read -r -a pairs <<<"${DATABASE_MAPPING:-}"
+	for pair in "${pairs[@]}"; do
+		if [[ -n ${DB_TARGET["${pair%%:*}"]:-} || -n ${DB_SOURCE["${pair#*:}"]:-} || ${pair%%:*} == "${pair#*:}" ]]; then
+			die "DATABASE_MAPPING maps a database twice, or to itself"
+		fi
+		DB_TARGET["${pair%%:*}"]=${pair#*:}
+		DB_SOURCE["${pair#*:}"]=${pair%%:*}
+	done
+	for pair in "${pairs[@]}"; do
+		if [[ -n ${DB_SOURCE["${pair%%:*}"]:-} ]]; then
+			die "DATABASE_MAPPING maps a database another one is mapped to"
+		fi
+	done
+}
+
+# restore_env sets ACTION_ENV to the --env flags of the commands of the restore: those of SOURCE_ENV, the tables and
+# table engines it leaves out, and, for a restore of partitions, no check of the replicas before the parts are
+# attached, as the Altinity Cloud Manager restores partitions. A typed request takes none of them
+restore_env() {
+	ACTION_ENV=${SOURCE_ENV}
+	if [[ -n ${SKIP_TABLES:-} ]]; then
+		ACTION_ENV+="${ACTION_ENV:+ }--env=CLICKHOUSE_SKIP_TABLES=${DEFAULT_SKIP_TABLES},${SKIP_TABLES}"
+	fi
+	if [[ -n ${SKIP_TABLE_ENGINES:-} ]]; then
+		ACTION_ENV+="${ACTION_ENV:+ }--env=CLICKHOUSE_SKIP_TABLE_ENGINES=${SKIP_TABLE_ENGINES}"
+	fi
+	if [[ -n ${PARTITIONS:-} ]]; then
+		ACTION_ENV+="${ACTION_ENV:+ }--env=CLICKHOUSE_CHECK_REPLICAS_BEFORE_ATTACH=0"
+	fi
 }
 
 # download_args HOST sets STEP_ARGS to the download of the backup to HOST: with the data on a host of DATA_DOWNLOADS,
@@ -2754,6 +2845,7 @@ do_restore() {
 			die "TABLES is not a valid table pattern"
 		fi
 	fi
+	check_restore_filters
 	check_source_name SOURCE_INSTALLATION "${SOURCE_INSTALLATION_MAX_LENGTH}" "installation name"
 	check_source_name SOURCE_NAMESPACE "${SOURCE_NAMESPACE_MAX_LENGTH}" namespace
 	# An overwrite may drop the tables of the backup ON CLUSTER only where a replica could clone their old parts back from
@@ -2876,8 +2968,8 @@ do_restore() {
 		# The restore steps download the backup to every host they restore it on, where a step that fails leaves a copy
 		SOURCE_COPIES=("${used[@]}")
 	fi
+	restore_env
 	RESTORE_KIND=op
-	ACTION_ENV=${SOURCE_ENV}
 	if [[ -n ${ACTION_ENV} ]]; then
 		RESTORE_KIND=action
 	fi
@@ -2980,6 +3072,8 @@ declare -A LAST_OP=() LAST_ACTION_START=() LAST_ACTION_COMMAND=() OWN_BACKUPS=()
 # The step that runs on every host: the operation id of an operation, the command of an action and the start times of
 # the rows of that command before it was submitted
 declare -A OP_ID=() ACTION_COMMAND=() ACTION_BEFORE=()
+# The database mapping of a restore: the database of the backup restored into each target, and the target of each
+declare -A DB_SOURCE=() DB_TARGET=()
 FAILED_HOSTS=()
 FAILURES=()
 # The arguments of the step of a host, as restore_command makes them; how the restore steps run, RESTORE_KIND op or

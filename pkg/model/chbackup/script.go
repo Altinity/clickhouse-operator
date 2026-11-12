@@ -73,8 +73,15 @@ const (
 	envSchemaOnly = "SCHEMA_ONLY"
 	// envTables is the clickhouse-backup table pattern of a backup or a restore
 	envTables = "TABLES"
-	// envPartitions is the comma-separated list of partitions of a backup
+	// envPartitions is the comma-separated list of partitions of a backup, or of the data of a restore
 	envPartitions = "PARTITIONS"
+	// envSkipTables is the clickhouse-backup table pattern of the tables a restore leaves out
+	envSkipTables = "SKIP_TABLES"
+	// envSkipTableEngines is the comma-separated list of the table engines a restore leaves out
+	envSkipTableEngines = "SKIP_TABLE_ENGINES"
+	// envDatabaseMapping maps the databases of the backup to those a restore restores into, as clickhouse-backup
+	// takes it: "source:target" pairs separated by commas
+	envDatabaseMapping = "DATABASE_MAPPING"
 	// envDiffFromRemote names the remote base backup of an incremental backup
 	envDiffFromRemote = "DIFF_FROM_REMOTE"
 	// envNoDataMessage is the termination message the script leaves when the backup it made holds no

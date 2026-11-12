@@ -508,6 +508,9 @@ run one Job per cluster, the backup orchestrator script of the operator configur
     `backup-orchestrator.sh` the ClickHouseRestore of the recovery runs instead of the operator's script; it is copied
     into that restore. Which script a backup, schedule or restore runs is otherwise set on that resource, in its
     `spec.orchestratorConfigMapRef` (see [backup.md](backup.md#the-orchestrator-script))
+  - a recovery restores the whole backup: the filters of a `ClickHouseRestore` - `tables`, `partitions`, `skipTables`,
+    `skipTableEngines`, `databaseMapping` - are for a restore created by hand (see
+    [backup.md](backup.md#restore-filters))
 
 The sidecar works on ClickHouse's data volume, so give backup-enabled clusters a `dataVolumeClaimTemplate`.
 Without a volume mounted at `/var/lib/clickhouse`, the operator shares an `emptyDir` there between the two containers,

@@ -458,6 +458,20 @@ func TestRestoreJobFollowsTheScriptContract(t *testing.T) {
 	require.Equal(t, "true", values[envSchemaOnly])
 	require.Equal(t, "false", values[envValidateTopology])
 	require.Equal(t, "db.*", values[envTables])
+	for _, name := range []string{envPartitions, envSkipTables, envSkipTableEngines, envDatabaseMapping} {
+		require.Empty(t, values[name], name)
+	}
+
+	// The filters of the Altinity Cloud Manager
+	chr.Spec.Partitions = []string{"202601", "202602"}
+	chr.Spec.SkipTables = "db.tmp*"
+	chr.Spec.SkipTableEngines = []string{"Kafka", "RabbitMQ"}
+	chr.Spec.DatabaseMapping = map[string]string{"db": "db_restored", "a": "b"}
+	values = env(container(t, BuildRestoreJob(chr, testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec))
+	require.Equal(t, "202601,202602", values[envPartitions])
+	require.Equal(t, "db.tmp*", values[envSkipTables])
+	require.Equal(t, "Kafka,RabbitMQ", values[envSkipTableEngines])
+	require.Equal(t, "a:b,db:db_restored", values[envDatabaseMapping])
 }
 
 // Access entities belong to the whole installation: a restore restores them only when it targets
