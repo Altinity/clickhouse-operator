@@ -54,6 +54,16 @@ func testTopology() *Topology {
 	return &Topology{installation: "demo", namespace: testNamespace, clusters: []topologyCluster{main}, enabled: []topologyCluster{main}}
 }
 
+// testOrchestrator is how the Jobs of the tests run the orchestrator script, over the sidecars.
+func testOrchestrator() Orchestrator {
+	return Orchestrator{
+		ConfigMap:          "demo-main-backup-orchestrator",
+		ScriptSHA256:       ScriptSHA256("echo test"),
+		ServiceAccountName: "clickhouse-operator",
+		Transport:          api.BackupModeSidecar,
+	}
+}
+
 func testInstallation() *api.ClickHouseInstallation {
 	return newCHI("demo")
 }
@@ -88,7 +98,7 @@ func testSchedule(name string) *api.ClickHouseBackupSchedule {
 	chbs.Name = name
 	chbs.Namespace = testNamespace
 	chbs.Spec.ClickHouseInstallation = "demo"
-	chbs.Spec.Schedule = "0 3 * * *"
+	chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 1}}
 	return chbs
 }
 
@@ -126,7 +136,7 @@ func TestBackupJobFollowsTheScriptContract(t *testing.T) {
 	chb.Spec.Partitions = []string{"202601", "202602"}
 	chb.Spec.SchemaOnly = types.NewStringBool(true)
 
-	job := BuildBackupJob(chb, testInstallation(), testTopology())
+	job := BuildBackupJob(chb, testInstallation(), testTopology(), testOrchestrator())
 	c := container(t, job.Spec.Template.Spec)
 	values := env(c)
 
@@ -143,10 +153,10 @@ func TestBackupJobFollowsTheScriptContract(t *testing.T) {
 	require.Equal(t, "202601,202602", values[envPartitions])
 	require.Equal(t, NoDataMessage, values[envNoDataMessage])
 	require.NotContains(t, values, envBackupNamePrefix, "a one-off backup has no retention")
-	require.NotContains(t, values, envKeepLast)
+	require.Equal(t, backupTransportSidecar, values[envBackupTransport])
 
 	chb.Spec.ReplicaSelection = api.ReplicaSelectionAllReplicas
-	values = env(container(t, BuildBackupJob(chb, testInstallation(), testTopology()).Spec.Template.Spec))
+	values = env(container(t, BuildBackupJob(chb, testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec))
 	require.Equal(t, "chi-demo-main-0-0 chi-demo-main-0-1 chi-demo-main-1-0 chi-demo-main-1-1", values[envBackupHosts])
 }
 
@@ -156,10 +166,10 @@ func TestJobsReferenceTheBackupSecret(t *testing.T) {
 	secret := managers.NewNameManager(managers.NameManagerTypeClickHouse).Name(interfaces.NameBackupAutoSecret, testInstallation())
 
 	for name, job := range map[string]*batch.Job{
-		"backup":  BuildBackupJob(testBackup("b1"), testInstallation(), testTopology()),
-		"verify":  BuildVerifyJob(testBackup("b1"), testInstallation(), testTopology()),
-		"restore": BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology()),
-		"cronjob": {Spec: BuildBackupCronJob(testSchedule("s1"), testInstallation(), testTopology(), false).Spec.JobTemplate.Spec},
+		"backup":  BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator()),
+		"verify":  BuildVerifyJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator()),
+		"restore": BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology(), testOrchestrator()),
+		"cronjob": {Spec: BuildBackupCronJob(testSchedule("s1"), testInstallation(), testTopology(), testOrchestrator(), false).Spec.JobTemplate.Spec},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := container(t, job.Spec.Template.Spec)
@@ -194,14 +204,15 @@ func TestNoUserValueReachesTheCommand(t *testing.T) {
 	chbs.Spec.BackupNamePrefix = hostile
 
 	for name, spec := range map[string]core.PodSpec{
-		"backup":  BuildBackupJob(chb, testInstallation(), testTopology()).Spec.Template.Spec,
-		"verify":  BuildVerifyJob(chb, testInstallation(), testTopology()).Spec.Template.Spec,
-		"restore": BuildRestoreJob(chr, testInstallation(), testTopology()).Spec.Template.Spec,
-		"cronjob": BuildBackupCronJob(chbs, testInstallation(), testTopology(), false).Spec.JobTemplate.Spec.Template.Spec,
+		"backup":  BuildBackupJob(chb, testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec,
+		"verify":  BuildVerifyJob(chb, testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec,
+		"restore": BuildRestoreJob(chr, testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec,
+		"cronjob": BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), false).Spec.JobTemplate.Spec.Template.Spec,
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := container(t, spec)
-			require.Equal(t, []string{"bash", "-c", jobScript}, receivedCommand(c.Command, nil), "kubelet hands the script over as written")
+			require.Equal(t, []string{"bash", OrchestratorMountPath + "/" + OrchestratorScriptFile}, receivedCommand(c.Command, nil),
+				"the Job runs the script of the ConfigMap")
 			require.Empty(t, c.Args)
 			require.NotContains(t, strings.Join(c.Command, " "), hostile)
 		})
@@ -211,16 +222,17 @@ func TestNoUserValueReachesTheCommand(t *testing.T) {
 func TestJobPodIsRestricted(t *testing.T) {
 	chb := testBackup("b1")
 	for name, job := range map[string]*batch.Job{
-		"backup":  BuildBackupJob(chb, testInstallation(), testTopology()),
-		"restore": BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology()),
-		"cronjob": {Spec: BuildBackupCronJob(testSchedule("s1"), testInstallation(), testTopology(), false).Spec.JobTemplate.Spec},
+		"backup":  BuildBackupJob(chb, testInstallation(), testTopology(), testOrchestrator()),
+		"restore": BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology(), testOrchestrator()),
+		"cronjob": {Spec: BuildBackupCronJob(testSchedule("s1"), testInstallation(), testTopology(), testOrchestrator(), false).Spec.JobTemplate.Spec},
 	} {
 		t.Run(name, func(t *testing.T) {
 			require.Equal(t, int32(0), ptr.Deref(job.Spec.BackoffLimit, -1), "a failed operation is never retried")
 
 			spec := job.Spec.Template.Spec
 			require.Equal(t, core.RestartPolicyNever, spec.RestartPolicy)
-			require.False(t, ptr.Deref(spec.AutomountServiceAccountToken, true))
+			require.True(t, ptr.Deref(spec.AutomountServiceAccountToken, false), "the script posts Events with the token")
+			require.Equal(t, "clickhouse-operator", spec.ServiceAccountName, "the Job runs as the orchestrator ServiceAccount")
 			require.False(t, ptr.Deref(spec.EnableServiceLinks, true),
 				"service links could inject a variable such as API_PORT from a Service named api")
 
@@ -239,7 +251,7 @@ func TestJobPodIsRestricted(t *testing.T) {
 // provides defaults, and a LimitRange may cap the ratio of a limit to its request.
 func TestJobPodFitsQuotasAndLimitRanges(t *testing.T) {
 	const maxLimitRequestRatio = 10
-	resources := container(t, BuildBackupJob(testBackup("b1"), testInstallation(), testTopology()).Spec.Template.Spec).Resources
+	resources := container(t, BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec).Resources
 	for _, name := range []core.ResourceName{core.ResourceCPU, core.ResourceMemory} {
 		request, requested := resources.Requests[name]
 		limit, limited := resources.Limits[name]
@@ -341,16 +353,16 @@ func TestJobPodInheritsThePodTemplate(t *testing.T) {
 			expectedContainer.Capabilities = &core.Capabilities{Drop: []core.Capability{capabilityAll}}
 
 			for kind, spec := range map[string]core.PodSpec{
-				"backup":  BuildBackupJob(testBackup("b1"), testInstallation(), topology).Spec.Template.Spec,
-				"verify":  BuildVerifyJob(testBackup("b1"), testInstallation(), topology).Spec.Template.Spec,
-				"restore": BuildRestoreJob(testRestore("r1"), testInstallation(), topology).Spec.Template.Spec,
-				"cronjob": BuildBackupCronJob(testSchedule("s1"), testInstallation(), topology, false).Spec.JobTemplate.Spec.Template.Spec,
+				"backup":  BuildBackupJob(testBackup("b1"), testInstallation(), topology, testOrchestrator()).Spec.Template.Spec,
+				"verify":  BuildVerifyJob(testBackup("b1"), testInstallation(), topology, testOrchestrator()).Spec.Template.Spec,
+				"restore": BuildRestoreJob(testRestore("r1"), testInstallation(), topology, testOrchestrator()).Spec.Template.Spec,
+				"cronjob": BuildBackupCronJob(testSchedule("s1"), testInstallation(), topology, testOrchestrator(), false).Spec.JobTemplate.Spec.Template.Spec,
 			} {
 				require.Equal(t, tc.expected, spec.SecurityContext, kind)
 				require.Equal(t, expectedContainer, spec.Containers[0].SecurityContext, kind)
 				require.Equal(t, []core.LocalObjectReference{{Name: "registry"}}, spec.ImagePullSecrets, kind)
-				require.Equal(t, "clickhouse", spec.ServiceAccountName, kind)
-				require.False(t, ptr.Deref(spec.AutomountServiceAccountToken, true), "%s: the Job needs no API access", kind)
+				require.Equal(t, "clickhouse-operator", spec.ServiceAccountName, "%s: the Job runs as the orchestrator, not the hosts", kind)
+				require.True(t, ptr.Deref(spec.AutomountServiceAccountToken, false), "%s: the script posts Events", kind)
 				for _, seccomp := range []*core.SeccompProfile{spec.SecurityContext.SeccompProfile, spec.Containers[0].SecurityContext.SeccompProfile} {
 					if seccomp != nil {
 						*seccomp = core.SeccompProfile{}
@@ -399,18 +411,18 @@ func TestJobContainerStarted(t *testing.T) {
 
 func TestJobDeadlineComesFromTheSpec(t *testing.T) {
 	chb := testBackup("b1")
-	require.Equal(t, int64(24*60*60), ptr.Deref(BuildBackupJob(chb, testInstallation(), testTopology()).Spec.ActiveDeadlineSeconds, 0))
+	require.Equal(t, int64(24*60*60), ptr.Deref(BuildBackupJob(chb, testInstallation(), testTopology(), testOrchestrator()).Spec.ActiveDeadlineSeconds, 0))
 	chb.Spec.ActiveDeadlineSeconds = ptr.To(int64(600))
-	require.Equal(t, int64(600), ptr.Deref(BuildBackupJob(chb, testInstallation(), testTopology()).Spec.ActiveDeadlineSeconds, 0))
-	require.Equal(t, int64(600), ptr.Deref(BuildVerifyJob(chb, testInstallation(), testTopology()).Spec.ActiveDeadlineSeconds, 0))
+	require.Equal(t, int64(600), ptr.Deref(BuildBackupJob(chb, testInstallation(), testTopology(), testOrchestrator()).Spec.ActiveDeadlineSeconds, 0))
+	require.Equal(t, int64(600), ptr.Deref(BuildVerifyJob(chb, testInstallation(), testTopology(), testOrchestrator()).Spec.ActiveDeadlineSeconds, 0))
 
 	chr := testRestore("r1")
 	chr.Spec.ActiveDeadlineSeconds = ptr.To(int64(900))
-	require.Equal(t, int64(900), ptr.Deref(BuildRestoreJob(chr, testInstallation(), testTopology()).Spec.ActiveDeadlineSeconds, 0))
+	require.Equal(t, int64(900), ptr.Deref(BuildRestoreJob(chr, testInstallation(), testTopology(), testOrchestrator()).Spec.ActiveDeadlineSeconds, 0))
 
 	chbs := testSchedule("s1")
 	chbs.Spec.ActiveDeadlineSeconds = ptr.To(int64(1200))
-	cronJob := BuildBackupCronJob(chbs, testInstallation(), testTopology(), false)
+	cronJob := BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), false)
 	require.Equal(t, int64(1200), ptr.Deref(cronJob.Spec.JobTemplate.Spec.ActiveDeadlineSeconds, 0))
 }
 
@@ -419,7 +431,7 @@ func TestJobDeadlineComesFromTheSpec(t *testing.T) {
 // replica of each shard, from which replication fills the others.
 func TestRestoreJobFollowsTheScriptContract(t *testing.T) {
 	chr := testRestore("r1")
-	values := env(container(t, BuildRestoreJob(chr, testInstallation(), testTopology()).Spec.Template.Spec))
+	values := env(container(t, BuildRestoreJob(chr, testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec))
 
 	require.Equal(t, operationRestore, values[envOperation])
 	require.Equal(t, "main", values[envCluster])
@@ -441,7 +453,7 @@ func TestRestoreJobFollowsTheScriptContract(t *testing.T) {
 	chr.Spec.SchemaOnly = types.NewStringBool(true)
 	chr.Spec.ValidateTopology = types.NewStringBool(false)
 	chr.Spec.Tables = "db.*"
-	values = env(container(t, BuildRestoreJob(chr, testInstallation(), testTopology()).Spec.Template.Spec))
+	values = env(container(t, BuildRestoreJob(chr, testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec))
 	require.Equal(t, "true", values[envOverwrite])
 	require.Equal(t, "true", values[envSchemaOnly])
 	require.Equal(t, "false", values[envValidateTopology])
@@ -481,7 +493,7 @@ func TestRestoreJobRestoresRBACOnlyWhereAllowed(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			chr := tc.chr()
 			require.Equal(t, tc.rbac, RestoresRBAC(chr))
-			values := env(container(t, BuildRestoreJob(chr, chi, testTopology()).Spec.Template.Spec))
+			values := env(container(t, BuildRestoreJob(chr, chi, testTopology(), testOrchestrator()).Spec.Template.Spec))
 			require.Equal(t, strconv.FormatBool(tc.rbac), values[envRestoreRBAC])
 		})
 	}
@@ -489,7 +501,7 @@ func TestRestoreJobRestoresRBACOnlyWhereAllowed(t *testing.T) {
 
 func TestVerifyJobFollowsTheScriptContract(t *testing.T) {
 	chb := testBackup("b1")
-	values := env(container(t, BuildVerifyJob(chb, testInstallation(), testTopology()).Spec.Template.Spec))
+	values := env(container(t, BuildVerifyJob(chb, testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec))
 
 	require.Equal(t, operationVerify, values[envOperation])
 	require.Equal(t, "main", values[envCluster])
@@ -499,10 +511,10 @@ func TestVerifyJobFollowsTheScriptContract(t *testing.T) {
 
 func TestBackupCronJobFollowsTheScriptContract(t *testing.T) {
 	chbs := testSchedule("nightly")
-	chbs.Spec.Retention.KeepLast = ptr.To(int32(7))
+	chbs.Spec.Schedules[0].Keep = 7
 	chbs.Spec.SuccessfulJobsHistoryLimit = ptr.To(int32(5))
 
-	cronJob := BuildBackupCronJob(chbs, testInstallation(), testTopology(), false)
+	cronJob := BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), false)
 	values := env(container(t, cronJob.Spec.JobTemplate.Spec.Template.Spec))
 
 	require.Equal(t, "ns-demo-nightly", values[envBackupNamePrefix],
@@ -514,7 +526,7 @@ func TestBackupCronJobFollowsTheScriptContract(t *testing.T) {
 	require.Equal(t, "metadata.labels['job-name']", jobName.ValueFrom.FieldRef.FieldPath,
 		"a run takes the name of its Job from its pod, by the label every supported Kubernetes version gives it")
 	require.NotContains(t, values, envBackupName, "every run names its backup at runtime")
-	require.Equal(t, "7", values[envKeepLast])
+	require.Equal(t, "period=daily time=03:00 keep=7", values[envSchedules])
 	require.Equal(t, values[envBackupHosts], values[envRetentionHosts], "retention prunes on every host the backup ran on")
 	require.Equal(t, NoDataMessage, values[envNoDataMessage])
 	require.Equal(t, "0 3 * * *", cronJob.Spec.Schedule)
@@ -525,20 +537,30 @@ func TestBackupCronJobFollowsTheScriptContract(t *testing.T) {
 
 	chbs.Spec.ReplicaSelection = api.ReplicaSelectionAllReplicas
 	chbs.Spec.BackupNamePrefix = "custom"
-	values = env(container(t, BuildBackupCronJob(chbs, testInstallation(), testTopology(), true).Spec.JobTemplate.Spec.Template.Spec))
+	values = env(container(t, BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), true).Spec.JobTemplate.Spec.Template.Spec))
 	require.Equal(t, "custom", values[envBackupNamePrefix])
 	require.Equal(t, "chi-demo-main-0-0 chi-demo-main-0-1 chi-demo-main-1-0 chi-demo-main-1-1", values[envRetentionHosts])
 	require.Equal(t, values[envBackupHosts], values[envRetentionHosts])
-	require.Equal(t, "0", env(container(t, BuildBackupCronJob(testSchedule("s"), testInstallation(), testTopology(), false).Spec.JobTemplate.Spec.Template.Spec))[envKeepLast])
+
+	chbs.Spec.Schedules = []api.BackupScheduleEntry{
+		{Period: api.BackupPeriodMonthly, Time: "02:30", Day: ptr.To(int32(31)), Keep: 12},
+		{Period: api.BackupPeriodHour, Keep: 24},
+	}
+	chbs.Spec.ConcurrencyPolicy = string(batch.AllowConcurrent)
+	cronJob = BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), false)
+	require.Equal(t, "30 * * * *", cronJob.Spec.Schedule, "the CronJob runs on the finest entry")
+	require.Equal(t, batch.AllowConcurrent, cronJob.Spec.ConcurrencyPolicy)
+	require.Equal(t, "period=monthly time=02:30 day=31 keep=12;period=hour time=02:30 keep=24",
+		env(container(t, cronJob.Spec.JobTemplate.Spec.Template.Spec))[envSchedules])
 }
 
 // A schedule is read in the time zone it names, as the CronJob's, and in that of the Kubernetes controller manager
 // without one. Backup names carry UTC times either way.
 func TestBackupCronJobReadsTheScheduleInItsTimeZone(t *testing.T) {
 	chbs := testSchedule("nightly")
-	require.Nil(t, BuildBackupCronJob(chbs, testInstallation(), testTopology(), false).Spec.TimeZone)
+	require.Nil(t, BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), false).Spec.TimeZone)
 	chbs.Spec.TimeZone = "Europe/Berlin"
-	require.Equal(t, ptr.To("Europe/Berlin"), BuildBackupCronJob(chbs, testInstallation(), testTopology(), false).Spec.TimeZone)
+	require.Equal(t, ptr.To("Europe/Berlin"), BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), false).Spec.TimeZone)
 }
 
 // A backup that runs a schedule once is named with the schedule's prefix, which the recovery prefix guard tells,
@@ -561,7 +583,7 @@ func TestBackupThatRunsAScheduleStaysOutOfItsSeries(t *testing.T) {
 
 	name := ResolveBackupName(chb)
 	require.Equal(t, "ns-demo-nightly-20231114T221320", name, "due when created, at 1700000000")
-	series := regexp.MustCompile("^" + regexp.QuoteMeta(BackupNamePrefix(chbs)) + "-[0-9]{8}-[0-9]{6}$")
+	series := regexp.MustCompile("^" + regexp.QuoteMeta(BackupNamePrefix(chbs)) + "-[0-9]{14}$")
 	require.False(t, series.MatchString(name), "the retention of the schedule prunes only the backups of its runs")
 	require.True(t, HasDefaultBackupNamePrefix(testNamespace, "demo", name))
 	named := testBackup("named")
@@ -573,13 +595,12 @@ func TestBackupThatRunsAScheduleStaysOutOfItsSeries(t *testing.T) {
 	chb.Status.Schedule.BackupNamePrefix = strings.Repeat("p", api.BackupNamePrefixMaxLength)
 	require.Len(t, ResolveBackupName(chb), api.BackupNameMaxLength, "the name of the longest prefix fits")
 
-	job := BuildBackupJob(chb, testInstallation(), testTopology())
+	job := BuildBackupJob(chb, testInstallation(), testTopology(), testOrchestrator())
 	values := env(container(t, job.Spec.Template.Spec))
 	require.Equal(t, "db.*", values[envTables])
 	require.Equal(t, "chi-demo-main-0-0 chi-demo-main-0-1 chi-demo-main-1-0 chi-demo-main-1-1", values[envBackupHosts])
 	require.Equal(t, int64(600), ptr.Deref(job.Spec.ActiveDeadlineSeconds, 0))
 	require.Equal(t, LabelValue("demo"), job.Labels[LabelBackupCHI], "the Jobs are locked and held by the installation of the schedule")
-	require.NotContains(t, values, envKeepLast, "only the runs of a schedule prune")
 }
 
 // Only a backup that runs a schedule is named with the prefix it recorded of it: where the API server does not
@@ -609,14 +630,14 @@ func TestBackupCronJobVersionFollowsItsSpec(t *testing.T) {
 	}
 	chbs := testSchedule("nightly")
 
-	base := BuildBackupCronJob(chbs, testInstallation(), testTopology(), false)
+	base := BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), false)
 	require.NotEmpty(t, version(base))
-	require.Equal(t, version(base), version(BuildBackupCronJob(chbs, testInstallation(), testTopology(), false)))
+	require.Equal(t, version(base), version(BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), false)))
 
 	scaled := testTopology()
 	scaled.clusters[0].shards = append(scaled.clusters[0].shards, topologyShard{name: "2", hosts: []string{"chi-demo-main-2-0"}})
-	require.NotEqual(t, version(base), version(BuildBackupCronJob(chbs, testInstallation(), scaled, false)))
-	require.NotEqual(t, version(base), version(BuildBackupCronJob(chbs, testInstallation(), testTopology(), true)))
+	require.NotEqual(t, version(base), version(BuildBackupCronJob(chbs, testInstallation(), scaled, testOrchestrator(), false)))
+	require.NotEqual(t, version(base), version(BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), true)))
 }
 
 // Every Job and CronJob drives one cluster, which its name tells.
@@ -680,7 +701,7 @@ func TestScheduledBackupNameSuffixFitsTheBackupNameLimit(t *testing.T) {
 	chbs.Spec.BackupNamePrefix = strings.Repeat("p", api.BackupNamePrefixMaxLength)
 	require.NoError(t, chbs.Spec.Validate())
 	name := ScheduledBackupName(scheduledRun(chbs, time.Date(2026, time.January, 2, 3, 4, 0, 0, time.UTC)))
-	require.Len(t, name, api.BackupNameMaxLength)
+	require.Len(t, name, api.BackupNameMaxLength-1, "one character is left for the \"T\" of a backup that runs the schedule once")
 
 	chr := testRestore("r1")
 	chr.Spec.BackupName = name
@@ -736,18 +757,18 @@ func TestHasDefaultBackupNamePrefix(t *testing.T) {
 			for _, schedule := range []string{"s", "nightly", strings.Repeat("s", 30), strings.Repeat("s", 200)} {
 				chbs := testSchedule(schedule)
 				chbs.Namespace, chbs.Spec.ClickHouseInstallation = tc.namespace, tc.chi
-				backup := BackupNamePrefix(chbs) + "-20261004-020000"
+				backup := BackupNamePrefix(chbs) + "-20261004020000"
 				require.True(t, HasDefaultBackupNamePrefix(tc.namespace, tc.chi, backup), backup)
 
 				other := chbs.DeepCopy()
 				other.Spec.ClickHouseInstallation = "x" + tc.chi
-				require.False(t, HasDefaultBackupNamePrefix(tc.namespace, tc.chi, BackupNamePrefix(other)+"-20261004-020000"))
+				require.False(t, HasDefaultBackupNamePrefix(tc.namespace, tc.chi, BackupNamePrefix(other)+"-20261004020000"))
 			}
-			require.False(t, HasDefaultBackupNamePrefix(tc.namespace, tc.chi, "custom-20261004-020000"))
+			require.False(t, HasDefaultBackupNamePrefix(tc.namespace, tc.chi, "custom-20261004020000"))
 			// An installation whose name extends this one's is another one, the shortened prefix included
 			installation := joinName(tc.namespace, tc.chi)
 			for _, root := range []string{installation, boundedHead(installation, "", api.BackupNamePrefixMaxLength)} {
-				require.False(t, HasDefaultBackupNamePrefix(tc.namespace, tc.chi, root+"2-nightly-20261004-020000"), root)
+				require.False(t, HasDefaultBackupNamePrefix(tc.namespace, tc.chi, root+"2-nightly-20261004020000"), root)
 			}
 		})
 	}
@@ -773,7 +794,7 @@ func TestVerifyJobVerifiesTheBackupThatWasMade(t *testing.T) {
 	chb := testBackup("b1")
 	chb.Spec.BackupName = "edited-later"
 	chb.Status.BackupName = "made"
-	job := BuildVerifyJob(chb, testInstallation(), testTopology())
+	job := BuildVerifyJob(chb, testInstallation(), testTopology(), testOrchestrator())
 	require.Equal(t, "made", env(container(t, job.Spec.Template.Spec))[envBackupName])
 	require.Equal(t, "made", JobBackupName(job))
 }
@@ -781,14 +802,14 @@ func TestVerifyJobVerifiesTheBackupThatWasMade(t *testing.T) {
 // What a Job works on is what it was built with, whatever its custom resource says by now.
 func TestJobBackupName(t *testing.T) {
 	chb := testBackup("b1")
-	require.Equal(t, ResolveBackupName(chb), JobBackupName(BuildBackupJob(chb, testInstallation(), testTopology())))
+	require.Equal(t, ResolveBackupName(chb), JobBackupName(BuildBackupJob(chb, testInstallation(), testTopology(), testOrchestrator())))
 	chr := testRestore("r1")
-	job := BuildRestoreJob(chr, testInstallation(), testTopology())
+	job := BuildRestoreJob(chr, testInstallation(), testTopology(), testOrchestrator())
 	chr.Spec.BackupName = "edited-later"
 	require.Equal(t, "nightly-20260101-000000", JobBackupName(job))
 
 	run := scheduledRun(testSchedule("nightly"), time.Date(2026, time.January, 2, 3, 4, 0, 0, time.UTC))
-	require.Equal(t, "ns-demo-nightly-20260102-030400", JobBackupName(run), "a scheduled run names its backup after its slot")
+	require.Equal(t, "ns-demo-nightly-20260102030400", JobBackupName(run), "a scheduled run names its backup after its slot")
 }
 
 // jobNameLabels are the labels that name its Job on a pod the API server of Kubernetes 1.27 or later creates.
@@ -802,7 +823,7 @@ func TestScheduledBackupName(t *testing.T) {
 		mutate func(*batch.Job)
 		backup string
 	}{
-		"a run of the CronJob": {backup: "ns-demo-nightly-20260102-030400"},
+		"a run of the CronJob": {backup: "ns-demo-nightly-20260102030400"},
 		"a Job created by hand from the CronJob": {mutate: func(job *batch.Job) {
 			job.Name = "nightly-main-backup-manual"
 			job.Spec.Template.Labels = jobNameLabels(job.Name)
@@ -819,7 +840,7 @@ func TestScheduledBackupName(t *testing.T) {
 			mutate: func(job *batch.Job) {
 				job.Spec.Template.Labels = map[string]string{LegacyJobNameLabel: job.Name}
 			},
-			backup: "ns-demo-nightly-20260102-030400",
+			backup: "ns-demo-nightly-20260102030400",
 		},
 		// The Job script reads the legacy label alone, and names the backup of a pod without it after the time it runs
 		"a run whose pods carry the Job name label of Kubernetes 1.27 alone": {
@@ -831,7 +852,7 @@ func TestScheduledBackupName(t *testing.T) {
 			job.Spec.Template.Labels = nil
 		}},
 		"a one-off backup": {mutate: func(job *batch.Job) {
-			*job = *BuildBackupJob(testBackup("b1"), testInstallation(), testTopology())
+			*job = *BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator())
 		}},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -848,10 +869,10 @@ func TestScheduledBackupName(t *testing.T) {
 // the container, and a container that dies without writing one reports the tail of its log.
 func TestJobsReportWhyTheyFailed(t *testing.T) {
 	for name, spec := range map[string]core.PodSpec{
-		"backup":  BuildBackupJob(testBackup("b1"), testInstallation(), testTopology()).Spec.Template.Spec,
-		"verify":  BuildVerifyJob(testBackup("b1"), testInstallation(), testTopology()).Spec.Template.Spec,
-		"restore": BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology()).Spec.Template.Spec,
-		"cronjob": BuildBackupCronJob(testSchedule("s1"), testInstallation(), testTopology(), false).Spec.JobTemplate.Spec.Template.Spec,
+		"backup":  BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec,
+		"verify":  BuildVerifyJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec,
+		"restore": BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec,
+		"cronjob": BuildBackupCronJob(testSchedule("s1"), testInstallation(), testTopology(), testOrchestrator(), false).Spec.JobTemplate.Spec.Template.Spec,
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := container(t, spec)
@@ -889,7 +910,7 @@ func TestJobBackupHoldsNoData(t *testing.T) {
 	exited := func(code int32, message string) core.ContainerState {
 		return core.ContainerState{Terminated: &core.ContainerStateTerminated{ExitCode: code, Message: message}}
 	}
-	declared := jobEnv(BuildBackupJob(testBackup("b1"), testInstallation(), testTopology()), envNoDataMessage)
+	declared := jobEnv(BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator()), envNoDataMessage)
 	for name, tc := range map[string]struct {
 		status core.ContainerStatus
 		noData bool
@@ -914,10 +935,10 @@ func TestJobBackupHoldsNoData(t *testing.T) {
 func TestJobTables(t *testing.T) {
 	chb := testBackup("b1")
 	chb.Spec.Tables = "db.*"
-	job := BuildBackupJob(chb, testInstallation(), testTopology())
+	job := BuildBackupJob(chb, testInstallation(), testTopology(), testOrchestrator())
 	chb.Spec.Tables = "other.*"
 	require.Equal(t, "db.*", JobTables(job))
-	require.Empty(t, JobTables(BuildBackupJob(testBackup("b2"), testInstallation(), testTopology())))
+	require.Empty(t, JobTables(BuildBackupJob(testBackup("b2"), testInstallation(), testTopology(), testOrchestrator())))
 }
 
 // A scheduled run tells the partitions it backed up, how many backups its retention keeps and the
@@ -926,21 +947,17 @@ func TestJobTables(t *testing.T) {
 func TestScheduledJobEnvironment(t *testing.T) {
 	chbs := testSchedule("nightly")
 	chbs.Spec.Partitions = []string{"202601", "202602"}
-	chbs.Spec.Retention.KeepLast = ptr.To(int32(7))
-	cronJob := BuildBackupCronJob(chbs, testInstallation(), testTopology(), false)
+	cronJob := BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), false)
 	run := scheduledRun(chbs, time.Date(2026, time.January, 2, 3, 0, 0, 0, time.UTC))
 	chbs.Spec.Partitions = nil
-	chbs.Spec.Retention.KeepLast = nil
 	chbs.Spec.ReplicaSelection = api.ReplicaSelectionAllReplicas
 
 	require.Equal(t, "202601,202602", JobPartitions(run))
-	require.Equal(t, int32(7), JobKeepLast(run))
 	require.Equal(t, []string{"chi-demo-main-0-0", "chi-demo-main-1-0"}, JobRetentionHosts(run))
 	require.Equal(t, JobRetentionHosts(run), CronJobRetentionHosts(cronJob))
 
-	oneOff := BuildBackupJob(testBackup("b1"), testInstallation(), testTopology())
+	oneOff := BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator())
 	require.Empty(t, JobPartitions(oneOff))
-	require.Zero(t, JobKeepLast(oneOff))
 	require.Empty(t, JobRetentionHosts(oneOff))
 	require.Empty(t, CronJobRetentionHosts(nil))
 }
@@ -951,7 +968,7 @@ func TestJobFailedUnchanged(t *testing.T) {
 	exited := func(code int32) core.ContainerState {
 		return core.ContainerState{Terminated: &core.ContainerStateTerminated{ExitCode: code}}
 	}
-	job := BuildBackupJob(testBackup("b1"), testInstallation(), testTopology())
+	job := BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator())
 	declared, err := strconv.Atoi(jobEnv(job, envUnchangedExitCode))
 	require.NoError(t, err)
 	unchanged := int32(declared)
@@ -1024,7 +1041,7 @@ func TestRecoveryRestore(t *testing.T) {
 // {installation} and {namespace} macros take, set only when named, so a restore of the own backups runs as ever. The
 // path check knows the namespace of the restored installation either way.
 func TestRestoreJobKnowsTheSourceOfTheBackup(t *testing.T) {
-	own := container(t, BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology()).Spec.Template.Spec)
+	own := container(t, BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec)
 	require.NotContains(t, env(own), envSourceInstallation)
 	require.NotContains(t, env(own), envSourceNamespace)
 	require.Equal(t, testNamespace, env(own)[envPathNamespace])
@@ -1032,7 +1049,7 @@ func TestRestoreJobKnowsTheSourceOfTheBackup(t *testing.T) {
 	chr := testRestore("r1")
 	chr.Spec.SourceInstallation = "prod-eu"
 	chr.Spec.SourceNamespace = "team-a"
-	other := env(container(t, BuildRestoreJob(chr, testInstallation(), testTopology()).Spec.Template.Spec))
+	other := env(container(t, BuildRestoreJob(chr, testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec))
 	require.Equal(t, "prod-eu", other[envSourceInstallation])
 	require.Equal(t, "team-a", other[envSourceNamespace])
 }
@@ -1058,6 +1075,27 @@ func TestRecoveryRestoresFromItsSource(t *testing.T) {
 	require.Equal(t, "cold-src", restore.Spec.SourceInstallation)
 	require.Equal(t, "team-a", restore.Spec.SourceNamespace)
 	require.NoError(t, restore.Spec.Validate())
+}
+
+// A recovery hands the ConfigMap of the orchestrator script it inherits to the restore it creates; a cluster may reset
+// it to the operator's script.
+func TestRecoveryRestoreRunsTheOrchestratorOfTheRecovery(t *testing.T) {
+	chi := newCHI("demo", &api.Cluster{Name: "hot", Backup: enabledBackup()}, &api.Cluster{Name: "cold", Backup: enabledBackup()})
+	chi.Spec.Configuration.Clusters[1].Backup.Recovery = &api.BackupRecovery{OrchestratorConfigMapRef: &core.LocalObjectReference{}}
+	chi.Spec.Backup = &api.ClusterBackup{Recovery: &api.BackupRecovery{
+		BackupName:               types.NewString("nightly-20261004020000"),
+		OrchestratorConfigMapRef: &core.LocalObjectReference{Name: "my-orchestrator"},
+	}}
+	_, stored := normalize(t, chi)
+
+	recoveries := Recoveries(stored)
+	require.Len(t, recoveries, 2)
+	require.Equal(t, "my-orchestrator", recoveries[0].OrchestratorConfigMap)
+	require.Equal(t, "", recoveries[1].OrchestratorConfigMap)
+	hot := BuildRecoveryRestore(stored, recoveries[0])
+	require.Equal(t, "my-orchestrator", hot.Spec.GetOrchestratorConfigMapName())
+	require.NoError(t, hot.Spec.Validate())
+	require.Nil(t, BuildRecoveryRestore(stored, recoveries[1]).Spec.OrchestratorConfigMapRef)
 }
 
 // Every backup-enabled cluster that inherits a non-empty backup name is recovered; a cluster that
@@ -1110,12 +1148,12 @@ func TestRecoveredFrom(t *testing.T) {
 // A Job tells the hosts it drives as it was built, and a restore that left access entities of the
 // backup unrestored tells so by the termination message its environment names.
 func TestJobHostsAndRBACNotRestored(t *testing.T) {
-	require.Equal(t, []string{"chi-demo-main-0-0", "chi-demo-main-1-0"}, JobHosts(BuildBackupJob(testBackup("b1"), testInstallation(), testTopology())))
-	require.Equal(t, []string{"chi-demo-main-0-0", "chi-demo-main-1-0"}, JobHosts(BuildVerifyJob(testBackup("b1"), testInstallation(), testTopology())))
+	require.Equal(t, []string{"chi-demo-main-0-0", "chi-demo-main-1-0"}, JobHosts(BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator())))
+	require.Equal(t, []string{"chi-demo-main-0-0", "chi-demo-main-1-0"}, JobHosts(BuildVerifyJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator())))
 	require.Equal(t, []string{"chi-demo-main-0-0", "chi-demo-main-0-1", "chi-demo-main-1-0", "chi-demo-main-1-1"},
-		JobHosts(BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology())))
+		JobHosts(BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology(), testOrchestrator())))
 
-	declared := jobEnv(BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology()), envRBACNotRestoredMessage)
+	declared := jobEnv(BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology(), testOrchestrator()), envRBACNotRestoredMessage)
 	exited := func(code int32, message string) *core.Pod {
 		return &core.Pod{Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{
 			Name: jobContainerName, State: core.ContainerState{Terminated: &core.ContainerStateTerminated{ExitCode: code, Message: message}},
@@ -1134,10 +1172,10 @@ func TestJobsNameTheConfigSecretOfTheirCluster(t *testing.T) {
 		topology, err := NewTopology(stored, cluster)
 		require.NoError(t, err)
 		for kind, obj := range map[string]meta.Object{
-			"backup":  BuildBackupJob(testBackup("b1"), stored, topology),
-			"verify":  BuildVerifyJob(testBackup("b1"), stored, topology),
-			"restore": BuildRestoreJob(testRestore("r1"), stored, topology),
-			"cronjob": BuildBackupCronJob(testSchedule("s1"), stored, topology, false),
+			"backup":  BuildBackupJob(testBackup("b1"), stored, topology, testOrchestrator()),
+			"verify":  BuildVerifyJob(testBackup("b1"), stored, topology, testOrchestrator()),
+			"restore": BuildRestoreJob(testRestore("r1"), stored, topology, testOrchestrator()),
+			"cronjob": BuildBackupCronJob(testSchedule("s1"), stored, topology, testOrchestrator(), false),
 		} {
 			require.Equal(t, secret, ObjectConfigSecret(obj), "%s of cluster %s", kind, cluster)
 		}
@@ -1158,7 +1196,10 @@ func pathCheckInstallation(t *testing.T) *api.ClickHouseInstallation {
 		ConfigSecretRef: &core.LocalObjectReference{Name: "s3-cold"},
 	})
 	plain := layoutCluster("plain", 1, 1, nil)
-	bare := layoutCluster("bare", 1, 1, &api.ClusterBackup{Enabled: types.NewStringBool(true)})
+	bare := layoutCluster("bare", 1, 1, &api.ClusterBackup{
+		Enabled:         types.NewStringBool(true),
+		ConfigSecretRef: &core.LocalObjectReference{Name: "s3-bare"},
+	})
 	chi := newCHI("demo", hot, plain, cold, bare)
 	chi.Spec.Templates = &api.Templates{PodTemplates: []api.PodTemplate{{
 		Name: "own-sidecar",
@@ -1200,7 +1241,7 @@ func TestJobsCarryTheConfiguredDefaultPaths(t *testing.T) {
 	require.NoError(t, err)
 	cold, err := topology.ForCluster("cold")
 	require.NoError(t, err)
-	values := env(container(t, BuildRestoreJob(testRestore("r1"), stored, cold).Spec.Template.Spec))
+	values := env(container(t, BuildRestoreJob(testRestore("r1"), stored, cold, testOrchestrator()).Spec.Template.Spec))
 	require.Equal(t, chop.Config().Backup.StoragePath, values["DEFAULT_PATH"])
 	require.Equal(t, chop.Config().Backup.StorageObjectDiskPath, values["DEFAULT_OBJECT_DISK_PATH"])
 	require.Equal(t, testNamespace, values[envPathNamespace], "the value of {namespace} on the hosts")
@@ -1226,9 +1267,9 @@ func TestJobsCarryWhatThePathCheckNeeds(t *testing.T) {
 		self      string
 		selection string
 	}{
-		"backup":  {spec: BuildBackupJob(testBackup("b1"), stored, cold).Spec.Template.Spec, self: "1", selection: string(api.ReplicaSelectionFirstPerShard)},
-		"cronjob": {spec: BuildBackupCronJob(chbs, stored, cold, false).Spec.JobTemplate.Spec.Template.Spec, self: "1", selection: string(api.ReplicaSelectionAllReplicas)},
-		"restore": {spec: BuildRestoreJob(testRestore("r1"), stored, cold).Spec.Template.Spec, self: "1"},
+		"backup":  {spec: BuildBackupJob(testBackup("b1"), stored, cold, testOrchestrator()).Spec.Template.Spec, self: "1", selection: string(api.ReplicaSelectionFirstPerShard)},
+		"cronjob": {spec: BuildBackupCronJob(chbs, stored, cold, testOrchestrator(), false).Spec.JobTemplate.Spec.Template.Spec, self: "1", selection: string(api.ReplicaSelectionAllReplicas)},
+		"restore": {spec: BuildRestoreJob(testRestore("r1"), stored, cold, testOrchestrator()).Spec.Template.Spec, self: "1"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := container(t, tc.spec)
@@ -1273,7 +1314,7 @@ func TestJobsCarryWhatThePathCheckNeeds(t *testing.T) {
 
 			require.Equal(t, "bare", values["PATH_2_CLUSTER"])
 			require.Equal(t, "demo-bare-backup-config", envVarNamed(t, c, "PATH_2_S3_PATH").ValueFrom.SecretKeyRef.Name,
-				"a cluster without a storage Secret has the configuration file all the same")
+				"a cluster whose sidecar template sets nothing has the configuration file")
 			require.NotContains(t, values, "PATH_3_CLUSTER")
 			for _, e := range c.Env {
 				require.NotContains(t, e.Name, "plain")
@@ -1293,8 +1334,8 @@ func TestJobsTargetOneCluster(t *testing.T) {
 	cold, err := topology.ForCluster("cold")
 	require.NoError(t, err)
 
-	hotJob := BuildBackupJob(testBackup("b1"), stored, hot)
-	coldJob := BuildBackupJob(testBackup("b1"), stored, cold)
+	hotJob := BuildBackupJob(testBackup("b1"), stored, hot, testOrchestrator())
+	coldJob := BuildBackupJob(testBackup("b1"), stored, cold, testOrchestrator())
 	require.Equal(t, "b1-hot-backup", hotJob.Name)
 	require.Equal(t, "b1-cold-backup", coldJob.Name)
 	require.Equal(t, []string{"chi-demo-hot-0-0", "chi-demo-hot-1-0"}, JobHosts(hotJob))
@@ -1304,9 +1345,36 @@ func TestJobsTargetOneCluster(t *testing.T) {
 		require.Equal(t, cluster, job.Labels[LabelBackupCluster])
 		require.Equal(t, cluster, job.Spec.Template.Labels[LabelBackupCluster], "the pods of a Job tell its cluster too")
 	}
-	cronJob := BuildBackupCronJob(testSchedule("s1"), stored, cold, false)
+	cronJob := BuildBackupCronJob(testSchedule("s1"), stored, cold, testOrchestrator(), false)
 	require.Equal(t, "s1-cold-backup", cronJob.Name)
 	require.Equal(t, "cold", cronJob.Labels[LabelBackupCluster])
 	require.Equal(t, "cold", cronJob.Spec.JobTemplate.Labels[LabelBackupCluster])
 	require.Equal(t, "cold", cronJob.Spec.JobTemplate.Spec.Template.Labels[LabelBackupCluster])
+}
+
+// A scheduled run names its backup after the time it was due in the schedule's time zone, which its Job carries
+// in SCHEDULE_TIMEZONE, as it carries the entries in SCHEDULES; the cron schedule is that of the finest entry.
+func TestScheduledBackupNameInTheScheduleTimeZone(t *testing.T) {
+	chbs := testSchedule("nightly")
+	chbs.Spec.TimeZone = "Europe/Berlin"
+	cronJob := BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), false)
+	require.Equal(t, "Europe/Berlin", ptr.Deref(cronJob.Spec.TimeZone, ""))
+	require.Equal(t, "0 3 * * *", cronJob.Spec.Schedule)
+	values := env(container(t, cronJob.Spec.JobTemplate.Spec.Template.Spec))
+	require.Equal(t, "Europe/Berlin", values[envScheduleTimezone])
+	require.Equal(t, "period=daily time=03:00 keep=1", values[envSchedules])
+
+	// 03:00 in Berlin in January is 02:00 UTC; the CronJob controller names the Job after the UTC minute
+	due := time.Date(2026, time.January, 2, 2, 0, 0, 0, time.UTC)
+	job := &batch.Job{Spec: cronJob.Spec.JobTemplate.Spec}
+	job.Name = cronJob.Name + "-" + strconv.FormatInt(due.Unix()/60, 10)
+	job.Spec.Template.Labels = map[string]string{LegacyJobNameLabel: job.Name}
+	require.Equal(t, "ns-demo-nightly-20260102030000", ScheduledBackupName(job))
+
+	for i := range job.Spec.Template.Spec.Containers[0].Env {
+		if job.Spec.Template.Spec.Containers[0].Env[i].Name == envScheduleTimezone {
+			job.Spec.Template.Spec.Containers[0].Env[i].Value = ""
+		}
+	}
+	require.Equal(t, "ns-demo-nightly-20260102020000", ScheduledBackupName(job), "no time zone is UTC")
 }

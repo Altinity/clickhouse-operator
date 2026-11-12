@@ -34,9 +34,10 @@ const backupCRDTemplatePath = "../../../../deploy/builder/templates-install-bund
 // chiCRDTemplatePath is the source of the ClickHouseInstallation and ClickHouseInstallationTemplate CRDs.
 const chiCRDTemplatePath = "../../../../deploy/builder/templates-install-bundle/clickhouse-operator-install-yaml-template-01-section-crd-01-chi-chit.yaml"
 
-// jobScriptPath is the script of the backup and restore Jobs, which checks a tables pattern again before it
-// passes the pattern to clickhouse-backup.
-const jobScriptPath = "../../../model/chbackup/scripts/job.sh"
+// jobScriptPath is the script of the backup and restore Jobs, backup-orchestrator.sh, an operator configuration
+// file in the backup folder of the operator configuration, which checks a tables pattern again before it passes the
+// pattern to clickhouse-backup.
+const jobScriptPath = "../../../../config/backup/backup-orchestrator.sh"
 
 // backupTargetImmutableRule keeps the target of a backup, a schedule and a restore what it was created
 // with: holds, locks and records follow the target, and a retargeted restore would release the
@@ -431,9 +432,9 @@ func TestBackupCRDBoundsTheStartingDeadline(t *testing.T) {
 func TestJobScriptSeriesMatchesTheTypes(t *testing.T) {
 	raw, err := os.ReadFile(jobScriptPath)
 	require.NoError(t, err)
-	series := regexp.MustCompile(`(?m)^\s*pattern="\^\$\{BACKUP_NAME_PREFIX//\./\[\.\]\}(.*)"$`).FindStringSubmatch(string(raw))
-	require.NotNil(t, series, "the script no longer prunes the series of a prefix")
-	require.Equal(t, scheduledBackupNameRegexp.String(), series[1])
+	tag := regexp.MustCompile(`(?m)^TAG_RE='\^([^']*)'$`).FindStringSubmatch(string(raw))
+	require.NotNil(t, tag, "the script no longer defines TAG_RE, the time a backup of the series ends with")
+	require.Equal(t, scheduledBackupNameRegexp.String(), "-"+tag[1])
 }
 
 // The Job script accepts exactly the source installations and namespaces the spec validation does.

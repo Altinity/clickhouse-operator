@@ -15,14 +15,17 @@
 package chbackup
 
 import (
-	_ "embed"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 )
 
-// Environment of the backup Job container. jobScript reads every input from these variables,
-// so no user-provided value is ever part of the script text.
+// Environment of the backup Job container. backup-orchestrator.sh, the OrchestratorScriptFile, reads every input
+// from these variables, so no user-provided value is ever part of the script text.
 const (
 	// envOperation selects what the Job does: operationBackup, operationVerify or operationRestore
 	envOperation = "OPERATION"
@@ -46,13 +49,21 @@ const (
 	envCluster = "CLUSTER"
 	// envBackupName is the backup to create, verify or restore
 	envBackupName = "BACKUP_NAME"
-	// envBackupNamePrefix names a scheduled backup "<prefix>-<UTC timestamp>" when envBackupName is empty,
-	// and scopes retention to the backups named that way
+	// envBackupNamePrefix names a scheduled backup "<prefix>-<YYYYMMDDHHMMSS>", the wall time of its slot in
+	// envScheduleTimezone, when envBackupName is empty, and scopes retention to the backups named that way
 	envBackupNamePrefix = "BACKUP_NAME_PREFIX"
+	// envSchedules (schedule.go) are the entries of the schedule of a scheduled backup, as EntriesEnv formats
+	// them: the heaviest entry whose slot the run is decides whether the backup is incremental; after the
+	// backup, every entry keeps its newest keep backups of its slots, and retention deletes the rest of the
+	// series. envScheduleTimezone (schedule.go) is the zone of the slots.
+	// envRestoreInProgress skips retention, "true" or "false": a restore of the cluster runs
+	envRestoreInProgress = "RESTORE_IN_PROGRESS"
 	// envCronJobName is the name of the CronJob of a scheduled backup, which the names of its Jobs start with
 	envCronJobName = "CRON_JOB_NAME"
-	// envJobName is the name of the Job, from the Job name label of its pod: a scheduled run takes the
-	// timestamp of its backup name from it
+	// envJobName is the name of the Job, from the Job name label of its pod: the CronJob controller names the Job
+	// of a scheduled run "<CronJob>-<minutes since the epoch of its slot>", the slot the script names the backup
+	// after, in envScheduleTimezone, and matches the entries of envSchedules with; a Job named otherwise takes the
+	// current minute
 	envJobName = "JOB_NAME"
 	// envBackupHosts lists the space-separated hosts create_remote runs on
 	envBackupHosts = "BACKUP_HOSTS"
@@ -66,9 +77,6 @@ const (
 	envPartitions = "PARTITIONS"
 	// envDiffFromRemote names the remote base backup of an incremental backup
 	envDiffFromRemote = "DIFF_FROM_REMOTE"
-	// envKeepLast is how many of the most recent scheduled backups retention keeps of
-	// those that hold data, and apart from them of those that hold none; 0 keeps all
-	envKeepLast = "KEEP_LAST"
 	// envNoDataMessage is the termination message the script leaves when the backup it made holds no
 	// data on any host
 	envNoDataMessage = "NO_DATA_MESSAGE"
@@ -108,6 +116,23 @@ const (
 	// Unset or empty, the restore reads the paths of its own installation for either
 	envSourceInstallation = "SOURCE_INSTALLATION"
 	envSourceNamespace    = "SOURCE_NAMESPACE"
+
+	// envBackupTransport is how the script reaches the clickhouse-backup API: "sidecar", the default, through the
+	// sidecar of every host, or "pod", through the backup Pod of every shard, which the host lists then name by
+	// DNS and which the script waits for to answer
+	envBackupTransport = "BACKUP_TRANSPORT"
+	// envBackupPodWaitSeconds is how long the script waits for the backup Pods of the pod transport, 600 when empty
+	envBackupPodWaitSeconds = "BACKUP_POD_WAIT_SECONDS"
+
+	// The object the script posts Kubernetes Events on, all of them needed for any: the ClickHouseBackup,
+	// ClickHouseRestore or ClickHouseBackupSchedule the run works for, in envPodNamespace, the namespace of the
+	// Job, with the token of the service account of the pod; envPodName names the Job pod as the reporting instance
+	envEventObjectAPIVersion = "EVENT_OBJECT_API_VERSION"
+	envEventObjectKind       = "EVENT_OBJECT_KIND"
+	envEventObjectName       = "EVENT_OBJECT_NAME"
+	envEventObjectUID        = "EVENT_OBJECT_UID"
+	envPodNamespace          = "POD_NAMESPACE"
+	envPodName               = "POD_NAME"
 )
 
 // Environment of the storage path check, which the script runs before a backup or a restore changes
@@ -196,8 +221,29 @@ const (
 	operationRestore = "restore"
 )
 
-// jobScript is the bash script a backup Job runs as ["bash", "-c", jobScript]. It drives the
-// clickhouse-backup sidecar REST API of the target hosts and fails the Job on any error.
-//
-//go:embed scripts/job.sh
-var jobScript string
+// Values of envBackupTransport
+const (
+	backupTransportSidecar = "sidecar"
+	backupTransportPod     = "pod"
+)
+
+// OrchestratorScriptFile is the file name of the orchestrator script, backup-orchestrator.sh, which a backup Job runs
+// as "bash <file>". It is an operator configuration file, in the folder backup.path of the operator configuration
+// (config/backup in the repository, generated from deploy/builder/templates-config/backup), shipped with the operator
+// in the ConfigMap etc-clickhouse-operator-backup-files and replaceable without a release. It drives
+// the clickhouse-backup REST API of the target hosts and fails the Job on any error; sourced, it runs nothing and
+// leaves its functions to the caller.
+const OrchestratorScriptFile = "backup-orchestrator.sh"
+
+// ReadOrchestratorScript returns the orchestrator script, the OrchestratorScriptFile of dir.
+func ReadOrchestratorScript(dir string) (string, error) {
+	path := filepath.Join(dir, OrchestratorScriptFile)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("cannot read the backup orchestrator script: %w", err)
+	}
+	if strings.TrimSpace(string(raw)) == "" {
+		return "", fmt.Errorf("the backup orchestrator script %s is empty", path)
+	}
+	return string(raw), nil
+}

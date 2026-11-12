@@ -388,7 +388,7 @@ func smallerLimit(x, y uint64) uint64 {
 // newPodSettings returns what a Job inherits from a host: the image, its pull policy and the identity of the
 // host's clickhouse-backup sidecar, and what its pod template sets at the pod level
 func newPodSettings(host *api.Host, containers interfaces.IContainerManager) podSettings {
-	sidecar, _ := containers.NewBackupContainer(host)
+	sidecar, _ := containers.NewBackupServerContainer(host)
 	settings := podSettings{
 		image:                    sidecar.Image,
 		imagePullPolicy:          sidecar.ImagePullPolicy,

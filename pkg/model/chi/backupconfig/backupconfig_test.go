@@ -305,3 +305,51 @@ func TestWithoutClickHouseCredentials(t *testing.T) {
 
 	require.Equal(t, "s3: [", string(WithoutClickHouseCredentials([]byte("s3: ["))), "a file that cannot be read is left as it is")
 }
+
+// The REST API always authenticates with the credentials the operator generates: no config.yml of the user turns
+// its authentication off, whether it sets the credentials empty, null, or to its own, or leaves the api section out.
+func TestBuildCannotDisableAPIAuth(t *testing.T) {
+	for name, storageConfig := range map[string]string{
+		"empty credentials":   "api:\n  username: \"\"\n  password: \"\"\n",
+		"null credentials":    "api:\n  username: null\n  password: null\n",
+		"own credentials":     "api:\n  username: admin\n  password: admin\n",
+		"no api section":      "s3:\n  bucket: b\n",
+		"empty api section":   "api: {}\n",
+		"null api section":    "api: ~\n",
+		"env override wanted": "general:\n  disable_environment_override: true\napi:\n  username: \"\"\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			built, err := Build([]byte(storageConfig), testCredentials, testDefaults)
+			require.NoError(t, err)
+			file := parse(t, built.File)
+			apiSection := file["api"].(map[string]any)
+			require.Equal(t, testCredentials.APIUsername, apiSection["username"])
+			require.Equal(t, testCredentials.APIPassword, apiSection["password"])
+			require.Equal(t, false, file["general"].(map[string]any)["disable_environment_override"])
+		})
+	}
+	t.Run("api section that is no mapping", func(t *testing.T) {
+		_, err := Build([]byte("api: [username]\n"), testCredentials, testDefaults)
+		require.ErrorIs(t, err, ErrInvalidStorageConfig)
+	})
+}
+
+// Retention is done by the orchestrator alone, and an incremental base may be deleted: the file always keeps every
+// remote backup and rebases on delete, whatever the user's general section says
+func TestBuildForcesRetentionSettings(t *testing.T) {
+	for name, storageConfig := range map[string]string{
+		"unset":     "s3:\n  bucket: b\n",
+		"user keep": "general:\n  backups_to_keep_remote: 7\n  rebase_during_delete: false\n  rebase_before_remove_old_remote: false\n",
+		"null":      "general:\n  backups_to_keep_remote: null\n  rebase_during_delete: null\n",
+		"empty":     "general: {}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			built, err := Build([]byte(storageConfig), testCredentials, testDefaults)
+			require.NoError(t, err)
+			general := parse(t, built.File)["general"].(map[string]any)
+			require.Equal(t, 0, general["backups_to_keep_remote"])
+			require.Equal(t, true, general["rebase_during_delete"])
+			require.Equal(t, true, general["rebase_before_remove_old_remote"])
+		})
+	}
+}

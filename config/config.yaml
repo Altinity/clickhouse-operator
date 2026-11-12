@@ -695,6 +695,10 @@ backup:
   # See docs/backup.md#storage-paths.
   storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
   storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
+  # Path to the folder of the backup orchestrator script, backup-orchestrator.sh, which the backup, verify and
+  # restore Jobs run. Relative to the folder of this file unless absolute, as template.chi.path.
+  # See docs/backup.md#the-orchestrator-script.
+  path: backup
 
 ################################################
 ##

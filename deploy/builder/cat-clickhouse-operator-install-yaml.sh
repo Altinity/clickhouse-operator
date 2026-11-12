@@ -59,6 +59,10 @@ TMP_CHI_TEMPLATESD_DIR="${TMP_CONFIG_DIR}/chi/templates.d"
 # as content of /etc/clickhouse-server/chi/users.d folder
 TMP_CHI_USERSD_DIR="${TMP_CONFIG_DIR}/chi/users.d"
 
+# Local path to folder with the backup orchestrator script which will be injected into .yaml
+# as content of /etc/clickhouse-operator/backup folder
+TMP_BACKUP_DIR="${TMP_CONFIG_DIR}/backup"
+
 # Local path to folder with Keeper's .xml configuration files which will be injected into .yaml
 # as content of /etc/clickhouse-server/chk/conf.d folder
 TMP_CHK_CONFD_DIR="${TMP_CONFIG_DIR}/chk/conf.d"
@@ -335,6 +339,25 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             for FILE in "${TMP_CHI_TEMPLATESD_DIR}"/*; do
                 render_configmap_data_section_file "${FILE}"
             done
+        fi
+
+        # Render backup files. A templated manifest, whose namespace is a placeholder, is rendered in turn by envsubst,
+        # terraform templatefile or Jinja, which would rewrite the variables and braces of a shell script: there the files
+        # go base64-encoded in binaryData
+        render_separator
+        if [[ "${OPERATOR_NAMESPACE}" == *'$'* ]] || [[ "${OPERATOR_NAMESPACE}" == *'{'* ]]; then
+            render_configmap_header "etc-clickhouse-operator-backup-files" | sed '$ s/^data:$/binaryData:/'
+            for FILE in "${TMP_BACKUP_DIR}"/*; do
+                [[ -f "${FILE}" ]] && echo "  $(basename "${FILE}"): $(base64 < "${FILE}" | tr -d '\n')"
+            done
+        else
+            render_configmap_header "etc-clickhouse-operator-backup-files"
+            if [[ ! -z "${TMP_BACKUP_DIR}" ]] && [[ -d "${TMP_BACKUP_DIR}" ]] && [[ ! -z "$(ls "${TMP_BACKUP_DIR}")" ]]; then
+                # Looks like at least one file is available, let's render it
+                for FILE in "${TMP_BACKUP_DIR}"/*; do
+                    render_configmap_data_section_file "${FILE}"
+                done
+            fi
         fi
 
         # Render chi/users.d files

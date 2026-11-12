@@ -25,7 +25,7 @@ spec:
   # spec.backupName nor spec.scheduledTime; otherwise that run fails before changing anything, as a
   # backup of that name is in the storage already. An explicit name holds letters, digits, "_", "-"
   # and "." (starting with a letter or digit, no "..", at most 128 characters) and must not end like
-  # the backups of a schedule, -YYYYMMDD-HHMMSS: the retention of a schedule whose prefix it carries
+  # the backups of a schedule, -YYYYMMDDHHMMSS: the retention of a schedule whose prefix it carries
   # would take it for one of its own and delete it.
   # backupName: demo-before-upgrade
 
@@ -97,3 +97,8 @@ spec:
   # fails the backup, or the verification, of its cluster with the reason DeadlineExceeded, as each
   # Job makes a single attempt. Raise it for a backup too large to upload in a day.
   # activeDeadlineSeconds: 7200
+
+  # A ConfigMap of this namespace whose key backup-orchestrator.sh the Jobs of this backup run instead of the operator's
+  # orchestrator script, the one of the operator configuration (see docs/backup.md, The orchestrator script)
+  # orchestratorConfigMapRef:
+  #   name: my-backup-orchestrator

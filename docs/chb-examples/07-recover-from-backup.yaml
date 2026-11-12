@@ -38,12 +38,16 @@ spec:
     recovery:
       # The backup to restore, e.g. LAST-BACKUP of kubectl get chbs -o wide; check that it still
       # exists on every cluster, or name each cluster's own backup, see docs/backup.md.
-      backupName: "default-backup-demo-nightly-20261003-020000"
+      backupName: "default-backup-demo-nightly-20261003023000"
       # The installation that made the backup: the default storage paths hold {namespace} and
       # {installation}, so the backup lies under those of "backup-demo", not of this one.
       sourceInstallation: "backup-demo"
       # The namespace of that installation, when another
       # sourceNamespace: "team-a"
+      # A ConfigMap of this namespace whose key backup-orchestrator.sh the ClickHouseRestore of the recovery runs
+      # instead of the operator's orchestrator script: it is copied into that restore
+      # orchestratorConfigMapRef:
+      #   name: my-backup-orchestrator
   defaults:
     templates:
       dataVolumeClaimTemplate: data-volume-template

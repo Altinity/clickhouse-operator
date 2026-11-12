@@ -102,7 +102,7 @@ func TestBackupFailsPastItsStartingDeadlineBeforeItIsValidated(t *testing.T) {
 	clock.SetTime(backupCreated.Add(61 * time.Second))
 	require.Equal(t, ctrl.Result{}, f.reconcile("b1"))
 	got := f.backup("b1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	ready := condition(t, got.Status.Conditions, api.BackupConditionReady)
 	require.Equal(t, api.BackupReasonStartingDeadlineExceeded, ready.Reason)
 	require.Equal(t, "not started by 2026-10-19T22:01:00Z, 60s after the backup was due: "+waited, ready.Message)
@@ -126,8 +126,8 @@ func TestBackupFailsOnAClusterPastItsStartingDeadline(t *testing.T) {
 	clock.SetTime(backupCreated.Add(61 * time.Second))
 	f.reconcile("b1")
 	got = f.backup("b1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Clusters[0].Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Clusters[0].Phase)
 	require.Equal(t, api.BackupReasonStartingDeadlineExceeded, got.Status.Clusters[0].Reason)
 	require.Equal(t, "not started by 2026-10-19T22:01:00Z, 60s after the backup was due: "+waited, got.Status.Clusters[0].Message)
 	require.Equal(t, 1, jobCount(t, f.client), "no backup Job joins the operation running there")
@@ -177,7 +177,7 @@ func TestBackupRunsASchedule(t *testing.T) {
 // schedule does not back up, as neither of them can change that.
 func TestBackupRunsAScheduleOnlyAsTheScheduleAllows(t *testing.T) {
 	invalid := newScheduleCR("nightly")
-	invalid.Spec.ConcurrencyPolicy = "Sometimes"
+	invalid.Spec.Schedules = nil
 	chb := newBackupCreated("b1")
 	chb.Spec.ClickHouseInstallation = ""
 	chb.Spec.ScheduleRef = &api.BackupScheduleRef{Name: "nightly"}
@@ -196,7 +196,7 @@ func TestBackupRunsAScheduleOnlyAsTheScheduleAllows(t *testing.T) {
 	f.at(backupCreated)
 	f.reconcile("b1")
 	got := f.backup("b1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	ready := condition(t, got.Status.Conditions, api.BackupConditionReady)
 	require.Equal(t, api.BackupReasonClusterNotFound, ready.Reason)
 	require.Equal(t, "ClickHouseBackupSchedule nightly backs up cluster main only, not cold", ready.Message)
@@ -216,7 +216,7 @@ func TestBackupRunsAScheduleThatNeverCame(t *testing.T) {
 	clock.SetTime(backupCreated.Add(61 * time.Second))
 	f.reconcile("b1")
 	got := f.backup("b1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	require.Equal(t, "not started by 2026-10-19T22:01:00Z, 60s after the backup was due: ClickHouseBackupSchedule nightly not found",
 		condition(t, got.Status.Conditions, api.BackupConditionReady).Message)
 	require.Equal(t, ctrl.Result{}, f.reconcile("b1"))
@@ -238,7 +238,7 @@ func TestBackupWithAnInvalidSpecFailsAtItsStartingDeadline(t *testing.T) {
 	clock.SetTime(backupCreated.Add(61 * time.Second))
 	f.reconcile("b1")
 	got := f.backup("b1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	require.Equal(t, api.BackupReasonStartingDeadlineExceeded, condition(t, got.Status.Conditions, api.BackupConditionReady).Reason)
 
 	unbounded := newBackupCreated("b2")

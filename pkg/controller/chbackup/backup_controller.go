@@ -78,6 +78,7 @@ func (c *BackupController) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	c.announcePhase(next, cur.Status.Phase, next.Status.Phase, next.Status.Conditions, &out)
 	return c.commitStatus(ctx, next, !apiEquality.Semantic.DeepEqual(cur.Status, next.Status), result, out)
 }
 
@@ -222,12 +223,13 @@ func (c *BackupController) recordSchedule(ctx context.Context, chb *api.ClickHou
 		}, nil
 	}
 	chb.Status.Schedule = &api.BackupScheduleRecord{
-		Name:                   name,
-		Generation:             chbs.GetGeneration(),
-		ClickHouseInstallation: chbs.Spec.ClickHouseInstallation,
-		Cluster:                cluster,
-		BackupNamePrefix:       model.BackupNamePrefix(chbs),
-		BackupOptions:          *chbs.Spec.BackupOptions.DeepCopy(),
+		Name:                     name,
+		Generation:               chbs.GetGeneration(),
+		ClickHouseInstallation:   chbs.Spec.ClickHouseInstallation,
+		Cluster:                  cluster,
+		BackupNamePrefix:         model.BackupNamePrefix(chbs),
+		OrchestratorConfigMapRef: chbs.Spec.OrchestratorConfigMapRef.DeepCopy(),
+		BackupOptions:            *chbs.Spec.BackupOptions.DeepCopy(),
 	}
 	return nil, nil
 }
@@ -342,7 +344,16 @@ func (c *BackupController) start(
 	}
 
 	retainRequestedClusters(chb.GetNamespace(), chb.TargetInstallation(), target.chi)
-	job := model.BuildBackupJob(chb, target.chi, target.topology)
+	orchestrator, missing, err := c.orchestrator(ctx, target.chi, cluster.Name, chb.OrchestratorConfigMap())
+	switch {
+	case err != nil:
+		return ctrl.Result{}, err
+	case missing != nil:
+		failOn(cluster, missing.reason, missing.message)
+		out.add(c.failed(chb, cluster))
+		return ctrl.Result{}, nil
+	}
+	job := model.BuildBackupJob(chb, target.chi, target.topology, orchestrator)
 	gate := c.accessRestoreGate(chb.GetNamespace(), chb.TargetInstallation())
 	result, err := c.startJob(ctx, chb, chb.TargetInstallation(), cluster.Name, job, gate, func(reason, message string) {
 		waitOn(cluster, reason, message)
@@ -534,7 +545,15 @@ func (c *BackupController) startVerify(
 		return ctrl.Result{RequeueAfter: wait.requeue}, nil
 	}
 
-	job := model.BuildVerifyJob(chb, target.chi, target.topology)
+	orchestrator, missing, err := c.orchestrator(ctx, target.chi, cluster.Name, chb.OrchestratorConfigMap())
+	switch {
+	case err != nil:
+		return ctrl.Result{}, err
+	case missing != nil:
+		c.concludeVerifyOn(chb, cluster, missing.reason, missing.message, out)
+		return ctrl.Result{}, nil
+	}
+	job := model.BuildVerifyJob(chb, target.chi, target.topology, orchestrator)
 	gate := c.accessRestoreGate(chb.GetNamespace(), chb.TargetInstallation())
 	return c.startJob(ctx, chb, chb.TargetInstallation(), cluster.Name, job, gate, func(reason, message string) {
 		cluster.Reason, cluster.Message = reason, message

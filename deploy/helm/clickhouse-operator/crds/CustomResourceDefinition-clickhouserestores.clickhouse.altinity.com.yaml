@@ -73,6 +73,17 @@ spec:
                 - rule: "(has(self.sourceInstallation) ? self.sourceInstallation : '') == (has(oldSelf.sourceInstallation) ? oldSelf.sourceInstallation : '') && (has(self.sourceNamespace) ? self.sourceNamespace : '') == (has(oldSelf.sourceNamespace) ? oldSelf.sourceNamespace : '')"
                   message: "sourceInstallation and sourceNamespace are immutable; create a new resource"
               properties:
+                orchestratorConfigMapRef:
+                  type: object
+                  description: |
+                    ConfigMap in the namespace of the restore whose key `backup-orchestrator.sh` its Jobs run instead of the
+                    operator's orchestrator script, the one of the operator configuration
+                  properties:
+                    name:
+                      description: |
+                        Name of the referent. More info:
+                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
                 clickHouseInstallation:
                   type: string
                   minLength: 1
@@ -143,6 +154,7 @@ spec:
                     - Running
                     - Completed
                     - Failed
+                    - Aborted
                 backupName:
                   type: string
                   description: "Backup the restore Jobs restore, as it was when the first Job was created"
@@ -173,6 +185,7 @@ spec:
                           - Running
                           - Completed
                           - Failed
+                          - Aborted
                       jobName:
                         type: string
                         description: "Job that drives the restore on the cluster"

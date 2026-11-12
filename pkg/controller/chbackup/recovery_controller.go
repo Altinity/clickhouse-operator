@@ -176,7 +176,7 @@ func (c *RecoveryController) recoverCluster(
 	}
 
 	recovery.BackupName = restoredBackupName(restore)
-	if restore.Status.Phase == api.OperationPhaseFailed {
+	if failedPhase(restore.Status.Phase) {
 		c.recoveryFailed(chi, restore)
 	}
 	return restore, ctrl.Result{}, nil

@@ -129,16 +129,16 @@ func TestJobsRunAsTheSidecarRuns(t *testing.T) {
 
 			topology, err := NewTopology(stored, "")
 			require.NoError(t, err)
-			job := BuildBackupJob(testBackup("b1"), stored, topology).Spec.Template.Spec
+			job := BuildBackupJob(testBackup("b1"), stored, topology, testOrchestrator()).Spec.Template.Spec
 			require.Equal(t, running.Image, job.Containers[0].Image)
-			require.Equal(t, running.ImagePullPolicy, job.Containers[0].ImagePullPolicy)
+			require.Equal(t, core.PullAlways, job.Containers[0].ImagePullPolicy, "the orchestrator image is pulled anew every time")
 			sidecarUser, sidecarGroup := effectiveIdentity(pod, running)
 			jobUser, jobGroup := effectiveIdentity(&job, &job.Containers[0])
 			require.Equal(t, sidecarUser, jobUser, "user")
 			require.Equal(t, sidecarGroup, jobGroup, "group")
 			require.NotNil(t, jobUser, "fixture: every case names a user")
 			require.Equal(t, pod.ImagePullSecrets, job.ImagePullSecrets)
-			require.Equal(t, pod.ServiceAccountName, job.ServiceAccountName)
+			require.Equal(t, testOrchestrator().ServiceAccountName, job.ServiceAccountName, "the Job runs as the orchestrator")
 		})
 	}
 }

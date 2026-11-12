@@ -17,6 +17,8 @@ package chbackup
 import (
 	"fmt"
 	"time"
+
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 const (
@@ -117,3 +119,47 @@ func accessRestoreInProgressMessage(chiName, restore string) string {
 // operationLockClusterSeparator separates the installation from the cluster in the key of an
 // operation lock: no namespace, installation or cluster name holds it.
 const operationLockClusterSeparator = "/"
+
+// Reasons of the backup custom resources the API does not define: the status and the events of the controllers
+// tell them.
+const (
+	// reasonOrchestratorScriptMissing tells that there is no orchestrator script to run: the operator configuration
+	// lacks it, or the ConfigMap the spec.orchestratorConfigMapRef of the resource names does not hold it.
+	reasonOrchestratorScriptMissing = "OrchestratorScriptMissing"
+	// reasonScheduledBackupSucceeded and reasonScheduledBackupFailed tell how a scheduled run went, on the
+	// schedule.
+	reasonScheduledBackupSucceeded = "ScheduledBackupSucceeded"
+	reasonScheduledBackupFailed    = "ScheduledBackupFailed"
+	// reasonCronJobCreated and reasonCronJobUpdated tell that a schedule created, or rebuilt, the CronJob of a
+	// cluster.
+	reasonCronJobCreated = "CronJobCreated"
+	reasonCronJobUpdated = "CronJobUpdated"
+	// reasonScheduleActive, reasonScheduleSuspended tell the transitions of the phase of a schedule.
+	reasonScheduleActive    = "ScheduleActive"
+	reasonScheduleSuspended = "ScheduleSuspended"
+	reasonScheduleAborted   = "ScheduleAborted"
+)
+
+// abortReason reports whether a failure with the given reason is the operator stopping an operation, or never
+// starting it, rather than its Job failing: the phase is then Aborted, not Failed.
+func abortReason(reason string) bool {
+	switch reason {
+	case api.BackupReasonJobFailed, api.BackupReasonJobFailedUnchanged, api.BackupReasonVerificationFailed,
+		api.BackupReasonPartiallyCompleted:
+		return false
+	}
+	return true
+}
+
+// failurePhase returns the phase of an operation, or of a cluster of it, that failed for the given reason.
+func failurePhase(reason string) api.OperationPhase {
+	if abortReason(reason) {
+		return api.OperationPhaseAborted
+	}
+	return api.OperationPhaseFailed
+}
+
+// failedPhase reports whether a phase is that of an operation that did not succeed: Failed or Aborted.
+func failedPhase(phase api.OperationPhase) bool {
+	return (phase == api.OperationPhaseFailed) || (phase == api.OperationPhaseAborted)
+}

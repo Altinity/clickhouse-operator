@@ -27,10 +27,10 @@ spec:
           description: Target cluster, empty means every backup-enabled cluster
           jsonPath: .spec.cluster
           priority: 1
-        - name: schedule
+        - name: phase
           type: string
-          description: Cron schedule
-          jsonPath: .spec.schedule
+          description: Schedule phase - Active, Suspended or Aborted
+          jsonPath: .status.phase
         - name: suspend
           type: string
           description: Whether the schedule is suspended by its spec
@@ -65,9 +65,10 @@ spec:
         openAPIV3Schema:
           description: |
             EXPERIMENTAL. ClickHouseBackupSchedule defines a recurring backup of a ClickHouseInstallation.
-            The operator runs one CronJob per backup-enabled cluster it targets, each driving the
-            clickhouse-backup sidecar it injects into the cluster (see ClickHouseInstallation spec.backup)
-            and, optionally, pruning old backups of this schedule there. The API may change in a future
+            The operator runs one CronJob per backup-enabled cluster it targets, on the cron schedule of the
+            finest of its entries, each driving clickhouse-backup on the cluster (see ClickHouseInstallation
+            spec.backup); a run whose time matches coarser entries counts for them too. After a successful run
+            the backups of the schedule's series that no entry keeps are deleted. The API may change in a future
             release.
           type: object
           required:
@@ -83,13 +84,24 @@ spec:
               type: object
               required:
                 - clickHouseInstallation
-                - schedule
+                - schedules
               x-kubernetes-validations:
                 - rule: "self.clickHouseInstallation == oldSelf.clickHouseInstallation && (has(self.cluster) ? self.cluster : '') == (has(oldSelf.cluster) ? oldSelf.cluster : '')"
                   message: "clickHouseInstallation and cluster are immutable; create a new resource"
                 - rule: "(has(oldSelf.backupNamePrefix) ? oldSelf.backupNamePrefix : '') == '' || (has(self.backupNamePrefix) ? self.backupNamePrefix : '') == oldSelf.backupNamePrefix"
                   message: "backupNamePrefix can be set once and is immutable after: a changed prefix would leave the former series unpruned; create a new resource"
               properties:
+                orchestratorConfigMapRef:
+                  type: object
+                  description: |
+                    ConfigMap in the namespace of the schedule whose key `backup-orchestrator.sh` the runs of its CronJobs
+                    run instead of the operator's orchestrator script, the one of the operator configuration
+                  properties:
+                    name:
+                      description: |
+                        Name of the referent. More info:
+                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
                 clickHouseInstallation:
                   type: string
                   minLength: 1
@@ -101,16 +113,67 @@ spec:
                   # Mirrors the ClickHouseInstallation cluster name constraint
                   maxLength: 15
                   pattern: "^[a-zA-Z0-9-]{0,15}$"
-                schedule:
-                  type: string
-                  minLength: 1
-                  description: "Cron schedule in standard Kubernetes CronJob format, e.g. \"0 2 * * *\""
+                schedules:
+                  type: array
+                  minItems: 1
+                  description: |
+                    The periods the schedule backs up at, at most one entry per period. Every entry that sets a time sets the
+                    same, which an hour or 6hours entry that sets none takes, so every slot of a coarser entry is a slot of the
+                    finest one, whose cron schedule the CronJobs run on. A run matches its time against the entries: one backup
+                    is made, for the entry of the longest period it matches, and it counts for each of them. A weekly and a
+                    monthly entry need a daily or finer one beside them
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - period
+                  items:
+                    type: object
+                    required:
+                      - period
+                      - keep
+                    properties:
+                      period:
+                        type: string
+                        description: "How often the entry is due; a minute entry is due every minute, whatever its time"
+                        enum:
+                          - minute
+                          - hour
+                          - 6hours
+                          - daily
+                          - weekly
+                          - monthly
+                      time:
+                        type: string
+                        description: |
+                          HH:MM the entry is due at, in timeZone. Required for daily, weekly and monthly. For hour only its
+                          minute is used, for 6hours its hour modulo 6 and its minute; empty takes the time the other entries
+                          set, 00:00 when none does
+                        pattern: "^(([01][0-9]|2[0-3]):[0-5][0-9])?$"
+                      day:
+                        type: integer
+                        format: int32
+                        minimum: 0
+                        maximum: 31
+                        description: |
+                          Day the entry is due on: for weekly 0..6, 0 being Sunday; for monthly 1..31, a day past the end
+                          of a shorter month meaning its last day. Required for weekly and monthly, not set otherwise
+                      keep:
+                        type: integer
+                        format: int32
+                        minimum: 1
+                        description: "How many of the newest backups made at the slots of the entry are kept, at least 1"
+                      incremental:
+                        # A StringBool, polymorphic as suspend below
+                        x-kubernetes-preserve-unknown-fields: true
+                        description: |
+                          Make the runs of the entry incremental backups on the newest backup of the series while the chain
+                          of incremental backups is shorter than keep; the run after makes a full backup again. At most one
+                          entry
                 timeZone:
                   type: string
                   maxLength: 64
                   description: |
-                    IANA time zone the schedule is read in, e.g. Europe/Berlin, as the CronJob's timeZone. Empty reads it in
-                    the time zone of the Kubernetes controller manager, UTC as a rule. Backup names carry UTC times either way
+                    IANA time zone the schedules are read in, e.g. Europe/Berlin, as the CronJob's timeZone. Empty reads them in
+                    the time zone of the Kubernetes controller manager, UTC as a rule
                 suspend: &TypeStringBool
                   description: "Pause creation of new backup Jobs. Jobs already running are not affected"
                   # StringBool is polymorphic — accepts native YAML bool (true/false),
@@ -180,32 +243,58 @@ spec:
                 backupNamePrefix:
                   type: string
                   description: |
-                    Prefix of the backup names; each run appends the UTC time it was due. Retention only
-                    ever prunes backups named with this prefix and such a time. Defaults to
+                    Prefix of the backup names; each run appends the time it was due, -YYYYMMDDHHMMSS.
+                    Retention only ever prunes backups named with this prefix and such a time. Defaults to
                     "<namespace>-<installation>-<schedule>", shortened with a hash when longer. At most
-                    112 characters, so the name with its "-YYYYMMDD-HHMMSS" suffix stays within 128.
+                    112 characters, so the name with its suffix stays within 128.
                     Can be set once and is immutable after, as a changed prefix would leave the backups of the
                     former series unpruned. Set later, it replaces the default prefix the same way: meant for a
                     schedule that has not run yet, such as one held for a recovery
                   maxLength: 112
                   pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
-                retention:
-                  type: object
-                  description: |
-                    Which backups of the schedule are deleted: a rule of the series of backups named with its backupNamePrefix
-                    and the time of a run, not of any one backup. Backups of other names, one-off backups and those that run
-                    the schedule once among them, are never deleted by it
-                  properties:
-                    keepLast:
-                      type: integer
-                      format: int32
-                      minimum: 0
-                      description: |
-                        After each successful run keep the N most recent backups of the series that hold data, and apart from
-                        them the N most recent that hold none, and delete older ones. 0 (default) keeps every backup
             status:
               type: object
               properties:
+                phase:
+                  type: string
+                  description: "Phase of the schedule"
+                  enum:
+                    - Active
+                    - Suspended
+                    - Aborted
+                reason:
+                  type: string
+                  description: "Why the schedule is in its phase, in one word"
+                message:
+                  type: string
+                  description: "Why the schedule is in its phase, in a sentence"
+                nextScheduleTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: "Next time a run of the CronJobs matches an entry of the schedule"
+                entries:
+                  type: array
+                  description: "State of the runs of each entry of the schedule"
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - period
+                  items:
+                    type: object
+                    required:
+                      - period
+                    properties:
+                      period:
+                        type: string
+                        description: "Period of the entry"
+                      lastScheduleTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                        description: "Last time a run matching the entry was scheduled, made for it or for a coarser entry that matched as well"
+                      lastBackupName:
+                        type: string
+                        description: "Backup the last successful run matching the entry made"
                 clusters:
                   type: array
                   description: |

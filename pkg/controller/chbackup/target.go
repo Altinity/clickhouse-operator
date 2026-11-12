@@ -63,7 +63,7 @@ func (p *pending) waitsForInstallation() bool {
 func (p *pending) refusesOneOff() bool {
 	switch p.reason {
 	case api.BackupReasonClusterNotFound, api.BackupReasonBackupDisabled, api.BackupReasonNoBackupStorage,
-		api.BackupReasonNoTargetHosts:
+		api.BackupReasonNoTargetHosts, reasonOrchestratorScriptMissing:
 		return true
 	}
 	return false

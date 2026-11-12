@@ -1,0 +1,14 @@
+# test_010089
+# Backup enabled without a configSecretRef, so without a storage: the reconcile is aborted.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-089-no-storage"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  backup:
+    enabled: "yes"
+  configuration:
+    clusters:
+      - name: main

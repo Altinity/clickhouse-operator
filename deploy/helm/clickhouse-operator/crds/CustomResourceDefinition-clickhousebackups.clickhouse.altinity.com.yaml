@@ -87,9 +87,21 @@ spec:
                   message: "a backup that runs a schedule takes its options from it: replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef"
                 - rule: "!has(self.scheduleRef) || (has(self.backupName) ? self.backupName : '') == ''"
                   message: "a backup that runs a schedule is named with the schedule's backupNamePrefix: backupName is not set with scheduleRef"
-                - rule: "!has(self.backupName) || !self.backupName.matches('-[0-9]{8}-[0-9]{6}$')"
-                  message: "backupName must not end like the backups of a schedule, -YYYYMMDD-HHMMSS, which the retention of a schedule of that prefix would prune"
+                - rule: "!has(self.backupName) || !self.backupName.matches('-[0-9]{14}$')"
+                  message: "backupName must not end like the backups of a schedule, -YYYYMMDDHHMMSS, which the retention of a schedule of that prefix would prune"
               properties:
+                orchestratorConfigMapRef:
+                  type: object
+                  description: |
+                    ConfigMap in the namespace of the backup whose key `backup-orchestrator.sh` its Jobs run instead of the
+                    operator's orchestrator script, the one of the operator configuration. With scheduleRef, unset takes the
+                    schedule's
+                  properties:
+                    name:
+                      description: |
+                        Name of the referent. More info:
+                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
                 clickHouseInstallation:
                   type: string
                   minLength: 1
@@ -120,7 +132,7 @@ spec:
                 backupName: &TypeBackupName
                   type: string
                   description: |
-                    Optional explicit backup name, which must not end like the backups of a schedule (-YYYYMMDD-HHMMSS).
+                    Optional explicit backup name, which must not end like the backups of a schedule (-YYYYMMDDHHMMSS).
                     Generated from the resource name and the time the backup is due when empty. Not set with scheduleRef,
                     whose backup is named with the schedule's backupNamePrefix
                   maxLength: 128
@@ -190,6 +202,7 @@ spec:
                     - Running
                     - Completed
                     - Failed
+                    - Aborted
                 backupName:
                   type: string
                   description: "Resolved backup name, the same on every cluster"
@@ -199,6 +212,16 @@ spec:
                     What a backup that runs a schedule takes from it, recorded anew on every reconcile until the backup is
                     validated and kept from then on: the backup is made with these, whatever the schedule becomes
                   properties:
+                    orchestratorConfigMapRef:
+                      type: object
+                      description: |
+                        The schedule's orchestratorConfigMapRef, which the backup runs unless it names its own
+                      properties:
+                        name:
+                          description: |
+                            Name of the referent. More info:
+                            https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
                     name:
                       type: string
                       description: "Name of the ClickHouseBackupSchedule"
@@ -258,6 +281,7 @@ spec:
                           - Running
                           - Completed
                           - Failed
+                          - Aborted
                       jobName:
                         type: string
                         description: "Job that drives the backup on the cluster"

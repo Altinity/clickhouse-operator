@@ -98,8 +98,12 @@ var ClickHouseSidecarContainerNames = []string{
 
 const (
 	// DefaultClickHouseBackupDockerImage specifies the clickhouse-backup image of a sidecar whose base container names
-	// none, or that has no base container as backup.podTemplate is empty
-	DefaultClickHouseBackupDockerImage = "altinity/clickhouse-backup:2.8.1"
+	// none, or that has no base container as backup.podTemplate is empty. The stable tag moves with the releases of
+	// clickhouse-backup, so the containers that run it pull it Always unless their base container sets a pull policy.
+	DefaultClickHouseBackupDockerImage = "altinity/clickhouse-backup:stable"
+	// DefaultClickHouseBackupImagePullPolicy is the pull policy of a clickhouse-backup container whose base container
+	// sets none
+	DefaultClickHouseBackupImagePullPolicy = "Always"
 
 	// ClickHouseBackupAPIPortName specifies name of the clickhouse-backup REST API port of the sidecar
 	ClickHouseBackupAPIPortName = "backup-api"
@@ -143,6 +147,12 @@ const (
 	ClickHouseBackupEnvClickHouseRestartCommand = "CLICKHOUSE_RESTART_COMMAND"
 	ClickHouseBackupEnvRestoreSchemaOnCluster   = "RESTORE_SCHEMA_ON_CLUSTER"
 	ClickHouseBackupEnvBackupsToKeepLocal       = "BACKUPS_TO_KEEP_LOCAL"
+	// ClickHouseBackupEnvBackupsToKeepRemote, ClickHouseBackupEnvRebaseDuringDelete and
+	// ClickHouseBackupEnvRebaseBeforeRemoveOldRemote are pinned: retention is the orchestrator's alone, and a
+	// deleted backup that another one is incremental to is rebased first
+	ClickHouseBackupEnvBackupsToKeepRemote         = "BACKUPS_TO_KEEP_REMOTE"
+	ClickHouseBackupEnvRebaseDuringDelete          = "REBASE_DURING_DELETE"
+	ClickHouseBackupEnvRebaseBeforeRemoveOldRemote = "REBASE_BEFORE_REMOVE_OLD_REMOTE"
 	// ClickHouseBackupEnvAPIAllowParallel is kept off, as by default, also where the storage Secret or the
 	// sidecar's base container turns it on: clickhouse-backup sets the env vars an operation overrides for the whole
 	// process, which an operation running alongside would see, and the operations of two Jobs on one host would run

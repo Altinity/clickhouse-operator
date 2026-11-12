@@ -536,7 +536,7 @@ func TestJobSeesTheSettingsTheSidecarsRunWith(t *testing.T) {
 			require.Equal(t, []string{"hot", "cold", "warm"}, topology.ClusterNames())
 			target, err := topology.ForCluster("hot")
 			require.NoError(t, err)
-			job := BuildBackupJob(testBackup("b1"), stored, target)
+			job := BuildBackupJob(testBackup("b1"), stored, target, testOrchestrator())
 			jobEnv := kube.resolve(t, &job.Spec.Template.Spec.Containers[0], job.Name)
 
 			for _, sidecar := range runSidecars(t, inMemory, kube) {
@@ -636,7 +636,7 @@ func TestRestoreJobKnowsWhatDropsOnTheClusterNeed(t *testing.T) {
 			_, stored := normalize(t, chi)
 			topology, err := NewTopology(stored, "main")
 			require.NoError(t, err)
-			values := env(container(t, BuildRestoreJob(testRestore("r1"), stored, topology).Spec.Template.Spec))
+			values := env(container(t, BuildRestoreJob(testRestore("r1"), stored, topology, testOrchestrator()).Spec.Template.Spec))
 			require.Equal(t, strconv.FormatBool(tc.replicated), values[envReplicated])
 			require.Equal(t, strconv.FormatUint(tc.limit, 10), values[envMaxTableSizeToDrop])
 		})

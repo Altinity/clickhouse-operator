@@ -88,8 +88,12 @@ const (
 )
 
 const (
-	// jobContainerName is the name of the container of every backup, verify and restore Job.
-	jobContainerName = "clickhouse-backup-job"
+	// jobContainerName is the name of the container of every backup, verify and restore Job, which runs the
+	// orchestrator script.
+	jobContainerName = "backup-orchestrator"
+	// legacyJobContainerName is the name of that container in the Jobs of operators before the orchestrator script
+	// came from a ConfigMap: their Jobs are still read the same way after an upgrade.
+	legacyJobContainerName = "clickhouse-backup-job"
 
 	// jobNameMaxLength keeps Job names usable as the job-name label value the Job controller
 	// stamps on its pods.
@@ -116,9 +120,9 @@ const (
 	// pollIntervalSeconds is how often the Job script polls a sidecar for the state of an action.
 	pollIntervalSeconds = 5
 
-	// scheduleTimestampLayout formats the time a scheduled run was due into the "-YYYYMMDD-HHMMSS"
-	// suffix of its backup name, as the Job script does.
-	scheduleTimestampLayout = "20060102-150405"
+	// scheduleTimestampLayout formats the time a scheduled run was due into the "-YYYYMMDDHHMMSS"
+	// suffix of its backup name, api.BackupNameScheduleSuffix.
+	scheduleTimestampLayout = "20060102150405"
 	// runNowTimestampLayout formats the time a backup that runs a schedule once is due into the "-YYYYMMDDTHHMMSS"
 	// suffix of its backup name: of the length of a scheduled run's, so the name fits as one does, and never one of
 	// those the schedule's retention prunes.
@@ -142,10 +146,6 @@ const (
 	recoveredFromSeparator        = ","
 	recoveredFromClusterSeparator = ":"
 )
-
-// jobCommand runs the Job script. The script text is static: every value it acts on reaches it
-// through the environment, so no user input is ever parsed as shell code.
-var jobCommand = []string{"bash", "-c"}
 
 // Resources of the Job container. The script holds whole sidecar responses in bash variables, and
 // the restore preflight reads the table list of every target host, system tables included, which
@@ -329,29 +329,47 @@ func JobBackupName(job *batch.Job) string {
 
 // ScheduledBackupName returns the name of the backup a scheduled run makes, as its Job script
 // derives it: the CronJob controller names each Job after the minute its run was due, which the
-// script reads from the Job name label of its pod, so every run of one slot makes the same
-// backup. It returns "" for a run named otherwise, such as a Job created by hand from the
+// script reads from the Job name label of its pod and writes in the schedule's time zone,
+// SCHEDULE_TIMEZONE, so every run of one slot makes the same backup. It returns "" for a run named otherwise, such as a Job created by hand from the
 // CronJob, and for a Job the API server did not label with its name: the script then names the
 // backup after the time it runs.
 func ScheduledBackupName(job *batch.Job) string {
-	prefix, cronJobName := jobEnv(job, envBackupNamePrefix), jobEnv(job, envCronJobName)
-	if (prefix == "") || (cronJobName == "") || (podJobName(job.Spec.Template.GetLabels()) != job.GetName()) {
+	prefix := jobEnv(job, envBackupNamePrefix)
+	slot, ok := ScheduledSlot(job)
+	if (prefix == "") || !ok {
 		return ""
 	}
-	slot, found := strings.CutPrefix(job.GetName(), cronJobName+"-")
-	if !found || !scheduleSlotRegexp.MatchString(slot) {
-		return ""
-	}
-	minutes, err := strconv.ParseInt(slot, 10, 64)
-	if err != nil {
-		return ""
-	}
-	timestamp := time.Unix(minutes*scheduleSlotSeconds, 0).UTC().Format(scheduleTimestampLayout)
+	timestamp := slot.Format(scheduleTimestampLayout)
 	// A year past 9999 would not fit the layout, and the script falls back to the time it runs
 	if len(timestamp) != len(scheduleTimestampLayout) {
 		return ""
 	}
 	return joinName(prefix, timestamp)
+}
+
+// ScheduledSlot returns the slot of a scheduled run, as its Job script reads it from the name of its Job: the time it
+// was due, in the time zone of the schedule, SCHEDULE_TIMEZONE. false for a Job that is no run of a CronJob, as
+// ScheduledBackupName tells.
+func ScheduledSlot(job *batch.Job) (time.Time, bool) {
+	cronJobName := jobEnv(job, envCronJobName)
+	if (cronJobName == "") || (podJobName(job.Spec.Template.GetLabels()) != job.GetName()) {
+		return time.Time{}, false
+	}
+	slot, found := strings.CutPrefix(job.GetName(), cronJobName+"-")
+	if !found || !scheduleSlotRegexp.MatchString(slot) {
+		return time.Time{}, false
+	}
+	minutes, err := strconv.ParseInt(slot, 10, 64)
+	if err != nil {
+		return time.Time{}, false
+	}
+	location := time.UTC
+	if zone := jobEnv(job, envScheduleTimezone); zone != "" {
+		if location, err = time.LoadLocation(zone); err != nil {
+			return time.Time{}, false
+		}
+	}
+	return time.Unix(minutes*scheduleSlotSeconds, 0).In(location), true
 }
 
 // podJobName returns the name of the Job the pod labels tell, as the Job script reads it: from
@@ -374,16 +392,6 @@ func JobTables(job *batch.Job) string {
 // "" stands for every partition.
 func JobPartitions(job *batch.Job) string {
 	return jobEnv(job, envPartitions)
-}
-
-// JobKeepLast returns how many backups with data the retention of a scheduled backup Job keeps,
-// as the Job was built; zero when it keeps all.
-func JobKeepLast(job *batch.Job) int32 {
-	keep, err := strconv.ParseInt(jobEnv(job, envKeepLast), 10, 32)
-	if (err != nil) || (keep < 0) {
-		return 0
-	}
-	return int32(keep)
 }
 
 // JobRetentionHosts returns the hosts a scheduled backup Job prunes on, as the Job was built.
@@ -420,7 +428,9 @@ func jobEnv(job *batch.Job, name string) string {
 func podEnv(pod *core.PodSpec, name string) string {
 	container, ok := k8s.PodSpecContainerGet(pod, jobContainerName)
 	if !ok {
-		return ""
+		if container, ok = k8s.PodSpecContainerGet(pod, legacyJobContainerName); !ok {
+			return ""
+		}
 	}
 	for _, env := range container.Env {
 		if env.Name == name {
@@ -433,30 +443,31 @@ func podEnv(pod *core.PodSpec, name string) string {
 // BuildBackupJob builds the Job that runs a one-off backup on the cluster the topology targets.
 // Every cluster makes the backup under the one name the backup resolved, which its status records,
 // whatever the spec names by now.
-func BuildBackupJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology *Topology) *batch.Job {
+func BuildBackupJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology *Topology, orchestrator Orchestrator) *batch.Job {
 	cluster := topology.cluster()
-	env := append(commonEnv(operationBackup, chi, cluster),
+	env := append(commonEnv(operationBackup, chi, cluster, orchestrator, eventObject(chb, api.ClickHouseBackupCRDResourceKind)),
 		envVar(envBackupName, cmp.Or(chb.Status.BackupName, ResolveBackupName(chb))),
 		envVar(envDiffFromRemote, chb.Spec.DiffFromRemote),
 	)
 	options := chb.GetBackupOptions()
-	env = append(env, backupOptionsEnv(options, topology)...)
+	env = append(env, backupOptionsEnv(options, topology, orchestrator)...)
 	labels := Labels(api.ClickHouseBackupCRDResourceKind, chb.GetName(), chb.TargetInstallation(), cluster)
-	return newJob(BackupJobName(chb, cluster), chb.GetNamespace(), labels, options.GetActiveDeadlineSeconds(), topology, env)
+	return newJob(BackupJobName(chb, cluster), chb.GetNamespace(), labels, options.GetActiveDeadlineSeconds(), topology, orchestrator, env)
 }
 
 // BuildVerifyJob builds the Job that verifies a one-off backup is restorable on the cluster the
 // topology targets: it downloads the backup and checks it without touching the installation's
 // data. It verifies the backup that was made, which the status records, whatever the spec names by now.
-func BuildVerifyJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology *Topology) *batch.Job {
+func BuildVerifyJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology *Topology, orchestrator Orchestrator) *batch.Job {
 	cluster := topology.cluster()
 	backupName := cmp.Or(chb.Status.BackupName, ResolveBackupName(chb))
-	env := append(commonEnv(operationVerify, chi, cluster),
+	env := append(commonEnv(operationVerify, chi, cluster, orchestrator, eventObject(chb, api.ClickHouseBackupCRDResourceKind)),
 		envVar(envBackupName, backupName),
-		envVar(envVerifyHosts, joinHosts(topology.firstPerShard())),
+		envVar(envVerifyHosts, joinHosts(orchestrator.hosts(topology.firstPerShard()))),
 	)
 	labels := Labels(api.ClickHouseBackupCRDResourceKind, chb.GetName(), chb.TargetInstallation(), cluster)
-	return newJob(VerifyJobName(chb, cluster), chb.GetNamespace(), labels, chb.GetBackupOptions().GetActiveDeadlineSeconds(), topology, env)
+	return newJob(VerifyJobName(chb, cluster), chb.GetNamespace(), labels, chb.GetBackupOptions().GetActiveDeadlineSeconds(), topology,
+		orchestrator, env)
 }
 
 // BuildRestoreJob builds the Job that runs a restore on the cluster the topology targets. Every cluster
@@ -464,13 +475,13 @@ func BuildVerifyJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology
 // The schema is restored on every replica, each creating its tables from the backup's own definitions,
 // which leaves Distributed tables pointing where they pointed; the data on the first replica of each
 // shard, from which replication fills the others.
-func BuildRestoreJob(chr *api.ClickHouseRestore, chi api.ICustomResource, topology *Topology) *batch.Job {
+func BuildRestoreJob(chr *api.ClickHouseRestore, chi api.ICustomResource, topology *Topology, orchestrator Orchestrator) *batch.Job {
 	cluster := topology.cluster()
-	allReplicas := joinHosts(topology.allReplicas())
-	env := append(commonEnv(operationRestore, chi, cluster),
+	allReplicas := joinHosts(orchestrator.hosts(topology.allReplicas()))
+	env := append(commonEnv(operationRestore, chi, cluster, orchestrator, eventObject(chr, api.ClickHouseRestoreCRDResourceKind)),
 		envVar(envBackupName, cmp.Or(chr.Status.BackupName, chr.Spec.BackupName)),
 		envVar(envSchemaHosts, allReplicas),
-		envVar(envDataHosts, joinHosts(topology.firstPerShard())),
+		envVar(envDataHosts, joinHosts(orchestrator.hosts(topology.firstPerShard()))),
 		envVar(envGuardHosts, allReplicas),
 		envVar(envSchemaOnly, strconv.FormatBool(chr.Spec.SchemaOnly.IsTrue())),
 		envVar(envTables, chr.Spec.Tables),
@@ -492,7 +503,7 @@ func BuildRestoreJob(chr *api.ClickHouseRestore, chi api.ICustomResource, topolo
 	// replicas the backup was made on
 	env = append(env, pathCheckEnv(topology, "")...)
 	labels := Labels(api.ClickHouseRestoreCRDResourceKind, chr.GetName(), chr.Spec.ClickHouseInstallation, cluster)
-	return newJob(RestoreJobName(chr, cluster), chr.GetNamespace(), labels, chr.Spec.GetActiveDeadlineSeconds(), topology, env)
+	return newJob(RestoreJobName(chr, cluster), chr.GetNamespace(), labels, chr.Spec.GetActiveDeadlineSeconds(), topology, orchestrator, env)
 }
 
 // RestoresRBAC reports whether a restore restores the access entities the backup holds. They belong
@@ -520,6 +531,8 @@ type ClusterRecovery struct {
 	// for the recovered installation's own.
 	SourceInstallation string
 	SourceNamespace    string
+	// OrchestratorConfigMap names the ConfigMap of the orchestrator script the restore runs, "" for the operator's.
+	OrchestratorConfigMap string
 }
 
 // Recoveries returns the recoveries a normalized installation asks for: one for every backup-enabled
@@ -557,10 +570,11 @@ func recoveriesOf(normalized *api.ClickHouseInstallation, filter func(*api.Clust
 		backupName := recovery.GetBackupName().Value()
 		if filter(cluster.GetBackup()) && (backupName != "") {
 			recoveries = append(recoveries, ClusterRecovery{
-				Cluster:            cluster.GetName(),
-				BackupName:         backupName,
-				SourceInstallation: recovery.GetSourceInstallation().Value(),
-				SourceNamespace:    recovery.GetSourceNamespace().Value(),
+				Cluster:               cluster.GetName(),
+				BackupName:            backupName,
+				SourceInstallation:    recovery.GetSourceInstallation().Value(),
+				SourceNamespace:       recovery.GetSourceNamespace().Value(),
+				OrchestratorConfigMap: recovery.GetOrchestratorConfigMapName(),
 			})
 		}
 	}
@@ -611,7 +625,7 @@ func RecoveryRestoreName(chi *api.ClickHouseInstallation, cluster string) string
 // BuildRecoveryRestore builds the ClickHouseRestore that recovers a cluster of an installation. A
 // recovery restores a new installation, users, roles and grants included.
 func BuildRecoveryRestore(chi *api.ClickHouseInstallation, recovery ClusterRecovery) *api.ClickHouseRestore {
-	return &api.ClickHouseRestore{
+	restore := &api.ClickHouseRestore{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      RecoveryRestoreName(chi, recovery.Cluster),
 			Namespace: chi.GetNamespace(),
@@ -625,31 +639,43 @@ func BuildRecoveryRestore(chi *api.ClickHouseInstallation, recovery ClusterRecov
 			RBAC:                   types.NewStringBool(true),
 		},
 	}
+	if recovery.OrchestratorConfigMap != "" {
+		restore.Spec.OrchestratorConfigMapRef = &core.LocalObjectReference{Name: recovery.OrchestratorConfigMap}
+	}
+	return restore
 }
 
 // RetentionHosts returns the hosts the runs of a schedule prune on: every host the backup runs
 // on. Replicas backed up individually usually keep separate storage paths, each pruned only from
 // its own host, while on replicas sharing a path every prune after the first finds nothing left
 // to do.
-func RetentionHosts(chbs *api.ClickHouseBackupSchedule, topology *Topology) []string {
-	return topology.hosts(chbs.Spec.GetReplicaSelection())
+func RetentionHosts(chbs *api.ClickHouseBackupSchedule, topology *Topology, orchestrator Orchestrator) []string {
+	return orchestrator.hosts(topology.hosts(chbs.Spec.GetReplicaSelection()))
 }
 
 // BuildBackupCronJob builds the CronJob that runs a backup schedule on the cluster the topology
 // targets. suspend overrides the schedule's own setting, so the operator can hold scheduled backups
 // while a restore runs. The CronJobs of one schedule share its cron schedule and backup name prefix,
 // so the runs of one slot make one backup name on every cluster.
-func BuildBackupCronJob(chbs *api.ClickHouseBackupSchedule, chi api.ICustomResource, topology *Topology, suspend bool) *batch.CronJob {
+func BuildBackupCronJob(
+	chbs *api.ClickHouseBackupSchedule,
+	chi api.ICustomResource,
+	topology *Topology,
+	orchestrator Orchestrator,
+	suspend bool,
+) *batch.CronJob {
 	cluster := topology.cluster()
 	options := &chbs.Spec.BackupOptions
-	env := append(commonEnv(operationBackup, chi, cluster),
+	env := append(commonEnv(operationBackup, chi, cluster, orchestrator, eventObject(chbs, api.ClickHouseBackupScheduleCRDResourceKind)),
 		envVar(envBackupNamePrefix, BackupNamePrefix(chbs)),
 		envVar(envCronJobName, CronJobName(chbs, cluster)),
 		k8s.NewEnvVarFromLabel(envJobName, LegacyJobNameLabel),
-		envVar(envKeepLast, strconv.FormatInt(int64(chbs.Spec.Retention.GetKeepLast()), 10)),
-		envVar(envRetentionHosts, joinHosts(RetentionHosts(chbs, topology))),
+		envVar(envSchedules, EntriesEnv(chbs.Spec.Schedules)),
+		envVar(envScheduleTimezone, chbs.Spec.TimeZone),
+		envVar(envRetentionHosts, joinHosts(RetentionHosts(chbs, topology, orchestrator))),
+		envVar(envRestoreInProgress, strconv.FormatBool(orchestrator.RestoreInProgress)),
 	)
-	env = append(env, backupOptionsEnv(options, topology)...)
+	env = append(env, backupOptionsEnv(options, topology, orchestrator)...)
 	labels := Labels(api.ClickHouseBackupScheduleCRDResourceKind, chbs.GetName(), chbs.Spec.ClickHouseInstallation, cluster)
 
 	concurrencyPolicy := batch.ForbidConcurrent
@@ -664,7 +690,7 @@ func BuildBackupCronJob(chbs *api.ClickHouseBackupSchedule, chi api.ICustomResou
 			Labels:    labels,
 		},
 		Spec: batch.CronJobSpec{
-			Schedule:                   chbs.Spec.Schedule,
+			Schedule:                   FinestCron(chbs.Spec.Schedules),
 			TimeZone:                   chbs.Spec.GetTimeZone(),
 			Suspend:                    ptr.To(suspend),
 			ConcurrencyPolicy:          concurrencyPolicy,
@@ -673,7 +699,7 @@ func BuildBackupCronJob(chbs *api.ClickHouseBackupSchedule, chi api.ICustomResou
 			FailedJobsHistoryLimit:     chbs.Spec.FailedJobsHistoryLimit,
 			JobTemplate: batch.JobTemplateSpec{
 				ObjectMeta: meta.ObjectMeta{Labels: labels},
-				Spec:       newJobSpec(labels, options.GetActiveDeadlineSeconds(), topology, env),
+				Spec:       newJobSpec(labels, options.GetActiveDeadlineSeconds(), topology, orchestrator, env),
 			},
 		},
 	}
@@ -685,9 +711,9 @@ func BuildBackupCronJob(chbs *api.ClickHouseBackupSchedule, chi api.ICustomResou
 
 // backupOptionsEnv returns the environment of the options one-off and scheduled backups share, the
 // termination message that tells a backup without data, and what the check of the storage paths needs.
-func backupOptionsEnv(options *api.BackupOptions, topology *Topology) []core.EnvVar {
+func backupOptionsEnv(options *api.BackupOptions, topology *Topology, orchestrator Orchestrator) []core.EnvVar {
 	env := []core.EnvVar{
-		envVar(envBackupHosts, joinHosts(topology.hosts(options.GetReplicaSelection()))),
+		envVar(envBackupHosts, joinHosts(orchestrator.hosts(topology.hosts(options.GetReplicaSelection())))),
 		envVar(envSchemaOnly, strconv.FormatBool(options.SchemaOnly.IsTrue())),
 		envVar(envTables, options.Tables),
 		envVar(envPartitions, strings.Join(options.Partitions, partitionListSeparator)),
@@ -746,13 +772,15 @@ func pathCheckEnv(topology *Topology, selection api.ReplicaSelection) []core.Env
 	return append(env, clusterEnv...)
 }
 
-// commonEnv returns the environment every Job script needs to reach the sidecars of the cluster it
-// targets. The REST API credentials stay in the operator-generated Secret; the Job only references them.
-func commonEnv(operation string, chi api.ICustomResource, cluster string) []core.EnvVar {
+// commonEnv returns the environment every Job script needs to reach the clickhouse-backup API of the cluster it
+// targets, through the transport of the cluster, and to post Events on the object it works for. The REST API
+// credentials stay in the operator-generated Secret; the Job only references them.
+func commonEnv(operation string, chi api.ICustomResource, cluster string, orchestrator Orchestrator, object []core.EnvVar) []core.EnvVar {
 	secret := managers.NewNameManager(managers.NameManagerTypeClickHouse).Name(interfaces.NameBackupAutoSecret, chi)
-	return []core.EnvVar{
+	env := []core.EnvVar{
 		envVar(envOperation, operation),
 		envVar(envCluster, cluster),
+		envVar(envBackupTransport, orchestrator.transport()),
 		envVar(envAPIPort, strconv.Itoa(config.ClickHouseBackupAPIPortNumber)),
 		k8s.NewEnvVarFromSecret(envAPIUsername, secret, config.ClickHouseBackupSecretKeyAPIUsername),
 		k8s.NewEnvVarFromSecret(envAPIPassword, secret, config.ClickHouseBackupSecretKeyAPIPassword),
@@ -760,6 +788,41 @@ func commonEnv(operation string, chi api.ICustomResource, cluster string) []core
 		envVar(envTerminationMessagePath, core.TerminationMessagePathDefault),
 		envVar(envUnchangedExitCode, strconv.Itoa(UnchangedExitCode)),
 	}
+	env = append(env, object...)
+	return append(env, fieldEnvVar(envPodNamespace, "metadata.namespace"), fieldEnvVar(envPodName, "metadata.name"))
+}
+
+// eventObject returns the environment that names the object the script posts its Events on: the custom resource
+// the Job works for.
+func eventObject(obj meta.Object, kind string) []core.EnvVar {
+	return []core.EnvVar{
+		envVar(envEventObjectAPIVersion, api.SchemeGroupVersion.String()),
+		envVar(envEventObjectKind, kind),
+		envVar(envEventObjectName, obj.GetName()),
+		envVar(envEventObjectUID, string(obj.GetUID())),
+	}
+}
+
+// fieldEnvVar returns a variable the downward API sets from a field of the pod.
+func fieldEnvVar(name, fieldPath string) core.EnvVar {
+	return core.EnvVar{Name: name, ValueFrom: &core.EnvVarSource{FieldRef: &core.ObjectFieldSelector{FieldPath: fieldPath}}}
+}
+
+// transport returns the value of envBackupTransport.
+func (o Orchestrator) transport() string {
+	if o.IsPodTransport() {
+		return backupTransportPod
+	}
+	return backupTransportSidecar
+}
+
+// hosts returns the hosts a Job reaches the API of for the given hosts of the cluster: those hosts with the sidecar
+// transport, the backup Pod of every shard with the pod transport, which drives each shard through one Pod.
+func (o Orchestrator) hosts(hosts []string) []string {
+	if o.IsPodTransport() {
+		return slices.Clone(o.ShardPodHosts)
+	}
+	return hosts
 }
 
 func envVar(name, value string) core.EnvVar {
@@ -778,7 +841,14 @@ func splitHosts(hosts string) []string {
 	return strings.Split(hosts, hostListSeparator)
 }
 
-func newJob(name, namespace string, labels map[string]string, deadline int64, topology *Topology, env []core.EnvVar) *batch.Job {
+func newJob(
+	name, namespace string,
+	labels map[string]string,
+	deadline int64,
+	topology *Topology,
+	orchestrator Orchestrator,
+	env []core.EnvVar,
+) *batch.Job {
 	return &batch.Job{
 		ObjectMeta: meta.ObjectMeta{
 			Name:        name,
@@ -786,7 +856,7 @@ func newJob(name, namespace string, labels map[string]string, deadline int64, to
 			Labels:      labels,
 			Annotations: configSecretAnnotations(topology),
 		},
-		Spec: newJobSpec(labels, deadline, topology, env),
+		Spec: newJobSpec(labels, deadline, topology, orchestrator, env),
 	}
 }
 
@@ -808,36 +878,45 @@ func ObjectConfigSecret(obj meta.Object) string {
 
 // newJobSpec builds a Job that runs the script once. A failed attempt is never retried: the
 // script is not idempotent across a restore, and a backup failure needs a human look.
-func newJobSpec(labels map[string]string, deadline int64, topology *Topology, env []core.EnvVar) batch.JobSpec {
+func newJobSpec(labels map[string]string, deadline int64, topology *Topology, orchestrator Orchestrator, env []core.EnvVar) batch.JobSpec {
+	var annotations map[string]string
+	if orchestrator.ScriptSHA256 != "" {
+		annotations = map[string]string{AnnotationOrchestratorScriptSHA256: orchestrator.ScriptSHA256}
+	}
 	return batch.JobSpec{
 		BackoffLimit:          ptr.To(int32(0)),
 		ActiveDeadlineSeconds: ptr.To(deadline),
 		Template: core.PodTemplateSpec{
-			ObjectMeta: meta.ObjectMeta{Labels: labels},
-			Spec:       newPodSpec(topology.pod(), env),
+			ObjectMeta: meta.ObjectMeta{Labels: labels, Annotations: annotations},
+			Spec:       newPodSpec(topology.pod(), orchestrator, env),
 		},
 	}
 }
 
-// newPodSpec builds the pod of a Job. It needs no Kubernetes API access, so the token of the
-// inherited service account stays unmounted, and service links are off so no Service in the
-// namespace can inject a variable that shadows the script's environment.
-func newPodSpec(pod podSettings, env []core.EnvVar) core.PodSpec {
+// newPodSpec builds the pod of a Job: the orchestrator script, mounted from its ConfigMap, run by bash of the image of
+// the clickhouse-backup container of the hosts, pulled anew every time. It runs as the ServiceAccount of the
+// orchestrator, whose token it posts Events with, and service links are off so no Service in the namespace can inject
+// a variable that shadows the script's environment.
+func newPodSpec(pod podSettings, orchestrator Orchestrator, env []core.EnvVar) core.PodSpec {
 	return core.PodSpec{
 		RestartPolicy:                core.RestartPolicyNever,
-		ServiceAccountName:           pod.serviceAccountName,
-		AutomountServiceAccountToken: ptr.To(false),
+		ServiceAccountName:           orchestrator.ServiceAccountName,
+		AutomountServiceAccountToken: ptr.To(true),
 		EnableServiceLinks:           ptr.To(false),
 		ImagePullSecrets:             slices.Clone(pod.imagePullSecrets),
 		SecurityContext:              newPodSecurityContext(pod),
+		Volumes:                      []core.Volume{orchestratorVolume(orchestrator.ConfigMap)},
 		Containers: []core.Container{
 			{
 				Name:            jobContainerName,
 				Image:           pod.image,
-				ImagePullPolicy: pod.imagePullPolicy,
-				Command:         k8s.EscapeVariableReferencesAll(append(append([]string{}, jobCommand...), jobScript)),
+				ImagePullPolicy: core.PullAlways,
+				Command:         orchestratorCommand(),
 				Env:             env,
-				Resources:       *jobResources.DeepCopy(),
+				VolumeMounts: []core.VolumeMount{
+					{Name: orchestratorVolumeName, MountPath: OrchestratorMountPath, ReadOnly: true},
+				},
+				Resources: *jobResources.DeepCopy(),
 				// The script writes why it failed there, or that the backup it made holds no data, so
 				// either outlives the Job's log; a container that dies without writing why reports the
 				// tail of its log instead.
@@ -949,7 +1028,7 @@ func containerTermination(status *core.ContainerStatus) *core.ContainerStateTerm
 // jobContainerStatus returns the status of the Job container of a pod, nil when the pod has none.
 func jobContainerStatus(pod *core.Pod) *core.ContainerStatus {
 	for i := range pod.Status.ContainerStatuses {
-		if pod.Status.ContainerStatuses[i].Name == jobContainerName {
+		if name := pod.Status.ContainerStatuses[i].Name; (name == jobContainerName) || (name == legacyJobContainerName) {
 			return &pod.Status.ContainerStatuses[i]
 		}
 	}

@@ -416,6 +416,7 @@ func TestTopologyPodSettings(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, podSettings{
 		image:                    config.DefaultClickHouseBackupDockerImage,
+		imagePullPolicy:          core.PullAlways,
 		securityContext:          &core.PodSecurityContext{FSGroup: ptr.To(int64(101))},
 		containerSecurityContext: &core.SecurityContext{RunAsUser: ptr.To(int64(101))},
 		imagePullSecrets:         []core.LocalObjectReference{{Name: "registry"}},
@@ -424,7 +425,8 @@ func TestTopologyPodSettings(t *testing.T) {
 
 	topology, err = NewTopology(stored, "")
 	require.NoError(t, err)
-	require.Equal(t, podSettings{image: config.DefaultClickHouseBackupDockerImage}, topology.pod(), "the first target cluster uses no pod template")
+	require.Equal(t, podSettings{image: config.DefaultClickHouseBackupDockerImage, imagePullPolicy: core.PullAlways}, topology.pod(),
+		"the first target cluster uses no pod template")
 	require.Equal(t, podSettings{}, (*Topology)(nil).pod())
 
 	// The sidecar's own security context, which the Jobs share an image with, names their identity.

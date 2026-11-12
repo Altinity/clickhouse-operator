@@ -22,6 +22,7 @@ import (
 	"github.com/go-logr/logr"
 
 	batch "k8s.io/api/batch/v1"
+	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	apiMachineryRuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
@@ -38,6 +39,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	controller "github.com/altinity/clickhouse-operator/pkg/controller/chbackup"
 	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
@@ -55,6 +57,10 @@ const backupCRDsPollInterval = time.Minute
 // recoveryControllerName tells the recovery controller apart from the CHI controller in logs;
 // both reconcile installations.
 const recoveryControllerName = "clickhouseinstallation-recovery"
+
+// shardPodControllerName tells the controller of the backup Pods of the shards apart from the other controllers
+// that reconcile installations.
+const shardPodControllerName = "clickhouseinstallation-backup-pods"
 
 // backupKinds are the kinds the backup controllers reconcile.
 var backupKinds = []string{
@@ -131,6 +137,10 @@ func newBackupCacheOptions(log logr.Logger, cacheNamespaces []string) cache.Opti
 		&batch.Job{}:                  {Label: selector},
 		&batch.CronJob{}:              {Label: selector},
 		&api.ClickHouseInstallation{}: {Transform: controller.TrimInstallation},
+		// The pods of the installations, whose nodes and volumes the backup Pods follow, and the backup Pods
+		&core.Pod{}: {Label: chbackup.PodSelector()},
+		// The headless Services of the backup Pods, which give them their DNS names
+		&core.Service{}: {Label: chbackup.ShardServiceSelector()},
 	}
 
 	// A wrong selector fails silently - the cache just stays empty - so the effective one goes in
@@ -141,6 +151,32 @@ func newBackupCacheOptions(log logr.Logger, cacheNamespaces []string) cache.Opti
 		DefaultNamespaces: newCacheNamespaces(cacheNamespaces),
 		ByObject:          byObject,
 	}
+}
+
+// backupLeaderElectionID names the Lease the backup controllers are elected by.
+const backupLeaderElectionID = "clickhouse-operator-backup"
+
+// newBackupManagerOptions builds the options of the backup manager. Its controllers are leader-elected, in the
+// namespace of the operator: they start operations in backup Pods and prune backups by schedule, which two
+// operators side by side must never do twice. An operator that runs outside a pod, with no namespace of its own,
+// runs them unelected.
+func newBackupManagerOptions(log logr.Logger) ctrlRuntime.Options {
+	options := ctrlRuntime.Options{
+		Scheme: backupScheme,
+		Cache:  newBackupCacheOptions(log, chop.Config().GetCacheNamespaces()),
+		// Disable controller-runtime's built-in metrics listener: operator metrics, backup
+		// metrics included, are served by pkg/metrics/operator on the operator's own endpoint.
+		Metrics: metricsserver.Options{BindAddress: "0"},
+	}
+	if namespace, ok := chop.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE); ok && (namespace != "") {
+		options.LeaderElection = true
+		options.LeaderElectionID = backupLeaderElectionID
+		options.LeaderElectionNamespace = namespace
+		// A stopping operator hands the Lease over at once, so a restart does not wait for it to expire
+		options.LeaderElectionReleaseOnCancel = true
+	}
+	log.Info("init backup - leader election", "enabled", options.LeaderElection, "namespace", options.LeaderElectionNamespace)
+	return options
 }
 
 // newBackupInitializer resolves the clients that must be built exactly once, then returns the
@@ -186,13 +222,7 @@ func initBackup(ctx context.Context, cr interfaces.IKubeCR) error {
 		return err
 	}
 
-	backupManager, err = ctrlRuntime.NewManager(restConfig, ctrlRuntime.Options{
-		Scheme: backupScheme,
-		Cache:  newBackupCacheOptions(backupLogger, chop.Config().GetCacheNamespaces()),
-		// Disable controller-runtime's built-in metrics listener: operator metrics, backup
-		// metrics included, are served by pkg/metrics/operator on the operator's own endpoint.
-		Metrics: metricsserver.Options{BindAddress: "0"},
-	})
+	backupManager, err = ctrlRuntime.NewManager(restConfig, newBackupManagerOptions(backupLogger))
 	if err != nil {
 		// Not terminal: building the manager depends on the API server.
 		backupLogger.Error(err, "init backup - unable to ctrlRuntime.NewManager")
@@ -256,6 +286,23 @@ func setupBackupControllers(manager ctrlRuntime.Manager, cr interfaces.IKubeCR) 
 		Owns(&batch.Job{}).
 		WithEventFilter(controller.WatchedNamespacePredicate()).
 		Complete(controller.NewRestoreController(c, apiReader, scheme, cr)); err != nil {
+		return err
+	}
+
+	// Keeps the backup Pod of every shard of a cluster in backup.mode pod next to its replica while a Job operates on
+	// the cluster, and the headless Service of the cluster: a change of a pod of an installation, of a backup Pod, of
+	// such a Service or of a backup, verify or restore Job reconciles the installation. The same controller ensures
+	// the ServiceAccount of the orchestrator in the namespace of every backup-enabled installation.
+	shardPods := controller.NewShardPodController(c, apiReader, scheme, cr)
+	if err := ctrlRuntime.
+		NewControllerManagedBy(manager).
+		Named(shardPodControllerName).
+		For(&api.ClickHouseInstallation{}).
+		Watches(&core.Pod{}, handler.EnqueueRequestsFromMapFunc(shardPods.InstallationsForPod)).
+		Watches(&core.Service{}, handler.EnqueueRequestsFromMapFunc(shardPods.InstallationsForService)).
+		Watches(&batch.Job{}, handler.EnqueueRequestsFromMapFunc(shardPods.InstallationsForJob)).
+		WithEventFilter(controller.WatchedNamespacePredicate()).
+		Complete(shardPods); err != nil {
 		return err
 	}
 

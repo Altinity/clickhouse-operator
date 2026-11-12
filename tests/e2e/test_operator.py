@@ -8609,7 +8609,8 @@ def test_010086_1(self, version_from="0.27.4", version_to=None):
 backup_kind = "clickhousebackup"
 restore_kind = "clickhouserestore"
 schedule_kind = "clickhousebackupschedule"
-backup_terminal_phases = ("Completed", "Failed")
+# Failed: a Job failed; Aborted: the operator stopped the operation, or never started it.
+backup_terminal_phases = ("Completed", "Failed", "Aborted")
 backup_label_chi = "clickhouse.altinity.com/backup-chi"
 backup_label_cr_name = "clickhouse.altinity.com/backup-cr-name"
 backup_label_cluster = "clickhouse.altinity.com/backup-cluster"
@@ -8655,8 +8656,106 @@ backup_replicated_engine = (
 )
 
 
+# The orchestrator Job, mirrored from pkg/model/chbackup/builder.go and orchestrator.go: container backup-orchestrator
+# runs backup-orchestrator.sh with bash from the clickhouse-backup image, out of the ConfigMap
+# <chi>-<cluster>-backup-orchestrator the operator copies the script of its configuration to, as the operator's
+# ServiceAccount, and posts Events of its steps as component clickhouse-backup-orchestrator.
+backup_orchestrator_container = "backup-orchestrator"
+backup_image = "altinity/clickhouse-backup:stable"
+backup_orchestrator_mount = "/etc/clickhouse-backup-orchestrator"
+backup_orchestrator_script = "backup-orchestrator.sh"
+backup_orchestrator_component = "clickhouse-backup-orchestrator"
+backup_operator_service_account = "clickhouse-operator"
+# The script of the operator configuration, config/backup of the repository, which the install manifests ship in
+# ConfigMap etc-clickhouse-operator-backup-files, mounted at /etc/clickhouse-operator/backup.
+backup_orchestrator_script_path = f"../../config/backup/{backup_orchestrator_script}"
+# The backup Pods of the shards of a pod-mode cluster, mirrored from pkg/model/chbackup/shard_pod.go.
+backup_shard_pod_selector = "clickhouse.altinity.com/backup-component=shard-pod"
+backup_shard_pod_replica_uid = "clickhouse.altinity.com/backup-replica-pod-uid"
+# Kinds of the backup resources as Events name them.
+backup_event_kinds = {
+    "clickhousebackup": "ClickHouseBackup",
+    "clickhouserestore": "ClickHouseRestore",
+    "clickhousebackupschedule": "ClickHouseBackupSchedule",
+}
+
+
 def backup_unset(value):
     return value in (None, "", "<none>")
+
+
+def backup_orchestrator_configmap(chi, cluster):
+    """The ConfigMap the operator keeps the orchestrator script of a cluster in."""
+    return f"{chi}-{cluster}-backup-orchestrator"
+
+
+def backup_repository_script():
+    with open(util.get_full_path(backup_orchestrator_script_path)) as f:
+        return f.read()
+
+
+def backup_events(kind, name):
+    """The Events on a backup resource, kind as backup_kind and its siblings name it."""
+    selector = f"--field-selector involvedObject.kind={backup_event_kinds[kind]},involvedObject.name={name}"
+    return (kubectl.get("events", "", label=selector, ok_to_fail=True) or {}).get("items", [])
+
+
+def backup_event_component(event):
+    return (event.get("source") or {}).get("component") or event.get("reportingComponent") or ""
+
+
+def check_backup_events(kind, name, operator_reasons, orchestrator_reasons, timeout=120):
+    """Checks that the operator posted Events of every reason of operator_reasons on a backup resource, and the
+    orchestrator, as its own component, of every reason of orchestrator_reasons."""
+    with Then(f"{kind} {name} carries Events {sorted(operator_reasons)} of the operator and {sorted(orchestrator_reasons)} of the orchestrator"):
+        for attempt in retries(timeout=timeout, delay=5):
+            with attempt:
+                events = backup_events(kind, name)
+                orchestrator = {e.get("reason") for e in events if backup_event_component(e) == backup_orchestrator_component}
+                operator = {e.get("reason") for e in events if backup_event_component(e) != backup_orchestrator_component}
+                assert set(operator_reasons) <= operator, error(f"{kind} {name}: operator Events {sorted(operator)}")
+                assert set(orchestrator_reasons) <= orchestrator, error(f"{kind} {name}: orchestrator Events {sorted(orchestrator)}")
+                assert all(reason.startswith("Orchestrator") for reason in orchestrator), error(
+                    f"{kind} {name}: orchestrator Events {sorted(orchestrator)}"
+                )
+
+
+def check_orchestrator_job(job, chi, cluster, transport, configmap=None):
+    """Checks that a Job runs the orchestrator script from the ConfigMap of its cluster, in the clickhouse-backup image,
+    as the operator's ServiceAccount, over the transport of the cluster."""
+    configmap = configmap or backup_orchestrator_configmap(chi, cluster)
+    data = kubectl.get("job", job)
+    spec = data["spec"]["template"]["spec"]
+    containers = {c["name"]: c for c in spec["containers"]}
+    assert list(containers) == [backup_orchestrator_container], error(f"Job {job}: containers {sorted(containers)}")
+    container = containers[backup_orchestrator_container]
+    assert container.get("image") == backup_image, error(f"Job {job}: image {container.get('image')}")
+    assert container.get("imagePullPolicy") == "Always", error(f"Job {job}: imagePullPolicy {container.get('imagePullPolicy')}")
+    command = (container.get("command") or []) + (container.get("args") or [])
+    assert command == ["bash", f"{backup_orchestrator_mount}/{backup_orchestrator_script}"], error(f"Job {job}: command {command}")
+    mounts = {m["mountPath"]: m["name"] for m in container.get("volumeMounts") or []}
+    volumes = {v["name"]: v for v in spec.get("volumes") or []}
+    mounted = (volumes.get(mounts.get(backup_orchestrator_mount)) or {}).get("configMap") or {}
+    assert mounted.get("name") == configmap, error(f"Job {job}: {backup_orchestrator_mount} mounts {mounted}")
+    assert spec.get("serviceAccountName") == backup_operator_service_account, error(
+        f"Job {job}: serviceAccountName {spec.get('serviceAccountName')}"
+    )
+    env = {e["name"]: e.get("value") for e in container.get("env") or []}
+    assert env.get("BACKUP_TRANSPORT") == transport, error(f"Job {job}: BACKUP_TRANSPORT {env.get('BACKUP_TRANSPORT')}")
+    assert env.get("CLUSTER") == cluster, error(f"Job {job}: CLUSTER {env.get('CLUSTER')}")
+    return env
+
+
+def check_orchestrator_configmap(chi, cluster):
+    """Checks that the operator keeps the script of its configuration in the ConfigMap of the cluster, owned by the CHI."""
+    name = backup_orchestrator_configmap(chi, cluster)
+    configmap = kubectl.get("configmap", name)
+    owners = [(o.get("kind"), o.get("name")) for o in configmap["metadata"].get("ownerReferences") or []]
+    assert ("ClickHouseInstallation", chi) in owners, error(f"ConfigMap {name}: owners {owners}")
+    script = (configmap.get("data") or {}).get(backup_orchestrator_script)
+    assert script == backup_repository_script(), error(
+        f"ConfigMap {name}: {backup_orchestrator_script} is not {backup_orchestrator_script_path} ({len(script or '')} bytes)"
+    )
 
 
 def backup_auto_secret(chi):
@@ -8700,15 +8799,21 @@ def backup_api_auth(chi):
     return data["API_USERNAME"], data["API_PASSWORD"]
 
 
+# How long a request to the sidecar REST API may take. clickhouse-backup retries a ClickHouse connection it cannot
+# open without end, with the credentials it read when the request came in, so a request made while those are not
+# the ones ClickHouse takes never answers: the client gives up instead of holding the shell for good.
+backup_api_timeout = 60
+
+
 def backup_api_get(pod_name, path, auth=None):
     """GET the sidecar REST API from inside the sidecar of pod_name, authenticated with auth = (user, password)
-    unless it is None. Returns (HTTP code, body)."""
+    unless it is None. Returns (HTTP code, body); the code is 000 when the request timed out."""
     credentials = ""
     if auth is not None:
         credentials = "-u " + shlex.quote(f"{auth[0]}:{auth[1]}")
     out = kubectl.launch(
         f"exec {pod_name} -c {backup_sidecar} -- "
-        f"curl -sS -w '\\n%{{http_code}}' {credentials} http://127.0.0.1:{backup_api_port}{path}",
+        f"curl -sS -m {backup_api_timeout} -w '\\n%{{http_code}}' {credentials} http://127.0.0.1:{backup_api_port}{path}",
         ok_to_fail=True,
     )
     body, _, code = out.replace("\r", "").rpartition("\n")
@@ -8970,7 +9075,15 @@ def test_010087(self):
     # A backup that runs the schedule as from_schedule does, under a backupName of its own: the API server refuses it.
     named_from_schedule, named_from_schedule_name = f"{from_schedule}-named", "e2e-087-from-schedule"
     schedule_prefix = schedule_data["spec"]["backupNamePrefix"]
-    keep_last = schedule_data["spec"]["retention"]["keepLast"]
+    # The one entry of the schedule: every minute, keeping the newest backups of the series it matches.
+    schedule_entry = schedule_data["spec"]["schedules"][0]
+    assert (len(schedule_data["spec"]["schedules"]) == 1) and (schedule_entry["period"] == "minute"), error(
+        f"{schedule_manifest} must have one entry, of period minute"
+    )
+    keep = schedule_entry["keep"]
+    assert keep >= 2, error(f"{schedule_manifest}: keep {keep}, retention must keep more than the last backup")
+    # The backups of the series: <prefix>-YYYYMMDDHHMMSS; a run of the schedule now adds a T, which keeps it out.
+    scheduled_name_pattern = re.escape(schedule_prefix) + r"-\d{14}"
 
     hot, cold = "hot", "cold"
     disabled_cluster = "disabled"
@@ -9020,6 +9133,27 @@ def test_010087(self):
         return [(cluster, shard, replica) for shard in range(shards) for replica in range(replicas)]
 
     enabled_hosts = [item for cluster in backup_clusters for item in cluster_hosts(cluster)]
+
+    def wait_sidecars_take_credentials(username, password):
+        # kubelet updates the users configuration of ClickHouse and the configuration file of the sidecar, two volumes,
+        # each in its own time: the Secret holding the credentials does not mean the pod uses them yet. A sidecar
+        # request made in between connects with credentials ClickHouse refuses and never answers.
+        for cluster, shard, replica in enabled_hosts:
+            name = pod(cluster, shard, replica)
+            for attempt in retries(timeout=300, delay=10):
+                with attempt:
+                    mounted = kubectl.launch(
+                        f"exec {name} -c {backup_sidecar} -- cat {backup_config_dir}/config.yml", ok_to_fail=True
+                    )
+                    section = (yaml.safe_load(mounted) or {}).get("clickhouse") or {}
+                    assert section.get("username") == username, error(
+                        f"{name}: the sidecar reads ClickHouse username {section.get('username')!r}"
+                    )
+                    assert section.get("password") == password, error(f"{name}: the sidecar reads another password")
+                    out = clickhouse.query_with_error(
+                        chi, "SELECT 1", user=username, pwd=shlex.quote(password), pod=name
+                    )
+                    assert out == "1", error(f"{name}: ClickHouse does not let {username} in yet: {out}")
 
     def query(sql, cluster, shard, replica, **kwargs):
         return clickhouse.query(chi, sql, pod=pod(cluster, shard, replica), **kwargs)
@@ -9168,6 +9302,12 @@ def test_010087(self):
                 mounts = {m["mountPath"]: m["name"] for m in containers[backup_sidecar].get("volumeMounts") or []}
                 assert mounts.get(backup_config_dir) == backup_config_volume, error(f"{name}: sidecar mounts {mounts}")
                 assert not containers[backup_sidecar].get("livenessProbe"), error(f"{name}: the sidecar has a liveness probe")
+                assert containers[backup_sidecar].get("image") == backup_image, error(
+                    f"{name}: sidecar image {containers[backup_sidecar].get('image')}"
+                )
+                assert containers[backup_sidecar].get("imagePullPolicy") == "Always", error(
+                    f"{name}: sidecar imagePullPolicy {containers[backup_sidecar].get('imagePullPolicy')}"
+                )
             name = pod(disabled_cluster, 0, 0)
             containers = [c["name"] for c in kubectl.get_pod_spec(chi, name)["containers"]]
             assert backup_sidecar not in containers, error(f"{name} runs {backup_sidecar} although its cluster opted out: {containers}")
@@ -9212,6 +9352,12 @@ def test_010087(self):
                 assert config_file["general"]["disable_environment_override"] is False, error(
                     f"{name}: the env vars the operator pins would not take precedence"
                 )
+                # Retention is the orchestrator's alone, and may delete the base of an incremental backup.
+                forced = {key: config_file["general"].get(key) for key in (
+                    "backups_to_keep_remote", "rebase_during_delete", "rebase_before_remove_old_remote")}
+                assert forced == {
+                    "backups_to_keep_remote": 0, "rebase_during_delete": True, "rebase_before_remove_old_remote": True
+                }, error(f"{name}: retention settings {forced}")
                 assert config_data.get("REMOTE_STORAGE") == "s3", error(f"{name}: settings {sorted(config_data)}")
 
         with And("Without ClickHouse credentials, every sidecar reaches ClickHouse with the defaults of clickhouse-backup"):
@@ -9242,6 +9388,9 @@ def test_010087(self):
                         assert clickhouse_section.get("password") == backup_password, error(
                             f"{name}: not the ClickHouse password set"
                         )
+
+        with And(f"Every pod takes them: the sidecar reads them, and ClickHouse lets {backup_user} in"):
+            wait_sidecars_take_credentials(backup_user, backup_password)
 
         with And(f"ClickHouse user {backup_user} logs in from its own pod only, not from another pod"):
             name = pod(hot, 0, 0)
@@ -9314,9 +9463,9 @@ def test_010087(self):
                     assert engine.startswith(f"Distributed('{target}'"), error(f"{table} on {cold} replica {replica}: {engine}")
                     engines[(table, shard, replica)] = engine
 
-        wait_backup_phase(backup_kind, disabled_backup, "Failed", timeout=120)
+        wait_backup_phase(backup_kind, disabled_backup, "Aborted", timeout=120)
 
-        with Then("The backup aimed at the opted-out cluster failed at once, and no Job is created"):
+        with Then("The backup aimed at the opted-out cluster was aborted at once, and no Job is created"):
             # Checked after the table setup above, which gives a wrongly created Job time to show up.
             reasons = [c.get("reason") for c in backup_status(backup_kind, disabled_backup).get("conditions") or []]
             assert "BackupDisabled" in reasons, error(f"{disabled_backup}: condition reasons {reasons}")
@@ -9324,6 +9473,8 @@ def test_010087(self):
             assert created == [], error(f"refused backup created Jobs: {created}")
             reported = [e for e in backup_cluster_status(backup_kind, disabled_backup).values() if not backup_unset(e.get("jobName"))]
             assert reported == [], error(f"refused backup reports Jobs: {reported}")
+
+        check_backup_events(backup_kind, disabled_backup, ("BackupAborted",), ())
 
         with And("The refused backup is removed"):
             kubectl.delete_kind(backup_kind, disabled_backup)
@@ -9351,6 +9502,24 @@ def test_010087(self):
             }
             expected = {f"{backup}-{cluster}-{step}": cluster for cluster in backup_clusters for step in ("backup", "verify")}
             assert labelled == expected, error(f"{backup}: Jobs by cluster label {labelled}, expected {expected}")
+
+        with And("Every Job ran the orchestrator script of the operator configuration, from the ConfigMap of its cluster, over the sidecars"):
+            for cluster in backup_clusters:
+                check_orchestrator_configmap(chi, cluster)
+                for step in ("backup", "verify"):
+                    env = check_orchestrator_job(f"{backup}-{cluster}-{step}", chi, cluster, "sidecar")
+                    if step == "backup":
+                        hosts = sorted((env.get("BACKUP_HOSTS") or "").split())
+                        assert hosts and all(f"-{cluster}-" in item for item in hosts), error(
+                            f"{backup}-{cluster}-backup: BACKUP_HOSTS {hosts}"
+                        )
+
+        check_backup_events(
+            backup_kind,
+            backup,
+            ("BackupRunning", "BackupCompleted"),
+            ("OrchestratorBackupStarted", "OrchestratorBackupCompleted", "OrchestratorVerifyStarted", "OrchestratorVerifyCompleted"),
+        )
 
         with And("The backup is verified and reported under its one name"):
             verified = backup_condition(backup_kind, backup, "Verified")
@@ -9427,6 +9596,9 @@ def test_010087(self):
                     )
                     assert "AUTHENTICATION_FAILED" in out, error(f"{backup_user} still logs in: {out}")
 
+        with And(f"Every pod takes them: the sidecar reads them, and ClickHouse lets {rotated_user} in"):
+            wait_sidecars_take_credentials(rotated_user, rotated_password)
+
         with And("Every sidecar reaches ClickHouse with the new credentials"):
             for cluster, shard, replica in enabled_hosts:
                 name = pod(cluster, shard, replica)
@@ -9435,7 +9607,7 @@ def test_010087(self):
                         code, body = backup_api_get(name, "/backup/tables", api_auth)
                         assert code == "200", error(f"{name}: /backup/tables answered {code}: {body}")
 
-        with When(f"A schedule of the whole installation, running every minute and keeping {keep_last} backup, is created"):
+        with When(f"A schedule of the whole installation, running every minute and keeping {keep} backups, is created"):
             kubectl.apply(util.get_full_path(schedule_manifest))
 
         with Then("The operator runs it in one CronJob per backup-enabled cluster, owned by the schedule"):
@@ -9449,8 +9621,18 @@ def test_010087(self):
                         assert name == f"{schedule}-{cluster}-backup", error(f"{schedule}: cluster {cluster} reports CronJob {name}")
             for cluster, name in cronjobs.items():
                 cronjob_data = kubectl.get("cronjob", name)
-                assert cronjob_data["spec"]["schedule"] == schedule_data["spec"]["schedule"], error(
+                # The cron schedule of the finest entry: every minute.
+                assert cronjob_data["spec"]["schedule"] == "* * * * *", error(
                     f"CronJob {name}: schedule {cronjob_data['spec']['schedule']}"
+                )
+                job_spec = cronjob_data["spec"]["jobTemplate"]["spec"]["template"]["spec"]
+                assert [c["name"] for c in job_spec["containers"]] == [backup_orchestrator_container], error(
+                    f"CronJob {name}: containers {[c['name'] for c in job_spec['containers']]}"
+                )
+                env = backup_cronjob_env(cronjob_data)
+                assert env.get("BACKUP_NAME_PREFIX") == schedule_prefix, error(f"CronJob {name}: env {env}")
+                assert "period=minute" in (env.get("SCHEDULES") or "") and f"keep={keep}" in env["SCHEDULES"], error(
+                    f"CronJob {name}: SCHEDULES {env.get('SCHEDULES')}"
                 )
                 assert not backup_cronjob_suspended(cronjob_data), error(f"CronJob {name} is suspended")
                 owners = [
@@ -9464,6 +9646,13 @@ def test_010087(self):
                 template = cronjob_data["spec"]["jobTemplate"]["spec"]["template"]
                 pod_labels = (template.get("metadata") or {}).get("labels") or {}
                 assert pod_labels.get(backup_label_cluster) == cluster, error(f"CronJob {name}: pod labels {pod_labels}")
+
+        with And("The schedule is Active, with the minute entry next due"):
+            for attempt in retries(timeout=120, delay=5):
+                with attempt:
+                    status = backup_status(schedule_kind, schedule)
+                    assert status.get("phase") == "Active", error(f"{schedule}: status {status}")
+                    assert not backup_unset(status.get("nextScheduleTime")), error(f"{schedule}: status {status}")
 
         with When("A backup that names the schedule is given a backupName of its own"):
             def name_from_schedule(data):
@@ -9672,9 +9861,9 @@ def test_010087(self):
                 f"{schedule}: spec.backupNamePrefix is {schedule_spec.get('backupNamePrefix')}, expected {schedule_prefix}"
             )
 
-        with And("At least two scheduled backups succeed on every backup-enabled cluster"):
+        with And(f"At least {keep + 1} scheduled backups succeed on every backup-enabled cluster, more than retention keeps"):
             succeeded = {}
-            deadline = time.time() + 300
+            deadline = time.time() + 360
             while time.time() < deadline:
                 for cluster, name in cronjobs.items():
                     scheduled = backup_scheduled_jobs(name)
@@ -9683,11 +9872,11 @@ def test_010087(self):
                         backup_dump(schedule_kind, schedule)
                     assert not failed, error(f"scheduled backups of {cluster} failed: {failed}")
                     succeeded[cluster] = backup_job_names([job for job in scheduled if backup_job_state(job, "succeeded")])
-                if all(len(names) >= 2 for names in succeeded.values()):
+                if all(len(names) >= keep + 1 for names in succeeded.values()):
                     break
                 time.sleep(10)
-            assert all(len(succeeded.get(cluster, [])) >= 2 for cluster in backup_clusters), error(
-                f"scheduled backups that succeeded within 5 minutes: {succeeded}"
+            assert all(len(succeeded.get(cluster, [])) >= keep + 1 for cluster in backup_clusters), error(
+                f"scheduled backups that succeeded within 6 minutes: {succeeded}"
             )
 
         with And("The schedule is suspended within a minute both clusters already ran, and no run is left in flight"):
@@ -9745,8 +9934,20 @@ def test_010087(self):
                     last_run = backup_condition(schedule_kind, schedule, "LastBackupSucceeded")
                     assert last_run.get("status") == "True", error(f"{schedule}: LastBackupSucceeded condition {last_run}")
                     assert last_run.get("reason") == "Completed", error(f"{schedule}: LastBackupSucceeded condition {last_run}")
+                    # Suspended: the phase says so, and the minute entry reports its last run.
+                    assert status.get("phase") == "Suspended", error(f"{schedule}: phase {status.get('phase')}")
+                    entries = {item.get("period"): item for item in status.get("entries") or []}
+                    assert sorted(entries) == ["minute"], error(f"{schedule}: status.entries {entries}")
+                    assert not backup_unset(entries["minute"].get("lastScheduleTime")), error(f"{schedule}: status.entries {entries}")
 
-        with And(f"Every (cluster, shard) path keeps {keep_last} scheduled backup, the last one, and the one-off backups survive"):
+        check_backup_events(
+            schedule_kind,
+            schedule,
+            ("CronJobCreated", "ScheduleActive", "ScheduleSuspended", "ScheduledBackupSucceeded"),
+            ("OrchestratorBackupStarted", "OrchestratorBackupCompleted", "OrchestratorRetentionDeleted"),
+        )
+
+        with And(f"Every (cluster, shard) path keeps the {keep} newest scheduled backups, the last one among them; the one-off backup survives, the older run of the schedule now is pruned"):
             # The last scheduled run pruned after the backup that ran the schedule once was made
             last_due = re.sub(r"\D", "", last_backup[len(schedule_prefix) :])
             from_schedule_due = re.sub(r"\D", "", from_schedule_name[len(schedule_prefix) :])
@@ -9758,13 +9959,19 @@ def test_010087(self):
                 shards, _ = layout[cluster]
                 for shard in range(shards):
                     names = backup_remote_names(pod(cluster, shard, 0), api_auth)
-                    kept = [name for name in names if re.fullmatch(re.escape(schedule_prefix) + r"-\d{8}-\d{6}", name)]
-                    assert (len(kept) == keep_last) and (last_backup in kept), error(
-                        f"{cluster} shard {shard}: scheduled backups {kept}, the last backup is {last_backup}"
+                    kept = sorted(name for name in names if re.fullmatch(scheduled_name_pattern, name))
+                    assert (len(kept) == keep) and (kept[-1] == last_backup), error(
+                        f"{cluster} shard {shard}: scheduled backups {kept}, the last backup is {last_backup}, keep {keep}"
                     )
+                    # A one-off backup of another name is never touched.
                     assert backup_name in names, error(f"{cluster} shard {shard}: retention removed {backup_name}, left {names}")
-                    assert from_schedule_name in names, error(
-                        f"{cluster} shard {shard}: retention removed {from_schedule_name}, left {names}"
+                    # The backup that ran the schedule once is kept while it is no older than the oldest scheduled
+                    # backup kept, then deleted: it was made before the runs retention keeps.
+                    oldest_kept_due = re.sub(r"\D", "", kept[0][len(schedule_prefix) :])
+                    expected_present = from_schedule_due >= oldest_kept_due
+                    assert (from_schedule_name in names) == expected_present, error(
+                        f"{cluster} shard {shard}: {from_schedule_name} {'removed' if expected_present else 'kept'} "
+                        f"with the oldest kept scheduled backup {kept[0]}, left {names}"
                     )
 
         with When("The storage path loses its {cluster} macro, and the whole installation is backed up"):
@@ -9944,6 +10151,10 @@ def test_010088(self):
             f"{schedule}: Ready condition {ready}"
         )
         assert source_backup_name in (ready.get("message") or ""), error(f"{schedule}: Ready condition {ready} does not name the backup")
+        status = backup_status(schedule_kind, schedule)
+        assert (status.get("phase") == "Aborted") and (status.get("reason") == "SharesSourcePrefix"), error(
+            f"{schedule}: phase {status.get('phase')}, reason {status.get('reason')}"
+        )
         return cronjobs
 
     archive_prefix = yaml_manifest.get_manifest_data(util.get_full_path(archive_manifest))["spec"]["backupNamePrefix"]
@@ -10032,6 +10243,18 @@ def test_010088(self):
                 assert source_backup_name in items, error(f"shard {shard}: remote backups {sorted(items)}")
                 rbac_size = int(items[source_backup_name].get("rbac_size") or 0)
                 assert rbac_size > 0, error(f"shard {shard}: {source_backup_name} holds no access objects: {items[source_backup_name]}")
+
+        with And("Its Job ran the orchestrator script of the operator configuration over the sidecars"):
+            check_orchestrator_configmap(source_chi, main_cluster)
+            env = check_orchestrator_job(f"{source_backup}-{main_cluster}-backup", source_chi, main_cluster, "sidecar")
+            assert env.get("BACKUP_NAME") == source_backup_name, error(f"{source_backup}: BACKUP_NAME {env.get('BACKUP_NAME')}")
+
+        check_backup_events(
+            backup_kind,
+            source_backup,
+            ("BackupRunning", "BackupCompleted"),
+            ("OrchestratorBackupStarted", "OrchestratorBackupCompleted"),
+        )
 
         with When("A new installation to be recovered from that backup is created, with three schedules due once a year"):
             def recover(data):
@@ -10157,6 +10380,14 @@ def test_010088(self):
             # Completed rather than RBACNotRestored: the access objects of the backup were restored.
             ready = [c for c in status.get("conditions") or [] if c.get("type") == "Ready"]
             assert ready and (ready[0].get("reason") == "Completed"), error(f"{recovery_restore}: Ready condition {ready}")
+            check_orchestrator_job(f"{recovery_restore}-{main_cluster}-restore", recovered_chi, main_cluster, "sidecar")
+
+        check_backup_events(
+            restore_kind,
+            recovery_restore,
+            ("RestoreRunning", "RestoreCompleted"),
+            ("OrchestratorRestoreStarted", "OrchestratorRestoreCompleted"),
+        )
 
         with And(f"It recorded the backup in annotation {backup_annotation_recovered_from}"):
             # Once the recovery restore completed.
@@ -10183,6 +10414,8 @@ def test_010088(self):
                     assert suspended_clusters(cronjobs) == [], error(f"{source_schedule}: held on {suspended_clusters(cronjobs)}")
                     ready = backup_condition(schedule_kind, source_schedule, "Ready")
                     assert ready.get("reason") == "Scheduled", error(f"{source_schedule}: Ready condition {ready}")
+                    phase = backup_status(schedule_kind, source_schedule).get("phase")
+                    assert phase == "Active", error(f"{source_schedule}: phase {phase}")
 
         with And(f"Schedule {archive}, with a backup name prefix of its own, is released"):
             for attempt in retries(timeout=120, delay=5):
@@ -10192,6 +10425,8 @@ def test_010088(self):
                     assert suspended_clusters(cronjobs) == [], error(f"{archive}: held on {suspended_clusters(cronjobs)}")
                     ready = backup_condition(schedule_kind, archive, "Ready")
                     assert ready.get("reason") == "Scheduled", error(f"{archive}: Ready condition {ready}")
+                    phase = backup_status(schedule_kind, archive).get("phase")
+                    assert phase == "Active", error(f"{archive}: phase {phase}")
             for cluster, cronjob in cronjobs.items():
                 prefix = backup_cronjob_env(cronjob).get("BACKUP_NAME_PREFIX")
                 assert prefix == archive_prefix, error(f"{archive} on {cluster}: backup name prefix {prefix}")
@@ -10233,6 +10468,8 @@ def test_010088(self):
                     assert suspended_clusters(nightly_cronjobs) == [], error(f"{nightly}: held on {suspended_clusters(nightly_cronjobs)}")
                     ready = backup_condition(schedule_kind, nightly, "Ready")
                     assert ready.get("reason") == "Scheduled", error(f"{nightly}: Ready condition {ready}")
+                    phase = backup_status(schedule_kind, nightly).get("phase")
+                    assert phase == "Active", error(f"{nightly}: phase {phase}")
             check_held_for_prefix(hourly)
 
         with And("Each hold was announced once, by one warning event"):
@@ -10265,6 +10502,326 @@ def test_010088(self):
                 with And("deleting the S3 store and the storage Secret"):
                     kubectl.delete(util.get_full_path(minio_manifest), ok_to_fail=True)
                     kubectl.delete(util.get_full_path(storage_manifest), ok_to_fail=True)
+            delete_test_namespace()
+
+
+
+@TestScenario
+@Name("test_010089. Operator-managed backup in pod mode: backup Pods per shard during an operation, aborted configurations")
+@Tags("HEAVY")
+def test_010089(self):
+    """backup.mode pod runs no clickhouse-backup sidecar. While a backup or a restore of a cluster runs, the operator
+    runs one backup Pod per shard, on the node of the pod of a ready replica - a nodeSelector on kubernetes.io/hostname -
+    with that pod's volume claims, serving the clickhouse-backup REST API; the orchestrator Job reaches them by DNS.
+    Once the operation ended the backup Pods are gone. A backup and a restore of cluster main round-trip the rows of
+    every shard. The Jobs run backup-orchestrator.sh, which the operator copies from its configuration to the
+    ConfigMap <chi>-<cluster>-backup-orchestrator, in container backup-orchestrator of the clickhouse-backup image, as
+    the operator's ServiceAccount, and the orchestrator posts Events of its steps on the backup and the restore next
+    to the operator's.
+
+    A backup and a schedule of cluster custom name in spec.orchestratorConfigMapRef a ConfigMap without the script:
+    the backup is Aborted with OrchestratorScriptMissing and the schedule is Aborted until the ConfigMap holds the
+    script, then Active, its CronJob mounting that ConfigMap.
+
+    An installation that enables backup with a configSecretRef to a missing Secret, or without any configSecretRef,
+    is not reconciled: its status is Aborted with the reason BackupConfigInvalid.
+    """
+    manifest = "manifests/chi/test-010089-backup-pods.yaml"
+    missing_secret_manifest = "manifests/chi/test-010089-missing-secret.yaml"
+    no_storage_manifest = "manifests/chi/test-010089-no-storage.yaml"
+    storage_manifest = "manifests/secret/test-010087-backup-storage.yaml"
+    minio_manifest = "manifests/minio/test-010087-minio.yaml"
+    backup_manifest = "manifests/chb/test-010089-backup.yaml"
+    custom_backup_manifest = "manifests/chb/test-010089-custom-backup.yaml"
+    restore_manifest = "manifests/chr/test-010089-restore.yaml"
+    custom_schedule_manifest = "manifests/chbs/test-010089-custom-schedule.yaml"
+
+    def name_of(path):
+        return yaml_manifest.get_name(util.get_full_path(path))
+
+    chi = name_of(manifest)
+    missing_secret_chi = name_of(missing_secret_manifest)
+    no_storage_chi = name_of(no_storage_manifest)
+    backup = name_of(backup_manifest)
+    custom_backup = name_of(custom_backup_manifest)
+    restore = name_of(restore_manifest)
+    custom_schedule = name_of(custom_schedule_manifest)
+    backup_name = yaml_manifest.get_manifest_data(util.get_full_path(backup_manifest))["spec"]["backupName"]
+    cluster, custom = "main", "custom"
+    custom_configmap = "test-089-custom-orchestrator"
+    shards = 2
+    rows = {0: 300, 1: 700}
+    database = "test_089"
+    table = f"{database}.events"
+
+    def replica_pod(shard):
+        return f"chi-{chi}-{cluster}-{shard}-0-0"
+
+    def shard_pod(shard):
+        return f"chi-{chi}-{cluster}-{shard}-bk"
+
+    def shard_pods():
+        return {
+            item["metadata"]["name"]: item
+            for item in (kubectl.get("pods", "", label=f"-l {backup_shard_pod_selector}", ok_to_fail=True) or {}).get("items", [])
+        }
+
+    def claims(pod):
+        return sorted(v["persistentVolumeClaim"]["claimName"] for v in pod["spec"]["volumes"] if "persistentVolumeClaim" in v)
+
+    def run_with_shard_pods(kind, name):
+        """Waits for an operation of cluster main to end, and checks the backup Pods seen meanwhile: one per shard,
+        running on the node of the replica it follows with its volume claims. Returns the phase."""
+        seen = {}
+        phase = ""
+        deadline = time.time() + 900
+        while time.time() < deadline:
+            for pod_name, pod in shard_pods().items():
+                if (pod.get("status") or {}).get("phase") == "Running":
+                    seen[pod_name] = pod
+            phase = kubectl.get_field(kind, name, ".status.phase")
+            if phase in backup_terminal_phases:
+                break
+            time.sleep(2)
+        if phase != "Completed":
+            backup_dump(kind, name)
+        assert phase == "Completed", error(f"{kind} {name}: expected phase Completed, got {phase}")
+        expected = sorted(shard_pod(shard) for shard in range(shards))
+        assert sorted(seen) == expected, error(f"{kind} {name}: running backup Pods seen {sorted(seen)}, expected {expected}")
+        for shard in range(shards):
+            pod = seen[shard_pod(shard)]
+            source = kubectl.get("pod", replica_pod(shard))
+            assert pod["metadata"]["annotations"][backup_shard_pod_replica_uid] == source["metadata"]["uid"], error(
+                f"backup Pod of shard {shard} does not follow {replica_pod(shard)}"
+            )
+            node = source["spec"]["nodeName"]
+            assert pod["spec"]["nodeSelector"] == {"kubernetes.io/hostname": node}, error(pod["spec"].get("nodeSelector"))
+            assert pod["spec"]["nodeName"] == node, error(f"backup Pod of shard {shard} ran on {pod['spec']['nodeName']}, not {node}")
+            assert claims(pod) == claims(source), error(f"shard {shard}: {claims(pod)} != {claims(source)}")
+            containers = [c["name"] for c in pod["spec"]["containers"]]
+            assert containers == [backup_sidecar], error(f"backup Pod of shard {shard}: containers {containers}")
+
+    def wait_no_shard_pods():
+        for attempt in retries(timeout=300, delay=5):
+            with attempt:
+                left = sorted(shard_pods())
+                assert left == [], error(f"backup Pods left once the operation ended: {left}")
+
+    def check_rows():
+        for shard, count in rows.items():
+            out = clickhouse.query(chi, f"SELECT count() FROM {table}", pod=replica_pod(shard))
+            assert out == str(count), error(f"shard {shard}: expected {count} rows, got {out}")
+
+    def check_chi_aborted(name):
+        kubectl.wait_chi_status(name, "Aborted", retries=30)
+        # The tagged abort, which a generic "FAILED to reconcile" entry may follow
+        errors = kubectl.get_field("chi", name, ".status.errors")
+        assert "[BackupConfigInvalid]" in errors, error(f"{name}: status.errors {errors}")
+        for attempt in retries(timeout=120, delay=5):
+            with attempt:
+                events = kubectl.launch(
+                    f"get events --field-selector involvedObject.name={name},reason=BackupStorageConfigInvalid "
+                    "-o jsonpath='{.items[*].type}'",
+                    ok_to_fail=True,
+                )
+                assert "Warning" in events, error(f"{name}: no BackupStorageConfigInvalid warning: {events!r}")
+        pods = kubectl.get_count("pod", label=f"-l clickhouse.altinity.com/chi={name}")
+        assert pods == 0, error(f"{name}: the aborted reconcile created {pods} pods")
+
+    try:
+        create_shell_namespace_clickhouse_template()
+
+        with Given("The storage Secret and an S3 store in the test namespace"):
+            kubectl.apply(util.get_full_path(storage_manifest))
+            kubectl.apply(util.get_full_path(minio_manifest))
+
+        with And(f"ConfigMap {custom_configmap}, which the resources of cluster {custom} name, without the script"):
+            kubectl.launch(f"create configmap {custom_configmap} --from-literal=readme=no-script-here")
+
+        with Given("An installation with backup in pod mode on two clusters, without the backup user credentials"):
+            kubectl.apply(util.get_full_path(current().context.clickhouse_template, False))
+            kubectl.apply(util.get_full_path(manifest))
+
+        with Then("Its reconcile is Aborted: the backup Pods log in over the network as the backup user, which has no credentials"):
+            kubectl.wait_chi_status(chi, "Aborted", retries=30)
+            errors = kubectl.get_field("chi", chi, ".status.errors")
+            assert ("BackupConfigInvalid" in errors) and ("CLICKHOUSE_USERNAME" in errors), error(f"{chi}: status.errors {errors}")
+
+        backup_password = f"backup-{os.urandom(8).hex()}"
+        with When(f"The backup user {backup_user} is set in {backup_auto_secret(chi)}"):
+            kubectl.launch(
+                f"patch secret {backup_auto_secret(chi)} --type merge "
+                f"-p '{{\"stringData\":{{\"CLICKHOUSE_USERNAME\":\"{backup_user}\",\"CLICKHOUSE_PASSWORD\":\"{backup_password}\"}}}}'"
+            )
+
+        with Then("The operator reconciles the installation to the end"):
+            kubectl.wait_chi_status(chi, "Completed")
+            kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=shards + 1)
+
+        with And("The S3 store is ready with its bucket"):
+            kubectl.launch("rollout status deployment/minio --timeout=300s", timeout=330)
+
+        with And(f"The backup user {backup_user} is let in from the backup Pods by their DNS names"):
+            for attempt in retries(timeout=300, delay=10):
+                with attempt:
+                    config_file = yaml.safe_load(backup_secret_data(backup_config_secret(chi, cluster)).get("config.yml") or "{}")
+                    assert (config_file.get("clickhouse") or {}).get("username") == backup_user, error(
+                        f"{backup_config_secret(chi, cluster)}: ClickHouse section {config_file.get('clickhouse')}"
+                    )
+                    regexp = clickhouse.query(
+                        chi, f"SELECT arrayStringConcat(host_names_regexp, ',') FROM system.users WHERE name = '{backup_user}'",
+                        pod=replica_pod(0),
+                    )
+                    assert "-bk" in regexp and f"{chi}-" in regexp, error(
+                        f"{backup_user} is not let in from the backup Pods: host_regexp {regexp!r}"
+                    )
+
+        with Then("No pod runs a clickhouse-backup sidecar, no host publishes the backup API, and no backup Pod runs"):
+            for pod_name in kubectl.get_pod_names(chi):
+                containers = [c["name"] for c in kubectl.get_pod_spec(chi, pod_name)["containers"]]
+                assert backup_sidecar not in containers, error(f"{pod_name} runs {backup_sidecar} in pod mode: {containers}")
+            for shard in range(shards):
+                service = f"chi-{chi}-{cluster}-{shard}-0"
+                ports = [p.get("name") for p in kubectl.get("service", service)["spec"]["ports"]]
+                assert backup_api_port_name not in ports, error(f"service {service} publishes {backup_api_port_name}: {ports}")
+            assert shard_pods() == {}, error(f"backup Pods with no operation running: {sorted(shard_pods())}")
+
+        with And("Every shard holds its own row count"):
+            for shard, count in rows.items():
+                clickhouse.query(chi, f"CREATE DATABASE IF NOT EXISTS {database}", pod=replica_pod(shard))
+                clickhouse.query(chi, f"CREATE TABLE {table} (id UInt64) ENGINE = MergeTree ORDER BY id", pod=replica_pod(shard))
+                clickhouse.query(chi, f"INSERT INTO {table} SELECT number FROM numbers({count})", pod=replica_pod(shard))
+            check_rows()
+
+        with When(f"Cluster {cluster} is backed up"):
+            kubectl.apply(util.get_full_path(backup_manifest))
+
+        with Then("A backup Pod per shard runs next to its replica while the backup runs, and the backup completes"):
+            run_with_shard_pods(backup_kind, backup)
+
+        with And("The backup Pods are gone once it ended"):
+            wait_no_shard_pods()
+
+        with And("The orchestrator Job ran the script of the operator configuration over the pod transport"):
+            job = f"{backup}-{cluster}-backup"
+            entry = backup_cluster_status(backup_kind, backup).get(cluster) or {}
+            assert entry.get("jobName") == job, error(f"{backup}: cluster {cluster} {entry}")
+            check_orchestrator_configmap(chi, cluster)
+            env = check_orchestrator_job(job, chi, cluster, "pod")
+            hosts = (env.get("BACKUP_HOSTS") or "").split()
+            assert sorted(hosts) == sorted(
+                f"{shard_pod(shard)}.{chi}-{cluster}-backup.{current().context.test_namespace}.svc" for shard in range(shards)
+            ), error(f"Job {job}: BACKUP_HOSTS {hosts}")
+            reported = kubectl.get_field(backup_kind, backup, ".status.backupName")
+            assert reported == backup_name, error(f"{backup}: status.backupName {reported}")
+
+        check_backup_events(
+            backup_kind,
+            backup,
+            ("BackupRunning", "BackupCompleted"),
+            ("OrchestratorBackupPodsReady", "OrchestratorBackupStarted", "OrchestratorBackupCompleted"),
+        )
+
+        with When(f"Database {database} is dropped on every shard"):
+            for shard in range(shards):
+                clickhouse.query(chi, f"DROP DATABASE {database} SYNC", pod=replica_pod(shard))
+
+        with And(f"Cluster {cluster} is restored from the backup"):
+            kubectl.apply(util.get_full_path(restore_manifest))
+
+        with Then("A backup Pod per shard runs next to its replica while the restore runs, and the restore completes"):
+            run_with_shard_pods(restore_kind, restore)
+
+        with And("The backup Pods are gone once it ended"):
+            wait_no_shard_pods()
+
+        with And("Every shard holds its rows again"):
+            for attempt in retries(timeout=60, delay=5):
+                with attempt:
+                    check_rows()
+
+        with And("The orchestrator Job of the restore ran over the pod transport"):
+            check_orchestrator_job(f"{restore}-{cluster}-restore", chi, cluster, "pod")
+
+        check_backup_events(
+            restore_kind,
+            restore,
+            ("RestoreRunning", "RestoreCompleted"),
+            ("OrchestratorRestoreStarted", "OrchestratorRestoreCompleted"),
+        )
+
+        with When(f"Cluster {custom} is backed up, and given a schedule, both naming the ConfigMap without the script"):
+            kubectl.apply(util.get_full_path(custom_backup_manifest))
+            kubectl.apply(util.get_full_path(custom_schedule_manifest))
+
+        wait_backup_phase(backup_kind, custom_backup, "Aborted", timeout=300)
+
+        with Then("The backup is Aborted for the missing script, without a Job, with a warning naming the ConfigMap"):
+            ready = backup_condition(backup_kind, custom_backup, "Ready")
+            assert ready.get("reason") == "OrchestratorScriptMissing", error(f"{custom_backup}: Ready condition {ready}")
+            assert custom_configmap in (ready.get("message") or ""), error(f"{custom_backup}: Ready condition {ready}")
+            jobs = backup_job_names(backup_jobs(f"-l {backup_label_cr_name}={custom_backup}"))
+            assert jobs == [], error(f"{custom_backup}: Jobs {jobs}")
+            for attempt in retries(timeout=120, delay=5):
+                with attempt:
+                    warnings = [e for e in backup_events(backup_kind, custom_backup) if e.get("type") == "Warning"]
+                    assert any(custom_configmap in (e.get("message") or "") for e in warnings), error(
+                        f"{custom_backup}: warnings {[e.get('message') for e in warnings]}"
+                    )
+
+        with And("The schedule is Aborted for the missing script"):
+            for attempt in retries(timeout=300, delay=5):
+                with attempt:
+                    status = backup_status(schedule_kind, custom_schedule)
+                    assert status.get("phase") == "Aborted", error(f"{custom_schedule}: status {status}")
+                    assert status.get("reason") == "OrchestratorScriptMissing", error(f"{custom_schedule}: status {status}")
+
+        with When(f"ConfigMap {custom_configmap} gets the script"):
+            kubectl.launch(f"delete configmap {custom_configmap}")
+            kubectl.launch(
+                f"create configmap {custom_configmap} "
+                f"--from-file={backup_orchestrator_script}={util.get_full_path(backup_orchestrator_script_path)}"
+            )
+
+        with Then("The schedule turns Active, its CronJob mounting that ConfigMap"):
+            for attempt in retries(timeout=600, delay=10):
+                with attempt:
+                    status = backup_status(schedule_kind, custom_schedule)
+                    assert status.get("phase") == "Active", error(f"{custom_schedule}: status {status}")
+            cronjobs = backup_schedule_cronjobs(custom_schedule)
+            assert sorted(cronjobs) == [custom], error(f"{custom_schedule}: CronJobs of {sorted(cronjobs)}")
+            volumes = cronjobs[custom]["spec"]["jobTemplate"]["spec"]["template"]["spec"].get("volumes") or []
+            mounted = [(v.get("configMap") or {}).get("name") for v in volumes if v.get("configMap")]
+            assert custom_configmap in mounted, error(f"{custom_schedule}: the CronJob mounts ConfigMaps {mounted}")
+            check_backup_events(schedule_kind, custom_schedule, ("ScheduleAborted", "ScheduleActive"), ())
+
+        with When("An installation enables backup with a configSecretRef to a Secret that does not exist"):
+            kubectl.apply(util.get_full_path(missing_secret_manifest))
+
+        with Then("Its reconcile is Aborted for the invalid backup configuration"):
+            check_chi_aborted(missing_secret_chi)
+
+        with When("An installation enables backup without any configSecretRef"):
+            kubectl.apply(util.get_full_path(no_storage_manifest))
+
+        with Then("Its reconcile is Aborted for the invalid backup configuration"):
+            check_chi_aborted(no_storage_chi)
+    finally:
+        with Finally("I clean up"):
+            if not settings.no_cleanup:
+                with By("deleting the backup resources while the operator still runs"):
+                    backup_delete_resources(
+                        (
+                            (schedule_kind, custom_schedule),
+                            (backup_kind, backup),
+                            (backup_kind, custom_backup),
+                            (restore_kind, restore),
+                        )
+                    )
+                for name in (missing_secret_chi, no_storage_chi):
+                    kubectl.delete_chi(name, ok_to_fail=True)
+                kubectl.delete(util.get_full_path(minio_manifest), ok_to_fail=True)
+                kubectl.delete(util.get_full_path(storage_manifest), ok_to_fail=True)
             delete_test_namespace()
 
 

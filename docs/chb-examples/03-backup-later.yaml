@@ -37,7 +37,7 @@ spec:
   # spec.backupName nor spec.scheduledTime; otherwise that run fails before changing anything, as a
   # backup of that name is in the storage already. An explicit name holds letters, digits, "_", "-"
   # and "." (starting with a letter or digit, no "..", at most 128 characters) and must not end like
-  # the backups of a schedule, -YYYYMMDD-HHMMSS: the retention of a schedule whose prefix it carries
+  # the backups of a schedule, -YYYYMMDDHHMMSS: the retention of a schedule whose prefix it carries
   # would take it for one of its own and delete it.
   # backupName: before-maintenance
 

@@ -1,18 +1,19 @@
 # test_010087
-# No spec.cluster: one CronJob per backup-enabled cluster, all on the same cron schedule, so the
-# runs of one minute make one backup name.
+# No spec.cluster: one CronJob per backup-enabled cluster, all on the cron schedule of the finest entry, every
+# minute, so the runs of one slot make one backup name. Every run matches the minute entry, whose retention keeps
+# the two newest backups of the series.
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseBackupSchedule"
 metadata:
   name: every-minute
 spec:
   clickHouseInstallation: test-087-backup
-  schedule: "* * * * *"
+  schedules:
+    - period: minute
+      keep: 2
   concurrencyPolicy: Forbid
-  # Kept above the two runs the scenario waits for, so finished runs stay countable.
-  successfulJobsHistoryLimit: 3
+  # Kept above the three runs the scenario waits for, so finished runs stay countable.
+  successfulJobsHistoryLimit: 4
   failedJobsHistoryLimit: 1
   # Unlike the one-off backup's name, so retention must leave that one alone.
   backupNamePrefix: e2e-087-sched
-  retention:
-    keepLast: 1

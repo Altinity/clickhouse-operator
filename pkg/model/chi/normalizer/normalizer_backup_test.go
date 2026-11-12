@@ -22,6 +22,7 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -89,9 +90,14 @@ func enabledBackup() *chi.ClusterBackup {
 	}
 }
 
-// enabledOn enables backup with the sidecar built on the clickhouse-backup container of the pod template named
+// enabledOn enables backup with a storage Secret and the sidecar built on the clickhouse-backup container of the
+// pod template named
 func enabledOn(podTemplate string) *chi.ClusterBackup {
-	return &chi.ClusterBackup{Enabled: types.NewStringBool(true), PodTemplate: types.NewString(podTemplate)}
+	return &chi.ClusterBackup{
+		Enabled:         types.NewStringBool(true),
+		PodTemplate:     types.NewString(podTemplate),
+		ConfigSecretRef: configSecretRef(backupStorageSecret),
+	}
 }
 
 func backupCluster(name string, backup *chi.ClusterBackup) *chi.Cluster {
@@ -377,6 +383,42 @@ func TestBackupUserInjected(t *testing.T) {
 	users := got.Spec.Configuration.Users
 	require.Equal(t, chop.Config().ClickHouse.Config.User.Default.Profile, users.Get(backupUser(userFieldProfile)).String())
 	require.Equal(t, chop.Config().ClickHouse.Config.User.Default.Quota, users.Get(backupUser(userFieldQuota)).String())
+}
+
+// In backup.mode pod the backup user connects from the backup Pods of the shards, over the network: it is let in
+// from their DNS names, and from nowhere else besides the pod's loopback.
+func TestBackupUserOfPodModeComesFromTheBackupPods(t *testing.T) {
+	podMode := enabledBackup()
+	podMode.Mode = types.NewString(chi.BackupModePod)
+	cr := &chi.ClickHouseInstallation{}
+	cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{
+		backupCluster("sidecars", enabledBackup()),
+		backupCluster("pods", podMode),
+	}}
+
+	got := normalizeBackupCR(t, cr, backupSecretGetter(t))
+	users := got.Spec.Configuration.Users
+	require.ElementsMatch(t, config.ClickHouseBackupUserNetworksIP, users.Get(backupUser(userFieldNetworksIP)).AsVectorOfStrings())
+	expression := users.Get(backupUser(userFieldNetworksHostRegexp)).String()
+	require.NotEmpty(t, expression)
+	re := regexp.MustCompile(expression)
+	require.True(t, re.MatchString("chi-chi-backup-pods-0-bk.chi-backup-pods-backup.ns.svc.cluster.local"))
+	for _, other := range []string{
+		"chi-chi-backup-pods-0-0.ns.svc.cluster.local",                            // a ClickHouse host
+		"chi-chi-backup-pods-0-bk.chi-backup-pods-backup.other.svc.cluster.local", // another namespace
+		"chi-other-pods-0-bk.other-pods-backup.ns.svc.cluster.local",              // another installation
+		"x.chi-chi-backup-pods-0-bk.chi-backup-pods-backup.ns.svc.cluster.local",  // not anchored
+	} {
+		require.False(t, re.MatchString(other), other)
+	}
+}
+
+// Sidecars connect over loopback only: no host regexp.
+func TestBackupUserOfSidecarModeHasNoHostRegexp(t *testing.T) {
+	cr := &chi.ClickHouseInstallation{}
+	cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{backupCluster("sidecars", enabledBackup())}}
+	got := normalizeBackupCR(t, cr, backupSecretGetter(t))
+	require.False(t, got.Spec.Configuration.Users.Has(backupUser(userFieldNetworksHostRegexp)))
 }
 
 // The operator manages a backup user only when the backup Secret sets both its username and its password, which are
@@ -781,6 +823,7 @@ func TestBackupPodTemplate(t *testing.T) {
 	t.Run("a cluster's empty podTemplate over the installation's, without a storage - no sidecar", func(t *testing.T) {
 		cr := newCR(&chi.ClusterBackup{PodTemplate: types.NewString("")}, podTemplate(backupTemplate, sidecar))
 		cr.Spec.Backup = enabledOn(backupTemplate)
+		cr.Spec.Backup.ConfigSecretRef = nil
 		got := normalizeBackupCR(t, cr, backupSecretGetter(t))
 		requireNotAborted(t, got)
 		require.True(t, findCluster(t, got, "c").GetBackup().LacksStorage())
@@ -980,6 +1023,7 @@ func TestBackupContainerValidation(t *testing.T) {
 		clusterBackup := &chi.ClusterBackup{Enabled: types.NewStringBool(backup)}
 		if backup {
 			clusterBackup.PodTemplate = types.NewString(sharedPodTemplate)
+			clusterBackup.ConfigSecretRef = configSecretRef(backupStorageSecret)
 		}
 		cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{backupCluster("c", clusterBackup)}}
 		return cr

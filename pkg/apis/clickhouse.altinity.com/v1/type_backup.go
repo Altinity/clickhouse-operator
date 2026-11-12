@@ -15,6 +15,8 @@
 package v1
 
 import (
+	"fmt"
+
 	core "k8s.io/api/core/v1"
 
 	clickhouse_altinity_com "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
@@ -31,10 +33,24 @@ const (
 )
 
 // BackupStorageHint tells how to settle the backup of a cluster that turns it on without a storage,
-// which leaves it off: name the Secret of the sidecar configuration, or turn backup off there, which a cluster may
-// inherit unasked.
+// which leaves it off: name the Secret of the clickhouse-backup configuration, or turn backup off there, which a
+// cluster may inherit unasked.
 const BackupStorageHint = "name the Secret of the clickhouse-backup configuration in backup.configSecretRef, " +
-	"or name the pod template of the sidecar in backup.podTemplate, or set backup.enabled to \"no\""
+	"or set backup.enabled to \"no\""
+
+// BackupOrchestratorScriptKey is the key of the ConfigMap the orchestratorConfigMapRef of a ClickHouseBackup,
+// ClickHouseBackupSchedule, ClickHouseRestore or recovery names that holds the
+// orchestrator script the backup and restore Jobs of the cluster run in place of the operator's.
+const BackupOrchestratorScriptKey = "backup-orchestrator.sh"
+
+// Backup modes: how the operator reaches clickhouse-backup on the hosts of a cluster.
+const (
+	// BackupModeSidecar runs clickhouse-backup as a sidecar in every ClickHouse pod of the cluster, the default.
+	BackupModeSidecar = "sidecar"
+	// BackupModePod runs no sidecar: while a backup or a restore of the cluster runs, the operator runs one backup Pod
+	// per shard next to a ready replica of the shard, mounting its volumes.
+	BackupModePod = "pod"
+)
 
 // BackupAnnotations lists the annotations that record operator-managed recovery. They describe the
 // installation, not its pods, so they must never be copied into pod templates: a change there would
@@ -49,8 +65,11 @@ var BackupAnnotations = []string{
 type ClusterBackup struct {
 	// Enabled turns operator-managed backup on for the cluster: the operator injects the
 	// clickhouse-backup sidecar into its pods and backup/restore resources may target it. It takes
-	// effect only with ConfigSecretRef, or with PodTemplate, see IsEnabled.
+	// effect only with ConfigSecretRef, see IsEnabled.
 	Enabled *types.StringBool `json:"enabled,omitempty"                yaml:"enabled,omitempty"`
+	// Mode tells how the operator reaches clickhouse-backup on the hosts of the cluster: "sidecar" (default) injects
+	// it into every ClickHouse pod, "pod" runs one backup Pod per shard only while a backup or a restore runs.
+	Mode *types.String `json:"mode,omitempty"                   yaml:"mode,omitempty"`
 	// PodTemplate names the pod template whose clickhouse-backup container the sidecar is built on: what the
 	// container sets is kept, and only what it lacks is filled in. Only that container is taken, not the other
 	// containers, volumes or pod settings of the template. Empty, the operator builds the sidecar on its own.
@@ -59,9 +78,13 @@ type ClusterBackup struct {
 	// configuration of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket,
 	// s3.access_key. The operator generates the configuration file of the sidecar from it, which follows a change of
 	// the Secret without a restart. A cluster that leaves it out takes the installation's, an installation a
-	// template's; an explicit name "" on a cluster leaves the cluster without one. Without one, the storage is
-	// configured by the clickhouse-backup container of the pod template PodTemplate names.
+	// template's; an explicit name "" on a cluster leaves the cluster without one. It is required: without one,
+	// backup stays off. The configuration must set api.username and api.password of the clickhouse-backup REST API.
 	ConfigSecretRef *core.LocalObjectReference `json:"configSecretRef,omitempty" yaml:"configSecretRef,omitempty"`
+	// PreferredReplica is the index, from 0, of the replica of each shard the backup Pod of the shard works next to:
+	// it mounts the volumes of that replica's pod and runs on its node. A shard with fewer replicas, or whose preferred
+	// replica is not ready, falls back to its next ready replica. Empty means 0, the first replica.
+	PreferredReplica *types.Int32 `json:"preferredReplica,omitempty" yaml:"preferredReplica,omitempty"`
 	// Recovery names the backup a new installation restores the cluster from once it has
 	// completed its first reconcile. It configures the operator, not the sidecar: it never changes a
 	// pod. It is never taken from a ClickHouseInstallationTemplate.
@@ -78,6 +101,10 @@ type BackupRecovery struct {
 	// give there. Empty, each is that of this installation.
 	SourceInstallation *types.String `json:"sourceInstallation,omitempty" yaml:"sourceInstallation,omitempty"`
 	SourceNamespace    *types.String `json:"sourceNamespace,omitempty"    yaml:"sourceNamespace,omitempty"`
+	// OrchestratorConfigMapRef names a ConfigMap in the installation's namespace whose key backup-orchestrator.sh the
+	// ClickHouseRestore of the recovery runs instead of the operator's orchestrator script: it is copied into that
+	// restore. An explicit name "" on a cluster resets it to the operator's script.
+	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
 }
 
 // IsBackupEnabled reports whether operator-managed backup is on for any cluster of the installation. It applies
@@ -130,8 +157,8 @@ func (spec *ChiSpec) DropBackupRecovery() {
 	}
 }
 
-// IsEnabled reports whether operator-managed backup is on, nil-safe: the spec turns it on and names where the storage
-// settings of its sidecar come from. Turned on without that, backup stays off, see LacksStorage.
+// IsEnabled reports whether operator-managed backup is on, nil-safe: the spec turns it on and names the Secret of
+// the clickhouse-backup configuration. Turned on without that, backup stays off, see LacksStorage.
 func (b *ClusterBackup) IsEnabled() bool {
 	return b.IsRequested() && b.namesStorageSettings()
 }
@@ -144,18 +171,44 @@ func (b *ClusterBackup) IsRequested() bool {
 	return b.Enabled.IsTrue()
 }
 
-// LacksStorage reports whether the spec turns operator-managed backup on without naming where the storage
-// settings of its sidecar come from, which leaves backup off, nil-safe.
+// LacksStorage reports whether the spec turns operator-managed backup on without naming the Secret of the
+// clickhouse-backup configuration, which leaves backup off, nil-safe.
 func (b *ClusterBackup) LacksStorage() bool {
 	return b.IsRequested() && !b.namesStorageSettings()
 }
 
-// namesStorageSettings reports whether the backup names a source of the storage settings of its sidecar: the
-// Secret of its configuration, or the pod template whose container the sidecar is built on. Without either, the sidecar
-// runs the bundled image, which carries no configuration file, on the operator's environment alone, which sets
-// no storage: clickhouse-backup takes none then, and refuses every upload and download.
+// namesStorageSettings reports whether the backup names the Secret of the clickhouse-backup configuration, the only
+// source of its storage settings and of the credentials of its REST API: a pod template only overrides the container.
 func (b *ClusterBackup) namesStorageSettings() bool {
-	return (b.GetConfigSecretName() != "") || (b.GetPodTemplate().Value() != "")
+	return b.GetConfigSecretName() != ""
+}
+
+// GetMode returns how the operator reaches clickhouse-backup on the hosts of the cluster, BackupModeSidecar when
+// unset, nil-safe.
+func (b *ClusterBackup) GetMode() string {
+	if (b == nil) || (b.Mode.Value() == "") {
+		return BackupModeSidecar
+	}
+	return b.Mode.Value()
+}
+
+// IsPodMode reports whether the cluster is backed up by backup Pods rather than sidecars, nil-safe.
+func (b *ClusterBackup) IsPodMode() bool {
+	return b.GetMode() == BackupModePod
+}
+
+// Validate checks the backup block against the allowed values, nil-safe.
+func (b *ClusterBackup) Validate() error {
+	if b == nil {
+		return nil
+	}
+	switch b.Mode.Value() {
+	case "", BackupModeSidecar, BackupModePod:
+	default:
+		return fmt.Errorf("%w: backup.mode %q is not one of %s, %s", ErrInvalidBackupSpec, b.Mode.Value(),
+			BackupModeSidecar, BackupModePod)
+	}
+	return validateStringBool("backup.enabled", b.Enabled)
 }
 
 // GetPodTemplate returns the name of the pod template the sidecar is built on, nil-safe.
@@ -172,6 +225,33 @@ func (b *ClusterBackup) GetConfigSecretName() string {
 		return ""
 	}
 	return b.ConfigSecretRef.Name
+}
+
+// orchestratorConfigMapName returns the name a reference to the ConfigMap of an orchestrator script holds, "" for
+// none: the operator's script runs.
+func orchestratorConfigMapName(ref *core.LocalObjectReference) string {
+	if ref == nil {
+		return ""
+	}
+	return ref.Name
+}
+
+// GetOrchestratorConfigMapName returns the ConfigMap whose backup-orchestrator.sh the restore of the recovery runs,
+// "" for the operator's script, nil-safe.
+func (r *BackupRecovery) GetOrchestratorConfigMapName() string {
+	if r == nil {
+		return ""
+	}
+	return orchestratorConfigMapName(r.OrchestratorConfigMapRef)
+}
+
+// GetPreferredReplica returns the index of the replica of each shard the backup Pod of the shard works next to,
+// 0 when unset or negative, nil-safe.
+func (b *ClusterBackup) GetPreferredReplica() int {
+	if (b == nil) || !b.PreferredReplica.HasValue() || (b.PreferredReplica.Value() < 0) {
+		return 0
+	}
+	return b.PreferredReplica.IntValue()
 }
 
 // GetRecovery returns the recovery of the cluster, nil-safe.
@@ -218,6 +298,8 @@ func (r *BackupRecovery) MergeFrom(from *BackupRecovery, _type MergeType) *Backu
 	r.BackupName = MergeScalar(r.BackupName, from.BackupName, _type)
 	r.SourceInstallation = MergeScalar(r.SourceInstallation, from.SourceInstallation, _type)
 	r.SourceNamespace = MergeScalar(r.SourceNamespace, from.SourceNamespace, _type)
+	// The reference is copied: it may be that of the installation level, which other clusters read
+	r.OrchestratorConfigMapRef = MergePointer(r.OrchestratorConfigMapRef, from.OrchestratorConfigMapRef.DeepCopy(), _type)
 	return r
 }
 
@@ -232,10 +314,12 @@ func (b *ClusterBackup) MergeFrom(from *ClusterBackup, _type MergeType) *Cluster
 	}
 
 	b.Enabled = MergeScalar(b.Enabled, from.Enabled, _type)
+	b.Mode = MergeScalar(b.Mode, from.Mode, _type)
 	b.PodTemplate = MergeScalar(b.PodTemplate, from.PodTemplate, _type)
 	// The reference is copied: it may be that of a cached template or of the installation level, which other
 	// clusters read
 	b.ConfigSecretRef = MergePointer(b.ConfigSecretRef, from.ConfigSecretRef.DeepCopy(), _type)
+	b.PreferredReplica = MergeScalar(b.PreferredReplica, from.PreferredReplica, _type)
 	b.Recovery = b.Recovery.MergeFrom(from.Recovery, _type)
 
 	return b

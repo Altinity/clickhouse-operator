@@ -1,0 +1,40 @@
+# test_010089
+# backup.mode pod: no sidecar. While a backup or a restore of a cluster runs, the operator runs a backup Pod per shard
+# next to a ready replica, with the volumes of that replica's pod, and removes it once the operation ended.
+# Cluster custom is backed up and scheduled by resources that name in orchestratorConfigMapRef a ConfigMap the
+# scenario creates without the script first: they are aborted until the ConfigMap holds the script.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-089"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  backup:
+    enabled: "yes"
+    mode: pod
+    configSecretRef:
+      name: backup-storage
+  defaults:
+    templates:
+      # A second pod can see the data only on a persistent volume
+      dataVolumeClaimTemplate: default
+  configuration:
+    clusters:
+      - name: main
+        layout:
+          shardsCount: 2
+          replicasCount: 1
+      - name: custom
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

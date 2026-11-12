@@ -800,6 +800,11 @@ spec:
                         Where in its storage the clickhouse-backup sidecar of a host keeps the object disk data of its backups when
                         the settings of that storage set no object disk path. A template like storagePath.
                         Default: object_disks/{namespace}/{installation}/{cluster}/{shard}
+                    path:
+                      type: string
+                      description: |
+                        Path to the folder of the backup orchestrator script, backup-orchestrator.sh, which the backup, verify
+                        and restore Jobs run. Relative to the folder of the operator configuration unless absolute. Default: backup
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"

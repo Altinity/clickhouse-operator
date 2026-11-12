@@ -127,7 +127,7 @@ func TestBackupRefusesTargetsWithoutBackup(t *testing.T) {
 
 			require.Equal(t, ctrl.Result{}, f.reconcile("b1"))
 			got := f.backup("b1")
-			require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+			require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 			require.Equal(t, tc.reason, condition(t, got.Status.Conditions, api.BackupConditionValidated).Reason)
 			require.Equal(t, tc.reason, condition(t, got.Status.Conditions, api.BackupConditionReady).Reason)
 			require.Empty(t, got.Status.Clusters)
@@ -319,7 +319,7 @@ func TestBackupFailureReasons(t *testing.T) {
 
 			f.reconcile("b1")
 			got := f.backup("b1")
-			require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+			require.Equal(t, failurePhase(expected), got.Status.Phase, "a Job that fails by itself fails the backup, one the operator stops aborts it")
 			ready := condition(t, got.Status.Conditions, api.BackupConditionReady)
 			require.Equal(t, meta.ConditionFalse, ready.Status)
 			require.Equal(t, expected, ready.Reason)
@@ -338,7 +338,7 @@ func TestBackupFailsAJobThatNeverStarts(t *testing.T) {
 
 	require.Equal(t, ctrl.Result{}, f.reconcile("b1"))
 	got := f.backup("b1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	ready := condition(t, got.Status.Conditions, api.BackupConditionReady)
 	require.Equal(t, api.BackupReasonJobNotStarted, ready.Reason)
 	require.Contains(t, ready.Message, "no pod of Job b1-main-backup started within")
@@ -393,7 +393,7 @@ func TestBackupAsksThePodsWhereReadyIsNotReported(t *testing.T) {
 				requireRunning(t, f.client, "b1-main-backup")
 				return
 			}
-			require.Equal(t, api.OperationPhaseFailed, f.backup("b1").Status.Phase, "a pending pod is not a started one")
+			require.Equal(t, api.OperationPhaseAborted, f.backup("b1").Status.Phase, "a pending pod is not a started one")
 			requireStopped(t, f.client, "b1-main-backup")
 		})
 	}
@@ -467,7 +467,7 @@ func TestBackupAsksThePodsBeforeStoppingAJob(t *testing.T) {
 				requireRunning(t, f.client, "b1-main-backup")
 				return
 			}
-			require.Equal(t, api.OperationPhaseFailed, f.backup("b1").Status.Phase, "pods of other Jobs tell nothing")
+			require.Equal(t, api.OperationPhaseAborted, f.backup("b1").Status.Phase, "pods of other Jobs tell nothing")
 			requireStopped(t, f.client, "b1-main-backup")
 		})
 	}
@@ -540,7 +540,7 @@ func TestBackupReportsALostJob(t *testing.T) {
 
 	f.reconcile("b1")
 	got := f.backup("b1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	require.Equal(t, api.BackupReasonJobLost, condition(t, got.Status.Conditions, api.BackupConditionReady).Reason)
 	require.Zero(t, jobCount(t, f.client), "a lost backup must not be run again")
 }
@@ -748,7 +748,7 @@ func TestBackupRecordsTheBackupItsJobMakes(t *testing.T) {
 	original.Spec.BackupName = "made"
 	topology, err := model.NewTopology(readyInstallation(t).GetAncestorT(), "")
 	require.NoError(t, err)
-	job := model.BuildBackupJob(original, readyInstallation(t), topology)
+	job := model.BuildBackupJob(original, readyInstallation(t), topology, testOrchestrator())
 	require.NoError(t, ctrl.SetControllerReference(original, job, newScheme(t)))
 	edited := original.DeepCopy()
 	edited.Spec.BackupName = "edited-later"
@@ -956,7 +956,7 @@ func TestBackupPinsItsClustersAndName(t *testing.T) {
 		cr.set(installation(t, api.StatusCompleted, backupCluster("hot", 2, true)))
 		f.reconcile("b1")
 		got := f.backup("b1")
-		require.Equal(t, api.OperationPhaseFailed, got.Status.Clusters[1].Phase)
+		require.Equal(t, api.OperationPhaseAborted, got.Status.Clusters[1].Phase)
 		require.Equal(t, api.BackupReasonClusterNotFound, got.Status.Clusters[1].Reason)
 		require.Empty(t, got.Status.Clusters[1].JobName)
 		require.Equal(t, api.OperationPhaseRunning, got.Status.Phase, "the other cluster goes on")

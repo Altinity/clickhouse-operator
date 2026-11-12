@@ -1,0 +1,11 @@
+# test_010089
+# Restores the tables of cluster main the scenario dropped, through the backup Pods of its shards.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseRestore"
+metadata:
+  name: restore-089
+spec:
+  clickHouseInstallation: test-089
+  cluster: main
+  backupName: e2e-089
+  tables: "test_089.*"

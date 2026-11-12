@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
@@ -158,6 +159,45 @@ func (r *reconciler) commitStatus(
 	}
 	out.emit()
 	return result, nil
+}
+
+// announcePhase announces a change of the phase of an operation, as a warning when it failed or was aborted. The
+// reason of the event is the phase prefixed by the operation, BackupAborted say, and its message tells the reason
+// and the message of the condition that tells why: Ready once it finished, else the JobCreated or Validated condition
+// that tells what it waits for or runs.
+func (r *reconciler) announcePhase(obj meta.Object, previous, phase api.OperationPhase, conditions []meta.Condition, out *announcements) {
+	if (previous == phase) || (phase == "") {
+		return
+	}
+	cause, message := "", ""
+	types := []string{api.BackupConditionJobCreated, api.BackupConditionValidated}
+	if phase.IsTerminal() {
+		types = []string{api.BackupConditionReady}
+	}
+	for _, conditionType := range types {
+		if condition := apiMeta.FindStatusCondition(conditions, conditionType); condition != nil {
+			cause, message = condition.Reason, condition.Message
+			break
+		}
+	}
+	from := string(previous)
+	if from == "" {
+		from = "New"
+	}
+	reason := phaseEventPrefix(r.kind) + string(phase)
+	if failedPhase(phase) {
+		out.add(r.warning(obj, a.EventActionReconcile, reason, "%s %s: %s -> %s (%s): %s", r.kind, obj.GetName(), from, phase, cause, message))
+		return
+	}
+	out.add(r.info(obj, a.EventActionReconcile, reason, "%s %s: %s -> %s (%s): %s", r.kind, obj.GetName(), from, phase, cause, message))
+}
+
+// phaseEventPrefix returns what the reasons of the phase events of an operation of the kind start with.
+func phaseEventPrefix(kind string) string {
+	if kind == api.ClickHouseRestoreCRDResourceKind {
+		return "Restore"
+	}
+	return "Backup"
 }
 
 func setCondition(

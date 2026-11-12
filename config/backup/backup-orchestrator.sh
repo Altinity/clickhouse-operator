@@ -1,7 +1,12 @@
-# Drives the clickhouse-backup sidecars of one cluster of a ClickHouse installation through their REST API.
+# backup-orchestrator.sh drives the clickhouse-backup REST API of one cluster of a ClickHouse installation: that of the
+# clickhouse-backup sidecar of every ClickHouse pod (BACKUP_TRANSPORT=sidecar), or that of the backup Pod of every shard
+# (BACKUP_TRANSPORT=pod), which the host lists then name by DNS. It makes a backup, verifies one or restores one, and
+# prunes the backups of a schedule. It runs in the clickhouse-backup image: bash, curl, sort, awk, base64 and tzdata.
 # Every input arrives through the environment (see script.go): no value is ever spliced into this text, and values
 # only reach curl as URL-encoded query parameters, or as tokens validated against NAME_RE, TABLES_RE or SOURCE_PATH_RE
 # in the commands the script runs through the actions endpoint.
+# Every piece of logic is a function, and the script runs main only when it is run, not when it is sourced: tests source
+# it and call the functions.
 set -euo pipefail
 
 NAME_RE='^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
@@ -22,9 +27,14 @@ SOURCE_NAMESPACE_MAX_LENGTH=63
 # A storage path of the installation a restore reads the backup of, as a value of the --env flags of its commands: the
 # actions endpoint splits a command as a shell does, which none of these characters takes part in
 SOURCE_PATH_RE='^[A-Za-z0-9_./{}-]+$'
-# The number the CronJob controller ends the name of a scheduled Job with, bounded as in builder.go
+# The time a scheduled backup is named after, "<prefix>-<YYYYMMDDHHMMSS>": the wall time of its slot in SCHEDULE_TIMEZONE
+TAG_RE='^[0-9]{14}$'
+# The number the CronJob controller ends the name of a scheduled Job with, the minutes since the epoch of its slot,
+# bounded as in builder.go
 SLOT_RE='^[0-9]{1,10}$'
-TIMESTAMP_RE='^[0-9]{8}-[0-9]{6}$'
+SCHEDULE_TIME_RE='^([01][0-9]|2[0-3]):([0-5][0-9])$'
+KEEP_RE='^[1-9][0-9]{0,5}$'
+ZONE_RE='^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
 INTERVAL_RE='^[0-9]+([.][0-9]+)?$'
 EXIT_CODE_RE='^[1-9][0-9]?$'
 IN_PROGRESS_RE='"status":"in progress"'
@@ -53,6 +63,28 @@ DELETE_TIMEOUT=3600
 UNREACHABLE_TIMEOUT=600
 MUTATED_UNREACHABLE_TIMEOUT=3600
 RESUME_TIMEOUT=300
+# How long the backup Pods of the pod transport are waited for to answer, unless BACKUP_POD_WAIT_SECONDS tells
+DEFAULT_BACKUP_POD_WAIT_SECONDS=600
+# Where the service account of the pod keeps its token and the CA of the Kubernetes API, which Events are posted to
+SERVICE_ACCOUNT_DIR=/var/run/secrets/kubernetes.io/serviceaccount
+EVENT_TIMEOUT=5
+# Events are given up after this many failures in a row: they never fail, nor hold, the operation
+EVENT_MAX_FAILURES=3
+EVENT_SOURCE_COMPONENT=clickhouse-backup-orchestrator
+EVENT_MESSAGE_MAX_LENGTH=1024
+EVENT_FAILURES=0
+EVENTS_DISABLED=
+# The entries of SCHEDULES, as parse_schedules reads them, by index
+SCHED_PERIOD=()
+SCHED_HOUR=()
+SCHED_MINUTE=()
+SCHED_DAY=()
+SCHED_KEEP=()
+SCHED_INCREMENTAL=()
+# SLOT_TAG is the wall time of the slot of the run in SCHEDULE_TIMEZONE, as YYYYMMDDHHMMSS; WINNER the index of the
+# heaviest schedule entry whose slot it is, empty when none is
+SLOT_TAG=
+WINNER=
 # MUTATED is set once a sidecar may have accepted a request that changes something
 MUTATED=
 # READ_ONLY is set, as a local of a caller, while the requests it submits change nothing the Job is asked to change:
@@ -107,6 +139,8 @@ termination_message() {
 die() {
 	log "ERROR: $*" >&2
 	termination_message "$*"
+	operation_title
+	event Warning "Orchestrator${REPLY}Failed" "$*"
 	# A copy of the backup a restore from another installation downloaded would refuse the next restore from the same paths
 	if ((${#SOURCE_COPIES[@]} > 0)); then
 		drop_source_copies
@@ -121,6 +155,95 @@ die() {
 # fail MESSAGE dies after a step that has just warned why it failed, adding that reason to MESSAGE
 fail() {
 	die "$*${LAST_WARNING:+: ${LAST_WARNING}}"
+}
+
+# operation_title sets REPLY to OPERATION as it names the reasons of Events: Backup, Verify or Restore, empty for another
+operation_title() {
+	case ${OPERATION:-} in
+	backup) REPLY=Backup ;;
+	verify) REPLY=Verify ;;
+	restore) REPLY=Restore ;;
+	*) REPLY= ;;
+	esac
+}
+
+# json_escape VALUE sets REPLY to VALUE as the content of a JSON string: a backslash, a quote and every control
+# character escaped. Bytes of UTF-8 beyond ASCII pass as they are
+json_escape() {
+	local value=$1 out= char code
+	value=${value//\\/\\\\}
+	value=${value//\"/\\\"}
+	value=${value//$'\n'/\\n}
+	value=${value//$'\r'/\\r}
+	value=${value//$'\t'/\\t}
+	while [[ ${value} =~ ^([^[:cntrl:]]*)([[:cntrl:]])(.*)$ ]]; do
+		out+=${BASH_REMATCH[1]}
+		char=${BASH_REMATCH[2]}
+		value=${BASH_REMATCH[3]}
+		printf -v code '\\u%04x' "'${char}"
+		out+=${code}
+	done
+	REPLY=${out}${value}
+}
+
+# event_body TYPE REASON MESSAGE TIME sets REPLY to the core/v1 Event of TYPE (Normal or Warning) with REASON and MESSAGE
+# on the object EVENT_OBJECT_* names, in POD_NAMESPACE, at TIME (RFC 3339)
+event_body() {
+	local type=$1 reason=$2 message=${3:0:${EVENT_MESSAGE_MAX_LENGTH}} at=$4 field value body= name=${EVENT_OBJECT_NAME:-}
+	local -a fields=(
+		generate_name "${name:0:200}." namespace "${POD_NAMESPACE:-}"
+		api_version "${EVENT_OBJECT_API_VERSION:-}" kind "${EVENT_OBJECT_KIND:-}" name "${name}" uid "${EVENT_OBJECT_UID:-}"
+		reason "${reason}" message "${message}" type "${type}" at "${at}"
+		component "${EVENT_SOURCE_COMPONENT}" instance "${POD_NAME:-${HOSTNAME:-}}"
+	)
+	local -A json=()
+	for ((field = 0; field < ${#fields[@]}; field += 2)); do
+		json_escape "${fields[field + 1]}"
+		json[${fields[field]}]="\"${REPLY}\""
+	done
+	body='{"apiVersion":"v1","kind":"Event"'
+	body+=',"metadata":{"generateName":'${json[generate_name]}',"namespace":'${json[namespace]}'}'
+	body+=',"involvedObject":{"apiVersion":'${json[api_version]}',"kind":'${json[kind]}',"name":'${json[name]}
+	body+=',"namespace":'${json[namespace]}',"uid":'${json[uid]}'}'
+	body+=',"reason":'${json[reason]}',"message":'${json[message]}',"type":'${json[type]}
+	body+=',"source":{"component":'${json[component]}'}'
+	body+=',"firstTimestamp":'${json[at]}',"lastTimestamp":'${json[at]}',"count":1'
+	body+=',"reportingComponent":'${json[component]}',"reportingInstance":'${json[instance]}'}'
+	REPLY=${body}
+}
+
+# event TYPE REASON MESSAGE posts a Kubernetes Event on the object EVENT_OBJECT_* names - the ClickHouseBackup,
+# ClickHouseRestore or ClickHouseBackupSchedule the run works for - with the token of the service account of the pod. It
+# does nothing unless all of them, POD_NAMESPACE and the token are there, and an Event that cannot be posted never fails
+# the run: after EVENT_MAX_FAILURES failures in a row, none is tried any more
+event() {
+	local type=$1 reason=$2 message=$3 host=${KUBERNETES_SERVICE_HOST:-} at code token
+	if [[ -n ${EVENTS_DISABLED} || -z ${EVENT_OBJECT_KIND:-} || -z ${EVENT_OBJECT_NAME:-} || -z ${EVENT_OBJECT_UID:-} ||
+		-z ${EVENT_OBJECT_API_VERSION:-} || -z ${POD_NAMESPACE:-} || -z ${host} || ! -r ${SERVICE_ACCOUNT_DIR}/token ]]; then
+		return 0
+	fi
+	if [[ ${host} == *:* ]]; then
+		host="[${host}]"
+	fi
+	TZ=UTC0 printf -v at '%(%Y-%m-%dT%H:%M:%SZ)T' -1
+	event_body "${type}" "${reason}" "${message}" "${at}"
+	token=$(<"${SERVICE_ACCOUNT_DIR}/token") || token=
+	# The token travels on stdin so it never shows up in the process list
+	code=$(printf 'Authorization: Bearer %s\n' "${token}" |
+		curl -sS -o /dev/null -w '%{http_code}' --noproxy '*' --cacert "${SERVICE_ACCOUNT_DIR}/ca.crt" \
+			--connect-timeout "${EVENT_TIMEOUT}" --max-time "${EVENT_TIMEOUT}" -X POST -H @- \
+			-H 'Content-Type: application/json' --data-binary "${REPLY}" \
+			"https://${host}:${KUBERNETES_SERVICE_PORT:-443}/api/v1/namespaces/${POD_NAMESPACE}/events" 2>&1) || :
+	if [[ ${code} == 2?? ]]; then
+		EVENT_FAILURES=0
+		return 0
+	fi
+	EVENT_FAILURES=$((EVENT_FAILURES + 1))
+	log "WARNING: cannot post the event ${reason}: ${code}" >&2
+	if ((EVENT_FAILURES >= EVENT_MAX_FAILURES)); then
+		EVENTS_DISABLED=1
+		log "WARNING: no more events are posted after ${EVENT_FAILURES} failures in a row" >&2
+	fi
 }
 
 # json_get FIELD JSON sets REPLY to the raw (still escaped) value of the first string field FIELD of a JSON object, or
@@ -202,20 +325,25 @@ parse_hosts() {
 	done
 }
 
-# request METHOD HOST PATH [CURL_ARGS...] performs one API call and sets HTTP_CODE, HTTP_BODY and CURL_EXIT
+# request METHOD HOST PATH [CURL_ARGS...] performs one API call and sets HTTP_CODE, HTTP_BODY, CURL_EXIT and
+# CURL_CONNECTED, empty when the connection was never established
 request() {
-	local method=$1 host=$2 path=$3 out
+	local method=$1 host=$2 path=$3 out last
 	shift 3
 	HTTP_CODE=000
 	CURL_EXIT=0
+	CURL_CONNECTED=1
 	# The credentials travel on stdin so they never show up in the process list
 	out=$(printf 'Authorization: Basic %s\n' "${AUTH}" |
 		curl -sS -X "${method}" -H @- --connect-timeout 10 --max-time "${REQUEST_TIMEOUT}" \
-			-w '\n%{http_code}' "$@" "http://${host}:${API_PORT}${path}" 2>&1) || CURL_EXIT=$?
-	# The status code written by -w is always the last line, also when curl fails
+			-w '\n%{time_connect} %{http_code}' "$@" "http://${host}:${API_PORT}${path}" 2>&1) || CURL_EXIT=$?
+	# What -w writes is always the last line, also when curl fails
 	HTTP_BODY=${out%$'\n'*}
+	last=${out##*$'\n'}
 	if ((CURL_EXIT == 0)); then
-		HTTP_CODE=${out##*$'\n'}
+		HTTP_CODE=${last##* }
+	elif [[ ${last%% *} =~ ^0+([.]0+)?$ ]]; then
+		CURL_CONNECTED=
 	fi
 }
 
@@ -226,7 +354,7 @@ unreachable() {
 	case ${CURL_EXIT} in
 	0) [[ $1 == GET ]] && proxy_failed ;;
 	6 | 7) return 0 ;;
-	*) [[ $1 == GET ]] ;;
+	*) [[ $1 == GET || -z ${CURL_CONNECTED} ]] ;;
 	esac
 }
 
@@ -410,6 +538,17 @@ action_rows() {
 # the rows of finished actions, and a restart drops them all. An action run READ_ONLY is no step of the Job: a sidecar
 # that restarts after it has lost nothing the steps to come build on
 run_action() {
+	if run_action_steps "$@"; then
+		return 0
+	fi
+	if [[ -z ${READ_ONLY:-} ]]; then
+		event Warning OrchestratorHostFailed "$1: $2 $3 failed${LAST_WARNING:+: ${LAST_WARNING}}"
+	fi
+	return 1
+}
+
+# run_action_steps HOST WHAT NAME COMMAND is run_action without the Event of a failure
+run_action_steps() {
 	local host=$1 what=$2 name=$3 command=$4 body i start status error
 	local -a before
 	log "${host}: ${what} ${name}"
@@ -447,6 +586,7 @@ run_action() {
 			log "${host}: ${what} ${name} succeeded"
 			if [[ -z ${READ_ONLY:-} ]]; then
 				remember_step "${host}" "" "${start}" "${command}"
+				event Normal OrchestratorHostStepSucceeded "${host}: ${what} ${name} succeeded"
 			fi
 			return 0
 			;;
@@ -469,6 +609,15 @@ run_action() {
 # run_op HOST WHAT NAME PATH [CURL_ARGS...] starts an asynchronous sidecar operation on backup NAME
 # and polls it until it succeeds or fails
 run_op() {
+	if run_op_steps "$@"; then
+		return 0
+	fi
+	event Warning OrchestratorHostFailed "$1: $2 $3 failed${LAST_WARNING:+: ${LAST_WARNING}}"
+	return 1
+}
+
+# run_op_steps HOST WHAT NAME PATH [CURL_ARGS...] is run_op without the Event of a failure
+run_op_steps() {
 	local host=$1 what=$2 name=$3 id status
 	shift 3
 	log "${host}: ${what} ${name}"
@@ -500,6 +649,7 @@ run_op() {
 		success)
 			log "${host}: ${what} ${name} succeeded"
 			remember_step "${host}" "${id}"
+			event Normal OrchestratorHostStepSucceeded "${host}: ${what} ${name} succeeded"
 			return 0
 			;;
 		"")
@@ -656,14 +806,14 @@ holds_data() {
 }
 
 # list_all PATTERN HOST... lists the backups of every HOST and fills the sets COMPLETE, with the names matching
-# PATTERN of the backups every HOST lists complete, and WITH_DATA, with those of the backups that hold data on any HOST,
-# and UNLISTED with the hosts that cannot be listed. A run that failed on one host leaves copies on the others that
-# cannot be restored on their own, and the copies of one backup on a host whose tables hold no data are as much part of
-# it as those that do
+# PATTERN of the backups every HOST lists complete, WITH_DATA, with those of the backups that hold data on any HOST,
+# EMPTY, with those of the backups a HOST lists complete with a size of 0, nothing at all, and ALL_NAMES, with those of
+# every backup any HOST lists, broken ones too, and UNLISTED with the hosts that cannot be listed. A run that failed on one host leaves copies on the others that cannot be restored on their own, and the copies
+# of one backup on a host whose tables hold no data are as much part of it as those that do
 list_all() {
 	local pattern=$1 host first=1 i name
 	local -A listed both
-	declare -gA COMPLETE=() WITH_DATA=()
+	declare -gA COMPLETE=() WITH_DATA=() EMPTY=() ALL_NAMES=()
 	UNLISTED=()
 	shift
 	for host in "$@"; do
@@ -676,12 +826,21 @@ list_all() {
 		fi
 		listed=()
 		for i in "${!LIST_NAMES[@]}"; do
-			if [[ ! ${LIST_NAMES[i]} =~ ${pattern} || ${LIST_DESC[i]} == broken* ]]; then
+			if [[ ! ${LIST_NAMES[i]} =~ ${pattern} ]]; then
+				continue
+			fi
+			ALL_NAMES[${LIST_NAMES[i]}]=1
+			if [[ ${LIST_DESC[i]} == broken* ]]; then
 				continue
 			fi
 			listed[${LIST_NAMES[i]}]=1
 			if holds_data "${i}"; then
 				WITH_DATA[${LIST_NAMES[i]}]=1
+			fi
+			# A sidecar older than 2.6.6 lists no sizes, which leaves the size unknown rather than 0
+			if [[ -n ${LIST_METADATA_SIZE[i]} && ${LIST_DATA_SIZE[i]:-0} == 0 && ${LIST_OBJECT_DISK_SIZE[i]:-0} == 0 &&
+				${LIST_METADATA_SIZE[i]} == 0 && ${LIST_RBAC_SIZE[i]:-0} == 0 ]]; then
+				EMPTY[${LIST_NAMES[i]}]=1
 			fi
 		done
 		both=()
@@ -698,74 +857,122 @@ list_all() {
 	done
 }
 
-# retention_on_host HOST KEEP PATTERN deletes the backups matching PATTERN on HOST that retention keeps no longer, as
-# list_all classified them
-retention_on_host() {
-	local host=$1 keep=$2 pattern=$3 i name kept=0 kept_empty=0 required_by
-	local -a candidates=()
-	local -A deleted=()
-	if ! list_backups "${host}" remote; then
-		return 1
-	fi
-	# The timestamp suffix is fixed-width, so name order is creation order
-	for i in "${!LIST_NAMES[@]}"; do
-		if [[ ${LIST_NAMES[i]} =~ ${pattern} ]]; then
-			candidates+=("${LIST_NAMES[i]}")
+# series_pattern sets REPLY to the regex of the names of the scheduled backups, "<prefix>-<YYYYMMDDHHMMSS>"
+series_pattern() {
+	REPLY="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{14}$"
+}
+
+# retention_pattern sets REPLY to the regex of the names retention looks at: those of the scheduled backups, and those
+# of the backups made at once from the schedule, "<prefix>-<YYYYMMDD>T<HHMMSS>"
+retention_pattern() {
+	REPLY="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{8}T?[0-9]{6}$"
+}
+
+# retention_plan decides, as the cleanup of remote backups of the Altinity Cloud Manager does, which backups of the
+# schedule retention keeps, KEEP, and which it deletes, OBSOLETE, newest first, of NAMES, the backups of the
+# retention_pattern any retention host lists, as list_all classified them:
+#  - a backup not every host lists complete, or one a host lists of size 0 - failed, in progress, or empty - is neither
+#    counted nor deleted, nor is one whose name tells no valid time;
+#  - the newest backup is always kept, as the base of the next incremental one, and so is the one just made;
+#  - every entry of the schedule keeps the newest keep backups of its slots: a backup may be kept by several, the
+#    weekly one counts for the daily entry too;
+#  - a backup made at once from the schedule, "<prefix>-<YYYYMMDD>T<HHMMSS>", is kept while it is no older than the
+#    oldest scheduled backup an entry keeps;
+#  - anything else is obsolete. Incremental chains are not protected: deleted newest first, a dependent goes before its
+#    base, and clickhouse-backup rebases the dependents of a base it deletes (rebase_during_delete), so the kept
+#    incremental backups stay restorable
+retention_plan() {
+	local name tag key i oldest= first=1
+	local -a ordered=() manual=() counts=()
+	declare -gA KEEP=()
+	OBSOLETE=()
+	for name in "${NAMES[@]}"; do
+		if [[ -z ${COMPLETE[${name}]:-} || -n ${EMPTY[${name}]:-} ]]; then
+			continue
+		fi
+		tag=${name:${#BACKUP_NAME_PREFIX}+1}
+		key=${tag/T/}
+		if tag_valid "${key}"; then
+			ordered+=("${key} ${name}")
 		fi
 	done
-	if ((${#candidates[@]} == 0)); then
-		return 0
+	if ((${#ordered[@]} > 0)); then
+		mapfile -t ordered < <(printf '%s\n' "${ordered[@]}" | sort -r)
 	fi
-	mapfile -t candidates < <(printf '%s\n' "${candidates[@]}" | sort -r)
-	# Walk newest to oldest: an incremental is always newer than its base,
-	# so deleting it first can free the base within the same pass
-	for name in "${candidates[@]}"; do
-		# A backup that not every host holds complete - broken, a copy of a run that failed on another host, or one made
-		# before a host was added - never takes the place of one they all do. One with data is kept until the backups
-		# with data that every host holds fill their window, as it may still restore from the hosts that hold it; any
-		# other while both windows are open: an upload in progress lists as broken until it completes, and a run in
-		# progress has made its copies on some hosts only
-		if [[ -z ${COMPLETE[${name}]:-} ]]; then
-			if [[ -n ${WITH_DATA[${name}]:-} ]]; then
-				if ((kept < keep)) || [[ ${name} == "${BACKUP_NAME}" ]]; then
-					continue
-				fi
-			elif (((kept < keep) && (kept_empty < keep))) || [[ ${name} == "${BACKUP_NAME}" ]]; then
-				continue
-			fi
-		# Nor does a backup without data - of tables that match nothing any more, or of an installation recreated
-		# empty: the newest of those are kept apart, so that a host which never holds data still prunes
-		elif [[ -z ${WITH_DATA[${name}]:-} ]]; then
-			if ((kept_empty < keep)) || [[ ${name} == "${BACKUP_NAME}" ]]; then
-				kept_empty=$((kept_empty + 1))
-				continue
-			fi
-		elif ((kept < keep)) || [[ ${name} == "${BACKUP_NAME}" ]]; then
-			kept=$((kept + 1))
+	for i in "${!SCHED_PERIOD[@]}"; do
+		counts[i]=0
+	done
+	for tag in "${ordered[@]}"; do
+		key=${tag%% *}
+		name=${tag#* }
+		if [[ -n ${first} || ${name} == "${BACKUP_NAME:-}" ]]; then
+			KEEP[${name}]=1
+			first=
+		fi
+		if [[ ${name:${#BACKUP_NAME_PREFIX}+1} == *T* ]]; then
+			manual+=("${tag}")
 			continue
 		fi
-		required_by=
-		for i in "${!LIST_NAMES[@]}"; do
-			# A dependent without a name, which no sidecar makes, is never one retention deleted
-			if [[ ${LIST_REQUIRED[i]} == "${name}" ]] && [[ -z ${LIST_NAMES[i]} || -z ${deleted[${LIST_NAMES[i]}]:-} ]]; then
-				required_by=${LIST_NAMES[i]:-a backup without a name}
-				break
+		for i in "${!SCHED_PERIOD[@]}"; do
+			if slot_matches "${i}" "${key}"; then
+				counts[i]=$((counts[i] + 1))
+				if ((counts[i] <= SCHED_KEEP[i])); then
+					KEEP[${name}]=1
+					# The backups come newest first
+					oldest=${key}
+				fi
 			fi
 		done
-		if [[ -n ${required_by} ]]; then
-			log "${host}: retention keeps ${name}, ${required_by} is based on it"
-			continue
+	done
+	for tag in "${manual[@]}"; do
+		key=${tag%% *}
+		if [[ -z ${oldest} || ! ${key} < ${oldest} ]]; then
+			KEEP[${tag#* }]=1
 		fi
-		if submit "${host}" "delete remote ${name}" "/backup/delete/remote/${name}" --max-time "${DELETE_TIMEOUT}"; then
-			deleted[${name}]=1
-			log "${host}: retention deleted ${name}"
+	done
+	for tag in "${ordered[@]}"; do
+		name=${tag#* }
+		if [[ -z ${KEEP[${name}]:-} ]]; then
+			OBSOLETE+=("${name}")
 		fi
 	done
 }
 
+# retention_on_host HOST deletes on HOST the backups of OBSOLETE it lists, newest first
+retention_on_host() {
+	local host=$1 name
+	local -A held=()
+	if ! list_backups "${host}" remote; then
+		return 1
+	fi
+	for name in "${LIST_NAMES[@]}"; do
+		if [[ -n ${name} ]]; then
+			held[${name}]=1
+		fi
+	done
+	for name in "${OBSOLETE[@]}"; do
+		if [[ -z ${held[${name}]:-} ]]; then
+			continue
+		fi
+		if submit "${host}" "delete remote ${name}" "/backup/delete/remote/${name}" --max-time "${DELETE_TIMEOUT}"; then
+			log "${host}: retention deleted ${name}"
+			event Normal OrchestratorRetentionDeleted "${host}: retention deleted ${name}"
+		else
+			event Warning OrchestratorRetentionFailed "${LAST_WARNING}"
+		fi
+	done
+}
+
+# retention prunes the backups of the schedule after a successful scheduled backup, as retention_plan decides, on every
+# host of RETENTION_HOSTS: one per shard. Nothing is deleted while a restore of the cluster runs, which may read them.
+# A failure only warns
 retention() {
-	local keep=$((10#${KEEP_LAST:-0})) host pattern
-	if ((keep == 0)); then
+	local host
+	if ((${#SCHED_PERIOD[@]} == 0)); then
+		return 0
+	fi
+	if is_true RESTORE_IN_PROGRESS; then
+		warn "retention skipped: a restore of the cluster is in progress"
 		return 0
 	fi
 	if [[ -z ${BACKUP_NAME_PREFIX:-} ]]; then
@@ -777,20 +984,23 @@ retention() {
 		warn "retention skipped: RETENTION_HOSTS is empty"
 		return 0
 	fi
-	log "retention: keeping the ${keep} newest ${BACKUP_NAME_PREFIX}-* backups with data, and the ${keep} newest without"
+	log "retention: keeping the newest ${BACKUP_NAME_PREFIX}-* backup, the newest backups of the slots of every schedule entry it keeps, and the backups made at once no older than the oldest of those"
 	# An unreachable host skips retention until the next run instead of holding the Job until its deadline
 	BEST_EFFORT=1
-	pattern="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{8}-[0-9]{6}$"
-	list_all "${pattern}" "${HOSTS[@]}"
+	retention_pattern
+	list_all "${REPLY}" "${HOSTS[@]}"
 	# Every host keeps and deletes the same backups, which takes knowing what each of them holds
 	if ((${#UNLISTED[@]} > 0)); then
 		warn "retention skipped: ${UNLISTED[*]} cannot be listed, backups are left as they are"
+		event Warning OrchestratorRetentionSkipped "${LAST_WARNING}"
 		return 0
 	fi
+	NAMES=("${!ALL_NAMES[@]}")
+	retention_plan
 	for host in "${HOSTS[@]}"; do
 		if [[ ! ${host} =~ ${HOST_RE} ]]; then
 			warn "retention skipped an invalid host name"
-		elif ! retention_on_host "${host}" "${keep}" "${pattern}"; then
+		elif ! retention_on_host "${host}"; then
 			warn "${host}: retention failed, backups are left as they are"
 		fi
 	done
@@ -802,7 +1012,6 @@ retention() {
 # that cannot be listed leaves that unknown, and so does a sidecar older than 2.6.6, which lists no sizes, so nothing
 # is told then
 report_data() {
-	local keep=$((10#${KEEP_LAST:-0}))
 	# The backup is made: a host that does not answer is asked once rather than waited for
 	local BEST_EFFORT=1
 	list_all "^${BACKUP_NAME//./[.]}$" "$@"
@@ -813,11 +1022,8 @@ report_data() {
 	if [[ -z ${COMPLETE[${BACKUP_NAME}]:-} || -n ${WITH_DATA[${BACKUP_NAME}]:-} ]]; then
 		return 0
 	fi
-	if ((keep > 0)); then
-		warn "${BACKUP_NAME} holds no data, so it does not count toward the ${keep} backups with data that retention keeps"
-	else
-		warn "${BACKUP_NAME} holds no data"
-	fi
+	warn "${BACKUP_NAME} holds no data"
+	event Warning OrchestratorNoData "${BACKUP_NAME} holds no data"
 	if [[ -n ${NO_DATA_MESSAGE:-} ]]; then
 		termination_message "${NO_DATA_MESSAGE}"
 	fi
@@ -1119,40 +1325,396 @@ check_storage_paths() {
 	log "storage path check: every shard of cluster ${self_name} has a path of its own"
 }
 
-# schedule_timestamp prints the UTC time a scheduled run was due, as YYYYMMDD-HHMMSS. The CronJob controller names each
-# Job after that time in minutes since the epoch, so every run of one slot makes the same backup, whose name the operator
-# derives the same way; a Job named otherwise, such as one created by hand from the CronJob, takes the current time.
-schedule_timestamp() {
-	local slot= timestamp=
+# days_from_civil YEAR MONTH DAY sets REPLY to the number of days from 1970-01-01 to the date of the proleptic
+# Gregorian calendar
+days_from_civil() {
+	local y=$1 m=$2 d=$3 era yoe doy doe
+	y=$((y - (m <= 2 ? 1 : 0)))
+	era=$(((y >= 0 ? y : y - 399) / 400))
+	yoe=$((y - era * 400))
+	doy=$(((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1))
+	doe=$((yoe * 365 + yoe / 4 - yoe / 100 + doy))
+	REPLY=$((era * 146097 + doe - 719468))
+}
+
+# month_days YEAR MONTH sets REPLY to the number of days of the month
+month_days() {
+	case $2 in
+	2) REPLY=$(($1 % 4 == 0 && ($1 % 100 != 0 || $1 % 400 == 0) ? 29 : 28)) ;;
+	4 | 6 | 9 | 11) REPLY=30 ;;
+	*) REPLY=31 ;;
+	esac
+}
+
+# weekday YEAR MONTH DAY sets REPLY to the day of the week of the date, 0 for Sunday
+weekday() {
+	days_from_civil "$1" "$2" "$3"
+	# 1970-01-01 was a Thursday
+	REPLY=$((((REPLY % 7) + 11) % 7))
+}
+
+# tag_valid TAG reports whether TAG is YYYYMMDDHHMMSS of a valid time
+tag_valid() {
+	local tag=$1 y m d
+	if [[ ! ${tag} =~ ${TAG_RE} ]]; then
+		return 1
+	fi
+	y=$((10#${tag:0:4})) m=$((10#${tag:4:2})) d=$((10#${tag:6:2}))
+	if ((m < 1 || m > 12)); then
+		return 1
+	fi
+	month_days "${y}" "${m}"
+	((d >= 1 && d <= REPLY && 10#${tag:8:2} < 24 && 10#${tag:10:2} < 60 && 10#${tag:12:2} < 60))
+}
+
+# period_weight PERIOD sets REPLY to the weight of a schedule period: the longer the period, the heavier
+period_weight() {
+	case $1 in
+	minute) REPLY=1 ;;
+	hour) REPLY=2 ;;
+	6hours) REPLY=3 ;;
+	daily) REPLY=4 ;;
+	weekly) REPLY=5 ;;
+	monthly) REPLY=6 ;;
+	*) REPLY=0 ;;
+	esac
+}
+
+# parse_schedules fills the SCHED_* arrays from SCHEDULES: entries separated by ";", each of blank-separated
+# key=value fields "period=<minute|hour|6hours|daily|weekly|monthly> [time=HH:MM] [day=N] keep=N [incremental=true]".
+# A minute entry is every minute, whatever its time; the time of an hour entry gives its minute, that of a 6hours entry
+# its minute and its hour modulo 6, empty is 00:00; daily, weekly and monthly entries need it. A weekly entry needs a day from 0 (Sunday) to 6, a monthly one a day from 1 to 31,
+# which a shorter month clamps to its last day; no other entry takes one. Anything else is fatal
+parse_schedules() {
+	local entry field key value index=0 period at day keep incremental
+	local -a entries fields
+	local -A periods=()
+	SCHED_PERIOD=() SCHED_HOUR=() SCHED_MINUTE=() SCHED_DAY=() SCHED_KEEP=() SCHED_INCREMENTAL=()
+	if [[ ${SCHEDULES:-} == *[[:cntrl:]]* ]]; then
+		die "SCHEDULES must be one line"
+	fi
+	IFS=';' read -r -a entries <<<"${SCHEDULES:-}"
+	for entry in "${entries[@]}"; do
+		read -r -a fields <<<"${entry}"
+		if ((${#fields[@]} == 0)); then
+			continue
+		fi
+		period= at= day= keep= incremental=false
+		for field in "${fields[@]}"; do
+			if [[ ${field} != *=* ]]; then
+				die "SCHEDULES entry ${index}: ${field} is no key=value"
+			fi
+			key=${field%%=*}
+			value=${field#*=}
+			case ${key} in
+			period) period=${value} ;;
+			time) at=${value} ;;
+			day) day=${value} ;;
+			keep) keep=${value} ;;
+			incremental) incremental=${value} ;;
+			*) die "SCHEDULES entry ${index}: unknown key ${key}" ;;
+			esac
+		done
+		case ${period} in
+		minute | hour | 6hours | daily | weekly | monthly) ;;
+		*) die "SCHEDULES entry ${index}: period must be minute, hour, 6hours, daily, weekly or monthly" ;;
+		esac
+		if [[ -n ${periods[${period}]:-} ]]; then
+			die "SCHEDULES entry ${index}: a second ${period} entry"
+		fi
+		periods[${period}]=1
+		if [[ ! ${keep} =~ ${KEEP_RE} ]]; then
+			die "SCHEDULES entry ${index} (${period}): keep must be a number from 1"
+		fi
+		if [[ -n ${at} && ! ${at} =~ ${SCHEDULE_TIME_RE} ]]; then
+			die "SCHEDULES entry ${index} (${period}): time must be HH:MM"
+		fi
+		if [[ -z ${at} && ${period} != minute && ${period} != hour && ${period} != 6hours ]]; then
+			die "SCHEDULES entry ${index} (${period}): time is required"
+		fi
+		case ${period} in
+		weekly)
+			if [[ ! ${day} =~ ^[0-6]$ ]]; then
+				die "SCHEDULES entry ${index} (weekly): day must be from 0 (Sunday) to 6"
+			fi
+			;;
+		monthly)
+			if [[ ! ${day} =~ ^([1-9]|[12][0-9]|3[01])$ ]]; then
+				die "SCHEDULES entry ${index} (monthly): day must be from 1 to 31"
+			fi
+			;;
+		*)
+			if [[ -n ${day} ]]; then
+				die "SCHEDULES entry ${index} (${period}): day is for weekly and monthly entries only"
+			fi
+			;;
+		esac
+		case ${incremental} in
+		true | false) ;;
+		*) die "SCHEDULES entry ${index} (${period}): incremental must be true or false" ;;
+		esac
+		if [[ ${period} == minute ]]; then
+			at=
+		fi
+		at=${at:-00:00}
+		SCHED_PERIOD+=("${period}")
+		SCHED_HOUR+=("$((10#${at%%:*}))")
+		SCHED_MINUTE+=("$((10#${at#*:}))")
+		SCHED_DAY+=("${day}")
+		SCHED_KEEP+=("${keep}")
+		SCHED_INCREMENTAL+=("${incremental}")
+		index=$((index + 1))
+	done
+}
+
+# slot_matches INDEX TAG reports whether the wall time TAG, YYYYMMDDHHMMSS, is a slot of the schedule entry INDEX, to the
+# minute: a minute entry at every minute, an hour entry at the minute of its time, a 6hours one at that minute every 6 hours from its hour, a daily one
+# at its time, a weekly one on its day of the week at its time, a monthly one on its day of the month, clamped to the last
+# day of a shorter month, at its time
+slot_matches() {
+	local i=$1 tag=$2 y m d hour minute day
+	y=$((10#${tag:0:4})) m=$((10#${tag:4:2})) d=$((10#${tag:6:2})) hour=$((10#${tag:8:2})) minute=$((10#${tag:10:2}))
+	if [[ ${SCHED_PERIOD[i]} == minute ]]; then
+		return 0
+	fi
+	if ((minute != SCHED_MINUTE[i])); then
+		return 1
+	fi
+	case ${SCHED_PERIOD[i]} in
+	hour) return 0 ;;
+	6hours)
+		((hour % 6 == SCHED_HOUR[i] % 6))
+		return
+		;;
+	esac
+	if ((hour != SCHED_HOUR[i])); then
+		return 1
+	fi
+	case ${SCHED_PERIOD[i]} in
+	daily) return 0 ;;
+	weekly)
+		weekday "${y}" "${m}" "${d}"
+		((REPLY == SCHED_DAY[i]))
+		;;
+	monthly)
+		month_days "${y}" "${m}"
+		day=$((SCHED_DAY[i] < REPLY ? SCHED_DAY[i] : REPLY))
+		((d == day))
+		;;
+	*) return 1 ;;
+	esac
+}
+
+# winner_entry TAG sets MATCHED to the indexes of the schedule entries whose slot TAG is, and WINNER to the heaviest of
+# them, empty when none matches: the run of a slot of several entries is a run of each, and of the heaviest above all,
+# which decides whether it is incremental
+winner_entry() {
+	local i weight=0
+	MATCHED=()
+	WINNER=
+	for i in "${!SCHED_PERIOD[@]}"; do
+		if slot_matches "${i}" "$1"; then
+			MATCHED+=("${i}")
+			period_weight "${SCHED_PERIOD[i]}"
+			if ((REPLY > weight)); then
+				weight=${REPLY}
+				WINNER=${i}
+			fi
+		fi
+	done
+}
+
+# check_timezone fails unless SCHEDULE_TIMEZONE is empty, UTC, or a zone of the tzdata of the image
+check_timezone() {
+	local zone=${SCHEDULE_TIMEZONE:-}
+	if [[ -z ${zone} || ${zone} == UTC ]]; then
+		return 0
+	fi
+	if [[ ! ${zone} =~ ${ZONE_RE} || ${zone} == *..* || ! -f ${TZDIR:-/usr/share/zoneinfo}/${zone} ]]; then
+		die "SCHEDULE_TIMEZONE is not a time zone of the tzdata of the image"
+	fi
+}
+
+# slot_tag EPOCH sets REPLY to the wall time of EPOCH in SCHEDULE_TIMEZONE, as YYYYMMDDHHMMSS
+slot_tag() {
+	local zone=${SCHEDULE_TIMEZONE:-}
+	if [[ -z ${zone} || ${zone} == UTC ]]; then
+		zone=UTC0
+	fi
+	TZ=${zone} printf -v REPLY '%(%Y%m%d%H%M%S)T' "$1"
+}
+
+# slot_epoch sets REPLY to the unix seconds of the slot of the run: the CronJob controller names the Job of a scheduled
+# run "<CRON_JOB_NAME>-<minutes since the epoch of its slot>", which the pod reads from the Job name label of its pod,
+# JOB_NAME, so every run of one slot makes the same backup, whose name the operator derives the same way. A Job named
+# otherwise, such as one created by hand from the CronJob, takes the current minute
+slot_epoch() {
+	local slot=
 	if [[ -n ${CRON_JOB_NAME:-} && ${JOB_NAME:-} == "${CRON_JOB_NAME}-"* ]]; then
 		slot=${JOB_NAME#"${CRON_JOB_NAME}-"}
 	fi
 	if [[ ${slot} =~ ${SLOT_RE} ]]; then
-		# GNU and BusyBox date take -d @seconds, BSD date takes -r seconds
-		timestamp=$(date -u -d "@$((10#${slot} * 60))" +%Y%m%d-%H%M%S 2>/dev/null ||
-			date -u -r "$((10#${slot} * 60))" +%Y%m%d-%H%M%S 2>/dev/null) || timestamp=
+		REPLY=$((10#${slot} * 60))
+		return 0
 	fi
-	if [[ ! ${timestamp} =~ ${TIMESTAMP_RE} ]]; then
-		timestamp=$(date -u +%Y%m%d-%H%M%S)
+	printf -v REPLY '%(%s)T' -1
+	REPLY=$((REPLY - REPLY % 60))
+}
+
+# schedule_slot sets SLOT_TAG to the wall time in SCHEDULE_TIMEZONE of the slot of the run, as YYYYMMDDHHMMSS. A slot past
+# the four-digit years takes the current minute, as the operator then derives no name
+schedule_slot() {
+	slot_epoch
+	slot_tag "${REPLY}"
+	if [[ ! ${REPLY} =~ ${TAG_RE} ]]; then
+		printf -v REPLY '%(%s)T' -1
+		slot_tag "$((REPLY - REPLY % 60))"
 	fi
-	printf '%s' "${timestamp}"
+	SLOT_TAG=${REPLY}
+}
+
+# record_series HOST adds to SERIES_REQUIRED, as "<host> <name>", the backup each complete backup of the series of
+# the last list of HOST is incremental from, empty for a full one; the backup this run makes is none of them
+record_series() {
+	local host=$1 i pattern
+	series_pattern
+	pattern=${REPLY}
+	for i in "${!LIST_NAMES[@]}"; do
+		if [[ ${LIST_NAMES[i]} =~ ${pattern} && ${LIST_NAMES[i]} != "${BACKUP_NAME}" && ${LIST_DESC[i]} != broken* ]]; then
+			SERIES_REQUIRED["${host} ${LIST_NAMES[i]}"]=${LIST_REQUIRED[i]}
+		fi
+	done
+}
+
+# incremental_base KEEP HOST... sets REPLY to the backup an incremental scheduled backup on every HOST is made from, as
+# SERIES_REQUIRED holds them: the newest backup of the series every HOST holds complete, unless the chain of
+# incremental backups that ends with it is KEEP long on any HOST, empty for a full backup then, as when there is none.
+# CHAIN is the length of that chain
+incremental_base() {
+	local keep=$1 host key name newest= count n
+	local -a names
+	local -A hosts=() held=()
+	shift
+	for host in "$@"; do
+		hosts[${host}]=1
+	done
+	for key in "${!SERIES_REQUIRED[@]}"; do
+		if [[ -n ${hosts[${key%% *}]:-} ]]; then
+			name=${key#* }
+			held[${name}]=$((${held[${name}]:-0} + 1))
+		fi
+	done
+	for name in "${!held[@]}"; do
+		n=${held[${name}]}
+		if ((n == ${#hosts[@]})) && [[ ${name} > ${newest} ]]; then
+			newest=${name}
+		fi
+	done
+	CHAIN=0
+	REPLY=
+	if [[ -z ${newest} ]]; then
+		return 0
+	fi
+	for host in "${!hosts[@]}"; do
+		names=()
+		for key in "${!SERIES_REQUIRED[@]}"; do
+			if [[ ${key%% *} == "${host}" ]]; then
+				names+=("${key#* }")
+			fi
+		done
+		mapfile -t names < <(printf '%s\n' "${names[@]}" | sort -r)
+		count=0
+		for name in "${names[@]}"; do
+			if [[ ${name} > ${newest} ]]; then
+				continue
+			fi
+			if [[ -z ${SERIES_REQUIRED["${host} ${name}"]} ]]; then
+				break
+			fi
+			count=$((count + 1))
+		done
+		if ((count > CHAIN)); then
+			CHAIN=${count}
+		fi
+	done
+	if ((CHAIN < keep)); then
+		REPLY=${newest}
+	fi
+}
+
+# backup_pod_wait_seconds sets REPLY to how long the backup Pods of the pod transport are waited for, failing for a
+# BACKUP_POD_WAIT_SECONDS that is no number
+backup_pod_wait_seconds() {
+	REPLY=${BACKUP_POD_WAIT_SECONDS:-${DEFAULT_BACKUP_POD_WAIT_SECONDS}}
+	if [[ ! ${REPLY} =~ ${NUMBER_RE} ]]; then
+		die "BACKUP_POD_WAIT_SECONDS must be a number of seconds"
+	fi
+	REPLY=$((10#${REPLY}))
+}
+
+# check_transport fails unless BACKUP_TRANSPORT is sidecar, pod or empty, which is sidecar
+check_transport() {
+	case ${BACKUP_TRANSPORT:-} in
+	"" | sidecar) ;;
+	pod) backup_pod_wait_seconds ;;
+	*) die "BACKUP_TRANSPORT must be sidecar or pod" ;;
+	esac
+}
+
+# wait_for_apis HOST... waits, with the pod transport, until the API of every HOST answers: the backup Pods of the shards
+# start with the operation, and their DNS names resolve once they are ready. A Pod that does not answer within
+# BACKUP_POD_WAIT_SECONDS fails the run, which has changed nothing yet
+wait_for_apis() {
+	local host since=${SECONDS} wait announced
+	if [[ ${BACKUP_TRANSPORT:-} != pod ]]; then
+		return 0
+	fi
+	backup_pod_wait_seconds
+	wait=${REPLY}
+	for host in "$@"; do
+		if [[ ! ${host} =~ ${HOST_RE} ]]; then
+			continue
+		fi
+		announced=
+		while :; do
+			request GET "${host}" /backup/version
+			if ((CURL_EXIT == 0)) && ! proxy_failed; then
+				break
+			fi
+			if ((SECONDS - since >= wait)); then
+				die "the backup Pod ${host} does not answer after $((SECONDS - since))s (curl exit ${CURL_EXIT}, HTTP ${HTTP_CODE})"
+			fi
+			if [[ -z ${announced} ]]; then
+				announced=1
+				log "${host}: waiting for the backup Pod to answer"
+			fi
+			sleep "${POLL_INTERVAL}"
+		done
+	done
+	event Normal OrchestratorBackupPodsReady "the backup Pods answer"
 }
 
 do_backup() {
-	local host
+	local host incremental= keep
 	local -a backup_hosts params
 	parse_hosts BACKUP_HOSTS
 	backup_hosts=("${HOSTS[@]}")
-	if [[ -n ${KEEP_LAST:-} && ! ${KEEP_LAST} =~ ${NUMBER_RE} ]]; then
-		die "KEEP_LAST must be a non-negative integer"
-	fi
 	if [[ -n ${BACKUP_NAME_PREFIX:-} ]]; then
 		check_name BACKUP_NAME_PREFIX
+	fi
+	parse_schedules
+	is_true RESTORE_IN_PROGRESS || :
+	check_timezone
+	if ((${#SCHED_PERIOD[@]} > 0)) || [[ -z ${BACKUP_NAME:-} ]]; then
+		schedule_slot
 	fi
 	if [[ -n ${BACKUP_NAME:-} ]]; then
 		check_name BACKUP_NAME
 	elif [[ -n ${BACKUP_NAME_PREFIX:-} ]]; then
-		BACKUP_NAME="${BACKUP_NAME_PREFIX}-$(schedule_timestamp)"
+		BACKUP_NAME="${BACKUP_NAME_PREFIX}-${SLOT_TAG}"
+		if [[ ! ${BACKUP_NAME} =~ ${NAME_RE} ]]; then
+			die "BACKUP_NAME_PREFIX is too long for a backup name"
+		fi
 	else
 		die "either BACKUP_NAME or BACKUP_NAME_PREFIX must be set"
 	fi
@@ -1168,14 +1730,28 @@ do_backup() {
 	fi
 	if [[ -n ${DIFF_FROM_REMOTE:-} ]]; then
 		check_name DIFF_FROM_REMOTE
-		params+=(--data-urlencode "diff-from-remote=${DIFF_FROM_REMOTE}")
 	fi
 	if [[ -n ${CLUSTER:-} ]]; then
 		check_cluster
 	fi
+	if ((${#SCHED_PERIOD[@]} > 0)); then
+		winner_entry "${SLOT_TAG}"
+		if [[ -z ${WINNER} ]]; then
+			log "backup ${BACKUP_NAME}: the slot ${SLOT_TAG} is a slot of no schedule entry, the backup is full"
+		else
+			log "backup ${BACKUP_NAME}: the slot ${SLOT_TAG} is a slot of the ${SCHED_PERIOD[WINNER]} entry${MATCHED[1]:+ and lighter ones}"
+			if [[ ${SCHED_INCREMENTAL[WINNER]} == true && -z ${DIFF_FROM_REMOTE:-} && -n ${BACKUP_NAME_PREFIX:-} ]]; then
+				incremental=1
+				keep=${SCHED_KEEP[WINNER]}
+			fi
+		fi
+	fi
 	check_storage_paths
+	wait_for_apis "${backup_hosts[@]}"
 
+	event Normal OrchestratorBackupStarted "backup ${BACKUP_NAME} on ${#backup_hosts[@]} host(s)"
 	log "backup ${BACKUP_NAME}: preflight on ${#backup_hosts[@]} host(s)"
+	declare -gA SERIES_REQUIRED=()
 	for host in "${backup_hosts[@]}"; do
 		if ! list_backups "${host}" remote; then
 			fail "preflight failed on ${host}"
@@ -1187,7 +1763,23 @@ do_backup() {
 		if [[ -n ${DIFF_FROM_REMOTE:-} ]] && ! find_backup "${DIFF_FROM_REMOTE}"; then
 			die "base backup ${DIFF_FROM_REMOTE} is missing in the storage of ${host}"
 		fi
+		if [[ -n ${incremental} ]]; then
+			record_series "${host}"
+		fi
 	done
+	if [[ -n ${DIFF_FROM_REMOTE:-} ]]; then
+		params+=(--data-urlencode "diff-from-remote=${DIFF_FROM_REMOTE}")
+	elif [[ -n ${incremental} ]]; then
+		incremental_base "${keep}" "${backup_hosts[@]}"
+		if [[ -n ${REPLY} ]]; then
+			log "backup ${BACKUP_NAME}: incremental from ${REPLY}, which ends a chain of ${CHAIN} incremental backups"
+			event Normal OrchestratorIncrementalBase "${BACKUP_NAME} is incremental from ${REPLY}"
+			params+=(--data-urlencode "diff-from-remote=${REPLY}")
+		else
+			log "backup ${BACKUP_NAME}: full, as the chain of incremental backups is ${CHAIN} long, of ${keep} at most, or there is no base every host holds"
+			event Normal OrchestratorIncrementalFull "${BACKUP_NAME} is a full backup"
+		fi
+	fi
 
 	for host in "${backup_hosts[@]}"; do
 		if ! list_backups "${host}" remote; then
@@ -1205,6 +1797,7 @@ do_backup() {
 	if ! is_true SCHEMA_ONLY; then
 		report_data "${backup_hosts[@]}"
 	fi
+	event Normal OrchestratorBackupCompleted "backup ${BACKUP_NAME} completed on ${#backup_hosts[@]} host(s)"
 	# A failed retention never fails the backup that has just been made
 	if ! retention; then
 		warn "retention failed"
@@ -1217,6 +1810,8 @@ do_verify() {
 	check_name BACKUP_NAME
 	parse_hosts VERIFY_HOSTS
 	verify_hosts=("${HOSTS[@]}")
+	wait_for_apis "${verify_hosts[@]}"
+	event Normal OrchestratorVerifyStarted "verify ${BACKUP_NAME} on ${#verify_hosts[@]} host(s)"
 	for host in "${verify_hosts[@]}"; do
 		log "${host}: verifying ${BACKUP_NAME}"
 		# Drop any local copy so the download really pulls the backup from the storage
@@ -1236,6 +1831,7 @@ do_verify() {
 		fi
 	done
 	log "backup ${BACKUP_NAME} verified on ${#verify_hosts[@]} host(s)"
+	event Normal OrchestratorVerifyCompleted "backup ${BACKUP_NAME} verified on ${#verify_hosts[@]} host(s)"
 }
 
 # db_dropped DATABASE reports whether the schema restore drops DATABASE as a whole, with every table it holds, those
@@ -1900,7 +2496,9 @@ do_restore() {
 	mapfile -t guarded < <(printf '%s\n' "${guarded[@]}" | awk 'NF && !seen[$0]++')
 	check_storage_paths
 	source_paths
+	wait_for_apis "${guarded[@]}"
 
+	event Normal OrchestratorRestoreStarted "restore ${BACKUP_NAME} on ${#targets[@]} host(s)"
 	# Nothing destructive happens before every check has passed on every host
 	if [[ -n ${overwrite} ]]; then
 		log "restore ${BACKUP_NAME}: preflight on ${#targets[@]} host(s)"
@@ -2042,6 +2640,7 @@ do_restore() {
 		fi
 	done
 	log "restore ${BACKUP_NAME} completed"
+	event Normal OrchestratorRestoreCompleted "restore ${BACKUP_NAME} completed"
 	report_rbac "${restore_rbac}" "${holds_rbac}" "${validate}"
 }
 
@@ -2060,32 +2659,43 @@ report_rbac() {
 		return 0
 	fi
 	warn "${BACKUP_NAME} holds access entities - users, roles, grants - which this restore did not restore"
+	event Warning OrchestratorRBACNotRestored "${LAST_WARNING}"
 	if [[ -n ${RBAC_NOT_RESTORED_MESSAGE:-} ]]; then
 		termination_message "${RBAC_NOT_RESTORED_MESSAGE}"
 	fi
 }
 
-# Retention keeps its sets in associative arrays, which bash handles under set -u from 4.4 on
-if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); then
-	die "bash 4.4 or newer is required, the image has ${BASH_VERSION}"
-fi
-API_PORT=${API_PORT:-}
-POLL_INTERVAL=${POLL_INTERVAL:-5}
-if [[ ! ${API_PORT} =~ ${NUMBER_RE} ]]; then
-	die "API_PORT must be a port number"
-fi
-if [[ ! ${POLL_INTERVAL} =~ ${INTERVAL_RE} ]]; then
-	die "POLL_INTERVAL must be a number of seconds"
-fi
-if [[ -z ${API_USERNAME:-} || -z ${API_PASSWORD:-} ]]; then
-	die "API_USERNAME and API_PASSWORD must be set"
-fi
-AUTH=$(printf '%s:%s' "${API_USERNAME}" "${API_PASSWORD}" | base64 | tr -d '\n')
+# The steps of a restore on every host, and the backups at the own storage path of every host
 declare -A LAST_OP=() LAST_ACTION_START=() LAST_ACTION_COMMAND=() OWN_BACKUPS=()
 
-case ${OPERATION:-} in
-backup) do_backup ;;
-verify) do_verify ;;
-restore) do_restore ;;
-*) die "OPERATION must be one of backup, verify, restore" ;;
-esac
+main() {
+	# Retention keeps its sets in associative arrays, which bash handles under set -u from 4.4 on
+	if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); then
+		die "bash 4.4 or newer is required, the image has ${BASH_VERSION}"
+	fi
+	API_PORT=${API_PORT:-}
+	POLL_INTERVAL=${POLL_INTERVAL:-5}
+	if [[ ! ${API_PORT} =~ ${NUMBER_RE} ]]; then
+		die "API_PORT must be a port number"
+	fi
+	if [[ ! ${POLL_INTERVAL} =~ ${INTERVAL_RE} ]]; then
+		die "POLL_INTERVAL must be a number of seconds"
+	fi
+	if [[ -z ${API_USERNAME:-} || -z ${API_PASSWORD:-} ]]; then
+		die "API_USERNAME and API_PASSWORD must be set"
+	fi
+	AUTH=$(printf '%s:%s' "${API_USERNAME}" "${API_PASSWORD}" | base64 | tr -d '\n')
+	check_transport
+
+	case ${OPERATION:-} in
+	backup) do_backup ;;
+	verify) do_verify ;;
+	restore) do_restore ;;
+	*) die "OPERATION must be one of backup, verify, restore" ;;
+	esac
+}
+
+# Run as a script - bash -c, or a file - and not when sourced, which leaves the functions to the tests
+if [[ ${BASH_SOURCE[0]:-$0} == "$0" ]]; then
+	main "$@"
+fi

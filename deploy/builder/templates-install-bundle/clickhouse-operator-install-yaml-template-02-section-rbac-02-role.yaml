@@ -73,11 +73,53 @@ rules:
     resources:
       - pods
     verbs:
+      - create
       - get
       - list
       - patch
       - update
       - watch
+      - delete
+  # The backup orchestrator Jobs run as the operator's ServiceAccount. In a namespace other than the
+  # operator's own the operator creates a ServiceAccount of that name, and a Role and RoleBinding that
+  # let the orchestrator read the backup resources and pods and post events
+  - apiGroups:
+      - ""
+    resources:
+      - serviceaccounts
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+      - update
+      - delete
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - roles
+      - rolebindings
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+      - update
+      - delete
+  # The backup controllers are leader-elected by a Lease in the namespace of the operator
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
       - delete
   - apiGroups:
       - ""

@@ -49,6 +49,9 @@ spec:
         - name: etc-clickhouse-operator-usersd-folder
           configMap:
             name: etc-clickhouse-operator-usersd-files
+        - name: etc-clickhouse-operator-backup-folder
+          configMap:
+            name: etc-clickhouse-operator-backup-files
         - name: etc-keeper-operator-confd-folder
           configMap:
             name: etc-keeper-operator-confd-files
@@ -84,6 +87,8 @@ spec:
               mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/chi/users.d
+            - name: etc-clickhouse-operator-backup-folder
+              mountPath: /etc/clickhouse-operator/backup
             - name: etc-keeper-operator-confd-folder
               mountPath: /etc/clickhouse-operator/chk/conf.d
             - name: etc-keeper-operator-configd-folder

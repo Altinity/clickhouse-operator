@@ -52,7 +52,7 @@ func reportBackupOutcome(chb *api.ClickHouseBackup, reported func(cluster string
 		case cluster.CompletionTime == nil:
 		case cluster.Phase == api.OperationPhaseCompleted:
 			reportSuccess(context.Background(), chb.GetNamespace(), chb.TargetInstallation(), cluster.Name, cluster.CompletionTime.Time)
-		case cluster.Phase == api.OperationPhaseFailed:
+		case failedPhase(cluster.Phase):
 			reportFailure(context.Background(), chb.GetNamespace(), chb.TargetInstallation(), cluster.Name, cluster.CompletionTime.Time)
 		}
 	}

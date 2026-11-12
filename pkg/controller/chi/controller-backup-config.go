@@ -33,6 +33,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
@@ -63,6 +64,9 @@ var (
 	errBackupStorageConfigNotFound = fmt.Errorf("has no key %s", backupconfig.FileName)
 	// errBackupStorageConfigEmpty: the storage Secret of the cluster holds an empty configuration file
 	errBackupStorageConfigEmpty = fmt.Errorf("has an empty key %s", backupconfig.FileName)
+	// errBackupStorageSecretUnreadable: the storage Secret of the cluster cannot be read for any reason but its
+	// absence
+	errBackupStorageSecretUnreadable = errors.New("cannot be read")
 )
 
 // backupConfigOutcome is how the configuration file Secret of a cluster has been reconciled
@@ -201,7 +205,7 @@ func (c *Controller) getBackupStorageConfig(ctx context.Context, namespace, name
 	case apiErrors.IsNotFound(err):
 		return backupStorageConfig{missing: errBackupStorageSecretNotFound}, nil
 	case err != nil:
-		return backupStorageConfig{}, err
+		return backupStorageConfig{}, fmt.Errorf("%w: %w", errBackupStorageSecretUnreadable, err)
 	}
 	storageConfig, ok := secret.Data[backupconfig.FileName]
 	switch {
@@ -376,6 +380,10 @@ func (c *Controller) syncBackupConfigs(ctx context.Context, announcer a.Announce
 		if !chop.Config().IsNamespaceWatched(item.GetNamespace()) || !item.GetDeletionTimestamp().IsZero() || item.Spec.Suspend.Value() {
 			continue
 		}
+		if isAbortedOnInvalidBackupConfig(item) {
+			c.retryAbortedOnInvalidBackupConfig(ctx, item)
+			continue
+		}
 		c.syncBackupConfig(ctx, announcer, item.GetNamespace(), item.GetName())
 	}
 }
@@ -408,4 +416,56 @@ func (c *Controller) syncBackupConfig(ctx context.Context, announcer a.Announcer
 			log.V(1).M(cr).F().Warning("Unable to sync backup configuration Secret of cluster %s err: %v", cluster, outcome.err)
 		}
 	}
+}
+
+// isAbortedOnInvalidBackupConfig reports whether the last reconcile of the installation was aborted as its backup
+// could not be configured, see abortOnInvalidBackupConfig
+func isAbortedOnInvalidBackupConfig(cr *api.ClickHouseInstallation) bool {
+	status := cr.EnsureStatus()
+	errs := status.GetErrors()
+	return (status.GetStatus() == api.StatusAborted) && (len(errs) > 0) &&
+		strings.HasPrefix(errs[0], "["+api.StatusReasonBackupConfigInvalid+"]")
+}
+
+// retryAbortedOnInvalidBackupConfig reconciles anew an installation whose reconcile was aborted as its backup could
+// not be configured, once the storage Secret of every backup-enabled cluster can be used: the operator does not
+// watch those Secrets, and fixing one changes nothing on the installation that would reconcile it
+func (c *Controller) retryAbortedOnInvalidBackupConfig(ctx context.Context, cr *api.ClickHouseInstallation) {
+	ctx, cancel := context.WithTimeout(ctx, backupConfigSyncInstallationTimeout)
+	defer cancel()
+	if !c.backupStorageUsable(ctx, cr) {
+		return
+	}
+	log.V(1).M(cr).F().Info("Storage Secrets of the backup can be used now - reconcile the installation aborted on them")
+	c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileAdd, nil, cr))
+}
+
+// backupStorageUsable reports whether the storage Secret of every backup-enabled cluster of the installation, as its
+// spec stands, holds a configuration file the operator can build the one of clickhouse-backup from
+func (c *Controller) backupStorageUsable(ctx context.Context, cr *api.ClickHouseInstallation) bool {
+	if len(backupSpecProblems(cr)) > 0 {
+		return false
+	}
+	for _, cluster := range cr.GetSpecT().GetConfiguration().GetClusters() {
+		backup := cluster.GetBackup().DeepCopy().MergeFrom(cr.GetSpecT().GetBackup(), api.MergeTypeFillEmptyValues)
+		if !backup.IsEnabled() {
+			continue
+		}
+		if backup.IsPodMode() {
+			// The backup Pods connect as the backup user, see podModeCredentialsProblem
+			credentials, err := c.getBackupCredentials(ctx, cr)
+			if (err != nil) || (credentials.ClickHouseUsername == "") || (credentials.ClickHousePassword == "") {
+				return false
+			}
+		}
+		storage, err := c.getBackupStorageConfig(ctx, cr.GetNamespace(), backup.GetConfigSecretName())
+		if (err != nil) || (storage.missing != nil) {
+			return false
+		}
+		probe := backupconfig.Credentials{APIUsername: "probe", APIPassword: "probe"}
+		if _, err := backupconfig.Build(storage.config, probe, backupconfig.Defaults{}); err != nil {
+			return false
+		}
+	}
+	return true
 }

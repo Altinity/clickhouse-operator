@@ -17,6 +17,7 @@ package v1
 import (
 	"fmt"
 
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -71,6 +72,18 @@ type ClickHouseRestoreSpec struct {
 	RBAC *types.StringBool `json:"rbac,omitempty" yaml:"rbac,omitempty"`
 	// ActiveDeadlineSeconds bounds how long the restore Job may run. Defaults to 24 hours.
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
+	// OrchestratorConfigMapRef names a ConfigMap in the namespace of the restore whose key backup-orchestrator.sh its
+	// Jobs run instead of the operator's orchestrator script.
+	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
+}
+
+// GetOrchestratorConfigMapName returns the ConfigMap of the orchestrator script of the restore, "" for the operator's
+// script, nil-safe.
+func (spec *ClickHouseRestoreSpec) GetOrchestratorConfigMapName() string {
+	if spec == nil {
+		return ""
+	}
+	return orchestratorConfigMapName(spec.OrchestratorConfigMapRef)
 }
 
 // TargetCluster returns the cluster the restore targets, "" for every backup-enabled cluster: the one
@@ -161,7 +174,7 @@ func (spec *ClickHouseRestoreSpec) Validate() error {
 
 // ClickHouseRestoreStatus defines the observed state of a ClickHouseRestore.
 type ClickHouseRestoreStatus struct {
-	// Phase is one of Pending, Running, Completed, Failed.
+	// Phase is one of Pending, Running, Completed, Failed, Aborted.
 	Phase OperationPhase `json:"phase,omitempty" yaml:"phase,omitempty"`
 	// BackupName is the backup the restore Jobs restore, as it was when the first Job was created.
 	BackupName string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
