@@ -1850,8 +1850,24 @@ configs:
 
       # run_action_steps HOST WHAT NAME COMMAND is run_action without the Event of a failure
       run_action_steps() {
-      	local host=$1 what=$2 name=$3 command=$4 body i start status error
-      	local -a before
+      	local rc
+      	if ! action_start "$@"; then
+      		return 1
+      	fi
+      	while :; do
+      		sleep "${POLL_INTERVAL}"
+      		rc=0
+      		action_poll "$1" "$2" "$3" || rc=$?
+      		if ((rc != 2)); then
+      			return "${rc}"
+      		fi
+      	done
+      }
+
+      # action_start HOST WHAT NAME COMMAND submits COMMAND to the actions endpoint of HOST, recording in ACTION_COMMAND and
+      # ACTION_BEFORE what action_poll tells its row by: the command, and the start times of the rows of it before
+      action_start() {
+      	local host=$1 what=$2 name=$3 command=$4 body
       	log "${host}: ${what} ${name}"
       	if ! sidecar_kept "${host}"; then
       		return 1
@@ -1861,7 +1877,8 @@ configs:
       	if ! action_rows "${host}" "${command}"; then
       		return 1
       	fi
-      	before=("${ACTION_STARTS[@]}")
+      	ACTION_COMMAND[${host}]=${command}
+      	ACTION_BEFORE[${host}]=$(printf '%s\n' "${ACTION_STARTS[@]}")
       	if ! submit "${host}" "${what}" /backup/actions --data-binary "${body}"; then
       		return 1
       	fi
@@ -1869,42 +1886,44 @@ configs:
       		warn "${host}: ${what} was not acknowledged: ${HTTP_BODY}"
       		return 1
       	fi
-      	while :; do
-      		sleep "${POLL_INTERVAL}"
-      		if ! action_rows "${host}" "${command}"; then
+      }
+
+      # action_poll HOST WHAT NAME reads once the row of the action action_start submitted to HOST: it returns 0 once the
+      # action succeeded, 2 while it runs and 1 when it failed, with a warning that tells why
+      action_poll() {
+      	local host=$1 what=$2 name=$3 command=${ACTION_COMMAND[$1]} i start= status= error=
+      	if ! action_rows "${host}" "${command}"; then
+      		return 1
+      	fi
+      	for ((i = ${#ACTION_STARTS[@]} - 1; i >= 0; i--)); do
+      		if [[ ${ACTION_STATUSES[i]} == "in progress" || $'\n'"${ACTION_BEFORE[${host}]}"$'\n' != *$'\n'"${ACTION_STARTS[i]}"$'\n'* ]]; then
+      			start=${ACTION_STARTS[i]} status=${ACTION_STATUSES[i]} error=${ACTION_ERRORS[i]}
+      			break
+      		fi
+      	done
+      	case ${status} in
+      	"in progress") return 2 ;;
+      	success)
+      		log "${host}: ${what} ${name} succeeded"
+      		if [[ -z ${READ_ONLY:-} ]]; then
+      			remember_step "${host}" "" "${start}" "${command}"
+      			event Normal OrchestratorHostStepSucceeded "${host}: ${what} ${name} succeeded"
+      		fi
+      		return 0
+      		;;
+      	"")
+      		if [[ -n ${READ_ONLY:-} ]]; then
+      			warn "${host}: the sidecar restarted during ${what} ${name}"
       			return 1
       		fi
-      		start= status= error=
-      		for ((i = ${#ACTION_STARTS[@]} - 1; i >= 0; i--)); do
-      			if [[ ${ACTION_STATUSES[i]} == "in progress" ]] || ! listed "${ACTION_STARTS[i]}" "${before[@]}"; then
-      				start=${ACTION_STARTS[i]} status=${ACTION_STATUSES[i]} error=${ACTION_ERRORS[i]}
-      				break
-      			fi
-      		done
-      		case ${status} in
-      		"in progress") ;;
-      		success)
-      			log "${host}: ${what} ${name} succeeded"
-      			if [[ -z ${READ_ONLY:-} ]]; then
-      				remember_step "${host}" "" "${start}" "${command}"
-      				event Normal OrchestratorHostStepSucceeded "${host}: ${what} ${name} succeeded"
-      			fi
-      			return 0
-      			;;
-      		"")
-      			if [[ -n ${READ_ONLY:-} ]]; then
-      				warn "${host}: the sidecar restarted during ${what} ${name}"
-      				return 1
-      			fi
-      			warn "${host}: the sidecar restarted during ${what} ${name}, which it does not resume: the ${OPERATION} is partially applied"
-      			return 1
-      			;;
-      		*)
-      			warn "${host}: ${what} ${name} ended with status '${status}': ${error}"
-      			return 1
-      			;;
-      		esac
-      	done
+      		warn "${host}: the sidecar restarted during ${what} ${name}, which it does not resume: the ${OPERATION} is partially applied"
+      		return 1
+      		;;
+      	*)
+      		warn "${host}: ${what} ${name} ended with status '${status}': ${error}"
+      		return 1
+      		;;
+      	esac
       }
 
       # run_op HOST WHAT NAME PATH [CURL_ARGS...] starts an asynchronous sidecar operation on backup NAME
@@ -1919,7 +1938,24 @@ configs:
 
       # run_op_steps HOST WHAT NAME PATH [CURL_ARGS...] is run_op without the Event of a failure
       run_op_steps() {
-      	local host=$1 what=$2 name=$3 id status
+      	local rc
+      	if ! op_start "$@"; then
+      		return 1
+      	fi
+      	while :; do
+      		sleep "${POLL_INTERVAL}"
+      		rc=0
+      		op_poll "$1" "$2" "$3" || rc=$?
+      		if ((rc != 2)); then
+      			return "${rc}"
+      		fi
+      	done
+      }
+
+      # op_start HOST WHAT NAME PATH [CURL_ARGS...] submits an asynchronous sidecar operation on backup NAME to HOST, recording
+      # its operation id in OP_ID
+      op_start() {
+      	local host=$1 what=$2 name=$3 id
       	shift 3
       	log "${host}: ${what} ${name}"
       	if ! sidecar_kept "${host}"; then
@@ -1937,39 +1973,111 @@ configs:
       		warn "${host}: ${what} returned no operation id: ${HTTP_BODY}"
       		return 1
       	fi
-      	while :; do
-      		sleep "${POLL_INTERVAL}"
-      		call GET "${host}" /backup/status -G --data-urlencode "operationid=${id}"
-      		if [[ ${HTTP_CODE} != 200 ]]; then
-      			warn "${host}: cannot read status of ${what} (HTTP ${HTTP_CODE}): $(error_of)"
+      	OP_ID[${host}]=${id}
+      }
+
+      # op_poll HOST WHAT NAME reads once the status of the operation op_start submitted to HOST: it returns 0 once the
+      # operation succeeded, 2 while it runs and 1 when it failed, with a warning that tells why
+      op_poll() {
+      	local host=$1 what=$2 name=$3 id=${OP_ID[$1]} status
+      	call GET "${host}" /backup/status -G --data-urlencode "operationid=${id}"
+      	if [[ ${HTTP_CODE} != 200 ]]; then
+      		warn "${host}: cannot read status of ${what} (HTTP ${HTTP_CODE}): $(error_of)"
+      		return 1
+      	fi
+      	status=$(json_field status "${HTTP_BODY}")
+      	if [[ -n ${status} && ${status} != "in progress" ]]; then
+      		finished_event "${host}" "${what} ${name}" "${id}" "${status}"
+      	fi
+      	case ${status} in
+      	"in progress") return 2 ;;
+      	success)
+      		log "${host}: ${what} ${name} succeeded"
+      		remember_step "${host}" "${id}"
+      		event Normal OrchestratorHostStepSucceeded "${host}: ${what} ${name} succeeded"
+      		return 0
+      		;;
+      	"")
+      		if ! lost_op "${host}" "${what}" "${name}"; then
       			return 1
       		fi
-      		status=$(json_field status "${HTTP_BODY}")
-      		if [[ -n ${status} && ${status} != "in progress" ]]; then
-      			finished_event "${host}" "${what} ${name}" "${id}" "${status}"
+      		# The restart that lost the operation took every step before it along
+      		remember_step "${host}"
+      		return 0
+      		;;
+      	*)
+      		warn "${host}: ${what} ${name} ended with status '${status}': $(error_of)"
+      		return 1
+      		;;
+      	esac
+      }
+
+      # run_all KIND HOSTS CHECK WHAT NAME ARGS... runs a step on every host of the space-separated HOSTS at once: an
+      # operation, KIND op, as run_op runs it with the arguments ARGS, or an action, KIND action, as run_action runs the
+      # command ARGS. It submits the step to one host after the other, each once the function CHECK, unless empty, has
+      # passed for it, then polls every host it was submitted to until it runs on none. A host whose CHECK or submission fails
+      # gets the step submitted to no other host after it, and those it was submitted to are waited for all the same.
+      # FAILED_HOSTS and FAILURES list the hosts that failed and the warning of each; it returns 1 when any did
+      run_all() {
+      	local kind=$1 check=$3 what=$4 name=$5 host rc
+      	local -a hosts pending=() running
+      	read -r -a hosts <<<"$2"
+      	shift 5
+      	FAILED_HOSTS=()
+      	FAILURES=()
+      	for host in "${hosts[@]}"; do
+      		LAST_WARNING=
+      		if [[ -n ${check} ]] && ! "${check}" "${host}"; then
+      			step_failed "${kind}" "${host}" "${what}" "${name}"
+      			break
       		fi
-      		case ${status} in
-      		"in progress") ;;
-      		success)
-      			log "${host}: ${what} ${name} succeeded"
-      			remember_step "${host}" "${id}"
-      			event Normal OrchestratorHostStepSucceeded "${host}: ${what} ${name} succeeded"
-      			return 0
-      			;;
-      		"")
-      			if ! lost_op "${host}" "${what}" "${name}"; then
-      				return 1
-      			fi
-      			# The restart that lost the operation took every step before it along
-      			remember_step "${host}"
-      			return 0
-      			;;
-      		*)
-      			warn "${host}: ${what} ${name} ended with status '${status}': $(error_of)"
-      			return 1
-      			;;
-      		esac
+      		if ! "${kind}_start" "${host}" "${what}" "${name}" "$@"; then
+      			step_failed "${kind}" "${host}" "${what}" "${name}"
+      			break
+      		fi
+      		pending+=("${host}")
       	done
+      	while ((${#pending[@]} > 0)); do
+      		sleep "${POLL_INTERVAL}"
+      		running=()
+      		for host in "${pending[@]}"; do
+      			rc=0
+      			LAST_WARNING=
+      			"${kind}_poll" "${host}" "${what}" "${name}" || rc=$?
+      			case ${rc} in
+      			0) ;;
+      			2) running+=("${host}") ;;
+      			*) step_failed "${kind}" "${host}" "${what}" "${name}" ;;
+      			esac
+      		done
+      		pending=(${running[@]+"${running[@]}"})
+      	done
+      	((${#FAILED_HOSTS[@]} == 0))
+      }
+
+      # step_failed KIND HOST WHAT NAME records in FAILED_HOSTS and FAILURES that the step WHAT of run_all failed on HOST, as
+      # LAST_WARNING tells, with the Event run_op or run_action posts
+      step_failed() {
+      	FAILED_HOSTS+=("$2")
+      	FAILURES+=("${LAST_WARNING:-$2: $3 $4 failed}")
+      	if [[ $1 == op || -z ${READ_ONLY:-} ]]; then
+      		event Warning OrchestratorHostFailed "$2: $3 $4 failed${LAST_WARNING:+: ${LAST_WARNING}}"
+      	fi
+      }
+
+      # fail_all MESSAGE dies after run_all failed, adding to MESSAGE the hosts that failed and the warning of each
+      fail_all() {
+      	local hosts failure
+      	join_items "${FAILED_HOSTS[@]}"
+      	hosts=${REPLY}
+      	if ((${#FAILURES[@]} == 1)); then
+      		die "$1 failed on ${hosts}: ${FAILURES[0]}"
+      	fi
+      	REPLY=
+      	for failure in "${FAILURES[@]}"; do
+      		REPLY+=${REPLY:+; }${failure}
+      	done
+      	die "$1 failed on ${hosts}: ${REPLY}"
       }
 
       # resumed_action HOST COMMAND NAME sets RESUMED_STATUS and RESUMED_ERROR from the last COMMAND (upload or download)
@@ -2998,11 +3106,29 @@ configs:
       	event Normal OrchestratorBackupPodsReady "the backup Pods answer"
       }
 
+      # backup_unseen HOST reports whether the storage of HOST does not hold the backup this run makes yet, as before it
+      # submits it there: one that does was made by another host of this run, at the same storage path
+      backup_unseen() {
+      	if ! list_backups "$1" remote; then
+      		return 1
+      	fi
+      	if find_backup "${BACKUP_NAME}"; then
+      		warn "backup ${BACKUP_NAME} appeared in the storage of $1 during this run: hosts of one backup must not share a storage path"
+      		return 1
+      	fi
+      }
+
       do_backup() {
-      	local host incremental= keep
+      	local host incremental= keep i
       	local -a backup_hosts params
       	parse_hosts BACKUP_HOSTS
       	backup_hosts=("${HOSTS[@]}")
+      	# The hosts make their parts of the backup at once: one host twice would make its part twice, at one storage path
+      	for ((i = 1; i < ${#backup_hosts[@]}; i++)); do
+      		if listed "${backup_hosts[i]}" "${backup_hosts[@]:0:i}"; then
+      			die "BACKUP_HOSTS lists ${backup_hosts[i]} twice: hosts of one backup must not share a storage path"
+      		fi
+      	done
       	if [[ -n ${BACKUP_NAME_PREFIX:-} ]]; then
       		check_name BACKUP_NAME_PREFIX
       	fi
@@ -3085,17 +3211,11 @@ configs:
       		fi
       	fi
 
-      	for host in "${backup_hosts[@]}"; do
-      		if ! list_backups "${host}" remote; then
-      			fail "backup ${BACKUP_NAME} failed on ${host}"
-      		fi
-      		if find_backup "${BACKUP_NAME}"; then
-      			die "backup ${BACKUP_NAME} appeared in the storage of ${host} during this run: hosts of one backup must not share a storage path"
-      		fi
-      		if ! run_op "${host}" create_remote "${BACKUP_NAME}" /backup/create_remote "${params[@]}"; then
-      			fail "backup ${BACKUP_NAME} failed on ${host}"
-      		fi
-      	done
+      	# Every host makes its part of the backup at the same time, as the Altinity Cloud Manager has every shard make its own;
+      	# one that fails leaves the others to finish, which the Job waits for before it fails
+      	if ! run_all op "${backup_hosts[*]}" backup_unseen create_remote "${BACKUP_NAME}" /backup/create_remote "${params[@]}"; then
+      		fail_all "backup ${BACKUP_NAME}"
+      	fi
       	log "backup ${BACKUP_NAME} completed on ${#backup_hosts[@]} host(s)"
       	# A schema-only backup never holds data, which needs no telling
       	if ! is_true SCHEMA_ONLY; then
@@ -3971,6 +4091,11 @@ configs:
 
       # The steps of a restore on every host, and the backups at the own storage path of every host
       declare -A LAST_OP=() LAST_ACTION_START=() LAST_ACTION_COMMAND=() OWN_BACKUPS=()
+      # The step that runs on every host: the operation id of an operation, the command of an action and the start times of
+      # the rows of that command before it was submitted
+      declare -A OP_ID=() ACTION_COMMAND=() ACTION_BEFORE=()
+      FAILED_HOSTS=()
+      FAILURES=()
 
       main() {
       	# Retention keeps its sets in associative arrays, which bash handles under set -u from 4.4 on

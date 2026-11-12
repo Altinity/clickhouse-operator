@@ -117,6 +117,8 @@ type stubHost struct {
 	// listsUnavailableAfterPost makes the host answer every remote backup list 503 once it accepted a
 	// POST, as a sidecar that went away right after the backup
 	listsUnavailableAfterPost bool
+	// failSubmit, when set, is the error the host refuses every asynchronous operation with, HTTP 500
+	failSubmit string
 	// proxyFailsPosts makes a proxy in front of the host answer every POST 503, which tells nothing
 	// about whether the host received it
 	proxyFailsPosts bool
@@ -669,6 +671,10 @@ func (h *stubHost) resumePending() {
 
 func (s *sidecarStub) servePost(w http.ResponseWriter, h *stubHost, call stubCall, segments []string) {
 	startOp := func(kind, name string, code int) {
+		if h.failSubmit != "" {
+			writeError(w, http.StatusInternalServerError, kind, h.failSubmit)
+			return
+		}
 		s.nextOp++
 		id := fmt.Sprintf("op-%d", s.nextOp)
 		s.ops[id] = &stubOp{host: call.host, kind: kind, name: name, params: call.query, polls: 1, epoch: h.epoch}
@@ -1042,11 +1048,10 @@ func TestJobScriptBackupRefusals(t *testing.T) {
 			output: "base backup base is missing in the storage of h1",
 		},
 		{
-			name:    "hosts sharing one storage path",
-			hosts:   map[string]*stubHost{"h0": {}},
-			env:     map[string]string{envBackupName: "bk-1", envBackupHosts: "h0 h0"},
-			output:  "must not share a storage path",
-			creates: 1,
+			name:   "a host listed twice",
+			hosts:  map[string]*stubHost{"h0": {}},
+			env:    map[string]string{envBackupName: "bk-1", envBackupHosts: "h0 h0"},
+			output: "BACKUP_HOSTS lists h0 twice: hosts of one backup must not share a storage path",
 		},
 	}
 	for _, tt := range tests {
@@ -1253,8 +1258,38 @@ func TestJobScriptOperationFailure(t *testing.T) {
 		})
 		code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1"})
 		require.Equal(t, 1, code, out)
-		require.Contains(t, out, "can't upload: disk full")
-		require.Len(t, s.matching(http.MethodPost, "/backup/create_remote"), 1, "the next host is not attempted")
+		require.Contains(t, out, "ERROR: backup bk-1 failed on h0: h0: create_remote bk-1 ended with status 'error': can't upload: disk full")
+		// Every host makes its part at once: the others finish all the same
+		require.Len(t, s.matching(http.MethodPost, "/backup/create_remote"), 2)
+		require.Equal(t, []string{"bk-1"}, s.remoteNames("h1"))
+	})
+	t.Run("errors of several hosts", func(t *testing.T) {
+		s := newSidecarStub(t, map[string]*stubHost{
+			"h0": {failOp: map[string]string{"create_remote": "disk full"}},
+			"h1": {},
+			"h2": {failOp: map[string]string{"create_remote": "no access"}},
+		})
+		code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1 h2"})
+		require.Equal(t, 1, code, out)
+		require.Contains(t, out, "ERROR: backup bk-1 failed on h0, h2: h0: create_remote bk-1 ended with status 'error': disk full; "+
+			"h2: create_remote bk-1 ended with status 'error': no access")
+		require.Equal(t, []string{"bk-1"}, s.remoteNames("h1"))
+	})
+	t.Run("a submission that fails", func(t *testing.T) {
+		s := newSidecarStub(t, map[string]*stubHost{"h0": {}, "h1": {}, "h2": {}})
+		s.hosts["h1"].failSubmit = "can't create: no such table"
+		code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1 h2"})
+		require.Equal(t, 1, code, out)
+		require.Contains(t, out, "ERROR: backup bk-1 failed on h1: h1: create_remote rejected (HTTP 500): can't create: no such table")
+		// No host after it gets the backup submitted, those before it finish theirs
+		require.Equal(t, []string{"h0 POST /backup/create_remote", "h1 POST /backup/create_remote"}, func() []string {
+			var calls []string
+			for _, c := range s.matching(http.MethodPost, "/") {
+				calls = append(calls, c.String())
+			}
+			return calls
+		}())
+		require.Equal(t, []string{"bk-1"}, s.remoteNames("h0"))
 	})
 	t.Run("user input echoed in the status command", func(t *testing.T) {
 		s := newSidecarStub(t, map[string]*stubHost{"h0": {failOp: map[string]string{"create_remote": "no tables for backup"}}})
@@ -4822,9 +4857,8 @@ func TestJobScriptPostsEvents(t *testing.T) {
 	s := newSidecarStub(t, map[string]*stubHost{"h0": {}, "h1": {}})
 	code, out := s.runScript(k.script, withEnv(k.env, map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1"}))
 	require.Zero(t, code, out)
-	require.Equal(t, []string{"OrchestratorBackupStarted",
-		"OrchestratorCommand", "OrchestratorCommandFinished", "OrchestratorHostStepSucceeded",
-		"OrchestratorCommand", "OrchestratorCommandFinished", "OrchestratorHostStepSucceeded",
+	require.Equal(t, []string{"OrchestratorBackupStarted", "OrchestratorCommand", "OrchestratorCommand",
+		"OrchestratorCommandFinished", "OrchestratorHostStepSucceeded", "OrchestratorCommandFinished", "OrchestratorHostStepSucceeded",
 		"OrchestratorBackupCompleted"}, k.reasons(), out)
 	require.Equal(t, "Normal", k.events[0]["type"])
 	require.Equal(t, "b1", k.events[0]["involvedObject"].(map[string]any)["name"])

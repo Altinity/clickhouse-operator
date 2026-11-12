@@ -94,10 +94,13 @@ cluster: the schedule names the last one in `status.lastBackupName`, see
 [ClickHouseBackupSchedule](#clickhousebackupschedule) for when it lags behind.
 
 **No consistency across shards or clusters.** A backup is not a snapshot of the CHI.
-`clickhouse-backup` freezes one table after another on each host, a Job backs up the hosts of its
-cluster one after another, and the Jobs of different clusters run independently of each other.
-Data written in the meantime is in the copies of some shards and not in those of others, and the
-later a host comes, the newer its copy. The shared name ties the copies together for naming,
+`clickhouse-backup` freezes one table after another on each host, a Job starts the backup on every
+host of its cluster at once - as the Altinity Cloud Manager has every shard make its own - and the
+hosts finish when their data is uploaded, and the Jobs of different clusters run independently of
+each other. Data written in the meantime is in the copies of some shards and not in those of others.
+A host whose backup fails leaves the others to finish theirs, which the Job waits for before it
+fails with the error of every host that failed; once the Job cannot submit the backup to a host, it
+submits it to no further host. The shared name ties the copies together for naming,
 retention and restore, and promises nothing more. Where shards or clusters must match - a batch of
 inserts spread over several shards, tables in two clusters fed by one pipeline - stop writing to
 them for the time of the backup.
@@ -692,8 +695,8 @@ other contents therefore takes effect by itself:
 * **Within a few minutes, without a restart.** Neither ClickHouse nor the sidecar restarts, and the
   Pod stays Ready. The generated Secret is updated only when its contents change.
 * **Operation by operation.** An operation that runs keeps the settings it started with; the next
-  one takes the new ones. A Job drives the hosts of its cluster one after another, so a change while
-  a backup or restore runs leaves it with the old settings on some hosts and the new ones on others:
+  one takes the new ones. A Job starts its steps on the hosts of its cluster at different times, so a
+  change while a backup or restore runs leaves it with the old settings on some hosts and the new ones on others:
   change the storage Secret only while no backup or restore runs.
 * **A removed setting counts.** The file is generated from the Secret as it is, so a setting removed
   from it is gone from the file too. A deleted storage Secret, or one without `config.yml` or with an
