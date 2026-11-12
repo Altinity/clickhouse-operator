@@ -1409,10 +1409,14 @@ schedule's backups on the cluster it ran on, newest first, as the cleanup of ACM
   just made, are always kept.
 * **Run-now backups are kept while they are recent.** A backup that ran the schedule now stays as long
   as it is no older than the oldest scheduled backup some entry keeps, and goes after that.
-* **Incomplete backups are left alone.** A backup that is not listed complete on every host
-  retention runs on - a run that failed on one host, an upload in progress - or that is listed with
-  size 0 is neither counted nor deleted; clean such a backup up by hand once it is certain that no
-  upload is still running. When a host cannot be listed, retention skips that run.
+* **Incomplete backups never count, and go once a complete one is newer.** A backup that is not
+  listed complete on every host retention runs on - a run that failed on one host, a broken copy,
+  a backup made before a host joined the cluster - never counts toward any `keep`, nor as the
+  newest backup. Once it is older than the newest backup every host lists complete it is deleted,
+  newest first among the others, on every host that holds it, as ACM deletes every backup of a
+  size; a newer one, which may still be uploading, is left. A backup no host lists with a size
+  above 0, and one a host lists complete with size 0, is neither counted nor deleted: clean it up
+  by hand. When a host cannot be listed, retention skips that run.
 * **Incremental bases are rebased, not protected.** The operator forces
   `rebase_during_delete` and `rebase_before_remove_old_remote` on, so `clickhouse-backup` rebases a
   backup that another one is incremental to before it deletes it.

@@ -9287,13 +9287,14 @@ data:
     
     # list_all PATTERN HOST... lists the backups of every HOST and fills the sets COMPLETE, with the names matching
     # PATTERN of the backups every HOST lists complete, WITH_DATA, with those of the backups that hold data on any HOST,
-    # EMPTY, with those of the backups a HOST lists complete with a size of 0, nothing at all, and ALL_NAMES, with those of
-    # every backup any HOST lists, broken ones too, and UNLISTED with the hosts that cannot be listed. A run that failed on one host leaves copies on the others that cannot be restored on their own, and the copies
+    # EMPTY, with those of the backups a HOST lists complete with a size of 0, nothing at all, SIZED, with those of the
+    # backups any HOST lists, broken or not, with a size above 0 of anything, and ALL_NAMES, with those of every backup any
+    # HOST lists, broken ones too, and UNLISTED with the hosts that cannot be listed. A run that failed on one host leaves copies on the others that cannot be restored on their own, and the copies
     # of one backup on a host whose tables hold no data are as much part of it as those that do
     list_all() {
     	local pattern=$1 host first=1 i name
     	local -A listed both
-    	declare -gA COMPLETE=() WITH_DATA=() EMPTY=() ALL_NAMES=()
+    	declare -gA COMPLETE=() WITH_DATA=() EMPTY=() SIZED=() ALL_NAMES=()
     	UNLISTED=()
     	shift
     	for host in "$@"; do
@@ -9310,6 +9311,11 @@ data:
     				continue
     			fi
     			ALL_NAMES[${LIST_NAMES[i]}]=1
+    			# Sizes are compared as text, as holds_data does; a sidecar older than 2.6.6 lists none
+    			if [[ -n ${LIST_METADATA_SIZE[i]} ]] && [[ ${LIST_DATA_SIZE[i]:-0} != 0 || ${LIST_OBJECT_DISK_SIZE[i]:-0} != 0 ||
+    				${LIST_METADATA_SIZE[i]} != 0 || ${LIST_RBAC_SIZE[i]:-0} != 0 ]]; then
+    				SIZED[${LIST_NAMES[i]}]=1
+    			fi
     			if [[ ${LIST_DESC[i]} == broken* ]]; then
     				continue
     			fi
@@ -9351,8 +9357,11 @@ data:
     # retention_plan decides, as the cleanup of remote backups of the Altinity Cloud Manager does, which backups of the
     # schedule retention keeps, KEEP, and which it deletes, OBSOLETE, newest first, of NAMES, the backups of the
     # retention_pattern any retention host lists, as list_all classified them:
-    #  - a backup not every host lists complete, or one a host lists of size 0 - failed, in progress, or empty - is neither
-    #    counted nor deleted, nor is one whose name tells no valid time;
+    #  - a backup not every host lists complete - failed, or in progress - never counts: it is deleted, on every host that
+    #    holds it, once it is older than the newest backup every host lists complete, unless no host lists a size above 0
+    #    of it, as the Altinity Cloud Manager deletes none of size 0; one newer is left, as it may be in progress;
+    #  - a backup a host lists complete of size 0, empty, is neither counted nor deleted, nor is one whose name tells no
+    #    valid time;
     #  - the newest backup is always kept, as the base of the next incremental one, and so is the one just made;
     #  - every entry of the schedule keeps the newest keep backups of its slots: a backup may be kept by several, the
     #    weekly one counts for the daily entry too;
@@ -9362,22 +9371,27 @@ data:
     #    base, and clickhouse-backup rebases the dependents of a base it deletes (rebase_during_delete), so the kept
     #    incremental backups stay restorable
     retention_plan() {
-    	local name tag key i oldest= first=1
-    	local -a ordered=() manual=() counts=()
+    	local name tag key i oldest= first=1 newest=
+    	local -a ordered=() manual=() counts=() incomplete=() obsolete=()
     	declare -gA KEEP=()
     	OBSOLETE=()
     	for name in "${NAMES[@]}"; do
-    		if [[ -z ${COMPLETE[${name}]:-} || -n ${EMPTY[${name}]:-} ]]; then
-    			continue
-    		fi
     		tag=${name:${#BACKUP_NAME_PREFIX}+1}
     		key=${tag/T/}
-    		if tag_valid "${key}"; then
+    		if ! tag_valid "${key}"; then
+    			continue
+    		fi
+    		if [[ -z ${COMPLETE[${name}]:-} ]]; then
+    			if [[ -n ${SIZED[${name}]:-} && ${name} != "${BACKUP_NAME:-}" ]]; then
+    				incomplete+=("${key} ${name}")
+    			fi
+    		elif [[ -z ${EMPTY[${name}]:-} ]]; then
     			ordered+=("${key} ${name}")
     		fi
     	done
     	if ((${#ordered[@]} > 0)); then
     		mapfile -t ordered < <(printf '%s\n' "${ordered[@]}" | sort -r)
+    		newest=${ordered[0]%% *}
     	fi
     	for i in "${!SCHED_PERIOD[@]}"; do
     		counts[i]=0
@@ -9411,11 +9425,22 @@ data:
     		fi
     	done
     	for tag in "${ordered[@]}"; do
-    		name=${tag#* }
-    		if [[ -z ${KEEP[${name}]:-} ]]; then
-    			OBSOLETE+=("${name}")
+    		if [[ -z ${KEEP[${tag#* }]:-} ]]; then
+    			obsolete+=("${tag}")
     		fi
     	done
+    	for tag in "${incomplete[@]}"; do
+    		if [[ -n ${newest} && ${tag%% *} < ${newest} ]]; then
+    			obsolete+=("${tag}")
+    		fi
+    	done
+    	# Newest first, the incomplete backups among the others
+    	if ((${#obsolete[@]} > 0)); then
+    		mapfile -t obsolete < <(printf '%s\n' "${obsolete[@]}" | sort -r)
+    		for tag in "${obsolete[@]}"; do
+    			OBSOLETE+=("${tag#* }")
+    		done
+    	fi
     }
     
     # retention_on_host HOST deletes on HOST the backups of OBSOLETE it lists, newest first

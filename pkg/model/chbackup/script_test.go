@@ -1521,14 +1521,24 @@ func TestJobScriptRetentionCountsOnlyBackupsCompleteEverywhere(t *testing.T) {
 		h0, h1       []stubBackup
 		left0, left1 []string
 	}{
+		// An incomplete backup goes from the hosts that hold it once a complete one is newer, as the Altinity Cloud
+		// Manager deletes every backup of a size
 		"a leftover of a failed run": {
-			h0:    []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200103000000", "")},
-			h1:    []stubBackup{remote("daily-20200101000000", "")},
-			left0: []string{"daily-20200103000000"},
+			h0: []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200103000000", "")},
+			h1: []stubBackup{remote("daily-20200101000000", "")},
 		},
 		"backups from before a host was added": {
-			h0:    []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200102000000", "")},
-			left0: []string{"daily-20200101000000", "daily-20200102000000"},
+			h0: []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200102000000", "")},
+		},
+		"a broken copy": {
+			h0: []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200102000000", "")},
+			h1: []stubBackup{remote("daily-20200101000000", ""), broken("daily-20200102000000")},
+		},
+		"a leftover of size 0 on every host": {
+			h0:    []stubBackup{emptyBackup("daily-20200103000000")},
+			h1:    []stubBackup{broken("daily-20200103000000")},
+			left0: []string{"daily-20200103000000"},
+			left1: []string{"daily-20200103000000"},
 		},
 		"a copy of size 0 on one host": {
 			h0:    []stubBackup{emptyBackup("daily-20200101000000"), remote("daily-20200102000000", "")},
@@ -4648,10 +4658,11 @@ func TestJobScriptRetentionPlan(t *testing.T) {
 	for name, tc := range map[string]struct {
 		schedules string
 		names     []string
-		// incomplete and empty name the backups not every host lists complete, and those listed of size 0
-		incomplete, empty []string
-		made              string
-		keep, obsolete    []string
+		// incomplete and empty name the backups not every host lists complete, and those listed of size 0;
+		// sizeless those no host lists a size above 0 of
+		incomplete, empty, sizeless []string
+		made                        string
+		keep, obsolete              []string
 	}{
 		"the newest of a daily entry": {
 			schedules: "period=daily time=00:00 keep=2",
@@ -4695,7 +4706,50 @@ func TestJobScriptRetentionPlan(t *testing.T) {
 			names:      all("d-20200101000000", "d-20200102000000", "d-20200103000000", "d-20200104000000", "d-20201399000000"),
 			incomplete: all("d-20200104000000"),
 			empty:      all("d-20200101000000"),
+			sizeless:   all("d-20200101000000"),
 			keep:       all("d-20200103000000"),
+			obsolete:   all("d-20200102000000"),
+		},
+		// An incomplete backup never counts, and goes once a complete one is newer, newest first among the others
+		"incomplete backups older than the newest complete one": {
+			schedules:  "period=daily time=00:00 keep=2",
+			names:      all("d-20200101000000", "d-20200102000000", "d-20200103000000", "d-20200104000000", "d-20200102T120000"),
+			incomplete: all("d-20200102000000", "d-20200102T120000"),
+			keep:       all("d-20200103000000", "d-20200104000000"),
+			obsolete:   all("d-20200102T120000", "d-20200102000000", "d-20200101000000"),
+		},
+		"incomplete backups the newest complete one keeps for the count": {
+			schedules:  "period=daily time=00:00 keep=3",
+			names:      all("d-20200101000000", "d-20200102000000", "d-20200103000000", "d-20200104000000"),
+			incomplete: all("d-20200103000000"),
+			keep:       all("d-20200101000000", "d-20200102000000", "d-20200104000000"),
+			obsolete:   all("d-20200103000000"),
+		},
+		"an incomplete backup of size 0": {
+			schedules:  "period=daily time=00:00 keep=1",
+			names:      all("d-20200101000000", "d-20200102000000"),
+			incomplete: all("d-20200101000000"),
+			sizeless:   all("d-20200101000000"),
+			keep:       all("d-20200102000000"),
+		},
+		"an incomplete backup newer than every complete one": {
+			schedules:  "period=daily time=00:00 keep=1",
+			names:      all("d-20200101000000", "d-20200102000000", "d-20200102T120000"),
+			incomplete: all("d-20200102000000", "d-20200102T120000"),
+			keep:       all("d-20200101000000"),
+			obsolete:   all(),
+		},
+		"incomplete backups alone": {
+			schedules:  "period=daily time=00:00 keep=1",
+			names:      all("d-20200101000000", "d-20200102000000"),
+			incomplete: all("d-20200101000000", "d-20200102000000"),
+		},
+		"the run just made, incomplete": {
+			schedules:  "period=daily time=00:00 keep=1",
+			names:      all("d-20200101000000", "d-20200102000000", "d-29990101000000"),
+			incomplete: all("d-20200101000000"),
+			made:       "d-20200101000000",
+			keep:       all("d-29990101000000"),
 			obsolete:   all("d-20200102000000"),
 		},
 		"the run just made, past newer ones": {
@@ -4711,18 +4765,20 @@ func TestJobScriptRetentionPlan(t *testing.T) {
 			out := sourcedOutput(t, map[string]string{
 				envSchedules: tc.schedules, envBackupNamePrefix: "d", envBackupName: tc.made,
 				"ALL": strings.Join(tc.names, " "), "INCOMPLETE": strings.Join(tc.incomplete, " "), "EMPTIES": strings.Join(tc.empty, " "),
+				"SIZELESS": strings.Join(tc.sizeless, " "),
 			}, `
 				parse_schedules
 				read -r -a NAMES <<<"${ALL}"
-				declare -A COMPLETE=() EMPTY=()
-				for name in "${NAMES[@]}"; do COMPLETE[${name}]=1; done
+				declare -A COMPLETE=() EMPTY=() SIZED=()
+				for name in "${NAMES[@]}"; do COMPLETE[${name}]=1; SIZED[${name}]=1; done
 				for name in ${INCOMPLETE}; do unset "COMPLETE[${name}]"; done
 				for name in ${EMPTIES}; do EMPTY[${name}]=1; done
+				for name in ${SIZELESS}; do unset "SIZED[${name}]"; done
 				retention_plan
 				echo "keep: $(for name in "${!KEEP[@]}"; do echo "${name}"; done | sort | tr '\n' ' ')"
 				echo "obsolete: ${OBSOLETE[*]}"`)
 			keep := slices.Clone(tc.keep)
-			if tc.made != "" && !slices.Contains(keep, tc.made) {
+			if tc.made != "" && !slices.Contains(keep, tc.made) && !slices.Contains(tc.incomplete, tc.made) {
 				keep = append(keep, tc.made)
 			}
 			slices.Sort(keep)
