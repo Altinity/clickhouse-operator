@@ -1454,6 +1454,9 @@ func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *
 			return err
 		}
 		version = v
+		// A new host whose image tag carries no version gets MinVersion from findMinMaxVersions.
+		// The schemer is built from host.Runtime.Version, so hand it the version the host just reported.
+		host.Runtime.Version = v
 		w.a.V(1).
 			M(host).F().
 			Info("Check host for ClickHouse availability. Host: %s ClickHouse version available: %s", host.GetName(), version)

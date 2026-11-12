@@ -43,6 +43,23 @@ func TestImageGetBaseName(t *testing.T) {
 	}
 }
 
+func TestContainerGetImageTag(t *testing.T) {
+	for image, want := range map[string]string{
+		"clickhouse/clickhouse-server:26.8.2.7":                                                  "26.8.2.7",
+		"clickhouse/clickhouse-server:26.8.2.7@sha256:" + sha256Digest:                           "26.8.2.7",
+		"registry.example.com:5000/clickhouse/clickhouse-server:26.8.2.7@sha256:" + sha256Digest: "26.8.2.7",
+		"registry.example.com:5000/clickhouse/clickhouse-server@sha256:" + sha256Digest:          "sha256:" + sha256Digest,
+		"clickhouse/clickhouse-server":                                                           "latest",
+	} {
+		got, ok := ContainerGetImageTag(&core.Container{Image: image})
+		require.True(t, ok, image)
+		require.Equal(t, want, got, image)
+	}
+
+	_, ok := ContainerGetImageTag(nil)
+	require.False(t, ok)
+}
+
 func TestPodSpecContainerGet(t *testing.T) {
 	spec := &core.PodSpec{Containers: []core.Container{{Name: "sidecar"}, {Name: "clickhouse"}}}
 
