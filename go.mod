@@ -5,7 +5,6 @@ go 1.26.8
 replace (
 	github.com/emicklei/go-restful/v3 => github.com/emicklei/go-restful/v3 v3.10.0
 	github.com/golang/glog => github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d
-	github.com/imdario/mergo => github.com/sunsingerus/mergo v0.0.0-20230507185449-fc6fffa94450
 )
 
 require github.com/altinity/queue v0.0.0-20210114142043-ddb7da66064f
@@ -25,7 +24,6 @@ require (
 	github.com/go-zookeeper/zk v1.0.3
 	github.com/golang/glog v1.1.0
 	github.com/google/uuid v1.6.0
-	github.com/imdario/mergo v0.3.15
 	github.com/juliangruber/go-intersect v1.0.0
 	github.com/kubernetes-sigs/yaml v1.1.0
 	github.com/mailru/go-clickhouse/v2 v2.1.0
@@ -68,6 +66,7 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/gookit/color v1.4.2 // indirect
+	github.com/imdario/mergo v0.3.15 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
