@@ -229,6 +229,8 @@ func (c *BackupController) recordSchedule(ctx context.Context, chb *api.ClickHou
 		Cluster:                  cluster,
 		BackupNamePrefix:         model.BackupNamePrefix(chbs),
 		OrchestratorConfigMapRef: chbs.Spec.OrchestratorConfigMapRef.DeepCopy(),
+		Schedules:                chbs.Spec.DeepCopy().Schedules,
+		TimeZone:                 chbs.Spec.TimeZone,
 		BackupOptions:            *chbs.Spec.BackupOptions.DeepCopy(),
 	}
 	return nil, nil
@@ -352,6 +354,18 @@ func (c *BackupController) start(
 		failOn(cluster, missing.reason, missing.message)
 		out.add(c.failed(chb, cluster))
 		return ctrl.Result{}, nil
+	}
+	if chb.Spec.ScheduleRef != nil {
+		// A backup that runs a schedule now prunes after it as a run of the schedule, which no restore may hold
+		schedules := &ScheduleController{c.reconciler}
+		holder := &api.ClickHouseBackupSchedule{}
+		holder.Namespace = chb.GetNamespace()
+		holder.Spec.ClickHouseInstallation = chb.TargetInstallation()
+		holds, err := schedules.restoreHolds(ctx, c.Client, holder, target.chi, []string{cluster.Name})
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		orchestrator.RestoreInProgress = holds[cluster.Name] != nil
 	}
 	job := model.BuildBackupJob(chb, target.chi, target.topology, orchestrator)
 	gate := c.accessRestoreGate(chb.GetNamespace(), chb.TargetInstallation())

@@ -1881,6 +1881,32 @@ func TestJobScriptMakesIncrementalBackups(t *testing.T) {
 	}
 }
 
+// A backup that runs a schedule now has the entries of the schedule: it is incremental as the first incremental entry
+// says, as the Altinity Cloud Manager makes a backup by hand, from the newest backup of the series, and retention runs
+// after it, keeping it while it is recent.
+func TestJobScriptRunsAScheduleNow(t *testing.T) {
+	s := newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{
+		remote("daily-20200101000000", ""), remote("daily-20200102000000", "daily-20200101000000"), remote("daily-20200103000000", ""),
+	}}})
+	code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "daily-20200103T120000",
+		envBackupNamePrefix: "daily", envBackupHosts: "h0", envRetentionHosts: "h0",
+		envSchedules: "period=weekly time=00:00 day=0 keep=1;period=daily time=00:00 keep=2 incremental=true"})
+	require.Zero(t, code, out)
+	require.Contains(t, out, "runs the schedule now, incremental as its daily entry")
+	creates := s.matching(http.MethodPost, "/backup/create_remote")
+	require.Len(t, creates, 1)
+	require.Equal(t, "daily-20200103000000", creates[0].query.Get("diff-from-remote"))
+	require.Equal(t, []string{"daily-20200102000000", "daily-20200103000000", "daily-20200103T120000"}, s.remoteNames("h0"),
+		"retention ran after it")
+
+	// Without an incremental entry it is full
+	s = newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("daily-20200103000000", "")}}})
+	code, out = s.run(map[string]string{envOperation: operationBackup, envBackupName: "daily-20200103T120000",
+		envBackupNamePrefix: "daily", envBackupHosts: "h0", envRetentionHosts: "h0", envSchedules: "period=daily time=00:00 keep=2"})
+	require.Zero(t, code, out)
+	require.Empty(t, s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("diff-from-remote"))
+}
+
 func TestJobScriptVerify(t *testing.T) {
 	s := newSidecarStub(t, map[string]*stubHost{
 		"h0": {remote: []stubBackup{remote("bk-1", "")}, local: []stubBackup{local("bk-1")}},

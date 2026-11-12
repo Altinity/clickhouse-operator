@@ -599,6 +599,11 @@ type BackupScheduleRecord struct {
 	// OrchestratorConfigMapRef is the schedule's orchestratorConfigMapRef, which the backup runs unless it names
 	// its own.
 	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
+	// Schedules are the schedule's entries, which tell whether the backup is incremental, and which backups the
+	// retention that follows it keeps, as after a scheduled run.
+	Schedules []BackupScheduleEntry `json:"schedules,omitempty" yaml:"schedules,omitempty"`
+	// TimeZone is the schedule's timeZone.
+	TimeZone string `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 
 	BackupOptions `json:",inline" yaml:",inline"`
 }

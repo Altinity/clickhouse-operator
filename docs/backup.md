@@ -919,6 +919,11 @@ spec:
   [retention](#retention) keeps it as long as it is no older than the oldest scheduled backup some
   entry keeps, then deletes it.
   The prefix also lets the [recovery prefix guard](#storage-paths) tell where it came from.
+* It runs as a run of the schedule, with its entries and `timeZone`, which `status.schedule` records
+  too: as ACM makes a backup by hand, it is incremental, on the newest scheduled backup, as the first
+  entry with `incremental: true` says - full when that entry's chain is `keep` long, or when no entry
+  is incremental - and [retention](#retention) runs after it as after a scheduled run, on the same
+  hosts, skipped while a restore holds the schedule's runs of the cluster.
 * It runs as any `ClickHouseBackup` does, also while the schedule is suspended or held for a restore:
   it is not part of the series those protect. A schedule that does not exist yet - both applied at
   once - is waited for (`ScheduleNotFound`), as is one whose spec the operator finds invalid

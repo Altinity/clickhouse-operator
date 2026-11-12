@@ -95,6 +95,9 @@ SCHED_INCREMENTAL=()
 # heaviest schedule entry whose slot it is, empty when none is
 SLOT_TAG=
 WINNER=
+# BACKUP_NAME_GIVEN is set when BACKUP_NAME names the backup: a backup with schedule entries that is no scheduled run
+# runs the schedule now
+BACKUP_NAME_GIVEN=
 # MUTATED is set once a sidecar may have accepted a request that changes something
 MUTATED=
 # READ_ONLY is set, as a local of a caller, while the requests it submits change nothing the Job is asked to change:
@@ -1753,6 +1756,19 @@ winner_entry() {
 	done
 }
 
+# incremental_entry sets WINNER to the index of the first schedule entry whose backups are incremental, empty when
+# none is
+incremental_entry() {
+	local i
+	WINNER=
+	for i in "${!SCHED_PERIOD[@]}"; do
+		if [[ ${SCHED_INCREMENTAL[i]} == true ]]; then
+			WINNER=${i}
+			return 0
+		fi
+	done
+}
+
 # check_timezone fails unless SCHEDULE_TIMEZONE is empty, UTC, or a zone of the tzdata of the image
 check_timezone() {
 	local zone=${SCHEDULE_TIMEZONE:-}
@@ -2014,6 +2030,7 @@ do_backup() {
 	fi
 	if [[ -n ${BACKUP_NAME:-} ]]; then
 		check_name BACKUP_NAME
+		BACKUP_NAME_GIVEN=1
 	elif [[ -n ${BACKUP_NAME_PREFIX:-} ]]; then
 		BACKUP_NAME="${BACKUP_NAME_PREFIX}-${SLOT_TAG}"
 		if [[ ! ${BACKUP_NAME} =~ ${NAME_RE} ]]; then
@@ -2038,7 +2055,18 @@ do_backup() {
 	if [[ -n ${CLUSTER:-} ]]; then
 		check_cluster
 	fi
-	if ((${#SCHED_PERIOD[@]} > 0)); then
+	if ((${#SCHED_PERIOD[@]} > 0)) && [[ -n ${BACKUP_NAME_GIVEN} ]]; then
+		# A backup that runs the schedule now has no slot: as the Altinity Cloud Manager makes a backup by hand, it is
+		# incremental as the first incremental entry of the schedule says
+		incremental_entry
+		if [[ -z ${WINNER} ]]; then
+			log "backup ${BACKUP_NAME}: runs the schedule now, which has no incremental entry: the backup is full"
+		elif [[ -z ${DIFF_FROM_REMOTE:-} && -n ${BACKUP_NAME_PREFIX:-} ]]; then
+			log "backup ${BACKUP_NAME}: runs the schedule now, incremental as its ${SCHED_PERIOD[WINNER]} entry"
+			incremental=1
+			keep=${SCHED_KEEP[WINNER]}
+		fi
+	elif ((${#SCHED_PERIOD[@]} > 0)); then
 		winner_entry "${SLOT_TAG}"
 		if [[ -z ${WINNER} ]]; then
 			log "backup ${BACKUP_NAME}: the slot ${SLOT_TAG} is a slot of no schedule entry, the backup is full"

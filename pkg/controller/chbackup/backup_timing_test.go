@@ -157,12 +157,22 @@ func TestBackupRunsASchedule(t *testing.T) {
 		Generation:             chbs.GetGeneration(),
 		ClickHouseInstallation: testCHI,
 		BackupNamePrefix:       model.BackupNamePrefix(chbs),
+		Schedules:              chbs.Spec.Schedules,
 		BackupOptions:          api.BackupOptions{Tables: "db.*"},
 	}, got.Status.Schedule)
 	require.Equal(t, model.BackupNamePrefix(chbs)+"-20261019T220000", got.Status.BackupName)
 	job := &batch.Job{}
 	require.NoError(t, f.client.Get(context.Background(), key("pre-upgrade-main-backup"), job))
 	require.Contains(t, envValues(job.Spec.Template.Spec), "db.*")
+	// It runs as a run of the schedule: its entries, retention after it, which no restore holds here
+	env := map[string]string{}
+	for _, e := range job.Spec.Template.Spec.Containers[0].Env {
+		env[e.Name] = e.Value
+	}
+	require.Equal(t, model.EntriesEnv(chbs.Spec.Schedules), env["SCHEDULES"])
+	require.Equal(t, model.BackupNamePrefix(chbs), env["BACKUP_NAME_PREFIX"])
+	require.NotEmpty(t, env["RETENTION_HOSTS"])
+	require.Equal(t, "false", env["RESTORE_IN_PROGRESS"])
 	require.Equal(t, model.Labels(api.ClickHouseBackupCRDResourceKind, "pre-upgrade", testCHI, "main"), job.Labels)
 
 	edited := &api.ClickHouseBackupSchedule{}

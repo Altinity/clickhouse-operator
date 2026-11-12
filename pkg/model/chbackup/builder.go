@@ -451,6 +451,18 @@ func BuildBackupJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology
 	)
 	options := chb.GetBackupOptions()
 	env = append(env, backupOptionsEnv(options, topology, orchestrator)...)
+	// A backup that runs a schedule now runs as its CronJob does - incremental as the schedule says, retention after
+	// it - but for its name, which keeps it out of the series of the scheduled runs
+	if record := chb.Status.Schedule; (chb.Spec.ScheduleRef != nil) && (record != nil) && (len(record.Schedules) > 0) &&
+		(record.BackupNamePrefix != "") {
+		env = append(env,
+			envVar(envBackupNamePrefix, record.BackupNamePrefix),
+			envVar(envSchedules, EntriesEnv(record.Schedules)),
+			envVar(envScheduleTimezone, record.TimeZone),
+			envVar(envRetentionHosts, joinHosts(orchestrator.hosts(topology.hosts(options.GetReplicaSelection())))),
+			envVar(envRestoreInProgress, strconv.FormatBool(orchestrator.RestoreInProgress)),
+		)
+	}
 	labels := Labels(api.ClickHouseBackupCRDResourceKind, chb.GetName(), chb.TargetInstallation(), cluster)
 	return newJob(BackupJobName(chb, cluster), chb.GetNamespace(), labels, options.GetActiveDeadlineSeconds(), topology, orchestrator, env)
 }

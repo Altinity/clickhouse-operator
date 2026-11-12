@@ -201,6 +201,13 @@ func (in *BackupScheduleRecord) DeepCopyInto(out *BackupScheduleRecord) {
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
+	if in.Schedules != nil {
+		in, out := &in.Schedules, &out.Schedules
+		*out = make([]BackupScheduleEntry, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	in.BackupOptions.DeepCopyInto(&out.BackupOptions)
 	return
 }

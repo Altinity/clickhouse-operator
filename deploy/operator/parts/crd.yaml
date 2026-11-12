@@ -11095,6 +11095,27 @@ spec:
                     backupNamePrefix:
                       type: string
                       description: "The schedule's backupNamePrefix, which names the backup"
+                    schedules:
+                      type: array
+                      description: "The schedule's entries, which make the backup incremental and the retention after it, as after a scheduled run"
+                      items:
+                        type: object
+                        properties:
+                          period:
+                            type: string
+                          time:
+                            type: string
+                          day:
+                            type: integer
+                            format: int32
+                          keep:
+                            type: integer
+                            format: int32
+                          incremental:
+                            type: string
+                    timeZone:
+                      type: string
+                      description: "The schedule's timeZone"
                     schemaOnly:
                       type: string
                       description: "The schedule's schemaOnly"
