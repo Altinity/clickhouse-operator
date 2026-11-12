@@ -169,6 +169,10 @@ const (
 	// ClickHouseBackupEnvAllowEmptyBackups lets a backup of a cluster without tables succeed. Without it every
 	// scheduled backup of a freshly created cluster fails with "no tables for backup".
 	ClickHouseBackupEnvAllowEmptyBackups = "ALLOW_EMPTY_BACKUPS"
+	// ClickHouseBackupEnvAPICreateIntegrationTables is kept off in the backup Pod of a shard: its server would create
+	// system.backup_list and the other integration tables in ClickHouse over the URL engine at 127.0.0.1, the port
+	// of its own API, where the pod of ClickHouse runs no API, and the backup Pod exists only while a Job runs.
+	ClickHouseBackupEnvAPICreateIntegrationTables = "API_CREATE_INTEGRATION_TABLES"
 
 	// ClickHouseBackupBackupsToKeepLocalDeleteAfterUpload makes clickhouse-backup delete the local copy of a
 	// backup once it is uploaded. Its default keeps every local copy, and these fill up the data disk.

@@ -496,6 +496,74 @@ mapping, a setting the operator reads that is a list - leave the configuration f
 is right, the sidecars pick it up by themselves, as they do any later change of it, see
 [Secret changes](#secret-changes).
 
+### Integration tables
+
+`clickhouse-backup` can create tables in ClickHouse that show the backups and the operations of its
+REST API: `system.backup_list` (the backups, local and remote, with their sizes),
+`system.backup_actions` (the operations it runs and ran - `INSERT INTO system.backup_actions(command)
+VALUES ('...')` runs one) and `system.backup_version`. They are tables of the `URL` engine that read
+`http://127.0.0.1:7171/backup/...` - the REST API of the sidecar in the same Pod - with the API
+credentials of the configuration file in the URL. `clickhouse-backup` creates them when its server
+starts, when `api.create_integration_tables` is `true`; it is `false` by default.
+
+Turn them on in the storage settings, the key `config.yml` of the storage Secret
+(`configSecretRef`): the operator takes the `api` section as it is and sets only `api.username`
+and `api.password` in it, which `clickhouse-backup` puts into the URL of the tables, so every
+ClickHouse user who may read `SHOW CREATE TABLE system.backup_list` sees the API credentials.
+The tables are made by the sidecar of every host, so with `mode: sidecar` only:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backup-demo-storage
+type: Opaque
+stringData:
+  config.yml: |
+    general:
+      remote_storage: s3
+    s3:
+      endpoint: https://s3.us-east-1.amazonaws.com
+      region: us-east-1
+      bucket: clickhouse-backups
+      access_key: "..."
+      secret_key: "..."
+    api:
+      # system.backup_list, system.backup_actions and system.backup_version in every ClickHouse
+      create_integration_tables: true
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: backup-demo
+spec:
+  backup:
+    enabled: "yes"
+    mode: sidecar
+    configSecretRef:
+      name: backup-demo-storage
+  configuration:
+    clusters:
+      - name: main
+        layout:
+          shardsCount: 2
+          replicasCount: 2
+```
+
+```sql
+SELECT name, created, data_size, location, desc FROM system.backup_list ORDER BY created;
+```
+
+The sidecar creates the tables when its server starts, or reloads on `POST /restart` or `SIGHUP`,
+and only if ClickHouse answers then: a change of the setting takes effect at the next restart of the
+sidecars, not when an operation reads the changed Secret (see [Secret changes](#secret-changes)), and
+a sidecar that started before ClickHouse accepted connections has no tables until it restarts.
+Setting it back to `false` leaves the tables that exist: drop them by hand. With `mode: pod` the API runs in a
+backup Pod per shard that exists only while a backup or restore runs, and tables at `127.0.0.1` of
+the ClickHouse Pod would point at nothing: the operator sets `API_CREATE_INTEGRATION_TABLES=false`
+in the backup Pods, over the storage settings and their pod template, and the integration tables
+are not available in that mode.
+
 ### A storage per cluster
 
 `configSecretRef` is inherited like every other field, so a cluster that names a Secret of its own
@@ -1387,7 +1455,8 @@ lists of backups, actions) show in none.
 * `pod`: no sidecar. While a backup or restore of the cluster runs, the operator runs one backup Pod per
   shard, on the node of a ready replica, mounting the volumes of that replica and serving the REST API;
   the host lists of the Job name these Pods by DNS, one per shard, and the script waits for them to
-  answer (`BACKUP_POD_WAIT_SECONDS`, 600 by default).
+  answer (`BACKUP_POD_WAIT_SECONDS`, 600 by default). The [integration tables](#integration-tables)
+  are not available in this mode.
 
 ## Retention
 

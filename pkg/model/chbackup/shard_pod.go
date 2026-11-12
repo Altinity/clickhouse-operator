@@ -20,6 +20,7 @@ import (
 	"net"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 
 	core "k8s.io/api/core/v1"
@@ -307,11 +308,16 @@ func shardPodHostAliases(aliases []core.HostAlias) []core.HostAlias {
 }
 
 // configureShardPodContainer turns the container NewBackupServerContainer builds into the container of the backup
-// Pod: it connects to ClickHouse through the host Service of its replica rather than over localhost, is ready once
-// its REST API accepts connections, and mounts the volumes of the ClickHouse container besides its own.
+// Pod: it connects to ClickHouse through the host Service of its replica rather than over localhost, creates no
+// integration tables in ClickHouse whatever the configuration file says - they would point at an API on the pod of
+// ClickHouse, which runs none, see config.ClickHouseBackupEnvAPICreateIntegrationTables -, is ready once its REST
+// API accepts connections, and mounts the volumes of the ClickHouse container besides its own.
 func configureShardPodContainer(container *core.Container, host *api.Host, clickHouse *core.Container, mounts []core.VolumeMount) {
 	service := managers.NewNameManager(managers.NameManagerTypeClickHouse).Name(interfaces.NameStatefulSetService, host)
-	container.Env = util.OverwriteEnvVars(container.Env, core.EnvVar{Name: config.ClickHouseBackupEnvClickHouseHost, Value: service})
+	container.Env = util.OverwriteEnvVars(container.Env,
+		core.EnvVar{Name: config.ClickHouseBackupEnvClickHouseHost, Value: service},
+		core.EnvVar{Name: config.ClickHouseBackupEnvAPICreateIntegrationTables, Value: strconv.FormatBool(false)},
+	)
 	if container.ReadinessProbe == nil {
 		container.ReadinessProbe = &core.Probe{
 			ProbeHandler: core.ProbeHandler{TCPSocket: &core.TCPSocketAction{

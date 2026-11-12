@@ -353,3 +353,20 @@ func TestBuildForcesRetentionSettings(t *testing.T) {
 		})
 	}
 }
+
+// The integration tables of clickhouse-backup - system.backup_list, system.backup_actions, system.backup_version -
+// are the storage Secret's to turn on: the file keeps api.create_integration_tables and every other API setting, the
+// credentials alone taken over, which clickhouse-backup puts into the URL of the tables.
+func TestBuildKeepsTheIntegrationTables(t *testing.T) {
+	built, err := Build([]byte(`
+api:
+  create_integration_tables: true
+  integration_tables_host: chi-demo-main-0-0
+`), testCredentials, testDefaults)
+	require.NoError(t, err)
+	section := parse(t, built.File)["api"].(map[string]any)
+	require.Equal(t, true, section["create_integration_tables"])
+	require.Equal(t, "chi-demo-main-0-0", section["integration_tables_host"])
+	require.Equal(t, testCredentials.APIUsername, section["username"])
+	require.Equal(t, testCredentials.APIPassword, section["password"])
+}

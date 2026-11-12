@@ -208,6 +208,30 @@ func TestShardPodServesTheRESTAPI(t *testing.T) {
 	require.Equal(t, "true", vars[config.ClickHouseBackupEnvRebaseBeforeRemoveOldRemote])
 	require.Equal(t, "altinity/clickhouse-backup:stable", c.Image)
 	require.Equal(t, core.PullAlways, c.ImagePullPolicy)
+	require.Equal(t, "false", vars[config.ClickHouseBackupEnvAPICreateIntegrationTables],
+		"no integration tables: they would point at an API the pod of ClickHouse does not run")
+}
+
+// The integration tables stay off in the backup Pod also when the clickhouse-backup container of the backup pod template
+// turns them on: the env var overrides the configuration file, and the operator's value overrides the template's.
+func TestShardPodCreatesNoIntegrationTables(t *testing.T) {
+	backup := podModeBackup()
+	backup.PodTemplate = types.NewString("backup")
+	chi := newCHI("demo", layoutCluster("main", 1, 2, backup))
+	chi.Spec.Templates = &api.Templates{PodTemplates: []api.PodTemplate{{Name: "backup", Spec: core.PodSpec{Containers: []core.Container{{
+		Name: config.ClickHouseBackupContainerName,
+		Env:  []core.EnvVar{{Name: config.ClickHouseBackupEnvAPICreateIntegrationTables, Value: "true"}},
+	}}}}}}
+	inMemory, _ := normalize(t, chi)
+	pod, err := NewShardPod(ShardPodSource{Host: inMemory.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[0], ReplicaPod: replicaPod()})
+	require.NoError(t, err)
+	var values []string
+	for _, e := range pod.Spec.Containers[0].Env {
+		if e.Name == config.ClickHouseBackupEnvAPICreateIntegrationTables {
+			values = append(values, e.Value)
+		}
+	}
+	require.Equal(t, []string{"false"}, values)
 }
 
 // The image and pull policy of the clickhouse-backup container of the backup pod template win
