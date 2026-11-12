@@ -799,7 +799,8 @@ op_poll() {
 # passed for it - CHECK may set STEP_ARGS, which hold ARGS until then, to the arguments of the host -, then polls every
 # host it was submitted to until it runs on none. A host whose CHECK or submission fails
 # gets the step submitted to no other host after it, and those it was submitted to are waited for all the same.
-# FAILED_HOSTS and FAILURES list the hosts that failed and the warning of each; it returns 1 when any did
+# FAILED_HOSTS and FAILURES list the hosts that failed and the warning of each, STEP_FAILED_HOSTS those of them the step
+# itself failed on, whose CHECK passed; it returns 1 when any did
 run_all() {
 	local kind=$1 check=$3 what=$4 name=$5 host rc
 	local -a hosts pending=() running
@@ -807,6 +808,7 @@ run_all() {
 	shift 5
 	FAILED_HOSTS=()
 	FAILURES=()
+	STEP_FAILED_HOSTS=()
 	for host in "${hosts[@]}"; do
 		LAST_WARNING=
 		STEP_ARGS=("$@")
@@ -816,6 +818,7 @@ run_all() {
 		fi
 		if ! "${kind}_start" "${host}" "${what}" "${name}" "${STEP_ARGS[@]}"; then
 			step_failed "${kind}" "${host}" "${what}" "${name}"
+			STEP_FAILED_HOSTS+=("${host}")
 			break
 		fi
 		pending+=("${host}")
@@ -830,7 +833,10 @@ run_all() {
 			case ${rc} in
 			0) ;;
 			2) running+=("${host}") ;;
-			*) step_failed "${kind}" "${host}" "${what}" "${name}" ;;
+			*)
+				step_failed "${kind}" "${host}" "${what}" "${name}"
+				STEP_FAILED_HOSTS+=("${host}")
+				;;
 			esac
 		done
 		pending=(${running[@]+"${running[@]}"})
@@ -1003,13 +1009,14 @@ holds_data() {
 # list_all PATTERN HOST... lists the backups of every HOST and fills the sets COMPLETE, with the names matching
 # PATTERN of the backups every HOST lists complete, WITH_DATA, with those of the backups that hold data on any HOST,
 # EMPTY, with those of the backups a HOST lists complete with a size of 0, nothing at all, SIZED, with those of the
-# backups any HOST lists, broken or not, with a size above 0 of anything, and ALL_NAMES, with those of every backup any
+# backups any HOST lists, broken or not, with a size above 0 of anything, BROKEN, with those any HOST lists broken, and
+# ALL_NAMES, with those of every backup any
 # HOST lists, broken ones too, and UNLISTED with the hosts that cannot be listed. A run that failed on one host leaves copies on the others that cannot be restored on their own, and the copies
 # of one backup on a host whose tables hold no data are as much part of it as those that do
 list_all() {
 	local pattern=$1 host first=1 i name
 	local -A listed both
-	declare -gA COMPLETE=() WITH_DATA=() EMPTY=() SIZED=() ALL_NAMES=()
+	declare -gA COMPLETE=() WITH_DATA=() EMPTY=() SIZED=() BROKEN=() ALL_NAMES=()
 	UNLISTED=()
 	shift
 	for host in "$@"; do
@@ -1032,6 +1039,7 @@ list_all() {
 				SIZED[${LIST_NAMES[i]}]=1
 			fi
 			if [[ ${LIST_DESC[i]} == broken* ]]; then
+				BROKEN[${LIST_NAMES[i]}]=1
 				continue
 			fi
 			listed[${LIST_NAMES[i]}]=1
@@ -1073,8 +1081,9 @@ retention_pattern() {
 # schedule retention keeps, KEEP, and which it deletes, OBSOLETE, newest first, of NAMES, the backups of the
 # retention_pattern any retention host lists, as list_all classified them:
 #  - a backup not every host lists complete - failed, or in progress - never counts: it is deleted, on every host that
-#    holds it, once it is older than the newest backup every host lists complete, unless no host lists a size above 0
-#    of it, as the Altinity Cloud Manager deletes none of size 0; one newer is left, as it may be in progress;
+#    holds it, once it is older than the newest backup every host lists complete, if a host lists a size above 0 of it,
+#    as the Altinity Cloud Manager deletes none of size 0, or lists it broken - an upload that failed, whatever its
+#    size; one newer is left, as it may be in progress;
 #  - a backup a host lists complete of size 0, empty, is neither counted nor deleted, nor is one whose name tells no
 #    valid time;
 #  - the newest backup is always kept, as the base of the next incremental one, and so is the one just made;
@@ -1097,7 +1106,7 @@ retention_plan() {
 			continue
 		fi
 		if [[ -z ${COMPLETE[${name}]:-} ]]; then
-			if [[ -n ${SIZED[${name}]:-} && ${name} != "${BACKUP_NAME:-}" ]]; then
+			if [[ -n ${SIZED[${name}]:-}${BROKEN[${name}]:-} && ${name} != "${BACKUP_NAME:-}" ]]; then
 				incomplete+=("${key} ${name}")
 			fi
 		elif [[ -z ${EMPTY[${name}]:-} ]]; then
@@ -1947,6 +1956,29 @@ fall_back_hosts() {
 	done
 }
 
+# drop_failed_backup HOST... deletes, as well as it can, what a create_remote that failed on every HOST left there:
+# clickhouse-backup deletes the local backup of a create that fails, but not that of an upload that fails, nor the part
+# of the remote backup it uploaded, which lists as broken; the Job resumes no upload. A copy that is not there is no
+# failure; a host that does not answer is asked once. A host whose backup only appeared in its storage, made by another
+# host, is no HOST
+drop_failed_backup() {
+	local host where BEST_EFFORT=1
+	for host in "$@"; do
+		for where in local remote; do
+			if submit "${host}" "delete ${where} ${BACKUP_NAME}" "/backup/delete/${where}/${BACKUP_NAME}" -G --data-urlencode "force=true" \
+				--max-time "${DELETE_TIMEOUT}"; then
+				log "${host}: the ${where} copy of the failed backup ${BACKUP_NAME} deleted"
+				event Normal OrchestratorFailedBackupDeleted "${host}: the ${where} copy of the failed backup ${BACKUP_NAME} deleted"
+			elif [[ ${LAST_WARNING} == *"not found"* ]]; then
+				log "${host}: no ${where} copy of the failed backup ${BACKUP_NAME} to delete"
+			else
+				advise "${host}: the ${where} copy of the failed backup ${BACKUP_NAME} is left: ${LAST_WARNING}"
+				event Warning OrchestratorFailedBackupLeft "${host}: the ${where} copy of the failed backup ${BACKUP_NAME} is left: ${LAST_WARNING}"
+			fi
+		done
+	done
+}
+
 # backup_unseen HOST reports whether the storage of HOST does not hold the backup this run makes yet, as before it
 # submits it there: one that does was made by another host of this run, at the same storage path
 backup_unseen() {
@@ -2056,6 +2088,7 @@ do_backup() {
 	# Every host makes its part of the backup at the same time, as the Altinity Cloud Manager has every shard make its own;
 	# one that fails leaves the others to finish, which the Job waits for before it fails
 	if ! run_all op "${backup_hosts[*]}" backup_unseen create_remote "${BACKUP_NAME}" /backup/create_remote "${params[@]}"; then
+		drop_failed_backup ${STEP_FAILED_HOSTS[@]+"${STEP_FAILED_HOSTS[@]}"}
 		fail_all "backup ${BACKUP_NAME}"
 	fi
 	log "backup ${BACKUP_NAME} completed on ${#backup_hosts[@]} host(s)"
@@ -3106,10 +3139,13 @@ declare -A LAST_OP=() LAST_ACTION_START=() LAST_ACTION_COMMAND=() OWN_BACKUPS=()
 # The step that runs on every host: the operation id of an operation, the command of an action and the start times of
 # the rows of that command before it was submitted
 declare -A OP_ID=() ACTION_COMMAND=() ACTION_BEFORE=()
+# The sets of backups list_all fills, which retention_plan reads
+declare -A COMPLETE=() WITH_DATA=() EMPTY=() SIZED=() BROKEN=() ALL_NAMES=()
 # The database mapping of a restore: the database of the backup restored into each target, and the target of each
 declare -A DB_SOURCE=() DB_TARGET=()
 FAILED_HOSTS=()
 FAILURES=()
+STEP_FAILED_HOSTS=()
 # The arguments of the step of a host, as restore_command makes them; how the restore steps run, RESTORE_KIND op or
 # action, and ACTION_ENV, the --env flags of their commands; the hosts DATA_DOWNLOADS lists download the data too
 STEP_ARGS=()

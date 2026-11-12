@@ -150,6 +150,9 @@ type stubHost struct {
 	restartAgainAfter time.Duration
 	// deleteFail maps a backup name to the error its remote deletion fails with
 	deleteFail map[string]string
+	// leavesFailedUpload makes a create_remote that fails leave what clickhouse-backup 2.8.3 leaves of an upload
+	// that fails: the local backup, and the remote one listed as broken
+	leavesFailedUpload bool
 	// noLocalOnDownload makes a download finish without a local copy
 	noLocalOnDownload bool
 	// backupTables lists the "db.table" names GET /backup/tables?remote_backup= reports of the backup
@@ -541,6 +544,11 @@ func (s *sidecarStub) serveStatus(w http.ResponseWriter, h *stubHost, id string)
 		return
 	}
 	if failure, failed := h.failOp[op.kind]; failed || (op.fails != "") {
+		if (op.kind == "create_remote") && h.leavesFailedUpload && !op.done {
+			op.done = true
+			h.local = append(h.local, local(op.name))
+			h.remote = append(h.remote, broken(op.name))
+		}
 		row["status"] = "error"
 		row["error"] = cmp.Or(failure, op.fails)
 		writeRows(w, http.StatusOK, row)
@@ -1347,8 +1355,10 @@ func TestJobScriptOperationFailure(t *testing.T) {
 		code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1 h2"})
 		require.Equal(t, 1, code, out)
 		require.Contains(t, out, "ERROR: backup bk-1 failed on h1: h1: create_remote rejected (HTTP 500): can't create: no such table")
-		// No host after it gets the backup submitted, those before it finish theirs
-		require.Equal(t, []string{"h0 POST /backup/create_remote", "h1 POST /backup/create_remote"}, func() []string {
+		// No host after it gets the backup submitted, those before it finish theirs; what the refused one may have
+		// left is deleted
+		require.Equal(t, []string{"h0 POST /backup/create_remote", "h1 POST /backup/create_remote",
+			"h1 POST /backup/delete/local/bk-1", "h1 POST /backup/delete/remote/bk-1"}, func() []string {
 			var calls []string
 			for _, c := range s.matching(http.MethodPost, "/") {
 				calls = append(calls, c.String())
@@ -1368,6 +1378,37 @@ func TestJobScriptOperationFailure(t *testing.T) {
 		require.Equal(t, 1, code, out)
 		require.Contains(t, out, "no tables for backup")
 	})
+}
+
+// clickhouse-backup deletes the local backup of a create_remote whose create fails, but not that of one whose upload
+// fails, nor the part of the remote backup it uploaded, which lists as broken: the Job deletes both on the host it
+// failed on, a copy that is not there being no failure, and fails all the same.
+func TestJobScriptDeletesWhatAFailedBackupLeft(t *testing.T) {
+	s := newSidecarStub(t, map[string]*stubHost{
+		"h0": {failOp: map[string]string{"create_remote": "can't upload: connection reset"}, leavesFailedUpload: true},
+		"h1": {failOp: map[string]string{"create_remote": "can't create: no tables"}},
+		"h2": {},
+	})
+	code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1 h2"})
+	require.Equal(t, 1, code, out)
+	require.Contains(t, out, "ERROR: backup bk-1 failed on h0, h1: ")
+	require.Contains(t, out, "h0: the local copy of the failed backup bk-1 deleted")
+	require.Contains(t, out, "h0: the remote copy of the failed backup bk-1 deleted")
+	require.Contains(t, out, "h1: no remote copy of the failed backup bk-1 to delete")
+	require.Empty(t, s.hosts["h0"].local)
+	require.Empty(t, s.remoteNames("h0"))
+	require.Equal(t, []string{"bk-1"}, s.remoteNames("h2"), "a host that made its part keeps it")
+	for _, c := range s.matching(http.MethodPost, "/backup/delete/") {
+		require.NotEqual(t, "h2", c.host)
+	}
+
+	// A copy that cannot be deleted is left with a warning
+	s = newSidecarStub(t, map[string]*stubHost{"h0": {failOp: map[string]string{"create_remote": "can't upload"}, leavesFailedUpload: true,
+		deleteFail: map[string]string{"bk-1": "access denied"}}})
+	code, out = s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0"})
+	require.Equal(t, 1, code, out)
+	require.Contains(t, out, "WARNING: h0: the remote copy of the failed backup bk-1 is left: ")
+	require.Contains(t, out, "ERROR: backup bk-1 failed on h0: h0: create_remote bk-1 ended with status 'error': can't upload")
 }
 
 // scheduledEnv returns the environment of a scheduled backup of the series "daily" on hosts, which are its retention
@@ -1513,12 +1554,13 @@ func TestJobScriptRetentionCountsOnlyBackupsOfASize(t *testing.T) {
 			}},
 			left: []string{"daily-20200102000000", "daily-29990101000000"},
 		},
+		// A broken backup is an upload that failed, whatever its size: it goes once a complete one is newer
 		"broken backups": {
 			host: stubHost{remote: []stubBackup{
 				broken("daily-20200101000000"), remote("daily-20200102000000", ""), remote("daily-20200103000000", ""),
 				broken("daily-20200104000000"),
 			}},
-			left: []string{"daily-20200101000000", "daily-20200103000000", "daily-20200104000000"},
+			left: []string{"daily-20200103000000"},
 		},
 		"data beyond what bash arithmetic holds": {
 			host: stubHost{remote: []stubBackup{remote("daily-20200101000000", ""), huge("daily-20200102000000"), remote("daily-20200103000000", "")}},
@@ -1562,11 +1604,13 @@ func TestJobScriptRetentionCountsOnlyBackupsCompleteEverywhere(t *testing.T) {
 			h0: []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200102000000", "")},
 			h1: []stubBackup{remote("daily-20200101000000", ""), broken("daily-20200102000000")},
 		},
-		"a leftover of size 0 on every host": {
+		"a backup of size 0 on one host, missing on the other": {
 			h0:    []stubBackup{emptyBackup("daily-20200103000000")},
-			h1:    []stubBackup{broken("daily-20200103000000")},
 			left0: []string{"daily-20200103000000"},
-			left1: []string{"daily-20200103000000"},
+		},
+		"a broken leftover of size 0 on every host": {
+			h0: []stubBackup{broken("daily-20200103000000")},
+			h1: []stubBackup{broken("daily-20200103000000")},
 		},
 		"a copy of size 0 on one host": {
 			h0:    []stubBackup{emptyBackup("daily-20200101000000"), remote("daily-20200102000000", "")},
@@ -4773,8 +4817,8 @@ func TestJobScriptRetentionPlan(t *testing.T) {
 		schedules string
 		names     []string
 		// incomplete and empty name the backups not every host lists complete, and those listed of size 0;
-		// sizeless those no host lists a size above 0 of
-		incomplete, empty, sizeless []string
+		// sizeless those no host lists a size above 0 of, broken those a host lists broken
+		incomplete, empty, sizeless, broken []string
 		made                        string
 		keep, obsolete              []string
 	}{
@@ -4846,6 +4890,15 @@ func TestJobScriptRetentionPlan(t *testing.T) {
 			sizeless:   all("d-20200101000000"),
 			keep:       all("d-20200102000000"),
 		},
+		"a broken backup of size 0": {
+			schedules:  "period=daily time=00:00 keep=1",
+			names:      all("d-20200101000000", "d-20200102000000", "d-20200103000000"),
+			incomplete: all("d-20200101000000", "d-20200103000000"),
+			sizeless:   all("d-20200101000000", "d-20200103000000"),
+			broken:     all("d-20200101000000", "d-20200103000000"),
+			keep:       all("d-20200102000000"),
+			obsolete:   all("d-20200101000000"),
+		},
 		"an incomplete backup newer than every complete one": {
 			schedules:  "period=daily time=00:00 keep=1",
 			names:      all("d-20200101000000", "d-20200102000000", "d-20200102T120000"),
@@ -4879,7 +4932,7 @@ func TestJobScriptRetentionPlan(t *testing.T) {
 			out := sourcedOutput(t, map[string]string{
 				envSchedules: tc.schedules, envBackupNamePrefix: "d", envBackupName: tc.made,
 				"ALL": strings.Join(tc.names, " "), "INCOMPLETE": strings.Join(tc.incomplete, " "), "EMPTIES": strings.Join(tc.empty, " "),
-				"SIZELESS": strings.Join(tc.sizeless, " "),
+				"SIZELESS": strings.Join(tc.sizeless, " "), "BROKENS": strings.Join(tc.broken, " "),
 			}, `
 				parse_schedules
 				read -r -a NAMES <<<"${ALL}"
@@ -4888,6 +4941,7 @@ func TestJobScriptRetentionPlan(t *testing.T) {
 				for name in ${INCOMPLETE}; do unset "COMPLETE[${name}]"; done
 				for name in ${EMPTIES}; do EMPTY[${name}]=1; done
 				for name in ${SIZELESS}; do unset "SIZED[${name}]"; done
+				for name in ${BROKENS}; do BROKEN[${name}]=1; done
 				retention_plan
 				echo "keep: $(for name in "${!KEEP[@]}"; do echo "${name}"; done | sort | tr '\n' ' ')"
 				echo "obsolete: ${OBSOLETE[*]}"`)

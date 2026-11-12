@@ -100,7 +100,11 @@ hosts finish when their data is uploaded, and the Jobs of different clusters run
 each other. Data written in the meantime is in the copies of some shards and not in those of others.
 A host whose backup fails leaves the others to finish theirs, which the Job waits for before it
 fails with the error of every host that failed; once the Job cannot submit the backup to a host, it
-submits it to no further host. The shared name ties the copies together for naming,
+submits it to no further host. `clickhouse-backup` deletes the local backup of a `create_remote`
+whose create fails, but not when its upload fails: the local backup stays, and so does the part of
+the remote backup it uploaded, listed as `broken`. The Job resumes no upload, so on every host the
+backup failed on it deletes both, as well as it can (`OrchestratorFailedBackupDeleted`, or
+`OrchestratorFailedBackupLeft` with a warning), before it fails. The shared name ties the copies together for naming,
 retention and restore, and promises nothing more. Where shards or clusters must match - a batch of
 inserts spread over several shards, tables in two clusters fed by one pipeline - stop writing to
 them for the time of the backup.
@@ -1542,9 +1546,10 @@ schedule's backups on the cluster it ran on, newest first, as the cleanup of ACM
   a backup made before a host joined the cluster - never counts toward any `keep`, nor as the
   newest backup. Once it is older than the newest backup every host lists complete it is deleted,
   newest first among the others, on every host that holds it, as ACM deletes every backup of a
-  size; a newer one, which may still be uploading, is left. A backup no host lists with a size
-  above 0, and one a host lists complete with size 0, is neither counted nor deleted: clean it up
-  by hand. When a host cannot be listed, retention skips that run.
+  size, and so is one a host lists `broken`, whatever its size, as that is an upload that failed;
+  a newer one, which may still be uploading, is left. A backup no host lists with a size above 0
+  nor as broken, and one a host lists complete with size 0, is neither counted nor deleted: clean
+  it up by hand. When a host cannot be listed, retention skips that run.
 * **Incremental bases are rebased, not protected.** The operator forces
   `rebase_during_delete` and `rebase_before_remove_old_remote` on, so `clickhouse-backup` rebases a
   backup that another one is incremental to before it deletes it.
