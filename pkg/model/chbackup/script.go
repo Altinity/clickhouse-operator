@@ -67,6 +67,9 @@ const (
 	envJobName = "JOB_NAME"
 	// envBackupHosts lists the space-separated hosts create_remote runs on
 	envBackupHosts = "BACKUP_HOSTS"
+	// envBackupFallbackHosts lists, as envBackupHosts, the host of every shard create_remote runs on when the one
+	// envBackupHosts names, the preferred replica of the shard, does not answer; empty when they are the same
+	envBackupFallbackHosts = "BACKUP_FALLBACK_HOSTS"
 	// envRetentionHosts lists the space-separated hosts whose backups retention prunes
 	envRetentionHosts = "RETENTION_HOSTS"
 	// envSchemaOnly restricts a backup or a restore to the schema, "true" or "false"

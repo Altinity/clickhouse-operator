@@ -173,6 +173,7 @@ spec:
 | `podTemplate`            | Pod template whose `clickhouse-backup` container the sidecar, and the backup Pods of the `pod` mode, are built on, see [Customizing the sidecar](#customizing-the-sidecar). It customizes the container only: it names no storage. `""` on a cluster: the operator's own. |
 | `configSecretRef`        | Secret in the CHI namespace whose key `config.yml` holds the `clickhouse-backup` configuration of the sidecar, see [Backup storage](#backup-storage). Required where backup is enabled. `name: ""` on a cluster: none.                                     |
 | `mode`                   | How the operator reaches `clickhouse-backup` on the hosts of the cluster: `sidecar` (default), a sidecar in every ClickHouse Pod; `pod`, no sidecar, a backup Pod per shard only while a backup or restore of the cluster runs, see [Backup modes](#backup-modes). |
+| `preferredReplica`       | Index, from 0, of the replica of each shard a backup works on, as the `backupReplica` of ACM; empty is 0, the first replica. With `mode: sidecar` a `FirstPerShard` backup runs on that replica's sidecar, or on the first replica's when the shard has fewer replicas or the preferred one's ClickHouse does not answer when the Job starts (`OrchestratorReplicaFallback` event); with `mode: pod` the backup Pod of the shard runs next to it, see [Which hosts are involved](#which-hosts-are-involved). |
 | `recovery`               | `backupName`: the backup a new CHI starts from, see [Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup). `""` on a cluster: nothing to recover there. `sourceInstallation`, `sourceNamespace`: the CHI that made the backup, when another; `""` on a cluster: this CHI. `orchestratorConfigMapRef`: the ConfigMap of the [orchestrator script](#the-orchestrator-script) the recovery restore runs, copied into it; `name: ""` on a cluster: the operator's. |
 
 Inheritance follows `spec.security`: a cluster inherits every field it leaves empty from
@@ -1321,9 +1322,18 @@ included - holds its CronJobs the same way (`InvalidSpec`) until the spec is fix
 is resolved, the hosts of each cluster, which `status.clusters[].hosts` records for a backup or
 restore, are:
 
-* **Backup:** one replica per shard (`FirstPerShard`) or every replica (`AllReplicas`).
-* **Retention:** every host of the cluster the backup ran on, which the schedule lists in
-  `status.clusters[].retentionHosts`.
+* **Backup:** one replica per shard (`FirstPerShard`) or every replica (`AllReplicas`). The one replica
+  is `backup.preferredReplica` of the cluster, the first replica (0) by default, as ACM backs up its
+  `backupReplica`: a lag-free replica, or one on a node with spare disk or network, can take the
+  load of the backup off the replica that serves the queries. A shard with fewer replicas backs up
+  its first one, and so does a shard whose preferred replica's ClickHouse does not answer through
+  the sidecar when the Job starts; the Job tells it in a warning and an `OrchestratorReplicaFallback`
+  event. Every replica of a shard keeps a `FirstPerShard` backup at the same storage path, without
+  `{replica}`, so the choice changes neither where the backup is nor what restores it.
+  `status.clusters[].hosts` records the preferred replicas.
+* **Retention:** one host per shard of the cluster the backup ran on - the first replica, which
+  lists the same backups as the preferred one -, or every replica with `AllReplicas`, which the
+  schedule lists in `status.clusters[].retentionHosts`.
 * **Verification:** the first replica of each shard.
 * **Restore:** the schema on every replica, the data on one replica per shard, access entities on
   every replica; with `overwrite`, one host first runs the `ON CLUSTER` pass when a shard has more

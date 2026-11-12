@@ -2718,10 +2718,12 @@ spec:
                                 type: integer
                                 minimum: 0
                                 description: |
-                                  Index, from 0, of the replica of each shard the backup Pod of the shard works next to: it mounts the
-                                  volumes of that replica's Pod and runs on the same node, by a nodeSelector on the node's hostname. A shard
-                                  with fewer replicas, or whose preferred replica is not ready, falls back to its next ready replica.
-                                  Empty means 0, the first replica
+                                  Index, from 0, of the replica of each shard a backup works on, as the backupReplica of the Altinity Cloud Manager.
+                                  With mode pod the backup Pod of the shard works next to it: it mounts the volumes of that replica's Pod and runs
+                                  on the same node, by a nodeSelector on the node's hostname; a shard with fewer replicas, or whose preferred replica
+                                  is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
+                                  (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
+                                  replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
                               recovery:
                                 type: object
                                 description: |
@@ -4243,10 +4245,12 @@ spec:
                       type: integer
                       minimum: 0
                       description: |
-                        Index, from 0, of the replica of each shard the backup Pod of the shard works next to: it mounts the
-                        volumes of that replica's Pod and runs on the same node, by a nodeSelector on the node's hostname. A shard
-                        with fewer replicas, or whose preferred replica is not ready, falls back to its next ready replica.
-                        Empty means 0, the first replica
+                        Index, from 0, of the replica of each shard a backup works on, as the backupReplica of the Altinity Cloud Manager.
+                        With mode pod the backup Pod of the shard works next to it: it mounts the volumes of that replica's Pod and runs
+                        on the same node, by a nodeSelector on the node's hostname; a shard with fewer replicas, or whose preferred replica
+                        is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
+                        (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
+                        replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
                     recovery:
                       type: object
                       description: |
@@ -7040,10 +7044,12 @@ spec:
                                 type: integer
                                 minimum: 0
                                 description: |
-                                  Index, from 0, of the replica of each shard the backup Pod of the shard works next to: it mounts the
-                                  volumes of that replica's Pod and runs on the same node, by a nodeSelector on the node's hostname. A shard
-                                  with fewer replicas, or whose preferred replica is not ready, falls back to its next ready replica.
-                                  Empty means 0, the first replica
+                                  Index, from 0, of the replica of each shard a backup works on, as the backupReplica of the Altinity Cloud Manager.
+                                  With mode pod the backup Pod of the shard works next to it: it mounts the volumes of that replica's Pod and runs
+                                  on the same node, by a nodeSelector on the node's hostname; a shard with fewer replicas, or whose preferred replica
+                                  is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
+                                  (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
+                                  replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
                               recovery:
                                 type: object
                                 description: |
@@ -8565,10 +8571,12 @@ spec:
                       type: integer
                       minimum: 0
                       description: |
-                        Index, from 0, of the replica of each shard the backup Pod of the shard works next to: it mounts the
-                        volumes of that replica's Pod and runs on the same node, by a nodeSelector on the node's hostname. A shard
-                        with fewer replicas, or whose preferred replica is not ready, falls back to its next ready replica.
-                        Empty means 0, the first replica
+                        Index, from 0, of the replica of each shard a backup works on, as the backupReplica of the Altinity Cloud Manager.
+                        With mode pod the backup Pod of the shard works next to it: it mounts the volumes of that replica's Pod and runs
+                        on the same node, by a nodeSelector on the node's hostname; a shard with fewer replicas, or whose preferred replica
+                        is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
+                        (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
+                        replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
                     recovery:
                       type: object
                       description: |

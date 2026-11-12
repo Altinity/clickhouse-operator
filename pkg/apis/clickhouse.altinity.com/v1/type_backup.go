@@ -81,9 +81,12 @@ type ClusterBackup struct {
 	// template's; an explicit name "" on a cluster leaves the cluster without one. It is required: without one,
 	// backup stays off. The configuration must set api.username and api.password of the clickhouse-backup REST API.
 	ConfigSecretRef *core.LocalObjectReference `json:"configSecretRef,omitempty" yaml:"configSecretRef,omitempty"`
-	// PreferredReplica is the index, from 0, of the replica of each shard the backup Pod of the shard works next to:
-	// it mounts the volumes of that replica's pod and runs on its node. A shard with fewer replicas, or whose preferred
-	// replica is not ready, falls back to its next ready replica. Empty means 0, the first replica.
+	// PreferredReplica is the index, from 0, of the replica of each shard a backup works on, as the backupReplica of
+	// the Altinity Cloud Manager. With mode pod the backup Pod of the shard works next to it: it mounts the volumes of
+	// that replica's pod and runs on its node; a shard with fewer replicas, or whose preferred replica is not ready,
+	// falls back to its next ready replica. With mode sidecar a backup of one replica per shard (FirstPerShard) runs
+	// on the sidecar of that replica, or on that of the first replica when the shard has fewer replicas or the
+	// preferred one does not answer when the Job starts. Empty means 0, the first replica.
 	PreferredReplica *types.Int32 `json:"preferredReplica,omitempty" yaml:"preferredReplica,omitempty"`
 	// Recovery names the backup a new installation restores the cluster from once it has
 	// completed its first reconcile. It configures the operator, not the sidecar: it never changes a
@@ -245,8 +248,8 @@ func (r *BackupRecovery) GetOrchestratorConfigMapName() string {
 	return orchestratorConfigMapName(r.OrchestratorConfigMapRef)
 }
 
-// GetPreferredReplica returns the index of the replica of each shard the backup Pod of the shard works next to,
-// 0 when unset or negative, nil-safe.
+// GetPreferredReplica returns the index of the replica of each shard a backup works on, 0 when unset or negative,
+// nil-safe.
 func (b *ClusterBackup) GetPreferredReplica() int {
 	if (b == nil) || !b.PreferredReplica.HasValue() || (b.PreferredReplica.Value() < 0) {
 		return 0

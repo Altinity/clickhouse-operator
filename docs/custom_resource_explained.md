@@ -497,6 +497,10 @@ run one Job per cluster, the backup orchestrator script of the operator configur
   - `mode` - how the operator reaches clickhouse-backup on the hosts of the cluster: `sidecar` (default), a sidecar in
     every ClickHouse Pod; `pod`, no sidecar, one backup Pod per shard on the volumes of a replica, only while a backup or
     restore of the cluster runs (see [backup.md](backup.md#backup-modes))
+  - `preferredReplica` - index, from 0, of the replica of each shard a backup works on (default 0, the first replica):
+    with `mode: sidecar` a backup of one replica per shard runs on that replica's sidecar, or on the first replica's when
+    the shard has fewer replicas or the preferred one does not answer; with `mode: pod` the backup Pod of the shard runs
+    next to it (see [backup.md](backup.md#which-hosts-are-involved))
   - `recovery.backupName` - for a new installation: the backup it starts from. Once its first reconcile completes,
     the operator restores every backup-enabled cluster from it, once, provided the installation holds no tables yet;
     a cluster may name another backup, or `""` for none. Taken from the installation only, never from a template;

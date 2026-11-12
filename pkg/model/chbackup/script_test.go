@@ -485,6 +485,9 @@ func (s *sidecarStub) serveGet(w http.ResponseWriter, h *stubHost, call stubCall
 			return
 		}
 		s.serveBackupTables(w, h, call.query.Get("table"))
+	// The live tables a pattern matches, which takes a query of ClickHouse: the system ones are left out
+	case (segments[0] == "tables") && (len(segments) == 1):
+		writeRows[map[string]string](w, http.StatusOK)
 	case (segments[0] == "tables") && (len(segments) == 2) && (segments[1] == "all"):
 		w.WriteHeader(http.StatusOK)
 		rows := []tableRow{
@@ -961,7 +964,7 @@ func TestJobScriptReadsDeclaredEnv(t *testing.T) {
 		envRestoreRBAC, envRBACNotRestoredMessage, envUnchangedExitCode, envReplicated, envMaxTableSizeToDrop,
 		envPathClusters, envPathSelf, envPathInstallation, envPathNamespace, envPathReplicaSelection,
 		envDefaultPath, envDefaultObjectDiskPath, envSourceInstallation, envSourceNamespace, envSkipTables, envSkipTableEngines,
-		envDatabaseMapping,
+		envDatabaseMapping, envBackupFallbackHosts,
 	} {
 		require.Regexp(t, regexp.MustCompile(`\$\{!?`+name+`\b|\b(parse_hosts|is_true|check_name|default_path "\$\{index\}") `+name+`\b`), orchestratorScript, name)
 	}
@@ -1032,6 +1035,30 @@ func TestJobScriptBackup(t *testing.T) {
 	}
 	require.Equal(t, []string{"base", "bk-1"}, s.remoteNames("chi-a-0-0"))
 	require.Equal(t, []string{"base", "bk-1"}, s.remoteNames("chi-a-1-0"))
+}
+
+// A backup of one replica per shard runs on the preferred replica of every shard, backup.preferredReplica, as the
+// Altinity Cloud Manager backs up its backupReplica: a preferred replica whose ClickHouse does not answer leaves the
+// backup of its shard to the first replica, whose storage path is the shard's too.
+func TestJobScriptBacksUpThePreferredReplica(t *testing.T) {
+	s := newSidecarStub(t, map[string]*stubHost{"a1": {}, "b1": {status: http.StatusInternalServerError}, "a0": {}, "b0": {}})
+	code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1",
+		envBackupHosts: "a1 b1", envBackupFallbackHosts: "a0 b0"})
+	require.Zero(t, code, out)
+	require.Contains(t, out, "WARNING: b1: the preferred replica does not answer (curl exit 0, HTTP 500), backing up b0 instead")
+	require.Equal(t, []string{"bk-1"}, s.remoteNames("a1"))
+	require.Equal(t, []string{"bk-1"}, s.remoteNames("b0"))
+	require.Empty(t, s.remoteNames("a0"))
+	for _, c := range s.matching(http.MethodGet, "/backup/tables") {
+		require.Equal(t, url.Values{"table": {"system.one"}}, c.query)
+	}
+
+	// Fallback hosts of another count are refused
+	s = newSidecarStub(t, map[string]*stubHost{"a1": {}})
+	code, out = s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1",
+		envBackupHosts: "a1", envBackupFallbackHosts: "a0 b0", envUnchangedExitCode: "3"})
+	require.Equal(t, 3, code, out)
+	require.Contains(t, out, "BACKUP_FALLBACK_HOSTS must name a host for every host of BACKUP_HOSTS")
 }
 
 func TestJobScriptBackupWithoutOptions(t *testing.T) {

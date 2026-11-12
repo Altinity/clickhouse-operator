@@ -75,6 +75,8 @@ type topologyCluster struct {
 	// maxTableSizeToDrop is the smallest max_table_size_to_drop of the hosts of the cluster, 0 when none
 	// of them limits the size of a table it drops
 	maxTableSizeToDrop uint64
+	// preferredReplica is the index of the replica of each shard a backup of one replica per shard runs on
+	preferredReplica int
 }
 
 // podSettings are the settings a Job inherits from a host it drives: the image of its clickhouse-backup
@@ -310,9 +312,10 @@ func newTopologyCluster(
 	containers interfaces.IContainerManager,
 ) topologyCluster {
 	cluster := topologyCluster{
-		name:         c.GetName(),
-		configSecret: c.GetBackup().GetConfigSecretName(),
-		replicated:   !c.GetZookeeper().IsEmpty(),
+		name:             c.GetName(),
+		configSecret:     c.GetBackup().GetConfigSecretName(),
+		replicated:       !c.GetZookeeper().IsEmpty(),
+		preferredReplica: c.GetBackup().GetPreferredReplica(),
 	}
 	if c.GetLayout() == nil {
 		return cluster
@@ -432,6 +435,34 @@ func (t *Topology) firstPerShard() []string {
 		}
 	}
 	return hosts
+}
+
+// preferredPerShard returns the preferred replica of every shard, backup.preferredReplica, or its first one when the
+// shard has fewer replicas: the replicas a backup of one replica per shard runs on.
+func (t *Topology) preferredPerShard() []string {
+	if t == nil {
+		return nil
+	}
+	var hosts []string
+	for _, cluster := range t.clusters {
+		for _, shard := range cluster.shards {
+			if cluster.preferredReplica < len(shard.hosts) {
+				hosts = append(hosts, shard.hosts[cluster.preferredReplica])
+			} else {
+				hosts = append(hosts, shard.hosts[0])
+			}
+		}
+	}
+	return hosts
+}
+
+// backupHosts returns the hosts a backup with the given replica selection makes its parts on: every replica, or the
+// preferred replica of every shard, see preferredPerShard.
+func (t *Topology) backupHosts(selection api.ReplicaSelection) []string {
+	if selection == api.ReplicaSelectionAllReplicas {
+		return t.allReplicas()
+	}
+	return t.preferredPerShard()
 }
 
 // allReplicas returns every host of every shard.

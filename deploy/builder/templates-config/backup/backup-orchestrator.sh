@@ -1914,6 +1914,39 @@ wait_for_apis() {
 	event Normal OrchestratorBackupPodsReady "the backup Pods answer"
 }
 
+# clickhouse_answers HOST reports whether the ClickHouse of HOST answers through its API: a listing of a table the API
+# lists none of, which takes a query of ClickHouse all the same, asked once
+clickhouse_answers() {
+	request GET "$1" /backup/tables -G --data-urlencode "table=system.one"
+	((CURL_EXIT == 0)) && [[ ${HTTP_CODE} == 200 ]]
+}
+
+# fall_back_hosts replaces in HOSTS, the hosts of BACKUP_HOSTS, the preferred replica of every shard whose ClickHouse
+# does not answer by the host of the shard BACKUP_FALLBACK_HOSTS names in its place, the first replica of the shard,
+# whose storage path is the shard's as well: the Altinity Cloud Manager backs up another replica when its backup
+# replica is not available. BACKUP_FALLBACK_HOSTS unset or empty leaves HOSTS as they are
+fall_back_hosts() {
+	local i
+	local -a preferred=("${HOSTS[@]}") fallback
+	parse_hosts BACKUP_FALLBACK_HOSTS optional
+	fallback=("${HOSTS[@]}")
+	HOSTS=("${preferred[@]}")
+	if ((${#fallback[@]} == 0)); then
+		return 0
+	fi
+	if ((${#fallback[@]} != ${#preferred[@]})); then
+		die "BACKUP_FALLBACK_HOSTS must name a host for every host of BACKUP_HOSTS"
+	fi
+	for i in "${!preferred[@]}"; do
+		if [[ ${preferred[i]} == "${fallback[i]}" ]] || clickhouse_answers "${preferred[i]}"; then
+			continue
+		fi
+		advise "${preferred[i]}: the preferred replica does not answer (curl exit ${CURL_EXIT}, HTTP ${HTTP_CODE}), backing up ${fallback[i]} instead"
+		event Normal OrchestratorReplicaFallback "${preferred[i]} does not answer, the backup of its shard runs on ${fallback[i]}"
+		HOSTS[i]=${fallback[i]}
+	done
+}
+
 # backup_unseen HOST reports whether the storage of HOST does not hold the backup this run makes yet, as before it
 # submits it there: one that does was made by another host of this run, at the same storage path
 backup_unseen() {
@@ -1930,6 +1963,7 @@ do_backup() {
 	local host incremental= keep i
 	local -a backup_hosts params
 	parse_hosts BACKUP_HOSTS
+	fall_back_hosts
 	backup_hosts=("${HOSTS[@]}")
 	# The hosts make their parts of the backup at once: one host twice would make its part twice, at one storage path
 	for ((i = 1; i < ${#backup_hosts[@]}; i++)); do

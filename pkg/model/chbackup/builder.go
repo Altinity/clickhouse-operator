@@ -713,11 +713,20 @@ func BuildBackupCronJob(
 	return cronJob
 }
 
-// backupOptionsEnv returns the environment of the options one-off and scheduled backups share, the
+// backupOptionsEnv returns the environment of the options one-off and scheduled backups share, the hosts the backup
+// runs on - the preferred replica of every shard, with the first replica of every shard to fall back to -, the
 // termination message that tells a backup without data, and what the check of the storage paths needs.
 func backupOptionsEnv(options *api.BackupOptions, topology *Topology, orchestrator Orchestrator) []core.EnvVar {
+	hosts := orchestrator.hosts(topology.backupHosts(options.GetReplicaSelection()))
+	// The preferred replica of a shard that does not answer leaves the backup to the first one, whose storage path
+	// is the shard's as well
+	fallback := orchestrator.hosts(topology.hosts(options.GetReplicaSelection()))
+	if slices.Equal(hosts, fallback) {
+		fallback = nil
+	}
 	env := []core.EnvVar{
-		envVar(envBackupHosts, joinHosts(orchestrator.hosts(topology.hosts(options.GetReplicaSelection())))),
+		envVar(envBackupHosts, joinHosts(hosts)),
+		envVar(envBackupFallbackHosts, joinHosts(fallback)),
 		envVar(envSchemaOnly, strconv.FormatBool(options.SchemaOnly.IsTrue())),
 		envVar(envTables, options.Tables),
 		envVar(envPartitions, strings.Join(options.Partitions, partitionListSeparator)),

@@ -426,6 +426,26 @@ func TestJobDeadlineComesFromTheSpec(t *testing.T) {
 	require.Equal(t, int64(1200), ptr.Deref(cronJob.Spec.JobTemplate.Spec.ActiveDeadlineSeconds, 0))
 }
 
+// A backup of one replica per shard runs on the preferred replica of every shard, with the first replica of every shard
+// to fall back to; the retention of a schedule prunes on the first replicas, whose storage paths are the same.
+func TestBackupJobRunsOnThePreferredReplica(t *testing.T) {
+	topology := testTopology()
+	topology.clusters[0].preferredReplica = 1
+	values := env(container(t, BuildBackupJob(testBackup("b1"), testInstallation(), topology, testOrchestrator()).Spec.Template.Spec))
+	require.Equal(t, "chi-demo-main-0-1 chi-demo-main-1-1", values[envBackupHosts])
+	require.Equal(t, "chi-demo-main-0-0 chi-demo-main-1-0", values[envBackupFallbackHosts])
+
+	chbs := testSchedule("s1")
+	cronJob := BuildBackupCronJob(chbs, testInstallation(), topology, testOrchestrator(), false)
+	values = env(container(t, cronJob.Spec.JobTemplate.Spec.Template.Spec))
+	require.Equal(t, "chi-demo-main-0-1 chi-demo-main-1-1", values[envBackupHosts])
+	require.Equal(t, "chi-demo-main-0-0 chi-demo-main-1-0", values[envRetentionHosts])
+
+	values = env(container(t, BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec))
+	require.Equal(t, "chi-demo-main-0-0 chi-demo-main-1-0", values[envBackupHosts])
+	require.Empty(t, values[envBackupFallbackHosts], "no fallback without a preferred replica")
+}
+
 // A restore creates the schema on every replica of its cluster from the backup's own definitions, so
 // that no Distributed table is rewritten to point at the cluster, and restores the data on the first
 // replica of each shard, from which replication fills the others.
