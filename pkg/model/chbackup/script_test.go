@@ -94,15 +94,18 @@ type stubHost struct {
 	rawTables []string
 	// busyPolls is the number of /backup/actions answers that report an operation in progress
 	busyPolls int
-	// lockedPosts is the number of POSTs answered 423 Locked
-	lockedPosts int
+	// lockedPosts is the number of POSTs answered 423 Locked, lockedActions that of the commands of the actions endpoint
+	lockedPosts   int
+	lockedActions int
 	// unavailable is the number of requests answered 503, a negative value means every request
 	unavailable int
 	// unavailableAfterPost is the number of requests answered 503 once the host accepted a POST, a
 	// negative value means every request
 	unavailableAfterPost int
-	// posted tells whether the host accepted a POST
-	posted bool
+	// posted tells whether the host accepted a POST, or postsBeforePosted of them when set
+	posted            bool
+	posts             int
+	postsBeforePosted int
 	// hangUpPosts makes the host accept every POST and close the connection without answering
 	hangUpPosts bool
 	// emptyBackups makes every backup the host creates hold no data, as of tables that match nothing
@@ -119,6 +122,8 @@ type stubHost struct {
 	listsUnavailableAfterPost bool
 	// failSubmit, when set, is the error the host refuses every asynchronous operation with, HTTP 500
 	failSubmit string
+	// failPostsAfter is the number of POSTs hangUpPosts and proxyFailsPosts let through first
+	failPostsAfter int
 	// proxyFailsPosts makes a proxy in front of the host answer every POST 503, which tells nothing
 	// about whether the host received it
 	proxyFailsPosts bool
@@ -157,8 +162,8 @@ type stubHost struct {
 	actions []*stubAction
 	// failAction is the error every command POST /backup/actions accepts ends with
 	failAction string
-	// failRestoreAction is the error every restore_remote command of the actions endpoint ends with once it
-	// downloaded the backup, which leaves the downloaded copy behind
+	// failRestoreAction is the error every restore or restore_remote command of the actions endpoint ends with,
+	// once restore_remote downloaded the backup, which leaves the downloaded copy behind
 	failRestoreAction string
 	// remoteListStatus, when set, answers every list of the remote backups with this HTTP status
 	remoteListStatus int
@@ -188,6 +193,8 @@ type stubOp struct {
 	polls  int
 	done   bool
 	epoch  int
+	// fails is the error the operation ends with, as the host was when it accepted it
+	fails string
 }
 
 // stubAction is a row of the actions log of a command POST /backup/actions accepted: it has a
@@ -329,6 +336,11 @@ func (s *sidecarStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.serveGet(w, h, call, segments)
 	case http.MethodPost:
+		if (h.lockedActions > 0) && (segments[0] == "actions") {
+			h.lockedActions--
+			writeError(w, http.StatusInternalServerError, segments[0], "another operation is currently running")
+			return
+		}
 		if h.lockedPosts > 0 {
 			h.lockedPosts--
 			// clickhouse-backup 2.8.1 refuses a command of the actions endpoint with 500, others with 423
@@ -339,12 +351,15 @@ func (s *sidecarStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeError(w, code, segments[0], "another operation is currently running")
 			return
 		}
-		if h.proxyFailsPosts {
+		failing := h.posts >= h.failPostsAfter
+		if h.proxyFailsPosts && failing {
+			h.posts++
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		h.posted = true
-		if h.hangUpPosts {
+		h.posts++
+		h.posted = h.posts >= h.postsBeforePosted
+		if h.hangUpPosts && failing {
 			conn, _, err := w.(http.Hijacker).Hijack()
 			if err != nil {
 				s.t.Errorf("cannot hang up on %s %s: %v", r.Method, r.URL, err)
@@ -421,7 +436,7 @@ func (s *sidecarStub) serveGet(w http.ResponseWriter, h *stubHost, call stubCall
 					a.polls--
 				} else {
 					a.status, a.err = "success", cmp.Or(h.failAction, a.fails)
-					if fields := strings.Fields(a.command); (a.err == "") && (h.failRestoreAction != "") && (fields[0] == "restore_remote") {
+					if fields := strings.Fields(a.command); (a.err == "") && (h.failRestoreAction != "") && ((fields[0] == "restore_remote") || (fields[0] == "restore")) {
 						completeStubOp(h, "restore_remote", fields[len(fields)-1])
 						a.err = h.failRestoreAction
 					}
@@ -522,9 +537,9 @@ func (s *sidecarStub) serveStatus(w http.ResponseWriter, h *stubHost, id string)
 		writeRows(w, http.StatusOK, row)
 		return
 	}
-	if failure, failed := h.failOp[op.kind]; failed {
+	if failure, failed := h.failOp[op.kind]; failed || (op.fails != "") {
 		row["status"] = "error"
-		row["error"] = failure
+		row["error"] = cmp.Or(failure, op.fails)
 		writeRows(w, http.StatusOK, row)
 		return
 	}
@@ -677,7 +692,17 @@ func (s *sidecarStub) servePost(w http.ResponseWriter, h *stubHost, call stubCal
 		}
 		s.nextOp++
 		id := fmt.Sprintf("op-%d", s.nextOp)
-		s.ops[id] = &stubOp{host: call.host, kind: kind, name: name, params: call.query, polls: 1, epoch: h.epoch}
+		op := &stubOp{host: call.host, kind: kind, name: name, params: call.query, polls: 1, epoch: h.epoch}
+		// clickhouse-backup 2.8.1 downloads no backup it holds a copy of, and restores none it holds no copy of
+		switch {
+		case (kind == "download") && (findStubBackup(h.local, name) >= 0):
+			op.fails = fmt.Sprintf("'%s' already exists", name)
+		case (kind == "download") && (findStubBackup(h.remote, name) < 0):
+			op.fails = fmt.Sprintf("'%s' is not found on remote storage", name)
+		case (kind == "restore") && (findStubBackup(h.local, name) < 0):
+			op.fails = fmt.Sprintf("'%s' is not found on local storage", name)
+		}
+		s.ops[id] = op
 		if h.lostOps {
 			h.restart(kind, name, call.query)
 		}
@@ -687,7 +712,7 @@ func (s *sidecarStub) servePost(w http.ResponseWriter, h *stubHost, call stubCal
 	case segments[0] == "actions":
 		// clickhouse-backup 2.8.1 takes the flags of a command after its name alone
 		fields := strings.Fields(call.command)
-		if (len(fields) < 2) || ((fields[0] != "restore_remote") && (fields[0] != "download")) {
+		if (len(fields) < 2) || ((fields[0] != "restore_remote") && (fields[0] != "download") && (fields[0] != "restore")) {
 			writeError(w, http.StatusBadRequest, call.command, "unknown command")
 			return
 		}
@@ -710,6 +735,8 @@ func (s *sidecarStub) servePost(w http.ResponseWriter, h *stubHost, call stubCal
 		startOp("download", segments[1], http.StatusOK)
 	case (segments[0] == "restore_remote") && (len(segments) == 2):
 		startOp("restore_remote", segments[1], http.StatusOK)
+	case (segments[0] == "restore") && (len(segments) == 2):
+		startOp("restore", segments[1], http.StatusOK)
 	case (segments[0] == "delete") && (len(segments) == 3):
 		list := &h.remote
 		if segments[1] == "local" {
@@ -754,6 +781,12 @@ func (h *stubHost) readBackups(fields []string) []stubBackup {
 func (h *stubHost) actionFailure(fields []string) string {
 	name := fields[len(fields)-1]
 	switch {
+	case (fields[0] == "restore") && (findStubBackup(h.local, name) < 0):
+		return fmt.Sprintf("'%s' is not found on local storage", name)
+	case (fields[0] == "restore") && h.schemaCopies[name] && slices.Contains(fields, "--data"):
+		return fmt.Sprintf("the local copy of %s holds the schema alone: no data was restored", name)
+	case fields[0] == "restore":
+		return ""
 	case findStubBackup(h.readBackups(fields), name) < 0:
 		return fmt.Sprintf("'%s' is not found on remote storage", name)
 	case (fields[0] == "download") && (findStubBackup(h.local, name) >= 0):
@@ -1226,20 +1259,25 @@ func TestJobScriptGivesUpOnASidecarGoneAfterAChange(t *testing.T) {
 	for name, tc := range map[string]struct {
 		env  map[string]string
 		gone string
+		// posts is the number of POSTs the host accepts before it is gone
+		posts int
 	}{
 		"backup": {
 			env:  map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1"},
 			gone: "h1",
 		},
+		// The download of the backup changes nothing, the data restore after it does
 		"restore": {
-			env:  restoreEnv(nil),
-			gone: "d1",
+			env:   restoreEnv(nil),
+			gone:  "d1",
+			posts: 2,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			hosts := restoreHosts()
 			hosts["h0"], hosts["h1"] = &stubHost{}, &stubHost{}
 			hosts[tc.gone].unavailableAfterPost = -1
+			hosts[tc.gone].postsBeforePosted = tc.posts
 			s := newSidecarStub(t, hosts)
 			script := scriptWithTimeout(t, scriptGivingUpAfter(t, 0), "MUTATED_UNREACHABLE_TIMEOUT", 0)
 			code, out := s.runScript(script, tc.env)
@@ -1792,7 +1830,7 @@ func TestJobScriptVerifyFailure(t *testing.T) {
 		require.Contains(t, out, "'bk-1' is not found on remote storage")
 	})
 	t.Run("no local copy after the download", func(t *testing.T) {
-		s := newSidecarStub(t, map[string]*stubHost{"h0": {noLocalOnDownload: true}})
+		s := newSidecarStub(t, map[string]*stubHost{"h0": {noLocalOnDownload: true, remote: []stubBackup{remote("bk-1", "")}}})
 		code, out := s.run(map[string]string{envOperation: operationVerify, envBackupName: "bk-1", envVerifyHosts: "h0"})
 		require.Equal(t, 1, code, out)
 		require.Contains(t, out, "bk-1 is not present locally after the download")
@@ -1867,10 +1905,12 @@ func TestJobScriptRestore(t *testing.T) {
 		// The engines and sizes of the tables of every replica
 		"a0 GET /backup/tables/all", "a1 GET /backup/tables/all", "b0 GET /backup/tables/all", "b1 GET /backup/tables/all",
 		"a0 GET /backup/list/local", "a1 GET /backup/list/local", "b0 GET /backup/list/local", "b1 GET /backup/list/local",
+		// Every host downloads the backup at once before anything is dropped, but a1, which holds a copy already
+		"a0 POST /backup/download/bk-1", "b0 POST /backup/download/bk-1", "b1 POST /backup/download/bk-1",
 		"a0 POST /backup/actions",
-		"a0 POST /backup/restore_remote/bk-1", "a1 POST /backup/restore_remote/bk-1",
-		"b0 POST /backup/restore_remote/bk-1", "b1 POST /backup/restore_remote/bk-1",
-		"a0 POST /backup/restore_remote/bk-1", "b0 POST /backup/restore_remote/bk-1",
+		"a0 POST /backup/restore/bk-1", "a1 POST /backup/restore/bk-1",
+		"b0 POST /backup/restore/bk-1", "b1 POST /backup/restore/bk-1",
+		"a0 POST /backup/restore/bk-1", "b0 POST /backup/restore/bk-1",
 		// Only the copies the restore downloaded are dropped, a1 had its own before
 		"a0 GET /backup/list/local", "a0 POST /backup/delete/local/bk-1",
 		"b0 GET /backup/list/local", "b0 POST /backup/delete/local/bk-1",
@@ -1882,10 +1922,13 @@ func TestJobScriptRestore(t *testing.T) {
 		}
 	}
 	actions := s.matching(http.MethodPost, "/backup/actions")
-	require.Equal(t, "restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER="+restoreTestCluster+" bk-1", actions[0].command)
+	require.Equal(t, "restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER="+restoreTestCluster+" bk-1", actions[0].command)
 	require.Equal(t, []string{
-		"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=", "a0 data= hardlink_exists_files=", "b0 data= hardlink_exists_files=",
-	}, s.restoreSteps()[1:])
+		// The data to the hosts that restore it, the schema alone to the others
+		"a0 download hardlink_exists_files=", "b0 download hardlink_exists_files=", "b1 download schema=",
+		"a0 restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=" + restoreTestCluster + " bk-1",
+		"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=", "a0 data=", "b0 data=",
+	}, s.restoreSteps())
 }
 
 // withReplicatedTable gives every host the live table db1.t1 of a Replicated engine, which the backup
@@ -2010,18 +2053,38 @@ func TestJobScriptDropsOnClusterOnlyWhatReplicates(t *testing.T) {
 			require.Equal(t, tc.unlisted, !slices.ContainsFunc(s.matching(http.MethodGet, "/backup/tables"), func(c stubCall) bool {
 				return c.path == "/backup/tables"
 			}))
-			steps := s.restoreSteps()
+			steps := slices.DeleteFunc(s.restoreSteps(), func(step string) bool { return strings.Contains(step, " download ") })
 			require.NotEmpty(t, steps)
 			if tc.onCluster {
-				require.True(t, strings.HasPrefix(steps[0], "a0 restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main "), out)
+				require.True(t, strings.HasPrefix(steps[0], "a0 restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main "), out)
 				require.Len(t, s.matching(http.MethodPost, "/backup/actions"), 1)
 				return
 			}
 			require.Empty(t, s.matching(http.MethodPost, "/backup/actions"), out)
 			for _, step := range steps {
-				require.NotContains(t, step, "restore_remote --schema")
+				require.NotContains(t, step, "--schema")
 			}
 		})
+	}
+}
+
+// As the Altinity Cloud Manager restores, every host downloads the backup before anything is dropped, all at once: the
+// data to the hosts that restore it, every file already on their disks hard-linked, the schema alone to the others. A
+// host that cannot download it - short of disk space, say - fails the restore before it changes anything: the other
+// hosts finish their downloads, which are deleted again.
+func TestJobScriptRestoreDownloadsEverywhereFirst(t *testing.T) {
+	hosts := replicaRestoreHosts()
+	hosts["b0"].failOp = map[string]string{"download": "not enough space on disk default"}
+	s := newSidecarStub(t, hosts)
+	code, out := s.run(replicaRestoreEnv(map[string]string{envUnchangedExitCode: "3", envTables: "db1.*"}))
+	require.Equal(t, 3, code, out)
+	require.Contains(t, out, "ERROR: download of bk-1 failed on b0: b0: download bk-1 ended with status 'error': not enough space on disk default")
+	require.Equal(t, []string{
+		"a0 download hardlink_exists_files= table=db1.*", "a1 download schema= table=db1.*",
+		"b0 download hardlink_exists_files= table=db1.*", "b1 download schema= table=db1.*",
+	}, s.restoreSteps(), "nothing is restored")
+	for _, host := range []string{"a0", "a1", "b1"} {
+		require.Empty(t, hosts[host].local, "the copy %s downloaded is deleted:\n%s", host, out)
 	}
 }
 
@@ -2035,7 +2098,7 @@ func TestJobScriptRestoreWithoutOverwrite(t *testing.T) {
 	requirePreflightFirst(t, s)
 	require.Len(t, s.matching(http.MethodGet, "/backup/tables/all"), 2)
 	require.Empty(t, s.matching(http.MethodPost, "/backup/actions"))
-	restores := s.matching(http.MethodPost, "/backup/restore_remote/")
+	restores := s.matching(http.MethodPost, "/backup/restore/")
 	require.Len(t, restores, 3)
 	require.Equal(t, url.Values{"schema": {""}, "rm": {""}}, restores[0].query)
 }
@@ -2044,10 +2107,8 @@ func TestJobScriptRestoreSchemaOnly(t *testing.T) {
 	s := newSidecarStub(t, restoreHosts())
 	code, out := s.run(restoreEnv(map[string]string{envSchemaOnly: "true", envDataHosts: ""}))
 	require.Zero(t, code, out)
-	restores := s.matching(http.MethodPost, "/backup/restore_remote/")
-	require.Len(t, restores, 1)
-	require.Equal(t, "s0", restores[0].host)
-	require.Equal(t, url.Values{"schema": {""}, "rm": {""}}, restores[0].query)
+	// The schema alone is downloaded
+	require.Equal(t, []string{"s0 download schema=", "s0 rm= schema="}, s.restoreSteps())
 }
 
 func TestJobScriptRestorePreflightRefusals(t *testing.T) {
@@ -2128,9 +2189,7 @@ func TestJobScriptRestoreGuardsEveryReplica(t *testing.T) {
 }
 
 func TestJobScriptRestoreWithoutTopologyValidation(t *testing.T) {
-	hosts := restoreHosts()
-	hosts["d1"].remote = nil
-	s := newSidecarStub(t, hosts)
+	s := newSidecarStub(t, restoreHosts())
 	code, out := s.run(restoreEnv(map[string]string{envValidateTopology: "false"}))
 	require.Zero(t, code, out)
 	require.Empty(t, s.matching(http.MethodGet, "/backup/list/remote"))
@@ -2275,15 +2334,24 @@ func TestJobScriptTellsWhetherItChangedAnything(t *testing.T) {
 			code:   unchanged,
 		},
 		"a restore that failed after it started": {
-			mutate: func(h map[string]*stubHost) { h["d1"].failOp = map[string]string{"restore_remote": "disk full"} },
+			mutate: func(h map[string]*stubHost) { h["d1"].failOp = map[string]string{"restore": "disk full"} },
 			code:   1,
 		},
-		"a request the sidecar may have accepted": {
+		// The download of the backup to every host comes first, and changes nothing
+		"a download that failed": {
+			mutate: func(h map[string]*stubHost) { h["d1"].failOp = map[string]string{"download": "not enough space"} },
+			code:   unchanged,
+		},
+		"a download the sidecar may have accepted": {
 			mutate: func(h map[string]*stubHost) { h["s0"].hangUpPosts = true },
+			code:   unchanged,
+		},
+		"a request the sidecar may have accepted": {
+			mutate: func(h map[string]*stubHost) { h["s0"].hangUpPosts, h["s0"].failPostsAfter = true, 1 },
 			code:   1,
 		},
 		"a request a proxy failed after passing it on": {
-			mutate: func(h map[string]*stubHost) { h["s0"].proxyFailsPosts = true },
+			mutate: func(h map[string]*stubHost) { h["s0"].proxyFailsPosts, h["s0"].failPostsAfter = true, 1 },
 			script: func(t *testing.T) string { return scriptGivingUpAfter(t, 0) },
 			code:   1,
 		},
@@ -2310,12 +2378,14 @@ func TestJobScriptTellsWhetherItChangedAnything(t *testing.T) {
 // the restore, or make the backup, twice.
 func TestJobScriptNeverResubmitsAChangeAProxyFailed(t *testing.T) {
 	hosts := restoreHosts()
-	hosts["s0"].proxyFailsPosts = true
+	hosts["s0"].proxyFailsPosts, hosts["s0"].failPostsAfter = true, 1
 	s := newSidecarStub(t, hosts)
 	// Long enough for a retry to happen, if the script retried
 	code, out := s.runScript(scriptGivingUpAfter(t, 1), restoreEnv(nil))
 	require.Equal(t, 1, code, out)
-	require.Len(t, s.matching(http.MethodPost, "/"), 1, out)
+	// The downloads, and the schema restore the proxy failed
+	require.Len(t, s.matching(http.MethodPost, "/"), 3, out)
+	require.Len(t, s.matching(http.MethodPost, "/backup/restore/"), 1, out)
 }
 
 // scheduledRun returns a run of the schedule's CronJob as the CronJob controller creates it for the
@@ -2507,7 +2577,7 @@ func TestJobScriptFollowsAnOperationResumedAfterARestart(t *testing.T) {
 		s := newSidecarStub(t, hosts)
 		code, out := s.run(restoreEnv(map[string]string{envOverwrite: "true"}))
 		require.Equal(t, 1, code, out)
-		require.Contains(t, out, "schema restore of bk-1 failed on s0: s0: the sidecar restarted during restore_remote schema bk-1, which it does not resume: the restore is partially applied")
+		require.Contains(t, out, "schema restore of bk-1 failed on s0: s0: the sidecar restarted during restore schema bk-1, which it does not resume: the restore is partially applied")
 	})
 }
 
@@ -2551,7 +2621,8 @@ func (s *sidecarStub) restoreSteps() []string {
 		switch {
 		case c.path == "/backup/actions":
 			steps = append(steps, c.host+" "+c.command)
-		case strings.HasPrefix(c.path, "/backup/restore_remote/"):
+		case strings.HasPrefix(c.path, "/backup/restore_remote/"), strings.HasPrefix(c.path, "/backup/restore/"),
+			strings.HasPrefix(c.path, "/backup/download/"):
 			var params []string
 			for key, values := range c.query {
 				for _, value := range values {
@@ -2559,6 +2630,9 @@ func (s *sidecarStub) restoreSteps() []string {
 				}
 			}
 			slices.Sort(params)
+			if strings.HasPrefix(c.path, "/backup/download/") {
+				params = append([]string{"download"}, params...)
+			}
 			steps = append(steps, c.host+" "+strings.Join(params, " "))
 		}
 	}
@@ -2573,8 +2647,9 @@ func TestJobScriptRestoresTheSchemaOnEveryReplica(t *testing.T) {
 	code, out := s.run(replicaRestoreEnv(nil))
 	require.Zero(t, code, out)
 	require.Equal(t, []string{
+		"a0 download hardlink_exists_files=", "a1 download schema=", "b0 download hardlink_exists_files=", "b1 download schema=",
 		"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=",
-		"a0 data= hardlink_exists_files=", "b0 data= hardlink_exists_files=",
+		"a0 data=", "b0 data=",
 	}, s.restoreSteps())
 }
 
@@ -2589,12 +2664,14 @@ func TestJobScriptOverwriteDropsTheBackupOnClusterFirst(t *testing.T) {
 	code, out := s.run(replicaRestoreEnv(map[string]string{envOverwrite: "true", envTables: "db1.*,db2.t?"}))
 	require.Zero(t, code, out)
 	require.Equal(t, []string{
-		"a0 restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main --tables=db1.*,db2.t? bk-1",
+		"a0 download hardlink_exists_files= table=db1.*,db2.t?", "a1 download schema= table=db1.*,db2.t?",
+		"b0 download hardlink_exists_files= table=db1.*,db2.t?", "b1 download schema= table=db1.*,db2.t?",
+		"a0 restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main --tables=db1.*,db2.t? bk-1",
 		"a0 rm= schema= table=db1.*,db2.t?", "a1 rm= schema= table=db1.*,db2.t?",
 		"b0 rm= schema= table=db1.*,db2.t?", "b1 rm= schema= table=db1.*,db2.t?",
-		"a0 data= hardlink_exists_files= table=db1.*,db2.t?", "b0 data= hardlink_exists_files= table=db1.*,db2.t?",
+		"a0 data= table=db1.*,db2.t?", "b0 data= table=db1.*,db2.t?",
 	}, s.restoreSteps())
-	require.Contains(t, out, "a0: restore_remote schema on cluster main bk-1 succeeded")
+	require.Contains(t, out, "a0: restore schema on cluster main bk-1 succeeded")
 }
 
 // The answer to a command of the actions endpoint names no operation: the script follows the row of
@@ -2611,7 +2688,7 @@ func TestJobScriptFollowsTheRowOfItsOwnAction(t *testing.T) {
 	code, out := s.run(replicaRestoreEnv(map[string]string{envOverwrite: "true"}))
 	require.Zero(t, code, out)
 	require.Len(t, s.matching(http.MethodPost, "/backup/actions"), 1)
-	require.Len(t, s.matching(http.MethodPost, "/backup/restore_remote/"), 6)
+	require.Len(t, s.matching(http.MethodPost, "/backup/restore/"), 6)
 }
 
 // A sidecar that runs another operation refuses a command of the actions endpoint with HTTP 500 and
@@ -2619,13 +2696,13 @@ func TestJobScriptFollowsTheRowOfItsOwnAction(t *testing.T) {
 // submitted again once the sidecar is idle.
 func TestJobScriptQueuesAnActionWhileTheSidecarIsLocked(t *testing.T) {
 	hosts := withReplicatedTable(replicaRestoreHosts())
-	hosts["a0"].lockedPosts = 2
+	hosts["a0"].lockedActions = 2
 	s := newSidecarStub(t, hosts)
 	code, out := s.run(replicaRestoreEnv(map[string]string{envOverwrite: "true"}))
 	require.Zero(t, code, out)
-	require.Contains(t, out, "a0: sidecar busy, queueing restore_remote schema on cluster main")
+	require.Contains(t, out, "a0: sidecar busy, queueing restore schema on cluster main")
 	require.Len(t, s.matching(http.MethodPost, "/backup/actions"), 3, "two refusals, then accepted")
-	require.Len(t, s.matching(http.MethodPost, "/backup/restore_remote/"), 6)
+	require.Len(t, s.matching(http.MethodPost, "/backup/restore/"), 6)
 }
 
 // The drop ON CLUSTER changes every replica: when it fails, or the sidecar restarts during it and
@@ -2637,11 +2714,11 @@ func TestJobScriptStopsWhenTheDropOnClusterFails(t *testing.T) {
 	}{
 		"the action fails": {
 			host:   stubHost{failAction: "code: 47, unknown identifier"},
-			output: "schema restore of bk-1 on cluster main failed on a0: a0: restore_remote schema on cluster main bk-1 ended with status 'error': code: 47, unknown identifier",
+			output: "schema restore of bk-1 on cluster main failed on a0: a0: restore schema on cluster main bk-1 ended with status 'error': code: 47, unknown identifier",
 		},
 		"the sidecar restarts during the action": {
 			host:   stubHost{loseActions: true},
-			output: "a0: the sidecar restarted during restore_remote schema on cluster main bk-1, which it does not resume: the restore is partially applied",
+			output: "a0: the sidecar restarted during restore schema on cluster main bk-1, which it does not resume: the restore is partially applied",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -2654,7 +2731,7 @@ func TestJobScriptStopsWhenTheDropOnClusterFails(t *testing.T) {
 			code, out := s.run(replicaRestoreEnv(map[string]string{envOverwrite: "true", envUnchangedExitCode: "3"}))
 			require.Equal(t, 1, code, out)
 			require.Contains(t, out, tc.output)
-			require.Empty(t, s.matching(http.MethodPost, "/backup/restore_remote/"))
+			require.Empty(t, s.matching(http.MethodPost, "/backup/restore/"))
 		})
 	}
 }
@@ -3019,7 +3096,7 @@ func TestJobScriptRefusesAnOverwriteThatStopsInADatabaseDroppedAsAWhole(t *testi
 					actions = 0
 				}
 				require.Len(t, s.matching(http.MethodPost, "/backup/actions"), actions, "the drop ON CLUSTER runs where it has to")
-				require.NotEmpty(t, s.matching(http.MethodPost, "/backup/restore_remote/"))
+				require.NotEmpty(t, s.matching(http.MethodPost, "/backup/restore/"))
 				return
 			}
 			require.Equal(t, 3, code, out)
@@ -3202,8 +3279,10 @@ func TestJobScriptRestoresAccessEntitiesOnEveryReplica(t *testing.T) {
 	}))
 	require.Zero(t, code, out)
 	require.Equal(t, []string{
+		"a0 download hardlink_exists_files= table=db1.*", "a1 download schema= table=db1.*",
+		"b0 download hardlink_exists_files= table=db1.*", "b1 download schema= table=db1.*",
 		"a0 rm= schema= table=db1.*", "a1 rm= schema= table=db1.*", "b0 rm= schema= table=db1.*", "b1 rm= schema= table=db1.*",
-		"a0 data= hardlink_exists_files= table=db1.*", "b0 data= hardlink_exists_files= table=db1.*",
+		"a0 data= table=db1.*", "b0 data= table=db1.*",
 		"a0 rbac-only=", "a1 rbac-only=", "b0 rbac-only=", "b1 rbac-only=",
 	}, s.restoreSteps())
 	_, err := os.Stat(path)
@@ -3253,26 +3332,41 @@ func TestJobScriptTellsAccessEntitiesItDidNotRestore(t *testing.T) {
 // script asks its sidecar for the last step it ran there, and stops when the sidecar no longer knows
 // it: the restore is partially applied, never continued.
 func TestJobScriptStopsWhenASidecarRestartsBetweenSteps(t *testing.T) {
+	downloads := []string{
+		"a0 download hardlink_exists_files=", "a1 download schema=", "b0 download hardlink_exists_files=", "b1 download schema=",
+	}
 	for name, tc := range map[string]struct {
-		host  string
+		host string
+		// after is the number of steps the host runs before its sidecar restarts, 1 when unset
+		after     int
+		unchanged bool
 		env   map[string]string
 		steps []string
 	}{
+		// The downloads change nothing
+		"after its download": {
+			host:      "a0",
+			steps:     downloads,
+			unchanged: true,
+		},
 		"after its schema restore": {
 			host:  "a0",
-			steps: []string{"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema="},
+			after: 2,
+			steps: append(slices.Clone(downloads), "a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema="),
 		},
 		"after the drop on cluster": {
 			host:  "a0",
+			after: 2,
 			env:   map[string]string{envOverwrite: "true"},
-			steps: []string{"a0 restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main bk-1"},
+			steps: append(slices.Clone(downloads), "a0 restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main bk-1"),
 		},
 		"before the restore of access entities": {
-			host: "a1",
-			env:  map[string]string{envRestoreRBAC: "true"},
-			steps: []string{
-				"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=", "a0 data= hardlink_exists_files=", "b0 data= hardlink_exists_files=", "a0 rbac-only=",
-			},
+			host:  "a1",
+			after: 2,
+			env:   map[string]string{envRestoreRBAC: "true"},
+			steps: append(slices.Clone(downloads),
+				"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=", "a0 data=", "b0 data=", "a0 rbac-only=",
+			),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -3280,11 +3374,16 @@ func TestJobScriptStopsWhenASidecarRestartsBetweenSteps(t *testing.T) {
 			if tc.env[envOverwrite] == "true" {
 				withReplicatedTable(hosts)
 			}
-			hosts[tc.host].restartAfter = 1
+			hosts[tc.host].restartAfter = max(tc.after, 1)
 			s := newSidecarStub(t, hosts)
 			code, out := s.run(replicaRestoreEnv(withEnv(map[string]string{envUnchangedExitCode: "3"}, tc.env)))
-			require.Equal(t, 1, code, out)
-			require.Contains(t, out, tc.host+": the sidecar restarted after the last step of this restore on it, which it no longer knows: the restore is partially applied")
+			if tc.unchanged {
+				require.Equal(t, 3, code, out)
+				require.Contains(t, out, tc.host+": the sidecar restarted after the last step of this restore on it, which it no longer knows; nothing was changed")
+			} else {
+				require.Equal(t, 1, code, out)
+				require.Contains(t, out, tc.host+": the sidecar restarted after the last step of this restore on it, which it no longer knows: the restore is partially applied")
+			}
 			require.Equal(t, tc.steps, s.restoreSteps())
 		})
 	}
@@ -3787,9 +3886,10 @@ func TestJobScriptRestoresFromTheStoragePathsOfAnotherInstallation(t *testing.T)
 			env:  map[string]string{envTables: "db1.*", envRestoreRBAC: "true"},
 			path: testSourcePath, objectDiskPath: testSourceObjectDiskPath,
 			steps: []string{
-				"s0 restore_remote --schema --rm --tables=db1.*",
-				"s0 restore_remote --data --hardlink-exists-files --tables=db1.*", "d1 restore_remote --data --hardlink-exists-files --tables=db1.*",
-				"s0 restore_remote --rbac-only",
+				"s0 download --hardlink-exists-files --tables=db1.*", "d1 download --hardlink-exists-files --tables=db1.*",
+				"s0 restore --schema --rm --tables=db1.*",
+				"s0 restore --data --tables=db1.*", "d1 restore --data --tables=db1.*",
+				"s0 restore --rbac-only",
 			},
 		},
 	} {
@@ -3812,7 +3912,9 @@ func TestJobScriptRestoresFromTheStoragePathsOfAnotherInstallation(t *testing.T)
 			steps := tc.steps
 			if steps == nil {
 				steps = []string{
-					"s0 restore_remote --schema --rm --tables=db1.t1", "s0 restore_remote --data --hardlink-exists-files --tables=db1.t1", "d1 restore_remote --data --hardlink-exists-files --tables=db1.t1",
+					// Every host downloads the backup first, with its data
+					"s0 download --hardlink-exists-files --tables=db1.t1", "d1 download --hardlink-exists-files --tables=db1.t1",
+					"s0 restore --schema --rm --tables=db1.t1", "s0 restore --data --tables=db1.t1", "d1 restore --data --tables=db1.t1",
 				}
 			}
 			calls := []string{
@@ -3887,10 +3989,12 @@ func TestJobScriptDropsOnClusterFromTheStoragePathsOfAnotherInstallation(t *test
 	require.Equal(t, []string{
 		"a0 download --schema --rbac" + flags + " bk-1", "a1 download --schema --rbac" + flags + " bk-1",
 		"b0 download --schema --rbac" + flags + " bk-1", "b1 download --schema --rbac" + flags + " bk-1",
-		"a0 restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main" + flags + " bk-1",
-		"a0 restore_remote --schema --rm" + flags + " bk-1", "a1 restore_remote --schema --rm" + flags + " bk-1",
-		"b0 restore_remote --schema --rm" + flags + " bk-1", "b1 restore_remote --schema --rm" + flags + " bk-1",
-		"a0 restore_remote --data --hardlink-exists-files" + flags + " bk-1", "b0 restore_remote --data --hardlink-exists-files" + flags + " bk-1",
+		"a0 download --hardlink-exists-files" + flags + " bk-1", "a1 download --schema" + flags + " bk-1",
+		"b0 download --hardlink-exists-files" + flags + " bk-1", "b1 download --schema" + flags + " bk-1",
+		"a0 restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main" + flags + " bk-1",
+		"a0 restore --schema --rm" + flags + " bk-1", "a1 restore --schema --rm" + flags + " bk-1",
+		"b0 restore --schema --rm" + flags + " bk-1", "b1 restore --schema --rm" + flags + " bk-1",
+		"a0 restore --data" + flags + " bk-1", "b0 restore --data" + flags + " bk-1",
 	}, s.restoreSteps())
 	var listed []string
 	for _, c := range s.matching(http.MethodGet, "/backup/tables") {
@@ -3913,7 +4017,7 @@ func TestJobScriptDropsOnClusterFromTheStoragePathsOfAnotherInstallation(t *test
 		"a0 POST /backup/delete/local/bk-1", "a1 POST /backup/delete/local/bk-1",
 		"b0 POST /backup/delete/local/bk-1", "b1 POST /backup/delete/local/bk-1",
 	}, deleted, "every downloaded copy is gone before the drop ON CLUSTER")
-	require.Empty(t, s.matching(http.MethodPost, "/backup/restore_remote/"))
+	require.Empty(t, s.matching(http.MethodPost, "/backup/restore/"))
 }
 
 // A restore from another installation fails before it changes anything, with the exit code that tells
@@ -4140,7 +4244,8 @@ func TestJobScriptRestoresFromItsOwnPathsWhenTheyTellNoOtherInstallation(t *test
 			}
 			require.Contains(t, out, tc.warned)
 			require.Empty(t, s.matching(http.MethodPost, "/backup/actions"))
-			require.Equal(t, []string{"s0 rm= schema=", "s0 data= hardlink_exists_files=", "d1 data= hardlink_exists_files="}, s.restoreSteps())
+			require.Equal(t, []string{"s0 download hardlink_exists_files=", "d1 download hardlink_exists_files=", "s0 rm= schema=", "s0 data=", "d1 data="},
+				s.restoreSteps())
 			require.Len(t, s.matching(http.MethodGet, "/backup/list/remote"), 2)
 		})
 	}
@@ -4214,7 +4319,7 @@ func TestJobScriptRestoresFromAnotherInstallationWithoutTopologyValidation(t *te
 				"s0 GET /backup/version", "d1 GET /backup/version",
 				"s0 GET /backup/list/local", "s0 GET /backup/list/remote", "d1 GET /backup/list/local", "d1 GET /backup/list/remote",
 				"s0 GET /backup/tables/all", "d1 GET /backup/tables/all",
-				"s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
+				"s0 POST /backup/actions", "d1 POST /backup/actions", "s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
 				"s0 GET /backup/list/local", "s0 POST /backup/delete/local/bk-1",
 				"d1 GET /backup/list/local", "d1 POST /backup/delete/local/bk-1",
 			},
@@ -4225,7 +4330,7 @@ func TestJobScriptRestoresFromAnotherInstallationWithoutTopologyValidation(t *te
 				"s0 GET /backup/version", "d1 GET /backup/version",
 				"s0 GET /backup/list/local", "s0 GET /backup/list/remote", "d1 GET /backup/list/local", "d1 GET /backup/list/remote",
 				"s0 GET /backup/tables/all", "d1 GET /backup/tables/all",
-				"s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
+				"s0 POST /backup/actions", "d1 POST /backup/actions", "s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
 				"s0 GET /backup/list/local", "s0 POST /backup/delete/local/bk-1",
 				"d1 GET /backup/list/local", "d1 POST /backup/delete/local/bk-1",
 			},
@@ -4239,7 +4344,7 @@ func TestJobScriptRestoresFromAnotherInstallationWithoutTopologyValidation(t *te
 				"s0 GET /backup/tables/all", "d1 GET /backup/tables/all",
 				"s0 POST /backup/actions", "s0 GET /backup/tables", "d1 POST /backup/actions", "d1 GET /backup/tables",
 				"s0 POST /backup/delete/local/bk-1", "d1 POST /backup/delete/local/bk-1",
-				"s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
+				"s0 POST /backup/actions", "d1 POST /backup/actions", "s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
 				"s0 GET /backup/list/local", "s0 POST /backup/delete/local/bk-1",
 				"d1 GET /backup/list/local", "d1 POST /backup/delete/local/bk-1",
 			},

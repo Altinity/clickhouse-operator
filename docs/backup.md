@@ -642,8 +642,8 @@ unless their names joined with dashes coincide.
 It also refuses an object disk path that is the same for both CHIs while the storage path is not:
 deleting the copy it downloads would delete the object disk data of the backup.
 
-The copies of the schema the preflight downloads are deleted before the restore steps, and a Job
-that fails deletes the copies it downloaded. One stopped at its `activeDeadlineSeconds`, or evicted,
+The copies of the schema the preflight downloads are deleted before the restore downloads the
+backup itself, and a Job that fails deletes the copies it downloaded. One stopped at its `activeDeadlineSeconds`, or evicted,
 leaves them: the next restore of the backup from the same paths then refuses the hosts that hold
 one, until it is deleted with `clickhouse-backup delete local <backup>` in their sidecar.
 
@@ -1049,9 +1049,17 @@ of a CHI of another name, or of another namespace, is found by naming that CHI i
 `sourceInstallation`, and its namespace in `sourceNamespace`, see
 [Restoring into another CHI](#storage-paths).
 
-On each cluster, the schema is restored on every replica, each from the copy of its shard, and the
-data on one replica of each shard; replication then copies `Replicated*` tables to the other
-replicas. The schema is restored replica by replica, not `ON CLUSTER`, to keep every table as the
+On each cluster the restore runs in the order of the Altinity Cloud Manager. First every host
+downloads the backup, all at once: the hosts that restore data download it whole, hard-linking every
+file of it already on their disks (`--hardlink-exists-files`) instead of downloading it again, the
+others the schema alone. A host short of disk space fails the restore here, before anything is
+dropped, and the copies the others downloaded are deleted again; a host that already holds a local
+copy of the backup restores from that one. Then the schema is restored on every replica, each from
+the copy of its shard, one after another, then the data on one replica of each shard, all at once,
+then the access entities; replication copies `Replicated*` tables to the other replicas. Each step
+restores from the downloaded copy (`POST /backup/restore`), which is deleted once the restore is
+done. A restore that reads the backup of [another CHI](#storage-paths) runs the same steps as
+commands of the `actions` endpoint (`download`, then `restore`), with the storage paths of that CHI. The schema is restored replica by replica, not `ON CLUSTER`, to keep every table as the
 backup describes it: restoring `ON CLUSTER`, `clickhouse-backup` re-points every `Distributed`
 table that names another cluster - `all-sharded`, or another cluster of the CHI - at the cluster
 it restores. `status.backupName` records the backup the Jobs restore, fixed when the Jobs are
@@ -1522,7 +1530,9 @@ anything:
    drop could not get past, and, where the restore drops the tables `ON CLUSTER`, the same tables in
    the backup of every shard, see [ClickHouseRestore](#clickhouserestore).
 
-Only when every host passes does the restore start. The recommended path is restoring into a fresh,
+Only when every host passes does the restore start, and it downloads the backup to every host
+before it drops anything: a host that cannot hold it fails the restore while the cluster is as it
+was. The recommended path is restoring into a fresh,
 empty CHI and switching clients over once it is verified.
 
 Do not change the target CHI while a restore runs. A change that rolls its Pods restarts the

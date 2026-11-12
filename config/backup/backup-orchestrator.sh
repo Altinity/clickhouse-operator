@@ -90,6 +90,9 @@ MUTATED=
 # READ_ONLY is set, as a local of a caller, while the requests it submits change nothing the Job is asked to change:
 # they leave MUTATED alone
 READ_ONLY=
+# NO_STEP is set, as a local of a caller, while the actions it runs are no steps of the Job: a sidecar that restarts
+# after them has lost nothing the steps to come build on
+NO_STEP=
 # LAST_WARNING is the last warning, which tells why the step that has just failed failed
 LAST_WARNING=
 # SELF_PATH is the storage path template of the target cluster, once the storage path check knows it
@@ -568,6 +571,10 @@ sidecar_kept() {
 	else
 		return 0
 	fi
+	if [[ -z ${MUTATED} ]]; then
+		warn "${host}: the sidecar restarted after the last step of this ${OPERATION} on it, which it no longer knows; nothing was changed"
+		return 1
+	fi
 	warn "${host}: the sidecar restarted after the last step of this ${OPERATION} on it, which it no longer knows: the ${OPERATION} is partially applied"
 	return 1
 }
@@ -601,13 +608,12 @@ action_rows() {
 # run_action HOST WHAT NAME COMMAND runs COMMAND, a fixed template every value of which is a validated single token,
 # through the actions endpoint, and polls it until it succeeds or fails. The answer names no operation: the action is
 # the row of COMMAND in the actions log that runs, or that started at a time no such row had before. The sidecar keeps
-# the rows of finished actions, and a restart drops them all. An action run READ_ONLY is no step of the Job: a sidecar
-# that restarts after it has lost nothing the steps to come build on
+# the rows of finished actions, and a restart drops them all. An action run with NO_STEP is no step of the Job
 run_action() {
 	if run_action_steps "$@"; then
 		return 0
 	fi
-	if [[ -z ${READ_ONLY:-} ]]; then
+	if [[ -z ${NO_STEP:-} ]]; then
 		event Warning OrchestratorHostFailed "$1: $2 $3 failed${LAST_WARNING:+: ${LAST_WARNING}}"
 	fi
 	return 1
@@ -670,14 +676,14 @@ action_poll() {
 	"in progress") return 2 ;;
 	success)
 		log "${host}: ${what} ${name} succeeded"
-		if [[ -z ${READ_ONLY:-} ]]; then
+		if [[ -z ${NO_STEP:-} ]]; then
 			remember_step "${host}" "" "${start}" "${command}"
 			event Normal OrchestratorHostStepSucceeded "${host}: ${what} ${name} succeeded"
 		fi
 		return 0
 		;;
 	"")
-		if [[ -n ${READ_ONLY:-} ]]; then
+		if [[ -n ${NO_STEP:-} ]]; then
 			warn "${host}: the sidecar restarted during ${what} ${name}"
 			return 1
 		fi
@@ -780,7 +786,8 @@ op_poll() {
 # run_all KIND HOSTS CHECK WHAT NAME ARGS... runs a step on every host of the space-separated HOSTS at once: an
 # operation, KIND op, as run_op runs it with the arguments ARGS, or an action, KIND action, as run_action runs the
 # command ARGS. It submits the step to one host after the other, each once the function CHECK, unless empty, has
-# passed for it, then polls every host it was submitted to until it runs on none. A host whose CHECK or submission fails
+# passed for it - CHECK may set STEP_ARGS, which hold ARGS until then, to the arguments of the host -, then polls every
+# host it was submitted to until it runs on none. A host whose CHECK or submission fails
 # gets the step submitted to no other host after it, and those it was submitted to are waited for all the same.
 # FAILED_HOSTS and FAILURES list the hosts that failed and the warning of each; it returns 1 when any did
 run_all() {
@@ -792,11 +799,12 @@ run_all() {
 	FAILURES=()
 	for host in "${hosts[@]}"; do
 		LAST_WARNING=
+		STEP_ARGS=("$@")
 		if [[ -n ${check} ]] && ! "${check}" "${host}"; then
 			step_failed "${kind}" "${host}" "${what}" "${name}"
 			break
 		fi
-		if ! "${kind}_start" "${host}" "${what}" "${name}" "$@"; then
+		if ! "${kind}_start" "${host}" "${what}" "${name}" "${STEP_ARGS[@]}"; then
 			step_failed "${kind}" "${host}" "${what}" "${name}"
 			break
 		fi
@@ -825,7 +833,7 @@ run_all() {
 step_failed() {
 	FAILED_HOSTS+=("$2")
 	FAILURES+=("${LAST_WARNING:-$2: $3 $4 failed}")
-	if [[ $1 == op || -z ${READ_ONLY:-} ]]; then
+	if [[ $1 == op || -z ${NO_STEP:-} ]]; then
 		event Warning OrchestratorHostFailed "$2: $3 $4 failed${LAST_WARNING:+: ${LAST_WARNING}}"
 	fi
 }
@@ -2507,8 +2515,8 @@ source_paths() {
 }
 
 # refuse_local_copy HOST refuses, before anything changes, a restore from the paths of another installation on a HOST
-# that holds a local copy of the backup: restore_remote takes a local copy of its backup for one it has downloaded in
-# part, and restores what that holds, whichever paths it came from. A restore from its own paths keeps such a copy
+# that holds a local copy of the backup: the restore would restore what that copy holds, whichever paths it came from,
+# rather than download the backup from those it reads. A restore from its own paths restores from such a copy
 refuse_local_copy() {
 	local host=$1
 	if listed "${host}" "${NO_LOCAL_COPY[@]}"; then
@@ -2551,7 +2559,7 @@ refuse_own_backup() {
 # unreadable there, and nothing tells which: clickhouse-backup keeps what it read of a storage in a cache of the storage
 # type, whatever the path, and may find a backup the cache lists broken where it is missing
 source_copy() {
-	local host=$1 READ_ONLY=1
+	local host=$1 READ_ONLY=1 NO_STEP=1
 	if listed "${host}" "${SOURCE_COPIES[@]}"; then
 		return 0
 	fi
@@ -2565,7 +2573,7 @@ source_copy() {
 
 # drop_source_copies [strict] deletes the copies of the backup SOURCE_COPIES lists, which changes nothing the Job is
 # asked to change. Strict, before the restore steps, a copy of the schema source_copy downloaded that cannot be deleted
-# fails the restore: restore_remote would take it for one it has downloaded in part and restore no data. A Job that
+# fails the restore: the restore would take it for the backup, which holds no data. A Job that
 # fails deletes what it can and leaves the rest with a warning, as such a copy refuses the next restore from the same
 # paths
 drop_source_copies() {
@@ -2590,17 +2598,85 @@ drop_source_copies() {
 	done
 }
 
-# restore_step HOST WHAT FLAGS PARAM... runs the restore step WHAT of the backup on HOST: a typed request with the query
-# parameters PARAM, or for a restore from another installation the command of the actions endpoint with the flags FLAGS
-# and SOURCE_ENV, as a typed request takes no setting in place of those of the sidecar
-restore_step() {
-	local host=$1 what=$2 flags=$3
-	shift 3
-	if [[ -n ${SOURCE_ENV} ]]; then
-		run_action "${host}" "${what}" "${BACKUP_NAME}" "restore_remote ${flags} ${SOURCE_ENV} ${BACKUP_NAME}"
-		return
+# restore_command STEP sets STEP_ARGS to the arguments of run_op, or of run_action, that run the step STEP of the
+# restore of the backup: download, the backup with the data, every file of it already on the disks of the host
+# hard-linked rather than downloaded again; download_schema, the backup without the data; schema, which drops the tables
+# of the backup first; schema_on_cluster, which drops and creates them ON CLUSTER; data; or rbac, the access entities.
+# Each restores from the copy the download made. RESTORE_KIND tells which: op, a typed request with query parameters,
+# or action, the command of the actions endpoint with the flags ACTION_ENV, as a typed request takes no setting in
+# place of those of the sidecar, such as the storage paths of another installation
+restore_command() {
+	local endpoint=restore command
+	local -a params=() flags=()
+	case $1 in
+	download)
+		endpoint=download
+		params=(hardlink_exists_files=)
+		flags=(download --hardlink-exists-files)
+		;;
+	download_schema)
+		endpoint=download
+		params=(schema=)
+		flags=(download --schema)
+		;;
+	schema)
+		params=(schema= rm=)
+		flags=(restore --schema --rm)
+		;;
+	schema_on_cluster) flags=(restore --schema --rm "--env=RESTORE_SCHEMA_ON_CLUSTER=${CLUSTER}") ;;
+	data)
+		params=(data=)
+		flags=(restore --data)
+		;;
+	rbac)
+		params=(rbac-only=)
+		flags=(restore --rbac-only)
+		;;
+	esac
+	if [[ -n ${TABLES:-} && $1 != rbac ]]; then
+		params+=("table=${TABLES}")
+		flags+=("--tables=${TABLES}")
 	fi
-	run_op "${host}" "${what}" "${BACKUP_NAME}" "/backup/restore_remote/${BACKUP_NAME}" -G "$@"
+	if [[ ${RESTORE_KIND} == action || $1 == schema_on_cluster ]]; then
+		command="${flags[*]}${ACTION_ENV:+ ${ACTION_ENV}} ${BACKUP_NAME}"
+		STEP_ARGS=("${command}")
+		return 0
+	fi
+	STEP_ARGS=("/backup/${endpoint}/${BACKUP_NAME}" -G)
+	for command in "${params[@]}"; do
+		STEP_ARGS+=(--data-urlencode "${command}")
+	done
+}
+
+# restore_step HOST WHAT STEP runs the step STEP of the restore, as restore_command makes it, on HOST
+restore_step() {
+	local kind=${RESTORE_KIND}
+	restore_command "$3"
+	if [[ $3 == schema_on_cluster ]]; then
+		kind=action
+	fi
+	"run_${kind}" "$1" "$2" "${BACKUP_NAME}" "${STEP_ARGS[@]}"
+}
+
+# download_args HOST sets STEP_ARGS to the download of the backup to HOST: with the data on a host of DATA_DOWNLOADS,
+# which restores the data, the schema alone on another
+download_args() {
+	if [[ " ${DATA_DOWNLOADS} " == *" $1 "* ]]; then
+		restore_command download
+	else
+		restore_command download_schema
+	fi
+}
+
+# drop_downloads HOST... deletes, as well as it can, the copies of the backup the download step of a restore made on
+# every HOST, which a restore would take for its own; a host that does not answer is asked once
+drop_downloads() {
+	local host BEST_EFFORT=1 READ_ONLY=1
+	for host in "$@"; do
+		if list_backups "${host}" local && find_backup "${BACKUP_NAME}" && ! delete_local "${host}" "${BACKUP_NAME}"; then
+			advise "${host}: the copy of ${BACKUP_NAME} the restore downloaded is left on local disk"
+		fi
+	done
 }
 
 # other_installation_hint sets REPLY to what the preflight adds to a backup it finds missing at the storage path of the
@@ -2624,8 +2700,8 @@ other_installation_hint() {
 }
 
 do_restore() {
-	local host restore_data=1 overwrite= validate= restore_rbac= holds_rbac= replicas= command hint where base
-	local -a schema_hosts data_hosts targets guarded used shards table_params=() had_local=()
+	local host restore_data=1 overwrite= validate= restore_rbac= holds_rbac= replicas= hint where base READ_ONLY=
+	local -a schema_hosts data_hosts targets guarded used shards had_local=() downloads
 	check_name BACKUP_NAME
 	parse_hosts SCHEMA_HOSTS
 	schema_hosts=("${HOSTS[@]}")
@@ -2652,7 +2728,6 @@ do_restore() {
 		if [[ ! ${TABLES} =~ ${TABLES_RE} ]] || ((${#TABLES} > TABLES_MAX_LENGTH)); then
 			die "TABLES is not a valid table pattern"
 		fi
-		table_params=(--data-urlencode "table=${TABLES}")
 	fi
 	check_source_name SOURCE_INSTALLATION "${SOURCE_INSTALLATION_MAX_LENGTH}" "installation name"
 	check_source_name SOURCE_NAMESPACE "${SOURCE_NAMESPACE_MAX_LENGTH}" namespace
@@ -2771,10 +2846,41 @@ do_restore() {
 			fi
 		done
 	else
-		# Only the copies of the schema the preflight downloaded are left, which restore_remote would restore no data from
+		# Only the copies of the schema the preflight downloaded are left, which a restore would take for the backup
 		drop_source_copies strict
 		# The restore steps download the backup to every host they restore it on, where a step that fails leaves a copy
 		SOURCE_COPIES=("${used[@]}")
+	fi
+	RESTORE_KIND=op
+	ACTION_ENV=${SOURCE_ENV}
+	if [[ -n ${ACTION_ENV} ]]; then
+		RESTORE_KIND=action
+	fi
+
+	# As the Altinity Cloud Manager restores, every host first downloads the backup, at once, the data to those that
+	# restore it, hard-linking every file of it already on their disks: a host short of disk space fails the restore here,
+	# before anything is dropped. A host that holds a copy of the backup already restores from it
+	downloads=()
+	for host in "${used[@]}"; do
+		if ! listed "${host}" ${had_local[@]+"${had_local[@]}"}; then
+			downloads+=("${host}")
+		fi
+	done
+	DATA_DOWNLOADS=
+	if [[ -n ${restore_data} ]]; then
+		DATA_DOWNLOADS=${data_hosts[*]}
+	fi
+	if ((${#downloads[@]} > 0)); then
+		# A download changes nothing the Job is asked to change: a restore that fails there leaves the cluster as it was
+		READ_ONLY=1
+		if ! run_all "${RESTORE_KIND}" "${downloads[*]}" download_args download "${BACKUP_NAME}"; then
+			READ_ONLY=
+			if [[ -z ${SOURCE_ENV} ]]; then
+				drop_downloads "${downloads[@]}"
+			fi
+			fail_all "download of ${BACKUP_NAME}"
+		fi
+		READ_ONLY=
 	fi
 
 	# The drop ON CLUSTER drops the tables of the backup the pattern takes, and the databases it takes as a whole, on every
@@ -2783,38 +2889,28 @@ do_restore() {
 	# clickhouse-backup rewrites on the way a Distributed table that names another cluster, which the restore of every
 	# replica on its own undoes next, as it drops and creates that table again from the backup
 	if [[ -n ${ON_CLUSTER} ]]; then
-		command="restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=${CLUSTER}"
-		if [[ -n ${TABLES:-} ]]; then
-			command+=" --tables=${TABLES}"
-		fi
-		if [[ -n ${SOURCE_ENV} ]]; then
-			command+=" ${SOURCE_ENV}"
-		fi
-		command+=" ${BACKUP_NAME}"
-		if ! run_action "${schema_hosts[0]}" "restore_remote schema on cluster ${CLUSTER}" "${BACKUP_NAME}" "${command}"; then
+		if ! restore_step "${schema_hosts[0]}" "restore schema on cluster ${CLUSTER}" schema_on_cluster; then
 			fail "schema restore of ${BACKUP_NAME} on cluster ${CLUSTER} failed on ${schema_hosts[0]}"
 		fi
 	fi
 	# Every replica restores the schema on its own, dropping what it has of the backup first: a table that has come
 	# through the replication of a Replicated database would fail its CREATE
 	for host in "${schema_hosts[@]}"; do
-		if ! restore_step "${host}" "restore_remote schema" "--schema --rm${TABLES:+ --tables=${TABLES}}" \
-			--data-urlencode "schema=" --data-urlencode "rm=" "${table_params[@]}"; then
+		if ! restore_step "${host}" "restore schema" schema; then
 			fail "schema restore of ${BACKUP_NAME} failed on ${host}"
 		fi
 	done
+	# Every host that restores data restores it at once
 	if [[ -n ${restore_data} ]]; then
-		for host in "${data_hosts[@]}"; do
-			if ! restore_step "${host}" "restore_remote data" "--data --hardlink-exists-files${TABLES:+ --tables=${TABLES}}" \
-				--data-urlencode "data=" --data-urlencode "hardlink_exists_files=" "${table_params[@]}"; then
-				fail "data restore of ${BACKUP_NAME} failed on ${host}"
-			fi
-		done
+		restore_command data
+		if ! run_all "${RESTORE_KIND}" "${data_hosts[*]}" "" "restore data" "${BACKUP_NAME}" "${STEP_ARGS[@]}"; then
+			fail_all "data restore of ${BACKUP_NAME}"
+		fi
 	fi
 	# Access entities are stored apart on every host, and a backup holds those of the replica it was made on
 	if [[ -n ${restore_rbac} ]]; then
 		for host in "${schema_hosts[@]}"; do
-			if ! restore_step "${host}" "restore_remote rbac" --rbac-only --data-urlencode "rbac-only="; then
+			if ! restore_step "${host}" "restore rbac" rbac; then
 				fail "access entity restore of ${BACKUP_NAME} failed on ${host}"
 			fi
 		done
@@ -2861,6 +2957,12 @@ declare -A LAST_OP=() LAST_ACTION_START=() LAST_ACTION_COMMAND=() OWN_BACKUPS=()
 declare -A OP_ID=() ACTION_COMMAND=() ACTION_BEFORE=()
 FAILED_HOSTS=()
 FAILURES=()
+# The arguments of the step of a host, as restore_command makes them; how the restore steps run, RESTORE_KIND op or
+# action, and ACTION_ENV, the --env flags of their commands; the hosts DATA_DOWNLOADS lists download the data too
+STEP_ARGS=()
+RESTORE_KIND=op
+ACTION_ENV=
+DATA_DOWNLOADS=
 
 main() {
 	# Retention keeps its sets in associative arrays, which bash handles under set -u from 4.4 on
