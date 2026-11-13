@@ -90,3 +90,17 @@ func TestClusterBackupInheritsTheNaming(t *testing.T) {
 	require.Equal(t, "s{shard}-{YYYYMMDDHHIISS}", own.MergeFrom(installation, MergeTypeFillEmptyValues).GetNaming())
 	require.Empty(t, (*ClusterBackup)(nil).GetNaming())
 }
+
+// A cluster runs the bash or the Python orchestrator, bash unless set, inherited from the installation as the mode.
+func TestClusterBackupOrchestrator(t *testing.T) {
+	require.Equal(t, BackupOrchestratorBash, (*ClusterBackup)(nil).GetOrchestrator())
+	installation := &ClusterBackup{Orchestrator: types.NewString(BackupOrchestratorPython)}
+	require.Equal(t, BackupOrchestratorPython, (&ClusterBackup{}).MergeFrom(installation, MergeTypeFillEmptyValues).GetOrchestrator())
+	own := &ClusterBackup{Orchestrator: types.NewString(BackupOrchestratorBash)}
+	require.Equal(t, BackupOrchestratorBash, own.MergeFrom(installation, MergeTypeFillEmptyValues).GetOrchestrator())
+	for value, valid := range map[string]bool{"": true, "bash": true, "python": true, "perl": false} {
+		require.Equal(t, valid, (&ClusterBackup{Orchestrator: types.NewString(value)}).Validate() == nil, value)
+	}
+	require.Equal(t, BackupOrchestratorPythonScriptKey, BackupOrchestratorScriptKeyOf(BackupOrchestratorPython))
+	require.Equal(t, BackupOrchestratorScriptKey, BackupOrchestratorScriptKeyOf(BackupOrchestratorBash))
+}

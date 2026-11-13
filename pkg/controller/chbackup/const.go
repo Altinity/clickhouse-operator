@@ -126,6 +126,9 @@ const (
 	// reasonOrchestratorScriptMissing tells that there is no orchestrator script to run: the operator configuration
 	// lacks it, or the ConfigMap the spec.orchestratorConfigMapRef of the resource names does not hold it.
 	reasonOrchestratorScriptMissing = "OrchestratorScriptMissing"
+	// reasonOrchestratorScriptMismatch tells that the ConfigMap the spec.orchestratorConfigMapRef of the resource names
+	// holds the script of the other orchestrator than backup.orchestrator of the cluster.
+	reasonOrchestratorScriptMismatch = "OrchestratorScriptMismatch"
 	// reasonScheduledBackupSucceeded and reasonScheduledBackupFailed tell how a scheduled run went, on the
 	// schedule.
 	reasonScheduledBackupSucceeded = "ScheduledBackupSucceeded"

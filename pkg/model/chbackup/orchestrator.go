@@ -24,6 +24,7 @@ import (
 
 	clickhouse_altinity_com "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 )
 
 const (
@@ -57,6 +58,18 @@ type Orchestrator struct {
 	ShardPodHosts []string
 	// RestoreInProgress tells that a restore of the cluster is not finished: a scheduled run skips retention.
 	RestoreInProgress bool
+	// Language is what the Job runs, api.BackupOrchestratorBash, the default when empty, or api.BackupOrchestratorPython.
+	Language string
+}
+
+// IsPython reports whether the Job runs the Python orchestrator script.
+func (o Orchestrator) IsPython() bool {
+	return o.Language == api.BackupOrchestratorPython
+}
+
+// scriptFile returns the file name of the script the Job runs, which is also its key in the ConfigMap.
+func (o Orchestrator) scriptFile() string {
+	return OrchestratorScriptFileOf(o.Language)
 }
 
 // IsPodTransport reports whether the Job reaches clickhouse-backup through the backup Pods of the shards.
@@ -77,8 +90,9 @@ func OrchestratorConfigMapName(chiName, cluster string) string {
 }
 
 // BuildOrchestratorConfigMap builds the ConfigMap the operator keeps the orchestrator script of a cluster of an
-// installation in, owned by the installation.
-func BuildOrchestratorConfigMap(chi *api.ClickHouseInstallation, cluster, script string) *core.ConfigMap {
+// installation in, owned by the installation: the script of the orchestrator, api.BackupOrchestratorBash or
+// api.BackupOrchestratorPython, under its file name.
+func BuildOrchestratorConfigMap(chi *api.ClickHouseInstallation, cluster, orchestrator, script string) *core.ConfigMap {
 	labels := map[string]string{
 		LabelBackupCHI:       LabelValue(chi.GetName()),
 		LabelBackupCluster:   LabelValue(cluster),
@@ -94,7 +108,7 @@ func BuildOrchestratorConfigMap(chi *api.ClickHouseInstallation, cluster, script
 			},
 			OwnerReferences: []meta.OwnerReference{ShardPodOwner(chi)},
 		},
-		Data: map[string]string{OrchestratorScriptFile: script},
+		Data: map[string]string{OrchestratorScriptFileOf(orchestrator): script},
 	}
 }
 
@@ -113,20 +127,33 @@ func ClusterBackupOf(normalized *api.ClickHouseInstallation, cluster string) *ap
 }
 
 // orchestratorVolume returns the volume of the ConfigMap of the script.
-func orchestratorVolume(configMap string) core.Volume {
+func orchestratorVolume(orchestrator Orchestrator) core.Volume {
 	return core.Volume{
 		Name: orchestratorVolumeName,
 		VolumeSource: core.VolumeSource{
 			ConfigMap: &core.ConfigMapVolumeSource{
-				LocalObjectReference: core.LocalObjectReference{Name: configMap},
-				Items:                []core.KeyToPath{{Key: OrchestratorScriptFile, Path: OrchestratorScriptFile}},
+				LocalObjectReference: core.LocalObjectReference{Name: orchestrator.ConfigMap},
+				Items:                []core.KeyToPath{{Key: orchestrator.scriptFile(), Path: orchestrator.scriptFile()}},
 			},
 		},
 	}
 }
 
-// orchestratorCommand runs the script from the ConfigMap. The script text is static: every value it acts on reaches
-// it through the environment, so no user input is ever parsed as shell code.
-func orchestratorCommand() []string {
-	return []string{"bash", OrchestratorMountPath + "/" + OrchestratorScriptFile}
+// orchestratorCommand runs the script from the ConfigMap, with bash or python3. The script text is static: every value
+// it acts on reaches it through the environment, so no user input is ever parsed as code.
+func orchestratorCommand(orchestrator Orchestrator) []string {
+	interpreter := "bash"
+	if orchestrator.IsPython() {
+		interpreter = "python3"
+	}
+	return []string{interpreter, OrchestratorMountPath + "/" + orchestrator.scriptFile()}
+}
+
+// orchestratorImage returns the image the Job runs the script in: that of the clickhouse-backup container of the hosts
+// for the bash orchestrator, a Python image for the Python one.
+func orchestratorImage(pod podSettings, orchestrator Orchestrator) string {
+	if orchestrator.IsPython() {
+		return config.DefaultBackupPythonOrchestratorImage
+	}
+	return pod.image
 }

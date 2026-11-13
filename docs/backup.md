@@ -178,6 +178,7 @@ spec:
 | `configSecretRef`        | Secret in the CHI namespace whose key `config.yml` holds the `clickhouse-backup` configuration of the sidecar, see [Backup storage](#backup-storage). Required where backup is enabled. `name: ""` on a cluster: none.                                     |
 | `mode`                   | How the operator reaches `clickhouse-backup` on the hosts of the cluster: `sidecar` (default), a sidecar in every ClickHouse Pod; `pod`, no sidecar, a backup Pod per shard only while a backup or restore of the cluster runs, see [Backup modes](#backup-modes). |
 | `preferredReplica`       | Index, from 0, of the replica of each shard a backup works on, as the `backupReplica` of ACM; empty is 0, the first replica. With `mode: sidecar` a `FirstPerShard` backup runs on that replica's sidecar, or on the first replica's when the shard has fewer replicas or the preferred one's ClickHouse does not answer when the Job starts (`OrchestratorReplicaFallback` event); with `mode: pod` the backup Pod of the shard runs next to it, see [Which hosts are involved](#which-hosts-are-involved). |
+| `orchestrator`           | What the backup, verify and restore Jobs of the cluster run: `bash` (default), the bash orchestrator script in the `clickhouse-backup` image, or `python`, its twin in Python in `python:3.14-slim`, see [Python orchestrator](#python-orchestrator). |
 | `naming`                 | Template the backups of the cluster are named by, one name per shard, e.g. `shard{shard}-{YYYYMMDDHHIISS}` as ACM names them; empty, the default, names a backup `<prefix>-YYYYMMDDHHMMSS` alike on every shard. See [Backup naming](#backup-naming). |
 | `recovery`               | `backupName`: the backup a new CHI starts from, see [Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup). `""` on a cluster: nothing to recover there. `sourceInstallation`, `sourceNamespace`: the CHI that made the backup, when another; `""` on a cluster: this CHI. `orchestratorConfigMapRef`: the ConfigMap of the [orchestrator script](#the-orchestrator-script) the recovery restore runs, copied into it; `name: ""` on a cluster: the operator's. |
 
@@ -1598,6 +1599,43 @@ When an operation ends, `OrchestratorCommandFinished` tells its operation id, it
 command `clickhouse-backup` reports it ran. The API credentials travel in a header and never show in
 an event; a message longer than the 1024 bytes an event takes is cut. The polling requests (status,
 lists of backups, actions) show in none.
+
+### Python orchestrator
+
+`backup.orchestrator: python`, on the CHI or on a cluster, inherited like `mode`, makes the Jobs of the
+cluster run `backup-orchestrator.py` instead: a port of the bash script to Python 3.10 or newer with its
+standard library alone, which does exactly the same - the same environment, the same requests to the
+`clickhouse-backup` API in the same order, the same Events, termination messages and exit codes, the same
+retention, naming, held changes, config overrides and restores. It talks to the API with `urllib`, through
+`http_proxy` as `curl` does, and posts the Events with the token and the CA of the Pod's service account.
+The Job runs it as `python3 /etc/clickhouse-backup-orchestrator/backup-orchestrator.py` in the image
+`python:3.14-slim`, pulled `Always` as the bash Job's image, rather than in the `clickhouse-backup` image;
+the hosts keep their sidecars or backup Pods as they are. Its messages quote the exit codes `curl` would have
+failed with, so a failure reads the same with either.
+
+```yaml
+spec:
+  backup:
+    enabled: "yes"
+    configSecretRef:
+      name: backup-demo-storage
+    orchestrator: python
+```
+
+The script is an operator configuration file of its own folder, `backup.pythonPath` (`backup-python` by
+default), shipped in the ConfigMap `etc-clickhouse-operator-backup-python-files` (Helm value
+`configs.backupPythonFiles`) mounted at `/etc/clickhouse-operator/backup-python`; in the repository it is
+`deploy/builder/templates-config/backup-python/backup-orchestrator.py`. It is a ConfigMap apart from the bash
+script's, as each script alone fills much of what one ConfigMap's data may take in the Helm chart generation.
+The operator copies it to the ConfigMap `<chi>-<cluster>-backup-orchestrator` under the key
+`backup-orchestrator.py`; switching `orchestrator` replaces the key there. A ConfigMap of your own that
+`orchestratorConfigMapRef` names has to hold the script of the cluster's orchestrator under its key -
+`backup-orchestrator.sh` for `bash`, `backup-orchestrator.py` for `python`, or both: one that holds only the
+other one aborts the operation, and holds the schedule, with the reason `OrchestratorScriptMismatch`.
+
+The script tests of the repository run every scenario against both orchestrators, the same fake
+`clickhouse-backup` and Kubernetes APIs and the same expectations, so a change of one that the other does not
+follow fails them.
 
 ### Backup modes
 

@@ -222,8 +222,9 @@ type ClickHouseBackupScheduleSpec struct {
 	// run yet, such as one held for a recovery.
 	BackupNamePrefix string `json:"backupNamePrefix,omitempty" yaml:"backupNamePrefix,omitempty"`
 
-	// OrchestratorConfigMapRef names a ConfigMap in the namespace of the schedule whose key backup-orchestrator.sh the
-	// runs of its CronJobs run instead of the operator's orchestrator script.
+	// OrchestratorConfigMapRef names a ConfigMap in the namespace of the schedule whose key backup-orchestrator.sh
+	// (backup-orchestrator.py for a cluster whose backup.orchestrator is python) the runs of its CronJobs run instead
+	// of the operator's orchestrator script.
 	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
 
 	// Retention tells what retention keeps beyond the entries: backups pinned by name, and the backups the schedule

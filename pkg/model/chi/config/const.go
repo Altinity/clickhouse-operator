@@ -101,6 +101,10 @@ const (
 	// none, or that has no base container as backup.podTemplate is empty. The stable tag moves with the releases of
 	// clickhouse-backup, so the containers that run it pull it Always unless their base container sets a pull policy.
 	DefaultClickHouseBackupDockerImage = "altinity/clickhouse-backup:stable"
+	// DefaultBackupPythonOrchestratorImage specifies the image the backup, verify and restore Jobs of a cluster whose
+	// backup.orchestrator is python run the Python orchestrator script in: python3 and its standard library are all
+	// it needs.
+	DefaultBackupPythonOrchestratorImage = "python:3.14-slim"
 	// DefaultClickHouseBackupImagePullPolicy is the pull policy of a clickhouse-backup container whose base container
 	// sets none
 	DefaultClickHouseBackupImagePullPolicy = "Always"

@@ -1008,7 +1008,8 @@ func newJobSpec(labels map[string]string, deadline int64, topology *Topology, or
 }
 
 // newPodSpec builds the pod of a Job: the orchestrator script, mounted from its ConfigMap, run by bash of the image of
-// the clickhouse-backup container of the hosts, pulled anew every time. It runs as the ServiceAccount of the
+// the clickhouse-backup container of the hosts, or by python3 of a Python image for the Python orchestrator, pulled
+// anew every time. It runs as the ServiceAccount of the
 // orchestrator, whose token it posts Events with, and service links are off so no Service in the namespace can inject
 // a variable that shadows the script's environment.
 func newPodSpec(pod podSettings, orchestrator Orchestrator, env []core.EnvVar) core.PodSpec {
@@ -1019,13 +1020,13 @@ func newPodSpec(pod podSettings, orchestrator Orchestrator, env []core.EnvVar) c
 		EnableServiceLinks:           ptr.To(false),
 		ImagePullSecrets:             slices.Clone(pod.imagePullSecrets),
 		SecurityContext:              newPodSecurityContext(pod),
-		Volumes:                      []core.Volume{orchestratorVolume(orchestrator.ConfigMap)},
+		Volumes:                      []core.Volume{orchestratorVolume(orchestrator)},
 		Containers: []core.Container{
 			{
 				Name:            jobContainerName,
-				Image:           pod.image,
+				Image:           orchestratorImage(pod, orchestrator),
 				ImagePullPolicy: core.PullAlways,
-				Command:         orchestratorCommand(),
+				Command:         orchestratorCommand(orchestrator),
 				Env:             env,
 				VolumeMounts: []core.VolumeMount{
 					{Name: orchestratorVolumeName, MountPath: OrchestratorMountPath, ReadOnly: true},

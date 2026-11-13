@@ -89,8 +89,9 @@ type ClickHouseRestoreSpec struct {
 	RBAC *types.StringBool `json:"rbac,omitempty" yaml:"rbac,omitempty"`
 	// ActiveDeadlineSeconds bounds how long the restore Job may run. Defaults to 24 hours.
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
-	// OrchestratorConfigMapRef names a ConfigMap in the namespace of the restore whose key backup-orchestrator.sh its
-	// Jobs run instead of the operator's orchestrator script.
+	// OrchestratorConfigMapRef names a ConfigMap in the namespace of the restore whose key backup-orchestrator.sh
+	// (backup-orchestrator.py for a cluster whose backup.orchestrator is python) its Jobs run instead of the operator's
+	// orchestrator script.
 	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
 }
 

@@ -76,7 +76,7 @@ spec:
                 orchestratorConfigMapRef:
                   type: object
                   description: |
-                    ConfigMap in the namespace of the restore whose key `backup-orchestrator.sh` its Jobs run instead of the
+                    ConfigMap in the namespace of the restore whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) its Jobs run instead of the
                     operator's orchestrator script, the one of the operator configuration
                   properties:
                     name:

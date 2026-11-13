@@ -99,7 +99,8 @@ func (c *ScheduleController) Reconcile(ctx context.Context, req ctrl.Request) (c
 func abortsSchedule(reason string) bool {
 	switch reason {
 	case api.BackupReasonInvalidSpec, api.BackupReasonCHINotFound, api.BackupReasonCHIStopped, api.BackupReasonClusterNotFound,
-		api.BackupReasonBackupDisabled, api.BackupReasonNoBackupStorage, api.BackupReasonNoTargetHosts, reasonOrchestratorScriptMissing:
+		api.BackupReasonBackupDisabled, api.BackupReasonNoBackupStorage, api.BackupReasonNoTargetHosts, reasonOrchestratorScriptMissing,
+		reasonOrchestratorScriptMismatch:
 		return true
 	}
 	return false

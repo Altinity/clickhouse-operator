@@ -1275,6 +1275,17 @@ spec:
                                   is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
                                   (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
                                   replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
+                              orchestrator:
+                                type: string
+                                enum:
+                                  - ""
+                                  - bash
+                                  - python
+                                description: |
+                                  What the backup, verify and restore Jobs of the cluster run: bash (default), the bash orchestrator script in
+                                  the clickhouse-backup image, or python, its twin in Python in the python:3.14-slim image. An
+                                  orchestratorConfigMapRef has to hold the script of the one the cluster takes, backup-orchestrator.sh or
+                                  backup-orchestrator.py. See docs/backup.md
                               naming:
                                 type: string
                                 maxLength: 128
@@ -1316,7 +1327,7 @@ spec:
                                   orchestratorConfigMapRef:
                                     type: object
                                     description: |
-                                      ConfigMap in the installation's namespace whose key `backup-orchestrator.sh` the ClickHouseRestore of
+                                      ConfigMap in the installation's namespace whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) the ClickHouseRestore of
                                       the recovery runs instead of the operator's orchestrator script: it is copied into that restore. An explicit
                                       `name: ""` on a cluster resets it to the operator's script
                                     properties:

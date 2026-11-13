@@ -438,8 +438,9 @@ type ClickHouseBackupSpec struct {
 	// a cluster whose Job is not created by then fails, as does the backup when it is not validated by then.
 	// Unset waits as long as it takes.
 	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty" yaml:"startingDeadlineSeconds,omitempty"`
-	// OrchestratorConfigMapRef names a ConfigMap in the namespace of the backup whose key backup-orchestrator.sh its
-	// Jobs run instead of the operator's orchestrator script. With ScheduleRef, unset takes the schedule's.
+	// OrchestratorConfigMapRef names a ConfigMap in the namespace of the backup whose key backup-orchestrator.sh
+	// (backup-orchestrator.py for a cluster whose backup.orchestrator is python) its Jobs run instead of the operator's
+	// orchestrator script. With ScheduleRef, unset takes the schedule's.
 	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
 	// ConfigOverrides are clickhouse-backup settings the backup is made with in place of those of the sidecar, as
 	// KEY=VALUE of the env var of the setting, e.g. S3_STORAGE_CLASS=STANDARD_IA, see type_backup_overrides.go. Not

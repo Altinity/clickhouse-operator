@@ -94,7 +94,7 @@ spec:
                 orchestratorConfigMapRef:
                   type: object
                   description: |
-                    ConfigMap in the namespace of the schedule whose key `backup-orchestrator.sh` the runs of its CronJobs
+                    ConfigMap in the namespace of the schedule whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) the runs of its CronJobs
                     run instead of the operator's orchestrator script, the one of the operator configuration
                   properties:
                     name:

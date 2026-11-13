@@ -43,6 +43,26 @@ const BackupStorageHint = "name the Secret of the clickhouse-backup configuratio
 // orchestrator script the backup and restore Jobs of the cluster run in place of the operator's.
 const BackupOrchestratorScriptKey = "backup-orchestrator.sh"
 
+// BackupOrchestratorPythonScriptKey is the key of such a ConfigMap that holds the Python orchestrator script, which
+// the Jobs of a cluster whose backup.orchestrator is python run.
+const BackupOrchestratorPythonScriptKey = "backup-orchestrator.py"
+
+// Backup orchestrators: what the backup, verify and restore Jobs of a cluster run.
+const (
+	// BackupOrchestratorBash runs backup-orchestrator.sh with bash in the clickhouse-backup image, the default.
+	BackupOrchestratorBash = "bash"
+	// BackupOrchestratorPython runs backup-orchestrator.py, its twin, with python3 in a Python image.
+	BackupOrchestratorPython = "python"
+)
+
+// BackupOrchestratorScriptKeyOf returns the key of a ConfigMap that holds the script of the orchestrator.
+func BackupOrchestratorScriptKeyOf(orchestrator string) string {
+	if orchestrator == BackupOrchestratorPython {
+		return BackupOrchestratorPythonScriptKey
+	}
+	return BackupOrchestratorScriptKey
+}
+
 // Backup modes: how the operator reaches clickhouse-backup on the hosts of a cluster.
 const (
 	// BackupModeSidecar runs clickhouse-backup as a sidecar in every ClickHouse pod of the cluster, the default.
@@ -88,6 +108,10 @@ type ClusterBackup struct {
 	// on the sidecar of that replica, or on that of the first replica when the shard has fewer replicas or the
 	// preferred one does not answer when the Job starts. Empty means 0, the first replica.
 	PreferredReplica *types.Int32 `json:"preferredReplica,omitempty" yaml:"preferredReplica,omitempty"`
+	// Orchestrator is what the backup, verify and restore Jobs of the cluster run: "bash" (default), the bash
+	// orchestrator script in the clickhouse-backup image, or "python", its twin in Python in a Python image. Both do
+	// the same; an orchestratorConfigMapRef has to hold the script of the one the cluster takes.
+	Orchestrator *types.String `json:"orchestrator,omitempty" yaml:"orchestrator,omitempty"`
 	// Naming is the template the backups of the cluster are named by, one name for the backup of each shard, e.g.
 	// "shard{shard}-{YYYYMMDDHHIISS}" as the Altinity Cloud Manager names them, see type_backup_naming.go. Empty, the
 	// default, names a backup "<prefix>-<YYYYMMDDHHMMSS>" alike on every shard, each at a storage path of its own.
@@ -108,9 +132,10 @@ type BackupRecovery struct {
 	// give there. Empty, each is that of this installation.
 	SourceInstallation *types.String `json:"sourceInstallation,omitempty" yaml:"sourceInstallation,omitempty"`
 	SourceNamespace    *types.String `json:"sourceNamespace,omitempty"    yaml:"sourceNamespace,omitempty"`
-	// OrchestratorConfigMapRef names a ConfigMap in the installation's namespace whose key backup-orchestrator.sh the
-	// ClickHouseRestore of the recovery runs instead of the operator's orchestrator script: it is copied into that
-	// restore. An explicit name "" on a cluster resets it to the operator's script.
+	// OrchestratorConfigMapRef names a ConfigMap in the installation's namespace whose key backup-orchestrator.sh
+	// (backup-orchestrator.py for a cluster whose backup.orchestrator is python) the ClickHouseRestore of the recovery
+	// runs instead of the operator's orchestrator script: it is copied into that restore. An explicit name "" on a
+	// cluster resets it to the operator's script.
 	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
 }
 
@@ -215,10 +240,24 @@ func (b *ClusterBackup) Validate() error {
 		return fmt.Errorf("%w: backup.mode %q is not one of %s, %s", ErrInvalidBackupSpec, b.Mode.Value(),
 			BackupModeSidecar, BackupModePod)
 	}
+	switch b.Orchestrator.Value() {
+	case "", BackupOrchestratorBash, BackupOrchestratorPython:
+	default:
+		return fmt.Errorf("%w: backup.orchestrator %q is not one of %s, %s", ErrInvalidBackupSpec, b.Orchestrator.Value(),
+			BackupOrchestratorBash, BackupOrchestratorPython)
+	}
 	if err := ValidateBackupNaming(b.Naming.Value()); err != nil {
 		return err
 	}
 	return validateStringBool("backup.enabled", b.Enabled)
+}
+
+// GetOrchestrator returns what the Jobs of the cluster run, BackupOrchestratorBash when unset, nil-safe.
+func (b *ClusterBackup) GetOrchestrator() string {
+	if (b == nil) || (b.Orchestrator.Value() == "") {
+		return BackupOrchestratorBash
+	}
+	return b.Orchestrator.Value()
 }
 
 // GetNaming returns the naming template of the backups of the cluster, "" for the default naming, nil-safe.
@@ -339,6 +378,7 @@ func (b *ClusterBackup) MergeFrom(from *ClusterBackup, _type MergeType) *Cluster
 	b.ConfigSecretRef = MergePointer(b.ConfigSecretRef, from.ConfigSecretRef.DeepCopy(), _type)
 	b.PreferredReplica = MergeScalar(b.PreferredReplica, from.PreferredReplica, _type)
 	b.Naming = MergeScalar(b.Naming, from.Naming, _type)
+	b.Orchestrator = MergeScalar(b.Orchestrator, from.Orchestrator, _type)
 	b.Recovery = b.Recovery.MergeFrom(from.Recovery, _type)
 
 	return b

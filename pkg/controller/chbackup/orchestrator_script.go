@@ -17,6 +17,7 @@ package chbackup
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strings"
 
@@ -33,7 +34,10 @@ import (
 
 // orchestratorScriptDir returns the directory the operator reads the orchestrator script from: backup.path of the
 // operator configuration, "" when that folder does not exist. A variable for the tests.
-var orchestratorScriptDir = func() string {
+var orchestratorScriptDir = func(orchestrator string) string {
+	if orchestrator == api.BackupOrchestratorPython {
+		return chop.Config().Backup.PythonPath
+	}
 	return chop.Config().Backup.Path
 }
 
@@ -42,6 +46,13 @@ var orchestratorScriptDir = func() string {
 // bring one.
 func orchestratorScriptMissing(message string) *pending {
 	return &pending{reason: reasonOrchestratorScriptMissing, message: message, requeue: targetRequeueInterval}
+}
+
+// orchestratorScriptMismatch explains an operation, or a schedule, whose cluster runs one orchestrator while the
+// ConfigMap its spec.orchestratorConfigMapRef names holds the script of the other: it is aborted, as only a change of
+// either can settle it.
+func orchestratorScriptMismatch(message string) *pending {
+	return &pending{reason: reasonOrchestratorScriptMismatch, message: message, requeue: targetRequeueInterval}
 }
 
 // orchestrator prepares what the Jobs of a cluster of an installation need to run the orchestrator script: the
@@ -57,7 +68,8 @@ func (r *reconciler) orchestrator(
 ) (model.Orchestrator, *pending, error) {
 	normalized := chi.GetAncestorT()
 	backup := model.ClusterBackupOf(normalized, cluster)
-	orchestrator := model.Orchestrator{Transport: backup.GetMode()}
+	orchestrator := model.Orchestrator{Transport: backup.GetMode(), Language: backup.GetOrchestrator()}
+	key := api.BackupOrchestratorScriptKeyOf(orchestrator.Language)
 	if orchestrator.IsPodTransport() {
 		orchestrator.ShardPodHosts = model.ShardPodHosts(normalized, cluster)
 	}
@@ -72,25 +84,39 @@ func (r *reconciler) orchestrator(
 		case err != nil:
 			return orchestrator, nil, err
 		}
-		script := configMap.Data[api.BackupOrchestratorScriptKey]
+		script := configMap.Data[key]
 		if strings.TrimSpace(script) == "" {
+			other := api.BackupOrchestratorScriptKeyOf(api.BackupOrchestratorBash)
+			if other == key {
+				other = api.BackupOrchestratorScriptKeyOf(api.BackupOrchestratorPython)
+			}
+			if strings.TrimSpace(configMap.Data[other]) != "" {
+				return orchestrator, orchestratorScriptMismatch(fmt.Sprintf("ConfigMap %s, which spec.orchestratorConfigMapRef "+
+					"names, holds the script %s, while backup.orchestrator of cluster %s is %s, which runs %s: name a ConfigMap "+
+					"with the key %s, or set backup.orchestrator to the orchestrator of the script", name, other, cluster,
+					orchestrator.Language, key, key)), nil
+			}
 			return orchestrator, orchestratorScriptMissing(fmt.Sprintf("ConfigMap %s, which spec.orchestratorConfigMapRef names, "+
-				"has no key %s with the orchestrator script", name, api.BackupOrchestratorScriptKey)), nil
+				"has no key %s with the orchestrator script", name, key)), nil
 		}
 		orchestrator.ConfigMap = name
 		orchestrator.ScriptSHA256 = model.ScriptSHA256(script)
 	} else {
-		dir := orchestratorScriptDir()
+		dir := orchestratorScriptDir(orchestrator.Language)
 		if dir == "" {
-			return orchestrator, orchestratorScriptMissing(fmt.Sprintf("no backup orchestrator script %s: the folder backup.path "+
-				"of the operator configuration does not exist", model.OrchestratorScriptFile)), nil
+			folder := "backup.path"
+			if orchestrator.IsPython() {
+				folder = "backup.pythonPath"
+			}
+			return orchestrator, orchestratorScriptMissing(fmt.Sprintf("no backup orchestrator script %s: the folder %s "+
+				"of the operator configuration does not exist", key, folder)), nil
 		}
-		script, err := model.ReadOrchestratorScript(dir)
+		script, err := model.ReadOrchestratorScriptOf(dir, orchestrator.Language)
 		if err != nil {
 			return orchestrator, orchestratorScriptMissing(fmt.Sprintf("no backup orchestrator script %s: %v",
-				filepath.Join(dir, model.OrchestratorScriptFile), err)), nil
+				filepath.Join(dir, key), err)), nil
 		}
-		desired := model.BuildOrchestratorConfigMap(chi, cluster, script)
+		desired := model.BuildOrchestratorConfigMap(chi, cluster, orchestrator.Language, script)
 		if wait, err := r.applyOrchestratorConfigMap(ctx, chi, desired); (wait != nil) || (err != nil) {
 			return orchestrator, wait, err
 		}
@@ -127,8 +153,7 @@ func (r *reconciler) applyOrchestratorConfigMap(ctx context.Context, chi *api.Cl
 			"spec.orchestratorConfigMapRef", desired.GetName(), chi.GetName())), nil
 	}
 	sha := desired.GetAnnotations()[model.AnnotationOrchestratorScriptSHA256]
-	if (existing.Data[model.OrchestratorScriptFile] == desired.Data[model.OrchestratorScriptFile]) &&
-		(existing.GetAnnotations()[model.AnnotationOrchestratorScriptSHA256] == sha) {
+	if maps.Equal(existing.Data, desired.Data) && (existing.GetAnnotations()[model.AnnotationOrchestratorScriptSHA256] == sha) {
 		return nil, nil
 	}
 	updated := existing.DeepCopy()

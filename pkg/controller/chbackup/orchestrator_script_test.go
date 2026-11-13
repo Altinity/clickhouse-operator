@@ -34,15 +34,26 @@ import (
 // tests read it from, as the operator reads it from its configuration.
 const repositoryScriptDir = "../../../config/backup"
 
+// repositoryPythonScriptDir is the folder of the Python orchestrator script of the repository.
+const repositoryPythonScriptDir = "../../../config/backup-python"
+
+// repositoryScriptDirOf returns the folder of the script of the orchestrator of the repository.
+func repositoryScriptDirOf(orchestrator string) string {
+	if orchestrator == api.BackupOrchestratorPython {
+		return repositoryPythonScriptDir
+	}
+	return repositoryScriptDir
+}
+
 func init() {
-	orchestratorScriptDir = func() string { return repositoryScriptDir }
+	orchestratorScriptDir = repositoryScriptDirOf
 }
 
 // withScriptDir makes the controllers read the orchestrator script from dir for the duration of the test.
 func withScriptDir(t *testing.T, dir string) {
 	t.Helper()
-	orchestratorScriptDir = func() string { return dir }
-	t.Cleanup(func() { orchestratorScriptDir = func() string { return repositoryScriptDir } })
+	orchestratorScriptDir = func(string) string { return dir }
+	t.Cleanup(func() { orchestratorScriptDir = repositoryScriptDirOf })
 }
 
 // testOrchestrator is how the Jobs the tests build themselves run the orchestrator script.
@@ -167,4 +178,61 @@ func TestOrchestratorOfThePodTransport(t *testing.T) {
 	require.True(t, orchestrator.IsPodTransport())
 	require.Equal(t, model.ShardPodHosts(chi.GetAncestorT(), "main"), orchestrator.ShardPodHosts)
 	require.Len(t, orchestrator.ShardPodHosts, 2)
+}
+
+// A cluster whose backup.orchestrator is python runs the Python script of the configuration, which the operator keeps
+// in the ConfigMap of the cluster under its own key; switched back to bash, the ConfigMap holds the bash script alone.
+func TestOrchestratorOfThePythonOrchestrator(t *testing.T) {
+	cluster := backupCluster("main", 1, true)
+	cluster.Backup.Orchestrator = types.NewString(api.BackupOrchestratorPython)
+	chi := installation(t, api.StatusCompleted, cluster)
+	c := newClient(t, nil)
+	r := newReconciler(c, c, c.Scheme(), newFakeCR(chi), api.ClickHouseBackupCRDResourceKind)
+
+	orchestrator, missing, err := r.orchestrator(context.Background(), chi, "main", "")
+	require.NoError(t, err)
+	require.Nil(t, missing)
+	require.True(t, orchestrator.IsPython())
+	script, err := model.ReadOrchestratorScriptOf(repositoryPythonScriptDir, api.BackupOrchestratorPython)
+	require.NoError(t, err)
+	require.Equal(t, model.ScriptSHA256(script), orchestrator.ScriptSHA256)
+	configMap := &core.ConfigMap{}
+	require.NoError(t, c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: orchestrator.ConfigMap}, configMap))
+	require.Equal(t, map[string]string{api.BackupOrchestratorPythonScriptKey: script}, configMap.Data)
+
+	bash := installation(t, api.StatusCompleted, backupCluster("main", 1, true))
+	orchestrator, missing, err = r.orchestrator(context.Background(), bash, "main", "")
+	require.NoError(t, err)
+	require.Nil(t, missing)
+	require.False(t, orchestrator.IsPython())
+	require.NoError(t, c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: orchestrator.ConfigMap}, configMap))
+	require.Equal(t, map[string]string{api.BackupOrchestratorScriptKey: repositoryScript(t)}, configMap.Data)
+}
+
+// The ConfigMap an operation names has to hold the script of the orchestrator of the cluster: one that holds the
+// script of the other one aborts the operation, saying which.
+func TestOrchestratorRefusesTheScriptOfTheOtherOrchestrator(t *testing.T) {
+	cluster := backupCluster("main", 1, true)
+	cluster.Backup.Orchestrator = types.NewString(api.BackupOrchestratorPython)
+	chi := installation(t, api.StatusCompleted, cluster)
+	bashScript := &core.ConfigMap{
+		ObjectMeta: meta.ObjectMeta{Name: "my-script", Namespace: testNamespace},
+		Data:       map[string]string{api.BackupOrchestratorScriptKey: "echo mine"},
+	}
+	c := newClient(t, nil, bashScript)
+	r := newReconciler(c, c, c.Scheme(), newFakeCR(chi), api.ClickHouseBackupCRDResourceKind)
+
+	_, missing, err := r.orchestrator(context.Background(), chi, "main", "my-script")
+	require.NoError(t, err)
+	require.NotNil(t, missing)
+	require.Equal(t, reasonOrchestratorScriptMismatch, missing.reason)
+	require.Contains(t, missing.message, "holds the script backup-orchestrator.sh, while backup.orchestrator of cluster main is python")
+	require.True(t, missing.refusesOneOff())
+
+	bashScript.Data = map[string]string{api.BackupOrchestratorScriptKey: "echo mine", api.BackupOrchestratorPythonScriptKey: "print()"}
+	require.NoError(t, c.Update(context.Background(), bashScript))
+	orchestrator, missing, err := r.orchestrator(context.Background(), chi, "main", "my-script")
+	require.NoError(t, err)
+	require.Nil(t, missing, "a ConfigMap of both scripts serves either orchestrator")
+	require.Equal(t, model.ScriptSHA256("print()"), orchestrator.ScriptSHA256)
 }

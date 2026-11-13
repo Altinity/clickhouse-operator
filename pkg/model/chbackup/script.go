@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 )
 
@@ -301,7 +302,21 @@ const OrchestratorPythonScriptFile = "backup-orchestrator.py"
 
 // ReadOrchestratorScript returns the orchestrator script, the OrchestratorScriptFile of dir.
 func ReadOrchestratorScript(dir string) (string, error) {
-	path := filepath.Join(dir, OrchestratorScriptFile)
+	return ReadOrchestratorScriptOf(dir, api.BackupOrchestratorBash)
+}
+
+// OrchestratorScriptFileOf returns the file name of the script of the orchestrator, api.BackupOrchestratorBash or
+// api.BackupOrchestratorPython.
+func OrchestratorScriptFileOf(orchestrator string) string {
+	if orchestrator == api.BackupOrchestratorPython {
+		return OrchestratorPythonScriptFile
+	}
+	return OrchestratorScriptFile
+}
+
+// ReadOrchestratorScriptOf returns the script of the orchestrator, its OrchestratorScriptFileOf in dir.
+func ReadOrchestratorScriptOf(dir, orchestrator string) (string, error) {
+	path := filepath.Join(dir, OrchestratorScriptFileOf(orchestrator))
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("cannot read the backup orchestrator script: %w", err)

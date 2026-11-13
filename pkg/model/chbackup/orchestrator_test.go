@@ -27,6 +27,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 )
 
 // Every Job pod runs the script of the ConfigMap, mounted read-only, as the orchestrator ServiceAccount, in the image
@@ -143,7 +144,7 @@ func TestCronJobTellsARestoreInProgress(t *testing.T) {
 func TestOrchestratorConfigMap(t *testing.T) {
 	chi := testInstallation()
 	chi.UID = "chi-uid"
-	configMap := BuildOrchestratorConfigMap(chi, "main", "echo script")
+	configMap := BuildOrchestratorConfigMap(chi, "main", api.BackupOrchestratorBash, "echo script")
 	require.Equal(t, "demo-main-backup-orchestrator", configMap.Name)
 	require.Equal(t, chi.Namespace, configMap.Namespace)
 	require.Equal(t, map[string]string{api.BackupOrchestratorScriptKey: "echo script"}, configMap.Data)
@@ -188,4 +189,29 @@ func TestScheduledSlot(t *testing.T) {
 	require.False(t, ok, "a pod without the Job name label names its backup after the time it runs")
 	_, ok = ScheduledSlot(BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator()))
 	require.False(t, ok, "a one-off backup is no scheduled run")
+}
+
+// The Job of a cluster with the Python orchestrator runs its script with python3 of the Python image, mounted from
+// its key of the ConfigMap; that of the bash one with bash of the image of the sidecar.
+func TestJobsOfThePythonOrchestrator(t *testing.T) {
+	python := testOrchestrator()
+	python.Language = api.BackupOrchestratorPython
+	for name, tc := range map[string]struct {
+		orchestrator Orchestrator
+		image, file  string
+		command      []string
+	}{
+		"bash":   {testOrchestrator(), testImage, OrchestratorScriptFile, []string{"bash", OrchestratorMountPath + "/" + OrchestratorScriptFile}},
+		"python": {python, config.DefaultBackupPythonOrchestratorImage, OrchestratorPythonScriptFile, []string{"python3", OrchestratorMountPath + "/" + OrchestratorPythonScriptFile}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pod := BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), tc.orchestrator).Spec.Template.Spec
+			require.Equal(t, tc.image, pod.Containers[0].Image)
+			require.Equal(t, core.PullAlways, pod.Containers[0].ImagePullPolicy)
+			require.Equal(t, tc.command, pod.Containers[0].Command)
+			require.Equal(t, []core.KeyToPath{{Key: tc.file, Path: tc.file}}, pod.Volumes[0].ConfigMap.Items)
+		})
+	}
+	configMap := BuildOrchestratorConfigMap(testInstallation(), "main", api.BackupOrchestratorPython, "print()")
+	require.Equal(t, map[string]string{api.BackupOrchestratorPythonScriptKey: "print()"}, configMap.Data)
 }
