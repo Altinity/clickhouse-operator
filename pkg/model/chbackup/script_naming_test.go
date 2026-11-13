@@ -59,18 +59,23 @@ func TestJobScriptParsesTheNamingTemplate(t *testing.T) {
 		{template: "{cluster}-{chi}-{namespace}-{shard}-{DD}.{MM}.{YYYY}-{HH}{II}{SS}", name: "main-prod-db-3-13.11.2026-T020000", want: "3  20261113T020000"},
 		{template: "{cluster}-{chi}-{namespace}-{shard}-{DD}.{MM}.{YYYY}-{HH}{II}{SS}", name: "other-prod-db-3-13.11.2026-020000"},
 	} {
-		out := sourcedOutput(t, scriptNamingEnv(tc.template, map[string]string{"NAME": tc.name, "PREFIX": tc.prefix}), `
+		out := snippetOutput(t, scriptNamingEnv(tc.template, map[string]string{"NAME": tc.name, "PREFIX": tc.prefix}), `
 			naming_init
-			if naming_parse "${NAME}" "${PREFIX}"; then echo "${N_SHARD} ${N_PREFIX} ${N_KEY}"; else echo; fi`)
+			if naming_parse "${NAME}" "${PREFIX}"; then echo "${N_SHARD} ${N_PREFIX} ${N_KEY}"; else echo; fi`, `
+naming_init()
+parsed = naming_parse(env('NAME'), env('PREFIX'))
+print(' '.join(parsed) if parsed else '')`)
 		require.Equal(t, tc.want+"\n", out, "%+v", tc)
 		if tc.want == "" {
 			continue
 		}
 		// The template makes the name back, as the operator does
 		fields := strings.SplitN(tc.want, " ", 3)
-		out = sourcedOutput(t, scriptNamingEnv(tc.template, map[string]string{"SHARD": fields[0], "PREFIX": fields[1], "KEY": fields[2]}), `
+		out = snippetOutput(t, scriptNamingEnv(tc.template, map[string]string{"SHARD": fields[0], "PREFIX": fields[1], "KEY": fields[2]}), `
 			naming_init
-			naming_render "${SHARD}" "${KEY}" "${PREFIX}"; echo "${REPLY}"`)
+			naming_render "${SHARD}" "${KEY}" "${PREFIX}"; echo "${REPLY}"`, `
+naming_init()
+print(naming_render(env('SHARD'), env('KEY'), env('PREFIX'))[0])`)
 		require.Equal(t, tc.name+"\n", out, "%+v", tc)
 		name, err := api.RenderBackupName(tc.template, api.BackupNameValues{
 			Shard: atoi(t, fields[0]), Cluster: "main", Chi: "prod", Namespace: "db", Prefix: fields[1], Tag: fields[2],
@@ -80,11 +85,16 @@ func TestJobScriptParsesTheNamingTemplate(t *testing.T) {
 	}
 	for _, invalid := range []string{"shard{shard}", "{YYYYMMDDHHIISS}", "shard{shard}-{YYYYMMDDHHII}", "s{shard}-{YYYYMMDDHHIISS}{SS}",
 		"s{replica}-{shard}-{YYYYMMDDHHIISS}", "s {shard}-{YYYYMMDDHHIISS}"} {
-		code, out := sourced(t, scriptNamingEnv(invalid, nil), "naming_init")
+		code, out := snippet(t, scriptNamingEnv(invalid, nil), "naming_init", "naming_init()")
 		require.Equal(t, 1, code, "%q: %s", invalid, out)
 		require.Contains(t, out, "ERROR: BACKUP_NAMING", invalid)
 	}
 }
+
+// pySlotMatches tells in Python, as the bash snippets of the slot tests do, whether TAG is a slot of the first entry
+const pySlotMatches = `
+naming_init()
+print('yes' if slot_matches(parse_schedules(env('SCHEDULES'))[0], env('TAG')) else 'no')`
 
 // atoi parses a number of a test
 func atoi(t *testing.T, value string) int {
@@ -121,12 +131,12 @@ func TestJobScriptSlotTolerance(t *testing.T) {
 		{"period=monthly day=31 time=23:45 keep=1", "20261201000500", true, false},
 		{"period=monthly day=1 time=23:45 keep=1", "20261201000500", false, false},
 	} {
-		out := sourcedOutput(t, scriptNamingEnv(api.BackupNamingACM, map[string]string{envSchedules: tc.entry, "TAG": tc.tag}),
-			`naming_init; parse_schedules; if slot_matches 0 "${TAG}"; then echo yes; else echo no; fi`)
+		out := snippetOutput(t, scriptNamingEnv(api.BackupNamingACM, map[string]string{envSchedules: tc.entry, "TAG": tc.tag}),
+			`naming_init; parse_schedules; if slot_matches 0 "${TAG}"; then echo yes; else echo no; fi`, pySlotMatches)
 		require.Equal(t, map[bool]string{true: "yes\n", false: "no\n"}[tc.match], out, "%s at %s", tc.entry, tc.tag)
 		// Without a naming template a slot is that minute
-		out = sourcedOutput(t, map[string]string{envSchedules: tc.entry, "TAG": tc.tag},
-			`naming_init; parse_schedules; if slot_matches 0 "${TAG}"; then echo yes; else echo no; fi`)
+		out = snippetOutput(t, map[string]string{envSchedules: tc.entry, "TAG": tc.tag},
+			`naming_init; parse_schedules; if slot_matches 0 "${TAG}"; then echo yes; else echo no; fi`, pySlotMatches)
 		require.Equal(t, map[bool]string{true: "yes\n", false: "no\n"}[tc.exact], out, "%s at %s, without a naming template", tc.entry, tc.tag)
 	}
 }

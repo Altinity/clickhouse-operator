@@ -35,11 +35,13 @@ func TestJobScriptParsesConfigOverrides(t *testing.T) {
 	}
 	env := EntriesEnv(entries)
 	require.Equal(t, "period=daily time=03:00 keep=7;period=monthly time=03:00 day=1 keep=12 env=S3_STORAGE_CLASS=GLACIER_IR env=S3_ACL=private", env)
-	out := sourcedOutput(t, map[string]string{envSchedules: env}, `parse_schedules; printf '[%s]\n' "${SCHED_ENV[@]}"`)
+	out := snippetOutput(t, map[string]string{envSchedules: env}, `parse_schedules; printf '[%s]\n' "${SCHED_ENV[@]}"`,
+		"for entry in parse_schedules(env('SCHEDULES')): print('[%s]' % entry['env'])")
 	require.Equal(t, "[]\n[ --env=S3_STORAGE_CLASS=GLACIER_IR --env=S3_ACL=private]\n", out)
 	for _, invalid := range []string{"S3_PATH=elsewhere", "API_LISTEN=0.0.0.0:1", "S3_SECRET_KEY=x", "API_FOO=1", "s3_class=x",
 		"S3_STORAGE_CLASS=a$b", "REMOTE_STORAGE=gcs", "CLICKHOUSE_HOST=x", "S3_OBJECT_DISK_PATH=x"} {
-		code, out := sourced(t, map[string]string{envSchedules: "period=daily time=03:00 keep=1 env=" + invalid}, "parse_schedules")
+		code, out := snippet(t, map[string]string{envSchedules: "period=daily time=03:00 keep=1 env=" + invalid}, "parse_schedules",
+			"parse_schedules(env('SCHEDULES'))")
 		require.Equal(t, 1, code, "%q: %s", invalid, out)
 		require.Contains(t, out, "ERROR: SCHEDULES entry 0: the config override", invalid)
 		require.Error(t, api.ValidateConfigOverrides("configOverrides", []string{invalid}), invalid)

@@ -257,11 +257,7 @@ type sidecarStub struct {
 
 func newSidecarStub(t *testing.T, hosts map[string]*stubHost) *sidecarStub {
 	t.Helper()
-	for _, tool := range []string{"bash", "curl", "base64", "sort", "awk", "tr", "date"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skipf("%s is required to run the Job script: %v", tool, err)
-		}
-	}
+	requireOrchestrator(t)
 	s := &sidecarStub{t: t, hosts: hosts, ops: map[string]*stubOp{}}
 	s.server = httptest.NewServer(s)
 	t.Cleanup(s.server.Close)
@@ -892,9 +888,7 @@ func (s *sidecarStub) runScript(script string, env map[string]string) (int, stri
 	}
 	// The script runs from a file, as the Job runs it: as an argument it would exceed the length Linux allows one,
 	// MAX_ARG_STRLEN
-	path := filepath.Join(s.t.TempDir(), OrchestratorScriptFile)
-	require.NoError(s.t, os.WriteFile(path, []byte(script), 0o600))
-	cmd := exec.CommandContext(ctx, "bash", path)
+	cmd := scriptCommand(ctx, s.t, script)
 	for name, value := range vars {
 		cmd.Env = append(cmd.Env, name+"="+value)
 	}
@@ -981,6 +975,7 @@ func local(name string) stubBackup {
 }
 
 func TestJobScriptSyntax(t *testing.T) {
+	bashOnly(t)
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("bash is not available")
 	}
@@ -990,21 +985,25 @@ func TestJobScriptSyntax(t *testing.T) {
 	require.NoError(t, err, string(out))
 }
 
+// declaredScriptEnv are the variables of the environment of a Job the orchestrator scripts read
+var declaredScriptEnv = []string{
+	envOperation, envAPIPort, envAPIUsername, envAPIPassword, envPollInterval, envTerminationMessagePath,
+	envCluster, envBackupName, envBackupNamePrefix, envBackupHosts, envRetentionHosts,
+	envSchemaOnly, envTables, envPartitions, envDiffFromRemote, envNoDataMessage,
+	envSchedules, envScheduleTimezone, envCronJobName, envJobName, envRestoreInProgress, envBackupTransport,
+	envBackupPodWaitSeconds, envEventObjectAPIVersion, envEventObjectKind, envEventObjectName, envEventObjectUID,
+	envPodNamespace, envPodName,
+	envVerifyHosts, envSchemaHosts, envDataHosts, envGuardHosts, envOverwrite, envValidateTopology,
+	envRestoreRBAC, envRBACNotRestoredMessage, envUnchangedExitCode, envReplicated, envMaxTableSizeToDrop,
+	envPathClusters, envPathSelf, envPathInstallation, envPathNamespace, envPathReplicaSelection,
+	envDefaultPath, envDefaultObjectDiskPath, envSourceInstallation, envSourceNamespace, envSkipTables, envSkipTableEngines,
+	envDatabaseMapping, envBackupFallbackHosts, envHostsUsedMessage, envBackupNaming, envShardNumbers, envNamingInstallation,
+	envNamingNamespace, envKeepBackups, envPreviousSchedules, envHeldBackupsMessage, envConfigOverrides,
+}
+
 func TestJobScriptReadsDeclaredEnv(t *testing.T) {
-	for _, name := range []string{
-		envOperation, envAPIPort, envAPIUsername, envAPIPassword, envPollInterval, envTerminationMessagePath,
-		envCluster, envBackupName, envBackupNamePrefix, envBackupHosts, envRetentionHosts,
-		envSchemaOnly, envTables, envPartitions, envDiffFromRemote, envNoDataMessage,
-		envSchedules, envScheduleTimezone, envCronJobName, envJobName, envRestoreInProgress, envBackupTransport,
-		envBackupPodWaitSeconds, envEventObjectAPIVersion, envEventObjectKind, envEventObjectName, envEventObjectUID,
-		envPodNamespace, envPodName,
-		envVerifyHosts, envSchemaHosts, envDataHosts, envGuardHosts, envOverwrite, envValidateTopology,
-		envRestoreRBAC, envRBACNotRestoredMessage, envUnchangedExitCode, envReplicated, envMaxTableSizeToDrop,
-		envPathClusters, envPathSelf, envPathInstallation, envPathNamespace, envPathReplicaSelection,
-		envDefaultPath, envDefaultObjectDiskPath, envSourceInstallation, envSourceNamespace, envSkipTables, envSkipTableEngines,
-		envDatabaseMapping, envBackupFallbackHosts, envHostsUsedMessage, envBackupNaming, envShardNumbers, envNamingInstallation,
-		envNamingNamespace, envKeepBackups, envPreviousSchedules, envHeldBackupsMessage, envConfigOverrides,
-	} {
+	bashOnly(t)
+	for _, name := range declaredScriptEnv {
 		require.Regexp(t, regexp.MustCompile(`\$\{!?`+name+`\b|\b(parse_hosts|is_true|check_name|default_path "\$\{index\}") `+name+`\b`), orchestratorScript, name)
 	}
 	for _, operation := range []string{operationBackup, operationVerify, operationRestore} {
@@ -1020,6 +1019,7 @@ func TestJobScriptReadsDeclaredEnv(t *testing.T) {
 // them, the operator's builder names them by: the script knows exactly the keys PathCheckKeys lists,
 // and the replica selections of the API.
 func TestJobScriptReadsThePathCheckEnv(t *testing.T) {
+	bashOnly(t)
 	keys := regexp.MustCompile(`(?m)^PATH_CHECK_KEYS=\(([^)]*)\)$`).FindStringSubmatch(orchestratorScript)
 	require.NotNil(t, keys, "the script lists its keys in PATH_CHECK_KEYS")
 	require.Equal(t, PathCheckKeys, strings.Fields(keys[1]))
@@ -3335,6 +3335,7 @@ func TestJobScriptRejectsAnInvalidOverwriteEnv(t *testing.T) {
 // The Job runs in an Alpine image, whose regex library refuses a repetition count above 255, the least
 // RE_DUP_MAX POSIX allows: a regex with a larger one fails every match, as if every value were invalid.
 func TestJobScriptRegexesArePortable(t *testing.T) {
+	bashOnly(t)
 	for _, count := range regexp.MustCompile(`\{([0-9]*),?([0-9]*)\}`).FindAllStringSubmatch(orchestratorScript, -1) {
 		for _, bound := range count[1:] {
 			if bound == "" {
@@ -4696,6 +4697,9 @@ var orchestratorScript string
 
 func init() {
 	script, err := ReadOrchestratorScript(orchestratorScriptDir())
+	if testedOrchestrator == orchestratorPython {
+		script, err = readScript(filepath.Join(pythonOrchestratorScriptDir(), OrchestratorPythonScriptFile))
+	}
 	if err != nil {
 		panic(err)
 	}
@@ -4703,6 +4707,7 @@ func init() {
 }
 
 func TestReadOrchestratorScript(t *testing.T) {
+	bashOnly(t)
 	script, err := ReadOrchestratorScript(orchestratorScriptDir())
 	require.NoError(t, err)
 	require.True(t, strings.HasPrefix(script, "# backup-orchestrator.sh "))
@@ -4716,12 +4721,13 @@ func TestReadOrchestratorScript(t *testing.T) {
 
 // The Job runs the script as a file: its main runs then, as under bash -c.
 func TestJobScriptRunsAsAFile(t *testing.T) {
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Skip("bash is not available")
-	}
+	requireOrchestrator(t)
 	path := filepath.Join(orchestratorScriptDir(), OrchestratorScriptFile)
 	termination := filepath.Join(t.TempDir(), "termination-log")
 	cmd := exec.Command("bash", path)
+	if testedOrchestrator == orchestratorPython {
+		cmd = exec.Command("python3", filepath.Join(pythonOrchestratorScriptDir(), OrchestratorPythonScriptFile))
+	}
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), envOperation + "=drop", envAPIPort + "=7171", envAPIUsername + "=u",
 		envAPIPassword + "=p", envTerminationMessagePath + "=" + termination, envUnchangedExitCode + "=3"}
 	out, err := cmd.CombinedOutput()
@@ -4737,6 +4743,7 @@ func TestJobScriptRunsAsAFile(t *testing.T) {
 // the given environment on top of PATH, and returns its exit code and output.
 func sourced(t *testing.T, env map[string]string, snippet string) (int, string) {
 	t.Helper()
+	bashOnly(t)
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("bash is not available")
 	}
@@ -4766,7 +4773,7 @@ func sourcedOutput(t *testing.T, env map[string]string, snippet string) string {
 
 // Sourced, the script runs nothing: no request, no output, no exit.
 func TestJobScriptSourcedRunsNothing(t *testing.T) {
-	require.Equal(t, "sourced\n", sourcedOutput(t, map[string]string{envOperation: "drop"}, "echo sourced"))
+	require.Equal(t, "sourced\n", snippetOutput(t, map[string]string{envOperation: "drop"}, "echo sourced", "print('sourced')"))
 }
 
 // The slot rules of the script are those of the scheduler: an hour entry matches the minute of its time, a 6hours
@@ -4805,8 +4812,8 @@ func TestJobScriptSlotMatches(t *testing.T) {
 		{"period=monthly day=15 time=00:00 keep=1", "20260215000000", true},
 		{"period=monthly day=15 time=00:00 keep=1", "20260228000000", false},
 	} {
-		out := sourcedOutput(t, map[string]string{envSchedules: tc.entry, "TAG": tc.tag},
-			`parse_schedules; if slot_matches 0 "${TAG}"; then echo yes; else echo no; fi`)
+		out := snippetOutput(t, map[string]string{envSchedules: tc.entry, "TAG": tc.tag},
+			`parse_schedules; if slot_matches 0 "${TAG}"; then echo yes; else echo no; fi`, pySlotMatches)
 		require.Equal(t, map[bool]string{true: "yes\n", false: "no\n"}[tc.match], out, "%s at %s", tc.entry, tc.tag)
 	}
 }
@@ -4849,12 +4856,16 @@ func TestJobScriptMatchesTheEntriesAsTheOperator(t *testing.T) {
 			}
 			want = append(want, winner)
 		}
-		out := sourcedOutput(t, map[string]string{envSchedules: env, "TAGS": strings.Join(tags, " ")}, `
+		out := snippetOutput(t, map[string]string{envSchedules: env, "TAGS": strings.Join(tags, " ")}, `
 			parse_schedules
 			for tag in ${TAGS}; do
 				winner_entry "${tag}"
 				printf '%s\n' "${WINNER:+${SCHED_PERIOD[WINNER]}}"
-			done`)
+			done`, `
+S.sched = parse_schedules(env('SCHEDULES'))
+for tag in env('TAGS').split():
+    winner_entry(tag)
+    print(S.sched[S.winner]['period'] if S.winner is not None else '')`)
 		require.Equal(t, want, strings.Split(strings.TrimSuffix(out, "\n"), "\n"), "schedule %d: %s", i, env)
 	}
 }
@@ -4867,19 +4878,24 @@ func TestJobScriptPicksTheHeaviestEntry(t *testing.T) {
 		"20261112071700": "minute 0", "20261112073000": "hour 0 1", "20261112003000": "6hours 0 1 2",
 		"20261112063000": "daily 0 1 2 3", "20261122063000": "weekly 0 1 2 3 4", "20261215063000": "monthly 0 1 2 3 5",
 	} {
-		out := sourcedOutput(t, map[string]string{envSchedules: schedules, "TAG": tag},
-			`parse_schedules; winner_entry "${TAG}"; echo "${SCHED_PERIOD[WINNER]} ${MATCHED[*]}"`)
+		out := snippetOutput(t, map[string]string{envSchedules: schedules, "TAG": tag},
+			`parse_schedules; winner_entry "${TAG}"; echo "${SCHED_PERIOD[WINNER]} ${MATCHED[*]}"`, `
+S.sched = parse_schedules(env('SCHEDULES'))
+winner_entry(env('TAG'))
+print(S.sched[S.winner]['period'], *S.matched)`)
 		require.Equal(t, want+"\n", out, tag)
 	}
 }
 
 func TestJobScriptParsesSchedules(t *testing.T) {
-	out := sourcedOutput(t, map[string]string{
+	out := snippetOutput(t, map[string]string{
 		envSchedules: " period=daily time=05:00 keep=7;period=weekly day=0 time=05:07 keep=4; ;period=hour keep=24 incremental=true;period=6hours time=13:15 keep=2;period=monthly day=31 time=05:00 keep=12 incremental=false;period=minute time=07:07 keep=5",
 	}, `parse_schedules
 		for i in "${!SCHED_PERIOD[@]}"; do
 			echo "${SCHED_PERIOD[i]} ${SCHED_HOUR[i]} ${SCHED_MINUTE[i]} ${SCHED_DAY[i]:--} ${SCHED_KEEP[i]} ${SCHED_INCREMENTAL[i]}"
-		done`)
+		done`, `
+for e in parse_schedules(env('SCHEDULES')):
+    print(e['period'], e['hour'], e['minute'], '-' if e['day'] is None else e['day'], e['keep'], str(e['incremental']).lower())`)
 	require.Equal(t, "daily 5 0 - 7 false\nweekly 5 7 0 4 false\nhour 0 0 - 24 true\n6hours 13 15 - 2 false\nmonthly 5 0 31 12 false\nminute 0 0 - 5 false\n", out)
 	for _, invalid := range []string{
 		"period=yearly keep=1",
@@ -4901,7 +4917,7 @@ func TestJobScriptParsesSchedules(t *testing.T) {
 		"period=daily time=01:00 keep=1;period=daily time=01:00 keep=2",
 		"period=daily time=01:00 keep=1\nperiod=hour keep=1",
 	} {
-		code, out := sourced(t, map[string]string{envSchedules: invalid}, "parse_schedules")
+		code, out := snippet(t, map[string]string{envSchedules: invalid}, "parse_schedules", "parse_schedules(env('SCHEDULES'))")
 		require.Equal(t, 1, code, "%q: %s", invalid, out)
 		require.Contains(t, out, "ERROR: SCHEDULES", invalid)
 	}
@@ -4926,8 +4942,8 @@ func TestJobScriptReadsTheSlotTime(t *testing.T) {
 		{"nightly", "", "", ""},
 		{"", "nightly-28333334", "", ""},
 	} {
-		out := sourcedOutput(t, map[string]string{envCronJobName: tc.cronJob, envJobName: tc.job, envScheduleTimezone: tc.zone},
-			`check_timezone; schedule_slot; echo "${SLOT_TAG}"`)
+		out := snippetOutput(t, map[string]string{envCronJobName: tc.cronJob, envJobName: tc.job, envScheduleTimezone: tc.zone},
+			`check_timezone; schedule_slot; echo "${SLOT_TAG}"`, "check_timezone(env('SCHEDULE_TIMEZONE')); schedule_slot(); print(S.slot_tag)")
 		if tc.want == "" {
 			require.Regexp(t, `^[0-9]{12}00\n$`, out, "%+v", tc)
 			require.NotEqual(t, "20231114221400\n", out)
@@ -4936,7 +4952,7 @@ func TestJobScriptReadsTheSlotTime(t *testing.T) {
 		require.Equal(t, tc.want+"\n", out, "%+v", tc)
 	}
 	for _, zone := range []string{"Mars/Olympus", "../etc/passwd", "Europe/../UTC", "a b"} {
-		code, out := sourced(t, map[string]string{envScheduleTimezone: zone}, "check_timezone")
+		code, out := snippet(t, map[string]string{envScheduleTimezone: zone}, "check_timezone", "check_timezone(env('SCHEDULE_TIMEZONE'))")
 		require.Equal(t, 1, code, "%q: %s", zone, out)
 		require.Contains(t, out, "ERROR: SCHEDULE_TIMEZONE is not a time zone of the tzdata of the image")
 	}
@@ -4948,7 +4964,8 @@ func TestJobScriptTellsValidTags(t *testing.T) {
 		"20260100000000": false, "20260101240000": false, "20260101006000": false, "2026010100000": false,
 		"202601010000000": false, "2026010100000x": false, "": false,
 	} {
-		out := sourcedOutput(t, map[string]string{"TAG": tag}, `if tag_valid "${TAG}"; then echo yes; else echo no; fi`)
+		out := snippetOutput(t, map[string]string{"TAG": tag}, `if tag_valid "${TAG}"; then echo yes; else echo no; fi`,
+			"print('yes' if tag_valid(env('TAG')) else 'no')")
 		require.Equal(t, map[bool]string{true: "yes\n", false: "no\n"}[valid], out, tag)
 	}
 }
@@ -5073,7 +5090,7 @@ func TestJobScriptRetentionPlan(t *testing.T) {
 		"no backups": {schedules: "period=daily time=00:00 keep=1"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			out := sourcedOutput(t, map[string]string{
+			out := snippetOutput(t, map[string]string{
 				envSchedules: tc.schedules, envBackupNamePrefix: "d", envBackupName: tc.made,
 				"ALL": strings.Join(tc.names, " "), "INCOMPLETE": strings.Join(tc.incomplete, " "), "EMPTIES": strings.Join(tc.empty, " "),
 				"SIZELESS": strings.Join(tc.sizeless, " "), "BROKENS": strings.Join(tc.broken, " "),
@@ -5088,7 +5105,10 @@ func TestJobScriptRetentionPlan(t *testing.T) {
 				for name in ${BROKENS}; do BROKEN[${name}]=1; done
 				retention_plan
 				echo "keep: $(for name in "${!KEEP[@]}"; do echo "${name}"; done | sort | tr '\n' ' ')"
-				echo "obsolete: ${OBSOLETE[*]}"`)
+				echo "obsolete: ${OBSOLETE[*]}"`, pyRetention+`
+obsolete, _, keep = plan()
+print('keep: ' + ''.join(name + ' ' for name in sorted(keep)))
+print('obsolete: ' + ' '.join(obsolete))`)
 			keep := slices.Clone(tc.keep)
 			if tc.made != "" && !slices.Contains(keep, tc.made) && !slices.Contains(tc.incomplete, tc.made) {
 				keep = append(keep, tc.made)
@@ -5131,7 +5151,7 @@ func TestJobScriptRetentionSimulation(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC).Unix()
-			out := sourcedOutput(t, map[string]string{
+			out := snippetOutput(t, map[string]string{
 				envSchedules: tc.schedules, envBackupNamePrefix: "d", "DAYS": strconv.Itoa(tc.days), "START": strconv.FormatInt(start, 10),
 			}, `
 				parse_schedules
@@ -5148,7 +5168,18 @@ func TestJobScriptRetentionSimulation(t *testing.T) {
 					# A backup made at once, at noon, after the scheduled one
 					if ((day % 10 == 5)); then HELD[d-${date}T120000]=1; fi
 				done
-				printf '%s\n' "${!HELD[@]}" | sed 's/^d-//' | sort`)
+				printf '%s\n' "${!HELD[@]}" | sed 's/^d-//' | sort`, `
+S.sched = parse_schedules(env('SCHEDULES'))
+held = set()
+for day in range(int(env('DAYS'))):
+    date = datetime.fromtimestamp(int(env('START')) + day * 86400, timezone.utc).strftime('%Y%m%d')
+    S.env['BACKUP_NAME'] = 'd-' + date + '000000'
+    held.add(S.env['BACKUP_NAME'])
+    obsolete, _, _ = retention_plan(sorted(held), {'complete': set(held), 'empty': set(), 'sized': set(), 'broken': set()})
+    held -= set(obsolete)
+    if day % 10 == 5:
+        held.add('d-' + date + 'T120000')
+print('\n'.join(sorted(name[2:] for name in held)))`)
 			require.Equal(t, strings.Join(tc.left, "\n")+"\n", out)
 		})
 	}
@@ -5188,14 +5219,18 @@ func TestJobScriptIncrementalBase(t *testing.T) {
 			";h1 " + d1 + "=;h1 " + r1 + "=" + d1 + ";h1 " + d2 + "=" + r1, keep: "2", base: "", chain: "2"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			out := sourcedOutput(t, map[string]string{"SERIES": tc.series, "KEEP": tc.keep, envBackupNamePrefix: "d"}, `
+			out := snippetOutput(t, map[string]string{"SERIES": tc.series, "KEEP": tc.keep, envBackupNamePrefix: "d"}, `
 				declare -A SERIES_REQUIRED=()
 				IFS=';' read -r -a entries <<<"${SERIES}"
 				for entry in "${entries[@]}"; do
 					SERIES_REQUIRED["${entry%%=*}"]=${entry#*=}
 				done
 				incremental_base "${KEEP}" h0 h1
-				echo "${REPLY} ${CHAIN}"`)
+				echo "${REPLY} ${CHAIN}"`, `
+for entry in filter(None, env('SERIES').split(';')):
+    key, required = entry.split('=', 1)
+    S.series_required[tuple(key.split(' ', 1))] = required
+print(*incremental_base(int(env('KEEP')), ['h0', 'h1']))`)
 			require.Equal(t, tc.base+" "+tc.chain+"\n", out)
 		})
 	}
@@ -5217,9 +5252,11 @@ func TestJobScriptRetriesWhatNeverConnected(t *testing.T) {
 		{"GET", "0", "1", "502", true},
 		{"GET", "0", "1", "500", false},
 	} {
-		out := sourcedOutput(t, map[string]string{"METHOD": tc.method, "EXIT": tc.exit, "CONNECTED": tc.connected, "CODE": tc.code}, `
+		out := snippetOutput(t, map[string]string{"METHOD": tc.method, "EXIT": tc.exit, "CONNECTED": tc.connected, "CODE": tc.code}, `
 			CURL_EXIT=${EXIT} CURL_CONNECTED=${CONNECTED} HTTP_CODE=${CODE}
-			if unreachable "${METHOD}"; then echo retry; else echo no; fi`)
+			if unreachable "${METHOD}"; then echo retry; else echo no; fi`, `
+S.curl_exit, S.curl_connected, S.http_code = int(env('EXIT')), bool(env('CONNECTED')), env('CODE')
+print('retry' if unreachable(env('METHOD')) else 'no')`)
 		require.Equal(t, map[bool]string{true: "retry\n", false: "no\n"}[tc.retry], out, "%+v", tc)
 	}
 }
@@ -5250,8 +5287,9 @@ func eventTestEnv() map[string]string {
 
 func TestJobScriptBuildsEvents(t *testing.T) {
 	message := "h0: create_remote \"bk-1\" failed:\n\tdisk full " + strings.Repeat("x", 2000)
-	out := sourcedOutput(t, withEnv(eventTestEnv(), map[string]string{"MESSAGE": message}),
-		`event_body Warning OrchestratorHostFailed "${MESSAGE}" 2026-01-02T03:04:05Z; printf '%s' "${REPLY}"`)
+	out := snippetOutput(t, withEnv(eventTestEnv(), map[string]string{"MESSAGE": message}),
+		`event_body Warning OrchestratorHostFailed "${MESSAGE}" 2026-01-02T03:04:05Z; printf '%s' "${REPLY}"`,
+		`print(event_body('Warning', 'OrchestratorHostFailed', env('MESSAGE'), '2026-01-02T03:04:05Z'), end='')`)
 	var event map[string]any
 	require.NoError(t, json.Unmarshal([]byte(out), &event), out)
 	require.Equal(t, map[string]any{
@@ -5279,6 +5317,9 @@ func scriptWith(t *testing.T, script, name, value string) string {
 	t.Helper()
 	setting := regexp.MustCompile(`(?m)^` + name + `=.*$`)
 	require.Len(t, setting.FindAllString(script, -1), 1, name)
+	if testedOrchestrator == orchestratorPython {
+		value = strconv.Quote(value)
+	}
 	return setting.ReplaceAllLiteralString(script, name+"="+value)
 }
 
@@ -5433,13 +5474,17 @@ func TestJobScriptPostsTheCommandsItRuns(t *testing.T) {
 
 	// A command of the actions endpoint shows with its body
 	s = newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("bk-1", "")}}})
-	out = sourcedOutput(t, map[string]string{"http_proxy": s.server.URL, envAPIPort: scriptTestAPIPort,
+	out = snippetOutput(t, map[string]string{"http_proxy": s.server.URL, envAPIPort: scriptTestAPIPort,
 		envAPIUsername: scriptTestUser, envAPIPassword: scriptTestPassword, envPollInterval: "0.01"}, `
 		event() { printf 'EVENT %s %s\n' "$2" "$3"; }
 		log() { :; }
 		API_PORT=${API_PORT} POLL_INTERVAL=${POLL_INTERVAL}
 		AUTH=$(printf '%s:%s' "${API_USERNAME}" "${API_PASSWORD}" | base64 | tr -d '\n')
-		submit h0 download /backup/actions --data-binary '{"command":"download --schema bk-1"}'`)
+		submit h0 download /backup/actions --data-binary '{"command":"download --schema bk-1"}'`, `
+def event(type_, reason, message): print('EVENT', reason, message)
+def log(message, stream=None): pass
+S.auth = base64.b64encode((env('API_USERNAME') + ':' + env('API_PASSWORD')).encode()).decode()
+submit('h0', 'download', '/backup/actions', body='{"command":"download --schema bk-1"}')`)
 	require.Equal(t, `EVENT OrchestratorCommand h0: download: POST h0:7171/backup/actions {"command":"download --schema bk-1"}`+"\n", out)
 }
 
@@ -5460,12 +5505,13 @@ func TestJobScriptCutsEventMessages(t *testing.T) {
 		{"a😀", 5, "a😀"},
 		{"üü", 3, "ü"},
 	} {
-		out := sourcedOutput(t, map[string]string{"VALUE": tc.value, "MAX": strconv.Itoa(tc.max), "LANG": "C.UTF-8"},
-			`truncate_bytes "${VALUE}" "${MAX}"; printf '%s' "${REPLY}"`)
+		out := snippetOutput(t, map[string]string{"VALUE": tc.value, "MAX": strconv.Itoa(tc.max), "LANG": "C.UTF-8"},
+			`truncate_bytes "${VALUE}" "${MAX}"; printf '%s' "${REPLY}"`, "print(truncate_bytes(env('VALUE'), int(env('MAX'))), end='')")
 		require.Equal(t, tc.want, out, "%q %d", tc.value, tc.max)
 	}
-	out := sourcedOutput(t, withEnv(eventTestEnv(), map[string]string{"MESSAGE": strings.Repeat("ü", 600), "LANG": "C.UTF-8"}),
-		`event_body Normal OrchestratorCommand "${MESSAGE}" 2026-01-02T03:04:05Z; printf '%s' "${REPLY}"`)
+	out := snippetOutput(t, withEnv(eventTestEnv(), map[string]string{"MESSAGE": strings.Repeat("ü", 600), "LANG": "C.UTF-8"}),
+		`event_body Normal OrchestratorCommand "${MESSAGE}" 2026-01-02T03:04:05Z; printf '%s' "${REPLY}"`,
+		`print(event_body('Normal', 'OrchestratorCommand', env('MESSAGE'), '2026-01-02T03:04:05Z'), end='')`)
 	var event map[string]any
 	require.NoError(t, json.Unmarshal([]byte(out), &event), out)
 	require.Equal(t, strings.Repeat("ü", 512), event["message"])

@@ -43,7 +43,7 @@ func dailyBackups(days int, hhmmss string) []string {
 // deletes and what it holds, newest first
 func retentionPlanOf(t *testing.T, env map[string]string, names []string) (obsolete, held []string) {
 	t.Helper()
-	out := sourcedOutput(t, withEnv(map[string]string{envBackupNamePrefix: "d", "ALL": strings.Join(names, " ")}, env), `
+	out := snippetOutput(t, withEnv(map[string]string{envBackupNamePrefix: "d", "ALL": strings.Join(names, " ")}, env), `
 		naming_init
 		parse_schedules
 		read -r -a NAMES <<<"${ALL}"
@@ -51,10 +51,26 @@ func retentionPlanOf(t *testing.T, env map[string]string, names []string) (obsol
 		for name in "${NAMES[@]}"; do COMPLETE[${name}]=1; SIZED[${name}]=1; done
 		retention_plan
 		echo "${OBSOLETE[*]}"
-		printf '%s\n' "${HELD_OBSOLETE[@]}" | sort -r | tr '\n' ' '; echo`)
+		printf '%s\n' "${HELD_OBSOLETE[@]}" | sort -r | tr '\n' ' '; echo`, pyRetention+`
+obsolete, held, _ = plan()
+print(' '.join(obsolete))
+print(' '.join(sorted(held, reverse=True)) + (' ' if held else ''))`)
 	lines := strings.Split(out, "\n")
 	return strings.Fields(lines[0]), strings.Fields(lines[1])
 }
+
+// pyRetention prepares the Python orchestrator as the bash snippets of the retention tests do: the naming template and
+// the schedule of the environment, and plan, retention_plan over ALL, complete and of a size, but those INCOMPLETE,
+// EMPTIES, SIZELESS and BROKENS name
+const pyRetention = `
+naming_init()
+S.sched = parse_schedules(env('SCHEDULES'))
+def plan():
+    names = env('ALL').split()
+    sets = {'complete': set(names) - set(env('INCOMPLETE').split()), 'empty': set(env('EMPTIES').split()),
+            'sized': set(names) - set(env('SIZELESS').split()), 'broken': set(env('BROKENS').split())}
+    return retention_plan(names, sets)
+`
 
 // changeAt returns the PREVIOUS_SCHEDULES record of a change at the time, RFC 3339, from entries in zone
 func changeAt(at, zone, entries string) string {
@@ -161,7 +177,7 @@ func TestJobScriptRetentionHoldsEveryChange(t *testing.T) {
 // Manager keeps it.
 func TestJobScriptRetentionOfBackupsTheAltinityCloudManagerMade(t *testing.T) {
 	keys := []string{"20261108020412", "20261109021733", "20261110020059", "20261111020502", "20261111143000", "20261112020911"}
-	out := sourcedOutput(t, scriptNamingEnv(api.BackupNamingACM, map[string]string{
+	out := snippetOutput(t, scriptNamingEnv(api.BackupNamingACM, map[string]string{
 		envSchedules: "period=daily time=02:00 keep=3", envBackupNamePrefix: "nightly", "ALL": strings.Join(keys, " "),
 		envKeepBackups: "shard2-20261111143000",
 	}), `
@@ -171,7 +187,8 @@ func TestJobScriptRetentionOfBackupsTheAltinityCloudManagerMade(t *testing.T) {
 		declare -A COMPLETE=() SIZED=()
 		for name in "${NAMES[@]}"; do COMPLETE[${name}]=1; SIZED[${name}]=1; done
 		retention_plan
-		echo "${OBSOLETE[*]}"`)
+		echo "${OBSOLETE[*]}"`, pyRetention+`
+print(' '.join(plan()[0]))`)
 	require.Equal(t, "20261109021733 20261108020412\n", out)
 }
 

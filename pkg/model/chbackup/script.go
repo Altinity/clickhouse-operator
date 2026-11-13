@@ -292,6 +292,13 @@ const (
 // leaves its functions to the caller.
 const OrchestratorScriptFile = "backup-orchestrator.sh"
 
+// OrchestratorPythonScriptFile is the file name of the Python orchestrator script, backup-orchestrator.py, the twin of
+// OrchestratorScriptFile, which a backup Job of a cluster whose backup.orchestrator is python runs as "python3 <file>".
+// It is an operator configuration file in the folder backup.pythonPath of the operator configuration (config/backup-python
+// in the repository, generated from deploy/builder/templates-config/backup-python), shipped in the ConfigMap
+// etc-clickhouse-operator-backup-python-files.
+const OrchestratorPythonScriptFile = "backup-orchestrator.py"
+
 // ReadOrchestratorScript returns the orchestrator script, the OrchestratorScriptFile of dir.
 func ReadOrchestratorScript(dir string) (string, error) {
 	path := filepath.Join(dir, OrchestratorScriptFile)
