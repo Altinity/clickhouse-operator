@@ -100,7 +100,7 @@ SOURCE_COPIES=()
 NO_LOCAL_COPY=()
 ON_CLUSTER=
 
-log() { printf '%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"; }
+log() { TZ=UTC0 printf '%(%Y-%m-%dT%H:%M:%SZ)T %s\n' -1 "$*"; }
 warn() {
 	LAST_WARNING=$*
 	log "WARNING: $*" >&2
@@ -224,7 +224,7 @@ event_body() {
 
 # event TYPE REASON MESSAGE posts a Kubernetes Event on the object EVENT_OBJECT_* names
 event() {
-	local type=$1 reason=$2 message=$3 host=${KUBERNETES_SERVICE_HOST:-} at code token
+	local type=$1 reason=$2 message=$3 host=${KUBERNETES_SERVICE_HOST:-} at code token=
 	if [[ -n ${EVENTS_DISABLED} || -z ${EVENT_OBJECT_KIND:-} || -z ${EVENT_OBJECT_NAME:-} || -z ${EVENT_OBJECT_UID:-} ||
 		-z ${EVENT_OBJECT_API_VERSION:-} || -z ${POD_NAMESPACE:-} || -z ${host} || ! -r ${SERVICE_ACCOUNT_DIR}/token ]]; then
 		return 0
@@ -234,7 +234,7 @@ event() {
 	fi
 	TZ=UTC0 printf -v at '%(%Y-%m-%dT%H:%M:%SZ)T' -1
 	event_body "${type}" "${reason}" "${message}" "${at}"
-	token=$(<"${SERVICE_ACCOUNT_DIR}/token") || token=
+	IFS= read -r token <"${SERVICE_ACCOUNT_DIR}/token" || :
 	code=$(printf 'Authorization: Bearer %s\n' "${token}" |
 		curl -sS -o /dev/null -w '%{http_code}' --noproxy '*' --cacert "${SERVICE_ACCOUNT_DIR}/ca.crt" \
 			--connect-timeout "${EVENT_TIMEOUT}" --max-time "${EVENT_TIMEOUT}" -X POST -H @- \
@@ -2028,15 +2028,17 @@ record_series() {
 incremental_base() {
 	local keep=$1 host key name newest= newest_time= count n
 	local -a names
-	local -A hosts=() held=()
+	local -A hosts=() held=() rows=()
 	shift
 	for host in "$@"; do
 		hosts[${host}]=1
 	done
 	for key in "${!SERIES_REQUIRED[@]}"; do
-		if [[ -n ${hosts[${key%% *}]:-} ]]; then
-			name=${key#* }
+		host=${key%% *} name=${key#* }
+		if [[ -n ${hosts[${host}]:-} ]]; then
 			held[${name}]=$((${held[${name}]:-0} + 1))
+			key_time "${name}"
+			rows[${host}]+="${REPLY} ${name}"$'\n'
 		fi
 	done
 	for name in "${!held[@]}"; do
@@ -2053,19 +2055,9 @@ incremental_base() {
 		return 0
 	fi
 	for host in "${!hosts[@]}"; do
-		names=()
-		for key in "${!SERIES_REQUIRED[@]}"; do
-			if [[ ${key%% *} == "${host}" ]]; then
-				key_time "${key#* }"
-				names+=("${REPLY} ${key#* }")
-			fi
-		done
-		mapfile -t names < <(printf '%s\n' ${names[@]+"${names[@]}"} | sort -r)
+		mapfile -t names < <(printf '%s' "${rows[${host}]:-}" | sort -r)
 		count=0
-		for name in "${names[@]}"; do
-			if [[ -z ${name} ]]; then
-				continue
-			fi
+		for name in ${names[@]+"${names[@]}"}; do
 			if [[ ${name%% *} > ${newest_time} ]]; then
 				continue
 			fi
