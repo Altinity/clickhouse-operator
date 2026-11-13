@@ -3359,7 +3359,14 @@ func TestJobScriptRefusesRestoreValuesThatAreNoToken(t *testing.T) {
 // Altinity Cloud Manager restores partitions, without the check of the replicas before the parts are attached. A
 // database mapping restores the schema and the data into other databases.
 func TestJobScriptRestoresWithTheFiltersOfTheAltinityCloudManager(t *testing.T) {
-	s := newSidecarStub(t, restoreHosts())
+	hosts := restoreHosts()
+	// A restore of partitions attaches them into the tables as they are, which the guard of a restore with the schema
+	// would refuse
+	for _, host := range hosts {
+		host.tables = []string{"db2.t1"}
+		host.backupTables = []string{"db1.t1"}
+	}
+	s := newSidecarStub(t, hosts)
 	code, out := s.run(restoreEnv(map[string]string{
 		envTables: "db1.*", envPartitions: "202601,202602", envSkipTables: "db1.tmp*", envSkipTableEngines: "Kafka,RabbitMQ",
 		envDatabaseMapping: "db1:db2",
@@ -3370,12 +3377,38 @@ func TestJobScriptRestoresWithTheFiltersOfTheAltinityCloudManager(t *testing.T) 
 	require.Equal(t, []string{
 		"s0 download --hardlink-exists-files --tables=db1.* --partitions=202601,202602" + env,
 		"d1 download --hardlink-exists-files --tables=db1.* --partitions=202601,202602" + env,
-		"s0 restore --schema --rm --tables=db1.* --restore-database-mapping=db1:db2" + env,
 		"s0 restore --data --tables=db1.* --partitions=202601,202602 --restore-database-mapping=db1:db2" + env,
 		"d1 restore --data --tables=db1.* --partitions=202601,202602 --restore-database-mapping=db1:db2" + env,
 	}, s.restoreSteps())
 	for _, host := range []string{"s0", "d1"} {
 		require.Empty(t, s.hosts[host].local, "the downloaded copies are dropped")
+	}
+	require.Contains(t, out, "restore bk-1: restores the partitions 202601,202602 into the tables as they are, without the schema")
+
+	// Without the schema step, a restore of partitions leaves the replicas that restore no data alone, and has no
+	// overwrite: nothing runs ON CLUSTER
+	replicas := withReplicatedTable(replicaRestoreHosts())
+	s = newSidecarStub(t, replicas)
+	code, out = s.run(replicaRestoreEnv(map[string]string{envPartitions: "202601", envOverwrite: "true"}))
+	require.Zero(t, code, out)
+	partitionEnv := " --env=CLICKHOUSE_CHECK_REPLICAS_BEFORE_ATTACH=0 bk-1"
+	require.Equal(t, []string{
+		"a0 download --hardlink-exists-files --partitions=202601" + partitionEnv,
+		"b0 download --hardlink-exists-files --partitions=202601" + partitionEnv,
+		"a0 restore --data --partitions=202601" + partitionEnv,
+		"b0 restore --data --partitions=202601" + partitionEnv,
+	}, s.restoreSteps())
+	for _, call := range s.calls {
+		require.NotContains(t, []string{"a1", "b1"}, call.host, "%s %s", call.method, call.path)
+	}
+
+	// Partitions take data, and no schema to restore the access entities with
+	for env, refused := range map[string]string{envSchemaOnly: "PARTITIONS restore data, which SCHEMA_ONLY leaves out",
+		envRestoreRBAC: "PARTITIONS restore no schema, which RESTORE_RBAC restores the access entities with"} {
+		s = newSidecarStub(t, restoreHosts())
+		code, out = s.run(restoreEnv(map[string]string{envPartitions: "202601", env: "true", envUnchangedExitCode: "3"}))
+		require.Equal(t, 3, code, out)
+		require.Contains(t, out, "ERROR: "+refused)
 	}
 
 	// A database mapping alone takes no setting: typed requests

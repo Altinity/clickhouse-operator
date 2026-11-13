@@ -1116,7 +1116,7 @@ spec:
 | `sourceNamespace`        | the restored CHI's | Namespace of the CHI that made the backup, when another and the paths hold `{namespace}`. Immutable.                                      |
 | `schemaOnly`             | `false`            | Restore table and database definitions only, no data.                                                                                     |
 | `tables`                 | all                | Restore only the matching tables: a `clickhouse-backup` pattern as for a backup, e.g. `db.table`, `db.*`, comma-separated.                |
-| `partitions`             | all                | Restore the data of only these partition ids (`--partitions`), e.g. `["202601", "202602"]`; the schema is restored as without it. See [Restore filters](#restore-filters). |
+| `partitions`             | all                | Restore the data of only these partition ids (`--partitions`), e.g. `["202601", "202602"]`, into the existing tables, replacing those partitions; the schema is not restored. Not with `schemaOnly` or `rbac`. See [Restore filters](#restore-filters). |
 | `skipTables`             | none               | Leave out the matching tables: a `clickhouse-backup` pattern, as `tables` (`CLICKHOUSE_SKIP_TABLES`).                                    |
 | `skipTableEngines`       | none               | Leave out the tables of these engines, e.g. `["Kafka", "RabbitMQ"]` (`CLICKHOUSE_SKIP_TABLE_ENGINES`).                                    |
 | `databaseMapping`        | none               | Restore the tables of a database of the backup into another one: `{source: target}` (`--restore-database-mapping`).                      |
@@ -1243,11 +1243,15 @@ spec:
     analytics: analytics_restored
 ```
 
-* `partitions` narrows the download and the data restore to those partition ids (`--partitions`),
-  and the data restore attaches their parts without checking the replicas first
-  (`CLICKHOUSE_CHECK_REPLICAS_BEFORE_ATTACH=0`), as ACM does. The schema step runs as without it: with
-  `overwrite: true` it drops and recreates the restored tables, which then hold those partitions
-  alone. An id is letters, digits, `_` and `-`, the form `system.parts` shows as `partition_id`.
+* `partitions` restores those partition ids into the tables as they are, as ACM restores partitions:
+  the download and the data restore are narrowed to them (`--partitions`), and the schema step is
+  left out entirely, so nothing is dropped or recreated and the [overwrite guard](#restore-safety)
+  and `overwrite` do not apply. The tables must exist. On the first replica of each shard
+  `clickhouse-backup` drops each of those partitions where a table holds it, which replication
+  carries to the other replicas, and attaches the parts of the backup without checking the replicas
+  first (`CLICKHOUSE_CHECK_REPLICAS_BEFORE_ATTACH=0`). The other replicas download nothing. As the
+  access entities come with the schema, `partitions` takes neither `schemaOnly` nor `rbac`. An id
+  is letters, digits, `_` and `-`, the form `system.parts` shows as `partition_id`.
 * `skipTables` and `skipTableEngines` leave tables out of every step, through `CLICKHOUSE_SKIP_TABLES`
   - on top of the system databases `clickhouse-backup` leaves out anyway - and
   `CLICKHOUSE_SKIP_TABLE_ENGINES`. The overwrite guard still counts the tables they leave out.
@@ -1674,7 +1678,8 @@ anything:
    replica must be reachable. Set `overwrite: true` to drop and recreate the restored tables, see
    [ClickHouseRestore](#clickhouserestore). This guard is the only protection for existing data:
    `clickhouse-backup` recreates every restored table during the schema restore, whether or not
-   `overwrite` is set.
+   `overwrite` is set. A restore of `partitions` has no schema restore, and no guard: it replaces
+   those partitions in the existing tables, see [Restore filters](#restore-filters).
 4. **What an overwrite needs** (`overwrite: true`): no table above `max_table_size_to_drop` that a
    drop could not get past, and, where the restore drops the tables `ON CLUSTER`, the same tables in
    the backup of every shard, see [ClickHouseRestore](#clickhouserestore).

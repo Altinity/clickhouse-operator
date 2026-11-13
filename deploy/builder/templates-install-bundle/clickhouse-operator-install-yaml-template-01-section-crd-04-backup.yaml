@@ -905,7 +905,7 @@ spec:
                   pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
                 partitions:
                   type: array
-                  description: "Optional partition ids the data restored is restricted to (clickhouse-backup --partitions), downloaded and attached; the schema is restored as without it"
+                  description: "Optional partition ids the restore is restricted to (clickhouse-backup --partitions): their data is downloaded and attached into the existing tables, replacing those partitions, and the schema is not restored, as the Altinity Cloud Manager restores partitions. Not with schemaOnly or rbac"
                   nullable: true
                   items:
                     type: string

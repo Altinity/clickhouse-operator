@@ -69,8 +69,10 @@ type ClickHouseRestoreSpec struct {
 	// Tables optionally restricts the restore to tables matching this clickhouse-backup pattern
 	// (e.g. "db.table", "db.*"), in the schema and the data alike. Empty restores everything.
 	Tables string `json:"tables,omitempty" yaml:"tables,omitempty"`
-	// Partitions optionally restricts the data restored to the given partition ids of the tables (clickhouse-backup
-	// --partitions), downloaded and attached; the schema is restored as without it.
+	// Partitions optionally restricts the restore to the data of the given partition ids of the tables
+	// (clickhouse-backup --partitions), downloaded and attached into the tables as they are, as the Altinity Cloud
+	// Manager restores partitions: the schema is not restored, nothing is dropped but those partitions, which
+	// clickhouse-backup drops before it attaches them, and the tables must exist. Not with schemaOnly or rbac.
 	Partitions []string `json:"partitions,omitempty" yaml:"partitions,omitempty"`
 	// SkipTables optionally leaves out of the restore the tables matching this clickhouse-backup pattern (e.g.
 	// "db.table", "db.*"), on top of the system databases (CLICKHOUSE_SKIP_TABLES).
@@ -167,6 +169,15 @@ func (spec *ClickHouseRestoreSpec) Validate() error {
 	}
 	if err := validateRestoreFilters(spec); err != nil {
 		return err
+	}
+	// A restore of partitions attaches their data into the tables as they are, without the schema step, which
+	// restores the access entities too
+	if len(spec.Partitions) > 0 && spec.SchemaOnly.IsTrue() {
+		return fmt.Errorf("%w: partitions restore data, which schemaOnly leaves out", ErrInvalidBackupSpec)
+	}
+	if len(spec.Partitions) > 0 && spec.RBAC.IsTrue() {
+		return fmt.Errorf("%w: partitions restore no schema, which the access entities rbac asks for are restored with",
+			ErrInvalidBackupSpec)
 	}
 	if err := validateBackupSource("sourceInstallation", spec.SourceInstallation, BackupSourceInstallationMaxLength); err != nil {
 		return err

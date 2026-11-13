@@ -310,6 +310,15 @@ func TestValidateRestoreFilters(t *testing.T) {
 		"partitions":                     {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{"202601", "all"} }, true},
 		"a partition with a quote":       {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{"'a'"} }, false},
 		"an empty partition":             {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{""} }, false},
+		"partitions of the schema alone": {func(s *ClickHouseRestoreSpec) {
+			s.Partitions, s.SchemaOnly = []string{"202601"}, types.NewStringBool(true)
+		}, false},
+		"partitions with access entities": {func(s *ClickHouseRestoreSpec) {
+			s.Partitions, s.RBAC = []string{"202601"}, types.NewStringBool(true)
+		}, false},
+		"partitions over existing tables": {func(s *ClickHouseRestoreSpec) {
+			s.Partitions, s.Overwrite = []string{"202601"}, types.NewStringBool(true)
+		}, true},
 		"tables left out":                {func(s *ClickHouseRestoreSpec) { s.SkipTables = "db.tmp*,logs.*" }, true},
 		"tables left out reading a flag": {func(s *ClickHouseRestoreSpec) { s.SkipTables = "--rbac" }, false},
 		"engines left out":               {func(s *ClickHouseRestoreSpec) { s.SkipTableEngines = []string{"Kafka", "RabbitMQ"} }, true},

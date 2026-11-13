@@ -2925,7 +2925,7 @@ other_installation_hint() {
 }
 
 do_restore() {
-	local host restore_data=1 overwrite= validate= restore_rbac= holds_rbac= replicas= hint where base READ_ONLY=
+	local host restore_data=1 restore_schema=1 overwrite= validate= restore_rbac= holds_rbac= replicas= hint where base READ_ONLY=
 	local -a schema_hosts data_hosts targets guarded used shards had_local=() resumed=() downloads drop
 	check_name BACKUP_NAME
 	parse_hosts SCHEMA_HOSTS
@@ -2957,6 +2957,20 @@ do_restore() {
 	check_restore_filters
 	check_source_name SOURCE_INSTALLATION "${SOURCE_INSTALLATION_MAX_LENGTH}" "installation name"
 	check_source_name SOURCE_NAMESPACE "${SOURCE_NAMESPACE_MAX_LENGTH}" namespace
+	# As the Altinity Cloud Manager restores partitions, a restore of partitions attaches their data into the tables as
+	# they are: no schema step, which would drop and recreate the tables, and with it no access entities. clickhouse-backup
+	# drops each of those partitions before it attaches it, and nothing else; the tables must exist
+	if [[ -n ${PARTITIONS:-} ]]; then
+		if [[ -z ${restore_data} ]]; then
+			die "PARTITIONS restore data, which SCHEMA_ONLY leaves out"
+		fi
+		if [[ -n ${restore_rbac} ]]; then
+			die "PARTITIONS restore no schema, which RESTORE_RBAC restores the access entities with"
+		fi
+		restore_schema=
+		overwrite=
+		schema_hosts=()
+	fi
 	# An overwrite may drop the tables of the backup ON CLUSTER only where a replica could clone their old parts back from
 	# another replica of its shard: a shard of one replica, which every data host is, has none
 	if [[ -n ${overwrite} ]]; then
@@ -2973,16 +2987,20 @@ do_restore() {
 		# Only read once the tables are listed, but checked before any request
 		no_zookeeper || :
 	fi
-	used=("${schema_hosts[@]}")
+	used=(${schema_hosts[@]+"${schema_hosts[@]}"})
 	if [[ -n ${restore_data} ]]; then
 		used+=("${data_hosts[@]}")
 	fi
 	mapfile -t used < <(printf '%s\n' "${used[@]}" | awk '!seen[$0]++')
-	targets=("${schema_hosts[@]}" "${data_hosts[@]}")
+	targets=(${schema_hosts[@]+"${schema_hosts[@]}"} "${data_hosts[@]}")
 	mapfile -t targets < <(printf '%s\n' "${targets[@]}" | awk 'NF && !seen[$0]++')
-	# The schema restore drops the tables of the backup on every replica, so the guard checks them all
+	# The schema restore drops the tables of the backup on every replica, so the guard checks them all; a restore of
+	# partitions has neither
 	parse_hosts GUARD_HOSTS optional
-	guarded=("${targets[@]}" "${HOSTS[@]}")
+	if [[ -z ${restore_schema} ]]; then
+		HOSTS=()
+	fi
+	guarded=("${targets[@]}" ${HOSTS[@]+"${HOSTS[@]}"})
 	mapfile -t guarded < <(printf '%s\n' "${guarded[@]}" | awk 'NF && !seen[$0]++')
 	check_storage_paths
 	source_paths
@@ -3050,7 +3068,9 @@ do_restore() {
 			fi
 		done
 	fi
-	if [[ -z ${overwrite} ]]; then
+	if [[ -z ${restore_schema} ]]; then
+		log "restore ${BACKUP_NAME}: restores the partitions ${PARTITIONS} into the tables as they are, without the schema, as the Altinity Cloud Manager does: each of them is dropped first where a table holds it"
+	elif [[ -z ${overwrite} ]]; then
 		guard_tables "${used[*]}" "${guarded[@]}"
 	elif [[ -n ${replicas} ]]; then
 		shards=("${schema_hosts[0]}" "${data_hosts[@]}")
@@ -3139,7 +3159,7 @@ do_restore() {
 	# through the replication of a Replicated database would fail its CREATE. Access entities are stored apart on every
 	# host, and a backup holds those of the replica it was made on: they come with the schema of every replica
 	RESTORE_RBAC_WITH_SCHEMA=${restore_rbac}
-	for host in "${schema_hosts[@]}"; do
+	for host in ${schema_hosts[@]+"${schema_hosts[@]}"}; do
 		if ! restore_step "${host}" "restore schema" schema; then
 			fail "schema restore of ${BACKUP_NAME} failed on ${host}"
 		fi
