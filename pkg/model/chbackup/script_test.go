@@ -5527,3 +5527,18 @@ func TestJobScriptWaitsForTheBackupPods(t *testing.T) {
 		})
 	}
 }
+
+// orchestratorScriptMaxBytes bounds the orchestrator script. dev/generate_helm_chart.sh passes the data of the
+// ConfigMap that ships it, the script indented as YAML, to yq in a single environment variable, and Linux refuses
+// any single argument or environment string longer than MAX_ARG_STRLEN, 128 KiB: the chart then fails to build,
+// on Linux alone. The bound leaves room for the indentation and a margin; macOS has no such limit, so this test
+// catches it there.
+const orchestratorScriptMaxBytes = 110000
+
+func TestJobScriptFitsTheLinuxArgumentLimit(t *testing.T) {
+	require.LessOrEqual(t, len(orchestratorScript), orchestratorScriptMaxBytes,
+		"the orchestrator script must stay within %d bytes, as Linux passes the ConfigMap data that holds it in one "+
+			"environment string of at most 128 KiB: condense it", orchestratorScriptMaxBytes)
+	lines := strings.Count(orchestratorScript, "\n") + 1
+	require.Less(t, len(orchestratorScript)+2*lines, 120000, "the script as the data of its ConfigMap, indented by YAML")
+}
