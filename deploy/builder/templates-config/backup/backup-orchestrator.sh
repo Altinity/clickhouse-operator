@@ -113,10 +113,21 @@ termination_message() {
 		{ printf '%s\n' "$*" >"${TERMINATION_MESSAGE_PATH}"; } 2>/dev/null || true
 	fi
 }
-report_message() {
-	if [[ -n ${TERMINATION_MESSAGE_PATH:-} ]]; then
-		{ printf '%s\n' "$*" >>"${TERMINATION_MESSAGE_PATH}"; } 2>/dev/null || true
+# report LINE [DETAIL] appends LINE, and DETAIL after it, to the termination message, unless LINE is empty
+report() {
+	if [[ -n $1 && -n ${TERMINATION_MESSAGE_PATH:-} ]]; then
+		{ printf '%s\n' "$1${2:+ $2}" >>"${TERMINATION_MESSAGE_PATH}"; } 2>/dev/null || true
 	fi
+}
+# notice REASON MESSAGE logs MESSAGE and posts it as a Normal Event
+notice() {
+	log "$2"
+	event Normal "$1" "$2"
+}
+# alert REASON MESSAGE warns of MESSAGE and posts it as a Warning Event
+alert() {
+	warn "$2"
+	event Warning "$1" "$2"
 }
 die() {
 	log "ERROR: $*" >&2
@@ -234,10 +245,10 @@ event() {
 		return 0
 	fi
 	EVENT_FAILURES=$((EVENT_FAILURES + 1))
-	log "WARNING: cannot post the event ${reason}: ${code}" >&2
+	advise "cannot post the event ${reason}: ${code}"
 	if ((EVENT_FAILURES >= EVENT_MAX_FAILURES)); then
 		EVENTS_DISABLED=1
-		log "WARNING: no more events are posted after ${EVENT_FAILURES} failures in a row" >&2
+		advise "no more events are posted after ${EVENT_FAILURES} failures in a row"
 	fi
 }
 
@@ -290,6 +301,13 @@ check_filter() {
 	local value=${!1:-}
 	if [[ -n ${value} ]] && [[ ! ${value} =~ $2 ]] || ((${#value} > $3)); then
 		die "$1 is not a valid $4"
+	fi
+}
+
+# one_line VAR_NAME fails unless VAR_NAME is one line
+one_line() {
+	if [[ ${!1:-} == *[[:cntrl:]]* ]]; then
+		die "$1 must be one line"
 	fi
 }
 
@@ -466,8 +484,7 @@ command_event() {
 		shift
 	done
 	message="${host}: ${what}: POST ${REQUEST_URL}${body}${note:+ (${note})}"
-	log "${message}"
-	event Normal OrchestratorCommand "${message}"
+	notice OrchestratorCommand "${message}"
 }
 
 finished_event() {
@@ -1031,9 +1048,7 @@ rules_keep() {
 pinned_keys() {
 	local value prefix
 	declare -gA PINNED=()
-	if [[ ${KEEP_BACKUPS:-} == *[[:cntrl:]]* ]]; then
-		die "KEEP_BACKUPS must be one line"
-	fi
+	one_line KEEP_BACKUPS
 	naming_prefix || :
 	prefix=${REPLY}
 	for value in ${KEEP_BACKUPS:-}; do
@@ -1053,9 +1068,7 @@ held_keys() {
 	if [[ -z ${PREVIOUS_SCHEDULES:-} ]]; then
 		return 0
 	fi
-	if [[ ${PREVIOUS_SCHEDULES} == *[[:cntrl:]]* ]]; then
-		die "PREVIOUS_SCHEDULES must be one line"
-	fi
+	one_line PREVIOUS_SCHEDULES
 	IFS='#' read -r -a records <<<"${PREVIOUS_SCHEDULES}"
 	for record in "${records[@]}"; do
 		if [[ ! ${record} =~ ^([0-9]{1,12})\|([^|]*)\|([^|]+)$ ]]; then
@@ -1103,8 +1116,7 @@ retention_on_host() {
 			continue
 		fi
 		if submit "${host}" "delete remote ${name}" "/backup/delete/remote/${name}" --max-time "${DELETE_TIMEOUT}"; then
-			log "${host}: retention deleted ${name}"
-			event Normal OrchestratorRetentionDeleted "${host}: retention deleted ${name}"
+			notice OrchestratorRetentionDeleted "${host}: retention deleted ${name}"
 		else
 			event Warning OrchestratorRetentionFailed "${LAST_WARNING}"
 		fi
@@ -1133,8 +1145,7 @@ retention() {
 	BEST_EFFORT=1
 	list_all series_key "${HOSTS[@]}"
 	if ((${#UNLISTED[@]} > 0)); then
-		warn "retention skipped: ${UNLISTED[*]} cannot be listed, backups are left as they are"
-		event Warning OrchestratorRetentionSkipped "${LAST_WARNING}"
+		alert OrchestratorRetentionSkipped "retention skipped: ${UNLISTED[*]} cannot be listed, backups are left as they are"
 		return 0
 	fi
 	NAMES=("${!ALL_NAMES[@]}")
@@ -1155,7 +1166,7 @@ this_backup() {
 }
 
 report_held() {
-	local key
+	local key more=
 	local -a names=()
 	if ((${#HELD_OBSOLETE[@]} == 0)); then
 		return 0
@@ -1167,15 +1178,11 @@ report_held() {
 		fi
 		names+=("${REPLY}")
 	done
-	warn "retention holds ${#names[@]} backup(s) the schedule kept before a change of it, which it would delete now: ${names[*]:0:HELD_REPORT_MAX}${names[HELD_REPORT_MAX]:+ ...}; keep those to keep in spec.retention.keepBackups and release the change with spec.retention.releaseHeld"
-	event Warning OrchestratorRetentionHeld "${LAST_WARNING}"
-	if [[ -n ${HELD_BACKUPS_MESSAGE:-} ]]; then
-		if ((${#names[@]} > HELD_REPORT_MAX)); then
-			report_message "${HELD_BACKUPS_MESSAGE} ${names[*]:0:HELD_REPORT_MAX} +$((${#names[@]} - HELD_REPORT_MAX))"
-		else
-			report_message "${HELD_BACKUPS_MESSAGE} ${names[*]}"
-		fi
+	alert OrchestratorRetentionHeld "retention holds ${#names[@]} backup(s) the schedule kept before a change of it, which it would delete now: ${names[*]:0:HELD_REPORT_MAX}${names[HELD_REPORT_MAX]:+ ...}; keep those to keep in spec.retention.keepBackups and release the change with spec.retention.releaseHeld"
+	if ((${#names[@]} > HELD_REPORT_MAX)); then
+		more=" +$((${#names[@]} - HELD_REPORT_MAX))"
 	fi
+	report "${HELD_BACKUPS_MESSAGE:-}" "${names[*]:0:HELD_REPORT_MAX}${more}"
 }
 
 report_data() {
@@ -1188,11 +1195,8 @@ report_data() {
 	if [[ -z ${COMPLETE[${BACKUP_KEY}]:-} || -n ${WITH_DATA[${BACKUP_KEY}]:-} ]]; then
 		return 0
 	fi
-	warn "${BACKUP_NAME} holds no data"
-	event Warning OrchestratorNoData "${BACKUP_NAME} holds no data"
-	if [[ -n ${NO_DATA_MESSAGE:-} ]]; then
-		report_message "${NO_DATA_MESSAGE}"
-	fi
+	alert OrchestratorNoData "${BACKUP_NAME} holds no data"
+	report "${NO_DATA_MESSAGE:-}"
 }
 
 storage_prefix() {
@@ -1814,9 +1818,7 @@ parse_schedules() {
 	local -a entries fields
 	local -A periods=()
 	SCHED_PERIOD=() SCHED_HOUR=() SCHED_MINUTE=() SCHED_DAY=() SCHED_KEEP=() SCHED_INCREMENTAL=() SCHED_ENV=()
-	if [[ ${SCHEDULES:-} == *[[:cntrl:]]* ]]; then
-		die "SCHEDULES must be one line"
-	fi
+	one_line SCHEDULES
 	IFS=';' read -r -a entries <<<"${SCHEDULES:-}"
 	for entry in "${entries[@]}"; do
 		read -r -a fields <<<"${entry}"
@@ -2166,8 +2168,7 @@ drop_failed_backup() {
 		for where in local remote; do
 			if submit "${host}" "delete ${where} ${name}" "/backup/delete/${where}/${name}" -G --data-urlencode "force=true" \
 				--max-time "${DELETE_TIMEOUT}"; then
-				log "${host}: the ${where} copy of the failed backup ${name} deleted"
-				event Normal OrchestratorFailedBackupDeleted "${host}: the ${where} copy of the failed backup ${name} deleted"
+				notice OrchestratorFailedBackupDeleted "${host}: the ${where} copy of the failed backup ${name} deleted"
 			elif [[ ${LAST_WARNING} == *"not found"* ]]; then
 				log "${host}: no ${where} copy of the failed backup ${name} to delete"
 			else
@@ -2225,9 +2226,7 @@ config_overrides() {
 		if ((${#SCHED_PERIOD[@]} > 0)); then
 			die "CONFIG_OVERRIDES are those of a backup that runs no schedule: a scheduled backup takes those of its entries"
 		fi
-		if [[ ${CONFIG_OVERRIDES} == *[[:cntrl:]]* ]]; then
-			die "CONFIG_OVERRIDES must be one line"
-		fi
+		one_line CONFIG_OVERRIDES
 		read -r -a items <<<"${CONFIG_OVERRIDES}"
 		if ((${#items[@]} > CONFIG_OVERRIDES_MAX_ITEMS)); then
 			die "CONFIG_OVERRIDES holds more than ${CONFIG_OVERRIDES_MAX_ITEMS} overrides"
@@ -2402,8 +2401,8 @@ do_backup() {
 		fail_all "backup ${BACKUP_NAME}"
 	fi
 	log "backup ${BACKUP_NAME} completed on ${#backup_hosts[@]} host(s)"
-	if [[ ${backup_hosts[*]} != "${PREFERRED_HOSTS[*]}" && -n ${HOSTS_USED_MESSAGE:-} ]]; then
-		report_message "${HOSTS_USED_MESSAGE} ${backup_hosts[*]}"
+	if [[ ${backup_hosts[*]} != "${PREFERRED_HOSTS[*]}" ]]; then
+		report "${HOSTS_USED_MESSAGE:-}" "${backup_hosts[*]}"
 	fi
 	if ! is_true SCHEMA_ONLY; then
 		report_data "${backup_hosts[@]}"
@@ -2445,8 +2444,7 @@ do_verify() {
 			warn "${host}: the downloaded copy of ${name} is left on local disk"
 		fi
 	done
-	log "backup ${BACKUP_NAME} verified on ${#verify_hosts[@]} host(s)"
-	event Normal OrchestratorVerifyCompleted "backup ${BACKUP_NAME} verified on ${#verify_hosts[@]} host(s)"
+	notice OrchestratorVerifyCompleted "backup ${BACKUP_NAME} verified on ${#verify_hosts[@]} host(s)"
 }
 
 restored_db() {
@@ -3295,19 +3293,15 @@ do_restore() {
 			warn "${host}: the downloaded copy of ${HOST_BACKUP[${host}]} is left on local disk"
 		fi
 	done
-	log "restore ${BACKUP_NAME} completed"
-	event Normal OrchestratorRestoreCompleted "restore ${BACKUP_NAME} completed"
+	notice OrchestratorRestoreCompleted "restore ${BACKUP_NAME} completed"
 	if [[ -n ${RESTORE_RBAC_WITH_SCHEMA} ]]; then
 		return 0
 	fi
 	if [[ -z ${RESTORE_VALIDATE} ]]; then
 		log "whether ${BACKUP_NAME} holds access entities is unknown: its copies in the storage were not listed"
 	elif [[ -n ${HOLDS_RBAC} ]]; then
-		warn "${BACKUP_NAME} holds access entities - users, roles, grants - which this restore did not restore"
-		event Warning OrchestratorRBACNotRestored "${LAST_WARNING}"
-		if [[ -n ${RBAC_NOT_RESTORED_MESSAGE:-} ]]; then
-			report_message "${RBAC_NOT_RESTORED_MESSAGE}"
-		fi
+		alert OrchestratorRBACNotRestored "${BACKUP_NAME} holds access entities - users, roles, grants - which this restore did not restore"
+		report "${RBAC_NOT_RESTORED_MESSAGE:-}"
 	fi
 }
 
