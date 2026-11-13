@@ -890,7 +890,11 @@ func (s *sidecarStub) runScript(script string, env map[string]string) (int, stri
 	for name, value := range env {
 		vars[name] = value
 	}
-	cmd := exec.CommandContext(ctx, "bash", "-c", script)
+	// The script runs from a file, as the Job runs it: as an argument it would exceed the length Linux allows one,
+	// MAX_ARG_STRLEN
+	path := filepath.Join(s.t.TempDir(), OrchestratorScriptFile)
+	require.NoError(s.t, os.WriteFile(path, []byte(script), 0o600))
+	cmd := exec.CommandContext(ctx, "bash", path)
 	for name, value := range vars {
 		cmd.Env = append(cmd.Env, name+"="+value)
 	}
