@@ -902,10 +902,6 @@ list_all() {
 	done
 }
 
-retention_pattern() {
-	REPLY="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{8}T?[0-9]{6}$"
-}
-
 retention_plan() {
 	local name tag key newest= made=${BACKUP_KEY:-${BACKUP_NAME:-}}
 	local -a ordered=() incomplete=() obsolete=() held=()
@@ -1003,14 +999,13 @@ rules_keep() {
 
 # pinned_keys sets PINNED to the keys of the backups KEEP_BACKUPS pins, which retention never deletes
 pinned_keys() {
-	local value prefix=
+	local value prefix
 	declare -gA PINNED=()
 	if [[ ${KEEP_BACKUPS:-} == *[[:cntrl:]]* ]]; then
 		die "KEEP_BACKUPS must be one line"
 	fi
-	if naming_holds prefix; then
-		prefix=${BACKUP_NAME_PREFIX:-}
-	fi
+	naming_prefix || :
+	prefix=${REPLY}
 	for value in ${KEEP_BACKUPS:-}; do
 		if ((${#NAMING_PARTS[@]} == 0)) || [[ ${value} =~ ${NAMING_TAG_RE} ]]; then
 			PINNED[${value}]=1
@@ -1597,7 +1592,7 @@ naming_regex() {
 
 naming_parse() {
 	local name=$1
-	if [[ -z ${NAMING_CACHED+set} || ${NAMING_CACHED} != "p:${2:-}" ]]; then
+	if [[ ${NAMING_CACHED-} != "p:${2:-}" ]]; then
 		naming_regex "${2:-}"
 		NAMING_CACHED_REGEX=${REPLY}
 		NAMING_CACHED=p:${2:-}
@@ -1648,23 +1643,29 @@ naming_holds() {
 	listed "p:$1" ${NAMING_PARTS[@]+"${NAMING_PARTS[@]}"}
 }
 
+# naming_prefix sets REPLY to the value of the {prefix} of the naming template, BACKUP_NAME_PREFIX, or to nothing when it
+# holds none; it fails when BACKUP_NAME_PREFIX leaves the {prefix} it holds empty
+naming_prefix() {
+	REPLY=
+	if naming_holds prefix; then
+		REPLY=${BACKUP_NAME_PREFIX:-}
+		[[ -n ${REPLY} ]]
+	fi
+}
+
+# series_key HOST NAME sets REPLY to the key of the backup NAME on HOST of the series retention keeps, or fails
+
 series_key() {
-	local prefix=
+	local pattern
 	if ((${#NAMING_PARTS[@]} == 0)); then
-		retention_pattern
-		if [[ ! $2 =~ ${REPLY} ]]; then
+		pattern="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{8}T?[0-9]{6}$"
+		if [[ ! $2 =~ ${pattern} ]]; then
 			return 1
 		fi
 		REPLY=$2
 		return 0
 	fi
-	if naming_holds prefix; then
-		prefix=${BACKUP_NAME_PREFIX:-}
-		if [[ -z ${prefix} ]]; then
-			return 1
-		fi
-	fi
-	if ! naming_parse "$2" "${prefix}" || [[ ${N_SHARD} != "${SHARD_OF[$1]:-}" ]]; then
+	if ! naming_prefix || ! naming_parse "$2" "${REPLY}" || [[ ${N_SHARD} != "${SHARD_OF[$1]:-}" ]]; then
 		return 1
 	fi
 	REPLY=${N_KEY}
@@ -1717,11 +1718,14 @@ naming_key() {
 	REPLY=${N_KEY}
 }
 
+# resolve_names INTO KEY HOST... sets INTO[HOST] to the name of the backup of the key KEY on every HOST
 resolve_names() {
-	local host
-	for host in "$@"; do
-		host_name "${host}" "${BACKUP_KEY}"
-		HOST_BACKUP[${host}]=${REPLY}
+	local -n _names=$1
+	local _key=$2 _host
+	shift 2
+	for _host in "$@"; do
+		host_name "${_host}" "${_key}"
+		_names["${_host}"]=${REPLY}
 	done
 }
 
@@ -2147,12 +2151,29 @@ backup_unseen() {
 	fi
 }
 
-# config_overrides sets CREATE_KIND to how the backup is made
+# create_args sets CREATE_PARAMS and CREATE_FLAGS to the options of the backup: parameters of the op that makes it, flags
+# of the command of the actions endpoint that does
+create_args() {
+	CREATE_PARAMS=() CREATE_FLAGS=
+	if is_true SCHEMA_ONLY; then
+		CREATE_PARAMS+=(--data-urlencode "schema=")
+		CREATE_FLAGS+=" --schema"
+	fi
+	if [[ -n ${TABLES:-} ]]; then
+		CREATE_PARAMS+=(--data-urlencode "table=${TABLES}")
+		CREATE_FLAGS+=" --tables=${TABLES}"
+	fi
+	if [[ -n ${PARTITIONS:-} ]]; then
+		CREATE_PARAMS+=(--data-urlencode "partitions=${PARTITIONS}")
+		CREATE_FLAGS+=" --partitions=${PARTITIONS}"
+	fi
+}
+
+# config_overrides sets CREATE_KIND to how the backup is made: an op, or, with config overrides, an action
 config_overrides() {
 	local item
 	local -a items
 	CREATE_KIND=op
-	CREATE_FLAGS=
 	if [[ -n ${CONFIG_OVERRIDES:-} ]]; then
 		if ((${#SCHED_PERIOD[@]} > 0)); then
 			die "CONFIG_OVERRIDES are those of a backup that runs no schedule: a scheduled backup takes those of its entries"
@@ -2175,32 +2196,18 @@ config_overrides() {
 		return 0
 	fi
 	CREATE_KIND=action
-	if is_true SCHEMA_ONLY; then
-		CREATE_FLAGS+=" --schema"
-	fi
-	if [[ -n ${TABLES:-} ]]; then
-		if [[ ! ${TABLES} =~ ${TABLES_RE} ]] || ((${#TABLES} > TABLES_MAX_LENGTH)); then
-			die "TABLES is not a valid table pattern"
-		fi
-		CREATE_FLAGS+=" --tables=${TABLES}"
-	fi
-	if [[ -n ${PARTITIONS:-} ]]; then
-		check_filter PARTITIONS "${PARTITIONS_RE}" "${FILTER_MAX_LENGTH}" "list of partition ids"
-		CREATE_FLAGS+=" --partitions=${PARTITIONS}"
-	fi
+	check_filter TABLES "${TABLES_RE}" "${TABLES_MAX_LENGTH}" "table pattern"
+	check_filter PARTITIONS "${PARTITIONS_RE}" "${FILTER_MAX_LENGTH}" "list of partition ids"
 	log "backup ${BACKUP_NAME}: made with the config overrides${CREATE_ENV}, through the actions endpoint"
 	event Normal OrchestratorConfigOverrides "backup ${BACKUP_NAME} is made with the config overrides${CREATE_ENV}"
 }
 
-do_backup() {
-	local host incremental= keep i
-	local -a backup_hosts
-	parse_hosts BACKUP_HOSTS
-	fall_back_hosts
-	backup_hosts=("${HOSTS[@]}")
-	for ((i = 1; i < ${#backup_hosts[@]}; i++)); do
-		if listed "${backup_hosts[i]}" "${backup_hosts[@]:0:i}"; then
-			die "BACKUP_HOSTS lists ${backup_hosts[i]} twice: hosts of one backup must not share a storage path"
+# backup_settings HOST... validates the settings of a backup on HOST... and reads its schedule
+backup_settings() {
+	local i
+	for ((i = 2; i <= $#; i++)); do
+		if listed "${!i}" "${@:1:i-1}"; then
+			die "BACKUP_HOSTS lists ${!i} twice: hosts of one backup must not share a storage path"
 		fi
 	done
 	if [[ -n ${BACKUP_NAME_PREFIX:-} ]]; then
@@ -2215,6 +2222,11 @@ do_backup() {
 	if [[ -n ${CLUSTER:-} ]]; then
 		check_cluster
 	fi
+}
+
+# backup_name HOST... names the backup: BACKUP_KEY, BACKUP_NAME, and HOST_BACKUP, the name of its backup on every HOST
+backup_name() {
+	local host
 	naming_init
 	if [[ -n ${BACKUP_NAME:-} ]]; then
 		check_name BACKUP_NAME
@@ -2222,7 +2234,7 @@ do_backup() {
 		naming_key BACKUP_NAME "${BACKUP_NAME_PREFIX:-}"
 		BACKUP_KEY=${REPLY}
 	elif ((${#NAMING_PARTS[@]} > 0)); then
-		if naming_holds prefix && [[ -z ${BACKUP_NAME_PREFIX:-} ]]; then
+		if ! naming_prefix; then
 			die "BACKUP_NAME_PREFIX must be set for the naming template '${BACKUP_NAMING}', which holds {prefix}"
 		fi
 		NAMING_PREFIX=${BACKUP_NAME_PREFIX:-}
@@ -2236,65 +2248,59 @@ do_backup() {
 	else
 		die "either BACKUP_NAME or BACKUP_NAME_PREFIX must be set"
 	fi
-	resolve_names "${backup_hosts[@]}"
+	resolve_names HOST_BACKUP "${BACKUP_KEY}" "$@"
 	if ((${#NAMING_PARTS[@]} > 0)); then
 		naming_render 1 "${BACKUP_KEY}" "${NAMING_PREFIX}" || :
 		BACKUP_NAME=${REPLY}
-		log "backup ${BACKUP_NAME}: named by the naming template '${BACKUP_NAMING}', $(for host in "${backup_hosts[@]}"; do printf '%s ' "${host}=${HOST_BACKUP[${host}]}"; done)"
+		log "backup ${BACKUP_NAME}: named by the naming template '${BACKUP_NAMING}', $(for host in "$@"; do printf '%s ' "${host}=${HOST_BACKUP[${host}]}"; done)"
 	fi
-	CREATE_PARAMS=()
-	if is_true SCHEMA_ONLY; then
-		CREATE_PARAMS+=(--data-urlencode "schema=")
-	fi
-	if [[ -n ${TABLES:-} ]]; then
-		CREATE_PARAMS+=(--data-urlencode "table=${TABLES}")
-	fi
-	if [[ -n ${PARTITIONS:-} ]]; then
-		CREATE_PARAMS+=(--data-urlencode "partitions=${PARTITIONS}")
-	fi
+}
+
+# backup_plan HOST... sets BASE_OF, the name on every HOST of the base DIFF_FROM_REMOTE names; and, of a scheduled backup,
+# CREATE_ENV to the config overrides of its entry and INCREMENTAL_KEEP to the longest chain of incremental backups of an
+# entry that makes them, from which backup_preflight picks their base
+backup_plan() {
+	local prefix=${NAMING_PREFIX}
 	declare -gA BASE_OF=()
 	CREATE_ENV=
+	INCREMENTAL_KEEP=
 	if [[ -n ${DIFF_FROM_REMOTE:-} ]]; then
 		check_name DIFF_FROM_REMOTE
-		local key=${BACKUP_KEY} prefix=${NAMING_PREFIX}
 		naming_key DIFF_FROM_REMOTE "${BACKUP_NAME_PREFIX:-}"
-		BACKUP_KEY=${REPLY}
-		for host in "${backup_hosts[@]}"; do
-			host_name "${host}" "${BACKUP_KEY}"
-			BASE_OF[${host}]=${REPLY}
-		done
-		BACKUP_KEY=${key} NAMING_PREFIX=${prefix}
+		resolve_names BASE_OF "${REPLY}" "$@"
+		NAMING_PREFIX=${prefix}
 	fi
-	if ((${#SCHED_PERIOD[@]} > 0)) && [[ -n ${BACKUP_NAME_GIVEN} ]]; then
+	if ((${#SCHED_PERIOD[@]} == 0)); then
+		return 0
+	fi
+	if [[ -n ${BACKUP_NAME_GIVEN} ]]; then
 		incremental_entry
 		if [[ -z ${WINNER} ]]; then
 			log "backup ${BACKUP_NAME}: runs the schedule now, which has no incremental entry: the backup is full"
 		elif [[ -z ${DIFF_FROM_REMOTE:-} && -n ${BACKUP_NAME_PREFIX:-} ]]; then
 			log "backup ${BACKUP_NAME}: runs the schedule now, incremental as its ${SCHED_PERIOD[WINNER]} entry"
-			incremental=1
-			keep=${SCHED_KEEP[WINNER]}
 		fi
-	elif ((${#SCHED_PERIOD[@]} > 0)); then
+	else
 		winner_entry "${SLOT_TAG}"
 		if [[ -z ${WINNER} ]]; then
 			log "backup ${BACKUP_NAME}: the slot ${SLOT_TAG} is a slot of no schedule entry, the backup is full"
 		else
 			log "backup ${BACKUP_NAME}: the slot ${SLOT_TAG} is a slot of the ${SCHED_PERIOD[WINNER]} entry${MATCHED[1]:+ and lighter ones}"
-			if [[ ${SCHED_INCREMENTAL[WINNER]} == true && -z ${DIFF_FROM_REMOTE:-} && -n ${BACKUP_NAME_PREFIX:-} ]]; then
-				incremental=1
-				keep=${SCHED_KEEP[WINNER]}
-			fi
 			CREATE_ENV=${SCHED_ENV[WINNER]}
 		fi
 	fi
-	config_overrides
-	check_storage_paths
-	wait_for_apis "${backup_hosts[@]}"
+	if [[ -n ${WINNER} && ${SCHED_INCREMENTAL[WINNER]} == true && -z ${DIFF_FROM_REMOTE:-} && -n ${BACKUP_NAME_PREFIX:-} ]]; then
+		INCREMENTAL_KEEP=${SCHED_KEEP[WINNER]}
+	fi
+}
 
-	event Normal OrchestratorBackupStarted "backup ${BACKUP_NAME} on ${#backup_hosts[@]} host(s)"
-	log "backup ${BACKUP_NAME}: preflight on ${#backup_hosts[@]} host(s)"
+# backup_preflight HOST... refuses a backup that a HOST holds already, or one of its time, or whose base it lacks; it picks
+# the base of an incremental backup of the schedule
+backup_preflight() {
+	local host i
+	log "backup ${BACKUP_NAME}: preflight on $# host(s)"
 	declare -gA SERIES_REQUIRED=()
-	for host in "${backup_hosts[@]}"; do
+	for host in "$@"; do
 		if ! list_backups "${host}" remote; then
 			fail "preflight failed on ${host}"
 		fi
@@ -2311,26 +2317,39 @@ do_backup() {
 		if [[ -n ${DIFF_FROM_REMOTE:-} ]] && ! find_backup "${BASE_OF[${host}]}"; then
 			die "base backup ${BASE_OF[${host}]} is missing in the storage of ${host}"
 		fi
-		if [[ -n ${incremental} ]]; then
+		if [[ -n ${INCREMENTAL_KEEP} ]]; then
 			record_series "${host}"
 		fi
 	done
-	if [[ -n ${incremental} && -z ${DIFF_FROM_REMOTE:-} ]]; then
-		incremental_base "${keep}" "${backup_hosts[@]}"
-		if [[ -n ${REPLY} ]]; then
-			local base=${REPLY}
-			for host in "${backup_hosts[@]}"; do
-				host_name "${host}" "${base}"
-				BASE_OF[${host}]=${REPLY}
-			done
-			log "backup ${BACKUP_NAME}: incremental from ${BASE_OF[${backup_hosts[0]}]}, which ends a chain of ${CHAIN} incremental backups"
-			event Normal OrchestratorIncrementalBase "${BACKUP_NAME} is incremental from ${BASE_OF[${backup_hosts[0]}]}"
-		else
-			log "backup ${BACKUP_NAME}: full, as the chain of incremental backups is ${CHAIN} long, of ${keep} at most, or there is no base every host holds"
-			event Normal OrchestratorIncrementalFull "${BACKUP_NAME} is a full backup"
-		fi
+	if [[ -z ${INCREMENTAL_KEEP} ]]; then
+		return 0
 	fi
+	incremental_base "${INCREMENTAL_KEEP}" "$@"
+	if [[ -n ${REPLY} ]]; then
+		resolve_names BASE_OF "${REPLY}" "$@"
+		log "backup ${BACKUP_NAME}: incremental from ${BASE_OF[$1]}, which ends a chain of ${CHAIN} incremental backups"
+		event Normal OrchestratorIncrementalBase "${BACKUP_NAME} is incremental from ${BASE_OF[$1]}"
+	else
+		log "backup ${BACKUP_NAME}: full, as the chain of incremental backups is ${CHAIN} long, of ${INCREMENTAL_KEEP} at most, or there is no base every host holds"
+		event Normal OrchestratorIncrementalFull "${BACKUP_NAME} is a full backup"
+	fi
+}
 
+do_backup() {
+	local -a backup_hosts
+	parse_hosts BACKUP_HOSTS
+	fall_back_hosts
+	backup_hosts=("${HOSTS[@]}")
+	backup_settings "${backup_hosts[@]}"
+	backup_name "${backup_hosts[@]}"
+	create_args
+	backup_plan "${backup_hosts[@]}"
+	config_overrides
+	check_storage_paths
+	wait_for_apis "${backup_hosts[@]}"
+
+	event Normal OrchestratorBackupStarted "backup ${BACKUP_NAME} on ${#backup_hosts[@]} host(s)"
+	backup_preflight "${backup_hosts[@]}"
 	if ! run_all "${CREATE_KIND}" backup_unseen create_remote "${BACKUP_NAME}" "${backup_hosts[@]}"; then
 		drop_failed_backup ${STEP_FAILED_HOSTS[@]+"${STEP_FAILED_HOSTS[@]}"}
 		fail_all "backup ${BACKUP_NAME}"
@@ -2360,7 +2379,7 @@ do_verify() {
 	naming_init
 	naming_key BACKUP_NAME "${BACKUP_NAME_PREFIX:-}"
 	BACKUP_KEY=${REPLY}
-	resolve_names "${verify_hosts[@]}"
+	resolve_names HOST_BACKUP "${BACKUP_KEY}" "${verify_hosts[@]}"
 	wait_for_apis "${verify_hosts[@]}"
 	event Normal OrchestratorVerifyStarted "verify ${BACKUP_NAME} on ${#verify_hosts[@]} host(s)"
 	for host in "${verify_hosts[@]}"; do
@@ -3070,7 +3089,7 @@ do_restore() {
 	mapfile -t used < <(printf '%s\n' "${used[@]}" | awk '!seen[$0]++')
 	targets=(${schema_hosts[@]+"${schema_hosts[@]}"} "${data_hosts[@]}")
 	mapfile -t targets < <(printf '%s\n' "${targets[@]}" | awk 'NF && !seen[$0]++')
-	resolve_names "${targets[@]}"
+	resolve_names HOST_BACKUP "${BACKUP_KEY}" "${targets[@]}"
 	parse_hosts GUARD_HOSTS optional
 	if [[ -z ${restore_schema} ]]; then
 		HOSTS=()
@@ -3267,6 +3286,7 @@ DATA_DOWNLOADS=
 CREATE_KIND=op
 CREATE_FLAGS=
 CREATE_ENV=
+INCREMENTAL_KEEP=
 RESTORE_RBAC_WITH_SCHEMA=
 
 main() {
