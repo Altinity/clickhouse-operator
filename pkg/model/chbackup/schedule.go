@@ -144,8 +144,9 @@ func Winner(matched []api.BackupScheduleEntry) *api.BackupScheduleEntry {
 }
 
 // EntriesEnv formats the entries for the orchestrator script: entries joined by ";", each
-// "period=<p> time=HH:MM [day=N] keep=N [incremental=true]", the time resolved as MatchingEntries resolves it; a
-// minute entry, which matches every minute, carries no time.
+// "period=<p> time=HH:MM [day=N] keep=N [incremental=true] [env=KEY=VALUE]...", the time resolved as MatchingEntries
+// resolves it, an env field of each config override of the entry; a minute entry, which matches every minute, carries
+// no time.
 func EntriesEnv(entries []api.BackupScheduleEntry) string {
 	var formatted []string
 	for _, entry := range api.ResolveScheduleTimes(entries) {
@@ -159,6 +160,10 @@ func EntriesEnv(entries []api.BackupScheduleEntry) string {
 		fields = append(fields, fmt.Sprintf("keep=%d", entry.Keep))
 		if entry.IsIncremental() {
 			fields = append(fields, "incremental=true")
+		}
+		// An override is a single token without a blank or a ";", as its validation makes sure
+		for _, override := range api.ConfigOverrides(entry.ConfigOverrides) {
+			fields = append(fields, "env="+override)
 		}
 		formatted = append(formatted, strings.Join(fields, " "))
 	}

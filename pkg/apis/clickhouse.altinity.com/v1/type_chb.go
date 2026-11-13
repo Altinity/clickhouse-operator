@@ -441,6 +441,10 @@ type ClickHouseBackupSpec struct {
 	// OrchestratorConfigMapRef names a ConfigMap in the namespace of the backup whose key backup-orchestrator.sh its
 	// Jobs run instead of the operator's orchestrator script. With ScheduleRef, unset takes the schedule's.
 	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
+	// ConfigOverrides are clickhouse-backup settings the backup is made with in place of those of the sidecar, as
+	// KEY=VALUE of the env var of the setting, e.g. S3_STORAGE_CLASS=STANDARD_IA, see type_backup_overrides.go. Not
+	// with ScheduleRef: a backup that runs a schedule takes no overrides.
+	ConfigOverrides []string `json:"configOverrides,omitempty" yaml:"configOverrides,omitempty"`
 
 	BackupOptions `json:",inline" yaml:",inline"`
 }
@@ -539,6 +543,12 @@ func (spec *ClickHouseBackupSpec) Validate() error {
 	case spec.BackupName != "":
 		return fmt.Errorf("%w: a backup that runs a schedule is named with the schedule's backupNamePrefix: "+
 			"backupName is not set with scheduleRef", ErrInvalidBackupSpec)
+	case len(spec.ConfigOverrides) > 0:
+		return fmt.Errorf("%w: a backup that runs a schedule takes no configOverrides: they are not set with scheduleRef",
+			ErrInvalidBackupSpec)
+	}
+	if err := ValidateConfigOverrides("configOverrides", spec.ConfigOverrides); err != nil {
+		return err
 	}
 	if err := validateBackupName("backupName", spec.BackupName, BackupNameMaxLength); err != nil {
 		return err

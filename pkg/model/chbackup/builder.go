@@ -510,6 +510,7 @@ func BuildBackupJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology
 	env := append(commonEnv(operationBackup, chi, cluster, orchestrator, eventObject(chb, api.ClickHouseBackupCRDResourceKind)),
 		envVar(envBackupName, cmp.Or(chb.Status.BackupName, ResolveBackupName(chb))),
 		envVar(envDiffFromRemote, chb.Spec.DiffFromRemote),
+		envVar(envConfigOverrides, strings.Join(api.ConfigOverrides(chb.Spec.ConfigOverrides), hostListSeparator)),
 	)
 	options := chb.GetBackupOptions()
 	env = append(env, backupOptionsEnv(options, topology, orchestrator)...)

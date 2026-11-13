@@ -926,6 +926,7 @@ spec:
 | `scheduledTime`           | when created    | RFC 3339 time, with its offset, the backup is due at, see [Back up at a later time](#back-up-at-a-later-time).                                                                                                               |
 | `startingDeadlineSeconds` |                 | How late, from the time it is due, the backup may start on a cluster; unset, it waits as long as it takes.                                                                                                                   |
 | `diffFromRemote`          |                 | Make this an [incremental backup](#incremental-backups) on top of this existing backup.                                                                                                                                      |
+| `configOverrides`         | none            | `clickhouse-backup` settings the backup is made with in place of the sidecar's, e.g. `["S3_STORAGE_CLASS=STANDARD_IA"]`, see [Config overrides](#config-overrides). Not with `scheduleRef`. |
 | `verify`                  | `false`         | [Verify](#verification) the backup after it is uploaded.                                                                                                                                                                     |
 | `schemaOnly`              | `false`         | Back up table and database definitions only, no data.                                                                                                                                                                        |
 | `replicaSelection`        | `FirstPerShard` | `FirstPerShard` backs up one replica of each shard, which is complete for `Replicated*` tables. `AllReplicas` backs up every replica, needed when a cluster holds non-replicated tables whose data differs between replicas. |
@@ -1075,6 +1076,7 @@ spec:
 | `schedules[].day`                                                                 |                                       | `weekly`: `0`..`6`, `0` being Sunday; `monthly`: `1`..`31`, a day past the end of a shorter month meaning its last day. Required for these two, refused for the others.                                                       |
 | `schedules[].keep`                                                                | required                              | At least `1`: how many of the newest backups of the runs that match the entry [retention](#retention) keeps.                                                                                                                  |
 | `schedules[].incremental`                                                         | `false`                               | At most one entry: its runs make [incremental backups](#incremental-backups) on the newest backup of the series while the chain is shorter than its `keep`.                                                                  |
+| `schedules[].configOverrides`                                                     | none                                  | `clickhouse-backup` settings the runs of the entry make their backups with, e.g. `["S3_STORAGE_CLASS=GLACIER_IR"]` on a monthly entry: those of the heaviest entry of a slot apply. See [Config overrides](#config-overrides). |
 | `timeZone`                                                                        | the controller manager's, usually UTC | IANA time zone the entries are read in, e.g. `Europe/Berlin`, as the `CronJob`'s. Backup names carry the time of the slot in this zone.                                                                                       |
 | `suspend`                                                                         | `false`                               | Stop starting new runs. A run already in progress continues.                                                                                                                                                                  |
 | `concurrencyPolicy`                                                               | `Forbid`                              | What to do when a run is due while the previous one still runs: `Forbid` starts it only once that one has finished, and not at all past `startingDeadlineSeconds`; `Allow` starts it anyway; `Replace` stops the running one. |
@@ -1750,6 +1752,49 @@ kubectl exec chi-backup-demo-main-0-0-0 -c clickhouse-backup -- \
 kubectl patch chbs nightly --subresource=status --type=json \
   -p '[{"op": "remove", "path": "/status/clusters/0/unprunedHosts"}]'
 ```
+
+## Config overrides
+
+ACM makes a backup with `--env S3_STORAGE_CLASS=...` to keep, say, the monthly backups in a colder
+storage class. `configOverrides` does the same, on each entry of a schedule and on a one-off
+`ClickHouseBackup`:
+
+```yaml
+spec:
+  clickHouseInstallation: prod
+  schedules:
+  - {period: daily,   time: "03:00", keep: 7, incremental: true}
+  - {period: weekly,  time: "03:00", day: 0, keep: 4,  configOverrides: [S3_STORAGE_CLASS=STANDARD_IA]}
+  - {period: monthly, time: "03:00", day: 1, keep: 12, configOverrides: [S3_STORAGE_CLASS=GLACIER_IR]}
+# GCS: GCS_STORAGE_CLASS=NEARLINE
+```
+
+* **What an override is.** `KEY=VALUE`, the environment variable `clickhouse-backup` knows the
+  setting by; a leading `--env=`, as ACM writes it, is stripped. The key is upper-case letters,
+  digits and `_`, the value letters, digits and `_ . , : / @ + = -`, so every override is one token of
+  a command. At most 16, each key once.
+* **Which apply.** A scheduled run takes the overrides of the heaviest entry of its slot, as it takes
+  its `incremental`: the Sunday run of the example is weekly, `STANDARD_IA`, the 1st of the month
+  monthly. A backup [run now](#run-a-schedule-now) from a schedule takes none, and `configOverrides`
+  is not set with `scheduleRef`; a restore takes none, as the storage class matters only on upload.
+* **How.** The typed `create_remote` request of the REST API takes no setting, so a backup with
+  overrides runs as the command `create_remote ... --env=KEY=VALUE NAME` of the `actions` endpoint,
+  on every host at once as the typed request does; one without overrides runs as before.
+* **Refused** - by the operator (`InvalidSpec`) and again by the Job - are the settings the operator
+  pins or sets in the sidecar (see [What the operator runs](#what-the-operator-runs)), every `API_*`
+  setting, the credentials, those that tell where the backups are - `REMOTE_STORAGE`, bucket,
+  endpoint, account, `*_PATH`, `*_OBJECT_DISK_PATH` - which the listings, retention and restores of
+  the backup, made with the sidecar's settings, would not find it by, and any setting of a secret
+  (a key holding `PASSWORD`, `SECRET`, `ACCESS_KEY`, `TOKEN`, `CREDENTIAL`, `SAS`, ...): secrets belong
+  in the configuration Secret.
+* **A sidecar restart loses them.** A sidecar that restarts during the upload resumes it by itself,
+  from what it keeps of the command, which leaves out the `--env` flags: the Job follows the resumed
+  upload, as for a typed request, and warns (`OrchestratorOverridesNotResumed` event) that the parts
+  uploaded after the restart got the sidecar's settings.
+* **Rebased parts.** Retention rebases a backup another one is incremental to before it deletes it,
+  copying parts with the sidecar's settings: a rebased part takes the sidecar's storage class.
+  Archive classes (`GLACIER`, `DEEP_ARCHIVE`) make listings, retention and restores read objects
+  that `clickhouse-backup` must first restore; prefer instant-retrieval classes.
 
 ## Incremental backups
 

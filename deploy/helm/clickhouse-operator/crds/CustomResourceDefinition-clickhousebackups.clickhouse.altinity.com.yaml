@@ -87,9 +87,23 @@ spec:
                   message: "a backup that runs a schedule takes its options from it: replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef"
                 - rule: "!has(self.scheduleRef) || (has(self.backupName) ? self.backupName : '') == ''"
                   message: "a backup that runs a schedule is named with the schedule's backupNamePrefix: backupName is not set with scheduleRef"
+                - rule: "!has(self.scheduleRef) || !has(self.configOverrides)"
+                  message: "a backup that runs a schedule takes no configOverrides: they are not set with scheduleRef"
                 - rule: "!has(self.backupName) || !self.backupName.matches('-[0-9]{14}$')"
                   message: "backupName must not end like the backups of a schedule, -YYYYMMDDHHMMSS, which the retention of a schedule of that prefix would prune"
               properties:
+                configOverrides:
+                  type: array
+                  nullable: true
+                  maxItems: 16
+                  x-kubernetes-list-type: set
+                  description: |
+                    clickhouse-backup settings the backup is made with in place of those of the sidecar, KEY=VALUE of the env
+                    var of the setting, e.g. S3_STORAGE_CLASS=STANDARD_IA; a leading --env= is stripped. Not the settings the
+                    operator sets, those of where the backups are, of the API or of secrets. Not with scheduleRef
+                  items:
+                    type: string
+                    pattern: '^(--env=)?[A-Z][A-Z0-9_]{0,63}=[A-Za-z0-9_.,:/@+=-]{1,256}$'
                 orchestratorConfigMapRef:
                   type: object
                   description: |
@@ -256,6 +270,11 @@ spec:
                             format: int32
                           incremental:
                             type: string
+                          configOverrides:
+                            type: array
+                            nullable: true
+                            items:
+                              type: string
                     timeZone:
                       type: string
                       description: "The schedule's timeZone"
@@ -296,6 +315,11 @@ spec:
                                   format: int32
                                 incremental:
                                   type: string
+                                configOverrides:
+                                  type: array
+                                  nullable: true
+                                  items:
+                                    type: string
                           timeZone:
                             type: string
                             description: "The time zone before the change"

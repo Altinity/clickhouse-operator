@@ -77,6 +77,18 @@ PATH_CHECK_KEYS=(
 	FTP_ADDRESS FTP_PATH FTP_OBJECT_DISK_PATH
 	SFTP_ADDRESS SFTP_PORT SFTP_PATH SFTP_OBJECT_DISK_PATH
 )
+# A config override, KEY=VALUE of the env var of a clickhouse-backup setting, as backupConfigOverrideRegexp in
+# type_backup_overrides.go bounds it: a single token of a command. The lengths of the key and the value are checked
+# apart, as TABLES_MAX_LENGTH
+CONFIG_OVERRIDE_RE='^[A-Z][A-Z0-9_]*=[A-Za-z0-9_.,:/@+=-]+$'
+CONFIG_OVERRIDE_KEY_MAX_LENGTH=64
+CONFIG_OVERRIDE_VALUE_MAX_LENGTH=256
+CONFIG_OVERRIDES_MAX_ITEMS=16
+# The settings a config override must not set, as BackupConfigOverrideForbidden in type_backup_overrides.go lists them
+# but those of where the backups are, PATH_CHECK_KEYS; every key of the REST API, API_*, and every key of a secret,
+# which holds one of CONFIG_OVERRIDE_SENSITIVE
+CONFIG_OVERRIDE_FORBIDDEN=' API_LISTEN API_SECURE API_ALLOW_PARALLEL RESTORE_SCHEMA_ON_CLUSTER CLICKHOUSE_RESTART_COMMAND RESTORE_DATABASE_MAPPING RESTORE_TABLE_MAPPING BACKUPS_TO_KEEP_REMOTE REBASE_DURING_DELETE REBASE_BEFORE_REMOVE_OLD_REMOTE API_USERNAME API_PASSWORD CLICKHOUSE_USERNAME CLICKHOUSE_PASSWORD CLICKHOUSE_BACKUP_CONFIG CLICKHOUSE_HOST CLICKHOUSE_PORT CLICKHOUSE_SECURE CLICKHOUSE_SKIP_VERIFY BACKUPS_TO_KEEP_LOCAL ALLOW_EMPTY_BACKUPS API_CREATE_INTEGRATION_TABLES '
+CONFIG_OVERRIDE_SENSITIVE=(PASSWORD SECRET ACCESS_KEY SECRET_KEY ACCOUNT_KEY SSE_KEY SSE_CUSTOMER_KEY ENCRYPTION_KEY TOKEN CREDENTIAL PRIVATE_KEY SAS CONNECTION_STRING)
 # The most backups held for a change of the schedule the termination message names
 HELD_REPORT_MAX=24
 REQUEST_TIMEOUT=600
@@ -102,6 +114,8 @@ SCHED_MINUTE=()
 SCHED_DAY=()
 SCHED_KEEP=()
 SCHED_INCREMENTAL=()
+# The --env flags of the config overrides of every entry, each " --env=KEY=VALUE"
+SCHED_ENV=()
 # SLOT_TAG is the wall time of the slot of the run in SCHEDULE_TIMEZONE, as YYYYMMDDHHMMSS; WINNER the index of the
 # heaviest schedule entry whose slot it is, empty when none is
 SLOT_TAG=
@@ -727,6 +741,18 @@ action_poll() {
 			warn "${host}: the sidecar restarted during ${what} ${name}"
 			return 1
 		fi
+		# The upload of a create_remote the sidecar resumes by itself, as for a typed request, but without the --env
+		# flags of the command, which it does not keep
+		if [[ ${what} == create_remote ]]; then
+			if ! lost_op "${host}" "${what}" "${name}"; then
+				return 1
+			fi
+			remember_step "${host}"
+			local message="${host}: the sidecar restarted during the upload of ${name}, which it resumed without the config overrides${CREATE_ENV:-}: the parts uploaded after the restart are stored with the settings of the sidecar"
+			advise "${message}"
+			event Warning OrchestratorOverridesNotResumed "${message}"
+			return 0
+		fi
 		warn "${host}: the sidecar restarted during ${what} ${name}, which it does not resume: the ${OPERATION} is partially applied"
 		return 1
 		;;
@@ -1262,7 +1288,7 @@ pinned_keys() {
 held_keys() {
 	local record change entries name
 	local -a records subset period=("${SCHED_PERIOD[@]}") hour=("${SCHED_HOUR[@]}") minute=("${SCHED_MINUTE[@]}")
-	local -a day=("${SCHED_DAY[@]}") keep=("${SCHED_KEEP[@]}") incremental=("${SCHED_INCREMENTAL[@]}")
+	local -a day=("${SCHED_DAY[@]}") keep=("${SCHED_KEEP[@]}") incremental=("${SCHED_INCREMENTAL[@]}") env=("${SCHED_ENV[@]}")
 	declare -gA HELD_KEYS=()
 	if [[ -z ${PREVIOUS_SCHEDULES:-} ]]; then
 		return 0
@@ -1301,6 +1327,7 @@ held_keys() {
 	done
 	SCHED_PERIOD=(${period[@]+"${period[@]}"}) SCHED_HOUR=(${hour[@]+"${hour[@]}"}) SCHED_MINUTE=(${minute[@]+"${minute[@]}"})
 	SCHED_DAY=(${day[@]+"${day[@]}"}) SCHED_KEEP=(${keep[@]+"${keep[@]}"}) SCHED_INCREMENTAL=(${incremental[@]+"${incremental[@]}"})
+	SCHED_ENV=(${env[@]+"${env[@]}"})
 }
 
 # retention_on_host HOST deletes on HOST the backups of OBSOLETE it lists, newest first: with a naming template, the
@@ -2061,6 +2088,28 @@ resolve_names() {
 	done
 }
 
+# check_override OVERRIDE reports whether OVERRIDE is a config override a backup may be made with, KEY=VALUE, setting
+# REPLY to why not: a single token of a command, of a key that is not one CONFIG_OVERRIDE_FORBIDDEN, PATH_CHECK_KEYS or
+# API_* lists, nor one of a secret, as the operator validates it
+check_override() {
+	local key=${1%%=*} value=${1#*=} token
+	REPLY=
+	if [[ ! $1 =~ ${CONFIG_OVERRIDE_RE} ]] || ((${#key} > CONFIG_OVERRIDE_KEY_MAX_LENGTH || ${#value} > CONFIG_OVERRIDE_VALUE_MAX_LENGTH)); then
+		REPLY="the config override '$1' is no KEY=VALUE of a clickhouse-backup setting"
+		return 1
+	fi
+	if [[ ${CONFIG_OVERRIDE_FORBIDDEN} == *" ${key} "* || ${key} == API_* ]] || listed "${key}" "${PATH_CHECK_KEYS[@]}"; then
+		REPLY="the config override of ${key} is refused: the operator sets it, or it tells where the backups are"
+		return 1
+	fi
+	for token in "${CONFIG_OVERRIDE_SENSITIVE[@]}"; do
+		if [[ ${key} == *"${token}"* ]]; then
+			REPLY="the config override of ${key} is refused: it is a secret, which belongs in the configuration of the sidecar"
+			return 1
+		fi
+	done
+}
+
 # period_weight PERIOD sets REPLY to the weight of a schedule period: the longer the period, the heavier
 period_weight() {
 	case $1 in
@@ -2075,15 +2124,16 @@ period_weight() {
 }
 
 # parse_schedules fills the SCHED_* arrays from SCHEDULES: entries separated by ";", each of blank-separated
-# key=value fields "period=<minute|hour|6hours|daily|weekly|monthly> [time=HH:MM] [day=N] keep=N [incremental=true]".
+# key=value fields "period=<minute|hour|6hours|daily|weekly|monthly> [time=HH:MM] [day=N] keep=N [incremental=true]
+# [env=KEY=VALUE]...", an env field for each config override of the entry, which check_override checks.
 # A minute entry is every minute, whatever its time; the time of an hour entry gives its minute, that of a 6hours entry
 # its minute and its hour modulo 6, empty is 00:00; daily, weekly and monthly entries need it. A weekly entry needs a day from 0 (Sunday) to 6, a monthly one a day from 1 to 31,
 # which a shorter month clamps to its last day; no other entry takes one. Anything else is fatal
 parse_schedules() {
-	local entry field key value index=0 period at day keep incremental
+	local entry field key value index=0 period at day keep incremental overrides
 	local -a entries fields
 	local -A periods=()
-	SCHED_PERIOD=() SCHED_HOUR=() SCHED_MINUTE=() SCHED_DAY=() SCHED_KEEP=() SCHED_INCREMENTAL=()
+	SCHED_PERIOD=() SCHED_HOUR=() SCHED_MINUTE=() SCHED_DAY=() SCHED_KEEP=() SCHED_INCREMENTAL=() SCHED_ENV=()
 	if [[ ${SCHEDULES:-} == *[[:cntrl:]]* ]]; then
 		die "SCHEDULES must be one line"
 	fi
@@ -2093,7 +2143,7 @@ parse_schedules() {
 		if ((${#fields[@]} == 0)); then
 			continue
 		fi
-		period= at= day= keep= incremental=false
+		period= at= day= keep= incremental=false overrides=
 		for field in "${fields[@]}"; do
 			if [[ ${field} != *=* ]]; then
 				die "SCHEDULES entry ${index}: ${field} is no key=value"
@@ -2106,6 +2156,12 @@ parse_schedules() {
 			day) day=${value} ;;
 			keep) keep=${value} ;;
 			incremental) incremental=${value} ;;
+			env)
+				if ! check_override "${value}"; then
+					die "SCHEDULES entry ${index}: ${REPLY}"
+				fi
+				overrides+=" --env=${value}"
+				;;
 			*) die "SCHEDULES entry ${index}: unknown key ${key}" ;;
 			esac
 		done
@@ -2157,6 +2213,7 @@ parse_schedules() {
 		SCHED_DAY+=("${day}")
 		SCHED_KEEP+=("${keep}")
 		SCHED_INCREMENTAL+=("${incremental}")
+		SCHED_ENV+=("${overrides}")
 		index=$((index + 1))
 	done
 }
@@ -2492,10 +2549,64 @@ backup_unseen() {
 		return 1
 	fi
 	STEP_NAME=${name}
+	# With config overrides the backup is a command of the actions endpoint, of tokens checked each
+	if [[ ${CREATE_KIND} == action ]]; then
+		STEP_ARGS=("create_remote${CREATE_FLAGS}${BASE_OF[$1]:+ --diff-from-remote=${BASE_OF[$1]}}${CREATE_ENV} ${name}")
+		return 0
+	fi
 	STEP_ARGS=(/backup/create_remote -G --data-urlencode "name=${name}" ${CREATE_PARAMS[@]+"${CREATE_PARAMS[@]}"})
 	if [[ -n ${BASE_OF[$1]:-} ]]; then
 		STEP_ARGS+=(--data-urlencode "diff-from-remote=${BASE_OF[$1]}")
 	fi
+}
+
+# config_overrides sets CREATE_KIND to how the backup is made: op, the typed create_remote request, or action, the
+# create_remote command of the actions endpoint, which alone takes the --env flags of config overrides, CREATE_ENV, as
+# the heaviest entry of the slot of a scheduled run gives them, or CONFIG_OVERRIDES those of a backup that runs no
+# schedule; CREATE_FLAGS are then the flags of its options, each a token checked as the API checks it. A backup run now
+# from the schedule takes no overrides
+config_overrides() {
+	local item
+	local -a items
+	CREATE_KIND=op
+	CREATE_FLAGS=
+	if [[ -n ${CONFIG_OVERRIDES:-} ]]; then
+		if ((${#SCHED_PERIOD[@]} > 0)); then
+			die "CONFIG_OVERRIDES are those of a backup that runs no schedule: a scheduled backup takes those of its entries"
+		fi
+		if [[ ${CONFIG_OVERRIDES} == *[[:cntrl:]]* ]]; then
+			die "CONFIG_OVERRIDES must be one line"
+		fi
+		read -r -a items <<<"${CONFIG_OVERRIDES}"
+		if ((${#items[@]} > CONFIG_OVERRIDES_MAX_ITEMS)); then
+			die "CONFIG_OVERRIDES holds more than ${CONFIG_OVERRIDES_MAX_ITEMS} overrides"
+		fi
+		for item in "${items[@]}"; do
+			if ! check_override "${item}"; then
+				die "CONFIG_OVERRIDES: ${REPLY}"
+			fi
+			CREATE_ENV+=" --env=${item}"
+		done
+	fi
+	if [[ -z ${CREATE_ENV} ]]; then
+		return 0
+	fi
+	CREATE_KIND=action
+	if is_true SCHEMA_ONLY; then
+		CREATE_FLAGS+=" --schema"
+	fi
+	if [[ -n ${TABLES:-} ]]; then
+		if [[ ! ${TABLES} =~ ${TABLES_RE} ]] || ((${#TABLES} > TABLES_MAX_LENGTH)); then
+			die "TABLES is not a valid table pattern"
+		fi
+		CREATE_FLAGS+=" --tables=${TABLES}"
+	fi
+	if [[ -n ${PARTITIONS:-} ]]; then
+		check_filter PARTITIONS "${PARTITIONS_RE}" "${FILTER_MAX_LENGTH}" "list of partition ids"
+		CREATE_FLAGS+=" --partitions=${PARTITIONS}"
+	fi
+	log "backup ${BACKUP_NAME}: made with the config overrides${CREATE_ENV}, through the actions endpoint"
+	event Normal OrchestratorConfigOverrides "backup ${BACKUP_NAME} is made with the config overrides${CREATE_ENV}"
 }
 
 do_backup() {
@@ -2562,6 +2673,7 @@ do_backup() {
 		CREATE_PARAMS+=(--data-urlencode "partitions=${PARTITIONS}")
 	fi
 	declare -gA BASE_OF=()
+	CREATE_ENV=
 	if [[ -n ${DIFF_FROM_REMOTE:-} ]]; then
 		check_name DIFF_FROM_REMOTE
 		# The base of a backup of a naming template is named by it alike, the backup of the shard of every host
@@ -2595,8 +2707,11 @@ do_backup() {
 				incremental=1
 				keep=${SCHED_KEEP[WINNER]}
 			fi
+			# The config overrides of the heaviest entry of the slot, as its incremental
+			CREATE_ENV=${SCHED_ENV[WINNER]}
 		fi
 	fi
+	config_overrides
 	check_storage_paths
 	wait_for_apis "${backup_hosts[@]}"
 
@@ -2645,7 +2760,7 @@ do_backup() {
 
 	# Every host makes its part of the backup at the same time, as the Altinity Cloud Manager has every shard make its own;
 	# one that fails leaves the others to finish, which the Job waits for before it fails
-	if ! run_all op "${backup_hosts[*]}" backup_unseen create_remote "${BACKUP_NAME}"; then
+	if ! run_all "${CREATE_KIND}" "${backup_hosts[*]}" backup_unseen create_remote "${BACKUP_NAME}"; then
 		drop_failed_backup ${STEP_FAILED_HOSTS[@]+"${STEP_FAILED_HOSTS[@]}"}
 		fail_all "backup ${BACKUP_NAME}"
 	fi
@@ -3768,6 +3883,11 @@ STEP_ARGS=()
 RESTORE_KIND=op
 ACTION_ENV=
 DATA_DOWNLOADS=
+# How create_remote runs, CREATE_KIND op or action, with the flags CREATE_FLAGS of its options and the --env flags
+# CREATE_ENV of its config overrides when an action
+CREATE_KIND=op
+CREATE_FLAGS=
+CREATE_ENV=
 # RESTORE_RBAC_WITH_SCHEMA is set when the schema restore of every replica restores the access entities too
 RESTORE_RBAC_WITH_SCHEMA=
 

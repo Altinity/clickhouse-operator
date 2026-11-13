@@ -217,6 +217,11 @@ func (in *BackupScheduleEntry) DeepCopyInto(out *BackupScheduleEntry) {
 		*out = new(types.StringBool)
 		**out = **in
 	}
+	if in.ConfigOverrides != nil {
+		in, out := &in.ConfigOverrides, &out.ConfigOverrides
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
@@ -972,6 +977,11 @@ func (in *ClickHouseBackupSpec) DeepCopyInto(out *ClickHouseBackupSpec) {
 		in, out := &in.OrchestratorConfigMapRef, &out.OrchestratorConfigMapRef
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
+	}
+	if in.ConfigOverrides != nil {
+		in, out := &in.ConfigOverrides, &out.ConfigOverrides
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	in.BackupOptions.DeepCopyInto(&out.BackupOptions)
 	return

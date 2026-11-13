@@ -119,6 +119,11 @@ type BackupScheduleEntry struct {
 	// Incremental makes the runs of the entry incremental backups on the newest backup of the series, as long as the
 	// chain of incremental backups is shorter than Keep; the run after makes a full backup again. At most one entry.
 	Incremental *types.StringBool `json:"incremental,omitempty" yaml:"incremental,omitempty"`
+	// ConfigOverrides are clickhouse-backup settings the runs of the entry make their backups with in place of those
+	// of the sidecar, as KEY=VALUE of the env var of the setting, e.g. S3_STORAGE_CLASS=GLACIER_IR for a monthly
+	// entry, see type_backup_overrides.go: those of the heaviest entry of a slot, which a lighter one of the slot
+	// leaves alone, as it does its incremental.
+	ConfigOverrides []string `json:"configOverrides,omitempty" yaml:"configOverrides,omitempty"`
 }
 
 // GetDay returns the day of the entry, -1 when it sets none, nil-safe.
@@ -174,6 +179,9 @@ func (entry *BackupScheduleEntry) Validate() error {
 	}
 	if entry.Keep < 1 {
 		return fmt.Errorf("%w: schedules[%s].keep must be at least 1", ErrInvalidBackupSpec, entry.Period)
+	}
+	if err := ValidateConfigOverrides(fmt.Sprintf("schedules[%s].configOverrides", entry.Period), entry.ConfigOverrides); err != nil {
+		return err
 	}
 	return validateStringBool(fmt.Sprintf("schedules[%s].incremental", entry.Period), entry.Incremental)
 }

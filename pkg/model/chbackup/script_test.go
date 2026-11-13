@@ -726,7 +726,8 @@ func (s *sidecarStub) servePost(w http.ResponseWriter, h *stubHost, call stubCal
 	case segments[0] == "actions":
 		// clickhouse-backup 2.8.1 takes the flags of a command after its name alone
 		fields := strings.Fields(call.command)
-		if (len(fields) < 2) || ((fields[0] != "restore_remote") && (fields[0] != "download") && (fields[0] != "restore")) {
+		if (len(fields) < 2) || ((fields[0] != "restore_remote") && (fields[0] != "download") && (fields[0] != "restore") &&
+			(fields[0] != "create_remote")) {
 			writeError(w, http.StatusBadRequest, call.command, "unknown command")
 			return
 		}
@@ -741,6 +742,16 @@ func (s *sidecarStub) servePost(w http.ResponseWriter, h *stubHost, call stubCal
 		})
 		if h.loseActions {
 			h.epoch++
+			// A create_remote whose upload the sidecar resumes, without its --env flags
+			if fields[0] == "create_remote" {
+				params := url.Values{}
+				for _, field := range fields {
+					if base, found := strings.CutPrefix(field, "--diff-from-remote="); found {
+						params.Set("diff-from-remote", base)
+					}
+				}
+				h.restart("create_remote", fields[len(fields)-1], params)
+			}
 		}
 		writeRows(w, http.StatusOK, map[string]string{"status": "acknowledged", "operation": call.command})
 	case segments[0] == "create_remote":
@@ -795,6 +806,8 @@ func (h *stubHost) readBackups(fields []string) []stubBackup {
 func (h *stubHost) actionFailure(fields []string) string {
 	name := fields[len(fields)-1]
 	switch {
+	case fields[0] == "create_remote":
+		return h.failOp["create_remote"]
 	case (fields[0] == "restore") && (findStubBackup(h.local, name) < 0):
 		return fmt.Sprintf("'%s' is not found on local storage", name)
 	case (fields[0] == "restore") && h.schemaCopies[name] && slices.Contains(fields, "--data"):
@@ -816,6 +829,16 @@ func (h *stubHost) actionFailure(fields []string) string {
 // entities only when it downloaded them; a restore, the copy it downloaded
 func (h *stubHost) completeAction(fields []string) {
 	name := fields[len(fields)-1]
+	if fields[0] == "create_remote" {
+		base := ""
+		for _, field := range fields {
+			if value, found := strings.CutPrefix(field, "--diff-from-remote="); found {
+				base = value
+			}
+		}
+		completeStubOp(h, "create_remote", name, base)
+		return
+	}
 	if fields[0] != "download" {
 		completeStubOp(h, fields[0], name)
 		return
@@ -976,7 +999,7 @@ func TestJobScriptReadsDeclaredEnv(t *testing.T) {
 		envPathClusters, envPathSelf, envPathInstallation, envPathNamespace, envPathReplicaSelection,
 		envDefaultPath, envDefaultObjectDiskPath, envSourceInstallation, envSourceNamespace, envSkipTables, envSkipTableEngines,
 		envDatabaseMapping, envBackupFallbackHosts, envHostsUsedMessage, envBackupNaming, envShardNumbers, envNamingInstallation,
-		envNamingNamespace, envKeepBackups, envPreviousSchedules, envHeldBackupsMessage,
+		envNamingNamespace, envKeepBackups, envPreviousSchedules, envHeldBackupsMessage, envConfigOverrides,
 	} {
 		require.Regexp(t, regexp.MustCompile(`\$\{!?`+name+`\b|\b(parse_hosts|is_true|check_name|default_path "\$\{index\}") `+name+`\b`), orchestratorScript, name)
 	}

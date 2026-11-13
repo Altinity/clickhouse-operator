@@ -115,6 +115,10 @@ const (
 	// envDatabaseMapping maps the databases of the backup to those a restore restores into, as clickhouse-backup
 	// takes it: "source:target" pairs separated by commas
 	envDatabaseMapping = "DATABASE_MAPPING"
+	// envConfigOverrides lists, space-separated, the config overrides of a one-off backup, KEY=VALUE each: the backup
+	// is made through the actions endpoint with an --env flag of each, see api.ConfigOverrides. Those of a scheduled
+	// backup are the env fields of the entries of envSchedules
+	envConfigOverrides = "CONFIG_OVERRIDES"
 	// envDiffFromRemote names the remote base backup of an incremental backup
 	envDiffFromRemote = "DIFF_FROM_REMOTE"
 	// envNoDataMessage is the termination message the script leaves when the backup it made holds no

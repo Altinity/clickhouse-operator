@@ -62,6 +62,8 @@ var backupRules = map[string]string{
 		"replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef",
 	"!has(self.scheduleRef) || (has(self.backupName) ? self.backupName : '') == ''": "a backup that runs a schedule is " +
 		"named with the schedule's backupNamePrefix: backupName is not set with scheduleRef",
+	"!has(self.scheduleRef) || !has(self.configOverrides)": "a backup that runs a schedule takes no configOverrides: " +
+		"they are not set with scheduleRef",
 	"!has(self.backupName) || !self.backupName.matches('" + scheduledBackupNameRegexp.String() + "')": "backupName must not " +
 		"end like the backups of a schedule, " + BackupNameScheduleSuffix + ", which the retention of a schedule of that prefix would prune",
 }
@@ -476,5 +478,20 @@ func TestNamingTemplateMatchesTheTypes(t *testing.T) {
 		value := regexp.MustCompile(`(?m)^` + name + `='?([^'\n]*)'?$`).FindStringSubmatch(script)
 		require.NotNil(t, value, "the script no longer defines %s", name)
 		require.Equal(t, want, value[1], name)
+	}
+}
+
+// A config override is bounded alike by the CRD schema and the spec validation, which take the --env= flag in front of
+// it, on a one-off backup and on every entry of a schedule.
+func TestBackupCRDBoundsTheConfigOverrides(t *testing.T) {
+	for name, path := range map[string]string{
+		"clickhousebackups.clickhouse.altinity.com":         "spec.configOverrides",
+		"clickhousebackupschedules.clickhouse.altinity.com": "spec.schedules.configOverrides",
+	} {
+		overrides := schemaProperty(loadCRDSchema(t, backupCRDTemplatePath, name), path)
+		require.NotNil(t, overrides, path)
+		require.Equal(t, BackupConfigOverridesMaxItems, overrides["maxItems"], path)
+		items := overrides["items"].(map[string]any)
+		require.Equal(t, "^(--env=)?"+strings.TrimPrefix(backupConfigOverrideRegexp.String(), "^"), items["pattern"], path)
 	}
 }
