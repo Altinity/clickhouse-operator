@@ -641,8 +641,10 @@ func completeStubOp(h *stubHost, kind, name string, base ...string) {
 		}
 		h.remote = append(h.remote, backup)
 	case "download", "restore_remote":
-		if !h.noLocalOnDownload && (findStubBackup(h.local, name) < 0) {
-			h.local = append(h.local, stubBackup{Name: name, Location: "local", Desc: "regular"})
+		if i := findStubBackup(h.local, name); !h.noLocalOnDownload && (i >= 0) {
+			h.local[i] = local(name)
+		} else if !h.noLocalOnDownload {
+			h.local = append(h.local, local(name))
 		}
 	}
 }
@@ -706,7 +708,8 @@ func (s *sidecarStub) servePost(w http.ResponseWriter, h *stubHost, call stubCal
 		op := &stubOp{host: call.host, kind: kind, name: name, params: call.query, polls: 1, epoch: h.epoch}
 		// clickhouse-backup 2.8.1 downloads no backup it holds a copy of, and restores none it holds no copy of
 		switch {
-		case (kind == "download") && (findStubBackup(h.local, name) >= 0):
+		// An incomplete copy, listed broken, is no copy: its download resumes
+		case (kind == "download") && (findStubBackup(h.local, name) >= 0) && !strings.HasPrefix(h.local[findStubBackup(h.local, name)].Desc, "broken"):
 			op.fails = fmt.Sprintf("'%s' already exists", name)
 		case (kind == "download") && (findStubBackup(h.remote, name) < 0):
 			op.fails = fmt.Sprintf("'%s' is not found on remote storage", name)
@@ -2194,6 +2197,39 @@ func TestJobScriptRestoreDownloadsEverywhereFirst(t *testing.T) {
 	for _, host := range []string{"a0", "a1", "b1"} {
 		require.Empty(t, hosts[host].local, "the copy %s downloaded is deleted:\n%s", host, out)
 	}
+}
+
+// A host that holds an incomplete local copy of the backup, as a download that failed or was stopped leaves it,
+// downloads it again, which clickhouse-backup resumes, rather than restoring from it; a restore whose download fails
+// leaves that copy for the next one to resume, and deletes only the copies it started itself.
+func TestJobScriptRestoreResumesAnIncompleteLocalCopy(t *testing.T) {
+	incomplete := stubBackup{Name: "bk-1", Location: "local", Desc: "broken (can't stat metadata.json)"}
+	t.Run("restored", func(t *testing.T) {
+		hosts := replicaRestoreHosts()
+		hosts["a0"].local = []stubBackup{incomplete}
+		s := newSidecarStub(t, hosts)
+		code, out := s.run(replicaRestoreEnv(nil))
+		require.Zero(t, code, out)
+		require.Contains(t, out, "a0: holds an incomplete local copy of bk-1, whose download the restore resumes")
+		require.Contains(t, s.restoreSteps(), "a0 download hardlink_exists_files=")
+		require.Empty(t, hosts["a0"].local, "the resumed copy is deleted after the restore, as any it downloaded")
+	})
+	t.Run("download failed", func(t *testing.T) {
+		hosts := replicaRestoreHosts()
+		hosts["a0"].local = []stubBackup{incomplete}
+		hosts["b0"].failOp = map[string]string{"download": "not enough space on disk default"}
+		hosts["a0"].failOp = map[string]string{"download": "connection reset"}
+		s := newSidecarStub(t, hosts)
+		code, out := s.run(replicaRestoreEnv(map[string]string{envUnchangedExitCode: "3"}))
+		require.Equal(t, 3, code, out)
+		require.Equal(t, []stubBackup{incomplete}, hosts["a0"].local, "the incomplete copy is kept to resume:\n%s", out)
+		for _, host := range []string{"a1", "b1"} {
+			require.Empty(t, hosts[host].local, "the copy %s downloaded is deleted:\n%s", host, out)
+		}
+		for _, request := range s.matching(http.MethodPost, "/backup/delete/local/bk-1") {
+			require.NotEqual(t, "a0", request.host)
+		}
+	})
 }
 
 // Without overwrite the guard has proven that nothing of the backup exists, so every schema host

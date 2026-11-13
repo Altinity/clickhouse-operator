@@ -11359,7 +11359,7 @@ data:
     
     do_restore() {
     	local host restore_data=1 overwrite= validate= restore_rbac= holds_rbac= replicas= hint where base READ_ONLY=
-    	local -a schema_hosts data_hosts targets guarded used shards had_local=() downloads
+    	local -a schema_hosts data_hosts targets guarded used shards had_local=() resumed=() downloads drop
     	check_name BACKUP_NAME
     	parse_hosts SCHEMA_HOSTS
     	schema_hosts=("${HOSTS[@]}")
@@ -11500,7 +11500,16 @@ data:
     	fi
     	if [[ -z ${SOURCE_ENV} ]]; then
     		for host in "${used[@]}"; do
-    			if list_backups "${host}" local && find_backup "${BACKUP_NAME}"; then
+    			if ! list_backups "${host}" local || ! find_backup "${BACKUP_NAME}"; then
+    				continue
+    			fi
+    			# An incomplete copy, as a download that failed or was stopped leaves it, is downloaded again, which
+    			# clickhouse-backup resumes from its resumable state (use_resumable_state) rather than starting over; it is
+    			# never deleted before that
+    			if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
+    				log "${host}: holds an incomplete local copy of ${BACKUP_NAME}, whose download the restore resumes"
+    				resumed+=("${host}")
+    			else
     				had_local+=("${host}")
     			fi
     		done
@@ -11518,7 +11527,7 @@ data:
     
     	# As the Altinity Cloud Manager restores, every host first downloads the backup, at once, the data to those that
     	# restore it, hard-linking every file of it already on their disks: a host short of disk space fails the restore here,
-    	# before anything is dropped. A host that holds a copy of the backup already restores from it
+    	# before anything is dropped. A host that holds a complete copy of the backup already restores from it
     	downloads=()
     	for host in "${used[@]}"; do
     		if ! listed "${host}" ${had_local[@]+"${had_local[@]}"}; then
@@ -11535,7 +11544,14 @@ data:
     		if ! run_all "${RESTORE_KIND}" "${downloads[*]}" download_args download "${BACKUP_NAME}"; then
     			READ_ONLY=
     			if [[ -z ${SOURCE_ENV} ]]; then
-    				drop_downloads "${downloads[@]}"
+    				# The incomplete copies the hosts held before are left for the next restore to resume
+    				drop=()
+    				for host in "${downloads[@]}"; do
+    					if ! listed "${host}" ${resumed[@]+"${resumed[@]}"}; then
+    						drop+=("${host}")
+    					fi
+    				done
+    				drop_downloads ${drop[@]+"${drop[@]}"}
     			fi
     			fail_all "download of ${BACKUP_NAME}"
     		fi

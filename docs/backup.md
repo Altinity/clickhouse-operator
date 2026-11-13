@@ -1137,7 +1137,10 @@ downloads the backup, all at once: the hosts that restore data download it whole
 file of it already on their disks (`--hardlink-exists-files`) instead of downloading it again, the
 others the schema alone. A host short of disk space fails the restore here, before anything is
 dropped, and the copies the others downloaded are deleted again; a host that already holds a local
-copy of the backup restores from that one. Then the schema is restored on every replica, each from
+copy of the backup restores from that one. An incomplete local copy - one a download that failed or
+was stopped left, which `clickhouse-backup` lists as `broken` - is never deleted: the host downloads
+the backup again, which `clickhouse-backup` resumes where the copy ends (`use_resumable_state`, on by
+default), and a restore whose download fails again leaves it for the next one to resume. Then the schema is restored on every replica, each from
 the copy of its shard, one after another - with the access entities, when the restore restores
 them - then the data on one replica of each shard, all at once; replication copies `Replicated*` tables to the other replicas. Each step
 restores from the downloaded copy (`POST /backup/restore`), which is deleted once the restore is
