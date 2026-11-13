@@ -349,19 +349,30 @@ proxy_failed() {
 	[[ ${HTTP_CODE} == 50[234] ]]
 }
 
+# changes_so_far SEPARATOR SEPARATOR_CHANGED sets REPLY to what the run has changed so far, after the separator of its case
+changes_so_far() {
+	if [[ -z ${MUTATED} ]]; then
+		REPLY="$1 nothing was changed"
+	else
+		REPLY="$2 the ${OPERATION} is partially applied"
+	fi
+}
+
 # call METHOD HOST PATH [CURL_ARGS...] performs an API call, retrying while the sidecar is unreachable
 call() {
-	local method=$1 host=$2 last= since=${SECONDS}
+	local method=$1 host=$2 last= since=${SECONDS} limit
 	while :; do
 		request "$@"
 		if [[ -n ${BEST_EFFORT:-} ]] || ! unreachable "${method}"; then
 			return 0
 		fi
-		if [[ -z ${MUTATED} ]] && ((SECONDS - since >= UNREACHABLE_TIMEOUT)); then
-			die "${host}: sidecar unreachable for $((SECONDS - since))s (curl exit ${CURL_EXIT}, HTTP ${HTTP_CODE}), nothing was changed"
+		limit=${UNREACHABLE_TIMEOUT}
+		if [[ -n ${MUTATED} ]]; then
+			limit=${MUTATED_UNREACHABLE_TIMEOUT}
 		fi
-		if [[ -n ${MUTATED} ]] && ((SECONDS - since >= MUTATED_UNREACHABLE_TIMEOUT)); then
-			die "${host}: sidecar unreachable for $((SECONDS - since))s (curl exit ${CURL_EXIT}, HTTP ${HTTP_CODE}), the ${OPERATION} is partially applied"
+		if ((SECONDS - since >= limit)); then
+			changes_so_far , ,
+			die "${host}: sidecar unreachable for $((SECONDS - since))s (curl exit ${CURL_EXIT}, HTTP ${HTTP_CODE})${REPLY}"
 		fi
 		if [[ ${last} != "${CURL_EXIT}/${HTTP_CODE}" ]]; then
 			last="${CURL_EXIT}/${HTTP_CODE}"
@@ -378,12 +389,21 @@ error_of() {
 	printf '%s' "${err:-${HTTP_BODY}}"
 }
 
+# get_ok HOST WHAT PATH [CURL_ARGS...] GETs PATH of HOST, warning that it cannot WHAT unless HOST answers 200
+get_ok() {
+	local host=$1 what=$2
+	shift 2
+	call GET "${host}" "$@"
+	if [[ ${HTTP_CODE} != 200 ]]; then
+		warn "${host}: cannot ${what} (HTTP ${HTTP_CODE}): $(error_of)"
+		return 1
+	fi
+}
+
 wait_idle() {
 	local host=$1 announced=
 	while :; do
-		call GET "${host}" /backup/actions
-		if [[ ${HTTP_CODE} != 200 ]]; then
-			warn "${host}: cannot read sidecar actions (HTTP ${HTTP_CODE}): $(error_of)"
+		if ! get_ok "${host}" "read sidecar actions" /backup/actions; then
 			return 1
 		fi
 		if [[ ! ${HTTP_BODY} =~ ${IN_PROGRESS_RE} ]]; then
@@ -478,9 +498,7 @@ remember_step() {
 sidecar_kept() {
 	local host=$1 i
 	if [[ -n ${LAST_OP[${host}]:-} ]]; then
-		call GET "${host}" /backup/status -G --data-urlencode "operationid=${LAST_OP[${host}]}"
-		if [[ ${HTTP_CODE} != 200 ]]; then
-			warn "${host}: cannot read the status of the last step (HTTP ${HTTP_CODE}): $(error_of)"
+		if ! get_ok "${host}" "read the status of the last step" /backup/status -G --data-urlencode "operationid=${LAST_OP[${host}]}"; then
 			return 1
 		fi
 		if [[ $(json_field status "${HTTP_BODY}") == success ]]; then
@@ -498,27 +516,22 @@ sidecar_kept() {
 	else
 		return 0
 	fi
-	if [[ -z ${MUTATED} ]]; then
-		warn "${host}: the sidecar restarted after the last step of this ${OPERATION} on it, which it no longer knows; nothing was changed"
-		return 1
-	fi
-	warn "${host}: the sidecar restarted after the last step of this ${OPERATION} on it, which it no longer knows: the ${OPERATION} is partially applied"
+	changes_so_far ";" ":"
+	warn "${host}: the sidecar restarted after the last step of this ${OPERATION} on it, which it no longer knows${REPLY}"
 	return 1
 }
 
+# action_rows HOST COMMAND [NAME] sets ACTION_STARTS, ACTION_STATUSES and ACTION_ERRORS to the rows of the actions of
+# HOST that ran COMMAND, or, with NAME, that resumed the COMMAND (upload or download) of the backup NAME
 action_rows() {
-	local host=$1 command=$2 line
-	ACTION_STARTS=()
-	ACTION_STATUSES=()
-	ACTION_ERRORS=()
-	call GET "${host}" /backup/actions
-	if [[ ${HTTP_CODE} != 200 ]]; then
-		warn "${host}: cannot read sidecar actions (HTTP ${HTTP_CODE}): $(error_of)"
+	local host=$1 line
+	ACTION_STARTS=() ACTION_STATUSES=() ACTION_ERRORS=()
+	if ! get_ok "${host}" "read sidecar actions" /backup/actions; then
 		return 1
 	fi
 	while IFS= read -r line; do
 		json_get command "${line}"
-		if [[ ${REPLY} != "${command}" ]]; then
+		if [[ -n ${3:-} && ${REPLY} != "$2 "*"--resumable=1 $3" || -z ${3:-} && ${REPLY} != "$2" ]]; then
 			continue
 		fi
 		json_get start "${line}"
@@ -530,9 +543,20 @@ action_rows() {
 	done <<<"${HTTP_BODY}"
 }
 
-run_action() {
-	if run_action_steps "$@"; then
-		return 0
+# run_step KIND HOST WHAT NAME ARGS... runs a step on HOST and polls it until it ends: an op, op_start PATH
+# [CURL_ARGS...], or an action, action_start COMMAND; unless NO_STEP, its failure is an Event
+run_step() {
+	local kind=$1 rc=2
+	shift
+	if "${kind}_start" "$@"; then
+		while ((rc == 2)); do
+			sleep "${POLL_INTERVAL}"
+			rc=0
+			"${kind}_poll" "$1" "$2" "$3" || rc=$?
+		done
+		if ((rc == 0)); then
+			return 0
+		fi
 	fi
 	if [[ -z ${NO_STEP:-} ]]; then
 		event Warning OrchestratorHostFailed "$1: $2 $3 failed${LAST_WARNING:+: ${LAST_WARNING}}"
@@ -540,20 +564,14 @@ run_action() {
 	return 1
 }
 
-# run_action_steps HOST WHAT NAME COMMAND is run_action without the Event of a failure
-run_action_steps() {
-	local rc
-	if ! action_start "$@"; then
-		return 1
+# step_succeeded HOST WHAT NAME [OPERATION_ID [START COMMAND]] tells of a step that succeeded and, unless NO_STEP,
+# remembers it
+step_succeeded() {
+	log "$1: $2 $3 succeeded"
+	if [[ -z ${NO_STEP:-} ]]; then
+		remember_step "$1" "${@:4}"
+		event Normal OrchestratorHostStepSucceeded "$1: $2 $3 succeeded"
 	fi
-	while :; do
-		sleep "${POLL_INTERVAL}"
-		rc=0
-		action_poll "$1" "$2" "$3" || rc=$?
-		if ((rc != 2)); then
-			return "${rc}"
-		fi
-	done
 }
 
 action_start() {
@@ -578,7 +596,7 @@ action_start() {
 	fi
 }
 
-# action_poll HOST WHAT NAME reads once the row of the action action_start submitted to HOST
+# action_poll HOST WHAT NAME reads once the row of the action action_start submitted to HOST: 2 while it runs
 action_poll() {
 	local host=$1 what=$2 name=$3 command=${ACTION_COMMAND[$1]} i start= status= error=
 	if ! action_rows "${host}" "${command}"; then
@@ -593,61 +611,31 @@ action_poll() {
 	case ${status} in
 	"in progress") return 2 ;;
 	success)
-		log "${host}: ${what} ${name} succeeded"
-		if [[ -z ${NO_STEP:-} ]]; then
-			remember_step "${host}" "" "${start}" "${command}"
-			event Normal OrchestratorHostStepSucceeded "${host}: ${what} ${name} succeeded"
-		fi
+		step_succeeded "${host}" "${what}" "${name}" "" "${start}" "${command}"
 		return 0
 		;;
-	"")
-		if [[ -n ${NO_STEP:-} ]]; then
-			warn "${host}: the sidecar restarted during ${what} ${name}"
-			return 1
-		fi
-		if [[ ${what} == create_remote ]]; then
-			if ! lost_op "${host}" "${what}" "${name}"; then
-				return 1
-			fi
-			remember_step "${host}"
-			local message="${host}: the sidecar restarted during the upload of ${name}, which it resumed without the config overrides${CREATE_ENV:-}: the parts uploaded after the restart are stored with the settings of the sidecar"
-			advise "${message}"
-			event Warning OrchestratorOverridesNotResumed "${message}"
-			return 0
-		fi
-		warn "${host}: the sidecar restarted during ${what} ${name}, which it does not resume: the ${OPERATION} is partially applied"
-		return 1
-		;;
+	"") ;;
 	*)
 		warn "${host}: ${what} ${name} ended with status '${status}': ${error}"
 		return 1
 		;;
 	esac
-}
-
-# run_op HOST WHAT NAME PATH [CURL_ARGS...] starts an asynchronous sidecar operation on backup NAME
-run_op() {
-	if run_op_steps "$@"; then
-		return 0
-	fi
-	event Warning OrchestratorHostFailed "$1: $2 $3 failed${LAST_WARNING:+: ${LAST_WARNING}}"
-	return 1
-}
-
-# run_op_steps HOST WHAT NAME PATH [CURL_ARGS...] is run_op without the Event of a failure
-run_op_steps() {
-	local rc
-	if ! op_start "$@"; then
+	# the sidecar restarted: it lost the row, and resumes nothing but an upload
+	if [[ -n ${NO_STEP:-} ]]; then
+		warn "${host}: the sidecar restarted during ${what} ${name}"
 		return 1
 	fi
-	while :; do
-		sleep "${POLL_INTERVAL}"
-		rc=0
-		op_poll "$1" "$2" "$3" || rc=$?
-		if ((rc != 2)); then
-			return "${rc}"
-		fi
-	done
+	if [[ ${what} != create_remote ]]; then
+		warn "${host}: the sidecar restarted during ${what} ${name}, which it does not resume: the ${OPERATION} is partially applied"
+		return 1
+	fi
+	if ! lost_op "${host}" "${what}" "${name}"; then
+		return 1
+	fi
+	remember_step "${host}"
+	local message="${host}: the sidecar restarted during the upload of ${name}, which it resumed without the config overrides${CREATE_ENV:-}: the parts uploaded after the restart are stored with the settings of the sidecar"
+	advise "${message}"
+	event Warning OrchestratorOverridesNotResumed "${message}"
 }
 
 op_start() {
@@ -672,12 +660,10 @@ op_start() {
 	OP_ID[${host}]=${id}
 }
 
-# op_poll HOST WHAT NAME reads once the status of the operation op_start submitted to HOST
+# op_poll HOST WHAT NAME reads once the status of the operation op_start submitted to HOST: 2 while it runs
 op_poll() {
 	local host=$1 what=$2 name=$3 id=${OP_ID[$1]} status
-	call GET "${host}" /backup/status -G --data-urlencode "operationid=${id}"
-	if [[ ${HTTP_CODE} != 200 ]]; then
-		warn "${host}: cannot read status of ${what} (HTTP ${HTTP_CODE}): $(error_of)"
+	if ! get_ok "${host}" "read status of ${what}" /backup/status -G --data-urlencode "operationid=${id}"; then
 		return 1
 	fi
 	status=$(json_field status "${HTTP_BODY}")
@@ -686,18 +672,12 @@ op_poll() {
 	fi
 	case ${status} in
 	"in progress") return 2 ;;
-	success)
-		log "${host}: ${what} ${name} succeeded"
-		remember_step "${host}" "${id}"
-		event Normal OrchestratorHostStepSucceeded "${host}: ${what} ${name} succeeded"
-		return 0
-		;;
+	success) step_succeeded "${host}" "${what}" "${name}" "${id}" ;;
 	"")
 		if ! lost_op "${host}" "${what}" "${name}"; then
 			return 1
 		fi
 		remember_step "${host}"
-		return 0
 		;;
 	*)
 		warn "${host}: ${what} ${name} ended with status '${status}': $(error_of)"
@@ -706,26 +686,24 @@ op_poll() {
 	esac
 }
 
+# run_all KIND PREPARE WHAT NAME HOST... runs a step on every HOST at once, as run_step does: PREPARE HOST sets
+# STEP_ARGS, and STEP_NAME, which is NAME unless it changes it, or fails, which leaves the hosts after HOST unstarted
 run_all() {
-	local kind=$1 check=$3 what=$4 name=$5 host rc
-	local -a hosts pending=() running
+	local kind=$1 prepare=$2 what=$3 name=$4 host rc
+	local -a pending=() running
 	local -A names=()
-	read -r -a hosts <<<"$2"
-	shift 5
-	FAILED_HOSTS=()
-	FAILURES=()
-	STEP_FAILED_HOSTS=()
-	for host in "${hosts[@]}"; do
+	shift 4
+	FAILED_HOSTS=() FAILURES=() STEP_FAILED_HOSTS=()
+	for host in "$@"; do
 		LAST_WARNING=
-		STEP_ARGS=("$@")
 		STEP_NAME=${name}
-		if [[ -n ${check} ]] && ! "${check}" "${host}"; then
-			step_failed "${kind}" "${host}" "${what}" "${STEP_NAME}"
+		if ! "${prepare}" "${host}"; then
+			step_failed "${host}" "${what}" "${STEP_NAME}"
 			break
 		fi
 		names[${host}]=${STEP_NAME}
 		if ! "${kind}_start" "${host}" "${what}" "${STEP_NAME}" "${STEP_ARGS[@]}"; then
-			step_failed "${kind}" "${host}" "${what}" "${STEP_NAME}"
+			step_failed "${host}" "${what}" "${STEP_NAME}"
 			STEP_FAILED_HOSTS+=("${host}")
 			break
 		fi
@@ -742,7 +720,7 @@ run_all() {
 			0) ;;
 			2) running+=("${host}") ;;
 			*)
-				step_failed "${kind}" "${host}" "${what}" "${names[${host}]}"
+				step_failed "${host}" "${what}" "${names[${host}]}"
 				STEP_FAILED_HOSTS+=("${host}")
 				;;
 			esac
@@ -752,49 +730,24 @@ run_all() {
 	((${#FAILED_HOSTS[@]} == 0))
 }
 
+# step_failed HOST WHAT NAME records the failure of a step of run_all
 step_failed() {
-	FAILED_HOSTS+=("$2")
-	FAILURES+=("${LAST_WARNING:-$2: $3 $4 failed}")
-	if [[ $1 == op || -z ${NO_STEP:-} ]]; then
-		event Warning OrchestratorHostFailed "$2: $3 $4 failed${LAST_WARNING:+: ${LAST_WARNING}}"
-	fi
+	FAILED_HOSTS+=("$1")
+	FAILURES+=("${LAST_WARNING:-$1: $2 $3 failed}")
+	event Warning OrchestratorHostFailed "$1: $2 $3 failed${LAST_WARNING:+: ${LAST_WARNING}}"
 }
 
 fail_all() {
-	local hosts failure
-	join_items "${FAILED_HOSTS[@]}"
+	local hosts
+	join_items ", " "${FAILED_HOSTS[@]}"
 	hosts=${REPLY}
-	if ((${#FAILURES[@]} == 1)); then
-		die "$1 failed on ${hosts}: ${FAILURES[0]}"
-	fi
-	REPLY=
-	for failure in "${FAILURES[@]}"; do
-		REPLY+=${REPLY:+; }${failure}
-	done
+	join_items "; " "${FAILURES[@]}"
 	die "$1 failed on ${hosts}: ${REPLY}"
-}
-
-# resumed_action HOST COMMAND NAME sets RESUMED_STATUS and RESUMED_ERROR from the last COMMAND
-resumed_action() {
-	local host=$1 command=$2 name=$3 line
-	RESUMED_STATUS=
-	RESUMED_ERROR=
-	call GET "${host}" /backup/actions
-	if [[ ${HTTP_CODE} != 200 ]]; then
-		warn "${host}: cannot read sidecar actions (HTTP ${HTTP_CODE}): $(error_of)"
-		return 1
-	fi
-	while IFS= read -r line; do
-		if [[ $(json_field command "${line}") == "${command} "*"--resumable=1 ${name}" ]]; then
-			RESUMED_STATUS=$(json_field status "${line}")
-			RESUMED_ERROR=$(json_field error "${line}")
-		fi
-	done <<<"${HTTP_BODY}"
 }
 
 # lost_op HOST WHAT NAME settles an operation that a restarted sidecar no longer knows
 lost_op() {
-	local host=$1 what=$2 name=$3 resumed where outcome since=${SECONDS}
+	local host=$1 what=$2 name=$3 resumed where outcome status error since=${SECONDS}
 	case ${what} in
 	create_remote) resumed=upload where=remote outcome="the remote backup ${name} may still complete" ;;
 	download) resumed=download where=local outcome="the download of ${name} may still complete" ;;
@@ -805,10 +758,11 @@ lost_op() {
 	esac
 	log "${host}: the sidecar restarted during ${what} ${name}, waiting for it to resume the ${resumed}"
 	while :; do
-		if ! resumed_action "${host}" "${resumed}" "${name}"; then
+		if ! action_rows "${host}" "${resumed}" "${name}"; then
 			return 1
 		fi
-		case ${RESUMED_STATUS} in
+		status=${ACTION_STATUSES[*]: -1} error=${ACTION_ERRORS[*]: -1}
+		case ${status} in
 		"in progress")
 			since=${SECONDS}
 			;;
@@ -827,7 +781,7 @@ lost_op() {
 			fi
 			;;
 		*)
-			warn "${host}: the resumed ${resumed} of ${name} ended with status '${RESUMED_STATUS}': ${RESUMED_ERROR}"
+			warn "${host}: the resumed ${resumed} of ${name} ended with status '${status}': ${error}"
 			return 1
 			;;
 		esac
@@ -2388,7 +2342,7 @@ do_backup() {
 		fi
 	fi
 
-	if ! run_all "${CREATE_KIND}" "${backup_hosts[*]}" backup_unseen create_remote "${BACKUP_NAME}"; then
+	if ! run_all "${CREATE_KIND}" backup_unseen create_remote "${BACKUP_NAME}" "${backup_hosts[@]}"; then
 		drop_failed_backup ${STEP_FAILED_HOSTS[@]+"${STEP_FAILED_HOSTS[@]}"}
 		fail_all "backup ${BACKUP_NAME}"
 	fi
@@ -2428,7 +2382,7 @@ do_verify() {
 				fail "verify failed on ${host}: cannot drop the local copy of ${name}"
 			fi
 		fi
-		if ! run_op "${host}" download "${name}" "/backup/download/${name}"; then
+		if ! run_step op "${host}" download "${name}" "/backup/download/${name}"; then
 			fail "verify failed on ${host}: ${name} cannot be downloaded"
 		fi
 		if ! has_usable_backup "${host}" local "${name}"; then
@@ -2623,11 +2577,13 @@ guard_tables() {
 	fi
 }
 
+# join_items SEPARATOR ITEM... sets REPLY to the items joined by SEPARATOR
 join_items() {
-	local item
+	local separator=$1 item
 	REPLY=
+	shift
 	for item in "$@"; do
-		REPLY+=${REPLY:+, }${item}
+		REPLY+=${REPLY:+${separator}}${item}
 	done
 }
 
@@ -2712,7 +2668,7 @@ refuse_database_drops() {
 		fi
 	done
 	if ((${#found[@]} > 0)); then
-		join_items "${found[@]:0:10}"
+		join_items ", " "${found[@]:0:10}"
 		die "refusing to overwrite: a host of cluster ${CLUSTER} that drops a database as a whole would stop at the second table of it ${stop} max_table_size_to_drop (${MAX_TABLE_SIZE_TO_DROP} bytes) (${REPLY}), as clickhouse-backup forces the drop of only one such table of each database it drops as a whole; ${SIZE_LIMIT_ADVICE}"
 	fi
 }
@@ -2763,7 +2719,7 @@ plan_overwrite() {
 	fi
 	if ((${#SHARD_TABLES_DIFFER[@]} > 0)); then
 		mapfile -t SHARD_TABLES_DIFFER < <(printf '%s\n' "${SHARD_TABLES_DIFFER[@]}" | sort)
-		join_items "${SHARD_TABLES_DIFFER[@]:0:10}"
+		join_items ", " "${SHARD_TABLES_DIFFER[@]:0:10}"
 		die "refusing to overwrite: the tables of ${BACKUP_NAME} differ between the shards of cluster ${CLUSTER} (${REPLY}): the drop ON CLUSTER drops and recreates on every shard the tables of the backup of ${initiator}, which takes the backup of every shard to hold the same; narrow the restore with tables to those they all hold"
 	fi
 	if ! drop_size_limited; then
@@ -2785,7 +2741,7 @@ plan_overwrite() {
 		fi
 	done
 	if ((${#oversized[@]} > 0)); then
-		join_items "${oversized[@]:0:10}"
+		join_items ", " "${oversized[@]:0:10}"
 		die "refusing to overwrite: the drop ON CLUSTER from ${initiator} would stop at tables larger than max_table_size_to_drop (${MAX_TABLE_SIZE_TO_DROP} bytes) of cluster ${CLUSTER} on other hosts (${REPLY}), as clickhouse-backup forces the drop of such a table on ${initiator} alone; ${SIZE_LIMIT_ADVICE}"
 	fi
 	refuse_database_drops "" "${initiator}"
@@ -2898,7 +2854,7 @@ source_copy() {
 	fi
 	refuse_local_copy "${host}"
 	SOURCE_COPIES+=("${host}")
-	if ! run_action "${host}" download "${HOST_BACKUP[${host}]}" "download --schema --rbac ${SOURCE_ENV} ${HOST_BACKUP[${host}]}"; then
+	if ! run_step action "${host}" download "${HOST_BACKUP[${host}]}" "download --schema --rbac ${SOURCE_ENV} ${HOST_BACKUP[${host}]}"; then
 		die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage path '${SOURCE_PATH_SHOWN}' of ${host}, or cannot be read there${LAST_WARNING:+: ${LAST_WARNING}}${SOURCE_HINT}"
 	fi
 }
@@ -2982,7 +2938,7 @@ restore_step() {
 	if [[ $3 == schema_on_cluster ]]; then
 		kind=action
 	fi
-	"run_${kind}" "$1" "$2" "${HOST_BACKUP[$1]}" "${STEP_ARGS[@]}"
+	run_step "${kind}" "$1" "$2" "${HOST_BACKUP[$1]}" "${STEP_ARGS[@]}"
 }
 
 check_filter() {
@@ -3256,7 +3212,7 @@ do_restore() {
 	fi
 	if ((${#downloads[@]} > 0)); then
 		READ_ONLY=1
-		if ! run_all "${RESTORE_KIND}" "${downloads[*]}" download_args download "${BACKUP_NAME}"; then
+		if ! run_all "${RESTORE_KIND}" download_args download "${BACKUP_NAME}" "${downloads[@]}"; then
 			READ_ONLY=
 			if [[ -z ${SOURCE_ENV} ]]; then
 				drop=()
@@ -3284,7 +3240,7 @@ do_restore() {
 		fi
 	done
 	if [[ -n ${restore_data} ]]; then
-		if ! run_all "${RESTORE_KIND}" "${data_hosts[*]}" data_args "restore data" "${BACKUP_NAME}"; then
+		if ! run_all "${RESTORE_KIND}" data_args "restore data" "${BACKUP_NAME}" "${data_hosts[@]}"; then
 			fail_all "data restore of ${BACKUP_NAME}"
 		fi
 	fi
