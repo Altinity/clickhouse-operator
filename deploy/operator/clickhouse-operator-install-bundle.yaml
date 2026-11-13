@@ -9521,9 +9521,18 @@ data:
     	done
     }
     
-    # series_pattern sets REPLY to the regex of the names of the scheduled backups, "<prefix>-<YYYYMMDDHHMMSS>"
+    # series_pattern sets REPLY to the regex of the names of the backups an incremental backup of the schedule may be
+    # made from: the scheduled ones, "<prefix>-<YYYYMMDDHHMMSS>", and those made at once from the schedule,
+    # "<prefix>-<YYYYMMDD>T<HHMMSS>", as the Altinity Cloud Manager makes a backup from any backup of the cluster
     series_pattern() {
-    	REPLY="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{14}$"
+    	REPLY="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{8}T?[0-9]{6}$"
+    }
+    
+    # series_time NAME sets REPLY to the time a backup of the series_pattern is named after, YYYYMMDDHHMMSS, which orders
+    # the backups made at once among the scheduled ones
+    series_time() {
+    	REPLY=${1:${#BACKUP_NAME_PREFIX}+1}
+    	REPLY=${REPLY/T/}
     }
     
     # retention_pattern sets REPLY to the regex of the names retention looks at: those of the scheduled backups, and those
@@ -10284,11 +10293,12 @@ data:
     }
     
     # incremental_base KEEP HOST... sets REPLY to the backup an incremental scheduled backup on every HOST is made from, as
-    # SERIES_REQUIRED holds them: the newest backup of the series every HOST holds complete, unless the chain of
-    # incremental backups that ends with it is KEEP long on any HOST, empty for a full backup then, as when there is none.
-    # CHAIN is the length of that chain
+    # SERIES_REQUIRED holds them: the newest backup of the series every HOST holds complete, by the time it is named after
+    # - a backup made at once from the schedule as well as a scheduled one -, unless the chain of incremental backups that
+    # ends with it is KEEP long on any HOST, empty for a full backup then, as when there is none. CHAIN is the length of
+    # that chain
     incremental_base() {
-    	local keep=$1 host key name newest= count n
+    	local keep=$1 host key name newest= newest_time= count n
     	local -a names
     	local -A hosts=() held=()
     	shift
@@ -10303,8 +10313,10 @@ data:
     	done
     	for name in "${!held[@]}"; do
     		n=${held[${name}]}
-    		if ((n == ${#hosts[@]})) && [[ ${name} > ${newest} ]]; then
+    		series_time "${name}"
+    		if ((n == ${#hosts[@]})) && [[ ${REPLY} > ${newest_time} || (${REPLY} == "${newest_time}" && ${name} > ${newest}) ]]; then
     			newest=${name}
+    			newest_time=${REPLY}
     		fi
     	done
     	CHAIN=0
@@ -10316,15 +10328,20 @@ data:
     		names=()
     		for key in "${!SERIES_REQUIRED[@]}"; do
     			if [[ ${key%% *} == "${host}" ]]; then
-    				names+=("${key#* }")
+    				series_time "${key#* }"
+    				names+=("${REPLY} ${key#* }")
     			fi
     		done
-    		mapfile -t names < <(printf '%s\n' "${names[@]}" | sort -r)
+    		mapfile -t names < <(printf '%s\n' ${names[@]+"${names[@]}"} | sort -r)
     		count=0
     		for name in "${names[@]}"; do
-    			if [[ ${name} > ${newest} ]]; then
+    			if [[ -z ${name} ]]; then
     				continue
     			fi
+    			if [[ ${name%% *} > ${newest_time} ]]; then
+    				continue
+    			fi
+    			name=${name#* }
     			if [[ -z ${SERIES_REQUIRED["${host} ${name}"]} ]]; then
     				break
     			fi
@@ -10334,6 +10351,7 @@ data:
     			CHAIN=${count}
     		fi
     	done
+    	REPLY=
     	if ((CHAIN < keep)); then
     		REPLY=${newest}
     	fi

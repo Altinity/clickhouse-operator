@@ -921,10 +921,12 @@ spec:
   entry keeps, then deletes it.
   The prefix also lets the [recovery prefix guard](#storage-paths) tell where it came from.
 * It runs as a run of the schedule, with its entries and `timeZone`, which `status.schedule` records
-  too: as ACM makes a backup by hand, it is incremental, on the newest scheduled backup, as the first
+  too: as ACM makes a backup by hand, it is incremental, on the newest backup of the schedule, as the first
   entry with `incremental: true` says - full when that entry's chain is `keep` long, or when no entry
   is incremental - and [retention](#retention) runs after it as after a scheduled run, on the same
-  hosts, skipped while a restore holds the schedule's runs of the cluster.
+  hosts, skipped while a restore holds the schedule's runs of the cluster. Like a scheduled backup it
+  is a base of the next incremental backup while it is the newest, as ACM makes a backup incremental
+  on the newest backup of the cluster whether made by hand or on schedule.
 * It runs as any `ClickHouseBackup` does, also while the schedule is suspended or held for a restore:
   it is not part of the series those protect. A schedule that does not exist yet - both applied at
   once - is waited for (`ScheduleNotFound`), as is one whose spec the operator finds invalid
@@ -1645,6 +1647,8 @@ not already in that backup. Each cluster's backup builds on that cluster's copy 
 base must exist on every cluster the backup targets. On a schedule, the runs of the one entry with
 `incremental: true` make incremental backups on the newest backup of the series as long as the chain
 of incremental backups is shorter than that entry's `keep`; the run after makes a full backup again.
+The series takes the backups [run now](#run-a-schedule-now) from the schedule too, ordered by the time
+they are named after, as ACM bases a backup on the newest backup whether made by hand or on schedule.
 Restoring an incremental backup needs its whole chain of bases in the storage. Retention rebases a
 base that a kept backup still needs before it deletes it, but
 deleting bases by other means (`BACKUPS_TO_KEEP_REMOTE`, a bucket lifecycle rule, manual removal)

@@ -1920,6 +1920,16 @@ func TestJobScriptRunsAScheduleNow(t *testing.T) {
 	require.Equal(t, []string{"daily-20200102000000", "daily-20200103000000", "daily-20200103T120000"}, s.remoteNames("h0"),
 		"retention ran after it")
 
+	// The next scheduled backup is incremental from it, the newest backup, as the Altinity Cloud Manager makes a backup
+	// incremental from the newest backup of the cluster, whether made by hand or on schedule
+	code, out = s.run(scheduledEnv("h0", "period=weekly time=00:00 day=0 keep=1;period=daily time=00:00 keep=2 incremental=true",
+		"2020-01-04T00:00:00Z"))
+	require.Zero(t, code, out)
+	creates = s.matching(http.MethodPost, "/backup/create_remote")
+	require.Len(t, creates, 2)
+	require.Equal(t, "daily-20200104000000", creates[1].query.Get("name"))
+	require.Equal(t, "daily-20200103T120000", creates[1].query.Get("diff-from-remote"))
+
 	// Without an incremental entry it is full
 	s = newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("daily-20200103000000", "")}}})
 	code, out = s.run(map[string]string{envOperation: operationBackup, envBackupName: "daily-20200103T120000",
@@ -5117,8 +5127,17 @@ func TestJobScriptRetentionSimulation(t *testing.T) {
 }
 
 // incremental_base makes a backup incremental from the newest backup of the series every host holds, until the chain
-// of incremental backups that ends with it is as long as the entry keeps.
+// of incremental backups that ends with it is as long as the entry keeps. A backup made at once from the schedule is
+// a base as a scheduled one, ordered by the time it is named after, as the Altinity Cloud Manager makes a backup
+// incremental from the newest backup of the cluster.
 func TestJobScriptIncrementalBase(t *testing.T) {
+	const (
+		d1 = "d-20260101000000"
+		d2 = "d-20260102000000"
+		d3 = "d-20260103000000"
+		// Made at once from the schedule, at noon of the first day: after d1, before d2
+		r1 = "d-20260101T120000"
+	)
 	for name, tc := range map[string]struct {
 		series string
 		keep   string
@@ -5126,16 +5145,22 @@ func TestJobScriptIncrementalBase(t *testing.T) {
 		chain  string
 	}{
 		"no backup":                  {series: "", keep: "3", base: "", chain: "0"},
-		"after a full backup":        {series: "h0 d-1=;h1 d-1=", keep: "3", base: "d-1", chain: "0"},
-		"a chain shorter than keep":  {series: "h0 d-1=;h0 d-2=d-1;h1 d-1=;h1 d-2=d-1", keep: "2", base: "d-2", chain: "1"},
-		"a chain of keep":            {series: "h0 d-1=;h0 d-2=d-1;h0 d-3=d-2;h1 d-1=;h1 d-2=d-1;h1 d-3=d-2", keep: "2", base: "", chain: "2"},
-		"a newest backup one lacks":  {series: "h0 d-1=;h0 d-2=d-1;h0 d-3=d-2;h1 d-1=;h1 d-2=d-1", keep: "2", base: "d-2", chain: "1"},
-		"the longest chain of hosts": {series: "h0 d-1=;h0 d-2=;h1 d-1=;h1 d-2=d-1", keep: "1", base: "", chain: "1"},
-		"another host's backups":     {series: "h0 d-1=;h1 d-1=;h9 d-2=d-1", keep: "1", base: "d-1", chain: "0"},
-		"a host without the series":  {series: "h0 d-1=;h9 d-1=", keep: "1", base: "", chain: "0"},
+		"after a full backup":        {series: "h0 " + d1 + "=;h1 " + d1 + "=", keep: "3", base: d1, chain: "0"},
+		"a chain shorter than keep":  {series: "h0 " + d1 + "=;h0 " + d2 + "=" + d1 + ";h1 " + d1 + "=;h1 " + d2 + "=" + d1, keep: "2", base: d2, chain: "1"},
+		"a chain of keep":            {series: "h0 " + d1 + "=;h0 " + d2 + "=" + d1 + ";h0 " + d3 + "=" + d2 + ";h1 " + d1 + "=;h1 " + d2 + "=" + d1 + ";h1 " + d3 + "=" + d2, keep: "2", base: "", chain: "2"},
+		"a newest backup one lacks":  {series: "h0 " + d1 + "=;h0 " + d2 + "=" + d1 + ";h0 " + d3 + "=" + d2 + ";h1 " + d1 + "=;h1 " + d2 + "=" + d1, keep: "2", base: d2, chain: "1"},
+		"the longest chain of hosts": {series: "h0 " + d1 + "=;h0 " + d2 + "=;h1 " + d1 + "=;h1 " + d2 + "=" + d1, keep: "1", base: "", chain: "1"},
+		"another host's backups":     {series: "h0 " + d1 + "=;h1 " + d1 + "=;h9 " + d2 + "=" + d1, keep: "1", base: d1, chain: "0"},
+		"a host without the series":  {series: "h0 " + d1 + "=;h9 " + d1 + "=", keep: "1", base: "", chain: "0"},
+		"a backup made at once, newest": {series: "h0 " + d1 + "=;h0 " + r1 + "=" + d1 + ";h1 " + d1 + "=;h1 " + r1 + "=" + d1,
+			keep: "3", base: r1, chain: "1"},
+		"a backup made at once, older than a scheduled one": {series: "h0 " + d1 + "=;h0 " + r1 + "=" + d1 + ";h0 " + d2 + "=" + r1 +
+			";h1 " + d1 + "=;h1 " + r1 + "=" + d1 + ";h1 " + d2 + "=" + r1, keep: "3", base: d2, chain: "2"},
+		"a backup made at once in a chain of keep": {series: "h0 " + d1 + "=;h0 " + r1 + "=" + d1 + ";h0 " + d2 + "=" + r1 +
+			";h1 " + d1 + "=;h1 " + r1 + "=" + d1 + ";h1 " + d2 + "=" + r1, keep: "2", base: "", chain: "2"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			out := sourcedOutput(t, map[string]string{"SERIES": tc.series, "KEEP": tc.keep}, `
+			out := sourcedOutput(t, map[string]string{"SERIES": tc.series, "KEEP": tc.keep, envBackupNamePrefix: "d"}, `
 				declare -A SERIES_REQUIRED=()
 				IFS=';' read -r -a entries <<<"${SERIES}"
 				for entry in "${entries[@]}"; do
